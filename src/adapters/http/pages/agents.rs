@@ -262,13 +262,63 @@ pub fn agent_row_fragment(company: &Company, agent: &Agent) -> String {
 }
 
 pub fn agent_edit_fragment(company: &Company, agent: &Agent) -> String {
+    let draft = AgentDraft {
+        name: &agent.name,
+        slug: &agent.slug,
+        provider: agent.provider.as_deref().unwrap_or(""),
+        model: agent.model.as_deref().unwrap_or(""),
+        system_prompt: agent.system_prompt.as_deref().unwrap_or(""),
+        description: agent.description.as_deref().unwrap_or(""),
+        avatar_url: agent
+            .avatar_url
+            .as_ref()
+            .map(AvatarUrl::as_str)
+            .unwrap_or(""),
+        expected_revision: Some(agent.draft_revision),
+        ..AgentDraft::default()
+    };
+    agent_edit_fragment_draft(company, agent, &draft, None)
+}
+
+pub fn agent_edit_fragment_draft(
+    company: &Company,
+    agent: &Agent,
+    draft: &AgentDraft<'_>,
+    error: Option<&str>,
+) -> String {
     let company_id = company.id;
     let agent_id = agent.id;
-    let name = &agent.name;
-    let slug = &agent.slug;
-    let provider = agent.provider.as_deref().unwrap_or("");
-    let model = agent.model.as_deref().unwrap_or("");
-    let system_prompt = agent.system_prompt.as_deref().unwrap_or("");
+    let name = draft.name;
+    let slug = draft.slug;
+    let provider = draft.provider;
+    let model = draft.model;
+    let system_prompt = draft.system_prompt;
+    let preserved = if error.is_some() {
+        let skills = draft.skill_ids_text.map(str::to_owned).unwrap_or_else(|| {
+            draft
+                .skill_ids
+                .iter()
+                .map(Uuid::to_string)
+                .collect::<Vec<_>>()
+                .join(",")
+        });
+        let skills = escape_html_attr(&skills);
+        let tools = draft
+            .tool_assignments
+            .map(|raw| {
+                format!(
+                    r#"<input type="hidden" name="tool_assignments" value="{}">"#,
+                    escape_html_attr(raw)
+                )
+            })
+            .unwrap_or_default();
+        format!(
+            r#"<input type="hidden" name="skill_ids" value="{skills}"><input type="hidden" name="description" value="{}">{tools}"#,
+            escape_html_attr(draft.description)
+        )
+    } else {
+        String::new()
+    };
     let prompt_gen_html = render_ai_prompt_generator(
         company_id,
         &format!("agent_system_prompt_{agent_id}"),
@@ -283,8 +333,11 @@ pub fn agent_edit_fragment(company: &Company, agent: &Agent) -> String {
     format!(
         r##"
         <div id="agent-row-{agent_id}" class="bg-base-200 border border-primary/40 rounded-xl p-5 shadow-xl">
+            {error}
             <form hx-put="/companies/{company_id}/agents/{agent_id}" hx-target="#agent-row-{agent_id}" hx-swap="outerHTML"
                   hx-params="not avatar_file" class="space-y-4">
+                <input type="hidden" name="expected_revision" value="{expected_revision}">
+                {preserved}
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                         <label class="block text-xs font-medium text-base-content/80 mb-1">Agent Name</label>
@@ -327,10 +380,15 @@ pub fn agent_edit_fragment(company: &Company, agent: &Agent) -> String {
         "##,
         agent_id = agent_id,
         company_id = company_id,
+        expected_revision = draft
+            .expected_revision
+            .unwrap_or(agent.draft_revision)
+            .get(),
+        error = form_error_banner(error),
         name = escape_html_attr(name),
         slug = escape_html_attr(slug),
         avatar_field =
-            legacy_agent_avatar_field(&agent_id.to_string(), name, agent.avatar_url.as_ref()),
+            super::agent_settings::agent_avatar_field(&format!("legacy-{agent_id}"), draft),
         provider = escape_html_attr(provider),
         model = escape_html_attr(model),
         system_prompt = escape_html_text(system_prompt),

@@ -135,6 +135,43 @@ impl LibraryAgentCopyPersistence for MockAgentPersistence {
     }
 }
 
+#[async_trait]
+impl crate::application::agent::AgentDraftPersistence for MockAgentPersistence {
+    async fn save_company_agent(
+        &self,
+        request: crate::application::agent::SaveCompanyAgent,
+    ) -> AppResult<Agent> {
+        if request.tools.is_some() {
+            return Err(AppError::BadRequest(
+                "This metadata fixture does not implement tool assignment".into(),
+            ));
+        }
+        let mut list = self.agents.lock().unwrap();
+        let agent = list
+            .iter_mut()
+            .find(|agent| {
+                agent.id == request.scope.agent.as_uuid()
+                    && agent.company_id == Some(request.scope.company.as_uuid())
+            })
+            .ok_or_else(agent_not_found)?;
+        if agent.draft_revision != request.expected_revision {
+            return Err(AppError::Conflict("Agent draft changed".into()));
+        }
+        agent.name = request.write.name;
+        agent.slug = request.write.slug;
+        agent.provider = request.write.provider;
+        agent.model = request.write.model;
+        agent.system_prompt = request.write.system_prompt;
+        agent.description = request.write.description;
+        agent.avatar_url = request.write.avatar_url;
+        agent.draft_revision = crate::entities::agent_capability::AgentDraftRevision::new(
+            agent.draft_revision.get() + 1,
+        )
+        .unwrap();
+        Ok(agent.clone())
+    }
+}
+
 /// A company, its owner, and the use cases over mock persistence.
 struct Fixture {
     owner_id: Uuid,
@@ -166,6 +203,7 @@ fn fixture() -> Fixture {
         company_id,
         use_cases: AgentUseCases::new(
             company_persistence,
+            agent_persistence.clone(),
             agent_persistence.clone(),
             agent_persistence,
         ),
@@ -260,6 +298,7 @@ async fn company_owner_agent_crud_flow_works() {
     let use_cases = AgentUseCases::new(
         company_persistence,
         agent_persistence.clone(),
+        agent_persistence.clone(),
         agent_persistence,
     );
 
@@ -328,13 +367,17 @@ async fn company_owner_agent_crud_flow_works() {
         .update_agent(
             owner_id,
             company_id,
-            agent.id,
-            AgentWrite {
-                name: "Updated Bot".to_string(),
-                slug: "updated-bot".to_string(),
-                provider: Some("anthropic".to_string()),
-                model: Some("claude-3-5-sonnet".to_string()),
-                ..Default::default()
+            crate::application::agent::CompanyAgentUpdate {
+                agent: crate::entities::agent_capability::AgentId::new(agent.id),
+                expected_revision: agent.draft_revision,
+                write: AgentWrite {
+                    name: "Updated Bot".to_string(),
+                    slug: "updated-bot".to_string(),
+                    provider: Some("anthropic".to_string()),
+                    model: Some("claude-3-5-sonnet".to_string()),
+                    ..Default::default()
+                },
+                tools: None,
             },
         )
         .await;
@@ -344,13 +387,17 @@ async fn company_owner_agent_crud_flow_works() {
         .update_agent(
             owner_id,
             company_id,
-            agent.id,
-            AgentWrite {
-                name: "Updated Bot".to_string(),
-                slug: "updated-bot".to_string(),
-                provider: Some("openai".to_string()),
-                model: Some("gpt-4o".to_string()),
-                ..Default::default()
+            crate::application::agent::CompanyAgentUpdate {
+                agent: crate::entities::agent_capability::AgentId::new(agent.id),
+                expected_revision: agent.draft_revision,
+                write: AgentWrite {
+                    name: "Updated Bot".to_string(),
+                    slug: "updated-bot".to_string(),
+                    provider: Some("openai".to_string()),
+                    model: Some("gpt-4o".to_string()),
+                    ..Default::default()
+                },
+                tools: None,
             },
         )
         .await
@@ -436,6 +483,7 @@ async fn members_read_agents_and_admins_manage_them() {
     });
     let use_cases = AgentUseCases::new(
         company_persistence,
+        agent_persistence.clone(),
         agent_persistence.clone(),
         agent_persistence,
     );
@@ -540,11 +588,15 @@ async fn members_read_agents_and_admins_manage_them() {
         .update_agent(
             admin_id,
             company_id,
-            managed.id,
-            AgentWrite {
-                name: "Managed Bot".into(),
-                slug: "managed-bot".into(),
-                ..Default::default()
+            crate::application::agent::CompanyAgentUpdate {
+                agent: crate::entities::agent_capability::AgentId::new(managed.id),
+                expected_revision: managed.draft_revision,
+                write: AgentWrite {
+                    name: "Managed Bot".into(),
+                    slug: "managed-bot".into(),
+                    ..Default::default()
+                },
+                tools: None,
             },
         )
         .await
@@ -600,6 +652,7 @@ async fn a_library_pick_is_copied_into_the_company_with_a_model_it_can_run() {
     });
     let use_cases = AgentUseCases::new(
         company_persistence,
+        agent_persistence.clone(),
         agent_persistence.clone(),
         agent_persistence,
     );

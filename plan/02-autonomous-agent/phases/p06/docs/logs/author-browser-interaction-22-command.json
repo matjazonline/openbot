@@ -1,0 +1,5 @@
+[
+  "node",
+  "--test",
+  "scripts/tests/agent-authoring-browser.mjs"
+]

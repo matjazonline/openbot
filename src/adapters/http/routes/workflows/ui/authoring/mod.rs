@@ -24,6 +24,7 @@ use axum::{
 use serde::Deserialize;
 use std::collections::BTreeMap;
 
+mod agent_picker;
 mod bindings;
 mod editor;
 mod library;
@@ -49,10 +50,9 @@ const ACTIVATE_ROUTE: &str = "/ui/workflows/{workflow_id}/bindings/{binding_id}/
 const DEACTIVATE_ROUTE: &str = "/ui/workflows/{workflow_id}/bindings/{binding_id}/deactivate";
 const REGISTER_TOOL_ROUTE: &str = "/ui/workflows/{workflow_id}/tools";
 const REVOKE_TOOL_ROUTE: &str = "/ui/workflows/tools/revoke";
-const GRANT_ROUTE: &str = "/ui/workflows/agents/{agent_id}/tools";
 /// Every write this workspace registers; the CSRF test routes these same patterns.
 #[cfg(test)]
-const WRITE_ROUTES: [&str; 12] = [
+const WRITE_ROUTES: [&str; 13] = [
     NEW_ROUTE,
     COPY_ROUTE,
     SAVE_ROUTE,
@@ -64,11 +64,13 @@ const WRITE_ROUTES: [&str; 12] = [
     DEACTIVATE_ROUTE,
     REGISTER_TOOL_ROUTE,
     REVOKE_TOOL_ROUTE,
-    GRANT_ROUTE,
+    agent_picker::PICKER_ROUTE,
+    agent_picker::APPLY_ROUTE,
 ];
 
 pub(super) fn router() -> Router<AppState> {
     Router::new()
+        .merge(agent_picker::router())
         .route("/ui/workflows", get(workspace))
         .route(
             "/ui/workflow-bindings/{binding_id}",
@@ -98,7 +100,6 @@ pub(super) fn router() -> Router<AppState> {
         .route("/ui/workflows/tools", get(tools_pane))
         .route(REVOKE_TOOL_ROUTE, post(revoke_tool))
         .route(REGISTER_TOOL_ROUTE, post(register_tool))
-        .route(GRANT_ROUTE, get(agent_tools).post(grant_agent_tools))
         .route("/ui/workflows/agents/{agent_id}/usage", get(agent_usage))
 }
 

@@ -1,0 +1,21 @@
+{
+  "argv": [
+    "bash",
+    "scripts/test-network-isolation.sh",
+    "target/debug/deps/open_bots-c19a0b960dacdcef",
+    "autonomous_agent_views_",
+    "knowledge_view_current_run_and_step_stamp_controls_payloads",
+    "knowledge_view_competing_readers_demotion_and_content_raise_use_final_facts",
+    "reconciliation_is_offered_as_an_annotation_and_a_step_shows_usage_and_receipts",
+    "every_workspace_write_refuses_a_cross_origin_cookie_post",
+    "routes::workflows::ui::runs::tests::",
+    "--test-threads=4"
+  ],
+  "environment": {
+    "DATABASE_URL": "postgres://mac02@127.0.0.1:55606/open_bots",
+    "TEST_DATABASE_URL": "postgres://mac02@127.0.0.1:55606/open_bots_test",
+    "SQLX_OFFLINE": "true",
+    "CARGO_INCREMENTAL": "0",
+    "RUST_MIN_STACK": "2097152"
+  }
+}

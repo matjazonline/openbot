@@ -1,0 +1,50 @@
+
+> openbots@1.0.0 test:run-counts
+> node --test scripts/tests/run-counts.mjs
+
+✖ channel: snapshot before pane, OOB list, competing reads, reconnect and navigation (3.270625ms)
+✖ channel: pane before first snapshot stays uninitialized and then hydrates (0.257167ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 0
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 213.0815
+
+✖ failing tests:
+
+test at scripts/tests/run-counts.mjs:103:5
+✖ channel: snapshot before pane, OOB list, competing reads, reconnect and navigation (3.270625ms)
+  browserType.launch: Executable doesn't exist at /Users/mac02/Library/Caches/ms-playwright/chromium_headless_shell-1193/chrome-mac/headless_shell
+  ╔═════════════════════════════════════════════════════════════════════════╗
+  ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+  ║ Please run the following command to download new browsers:              ║
+  ║                                                                         ║
+  ║     npx playwright install                                              ║
+  ║                                                                         ║
+  ║ <3 Playwright Team                                                      ║
+  ╚═════════════════════════════════════════════════════════════════════════╝
+      at TestContext.<anonymous> (/Users/mac02/dev/openbot-recovery/.worktrees/autonomous-p06/scripts/tests/run-counts.mjs:23:30)
+      at /Users/mac02/dev/openbot-recovery/.worktrees/autonomous-p06/scripts/tests/run-counts.mjs:22:1
+      at async node:internal/modules/esm/loader:650:26 {
+    name: 'Error'
+  }
+
+test at scripts/tests/run-counts.mjs:135:5
+✖ channel: pane before first snapshot stays uninitialized and then hydrates (0.257167ms)
+  browserType.launch: Executable doesn't exist at /Users/mac02/Library/Caches/ms-playwright/chromium_headless_shell-1193/chrome-mac/headless_shell
+  ╔═════════════════════════════════════════════════════════════════════════╗
+  ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+  ║ Please run the following command to download new browsers:              ║
+  ║                                                                         ║
+  ║     npx playwright install                                              ║
+  ║                                                                         ║
+  ║ <3 Playwright Team                                                      ║
+  ╚═════════════════════════════════════════════════════════════════════════╝
+      at TestContext.<anonymous> (/Users/mac02/dev/openbot-recovery/.worktrees/autonomous-p06/scripts/tests/run-counts.mjs:23:30)
+      at /Users/mac02/dev/openbot-recovery/.worktrees/autonomous-p06/scripts/tests/run-counts.mjs:22:1
+      at async node:internal/modules/esm/loader:650:26 {
+    name: 'Error'
+  }

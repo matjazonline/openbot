@@ -1,0 +1,32 @@
+Browser failure artifacts: /Users/mac02/dev/openbot-recovery/.worktrees/autonomous-p06/plan/02-autonomous-agent/phases/p06/docs/logs/agent-authoring-browser-fixtures-18/failure-1793980199873
+✖ agent selectors preserve unsaved input, publication retries and navigation after an accepted write (5413.516708ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 6384.103125
+
+✖ failing tests:
+
+test at scripts/tests/agent-authoring-browser.mjs:17:1
+✖ agent selectors preserve unsaved input, publication retries and navigation after an accepted write (5413.516708ms)
+  Error: expect(locator).toBeVisible() failed
+  
+  Locator:  locator('#agent-tool-catalog-e2986823-fccf-4231-9380-6af8b674c063').locator('[name=connection]')
+  Expected: visible
+  Received: <element(s) not found>
+  Timeout:  5000ms
+  
+  Call log:
+  [2m  - Expect "to.be.visible" with timeout 5000ms[22m
+  [2m  - waiting for locator('#agent-tool-catalog-e2986823-fccf-4231-9380-6af8b674c063').locator('[name=connection]')[22m
+  
+      at Proxy.<anonymous> (/Users/mac02/dev/openbot-recovery/.worktrees/autonomous-p06/node_modules/playwright/lib/matchers/expect.js:221:24)
+      at TestContext.<anonymous> (file:///Users/mac02/dev/openbot-recovery/.worktrees/autonomous-p06/scripts/tests/agent-authoring-browser.mjs:94:58)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    matcherResult: { message: `expect(locator).toBeVisible() failed\n\nLocator:  locator('#agent-tool-catalog-e2986823-fccf-4231-9380-6af8b674c063').locator('[name=connection]')\nExpected: visible\nReceived: <element(s) not found>\nTimeout:  5000ms\n\nCall log:\n\x1B[2m  - Expect "to.be.visible" with timeout 5000ms\x1B[22m\n\x1B[2m  - waiting for locator('#agent-tool-catalog-e2986823-fccf-4231-9380-6af8b674c063').locator('[name=connection]')\x1B[22m\n`, pass: false, actual: '<element(s) not found>', name: 'toBeVisible', expected: 'visible', log: [ '  - Expect "to.be.visible" with timeout 5000ms', "  - waiting for locator('#agent-tool-catalog-e2986823-fccf-4231-9380-6af8b674c063').locator('[name=connection]')" ], timeout: 5000 }
+  }

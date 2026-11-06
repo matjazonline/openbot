@@ -53,6 +53,7 @@ impl Fixture {
             persistence.clone(),
             persistence.clone(),
             persistence.clone(),
+            persistence.clone(),
         ));
         Some(Self {
             persistence,
@@ -81,6 +82,12 @@ impl Fixture {
         body.as_object_mut()
             .unwrap()
             .extend(patch.as_object().unwrap().clone());
+        let current = self
+            .agents
+            .get_company_agent(self.user, self.company, id)
+            .await?
+            .expect("created agent");
+        let body = json!({"expected_revision":current.draft_revision, "agent":body});
         Ok(response_json(
             update_agent_json(
                 State(self.agents.clone()),

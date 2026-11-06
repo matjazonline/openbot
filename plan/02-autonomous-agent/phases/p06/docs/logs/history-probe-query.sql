@@ -1,0 +1,1 @@
+SELECT id,draft_revision,digest,created_at FROM agent_revisions WHERE company_id='719df8bc-fd27-41b0-9528-02d88f605234' AND agent_id='5af58162-ebc2-4a32-8aa7-b03e8f522804' ORDER BY created_at DESC,id DESC LIMIT 21;

@@ -76,9 +76,13 @@ pub struct AgentDraft<'a> {
     pub provider: &'a str,
     pub model: &'a str,
     pub skill_ids: Vec<Uuid>,
+    /// Raw submitted CSV survives parsing failures until the user changes the selection.
+    pub skill_ids_text: Option<&'a str>,
     pub avatar_url: &'a str,
     /// Whether the create pane should open on the Advanced tab.
     pub advanced: bool,
+    pub expected_revision: Option<crate::entities::agent_capability::AgentDraftRevision>,
+    pub tool_assignments: Option<&'a str>,
 }
 
 /// The settings pane for an agent that already exists.
@@ -91,6 +95,7 @@ pub struct AgentEditPane<'a> {
     pub draft: Option<&'a AgentDraft<'a>>,
     pub error: Option<&'a str>,
     pub capability_options: AgentCapabilityOptions<'a>,
+    pub authoring: Option<&'a crate::application::agent::AgentAuthoringState>,
 }
 
 #[derive(Debug, Clone, Copy, Default)]
@@ -292,7 +297,9 @@ fn agent_settings_body(pane: &AgentEditPane<'_>) -> String {
                 <form method="post" action="/ui/agents/{agent_id}?company_id={company_id}" hx-disabled-elt="find button[type='submit']" hx-put="/ui/agents/{agent_id}?company_id={company_id}" hx-target="#agent-pane" hx-swap="outerHTML"
                     hx-params="not avatar_file" class="space-y-4">
                     <input type="hidden" name="form_mode" value="advanced">
+                    <input type="hidden" name="expected_revision" value="{expected_revision}">
                     {fields}
+                    {tools}
                     <div class="flex items-center gap-3 border-t border-base-300 pt-4">
                         <button type="submit" class="btn btn-primary">
                             <span class="loading loading-spinner loading-sm hidden [.htmx-request_&]:inline-block"></span>
@@ -309,12 +316,26 @@ fn agent_settings_body(pane: &AgentEditPane<'_>) -> String {
                             hx-push-url="/ui/agents?company_id={company_id}">Delete Agent</button>
                     </div>
                 </form>
+                <form id="agent-catalog-form-{agent_id}" class="hidden"></form>
                 {assistant_html}
-                {workflow_cards}
+                {publication}
+                {workflow_usage}
             </div>
         "##,
+        expected_revision = draft
+            .expected_revision
+            .unwrap_or(pane.agent.draft_revision)
+            .get(),
         assistant_html = assistant_channel_card(company_id, pane.agent, None),
-        workflow_cards = super::workflow_agent_cards(company_id, agent_id),
+        workflow_usage = super::workflow_agent_usage_card(company_id, agent_id),
+        tools = pane
+            .authoring
+            .map(|state| super::agent_tools_editor(company_id, state, draft.tool_assignments))
+            .unwrap_or_default(),
+        publication = pane
+            .authoring
+            .map(|state| super::agent_publication_panel(company_id, state, None, None))
+            .unwrap_or_default(),
         name = escape_html_attr(&pane.agent.name),
         error_html = form_error_banner(pane.error),
         fields = agent_fields(&AgentFields {
@@ -673,26 +694,32 @@ fn capability_picker(fields: &AgentFields<'_>) -> String {
 }
 
 fn skill_picker(skills: &[Skill], draft: &AgentDraft<'_>, scope: AgentFormScope) -> String {
-    let cards = skills
+    let skill_ids_text = draft
+        .skill_ids_text
+        .map(str::to_owned)
+        .unwrap_or_else(|| csv_uuids(&draft.skill_ids));
+    let mut ordered = skills
         .iter()
         .filter(|skill| match scope {
-            AgentFormScope::Company(company_id) => skill.company_id == Some(company_id),
+            AgentFormScope::Company(company) => skill.company_id == Some(company),
             AgentFormScope::Library => skill.company_id.is_none(),
         })
-        .map(|skill| {
-            format!(
-                r##"<label class="flex cursor-pointer items-start gap-3 rounded-box border border-base-300 p-3">
-                    <input type="checkbox" class="checkbox checkbox-primary mt-0.5" value="{id}"
-                        data-action="capability-multi-select"{checked}>
-                    <span><span class="font-medium">{name}</span><span class="block text-xs opacity-60">{description}</span></span>
-                </label>"##,
-                id = skill.id,
-                checked = if draft.skill_ids.contains(&skill.id) { " checked" } else { "" },
-                name = escape_html_text(&skill.name),
-                description = escape_html_text(&skill.description),
-            )
-        })
-        .collect::<String>();
+        .collect::<Vec<_>>();
+    ordered.sort_by_key(|skill| {
+        draft
+            .skill_ids
+            .iter()
+            .position(|id| *id == skill.id)
+            .unwrap_or(usize::MAX)
+    });
+    let cards = ordered.into_iter().map(|skill| {
+        format!(r##"<div class="flex items-start gap-3 rounded-box border border-base-300 p-3" data-agent-skill-row>
+            <label class="flex cursor-pointer items-start gap-3 grow"><input type="checkbox" class="checkbox checkbox-primary mt-0.5" value="{id}" data-action="capability-multi-select"{checked}>
+            <span><span class="font-medium">{name}</span><span class="block text-xs opacity-60">{description}</span></span></label>
+            <div class="flex flex-col gap-1"><button type="button" class="btn btn-ghost btn-xs" data-agent-skill-move="up" aria-label="Move skill {attr_name} earlier">↑</button><button type="button" class="btn btn-ghost btn-xs" data-agent-skill-move="down" aria-label="Move skill {attr_name} later">↓</button></div></div>"##,
+            id = skill.id, checked = if draft.skill_ids.contains(&skill.id) { " checked" } else { "" },
+            name = escape_html_text(&skill.name), attr_name = escape_html_attr(&skill.name), description = escape_html_text(&skill.description))
+    }).collect::<String>();
     let empty = if cards.is_empty() {
         r#"<p class="text-xs opacity-60">No skills are available yet.</p>"#
     } else {
@@ -702,8 +729,8 @@ fn skill_picker(skills: &[Skill], draft: &AgentDraft<'_>, scope: AgentFormScope)
         r##"<section class="space-y-2" data-capability-multi-select>
             <input type="hidden" name="skill_ids" value="{value}">
             <div class="flex items-center justify-between"><h4 class="text-sm font-semibold">Skills</h4>{browse}</div>
-            <div class="grid grid-cols-1 gap-2 md:grid-cols-2">{cards}</div>{empty}</section>"##,
-        value = escape_html_attr(&csv_uuids(&draft.skill_ids)),
+            <p class="text-xs opacity-60">Selected skills are applied in the order shown. Use the arrow buttons to reorder them; their current text is copied when you publish.</p><div class="grid grid-cols-1 gap-2">{cards}</div>{empty}</section>"##,
+        value = escape_html_attr(&skill_ids_text),
         browse = match scope {
             AgentFormScope::Company(company_id) => format!(
                 r#"<a class="btn btn-ghost btn-xs" href="/ui/companies?company_id={company_id}&amp;tab=skills">Browse library</a>"#
@@ -777,9 +804,17 @@ fn company_model_selection(
 ///
 /// `id_prefix` is what keeps the two forms on the create pane -- Simple and Advanced, both
 /// rendered, one hidden -- from swapping each other's field when a file is picked.
-fn agent_avatar_field(id_prefix: &str, draft: &AgentDraft<'_>) -> String {
-    let stored = AvatarUrl::parse(draft.avatar_url).ok().flatten();
-
+pub(super) fn agent_avatar_field(id_prefix: &str, draft: &AgentDraft<'_>) -> String {
+    let stored = match AvatarUrl::parse(draft.avatar_url) {
+        Ok(stored) => stored,
+        Err(message) => {
+            return format!(
+                r#"<label class="form-control">Agent Picture<input type="text" class="input input-bordered" name="avatar_url" value="{value}" aria-invalid="true"><span class="text-error">{message}</span></label>"#,
+                value = escape_html_attr(draft.avatar_url),
+                message = escape_html_text(&message)
+            );
+        }
+    };
     avatar_picker(&AvatarPicker {
         field_id: &format!("agent-avatar-{id_prefix}"),
         avatar_url: stored.as_ref(),
@@ -882,12 +917,15 @@ fn stored_draft(agent: &Agent) -> AgentDraft<'_> {
         provider: agent.provider.as_deref().unwrap_or(""),
         model: agent.model.as_deref().unwrap_or(""),
         skill_ids: Vec::new(),
+        skill_ids_text: None,
         avatar_url: agent
             .avatar_url
             .as_ref()
             .map(AvatarUrl::as_str)
             .unwrap_or(""),
         advanced: true,
+        expected_revision: Some(agent.draft_revision),
+        tool_assignments: None,
     }
 }
 

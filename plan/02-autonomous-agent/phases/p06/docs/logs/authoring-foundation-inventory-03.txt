@@ -1,0 +1,4 @@
+adapters::persistence::agent_publication::tests::authoring::autonomous_agent_authoring_competing_draft_writers_commit_one_complete_assignment_set: test
+adapters::persistence::agent_publication::tests::authoring::autonomous_agent_authoring_final_metadata_conflict_rolls_back_skill_and_binding_changes: test
+adapters::persistence::agent_publication::tests::authoring::autonomous_agent_authoring_refuses_builder_spoofing_reserved_aliases_and_foreign_scope: test
+adapters::persistence::agent_publication::tests::authoring::autonomous_agent_authoring_save_competing_with_publication_never_activates_unsaved_content: test

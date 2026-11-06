@@ -4,18 +4,9 @@
 use super::*;
 use crate::application::workflow::run_views::StepView;
 
-/// The agent a model step ran, as the run's bundle froze it.
-pub struct FrozenAgentView<'a> {
-    pub handle: &'a str,
-    pub model: String,
-    pub tools: Vec<&'a str>,
-    pub skills: Vec<&'a str>,
-}
-
 pub struct StepBodyView<'a> {
     pub company_id: Uuid,
     pub step: &'a StepView,
-    pub agent: Option<FrozenAgentView<'a>>,
 }
 
 pub fn run_step_body(view: &StepBodyView<'_>) -> String {
@@ -71,29 +62,13 @@ fn unrestricted_step_body(view: &StepBodyView<'_>) -> String {
             _ => String::new(),
         },
     )];
-    if let Some(agent) = &view.agent {
-        let list = |names: &[&str], none: &str| {
-            if names.is_empty() {
-                none.to_owned()
-            } else {
-                names
-                    .iter()
-                    .map(|name| escape_html_text(name))
-                    .collect::<Vec<_>>()
-                    .join(", ")
-            }
-        };
+    if let Some(agent) = &step.agent {
         parts.push(section(
-            "Agent",
-            format!(
-                r#"<p class="text-sm"><span class="font-mono">@{handle}</span> · {model} · uses the agent's tools and skills as frozen when this version was published: tools {tools}; skills {skills}.</p>"#,
-                handle = escape_html_text(agent.handle),
-                model = escape_html_text(&agent.model),
-                tools = list(&agent.tools, "none"),
-                skills = list(&agent.skills, "none"),
-            ),
+            "Agent selected for this step",
+            super::provenance::agent_revision(agent),
         ));
     }
+    parts.push(super::provenance::call_provenance(&step.calls));
     parts.push(section(
         "Inputs (frozen when the step started)",
         step.frozen_inputs

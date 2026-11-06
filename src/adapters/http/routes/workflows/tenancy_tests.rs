@@ -185,18 +185,20 @@ async fn probe(
             .0,
         ),
         (
-            "agents.grant",
-            answer(
-                tools::grant(
-                    s(),
-                    by(user),
-                    Path((company, ids.agent)),
-                    body(json!({"expected": [], "tools": ["probe.tool"]})),
-                )
-                .await,
-            )
-            .await
-            .0,
+            "agents.authoring",
+            match f
+                .engine
+                .agent_authoring_reads()
+                .authoring_state(crate::application::agent::AgentPublicationScope {
+                    company: CompanyId::new(company),
+                    actor: WorkflowActor::authenticated(user).unwrap(),
+                    agent: crate::entities::agent_capability::AgentId::new(ids.agent),
+                })
+                .await
+            {
+                Ok(_) => StatusCode::OK,
+                Err(error) => error.into_response().status(),
+            },
         ),
         (
             "tools.revoke",

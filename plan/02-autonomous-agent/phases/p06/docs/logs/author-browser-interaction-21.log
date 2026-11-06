@@ -1,0 +1,32 @@
+Browser failure artifacts: /Users/mac02/dev/openbot-recovery/.worktrees/autonomous-p06/plan/02-autonomous-agent/phases/p06/docs/logs/agent-authoring-browser-fixtures-18/failure-1793980392044
+✖ agent selectors preserve unsaved input, publication retries and navigation after an accepted write (6675.094584ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 7618.479708
+
+✖ failing tests:
+
+test at scripts/tests/agent-authoring-browser.mjs:17:1
+✖ agent selectors preserve unsaved input, publication retries and navigation after an accepted write (6675.094584ms)
+  Error: expect(locator).toBeDisabled() failed
+  
+  Locator:  locator('#agent-pane > div form[hx-put]').first().locator('button[type=submit]')
+  Expected: disabled
+  Received: <element(s) not found>
+  Timeout:  5000ms
+  
+  Call log:
+  [2m  - Expect "to.be.disabled" with timeout 5000ms[22m
+  [2m  - waiting for locator('#agent-pane > div form[hx-put]').first().locator('button[type=submit]')[22m
+  
+      at Proxy.<anonymous> (/Users/mac02/dev/openbot-recovery/.worktrees/autonomous-p06/node_modules/playwright/lib/matchers/expect.js:221:24)
+      at TestContext.<anonymous> (file:///Users/mac02/dev/openbot-recovery/.worktrees/autonomous-p06/scripts/tests/agent-authoring-browser.mjs:147:59)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    matcherResult: { message: `expect(locator).toBeDisabled() failed\n\nLocator:  locator('#agent-pane > div form[hx-put]').first().locator('button[type=submit]')\nExpected: disabled\nReceived: <element(s) not found>\nTimeout:  5000ms\n\nCall log:\n\x1B[2m  - Expect "to.be.disabled" with timeout 5000ms\x1B[22m\n\x1B[2m  - waiting for locator('#agent-pane > div form[hx-put]').first().locator('button[type=submit]')\x1B[22m\n`, pass: false, actual: '<element(s) not found>', name: 'toBeDisabled', expected: 'disabled', log: [ '  - Expect "to.be.disabled" with timeout 5000ms', "  - waiting for locator('#agent-pane > div form[hx-put]').first().locator('button[type=submit]')" ], timeout: 5000 }
+  }

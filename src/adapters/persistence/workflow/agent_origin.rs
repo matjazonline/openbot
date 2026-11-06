@@ -93,6 +93,9 @@ pub(super) async fn request_on(
         .ok_or_else(missing)?;
     let declared = AgentModelToolName::for_alias(&tool.binding.alias)?;
     saved_call_on(tx, scope, origin, &declared, call, &arguments).await?;
+    tracing::debug!(company=%scope.company.as_uuid(), run=%scope.run.as_uuid(),
+        agent=%origin.agent.as_uuid(), revision=%origin.revision.as_uuid(),
+        binding=%origin.binding.as_uuid(), call=%call.as_str(), "Resolved saved agent action");
     let contract = agent_action_snapshot(scope.company, tool)?;
     let request = ActionRequest {
         scope,

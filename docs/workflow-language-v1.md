@@ -133,15 +133,16 @@ never fabricate it. User context/proposals/HTTP bodies may contain arbitrary JSO
 within the workflow context budget; arguments, mapped values, child inputs and
 results follow their explicit schemas. HTTP headers are a bounded string map.
 
-An agent's capabilities are defined on the agent. `agent.run` uses exactly the
-agent's saved workflow tools and skills, frozen when the workflow version is
-published; there is no step-level capability profile and no workflow-level
-capability ceiling, so a step can neither add nor narrow a capability.
-`ai.classify` and `decision.agent` use only the selected agent's instructions and
-model, with no tools and no skills. Agent edits take effect on republish. At
-execution the runtime refuses a model step (terminal `agent.rejected`, before any
-provider call) when its agent or model is no longer available, or when a prepared
-tool or skill has since been removed from the agent.
+An agent owns its tool bindings and ordered skills and publishes revisions independently.
+Workflow publication captures scoped agent identities and allowed use modes; root admission
+selects active revisions and their transitive workflow dependencies into a native manifest.
+`agent.run` uses that selected revision's tools and skills. `ai.classify` and `decision.agent`
+use instructions/model only, with no tools or skills. A step cannot add or narrow an agent's
+capabilities. Publishing a later agent revision affects new root admissions without changing
+the workflow version. Queued/running runs, retries and children retain their selections.
+Draft edits alone do not revoke a published grant. Current account/model/connection authority
+and one-way binding/skill-assignment revocation are checked before guarded work; removed
+access may stop a running call. See [agent authoring](agent-authoring.md).
 
 All identifiers/selections are bounded to 128 characters; selections have
 at most 128 tools, skills or destinations. Collections of context/memory
@@ -234,9 +235,10 @@ decoded source and captured company dependencies. It is not a publish command or
 authorization service. The lifecycle layer must load trusted company-owned snapshots
 and approved policies; a caller-supplied company identifier is not proof of access.
 
-The bundle retains source/compiler content, agent instructions and explicit model
-settings, ordered saved tools/skills, skill instructions and required tools,
-tool schemas and approved effect/recovery policy, and pinned immutable child bundles.
+The workflow bundle retains source/compiler content, scoped agent references/use modes,
+explicit action schemas/policies, and pinned immutable explicit child bundles. Agent instructions,
+model settings, ordered bindings/skills, schemas and policies belong to independently published
+agent revisions selected by the root run manifest, including workflow tools reachable from them.
 Compiler facts are derived from that same content. SHA-256 hashes cover each captured
 dependency and the version manifest; child hashes transitively cover child content.
 Editing a captured input copy or constructing another version cannot mutate a bundle.
@@ -245,17 +247,17 @@ plus MCP slot identify explicit calls; name-only capability selections reject am
 tool names across slots.
 
 An agent selector is a literal agent key or a binding whose compiled type is a
-finite string enum of agent keys; publication captures every agent in that set and
-refuses any other selector. `PublishedBundle::prepare_step_inputs` rejects a resolved
+finite string enum of agent keys; publication captures every scoped agent identity in that
+set and refuses any other selector. `PublishedBundle::prepare_step_inputs` rejects a resolved
 selection outside the captured catalogue. Runtime integration must use this bundle
-hook rather than the compiler-only input hook. Each captured agent carries exactly
-its saved tools and skills, in order, and every skill's required tools must be among
-the agent's own tools. These snapshots do not grant execution access: the runtime
-re-checks the agent, its model and the prepared tools and skills before each model
-call.
+hook rather than the compiler-only input hook. Agent publication verifies that every attached skill's required aliases exist among its
+own bindings. Root admission captures the complete selected revision universe; retries
+and first-started children use it without resolving today's active configuration. Captured
+content does not grant execution access: the runtime rechecks current authority before
+guarded work.
 
-Resource declarations retain slot, kind and optional contract. MCP snapshots must
-refer to declared MCP slots. Company resource selection, provider compatibility and
+Resource declarations retain slot, kind and optional contract. Explicit `mcp.call` snapshots must
+refer to declared MCP slots; an agent's concrete MCP bindings do not require duplicate slots. Company resource selection, provider compatibility and
 readiness checks use the binding library below; connections and
 credentials are not publication content. Admission snapshots retain the
 exact binding revision and resource IDs; effects must resolve current secrets at use time.

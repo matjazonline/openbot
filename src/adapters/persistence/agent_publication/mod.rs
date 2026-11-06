@@ -29,18 +29,38 @@ fn unavailable() -> AppError {
     AppError::BadRequest("An agent source is unavailable or its reviewed contract changed".into())
 }
 
-async fn begin_authorized(
+pub(in crate::adapters::persistence) async fn begin_authorized(
     persistence: &PostgresPersistence,
     scope: AgentPublicationScope,
 ) -> AppResult<Transaction<'_, Postgres>> {
-    let mut tx = persistence.pool().begin().await?;
-    sqlx::query("SELECT set_config('lock_timeout','1000ms',true),set_config('statement_timeout','5000ms',true)")
-        .execute(&mut *tx).await?;
+    let mut tx = begin_bounded(persistence).await?;
     LockedAgentPublication::lock(&mut tx, scope).await?;
     Ok(tx)
 }
 
-/// The borrow keeps authorization/owner locks and writes on this exact transaction.
+pub(in crate::adapters::persistence) async fn begin_bounded(
+    persistence: &PostgresPersistence,
+) -> AppResult<Transaction<'_, Postgres>> {
+    let mut tx = persistence.pool().begin().await?;
+    sqlx::query("SELECT set_config('lock_timeout','1000ms',true),set_config('statement_timeout','5000ms',true)")
+        .execute(&mut *tx).await?;
+    Ok(tx)
+}
+
+pub(in crate::adapters::persistence) async fn lock_company_on(
+    tx: &mut Transaction<'_, Postgres>,
+    scope: AgentCompanyScope,
+) -> AppResult<()> {
+    sqlx::query_scalar::<_, Uuid>("SELECT id FROM users WHERE id=$1 FOR SHARE")
+        .bind(scope.actor.user_id())
+        .fetch_optional(&mut **tx)
+        .await?
+        .ok_or_else(missing)?;
+    super::workflow::authority::authorize_company(tx, scope.company, scope.actor).await?;
+    Ok(())
+}
+
+/// Keeps authorization/owner locks and writes on this exact transaction.
 /// Existing callers acquire the actor account before any company lock they already hold.
 pub(in crate::adapters::persistence) struct LockedAgentPublication<'a, 'db> {
     tx: &'a mut Transaction<'db, Postgres>,
@@ -51,12 +71,14 @@ impl<'a, 'db> LockedAgentPublication<'a, 'db> {
         tx: &'a mut Transaction<'db, Postgres>,
         scope: AgentPublicationScope,
     ) -> AppResult<Self> {
-        sqlx::query_scalar::<_, Uuid>("SELECT id FROM users WHERE id=$1 FOR SHARE")
-            .bind(scope.actor.user_id())
-            .fetch_optional(&mut **tx)
-            .await?
-            .ok_or_else(missing)?;
-        super::workflow::authority::authorize_company(tx, scope.company, scope.actor).await?;
+        lock_company_on(
+            tx,
+            AgentCompanyScope {
+                company: scope.company,
+                actor: scope.actor,
+            },
+        )
+        .await?;
         sqlx::query_scalar::<_, Uuid>(
             "SELECT id FROM agents WHERE company_id=$1 AND id=$2 FOR UPDATE",
         )

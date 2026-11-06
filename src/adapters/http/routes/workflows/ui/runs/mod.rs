@@ -11,7 +11,7 @@ use crate::application::workflow::board::{BoardWindow, RunBoardScope};
 use crate::application::workflow::reads::{
     MAX_BINDING_OPTIONS, MAX_LISTED, PageRequest, RunFilter, RunLineage, RunStateName, RunSummary,
 };
-use crate::application::workflow::run_views::{RunView, StepView};
+use crate::application::workflow::run_views::RunView;
 use crate::domain::workflow::{RunId, WorkflowBindingId, WorkflowId};
 use axum::extract::{Path, Query};
 use serde::Deserialize;
@@ -687,16 +687,6 @@ pub(super) fn selected(mut response: Response) -> Response {
 }
 
 /// The step read already applied a fresh viewer check to its run-selected summary.
-fn frozen_agent(step: &StepView) -> Option<pages::FrozenAgentView<'_>> {
-    let agent = step.agent.as_ref()?;
-    Some(pages::FrozenAgentView {
-        handle: &agent.key,
-        model: agent.model.clone(),
-        tools: agent.tools.iter().map(String::as_str).collect(),
-        skills: agent.skills.iter().map(String::as_str).collect(),
-    })
-}
-
 /// GET /ui/workflow-runs/{run}/steps/{execution} — one step's body, when its row opens.
 async fn step(
     ui: Ui,
@@ -719,11 +709,9 @@ async fn step(
         )
         .await?
         .ok_or_else(|| AppError::NotFound("Workflow step not found".into()))?;
-    let agent = frozen_agent(&step);
     Ok(Html(pages::run_step_body(&pages::StepBodyView {
         company_id: company,
         step: &step,
-        agent,
     })))
 }
 

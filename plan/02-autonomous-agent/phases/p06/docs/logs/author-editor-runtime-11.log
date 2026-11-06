@@ -1,0 +1,112 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+
+running 29 tests
+test adapters::http::pages::tests::legacy_agent_fields_and_confirmation_attribute_are_escaped ... ok
+test adapters::http::pages::tests::agent_edit_pane_keeps_a_rejected_save_in_the_form ... ok
+test adapters::http::pages::tests::agent_edit_pane_prefills_the_stored_agent_and_offers_delete ... ok
+test adapters::http::pages::tests::no_function_name_is_declared_twice_in_the_bundle ... ok
+test adapters::http::routes::ui_agents::authoring::browser_fixtures::dump_autonomous_agent_authoring_browser_fixtures ... ignored, explicit browser fixture export; requires owned PostgreSQL and AGENT_AUTHORING_BROWSER_FIXTURES
+test adapters::http::pages::tests::every_delegated_action_has_a_branch_in_the_bundle ... ok
+test adapters::http::routes::agent::api_tests::api_agents_carry_no_retired_runtime_fields ... ok
+test adapters::http::routes::ui_agents::authoring::catalog::tests::autonomous_agent_authoring_catalog_builtin_choices_do_not_offer_builder_or_slots ... ok
+test adapters::http::routes::ui_agents::authoring::catalog::tests::autonomous_agent_authoring_catalog_connection_pages_are_scoped_bounded_and_complete ... ok
+test adapters::http::routes::ui_agents::authoring::publication::tests::autonomous_agent_authoring_exact_binding_revoke_and_foreign_mutation_refusal ... ok
+test adapters::http::routes::ui_agents::authoring::publication::tests::autonomous_agent_authoring_failed_publication_retains_original_request_and_does_not_save_editor ... ok
+test adapters::http::routes::ui_agents::authoring::publication::tests::autonomous_agent_authoring_form_preserves_stale_input_tools_and_expected_revision ... ok
+test adapters::http::routes::ui_agents::authoring::publication::tests::autonomous_agent_authoring_missing_skill_tool_fails_shared_preview_without_changing_active ... FAILED
+test adapters::http::routes::ui_agents::form_tests::a_native_urlencoded_submission_builds_the_write ... ok
+test adapters::http::routes::ui_agents::authoring::publication::tests::autonomous_agent_authoring_preview_publish_replay_and_deactivation_omit_canonical_payloads ... ok
+test adapters::http::routes::agent::api_tests::library_builder_copy_keeps_its_grants_on_an_explicit_model ... ok
+test adapters::http::routes::ui_agents::authoring::publication::tests::autonomous_agent_authoring_skill_order_survives_classic_metadata_save_and_stale_rejection ... ok
+test adapters::http::routes::workflows::tests::tenancy_tests::workflow_routes_refuse_other_tenants_and_members ... ok
+test adapters::http::routes::workflows::tests::tool_tests::autonomous_agent_authoring_competing_json_draft_writes_apply_once ... ok
+test adapters::http::routes::workflows::tests::tool_tests::workflow_tool_routes_register_and_revoke ... ok
+test adapters::persistence::agent_publication::tests::authoring::autonomous_agent_authoring_competing_draft_writers_commit_one_complete_assignment_set ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::tools_tests::autonomous_agent_authoring_usage_refuses_members_and_foreign_agents ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::sample_tests::sample_direct_workflow_tool_child_and_message_have_zero_production_effects ... ok
+test adapters::persistence::agent_publication::tests::authoring::autonomous_agent_authoring_final_metadata_conflict_rolls_back_skill_and_binding_changes ... ok
+test adapters::persistence::agent_publication::tests::authoring::autonomous_agent_authoring_refuses_builder_spoofing_reserved_aliases_and_foreign_scope ... ok
+test adapters::persistence::agent_publication::tests::authoring::autonomous_agent_authoring_save_competing_with_publication_never_activates_unsaved_content ... ok
+test adapters::persistence::agent_publication::tests::authoring_views::autonomous_agent_views_authoring_separates_active_and_draft_and_omits_credentials_and_active_prompt ... ok
+test adapters::persistence::agent_publication::tests::authoring_views::autonomous_agent_views_history_pages_timestamp_ties_without_payloads_or_foreign_rows ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::tools_tests::revoking_or_re_pointing_a_frozen_tool_stops_its_versions_bindings_as_the_warning_says ... FAILED
+
+failures:
+
+---- adapters::http::routes::ui_agents::authoring::publication::tests::autonomous_agent_authoring_missing_skill_tool_fails_shared_preview_without_changing_active stdout ----
+
+thread 'adapters::http::routes::ui_agents::authoring::publication::tests::autonomous_agent_authoring_missing_skill_tool_fails_shared_preview_without_changing_active' (32987931) panicked at src/adapters/http/routes/ui_agents/authoring/test_support.rs:85:14:
+called `Result::unwrap()` on an `Err` value: BadRequest("A skill slug uses lowercase letters, digits and hyphens, such as triage-invoice.")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- adapters::http::routes::workflows::ui::authoring::tests::tools_tests::revoking_or_re_pointing_a_frozen_tool_stops_its_versions_bindings_as_the_warning_says stdout ----
+
+thread 'adapters::http::routes::workflows::ui::authoring::tests::tools_tests::revoking_or_re_pointing_a_frozen_tool_stops_its_versions_bindings_as_the_warning_says' (32987981) panicked at src/adapters/http/routes/workflows/ui/authoring/tools_tests.rs:497:5:
+<section id="workflow-pane" class="ui-pane-detail flex min-w-0 flex-1 flex-col bg-base-100">
+            <div class="border-b border-base-300 px-4 pt-4 sm:px-6">
+                <div class="flex flex-wrap items-center gap-2">
+                    <h2 class="min-w-0 truncate text-xl font-bold">Answer</h2>
+                    <a class="btn btn-ghost btn-xs ml-auto" href="/ui/workflow-runs?company_id=ca1fb0ce-75fa-43bc-93c3-98890509cc92&amp;view=board&amp;workflow_id=8d537299-b958-40fe-869b-72d675c5f5a9">Runs board</a>
+                </div>
+                <p class="mt-1 text-xs opacity-60">Draft revision 1 · 1 published version</p>
+                <nav role="tablist" class="tabs tabs-border mt-3" aria-label="Workflow views"><a role="tab" class="tab" aria-selected="false"
+                href="/ui/workflows?company_id=ca1fb0ce-75fa-43bc-93c3-98890509cc92&amp;workflow_id=8d537299-b958-40fe-869b-72d675c5f5a9&amp;tab=editor"
+                hx-get="/ui/workflows/8d537299-b958-40fe-869b-72d675c5f5a9?company_id=ca1fb0ce-75fa-43bc-93c3-98890509cc92&amp;tab=editor"
+                hx-target="#workflow-pane" hx-swap="outerHTML" hx-sync="#workflow-pane:replace"
+                hx-push-url="/ui/workflows?company_id=ca1fb0ce-75fa-43bc-93c3-98890509cc92&amp;workflow_id=8d537299-b958-40fe-869b-72d675c5f5a9&amp;tab=editor">Editor</a><a role="tab" class="tab" aria-selected="false"
+                href="/ui/workflows?company_id=ca1fb0ce-75fa-43bc-93c3-98890509cc92&amp;workflow_id=8d537299-b958-40fe-869b-72d675c5f5a9&amp;tab=sample"
+                hx-get="/ui/workflows/8d537299-b958-40fe-869b-72d675c5f5a9?company_id=ca1fb0ce-75fa-43bc-93c3-98890509cc92&amp;tab=sample"
+                hx-target="#workflow-pane" hx-swap="outerHTML" hx-sync="#workflow-pane:replace"
+                hx-push-url="/ui/workflows?company_id=ca1fb0ce-75fa-43bc-93c3-98890509cc92&amp;workflow_id=8d537299-b958-40fe-869b-72d675c5f5a9&amp;tab=sample">Sample</a><a role="tab" class="tab" aria-selected="false"
+                href="/ui/workflows?company_id=ca1fb0ce-75fa-43bc-93c3-98890509cc92&amp;workflow_id=8d537299-b958-40fe-869b-72d675c5f5a9&amp;tab=versions"
+                hx-get="/ui/workflows/8d537299-b958-40fe-869b-72d675c5f5a9?company_id=ca1fb0ce-75fa-43bc-93c3-98890509cc92&amp;tab=versions"
+                hx-target="#workflow-pane" hx-swap="outerHTML" hx-sync="#workflow-pane:replace"
+                hx-push-url="/ui/workflows?company_id=ca1fb0ce-75fa-43bc-93c3-98890509cc92&amp;workflow_id=8d537299-b958-40fe-869b-72d675c5f5a9&amp;tab=versions">Versions and usage</a><a role="tab" class="tab tab-active" aria-selected="true"
+                href="/ui/workflows?company_id=ca1fb0ce-75fa-43bc-93c3-98890509cc92&amp;workflow_id=8d537299-b958-40fe-869b-72d675c5f5a9&amp;tab=bindings"
+                hx-get="/ui/workflows/8d537299-b958-40fe-869b-72d675c5f5a9?company_id=ca1fb0ce-75fa-43bc-93c3-98890509cc92&amp;tab=bindings"
+                hx-target="#workflow-pane" hx-swap="outerHTML" hx-sync="#workflow-pane:replace"
+                hx-push-url="/ui/workflows?company_id=ca1fb0ce-75fa-43bc-93c3-98890509cc92&amp;workflow_id=8d537299-b958-40fe-869b-72d675c5f5a9&amp;tab=bindings">Bindings</a></nav>
+            </div>
+            <div class="flex-1 overflow-y-auto px-4 py-4 sm:px-6"><div role="status" class="alert alert-success mb-4 text-sm">Activated binding 69688d61 (state revision 4).</div><div class="space-y-6">
+            <section class="space-y-2"><h3 class="font-semibold">Bindings</h3><ul class="divide-y divide-base-300"><li class="py-3" id="binding-69688d61-d587-41df-bc46-94aa032db03a">
+            <div class="flex flex-wrap items-center gap-2"><span class="font-semibold">Company-wide (manual starts and schedules)</span><span class="badge badge-sm badge-success">active</span><span class="ml-auto flex gap-1"><button type="button" class="btn btn-xs btn-outline"
+                hx-post="/ui/workflows/8d537299-b958-40fe-869b-72d675c5f5a9/bindings/69688d61-d587-41df-bc46-94aa032db03a/deactivate?company_id=ca1fb0ce-75fa-43bc-93c3-98890509cc92"
+                hx-vals='{"expected_state_revision": "4"}'
+                hx-target="#workflow-pane" hx-swap="outerHTML">Deactivate</button>
+            <button type="button" class="btn btn-ghost btn-xs"
+                hx-get="/ui/workflows/8d537299-b958-40fe-869b-72d675c5f5a9/bindings/form?company_id=ca1fb0ce-75fa-43bc-93c3-98890509cc92&amp;binding_id=69688d61-d587-41df-bc46-94aa032db03a"
+                hx-target="#binding-form" hx-swap="outerHTML">Configure</button></span></div>
+            <p class="text-xs opacity-70">Runs version f3e72507 (newest, draft revision 1) · No message trigger · as 31fa2f8c8c2647d3b9955ea70af9337b (owner)</p>
+            
+            <p class="font-mono text-[11px] opacity-60">binding 69688d61 · state revision 4 · <a class="link" href="/ui/workflow-runs?company_id=ca1fb0ce-75fa-43bc-93c3-98890509cc92&amp;binding_id=69688d61-d587-41df-bc46-94aa032db03a">runs</a></p>
+        </li></ul></section>
+            <section id="binding-form" class="space-y-3 rounded-box border border-base-300 p-4">
+            <h3 class="font-semibold">New binding</h3>
+            
+            <form hx-post="/ui/workflows/8d537299-b958-40fe-869b-72d675c5f5a9/bindings?company_id=ca1fb0ce-75fa-43bc-93c3-98890509cc92" hx-target="#workflow-pane" hx-swap="outerHTML"
+                hx-disabled-elt="find button[type='submit']" class="space-y-4">
+                <input type="hidden" name="form_key" value="b2c833e6-6c3b-4e76-934d-25eaf5721160">
+                <div class="grid gap-3 sm:grid-cols-2"><label class="form-control w-full"><div class="label"><span class="text-xs">Association</span></div><select class="select w-full" name="association"><option value="company" selected>Company-wide (manual starts and schedules)</option></select><div class="label"><span class="text-xs">A channel binding can answer that channel&#39;s messages; thread bindings are made through the API.</span></div></label><label class="form-control w-full"><div class="label"><span class="text-xs">Published version</span></div><select class="select w-full" name="version_id"
+                hx-get="/ui/workflows/8d537299-b958-40fe-869b-72d675c5f5a9/bindings/form?company_id=ca1fb0ce-75fa-43bc-93c3-98890509cc92" hx-include="closest form"
+                hx-target="#binding-form" hx-swap="outerHTML" hx-trigger="change"><option value="f3e72507-f3d9-8634-9359-4a1efedfabf5" selected>version f3e72507 (newest, draft revision 1)</option></select><div class="label"><span class="text-xs">Changing it reloads the parameters and resources this version declares.</span></div></label></div>
+                <fieldset class="space-y-1"><legend class="text-sm font-semibold">Parameters</legend><input type="hidden" name="params_mode" value="json"><label class="form-control w-full"><div class="label"><span class="text-xs">Parameters (JSON object)</span></div><textarea class="textarea w-full font-mono text-xs" rows="6" name="params_json">
+{}</textarea><div class="label"><span class="text-xs">Typed as one JSON object: the version&#39;s parameter schema has no fields this form can show, or the stored parameters hold something the fields cannot carry exactly. The binding command validates the object against the schema.</span></div></label></fieldset>
+                
+                <div class="grid gap-3 sm:grid-cols-2"><label class="form-control w-full"><div class="label"><span class="text-xs">Message trigger</span></div><select class="select w-full" name="message_trigger"><option value="" selected>No message trigger: messages never start it</option><option value="direct">Addressed in To, or mentioned</option><option value="any">Addressed in To or Cc, or mentioned</option><option value="mentioned">Mentioned by name, alias, address or handle</option><option value="mentioned_or_reply">Mentioned, or a direct reply to a message a run published</option></select><div class="label"><span class="text-xs">Channel bindings only; a company-wide binding takes none.</span></div></label><label class="form-control w-full"><div class="label"><span class="text-xs">Runs as</span></div><select class="select w-full" name="run_as"><option value="dce8c447-a81b-4351-bb0d-1793bdd464c6" selected>31fa2f8c8c2647d3b9955ea70af9337b (owner)</option><option value="cd0d9101-c029-46b9-876d-5ef4eed55c72">40ec89d8e8094cb3afc323674d79c541 (admin)</option></select><div class="label"><span class="text-xs">An owner or admin who can see the channel; automatic runs use their authority.</span></div></label></div>
+                
+                <div class="flex items-center gap-3 border-t border-base-300 pt-3">
+                    <button type="submit" class="btn btn-primary btn-sm">Save binding</button>
+                    <p class="text-xs opacity-70">A saved binding stays paused until you activate it; activation checks readiness again.</p>
+                </div>
+            </form>
+        </section>
+        </div></div>
+        </section>
+
+
+failures:
+    adapters::http::routes::ui_agents::authoring::publication::tests::autonomous_agent_authoring_missing_skill_tool_fails_shared_preview_without_changing_active
+    adapters::http::routes::workflows::ui::authoring::tests::tools_tests::revoking_or_re_pointing_a_frozen_tool_stops_its_versions_bindings_as_the_warning_says
+
+test result: FAILED. 26 passed; 2 failed; 1 ignored; 0 measured; 2977 filtered out; finished in 2.98s
+

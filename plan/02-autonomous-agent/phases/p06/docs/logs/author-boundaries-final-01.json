@@ -1,0 +1,30 @@
+[
+  {
+    "name": "sample-boundary-negative",
+    "argv": [
+      "python3",
+      "scripts/tests/workflow-sample-boundary.py"
+    ],
+    "exit": 0,
+    "log": "plan/02-autonomous-agent/phases/p06/docs/logs/author-sample-boundary-negative-final-01.log"
+  },
+  {
+    "name": "sample-boundary-source",
+    "argv": [
+      "python3",
+      "scripts/workflow-sample-boundary.py"
+    ],
+    "exit": 0,
+    "log": "plan/02-autonomous-agent/phases/p06/docs/logs/author-sample-boundary-source-final-01.log"
+  },
+  {
+    "name": "run-counts",
+    "argv": [
+      "npm",
+      "run",
+      "test:run-counts"
+    ],
+    "exit": 1,
+    "log": "plan/02-autonomous-agent/phases/p06/docs/logs/author-run-counts-final-01.log"
+  }
+]

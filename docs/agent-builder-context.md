@@ -6,11 +6,11 @@ Use this reference to design company agents and workflow steps. Check the compan
 
 | Piece | Owns | How it runs |
 | --- | --- | --- |
-| **Agent** | Name, slug, description, system prompt, enabled provider/model, workflow-tool grants, and attached prompt-only skills. | A workflow model step selects it. `agent.run` gets its saved tools and skills; `ai.classify` and `decision.agent` use its instructions and model without them. |
+| **Agent** | Name, slug, description, system prompt, enabled provider/model, agent-owned tool bindings, ordered skills and independent revisions. | A workflow model step selects it. `agent.run` gets its saved tools and skills; `ai.classify` and `decision.agent` use its instructions and model without them. |
 | **Channel** | Company address, aliases, access (`team`, allowlist, or public), and independent threads. It needs no agent. | Active workflow bindings decide what accepted messages start. A channel may have multiple bindings. |
 | **Workflow** | A typed, routed sequence of steps with input, parameter, and output schemas. | Publish an immutable version, configure a binding to that version, then activate it. The binding supplies parameters, resource references, run-as member, and an optional message trigger. Schedules and manual starts can also admit runs. |
 
-No active binding means messages are stored without starting that workflow. A draft, a published version, and an active binding are separate states. Agent edits require republishing a workflow version to affect new runs.
+No active binding means messages are stored without starting that workflow. A draft, a published version, and an active binding are separate states. Save, preview and publish agent edits from **Agents** to affect new root admissions without republishing a workflow. Existing runs, retries and children retain their selected revisions. See [agent authoring](agent-authoring.md).
 
 ## What Agent Builder can create today
 
@@ -102,7 +102,7 @@ steps:
 limits: {max_steps: 10, max_context_bytes: 65536}
 ```
 
-For a reviewed reply, place `decision.human` between `draft` and `reply`, supply explicit company-user reviewers and a deadline such as `{ref: /run/deadline}`, then route approval to `reply` and rejection to `$end`. `message.reply` needs the source message and replies only to its sender from the source channel; `message.send` names explicit destinations. A model step's `output_schema` is its answer contract. Tools and skills belong to the agent selected by `agent.run`; the step cannot add or narrow them. Publication freezes their definitions, while current revocation still applies.
+For a reviewed reply, place `decision.human` between `draft` and `reply`, supply explicit company-user reviewers and a deadline such as `{ref: /run/deadline}`, then route approval to `reply` and rejection to `$end`. `message.reply` needs the source message and replies only to its sender from the source channel; `message.send` names explicit destinations. A model step's `output_schema` is its answer contract. Tools and skills belong to the agent selected by `agent.run`; the step cannot add or narrow them. Agent publication freezes their definitions; root admission selects active revisions for the complete run tree. Current revocation still applies.
 
 In **Workflows**, start from a shipped template or blank draft, save and validate the exact source, resolve named agents/tools/resources, publish a version, configure its channel binding and trigger, then activate it. A binding with no message trigger can still serve a schedule or manual start. Message triggers are `direct` (To or mention), `any` (To/Cc or mention), `mentioned`, and `mentioned_or_reply`. A quiet message is filed without admitting a new run.
 

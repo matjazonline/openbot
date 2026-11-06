@@ -33,7 +33,8 @@ fn agents(
             crate::adapters::harness::rig::providers::ProviderRegistry::standard()?,
         ));
     Ok(Arc::new(
-        AgentUseCases::new(p.clone(), p.clone(), p.clone()).with_prompt_classifier(classifier),
+        AgentUseCases::new(p.clone(), p.clone(), p.clone(), p.clone())
+            .with_prompt_classifier(classifier),
     ))
 }
 pub(super) fn build(

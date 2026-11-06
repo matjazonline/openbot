@@ -1,0 +1,9 @@
+BEGIN;
+INSERT INTO companies(id,user_id,name,slug) VALUES('719df8bc-fd27-41b0-9528-02d88f605234','eb277b4d-84cf-4fb4-a946-992dedbfda29','History probe','history-probe');
+INSERT INTO company_members(id,company_id,user_id,role,access_level) VALUES(gen_random_uuid(),'719df8bc-fd27-41b0-9528-02d88f605234','eb277b4d-84cf-4fb4-a946-992dedbfda29','owner',9);
+INSERT INTO agents(id,company_id,name,slug,created_by,draft_revision) VALUES('5af58162-ebc2-4a32-8aa7-b03e8f522804','719df8bc-fd27-41b0-9528-02d88f605234','History agent','history-agent','{"actor_type":"system","actor_id":null,"actor_name":"History probe"}',30001),('50c47056-6b15-4e69-9f75-c8318769b2f1','719df8bc-fd27-41b0-9528-02d88f605234','Other history','other-history','{"actor_type":"system","actor_id":null,"actor_name":"History probe"}',30001);
+WITH fixtures AS (SELECT agent,seq,jsonb_build_object('company_id','719df8bc-fd27-41b0-9528-02d88f605234','agent_id',agent::text,'key','history-agent','instructions','History '||seq,'model',jsonb_build_object('provider','openai','model','gpt-4o-mini','max_output_tokens',512),'tools','[]'::jsonb,'skills','[]'::jsonb)::text AS content FROM (SELECT '5af58162-ebc2-4a32-8aa7-b03e8f522804'::uuid AS agent,seq FROM generate_series(1,30000) AS seq UNION ALL SELECT '50c47056-6b15-4e69-9f75-c8318769b2f1'::uuid,seq FROM generate_series(1,10000) AS seq) AS fixture_rows)
+INSERT INTO agent_revisions(company_id,agent_id,id,draft_revision,content,digest,created_at) SELECT '719df8bc-fd27-41b0-9528-02d88f605234',agent,gen_random_uuid(),seq,content,sha256(convert_to(content,'UTF8')),'2026-01-01'::timestamptz+seq*interval '1 second' FROM fixtures;
+ANALYZE agent_revisions;
+
+COMMIT;

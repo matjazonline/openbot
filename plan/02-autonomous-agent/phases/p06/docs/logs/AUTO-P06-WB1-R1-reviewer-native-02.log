@@ -1,0 +1,12 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+
+running 6 tests
+test adapters::http::routes::ui_agents::authoring::security_tests::autonomous_agent_authoring_every_publication_write_refuses_cross_origin_cookie_posts ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::agent_picker_tests::autonomous_agent_authoring_workflow_picker_uses_current_hint_and_keeps_model_only_steps_tool_free ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::agent_picker_tests::autonomous_agent_authoring_workflow_picker_preserves_unsaved_source_and_selected_agent_outside_page ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::agent_picker_tests::autonomous_agent_authoring_workflow_picker_refuses_foreign_actor_agent_workflow_and_non_model_step ... ok
+test adapters::http::routes::workflows::tests::tool_tests::autonomous_agent_authoring_competing_json_draft_writes_apply_once ... ok
+test adapters::persistence::workflow::tests::mcp_tests::agent_tests::authoring_journey::autonomous_agent_authoring_one_typed_mcp_agent_runs_in_two_workflows_and_views_retain_revisions ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 3013 filtered out; finished in 2.81s
+

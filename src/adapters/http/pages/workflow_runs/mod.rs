@@ -9,6 +9,7 @@ use std::collections::HashMap;
 
 mod board;
 mod detail;
+mod provenance;
 mod step;
 
 pub use board::*;

@@ -1,0 +1,14 @@
+{
+  "phase": "p06",
+  "owner": "root",
+  "port": 55606,
+  "pg_data": "/Users/mac02/dev/openbot-recovery/.worktrees/pg-autonomous-p06",
+  "socket": "/Users/mac02/dev/openbot-recovery/.worktrees/pg-autonomous-p06-socket",
+  "databases": [
+    "open_bots",
+    "open_bots_test"
+  ],
+  "build_target": "/Users/mac02/dev/openbot-recovery/.worktrees/autonomous-p06/target",
+  "env_mode": "0600",
+  "disposable": true
+}

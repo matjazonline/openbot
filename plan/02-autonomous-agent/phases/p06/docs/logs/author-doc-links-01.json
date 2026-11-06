@@ -1,0 +1,12 @@
+{
+  "files": [
+    "README.md",
+    "docs/agent-authoring.md",
+    "docs/rig.md",
+    "docs/agent-builder-context.md",
+    "docs/workflow-language-v1.md",
+    "docs/workflow-operations.md"
+  ],
+  "local_links_checked": 27,
+  "missing": []
+}

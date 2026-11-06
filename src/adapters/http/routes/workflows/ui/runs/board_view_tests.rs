@@ -55,7 +55,7 @@ impl Fixture {
         .execute(self.persistence.pool())
         .await
         .unwrap();
-        AgentPersistence::create(
+        let agent = AgentPersistence::create(
             &self.persistence,
             company,
             AgentWrite {
@@ -67,8 +67,30 @@ impl Fixture {
             },
         )
         .await
-        .unwrap()
-        .id
+        .unwrap();
+        use crate::application::agent::{
+            AgentPublicationKey, AgentPublicationScope, AgentPublications, PublishAgent,
+        };
+        let user = if company == self.company {
+            self.owner
+        } else {
+            assert_eq!(company, self.other);
+            self.stranger
+        };
+        self.persistence
+            .publish_agent(PublishAgent {
+                scope: AgentPublicationScope {
+                    company: CompanyId::new(company),
+                    actor: WorkflowActor::authenticated(user).unwrap(),
+                    agent: crate::entities::agent_capability::AgentId::new(agent.id),
+                },
+                expected_draft_revision: agent.draft_revision,
+                expected_active_revision: None,
+                key: AgentPublicationKey::parse(Uuid::new_v4().to_string()).unwrap(),
+            })
+            .await
+            .unwrap();
+        agent.id
     }
 
     /// Put `run` in `state` as the engine would leave it (the database stamps `finished_at`).

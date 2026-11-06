@@ -1,6 +1,5 @@
-//! Workflow tool registrations and agent tool grants (notice WF-C003): register with the
-//! revision the caller saw, revoke (which stops new runs and calls; existing pins stay refused,
-//! P07-Q2), list, and replace an agent's granted names against the list the caller saw.
+//! Company workflow tool registrations: register the observed revision, revoke and list.
+//! Agent-local assignments are edited through the guarded agent authoring command.
 use super::*;
 use crate::application::workflow::tools::{WorkflowToolRegistration, WorkflowToolWrite};
 use crate::domain::workflow::{TypeName, VersionId, WorkflowId};
@@ -102,40 +101,4 @@ pub async fn revoke(
         )
         .await?;
     Ok(StatusCode::NO_CONTENT)
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct GrantBody {
-    /// The agent's grants as the caller saw them; a different current list is a conflict.
-    pub expected: Vec<String>,
-    pub tools: Vec<String>,
-}
-
-pub async fn grant(
-    State(engine): State<Engine>,
-    user: AuthenticatedUser,
-    Path((company_id, agent)): Path<(Uuid, Uuid)>,
-    Json(body): Json<GrantBody>,
-) -> WorkflowResult<Json<Value>> {
-    let parse = |names: &[String]| {
-        names
-            .iter()
-            .map(|name| tool_name(name))
-            .collect::<AppResult<Vec<_>>>()
-    };
-    let granted = engine
-        .workflow_tools()
-        .grant_agent_tools(
-            company(company_id),
-            actor(&user)?,
-            agent,
-            &parse(&body.expected)?,
-            &parse(&body.tools)?,
-        )
-        .await?;
-    Ok(ok(json!({
-        "agent_id": agent,
-        "tools": granted.iter().map(TypeName::as_str).collect::<Vec<_>>(),
-    })))
 }

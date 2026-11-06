@@ -1,0 +1,21 @@
+   Compiling open_bots v0.1.0 (/Users/mac02/dev/openbot-recovery/.worktrees/autonomous-p06)
+error[E0277]: `application::agent::publication::PublishedAgentRevision` doesn't implement `std::fmt::Debug`
+   --> src/adapters/persistence/agent_publication/tests/authoring.rs:122:26
+    |
+122 |         other => panic!("{other:?}"),
+    |                          ^^^^^^^^^ `application::agent::publication::PublishedAgentRevision` cannot be formatted using `{:?}` because it doesn't implement `std::fmt::Debug`
+    |
+help: the trait `std::fmt::Debug` is not implemented for `application::agent::publication::PublishedAgentRevision`
+   --> src/application/agent/publication.rs:61:1
+    |
+ 61 | pub struct PublishedAgentRevision {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    = note: add `#[derive(Debug)]` to `application::agent::publication::PublishedAgentRevision` or manually `impl std::fmt::Debug for application::agent::publication::PublishedAgentRevision`
+help: the trait `std::fmt::Debug` is implemented for `std::result::Result<T, E>`
+   --> /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/result.rs:552:15
+    = note: required for `Result<PublishedAgentRevision, AppError>` to implement `std::fmt::Debug`
+    = note: the full name for the type has been written to '/Users/mac02/dev/openbot-recovery/.worktrees/autonomous-p06/target/debug/deps/open_bots-c19a0b960dacdcef.long-type-16406516538887442141.txt'
+    = note: consider using `--verbose` to print the full type name to the console
+
+For more information about this error, try `rustc --explain E0277`.
+error: could not compile `open_bots` (lib test) due to 1 previous error

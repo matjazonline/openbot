@@ -46,7 +46,6 @@ async fn knowledge_view_current_run_and_step_stamp_controls_payloads() {
         crate::adapters::http::pages::run_step_body(&crate::adapters::http::pages::StepBodyView {
             company_id: scope.company.as_uuid(),
             step: &step,
-            agent: None,
         });
     assert!(html.contains("Restricted run content") && html.contains(&step.step));
     if step.activated_at.is_some() {

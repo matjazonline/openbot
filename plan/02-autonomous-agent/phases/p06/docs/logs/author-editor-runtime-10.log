@@ -1,0 +1,40 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+
+running 22 tests
+test adapters::http::pages::tests::legacy_agent_fields_and_confirmation_attribute_are_escaped ... ok
+test adapters::http::pages::tests::agent_edit_pane_keeps_a_rejected_save_in_the_form ... ok
+test adapters::http::pages::tests::agent_edit_pane_prefills_the_stored_agent_and_offers_delete ... ok
+test adapters::http::pages::tests::no_function_name_is_declared_twice_in_the_bundle ... ok
+test adapters::http::pages::tests::every_delegated_action_has_a_branch_in_the_bundle ... ok
+test adapters::http::routes::ui_agents::authoring::publication::tests::autonomous_agent_authoring_preview_publish_replay_and_deactivation_omit_canonical_payloads ... ok
+test adapters::http::routes::ui_agents::form_tests::a_native_urlencoded_submission_builds_the_write ... ok
+test adapters::http::routes::ui_agents::authoring::publication::tests::autonomous_agent_authoring_failed_publication_retains_original_request_and_does_not_save_editor ... ok
+test adapters::http::routes::ui_agents::authoring::publication::tests::autonomous_agent_authoring_form_preserves_stale_input_tools_and_expected_revision ... ok
+test adapters::http::routes::ui_agents::authoring::publication::tests::autonomous_agent_authoring_exact_binding_revoke_and_foreign_mutation_refusal ... ok
+test adapters::http::routes::workflows::tests::tenancy_tests::workflow_routes_refuse_other_tenants_and_members ... ok
+test adapters::http::routes::workflows::tests::tool_tests::workflow_tool_routes_register_and_revoke ... ok
+test adapters::http::routes::workflows::tests::tool_tests::autonomous_agent_authoring_competing_json_draft_writes_apply_once ... ok
+test adapters::persistence::agent_publication::tests::authoring::autonomous_agent_authoring_competing_draft_writers_commit_one_complete_assignment_set ... ok
+test adapters::persistence::agent_publication::tests::authoring::autonomous_agent_authoring_final_metadata_conflict_rolls_back_skill_and_binding_changes ... ok
+test adapters::persistence::agent_publication::tests::authoring::autonomous_agent_authoring_refuses_builder_spoofing_reserved_aliases_and_foreign_scope ... ok
+test adapters::persistence::agent_publication::tests::authoring::autonomous_agent_authoring_save_competing_with_publication_never_activates_unsaved_content ... ok
+test adapters::persistence::agent_publication::tests::authoring_views::autonomous_agent_views_authoring_separates_active_and_draft_and_omits_credentials_and_active_prompt ... ok
+test adapters::persistence::agent_publication::tests::authoring_views::autonomous_agent_views_history_pages_timestamp_ties_without_payloads_or_foreign_rows ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::sample_tests::sample_direct_workflow_tool_child_and_message_have_zero_production_effects ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::tools_tests::autonomous_agent_authoring_usage_refuses_members_and_foreign_agents ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::tools_tests::revoking_or_re_pointing_a_frozen_tool_stops_its_versions_bindings_as_the_warning_says ... FAILED
+
+failures:
+
+---- adapters::http::routes::workflows::ui::authoring::tests::tools_tests::revoking_or_re_pointing_a_frozen_tool_stops_its_versions_bindings_as_the_warning_says stdout ----
+
+thread 'adapters::http::routes::workflows::ui::authoring::tests::tools_tests::revoking_or_re_pointing_a_frozen_tool_stops_its_versions_bindings_as_the_warning_says' (32978887) panicked at src/adapters/http/routes/workflows/ui/authoring/tests.rs:158:10:
+called `Result::unwrap()` on an `Err` value: App(BadRequest("Agent assistant must be published in this company before a workflow can reference it"))
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    adapters::http::routes::workflows::ui::authoring::tests::tools_tests::revoking_or_re_pointing_a_frozen_tool_stops_its_versions_bindings_as_the_warning_says
+
+test result: FAILED. 21 passed; 1 failed; 0 ignored; 0 measured; 2979 filtered out; finished in 3.16s
+

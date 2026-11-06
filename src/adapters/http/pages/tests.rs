@@ -1021,6 +1021,7 @@ fn agent_edit_pane_prefills_the_stored_agent_and_offers_delete() {
     }];
 
     let html = agent_edit_pane(&AgentEditPane {
+        authoring: None,
         company: &company,
         app_domain_name: "mail.test",
         model_connections: &model_connections,
@@ -1053,6 +1054,7 @@ fn agent_edit_pane_prefills_the_stored_agent_and_offers_delete() {
     // An agent with nothing overridden keeps the model section collapsed.
     let plain = settings_agent(company.id, "Plain", "plain");
     let plain_html = agent_edit_pane(&AgentEditPane {
+        authoring: None,
         company: &company,
         app_domain_name: "mail.test",
         model_connections: &[],
@@ -1074,6 +1076,7 @@ fn an_agent_with_a_picture_shows_it_and_one_without_falls_back_to_its_letter() {
     let plain = settings_agent(company.id, "Plain", "plain");
 
     let html = agent_edit_pane(&AgentEditPane {
+        authoring: None,
         company: &company,
         app_domain_name: "mail.test",
         model_connections: &[],
@@ -1089,6 +1092,7 @@ fn an_agent_with_a_picture_shows_it_and_one_without_falls_back_to_its_letter() {
     assert!(html.contains(">T</span>"));
 
     let plain_html = agent_edit_pane(&AgentEditPane {
+        authoring: None,
         company: &company,
         app_domain_name: "mail.test",
         model_connections: &[],
@@ -1127,6 +1131,7 @@ fn agent_edit_pane_keeps_a_rejected_save_in_the_form() {
     };
 
     let html = agent_edit_pane(&AgentEditPane {
+        authoring: None,
         company: &company,
         app_domain_name: "mail.test",
         model_connections: &[],
@@ -1152,6 +1157,7 @@ fn prompt_generator_names_the_pane_it_answers_into() {
     let agent = settings_agent(company.id, "Triage", "triage");
 
     let edit = agent_edit_pane(&AgentEditPane {
+        authoring: None,
         company: &company,
         app_domain_name: "mail.test",
         model_connections: &[],
@@ -3532,6 +3538,7 @@ fn each_agent_form_owns_its_own_picker() {
         ..settings_agent(company.id, "Triage", "triage")
     };
     let edit = agent_edit_pane(&AgentEditPane {
+        authoring: None,
         company: &company,
         app_domain_name: "mail.test",
         model_connections: &[],

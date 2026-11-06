@@ -1,0 +1,9 @@
+{
+  "argv": [
+    "bash",
+    "/Users/mac02/dev/openbot-recovery/.agents/skills/implement-astra-reviewed-2-2/scripts/snapshot.sh",
+    "plan/02-autonomous-agent/phases/p06/docs"
+  ],
+  "path_prefix": "/Users/mac02/dev/openbot-recovery/.worktrees/knowledge-tooling/autonomous-review-bin",
+  "exit": 0
+}

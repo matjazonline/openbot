@@ -115,10 +115,6 @@ pub fn router() -> Router<AppState> {
             &format!("{company}/workflow-tools/{{name}}"),
             put(tools::register).delete(tools::revoke),
         )
-        .route(
-            &format!("{company}/agents/{{agent_id}}/workflow-tools"),
-            put(tools::grant),
-        )
         .merge(jev::router())
         .merge(ui::router())
         .layer(DefaultBodyLimit::max(BODY_LIMIT))

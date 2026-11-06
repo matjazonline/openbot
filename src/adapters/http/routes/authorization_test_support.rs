@@ -102,7 +102,12 @@ impl Fixture {
         let threads = thread_use_cases(&p, &config);
         Some(Self {
             companies: Arc::new(CompanyUseCases::new(p.clone())),
-            agents: Arc::new(AgentUseCases::new(p.clone(), p.clone(), p.clone())),
+            agents: Arc::new(AgentUseCases::new(
+                p.clone(),
+                p.clone(),
+                p.clone(),
+                p.clone(),
+            )),
             channels: Arc::new(ChannelUseCases::new(
                 p.clone(),
                 p.clone(),

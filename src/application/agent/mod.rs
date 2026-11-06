@@ -2,6 +2,8 @@
 use crate::domain::workflow::{CompanyId, TypeName};
 use serde::{Deserialize, Serialize};
 
+mod authoring;
+mod authoring_reads;
 mod definition;
 pub(crate) mod dependency;
 mod manifest;
@@ -9,6 +11,8 @@ mod publication;
 mod resolution;
 mod tool_name;
 mod tool_origin;
+pub use authoring::*;
+pub use authoring_reads::*;
 pub use definition::*;
 pub use manifest::*;
 pub use publication::*;

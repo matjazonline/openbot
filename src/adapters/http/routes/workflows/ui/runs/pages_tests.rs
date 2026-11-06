@@ -43,7 +43,22 @@ fn reconciliation_is_offered_as_an_annotation_and_a_step_shows_usage_and_receipt
 
     let hostile = format!("<{}>alert(1)</script>", "script");
     let step_view = StepView {
-        agent: None,
+        agent: Some(
+            crate::application::workflow::run_views::SelectedAgentSummary {
+                manifest: crate::entities::agent_capability::DependencyManifestId::new(
+                    Uuid::new_v4(),
+                ),
+                agent_id: crate::entities::agent_capability::AgentId::new(Uuid::new_v4()),
+                revision_id: crate::entities::agent_capability::AgentRevisionId::new(Uuid::new_v4()),
+                key: "assistant".into(),
+                model: "openai / gpt-test".into(),
+                tools: vec!["lookup".into()],
+                skills: Vec::new(),
+                bindings: Vec::new(),
+                assignments: Vec::new(),
+            },
+        ),
+        calls: Default::default(),
         payload_restricted: false,
         execution: Uuid::new_v4(),
         step: "lookup".into(),
@@ -88,19 +103,13 @@ fn reconciliation_is_offered_as_an_annotation_and_a_step_shows_usage_and_receipt
     let body = pages::run_step_body(&pages::StepBodyView {
         company_id: Uuid::new_v4(),
         step: &step_view,
-        agent: Some(pages::FrozenAgentView {
-            handle: "assistant",
-            model: "openai / gpt-test".into(),
-            tools: vec!["lookup"],
-            skills: Vec::new(),
-        }),
     });
     assert!(
         body.contains("Model usage") && body.contains(">12<") && body.contains(">34<"),
         "{body}"
     );
     assert!(body.contains("Action receipts") && body.contains("accepted"));
-    assert!(body.contains("uses the agent's tools and skills as frozen"));
+    assert!(body.contains("Agent selected for this step"));
     assert!(body.contains("tools lookup; skills none"));
     assert!(body.contains("Diagnostics: worker attempts"));
     assert!(body.contains("transient: workflow.timeout") && body.contains("lease_expired"));
@@ -119,6 +128,8 @@ fn sample_view(
     let now = chrono::Utc::now();
     RunView {
         payload_restricted: false,
+        dependencies: None,
+        calls: Default::default(),
         detail: RunDetail {
             summary: RunSummary {
                 run: RunId::new(Uuid::new_v4()),

@@ -219,9 +219,11 @@ async fn http_tool(
 ) -> AppResult<RegisteredTool> {
     let current = super::super::workflow::http::connection_on(tx, company, connection)
         .await?
-        .ok_or_else(unavailable)?;
+        .ok_or_else(|| AppError::BadRequest("Selected HTTP connection is unavailable".into()))?;
     if !current.enabled {
-        return Err(unavailable());
+        return Err(AppError::BadRequest(
+            "Selected HTTP connection is unavailable".into(),
+        ));
     }
     if current.bearer {
         credential_ready(tx, company, connection, CredentialOwner::Http).await?;
@@ -235,7 +237,9 @@ async fn http_tool(
     .bind(operation.as_str())
     .fetch_optional(&mut *tx)
     .await?
-    .ok_or_else(unavailable)?;
+    .ok_or_else(|| {
+        AppError::BadRequest("Selected HTTP operation is unavailable or revoked".into())
+    })?;
     let tool: ToolSnapshot = serde_json::from_value(snapshot).map_err(|_| invalid())?;
     HttpOperation {
         tool: tool.clone(),
@@ -265,9 +269,11 @@ async fn mcp_tool(
 ) -> AppResult<RegisteredTool> {
     let current = super::super::mcp::publication_connection_on(tx, company.as_uuid(), connection)
         .await?
-        .ok_or_else(unavailable)?;
+        .ok_or_else(|| AppError::BadRequest("Selected MCP connection is unavailable".into()))?;
     if !current.enabled {
-        return Err(unavailable());
+        return Err(AppError::BadRequest(
+            "Selected MCP connection is unavailable".into(),
+        ));
     }
     if current.auth == McpAuth::Bearer {
         credential_ready(tx, company, connection, CredentialOwner::Mcp).await?;
@@ -281,18 +287,24 @@ async fn mcp_tool(
     .bind(remote_name)
     .fetch_optional(&mut *tx)
     .await?
-    .ok_or_else(unavailable)?;
+    .ok_or_else(|| {
+        AppError::BadRequest("Selected MCP tool permission is revoked or missing".into())
+    })?;
     let reviewed: ReviewedMcpOperation = sqlx::query_as(
         "SELECT snapshot,approval_required,version FROM workflow_mcp_operations WHERE company_id=$1 \
          AND connection_id=$2 AND name=$3 AND revoked_at IS NULL FOR SHARE"
     ).bind(company.as_uuid()).bind(connection).bind(operation.as_str())
-        .fetch_optional(&mut *tx).await?.ok_or_else(unavailable)?;
+        .fetch_optional(&mut *tx).await?.ok_or_else(|| AppError::BadRequest("Selected MCP operation is unavailable or revoked".into()))?;
     if reviewed.version != reviewed_version {
-        return Err(unavailable());
+        return Err(AppError::BadRequest(
+            "Selected MCP schema review changed; select the reviewed operation again".into(),
+        ));
     }
     let tool: ToolSnapshot = serde_json::from_value(reviewed.snapshot).map_err(|_| invalid())?;
     if tool.contract.name.as_str() != remote_name {
-        return Err(unavailable());
+        return Err(AppError::BadRequest(
+            "Selected MCP reviewed operation no longer matches its remote tool".into(),
+        ));
     }
     McpOperation {
         tool: tool.clone(),

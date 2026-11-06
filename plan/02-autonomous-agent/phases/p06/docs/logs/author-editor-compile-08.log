@@ -1,0 +1,97 @@
+   Compiling open_bots v0.1.0 (/Users/mac02/dev/openbot-recovery/.worktrees/autonomous-p06)
+error[E0433]: cannot find type `TypeName` in this scope
+  --> src/adapters/http/routes/workflows/ui/authoring/tools_tests.rs:45:32
+   |
+45 |                         alias: TypeName::parse(name).unwrap(),
+   |                                ^^^^^^^^ use of undeclared type `TypeName`
+   |
+help: consider importing this struct through its public re-export
+   |
+ 5 + use crate::workflow::TypeName;
+   |
+
+error[E0433]: cannot find type `TypeName` in this scope
+  --> src/adapters/http/routes/workflows/ui/authoring/tools_tests.rs:47:43
+   |
+47 | ...                   registration: TypeName::parse(name).unwrap(),
+   |                                     ^^^^^^^^ use of undeclared type `TypeName`
+   |
+help: consider importing this struct through its public re-export
+   |
+ 5 + use crate::workflow::TypeName;
+   |
+
+error[E0425]: cannot find function `grant` in module `tools`
+   --> src/adapters/http/routes/workflows/tenancy_tests.rs:190:24
+    |
+190 |                 tools::grant(
+    |                        ^^^^^ not found in `tools`
+    |
+note: these functions exist but are inaccessible
+   --> src/adapters/persistence/workflow/action_reconciliation_authority_support.rs:80:1
+    |
+ 80 | pub(super) async fn grant(f: &AdmissionFixture, actor: WorkflowActor, enabled: bool) {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `crate::adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::grant`: not accessible
+    |
+   ::: src/adapters/persistence/workflow/workflow_tool_registration_tests.rs:49:1
+    |
+ 49 | async fn grant(setup: &ToolSetup, tools: &[&str]) {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `crate::adapters::persistence::workflow::tests::message_tests::workflow_tool_registration_tests::grant`: not accessible
+
+error[E0425]: cannot find function `grant` in module `tools`
+  --> src/adapters/http/routes/workflows/tool_tests.rs:93:16
+   |
+93 |         tools::grant(
+   |                ^^^^^ not found in `tools`
+   |
+note: these functions exist but are inaccessible
+  --> src/adapters/persistence/workflow/action_reconciliation_authority_support.rs:80:1
+   |
+80 | pub(super) async fn grant(f: &AdmissionFixture, actor: WorkflowActor, enabled: bool) {
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `crate::adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::grant`: not accessible
+   |
+  ::: src/adapters/persistence/workflow/workflow_tool_registration_tests.rs:49:1
+   |
+49 | async fn grant(setup: &ToolSetup, tools: &[&str]) {
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `crate::adapters::persistence::workflow::tests::message_tests::workflow_tool_registration_tests::grant`: not accessible
+
+error[E0425]: cannot find function `grant` in module `tools`
+   --> src/adapters/http/routes/workflows/tool_tests.rs:232:24
+    |
+232 |                 tools::grant(
+    |                        ^^^^^ not found in `tools`
+    |
+note: these functions exist but are inaccessible
+   --> src/adapters/persistence/workflow/action_reconciliation_authority_support.rs:80:1
+    |
+ 80 | pub(super) async fn grant(f: &AdmissionFixture, actor: WorkflowActor, enabled: bool) {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `crate::adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::grant`: not accessible
+    |
+   ::: src/adapters/persistence/workflow/workflow_tool_registration_tests.rs:49:1
+    |
+ 49 | async fn grant(setup: &ToolSetup, tools: &[&str]) {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `crate::adapters::persistence::workflow::tests::message_tests::workflow_tool_registration_tests::grant`: not accessible
+
+warning: unused import: `uuid::Uuid`
+  --> src/application/workflow/tools.rs:15:5
+   |
+15 | use uuid::Uuid;
+   |     ^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+error[E0624]: method `assign_workflow_tool` is private
+   --> src/adapters/http/routes/workflows/ui/authoring/sample_tests.rs:141:7
+    |
+141 |     f.assign_workflow_tool(agent, "sample.send", child, version)
+    |       ^^^^^^^^^^^^^^^^^^^^ private method
+    |
+   ::: src/adapters/http/routes/workflows/ui/authoring/tools_tests.rs:20:5
+    |
+ 20 |     async fn assign_workflow_tool(&self, agent: Uuid, name: &str, workflow: Uuid, version: Uuid) {
+    |     -------------------------------------------------------------------------------------------- private method defined here
+
+Some errors have detailed explanations: E0425, E0433, E0624.
+For more information about an error, try `rustc --explain E0425`.
+warning: `open_bots` (lib test) generated 1 warning
+error: could not compile `open_bots` (lib test) due to 6 previous errors; 1 warning emitted

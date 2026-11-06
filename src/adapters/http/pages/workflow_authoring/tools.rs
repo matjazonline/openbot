@@ -1,23 +1,19 @@
 //! Workflow tools (p09 B1b, notice WF-C003): the company's registrations with revoke, the
-//! versions tab's "Use as a workflow tool" form, and the agent pane's two cards — the agent's
-//! ordered tool grants and the bindings that run it ("used by", F098.2). What reuse does to
-//! published versions follows P07-D2 rev 4 §D2.2: a frozen pin runs while its name is
-//! registered for the same workflow, whatever version it pins now.
+//! versions tab's "Use as a workflow tool" form and agent usage. Agent authoring owns typed
+//! assignments and independent publication. Retained pins require the registration to keep
+//! naming the same workflow, even when its current version changes.
 use super::*;
 use crate::application::workflow::RelatedAssociation;
 use crate::application::workflow::reads::{BindingUse, ToolTarget, VersionSummary};
 use crate::application::workflow::tools::WorkflowToolRegistration;
 
-/// What revoking a name does to the published versions that froze it (P07-D2 rev 4 §D2.2,
-/// §D2.7), said where the author revokes it.
-pub const REVOKE_WARNING: &str = "Revoking stops every published version that froze this tool: their new runs are refused, their bindings can no longer be configured or activated, and their agents' next calls to it are refused. A call already in progress still returns its result. Registering the name again for the same workflow restores them; for another workflow they stay stopped until republished.";
+/// Registration authority is checked at agent publication, run admission and each new call.
+pub const REVOKE_WARNING: &str = "Revoking refuses new runs whose selected agents need this workflow tool, and running agents' next calls to it. A call already in progress still returns its result. Workflow versions and binding configuration stay saved. Registering the name again does not restore revoked agent binding access. Select the tool again to create a fresh binding and publish the agent; the workflow that selects the agent keeps its version.";
 
-/// What pointing a name at another workflow does: for the versions that froze the old one it
-/// is a revocation (P07-D2 rev 4 §D2.2).
-pub const REPOINT_WARNING: &str = "It is registered for another workflow. Pointing it here stops every published version that froze that workflow: their new runs are refused, their bindings can no longer be configured or activated, and their agents' next calls to it are refused, until they are republished. A call already in progress still returns its result.";
+/// A retained agent binding never follows a registration to another workflow.
+pub const REPOINT_WARNING: &str = "It is registered for another workflow. Pointing it here refuses new runs and new calls through agent bindings to the old workflow. A call already in progress still returns its result. Select this target in the agent draft and publish a new agent revision to use it; the workflow that selects the agent keeps its version.";
 
-/// What re-pinning within the same workflow does: nothing to what is published.
-pub const REPIN_NOTE: &str = "It is registered for this workflow already. Re-pinning it changes only what later publications freeze; published versions keep running and calling the version they froze.";
+pub const REPIN_NOTE: &str = "It is registered for this workflow already. Re-pinning changes the choices offered for new agent tool selections. Published agents and running work keep their pinned workflow version.";
 
 fn target_label(targets: &[ToolTarget], registration: &WorkflowToolRegistration) -> String {
     match targets
@@ -188,106 +184,7 @@ pub fn workflow_tool_form(form: &ToolFormView<'_>) -> String {
     )
 }
 
-/// What one granted name resolves to at publication, for the grants card's reference.
-pub enum GrantResolution {
-    /// A registered workflow tool, with what it pins.
-    Workflow(String),
-    Message,
-    Provisioning,
-    /// An HTTP operation or a selected MCP slot tool, resolved against the publishing workflow.
-    Elsewhere,
-}
-
-pub struct AgentToolsCard<'a> {
-    pub company_id: Uuid,
-    pub agent: Uuid,
-    /// The grants as stored, in order.
-    pub granted: &'a [String],
-    /// What the field shows (the typed text after a refusal).
-    pub typed: Option<&'a str>,
-    /// The list the form was opened with, sent back as `expected`.
-    pub expected: &'a [String],
-    pub resolutions: &'a [(String, GrantResolution)],
-    /// Registered workflow tools the agent does not grant yet.
-    pub available: &'a [(String, String)],
-    pub banner: Option<&'a str>,
-    pub error: Option<&'a str>,
-}
-
-/// The agent pane's "Workflow tools" card: its ordered grants, one name per line.
-pub fn agent_tools_card(card: &AgentToolsCard<'_>) -> String {
-    let (company_id, agent) = (card.company_id, card.agent);
-    let resolved: String = card
-        .resolutions
-        .iter()
-        .map(|(name, resolution)| {
-            let what = match resolution {
-                GrantResolution::Workflow(target) => format!("workflow tool: {target}"),
-                GrantResolution::Message => "built-in message tool".to_owned(),
-                GrantResolution::Provisioning => {
-                    "provisioning tool (the Agent Builder's: a grant may keep or drop it, never add it)"
-                        .to_owned()
-                }
-                GrantResolution::Elsewhere => "resolved at publication: an HTTP operation, or an MCP tool the workflow selects; publication refuses a name nothing provides".to_owned(),
-            };
-            format!(
-                r#"<li><span class="font-mono">{}</span> — {}</li>"#,
-                escape_html_text(name),
-                escape_html_text(&what)
-            )
-        })
-        .collect();
-    let available: String = card
-        .available
-        .iter()
-        .map(|(name, target)| {
-            format!(
-                r#"<li><span class="font-mono">{}</span> — {}</li>"#,
-                escape_html_text(name),
-                escape_html_text(target)
-            )
-        })
-        .collect();
-    let typed = card
-        .typed
-        .map(str::to_owned)
-        .unwrap_or_else(|| card.granted.join("\n"));
-    format!(
-        r##"<section id="agent-workflow-tools" class="mt-6 space-y-3 rounded-box border border-base-300 p-4">
-            <div><h3 class="font-semibold">Workflow tools</h3>
-            <p class="text-sm opacity-70">The tools this agent may call in a workflow, in order. A workflow freezes them when it is published; revoking a tool later still stops it.</p></div>
-            {banner}{error}
-            <form hx-post="/ui/workflows/agents/{agent}/tools?company_id={company_id}" hx-target="#agent-workflow-tools" hx-swap="outerHTML"
-                hx-disabled-elt="find button[type='submit']" class="space-y-2">
-                <input type="hidden" name="expected" value="{expected}">
-                <label class="form-control w-full"><div class="label"><span class="text-xs">Granted tools, one name per line (at most 32)</span></div>
-                    <textarea class="textarea w-full font-mono text-xs" rows="4" name="tools">
-{typed}</textarea></label>
-                <button type="submit" class="btn btn-outline btn-sm">Save tools</button>
-            </form>
-            {resolved_list}{available_list}
-        </section>"##,
-        banner = card.banner.map(status_banner).unwrap_or_default(),
-        error = form_error_banner(card.error),
-        expected = escape_html_attr(&card.expected.join("\n")),
-        typed = escape_html_text(&typed),
-        resolved_list = if resolved.is_empty() {
-            String::new()
-        } else {
-            format!(
-                r#"<div><p class="text-xs font-semibold">What each granted name is</p><ul class="space-y-1 text-xs opacity-80">{resolved}</ul></div>"#
-            )
-        },
-        available_list = if available.is_empty() {
-            String::new()
-        } else {
-            format!(
-                r#"<div><p class="text-xs font-semibold">Registered workflow tools not granted</p><ul class="space-y-1 text-xs opacity-80">{available}</ul></div>"#
-            )
-        },
-    )
-}
-
+/// Workflow bindings that reference this company agent.
 pub struct AgentUsageCard<'a> {
     pub company_id: Uuid,
     /// The agent the card describes; its board is linked.
@@ -379,18 +276,10 @@ pub(crate) fn lazy_card(url: &str, loading: &str, failed: &str) -> String {
 }
 
 /// The agent pane's workflow cards: its tool grants and the bindings that run it.
-pub(crate) fn workflow_agent_cards(company_id: Uuid, agent: Uuid) -> String {
-    format!(
-        "{}{}",
-        lazy_card(
-            &format!("/ui/workflows/agents/{agent}/tools?company_id={company_id}"),
-            "Loading the agent's workflow tools…",
-            "The agent's workflow tools could not be loaded.",
-        ),
-        lazy_card(
-            &format!("/ui/workflows/agents/{agent}/usage?company_id={company_id}"),
-            "Loading where this agent is used…",
-            "Where this agent is used could not be loaded.",
-        ),
+pub(crate) fn workflow_agent_usage_card(company_id: Uuid, agent: Uuid) -> String {
+    lazy_card(
+        &format!("/ui/workflows/agents/{agent}/usage?company_id={company_id}"),
+        "Loading where this agent is used…",
+        "Where this agent is used could not be loaded.",
     )
 }

@@ -23,3 +23,6 @@ mod manifest_tests;
 mod revision_tests;
 #[path = "autonomous_agent_storage_targets_tests.rs"]
 mod targets_tests;
+
+#[path = "autonomous_agent_storage_view_tests.rs"]
+mod view_tests;

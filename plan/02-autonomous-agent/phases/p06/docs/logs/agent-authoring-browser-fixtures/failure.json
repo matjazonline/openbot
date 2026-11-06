@@ -1,0 +1,7 @@
+{
+  "errors": [],
+  "queries": [
+    "http://127.0.0.1/ui/agents/d8a681c1-f380-435d-acc8-bb20efb3b82b/tool-catalog?company_id=b58eaae5-8e49-49f9-a86c-d513d8e653cf"
+  ],
+  "writes": []
+}

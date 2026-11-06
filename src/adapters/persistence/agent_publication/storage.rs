@@ -9,7 +9,7 @@ struct RevisionRow {
     digest: Vec<u8>,
 }
 
-pub(super) async fn active_on(
+pub(in crate::adapters::persistence) async fn active_on(
     db: &mut PgConnection,
     scope: AgentPublicationScope,
 ) -> AppResult<Option<AgentRevisionId>> {

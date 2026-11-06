@@ -1,0 +1,30 @@
+{
+  "recorded_at": "2026-11-06T18:44:43.626032+00:00",
+  "segment": "08",
+  "prior_summary_unpersisted_metrics": [
+    2275,
+    2276,
+    711,
+    1541,
+    3158,
+    2053,
+    2482,
+    1822,
+    1859,
+    2324,
+    3298,
+    3149
+  ],
+  "current_resume_metrics": [
+    16708,
+    19521,
+    1892,
+    24771,
+    7081,
+    3427,
+    4003
+  ],
+  "total_reported_tokens_saved": 104351,
+  "basis": "Graft reported estimates only; no independent cost estimate",
+  "pricing_available": false
+}

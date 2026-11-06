@@ -1,0 +1,86 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+
+running 1 test
+test adapters::persistence::workflow::tests::mcp_tests::agent_tests::authoring_journey::autonomous_agent_authoring_one_typed_mcp_agent_runs_in_two_workflows_and_views_retain_revisions ... FAILED
+
+failures:
+
+---- adapters::persistence::workflow::tests::mcp_tests::agent_tests::authoring_journey::autonomous_agent_authoring_one_typed_mcp_agent_runs_in_two_workflows_and_views_retain_revisions stdout ----
+
+thread 'adapters::persistence::workflow::tests::mcp_tests::agent_tests::authoring_journey::autonomous_agent_authoring_one_typed_mcp_agent_runs_in_two_workflows_and_views_retain_revisions' (33186782) panicked at src/adapters/persistence/workflow/mcp_test_support.rs:534:10:
+called `Option::unwrap()` on a `None` value
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/panicking.rs:689:5
+   1: core::panicking::panic_fmt
+             at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/panicking.rs:80:14
+   2: core::panicking::panic
+             at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/panicking.rs:150:5
+   3: core::option::unwrap_failed
+             at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/option.rs:2236:5
+   4: core::option::Option<T>::unwrap
+             at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/option.rs:1016:21
+   5: open_bots::adapters::persistence::workflow::tests::mcp_tests::support::claim::{{closure}}
+             at ./src/adapters/persistence/workflow/mcp_test_support.rs:534:10
+   6: open_bots::adapters::persistence::workflow::tests::mcp_tests::agent_tests::authoring_journey::admit_again::{{closure}}
+             at ./src/adapters/persistence/workflow/autonomous_agent_authoring_mcp_tests.rs:96:63
+   7: open_bots::adapters::persistence::workflow::tests::mcp_tests::agent_tests::authoring_journey::autonomous_agent_authoring_one_typed_mcp_agent_runs_in_two_workflows_and_views_retain_revisions::{{closure}}
+             at ./src/adapters/persistence/workflow/autonomous_agent_authoring_mcp_tests.rs:116:41
+   8: <core::pin::Pin<P> as core::future::future::Future>::poll
+             at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/future/future.rs:133:9
+   9: <core::pin::Pin<P> as core::future::future::Future>::poll
+             at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/future/future.rs:133:9
+  10: tokio::runtime::scheduler::current_thread::CoreGuard::block_on::{{closure}}::{{closure}}::{{closure}}
+             at /Users/mac02/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.50.0/src/runtime/scheduler/current_thread/mod.rs:769:70
+  11: tokio::task::coop::with_budget
+             at /Users/mac02/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.50.0/src/task/coop/mod.rs:167:5
+  12: tokio::task::coop::budget
+             at /Users/mac02/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.50.0/src/task/coop/mod.rs:133:5
+  13: tokio::runtime::scheduler::current_thread::CoreGuard::block_on::{{closure}}::{{closure}}
+             at /Users/mac02/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.50.0/src/runtime/scheduler/current_thread/mod.rs:769:25
+  14: tokio::runtime::scheduler::current_thread::Context::enter
+             at /Users/mac02/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.50.0/src/runtime/scheduler/current_thread/mod.rs:446:19
+  15: tokio::runtime::scheduler::current_thread::CoreGuard::block_on::{{closure}}
+             at /Users/mac02/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.50.0/src/runtime/scheduler/current_thread/mod.rs:768:44
+  16: tokio::runtime::scheduler::current_thread::CoreGuard::enter::{{closure}}
+             at /Users/mac02/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.50.0/src/runtime/scheduler/current_thread/mod.rs:856:68
+  17: tokio::runtime::context::scoped::Scoped<T>::set
+             at /Users/mac02/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.50.0/src/runtime/context/scoped.rs:40:9
+  18: tokio::runtime::context::set_scheduler::{{closure}}
+             at /Users/mac02/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.50.0/src/runtime/context.rs:176:38
+  19: std::thread::local::LocalKey<T>::try_with
+             at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/thread/local.rs:513:12
+  20: std::thread::local::LocalKey<T>::with
+             at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/thread/local.rs:477:20
+  21: tokio::runtime::context::set_scheduler
+             at /Users/mac02/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.50.0/src/runtime/context.rs:176:17
+  22: tokio::runtime::scheduler::current_thread::CoreGuard::enter
+             at /Users/mac02/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.50.0/src/runtime/scheduler/current_thread/mod.rs:856:27
+  23: tokio::runtime::scheduler::current_thread::CoreGuard::block_on
+             at /Users/mac02/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.50.0/src/runtime/scheduler/current_thread/mod.rs:756:24
+  24: tokio::runtime::scheduler::current_thread::CurrentThread::block_on::{{closure}}
+             at /Users/mac02/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.50.0/src/runtime/scheduler/current_thread/mod.rs:200:33
+  25: tokio::runtime::context::runtime::enter_runtime
+             at /Users/mac02/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.50.0/src/runtime/context/runtime.rs:65:16
+  26: tokio::runtime::scheduler::current_thread::CurrentThread::block_on
+             at /Users/mac02/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.50.0/src/runtime/scheduler/current_thread/mod.rs:188:9
+  27: tokio::runtime::runtime::Runtime::block_on_inner
+             at /Users/mac02/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.50.0/src/runtime/runtime.rs:371:52
+  28: tokio::runtime::runtime::Runtime::block_on
+             at /Users/mac02/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.50.0/src/runtime/runtime.rs:345:18
+  29: open_bots::adapters::persistence::workflow::tests::mcp_tests::agent_tests::authoring_journey::autonomous_agent_authoring_one_typed_mcp_agent_runs_in_two_workflows_and_views_retain_revisions
+             at ./src/adapters/persistence/workflow/autonomous_agent_authoring_mcp_tests.rs:172:47
+  30: open_bots::adapters::persistence::workflow::tests::mcp_tests::agent_tests::authoring_journey::autonomous_agent_authoring_one_typed_mcp_agent_runs_in_two_workflows_and_views_retain_revisions::{{closure}}
+             at ./src/adapters/persistence/workflow/autonomous_agent_authoring_mcp_tests.rs:100:107
+  31: core::ops::function::FnOnce::call_once
+             at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ops/function.rs:250:5
+  32: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+
+
+failures:
+    adapters::persistence::workflow::tests::mcp_tests::agent_tests::authoring_journey::autonomous_agent_authoring_one_typed_mcp_agent_runs_in_two_workflows_and_views_retain_revisions
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 3018 filtered out; finished in 1.17s
+

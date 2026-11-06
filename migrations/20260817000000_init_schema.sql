@@ -12115,6 +12115,7 @@ CREATE TABLE public.agent_revisions (
     CHECK((jsonb_typeof(content::jsonb->'tools')='array' AND jsonb_array_length(content::jsonb->'tools')<=32) IS TRUE),
     CHECK((jsonb_typeof(content::jsonb->'skills')='array' AND jsonb_array_length(content::jsonb->'skills')<=16) IS TRUE)
 );
+CREATE INDEX agent_revisions_history_idx ON public.agent_revisions(company_id,agent_id,created_at DESC,id DESC);
 CREATE TABLE public.agent_revision_bindings (
     company_id uuid NOT NULL,
     agent_id uuid NOT NULL,

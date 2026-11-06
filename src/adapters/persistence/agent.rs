@@ -258,7 +258,6 @@ pub(crate) async fn update_agent(
     id: Uuid,
     write: AgentWrite,
 ) -> AppResult<Agent> {
-    validated_created_by(&write)?;
     let mut tx = persistence.pool.begin().await.map_err(AppError::from)?;
     let company_id: Option<Uuid> =
         sqlx::query_scalar("SELECT company_id FROM agents WHERE id = $1 FOR UPDATE")
@@ -267,12 +266,26 @@ pub(crate) async fn update_agent(
             .await
             .map_err(AppError::from)?
             .ok_or_else(crate::use_cases::agent::agent_not_found)?;
-    replace_agent_capabilities_on(&mut tx, company_id, id, &write).await?;
-    let db = sqlx::query_as::<_, AgentDb>(&format!(
+    let db = update_agent_on(&mut tx, company_id, id, &write).await?;
+    tx.commit()
+        .await
+        .map_err(super::agent_capability::relationship_error)?;
+    db.try_into()
+}
+
+pub(in crate::adapters::persistence) async fn update_agent_on(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    company_id: Option<Uuid>,
+    id: Uuid,
+    write: &AgentWrite,
+) -> AppResult<AgentDb> {
+    validated_created_by(write)?;
+    replace_agent_capabilities_on(tx, company_id, id, write).await?;
+    sqlx::query_as::<_, AgentDb>(&format!(
         r#"UPDATE agents AS agent
            SET name = $1, slug = $2, provider = $3, model = $4, system_prompt = $5,
                description = $6, avatar_url = $7, draft_revision = draft_revision + 1
-           WHERE id = $8
+           WHERE id = $8 AND company_id IS NOT DISTINCT FROM $9
            RETURNING {AGENT_COLUMNS}"#
     ))
     .bind(&write.name)
@@ -283,13 +296,11 @@ pub(crate) async fn update_agent(
     .bind(&write.description)
     .bind(write.avatar_url.as_ref().map(AvatarUrl::as_str))
     .bind(id)
-    .fetch_one(&mut *tx)
+    .bind(company_id)
+    .fetch_optional(&mut **tx)
     .await
-    .map_err(slug_conflict)?;
-    tx.commit()
-        .await
-        .map_err(super::agent_capability::relationship_error)?;
-    db.try_into()
+    .map_err(slug_conflict)?
+    .ok_or_else(crate::use_cases::agent::agent_not_found)
 }
 
 fn slug_conflict(error: sqlx::Error) -> AppError {

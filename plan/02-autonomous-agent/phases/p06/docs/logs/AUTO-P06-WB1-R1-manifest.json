@@ -1,0 +1,97 @@
+{
+  "id": "AUTO-P06-WB1-R1",
+  "created_at": "2026-11-06T18:40:38.190015+00:00",
+  "worktree": "/Users/mac02/dev/openbot-recovery/.worktrees/autonomous-p06",
+  "branch": "autonomous/p06",
+  "phase_start": "fb92a7b48aec030b685701eff31fba9f86f5ae19",
+  "review_base": "fb92a7b48aec030b685701eff31fba9f86f5ae19",
+  "head": "fb92a7b48aec030b685701eff31fba9f86f5ae19",
+  "digest": "2ae1e93a0861c03b3ef1f223a109ad74f399ed30020f25d54904e794a6368e3c",
+  "exclusions": [
+    "plan/02-autonomous-agent/phases/p06/docs"
+  ],
+  "authority": "/Users/mac02/dev/openbot-recovery/plan/02-autonomous-agent/COORDINATION.md",
+  "authority_revision": 36,
+  "authority_pin": "/Users/mac02/dev/openbot-recovery/.worktrees/autonomous-p06/plan/02-autonomous-agent/phases/p06/docs/logs/coordination-r36.md",
+  "authority_sha256": "7e8af1c59d239facd7daf0674f734acd41cdb5da7675a95245934ca2274a098a",
+  "gated_decision": "AUTO-P06-G1-D1/r2",
+  "decision_sha256": "679876e01f1e6a8ac9bfebdbefa3657d7fd0985d00057ee5b3cc33849e511c37",
+  "gate_pass": "AUTO-P06-G1-R1-N1",
+  "applicable_notices": [
+    "I001/r2",
+    "I002/r1",
+    "I003/r2",
+    "I004/r1",
+    "I005/r1",
+    "I006/r3",
+    "I007/r2",
+    "I008/r2",
+    "C001-C007/r1",
+    "C008/r2"
+  ],
+  "skill_dir": "/Users/mac02/dev/openbot-recovery/.agents/skills/implement-astra-reviewed-2-2",
+  "snapshot_path_prefix": "/Users/mac02/dev/openbot-recovery/.worktrees/knowledge-tooling/autonomous-review-bin",
+  "preserved_preexisting_changes": "none in assigned implementation worktree; primary coordination files excluded from staging by location",
+  "checks": {
+    "author-clippy-04.log": {
+      "sha256": "532594ee9a48df6906855abb87f7ef99c321ffca1b275014394200d1d2c43969",
+      "bytes": 165
+    },
+    "author-final-compile-34.log": {
+      "sha256": "b65d49da1edeb7fc3cee50e1b45d34e5d5c6b030754cf5728f46132d0585559c",
+      "bytes": 329
+    },
+    "author-final-targeted-02.log": {
+      "sha256": "e8f974ae979664fcf3f2f3cf7686478bc4f41f6d33eba8eca870b54f1a47417a",
+      "bytes": 16431
+    },
+    "author-offline-check-final-01.log": {
+      "sha256": "40279d3a03eb6a1a7a40372d240a9c9454a831eb3f8083dc3d0d398e3ef2cefd",
+      "bytes": 165
+    },
+    "author-sqlx-prepare-01.log": {
+      "sha256": "a87e19081625de9a2868c596d0b124570fae2b13433a5ed7ed4995227a25c54c",
+      "bytes": 258
+    },
+    "author-sqlx-check-final-01.log": {
+      "sha256": "005a6d21b37b34b49dd479475098f6b4b16ab3ef6b7080ab24cfab308ea0ee72",
+      "bytes": 165
+    },
+    "author-current-owned-migrations-01.json": {
+      "sha256": "c706b82199879cfaf925a6e7b048812e55aedaf79237fb74c62eeeb31057420e",
+      "bytes": 1200
+    },
+    "author-agent-browser-interaction-32.log": {
+      "sha256": "cf8dbe412126605d4b77d43e43a4718ae7bec3aedf0c557077b8ae1f60f9501b",
+      "bytes": 345
+    },
+    "author-affected-ui-protocols-02.log": {
+      "sha256": "2b23e4ceae2af5b9a36de600435f05a0bc6f1fd7c7d5b1cc7496baa627d011b3",
+      "bytes": 2431
+    },
+    "author-security-browser-01.log": {
+      "sha256": "3d42211d752daa172502845b8cb6f5795bbdb58ebeca41fce13de180a76f1485",
+      "bytes": 447
+    },
+    "author-run-counts-final-02.log": {
+      "sha256": "3bd9a80626b22faa37ab795c360c719f7c283472854b8391e5b9993f3368f0f1",
+      "bytes": 389
+    },
+    "author-graft-build-final-01.log": {
+      "sha256": "0acfc722cb8c17487226f5f686d910c765296c71962c16a03d311cbe7896d1bb",
+      "bytes": 96573
+    },
+    "author-static-final-01.json": {
+      "sha256": "2f114cd4dcafce268f03c7a2c5ec3742874e45c903aa3696ae263f9416bcc225",
+      "bytes": 856
+    },
+    "author-sample-boundary-negative-final-01.log": {
+      "sha256": "44825f24cdbd1bcc73113cc0e880161c602c66296af8171cc29ead1360391377",
+      "bytes": 102
+    },
+    "author-sample-boundary-source-final-01.log": {
+      "sha256": "228c0f0f23407594379b257a3e3684550f2f3eb1741d27acbc9be312e22e6d2d",
+      "bytes": 43
+    }
+  }
+}

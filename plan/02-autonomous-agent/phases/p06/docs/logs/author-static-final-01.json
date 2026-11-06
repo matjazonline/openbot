@@ -1,0 +1,52 @@
+{
+  "fmt": {
+    "argv": [
+      "cargo",
+      "fmt",
+      "--all",
+      "--",
+      "--check"
+    ],
+    "exit": 0,
+    "output": ""
+  },
+  "diff": {
+    "argv": [
+      "git",
+      "diff",
+      "--check"
+    ],
+    "exit": 0,
+    "output": ""
+  },
+  "node_agent_syntax": {
+    "argv": [
+      "node",
+      "--check",
+      "scripts/tests/agent-authoring-browser.mjs"
+    ],
+    "exit": 0,
+    "output": ""
+  },
+  "node_picker_syntax": {
+    "argv": [
+      "node",
+      "--check",
+      "scripts/tests/workflow-agent-picker-browser.mjs"
+    ],
+    "exit": 0,
+    "output": ""
+  },
+  "doc_links": {
+    "files": [
+      "README.md",
+      "docs/agent-authoring.md",
+      "docs/rig.md",
+      "docs/agent-builder-context.md",
+      "docs/workflow-language-v1.md",
+      "docs/workflow-operations.md"
+    ],
+    "count": 27,
+    "missing": []
+  }
+}

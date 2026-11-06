@@ -1,0 +1,3 @@
+BEGIN
+ERROR:  duplicate key value violates unique constraint "users_email_key"
+DETAIL:  Key (email)=(history_probe@example.test) already exists.

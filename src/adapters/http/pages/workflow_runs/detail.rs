@@ -167,6 +167,7 @@ pub fn run_body(view: &RunPaneView<'_>) -> String {
             </div>
             <div class="flex-1 space-y-6 overflow-y-auto px-4 py-4 sm:px-6">
                 {facts}
+                {dependencies}
                 {controls}
                 <section class="space-y-2"><h3 class="font-semibold">Graph</h3>{graph}</section>
                 {timeline}
@@ -194,6 +195,7 @@ pub fn run_body(view: &RunPaneView<'_>) -> String {
         revision = summary.revision,
         created = format_date_time(summary.created_at),
         deadline = format_date_time(summary.deadline),
+        dependencies = super::provenance::dependencies(run),
         facts = facts(view),
         controls = controls(view),
         graph = view.graph_html,
@@ -735,7 +737,11 @@ fn children(view: &RunPaneView<'_>) -> String {
         .iter()
         .map(|child| {
             format!(
-                r#"<li class="py-1 text-sm">{link} {state} · step <span class="font-mono">{step}</span>{round}{call}</li>"#,
+                r#"<li class="py-1 text-sm">{link} {state} · step <span class="font-mono">{step}</span>{round}{call}{dependency}</li>"#,
+                dependency = child.dependency.as_ref().map(|selected| format!(
+                    "<p class=\"break-all text-xs\">Workflow {} · version {}</p>",
+                    selected.workflow_id.as_uuid(), selected.version_id.as_uuid()
+                )).unwrap_or_default(),
                 link = run_link(company_id, child.run.as_uuid()),
                 state = run_state_badge(&child.state, child.waiting_reason.as_deref()),
                 step = escape_html_text(child.step.as_deref().unwrap_or("?")),

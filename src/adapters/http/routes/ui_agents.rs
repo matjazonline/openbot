@@ -48,8 +48,11 @@ use super::{
     ui::{load_account, load_managed_company, workspace_user},
 };
 
+mod authoring;
+
 pub fn router() -> Router<AppState> {
     Router::new()
+        .merge(authoring::router())
         .route("/ui/agents", get(agents_page).post(create_agent))
         .route("/ui/agents/new", get(create_pane))
         .route("/ui/agents/from-library", post(create_from_library))
@@ -115,6 +118,7 @@ const NO_SELECTION: &str = "Select an agent to configure it, or create a new one
 /// Extracted as one value rather than five `State`s per handler: each of these routes needs the
 /// same set, and a handler's own parameters should be what makes it different from its siblings.
 struct Workspace {
+    workflow: Arc<crate::infra::workflow::WorkflowServices>,
     company_use_cases: Arc<CompanyUseCases>,
     agent_use_cases: Arc<AgentUseCases>,
     skill_use_cases: Arc<SkillUseCases>,
@@ -133,6 +137,7 @@ impl FromRequestParts<AppState> for Workspace {
         let user = AuthenticatedUser::from_request_parts(parts, state).await?;
 
         Ok(Self {
+            workflow: state.workflow.clone(),
             company_use_cases: state.company_use_cases.clone(),
             agent_use_cases: state.agent_use_cases.clone(),
             skill_use_cases: state.skill_use_cases.clone(),
@@ -156,6 +161,7 @@ impl Workspace {
 
     fn view<'a>(&'a self, company: &'a Company) -> AgentSettingsView<'a> {
         AgentSettingsView {
+            workflow: &self.workflow,
             agent_use_cases: &self.agent_use_cases,
             skill_use_cases: &self.skill_use_cases,
             user_id: self.user_id,
@@ -462,9 +468,19 @@ async fn update_agent(
         }
     };
 
+    let request = match submitted.form.company_update(agent_id, write) {
+        Ok(request) => request,
+        Err(message) => {
+            return Ok(Html(
+                view.edit_pane(&stored, Some(&submitted.draft()), Some(&message))
+                    .await?,
+            )
+            .into_response());
+        }
+    };
     let saved = workspace
         .agent_use_cases
-        .update_agent(workspace.user_id, company.id, agent_id, write)
+        .update_agent(workspace.user_id, company.id, request)
         .await;
 
     match saved {
@@ -515,6 +531,7 @@ struct CreateForm<'a> {
 
 /// Everything the workspace renders from, so each handler names its data once.
 struct AgentSettingsView<'a> {
+    workflow: &'a crate::infra::workflow::WorkflowServices,
     agent_use_cases: &'a AgentUseCases,
     skill_use_cases: &'a SkillUseCases,
     user_id: Uuid,
@@ -633,6 +650,12 @@ impl AgentSettingsView<'_> {
         draft: Option<&pages::AgentDraft<'_>>,
         error: Option<&str>,
     ) -> AppResult<String> {
+        let authoring = self
+            .workflow
+            .agent_authoring_reads()
+            .authoring_state(authoring::scope(self.user_id, self.company.id, agent.id)?)
+            .await?;
+        let agent = &authoring.agent;
         let model_connections = self.model_connections().await?;
         let capabilities = self
             .skill_use_cases
@@ -653,16 +676,19 @@ impl AgentSettingsView<'_> {
             provider: agent.provider.as_deref().unwrap_or(""),
             model: agent.model.as_deref().unwrap_or(""),
             skill_ids: capabilities.skills.iter().map(|skill| skill.id).collect(),
+            skill_ids_text: None,
             avatar_url: agent
                 .avatar_url
                 .as_ref()
                 .map(AvatarUrl::as_str)
                 .unwrap_or(""),
             advanced: true,
+            expected_revision: Some(agent.draft_revision),
+            tool_assignments: None,
         };
         let shown = draft.cloned().unwrap_or(stored);
 
-        Ok(pages::agent_edit_pane(&pages::AgentEditPane {
+        let html = pages::agent_edit_pane(&pages::AgentEditPane {
             company: self.company,
             app_domain_name: self.app_domain_name,
             model_connections: &model_connections,
@@ -670,7 +696,13 @@ impl AgentSettingsView<'_> {
             draft: Some(&shown),
             error,
             capability_options: pages::AgentCapabilityOptions { skills: &skills },
-        }))
+            authoring: Some(&authoring),
+        });
+        self.workflow
+            .agent_authoring_reads()
+            .authorize_authoring(authoring::scope(self.user_id, self.company.id, agent.id)?)
+            .await?;
+        Ok(html)
     }
 
     /// What every successful write returns: the saved agent's pane, with the sidebar list
@@ -738,6 +770,13 @@ impl SubmittedAgent {
     /// One builder for every place a submit becomes a write -- the check before a Simple create
     /// expands its prompt, and the create itself -- so none of them can drift on what the form
     /// means.
+    pub(super) fn company_update(
+        &self,
+        agent: Uuid,
+    ) -> Result<crate::application::agent::CompanyAgentUpdate, String> {
+        self.form.company_update(agent, self.agent_write()?)
+    }
+
     pub(super) fn agent_write(&self) -> Result<AgentWrite, String> {
         let capabilities = self.form.capabilities()?;
         Ok(AgentWrite {
@@ -776,8 +815,11 @@ impl SubmittedAgent {
             provider: self.form.provider.as_deref().unwrap_or(""),
             model: self.form.model.as_deref().unwrap_or(""),
             skill_ids: capabilities.skill_ids,
+            skill_ids_text: self.form.skill_ids.as_deref(),
             avatar_url: self.form.avatar_url.as_deref().unwrap_or(""),
             advanced: !self.is_simple(),
+            expected_revision: self.form.expected_revision,
+            tool_assignments: self.form.tool_assignments.as_deref(),
         }
     }
 }

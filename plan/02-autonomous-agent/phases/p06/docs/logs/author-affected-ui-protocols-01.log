@@ -1,0 +1,321 @@
+✔ library payload carries the agent's own fields and no retired runtime fields (1.273333ms)
+✔ accepted library writes show progress, prevent duplicate submits, and restore on failure (0.999ms)
+✔ ordinary page links release every stream before navigation (2.10975ms)
+✔ HTMX/prevented clicks, modified clicks, downloads and new tabs keep streams (2.059209ms)
+✔ anchors and non-document protocols keep streams (0.955083ms)
+✔ native filter submissions release all streams on every navigation (5.059625ms)
+✔ cancelled, HTMX, dialog and other-window submissions retain streams (1.62575ms)
+✖ late attribution and reconnect keep both replies, composer and stream owner (12.666375ms)
+✖ a reconnect backlog keeps an explicit 200-message live window and the composer (3.705916ms)
+
+Interrupted while running:
+
+⚠ scripts/tests/workflow-conversations.mjs (scripts/tests/workflow-conversations.mjs:1:1)
+⚠ scripts/tests/workflow-runs.mjs (scripts/tests/workflow-runs.mjs:1:1)
+⚠ scripts/tests/workflow-samples.mjs (scripts/tests/workflow-samples.mjs:1:1)
+✖ scripts/tests/workflow-conversations.mjs (173665.405ms)
+✖ a late body read cannot remove preserved steps after a cancel or navigation (12.457167ms)
+✖ an actual SSE disconnect reconciles and preserves an unfinished note and disclosure (3.512292ms)
+✖ a waiting parent refreshes a child badge on the child wakeup without reconnecting (1.207583ms)
+✖ board: two window reads completing out of order show the later choice (0.892042ms)
+✖ board: opening a run while a filter read is in flight keeps the chosen filters (0.80375ms)
+✖ list: a wake-up during a filter read reads the new filter instead of undoing it (0.99975ms)
+✖ board: a filter change while a wake-up read is in flight wins (0.619417ms)
+✖ board: a burst of run events reads at most once per two seconds and shows the final state (0.711375ms)
+✖ board: constant change still reads every two seconds and never starves (0.845333ms)
+✖ phone: a stream-driven or polled pane reload leaves the reader on the list; opening a run still moves them (1.023834ms)
+✖ board: reads slower than the interval never overlap and keep landing under constant change (0.890792ms)
+✖ board: a run change during a filter read is read again after it, on the new leaf (0.729459ms)
+✖ board: two quick filter changes do not leave the coalescer waiting for ever (0.873708ms)
+✖ scripts/tests/workflow-runs.mjs (173665.089334ms)
+✖ sample progress, failed request recovery and late navigation response use the requesting form (11.364ms)
+✖ actual sample textarea template preserves leading newlines for every raw JSON field (1.878125ms)
+✖ scripts/tests/workflow-samples.mjs (173664.772ms)
+ℹ tests 27
+ℹ suites 0
+ℹ pass 7
+ℹ fail 17
+ℹ cancelled 3
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 173672.611375
+
+✖ failing tests:
+
+test at scripts/tests/workflow-conversations.mjs:11:1
+✖ late attribution and reconnect keep both replies, composer and stream owner (12.666375ms)
+  browserType.launch: Executable doesn't exist at /Users/mac02/Library/Caches/ms-playwright/chromium_headless_shell-1193/chrome-mac/headless_shell
+  ╔═════════════════════════════════════════════════════════════════════════╗
+  ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+  ║ Please run the following command to download new browsers:              ║
+  ║                                                                         ║
+  ║     npx playwright install                                              ║
+  ║                                                                         ║
+  ║ <3 Playwright Team                                                      ║
+  ╚═════════════════════════════════════════════════════════════════════════╝
+      at TestContext.<anonymous> (/Users/mac02/dev/openbot-recovery/.worktrees/autonomous-p06/scripts/tests/workflow-conversations.mjs:37:36) {
+    name: 'Error'
+  }
+
+test at scripts/tests/workflow-conversations.mjs:67:1
+✖ a reconnect backlog keeps an explicit 200-message live window and the composer (3.705916ms)
+  browserType.launch: Executable doesn't exist at /Users/mac02/Library/Caches/ms-playwright/chromium_headless_shell-1193/chrome-mac/headless_shell
+  ╔═════════════════════════════════════════════════════════════════════════╗
+  ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+  ║ Please run the following command to download new browsers:              ║
+  ║                                                                         ║
+  ║     npx playwright install                                              ║
+  ║                                                                         ║
+  ║ <3 Playwright Team                                                      ║
+  ╚═════════════════════════════════════════════════════════════════════════╝
+      at TestContext.<anonymous> (/Users/mac02/dev/openbot-recovery/.worktrees/autonomous-p06/scripts/tests/workflow-conversations.mjs:102:36) {
+    name: 'Error'
+  }
+
+test at scripts/tests/workflow-conversations.mjs:1:1
+✖ scripts/tests/workflow-conversations.mjs (173665.405ms)
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at scripts/tests/workflow-runs.mjs:71:1
+✖ a late body read cannot remove preserved steps after a cancel or navigation (12.457167ms)
+  browserType.launch: Executable doesn't exist at /Users/mac02/Library/Caches/ms-playwright/chromium_headless_shell-1193/chrome-mac/headless_shell
+  ╔═════════════════════════════════════════════════════════════════════════╗
+  ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+  ║ Please run the following command to download new browsers:              ║
+  ║                                                                         ║
+  ║     npx playwright install                                              ║
+  ║                                                                         ║
+  ║ <3 Playwright Team                                                      ║
+  ╚═════════════════════════════════════════════════════════════════════════╝
+      at harness (/Users/mac02/dev/openbot-recovery/.worktrees/autonomous-p06/scripts/tests/workflow-runs.mjs:48:36)
+      at async TestContext.<anonymous> (/Users/mac02/dev/openbot-recovery/.worktrees/autonomous-p06/scripts/tests/workflow-runs.mjs:73:19) {
+    name: 'Error'
+  }
+
+test at scripts/tests/workflow-runs.mjs:89:1
+✖ an actual SSE disconnect reconciles and preserves an unfinished note and disclosure (3.512292ms)
+  browserType.launch: Executable doesn't exist at /Users/mac02/Library/Caches/ms-playwright/chromium_headless_shell-1193/chrome-mac/headless_shell
+  ╔═════════════════════════════════════════════════════════════════════════╗
+  ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+  ║ Please run the following command to download new browsers:              ║
+  ║                                                                         ║
+  ║     npx playwright install                                              ║
+  ║                                                                         ║
+  ║ <3 Playwright Team                                                      ║
+  ╚═════════════════════════════════════════════════════════════════════════╝
+      at harness (/Users/mac02/dev/openbot-recovery/.worktrees/autonomous-p06/scripts/tests/workflow-runs.mjs:48:36)
+      at async TestContext.<anonymous> (/Users/mac02/dev/openbot-recovery/.worktrees/autonomous-p06/scripts/tests/workflow-runs.mjs:90:15) {
+    name: 'Error'
+  }
+
+test at scripts/tests/workflow-runs.mjs:105:1
+✖ a waiting parent refreshes a child badge on the child wakeup without reconnecting (1.207583ms)
+  browserType.launch: Executable doesn't exist at /Users/mac02/Library/Caches/ms-playwright/chromium_headless_shell-1193/chrome-mac/headless_shell
+  ╔═════════════════════════════════════════════════════════════════════════╗
+  ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+  ║ Please run the following command to download new browsers:              ║
+  ║                                                                         ║
+  ║     npx playwright install                                              ║
+  ║                                                                         ║
+  ║ <3 Playwright Team                                                      ║
+  ╚═════════════════════════════════════════════════════════════════════════╝
+      at harness (/Users/mac02/dev/openbot-recovery/.worktrees/autonomous-p06/scripts/tests/workflow-runs.mjs:48:36)
+      at async TestContext.<anonymous> (/Users/mac02/dev/openbot-recovery/.worktrees/autonomous-p06/scripts/tests/workflow-runs.mjs:106:15) {
+    name: 'Error'
+  }
+
+test at scripts/tests/workflow-runs.mjs:214:1
+✖ board: two window reads completing out of order show the later choice (0.892042ms)
+  browserType.launch: Executable doesn't exist at /Users/mac02/Library/Caches/ms-playwright/chromium_headless_shell-1193/chrome-mac/headless_shell
+  ╔═════════════════════════════════════════════════════════════════════════╗
+  ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+  ║ Please run the following command to download new browsers:              ║
+  ║                                                                         ║
+  ║     npx playwright install                                              ║
+  ║                                                                         ║
+  ║ <3 Playwright Team                                                      ║
+  ╚═════════════════════════════════════════════════════════════════════════╝
+      at boardHarness (/Users/mac02/dev/openbot-recovery/.worktrees/autonomous-p06/scripts/tests/workflow-runs.mjs:180:36)
+      at async TestContext.<anonymous> (/Users/mac02/dev/openbot-recovery/.worktrees/autonomous-p06/scripts/tests/workflow-runs.mjs:215:15) {
+    name: 'Error'
+  }
+
+test at scripts/tests/workflow-runs.mjs:230:1
+✖ board: opening a run while a filter read is in flight keeps the chosen filters (0.80375ms)
+  browserType.launch: Executable doesn't exist at /Users/mac02/Library/Caches/ms-playwright/chromium_headless_shell-1193/chrome-mac/headless_shell
+  ╔═════════════════════════════════════════════════════════════════════════╗
+  ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+  ║ Please run the following command to download new browsers:              ║
+  ║                                                                         ║
+  ║     npx playwright install                                              ║
+  ║                                                                         ║
+  ║ <3 Playwright Team                                                      ║
+  ╚═════════════════════════════════════════════════════════════════════════╝
+      at boardHarness (/Users/mac02/dev/openbot-recovery/.worktrees/autonomous-p06/scripts/tests/workflow-runs.mjs:180:36)
+      at async TestContext.<anonymous> (/Users/mac02/dev/openbot-recovery/.worktrees/autonomous-p06/scripts/tests/workflow-runs.mjs:231:15) {
+    name: 'Error'
+  }
+
+test at scripts/tests/workflow-runs.mjs:274:1
+✖ list: a wake-up during a filter read reads the new filter instead of undoing it (0.99975ms)
+  browserType.launch: Executable doesn't exist at /Users/mac02/Library/Caches/ms-playwright/chromium_headless_shell-1193/chrome-mac/headless_shell
+  ╔═════════════════════════════════════════════════════════════════════════╗
+  ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+  ║ Please run the following command to download new browsers:              ║
+  ║                                                                         ║
+  ║     npx playwright install                                              ║
+  ║                                                                         ║
+  ║ <3 Playwright Team                                                      ║
+  ╚═════════════════════════════════════════════════════════════════════════╝
+      at TestContext.<anonymous> (/Users/mac02/dev/openbot-recovery/.worktrees/autonomous-p06/scripts/tests/workflow-runs.mjs:292:36) {
+    name: 'Error'
+  }
+
+test at scripts/tests/workflow-runs.mjs:329:1
+✖ board: a filter change while a wake-up read is in flight wins (0.619417ms)
+  browserType.launch: Executable doesn't exist at /Users/mac02/Library/Caches/ms-playwright/chromium_headless_shell-1193/chrome-mac/headless_shell
+  ╔═════════════════════════════════════════════════════════════════════════╗
+  ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+  ║ Please run the following command to download new browsers:              ║
+  ║                                                                         ║
+  ║     npx playwright install                                              ║
+  ║                                                                         ║
+  ║ <3 Playwright Team                                                      ║
+  ╚═════════════════════════════════════════════════════════════════════════╝
+      at boardHarness (/Users/mac02/dev/openbot-recovery/.worktrees/autonomous-p06/scripts/tests/workflow-runs.mjs:180:36)
+      at async TestContext.<anonymous> (/Users/mac02/dev/openbot-recovery/.worktrees/autonomous-p06/scripts/tests/workflow-runs.mjs:330:15) {
+    name: 'Error'
+  }
+
+test at scripts/tests/workflow-runs.mjs:347:1
+✖ board: a burst of run events reads at most once per two seconds and shows the final state (0.711375ms)
+  browserType.launch: Executable doesn't exist at /Users/mac02/Library/Caches/ms-playwright/chromium_headless_shell-1193/chrome-mac/headless_shell
+  ╔═════════════════════════════════════════════════════════════════════════╗
+  ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+  ║ Please run the following command to download new browsers:              ║
+  ║                                                                         ║
+  ║     npx playwright install                                              ║
+  ║                                                                         ║
+  ║ <3 Playwright Team                                                      ║
+  ╚═════════════════════════════════════════════════════════════════════════╝
+      at boardHarness (/Users/mac02/dev/openbot-recovery/.worktrees/autonomous-p06/scripts/tests/workflow-runs.mjs:180:36)
+      at async TestContext.<anonymous> (/Users/mac02/dev/openbot-recovery/.worktrees/autonomous-p06/scripts/tests/workflow-runs.mjs:348:15) {
+    name: 'Error'
+  }
+
+test at scripts/tests/workflow-runs.mjs:367:1
+✖ board: constant change still reads every two seconds and never starves (0.845333ms)
+  browserType.launch: Executable doesn't exist at /Users/mac02/Library/Caches/ms-playwright/chromium_headless_shell-1193/chrome-mac/headless_shell
+  ╔═════════════════════════════════════════════════════════════════════════╗
+  ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+  ║ Please run the following command to download new browsers:              ║
+  ║                                                                         ║
+  ║     npx playwright install                                              ║
+  ║                                                                         ║
+  ║ <3 Playwright Team                                                      ║
+  ╚═════════════════════════════════════════════════════════════════════════╝
+      at boardHarness (/Users/mac02/dev/openbot-recovery/.worktrees/autonomous-p06/scripts/tests/workflow-runs.mjs:180:36)
+      at async TestContext.<anonymous> (/Users/mac02/dev/openbot-recovery/.worktrees/autonomous-p06/scripts/tests/workflow-runs.mjs:368:15) {
+    name: 'Error'
+  }
+
+test at scripts/tests/workflow-runs.mjs:398:1
+✖ phone: a stream-driven or polled pane reload leaves the reader on the list; opening a run still moves them (1.023834ms)
+  browserType.launch: Executable doesn't exist at /Users/mac02/Library/Caches/ms-playwright/chromium_headless_shell-1193/chrome-mac/headless_shell
+  ╔═════════════════════════════════════════════════════════════════════════╗
+  ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+  ║ Please run the following command to download new browsers:              ║
+  ║                                                                         ║
+  ║     npx playwright install                                              ║
+  ║                                                                         ║
+  ║ <3 Playwright Team                                                      ║
+  ╚═════════════════════════════════════════════════════════════════════════╝
+      at TestContext.<anonymous> (/Users/mac02/dev/openbot-recovery/.worktrees/autonomous-p06/scripts/tests/workflow-runs.mjs:435:36) {
+    name: 'Error'
+  }
+
+test at scripts/tests/workflow-runs.mjs:462:1
+✖ board: reads slower than the interval never overlap and keep landing under constant change (0.890792ms)
+  browserType.launch: Executable doesn't exist at /Users/mac02/Library/Caches/ms-playwright/chromium_headless_shell-1193/chrome-mac/headless_shell
+  ╔═════════════════════════════════════════════════════════════════════════╗
+  ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+  ║ Please run the following command to download new browsers:              ║
+  ║                                                                         ║
+  ║     npx playwright install                                              ║
+  ║                                                                         ║
+  ║ <3 Playwright Team                                                      ║
+  ╚═════════════════════════════════════════════════════════════════════════╝
+      at boardHarness (/Users/mac02/dev/openbot-recovery/.worktrees/autonomous-p06/scripts/tests/workflow-runs.mjs:180:36)
+      at async TestContext.<anonymous> (/Users/mac02/dev/openbot-recovery/.worktrees/autonomous-p06/scripts/tests/workflow-runs.mjs:463:15) {
+    name: 'Error'
+  }
+
+test at scripts/tests/workflow-runs.mjs:485:1
+✖ board: a run change during a filter read is read again after it, on the new leaf (0.729459ms)
+  browserType.launch: Executable doesn't exist at /Users/mac02/Library/Caches/ms-playwright/chromium_headless_shell-1193/chrome-mac/headless_shell
+  ╔═════════════════════════════════════════════════════════════════════════╗
+  ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+  ║ Please run the following command to download new browsers:              ║
+  ║                                                                         ║
+  ║     npx playwright install                                              ║
+  ║                                                                         ║
+  ║ <3 Playwright Team                                                      ║
+  ╚═════════════════════════════════════════════════════════════════════════╝
+      at boardHarness (/Users/mac02/dev/openbot-recovery/.worktrees/autonomous-p06/scripts/tests/workflow-runs.mjs:180:36)
+      at async TestContext.<anonymous> (/Users/mac02/dev/openbot-recovery/.worktrees/autonomous-p06/scripts/tests/workflow-runs.mjs:486:15) {
+    name: 'Error'
+  }
+
+test at scripts/tests/workflow-runs.mjs:506:1
+✖ board: two quick filter changes do not leave the coalescer waiting for ever (0.873708ms)
+  browserType.launch: Executable doesn't exist at /Users/mac02/Library/Caches/ms-playwright/chromium_headless_shell-1193/chrome-mac/headless_shell
+  ╔═════════════════════════════════════════════════════════════════════════╗
+  ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+  ║ Please run the following command to download new browsers:              ║
+  ║                                                                         ║
+  ║     npx playwright install                                              ║
+  ║                                                                         ║
+  ║ <3 Playwright Team                                                      ║
+  ╚═════════════════════════════════════════════════════════════════════════╝
+      at boardHarness (/Users/mac02/dev/openbot-recovery/.worktrees/autonomous-p06/scripts/tests/workflow-runs.mjs:180:36)
+      at async TestContext.<anonymous> (/Users/mac02/dev/openbot-recovery/.worktrees/autonomous-p06/scripts/tests/workflow-runs.mjs:507:15) {
+    name: 'Error'
+  }
+
+test at scripts/tests/workflow-runs.mjs:1:1
+✖ scripts/tests/workflow-runs.mjs (173665.089334ms)
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at scripts/tests/workflow-samples.mjs:9:1
+✖ sample progress, failed request recovery and late navigation response use the requesting form (11.364ms)
+  browserType.launch: Executable doesn't exist at /Users/mac02/Library/Caches/ms-playwright/chromium_headless_shell-1193/chrome-mac/headless_shell
+  ╔═════════════════════════════════════════════════════════════════════════╗
+  ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+  ║ Please run the following command to download new browsers:              ║
+  ║                                                                         ║
+  ║     npx playwright install                                              ║
+  ║                                                                         ║
+  ║ <3 Playwright Team                                                      ║
+  ╚═════════════════════════════════════════════════════════════════════════╝
+      at TestContext.<anonymous> (/Users/mac02/dev/openbot-recovery/.worktrees/autonomous-p06/scripts/tests/workflow-samples.mjs:19:34) {
+    name: 'Error'
+  }
+
+test at scripts/tests/workflow-samples.mjs:42:1
+✖ actual sample textarea template preserves leading newlines for every raw JSON field (1.878125ms)
+  browserType.launch: Executable doesn't exist at /Users/mac02/Library/Caches/ms-playwright/chromium_headless_shell-1193/chrome-mac/headless_shell
+  ╔═════════════════════════════════════════════════════════════════════════╗
+  ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+  ║ Please run the following command to download new browsers:              ║
+  ║                                                                         ║
+  ║     npx playwright install                                              ║
+  ║                                                                         ║
+  ║ <3 Playwright Team                                                      ║
+  ╚═════════════════════════════════════════════════════════════════════════╝
+      at TestContext.<anonymous> (/Users/mac02/dev/openbot-recovery/.worktrees/autonomous-p06/scripts/tests/workflow-samples.mjs:46:34) {
+    name: 'Error'
+  }
+
+test at scripts/tests/workflow-samples.mjs:1:1
+✖ scripts/tests/workflow-samples.mjs (173664.772ms)
+  'Promise resolution is still pending but the event loop has already resolved'

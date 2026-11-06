@@ -5,7 +5,11 @@
 use super::publication::PublishedBundle;
 use super::reads::RunDetail;
 use crate::app_error::AppResult;
+use crate::application::agent::{AgentToolChoice, AgentToolOrigin, WorkflowVersionSelection};
 use crate::domain::workflow::{CompanyId, RunId};
+use crate::entities::agent_capability::{
+    AgentBindingId, AgentSkillAssignmentId, AgentToolAlias, DependencyManifestId,
+};
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use serde_json::Value;
@@ -29,6 +33,7 @@ pub struct Lineage {
 #[derive(Debug, Clone, PartialEq)]
 pub struct ChildRun {
     pub run: RunId,
+    pub dependency: Option<WorkflowVersionSelection>,
     pub state: String,
     pub waiting_reason: Option<String>,
     pub execution: Uuid,
@@ -75,6 +80,8 @@ pub struct RunEvent {
 #[derive(Debug, Clone, PartialEq)]
 pub struct RunView {
     pub payload_restricted: bool,
+    pub dependencies: Option<RunDependencies>,
+    pub calls: CallProvenancePage,
     pub detail: RunDetail,
     pub workflow_title: String,
     pub draft_revision: u64,
@@ -134,8 +141,56 @@ pub struct Attempt {
     pub retry_safety: Option<String>,
 }
 
+/// Safe immutable metadata; never includes instructions, schemas or raw parameters.
+#[derive(Debug, Clone, PartialEq)]
+pub struct SelectedToolSummary {
+    pub binding: AgentBindingId,
+    pub alias: AgentToolAlias,
+    pub target: AgentToolChoice,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct SelectedSkillSummary {
+    pub assignment: AgentSkillAssignmentId,
+    pub skill: Uuid,
+    pub name: String,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct RunDependencies {
+    pub manifest: DependencyManifestId,
+    pub root: RunId,
+    pub agents: Vec<SelectedAgentSummary>,
+    pub agents_truncated: bool,
+    pub workflows: Vec<WorkflowVersionSelection>,
+    pub workflows_truncated: bool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum CallRecordKind {
+    ActionInvocation,
+    ChildToolCall,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct CallProvenance {
+    pub kind: CallRecordKind,
+    pub record: Uuid,
+    pub origin: AgentToolOrigin,
+    pub tool: SelectedToolSummary,
+}
+
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct CallProvenancePage {
+    pub items: Vec<CallProvenance>,
+    pub truncated: bool,
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct SelectedAgentSummary {
+    pub manifest: DependencyManifestId,
+    pub bindings: Vec<SelectedToolSummary>,
+    pub assignments: Vec<SelectedSkillSummary>,
     pub agent_id: crate::entities::agent_capability::AgentId,
     pub revision_id: crate::entities::agent_capability::AgentRevisionId,
     pub key: String,
@@ -146,6 +201,7 @@ pub struct SelectedAgentSummary {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct StepView {
+    pub calls: CallProvenancePage,
     pub agent: Option<SelectedAgentSummary>,
     pub payload_restricted: bool,
     pub execution: Uuid,
@@ -183,7 +239,7 @@ pub trait RunViews: Send + Sync {
         company: CompanyId,
         workflows: &[Uuid],
     ) -> AppResult<std::collections::HashMap<Uuid, String>>;
-    /// The bundle the run was admitted with: its graph, and each agent's frozen tools and skills.
+    /// The workflow bundle admitted with the run; agent revisions are in its native manifest.
     async fn run_bundle(
         &self,
         company: CompanyId,
@@ -204,6 +260,11 @@ impl RunView {
             return;
         }
         self.payload_restricted = true;
+        self.dependencies = None;
+        for child in &mut self.children {
+            child.dependency = None;
+        }
+        self.calls = CallProvenancePage::default();
         self.input = Value::Null;
         self.params = Value::Null;
         self.detail.project(visibility);
@@ -216,6 +277,10 @@ impl StepView {
         }
         self.payload_restricted = true;
         self.agent = None;
+        for child in &mut self.children {
+            child.dependency = None;
+        }
+        self.calls = CallProvenancePage::default();
         self.frozen_inputs = None;
         self.committed_output = None;
         self.frozen_choice = None;

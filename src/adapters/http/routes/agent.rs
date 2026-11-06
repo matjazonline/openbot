@@ -77,6 +77,39 @@ pub struct AgentForm {
     pub avatar_url: Option<String>,
     /// `"simple"` means `system_prompt` holds instructions to expand, not the prompt itself.
     pub form_mode: Option<String>,
+    pub expected_revision: Option<crate::entities::agent_capability::AgentDraftRevision>,
+    pub tool_assignments: Option<String>,
+}
+
+impl AgentForm {
+    pub(super) fn company_update(
+        &self,
+        agent: Uuid,
+        write: AgentWrite,
+    ) -> Result<crate::application::agent::CompanyAgentUpdate, String> {
+        let tools = self
+            .tool_assignments
+            .as_deref()
+            .map(|raw| {
+                if raw.len() > 65_536 {
+                    return Err("Tool assignments exceed 64 KiB".to_owned());
+                }
+                serde_json::from_str::<Vec<crate::application::agent::AgentToolAssignment>>(raw)
+                    .map_err(|error| format!("Invalid tool assignments: {error}"))
+            })
+            .transpose()?;
+        if tools.as_ref().is_some_and(|tools| tools.len() > 32) {
+            return Err("An agent may have at most 32 tools".into());
+        }
+        Ok(crate::application::agent::CompanyAgentUpdate {
+            agent: crate::entities::agent_capability::AgentId::new(agent),
+            expected_revision: self
+                .expected_revision
+                .ok_or("Expected draft revision is required")?,
+            write,
+            tools,
+        })
+    }
 }
 
 impl AgentForm {
@@ -162,6 +195,14 @@ pub struct AgentJsonPayload {
     pub avatar_url: Option<String>,
 }
 
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CompanyAgentJsonUpdate {
+    pub expected_revision: crate::entities::agent_capability::AgentDraftRevision,
+    pub agent: AgentJsonPayload,
+    pub tool_assignments: Option<Vec<crate::application::agent::AgentToolAssignment>>,
+}
+
 impl AgentJsonPayload {
     pub(super) fn preserve_capabilities(
         &mut self,
@@ -226,7 +267,7 @@ pub(super) async fn agent_write_from_instructions(
         .map_err(|err| format!("Failed to generate agent prompt: {err}"))?;
 
     Ok(AgentWrite {
-        // Workflow tool grants are edited in phase 09; keep the stored list.
+        // Typed tool assignments are edited in the agent workspace; this prompt-only helper preserves them.
         tool_bindings: None,
         name: request.name.to_string(),
         slug: request.slug.to_string(),
@@ -288,7 +329,7 @@ async fn create_agent_handler(
                 user.id,
                 company_id,
                 AgentWrite {
-                    // Workflow tool grants are edited in phase 09; keep the stored list.
+                    // Typed tool assignments are edited in the agent workspace; this prompt-only helper preserves them.
                     tool_bindings: None,
                     name: form.name.clone(),
                     slug: form.slug(),
@@ -381,14 +422,15 @@ async fn cancel_agent_edit(
 
 /// PUT /companies/{company_id}/agents/{id} - HTMX update agent (Protected).
 #[instrument(skip_all)]
-async fn update_agent_handler(
+pub(super) async fn update_agent_handler(
     State(company_use_cases): State<Arc<CompanyUseCases>>,
     State(agent_use_cases): State<Arc<AgentUseCases>>,
+    State(skills): State<Arc<SkillUseCases>>,
     user: AuthenticatedUser,
     Path((company_id, agent_id)): Path<(Uuid, Uuid)>,
-    Form(form): Form<AgentForm>,
+    Form(mut form): Form<AgentForm>,
 ) -> AppResult<Html<String>> {
-    let (company, _) = managed_agent(
+    let (company, stored) = managed_agent(
         &company_use_cases,
         &agent_use_cases,
         user.id,
@@ -396,45 +438,50 @@ async fn update_agent_handler(
         agent_id,
     )
     .await?;
-
-    let submitted = form
-        .capabilities()
-        .and_then(|capabilities| Ok((capabilities, form.avatar_url()?)));
-
-    let (capabilities, avatar_url) = match submitted {
-        Ok(fields) => fields,
-        Err(err) => return Ok(Html(pages::error_alert(&err))),
+    // This metadata-only form has no skill controls; absence preserves the ordered assignment.
+    // The expected draft revision still fences a concurrent capability edit.
+    if form.skill_ids.is_none() {
+        let capabilities = skills
+            .company_agent_capabilities(user.id, company_id, agent_id)
+            .await?
+            .ok_or_else(|| AppError::NotFound("Agent not found".into()))?;
+        form.skill_ids = Some(
+            capabilities
+                .skills
+                .iter()
+                .map(|skill| skill.id.to_string())
+                .collect::<Vec<_>>()
+                .join(","),
+        );
+    }
+    if form.description.is_none() {
+        form.description = stored.description.clone();
+    }
+    let submitted = super::ui_agents::SubmittedAgent::new(form);
+    let rejected = |message: &str| {
+        Html(pages::agent_edit_fragment_draft(
+            &company,
+            &stored,
+            &submitted.draft(),
+            Some(message),
+        ))
     };
-
-    Ok(
-        match agent_use_cases
-            .update_agent(
-                user.id,
-                company_id,
-                agent_id,
-                AgentWrite {
-                    // Workflow tool grants are edited in phase 09; keep the stored list.
-                    tool_bindings: None,
-                    name: form.name.clone(),
-                    slug: form.slug(),
-                    provider: form.provider.clone(),
-                    model: form.model.clone(),
-                    system_prompt: form.system_prompt.clone(),
-                    description: form.description.clone(),
-                    skill_ids: capabilities.skill_ids,
-                    avatar_url,
-                    created_by: None,
-                },
-            )
-            .await
-        {
-            Ok(ag) => Html(pages::agent_row_fragment(&company, &ag)),
-            Err(err @ (AppError::BadRequest(_) | AppError::Conflict(_))) => {
-                Html(pages::error_alert(&format!("Update failed: {err}")))
-            }
-            Err(error) => return Err(error),
-        },
-    )
+    let request = match submitted.company_update(agent_id) {
+        Ok(request) => request,
+        Err(message) => return Ok(rejected(&message)),
+    };
+    match agent_use_cases
+        .update_agent(user.id, company_id, request)
+        .await
+    {
+        Ok(agent) => Ok(Html(pages::agent_row_fragment(&company, &agent))),
+        Err(
+            error @ (AppError::BadRequest(_)
+            | AppError::Conflict(_)
+            | AppError::ServiceUnavailable(_)),
+        ) => Ok(rejected(&format!("Update failed: {error}"))),
+        Err(error) => Err(error),
+    }
 }
 
 /// DELETE /companies/{company_id}/agents/{id} - HTMX delete agent (Protected).
@@ -491,7 +538,7 @@ async fn create_agent_json(
             user.id,
             company_id,
             AgentWrite {
-                // Workflow tool grants are edited in phase 09; keep the stored list.
+                // Typed tool assignments are edited in the agent workspace; this prompt-only helper preserves them.
                 tool_bindings: None,
                 name: payload.name.clone(),
                 slug: payload.slug.clone(),
@@ -543,13 +590,14 @@ async fn get_agent_json(
 }
 
 /// JSON API: Update company agent (Protected).
-async fn update_agent_json(
+pub(super) async fn update_agent_json(
     State(agent_use_cases): State<Arc<AgentUseCases>>,
     State(skills): State<Arc<SkillUseCases>>,
     user: AuthenticatedUser,
     Path((company_id, agent_id)): Path<(Uuid, Uuid)>,
-    Json(mut payload): Json<AgentJsonPayload>,
+    Json(body): Json<CompanyAgentJsonUpdate>,
 ) -> AppResult<impl IntoResponse> {
+    let mut payload = body.agent;
     let stored = skills
         .company_agent_capabilities(user.id, company_id, agent_id)
         .await?
@@ -561,19 +609,22 @@ async fn update_agent_json(
         .update_agent(
             user.id,
             company_id,
-            agent_id,
-            AgentWrite {
-                // Workflow tool grants are edited in phase 09; keep the stored list.
-                tool_bindings: None,
-                name: payload.name.clone(),
-                slug: payload.slug.clone(),
-                provider: payload.provider.clone(),
-                model: payload.model.clone(),
-                system_prompt: payload.system_prompt.clone(),
-                description: payload.description.clone(),
-                skill_ids: payload.skill_ids.clone().unwrap_or_default(),
-                avatar_url,
-                created_by: None,
+            crate::application::agent::CompanyAgentUpdate {
+                agent: crate::entities::agent_capability::AgentId::new(agent_id),
+                expected_revision: body.expected_revision,
+                tools: body.tool_assignments,
+                write: AgentWrite {
+                    tool_bindings: None,
+                    name: payload.name.clone(),
+                    slug: payload.slug.clone(),
+                    provider: payload.provider.clone(),
+                    model: payload.model.clone(),
+                    system_prompt: payload.system_prompt.clone(),
+                    description: payload.description.clone(),
+                    skill_ids: payload.skill_ids.clone().unwrap_or_default(),
+                    avatar_url,
+                    created_by: None,
+                },
             },
         )
         .await?;

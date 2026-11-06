@@ -1,0 +1,7 @@
+{
+  "owner": "p06/root",
+  "database": "p06_history_probe_df7f105383f94eef925e22f8d93e51d0",
+  "url": "postgres://mac02@127.0.0.1:55606/p06_history_probe_df7f105383f94eef925e22f8d93e51d0",
+  "disposable": true,
+  "purpose": "isolated architecture query-plan experiment; no application source/base schema mutation"
+}

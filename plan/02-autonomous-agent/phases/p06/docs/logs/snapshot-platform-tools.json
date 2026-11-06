@@ -1,0 +1,9 @@
+{
+  "directory": "/Users/mac02/dev/openbot-recovery/.worktrees/knowledge-tooling/autonomous-review-bin",
+  "purpose": "GNU realpath -m/relative-to and readlink -z semantics required by unchanged selected-skill snapshot.sh on macOS; no project/skill source edits",
+  "sha256": {
+    "realpath": "da109fb0a65036cda407af8ccf17801ec769055a68eb1a817ef3d02a696c10d2",
+    "readlink": "78f40247757dc4f9ee5a14d3cd6f61fbbd16df4b4afda2b549aebf41978a5c1a"
+  },
+  "relative_path_smoke": "plan/02-autonomous-agent/phases/p06/docs"
+}

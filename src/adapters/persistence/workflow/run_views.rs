@@ -48,6 +48,8 @@ struct LineageRow {
 #[derive(sqlx::FromRow)]
 struct ChildRow {
     id: Uuid,
+    workflow_id: Uuid,
+    version_id: Uuid,
     state: String,
     waiting_reason: Option<String>,
     parent_execution_id: Uuid,
@@ -61,6 +63,10 @@ impl From<ChildRow> for ChildRun {
     fn from(row: ChildRow) -> Self {
         Self {
             run: RunId::new(row.id),
+            dependency: Some(crate::application::agent::WorkflowVersionSelection {
+                workflow_id: WorkflowId::new(row.workflow_id),
+                version_id: VersionId::new(row.version_id),
+            }),
             state: row.state,
             waiting_reason: row.waiting_reason,
             execution: row.parent_execution_id,
@@ -233,7 +239,7 @@ impl From<AttemptRow> for Attempt {
 
 /// Children of `run` (all, or those `execution` started), newest first, with the parent
 /// wait's round and tool call.
-const CHILDREN_SQL: &str = "SELECT child.id, child.state, child.waiting_reason, \
+const CHILDREN_SQL: &str = "SELECT child.id, child.workflow_id, child.version_id, child.state, child.waiting_reason, \
         link.parent_execution_id, execution.step_id, wait.child_ordinal, wait.child_tool_call_id, \
         child.created_at \
    FROM workflow_run_parents AS link \
@@ -454,8 +460,19 @@ impl RunViews for PostgresPersistence {
             listed::<ReconciliationRow, _>(self.run_rows(RECONCILIATIONS_SQL, company, run).await?);
         let (events, events_truncated) =
             listed::<EventRow, _>(self.run_rows(EVENTS_SQL, company, run).await?);
+        let dependencies = self.run_dependencies(company, run).await?;
+        let calls = self
+            .call_provenance(
+                company,
+                run,
+                &action_call_keys(&detail.actions),
+                &child_call_keys(&children),
+            )
+            .await?;
         let mut view = RunView {
             payload_restricted: false,
+            dependencies: Some(dependencies),
+            calls,
             detail,
             workflow_title: facts.title,
             draft_revision: revision_of(facts.draft_revision)?,
@@ -525,8 +542,17 @@ impl RunViews for PostgresPersistence {
                 .await?,
         );
         let agent = selected_agent_summary(self, company, run, &row).await?;
+        let calls = self
+            .call_provenance(
+                company,
+                run,
+                &receipt_call_keys(execution, &receipts),
+                &child_call_keys(&children),
+            )
+            .await?;
         let mut view = StepView {
             agent,
+            calls,
             payload_restricted: false,
             execution,
             step: row.step_id,
@@ -618,41 +644,56 @@ async fn selected_agent_summary(
         .await?
         .ok_or_else(missing)?;
     let reference = bundle.agent_reference(company, &key)?;
-    let row: Option<(Uuid, String)> = sqlx::query_as(
-        "SELECT revision.id,revision.content FROM run_dependency_manifests AS ownership \
-         JOIN agent_manifest_revisions AS selection ON selection.company_id=ownership.company_id AND selection.manifest_id=ownership.manifest_id \
-         JOIN agent_revisions AS revision ON revision.company_id=selection.company_id AND revision.agent_id=selection.agent_id AND revision.id=selection.revision_id \
-         WHERE ownership.company_id=$1 AND ownership.run_id=$2 AND selection.agent_id=$3 AND octet_length(revision.content)<=$4"
-    ).bind(company.as_uuid()).bind(run.as_uuid()).bind(reference.agent_id.as_uuid())
-        .bind(crate::application::agent::MAX_AGENT_DEFINITION_BYTES as i32).fetch_optional(persistence.pool()).await?;
-    let (revision, content) = row.ok_or_else(missing)?;
-    let agent = crate::application::agent::ResolvedAgentDefinition::decode(content.as_bytes())?;
+    let mut summary = persistence
+        .selected_agent_metadata(company, run, reference.agent_id)
+        .await?;
+    summary.key = reference.key.as_str().to_owned();
     let model_only = !reference
         .uses
         .iter()
         .any(|usage| usage.step.as_str() == step.step_id && usage.mode == AgentUseMode::Tools);
-    Ok(Some(SelectedAgentSummary {
-        agent_id: agent.agent_id,
-        revision_id: crate::entities::agent_capability::AgentRevisionId::new(revision),
-        key: reference.key.as_str().to_owned(),
-        model: format!("{} / {}", agent.model.provider.as_str(), agent.model.model),
-        tools: if model_only {
-            vec![]
-        } else {
-            agent
-                .tools
-                .iter()
-                .map(|tool| tool.binding.alias.as_str().to_owned())
-                .collect()
-        },
-        skills: if model_only {
-            vec![]
-        } else {
-            agent
-                .skills
-                .iter()
-                .map(|skill| skill.skill.name.as_str().to_owned())
-                .collect()
-        },
-    }))
+    if model_only {
+        summary.tools.clear();
+        summary.skills.clear();
+        summary.bindings.clear();
+        summary.assignments.clear();
+    }
+    Ok(Some(summary))
+}
+
+fn action_call_keys(
+    actions: &[crate::application::workflow::reads::ActionSummary],
+) -> Vec<super::run_provenance::CallRecordScope> {
+    actions
+        .iter()
+        .map(|action| super::run_provenance::CallRecordScope {
+            record: action.invocation,
+            execution: action.execution,
+        })
+        .collect()
+}
+fn child_call_keys(children: &[ChildRun]) -> Vec<super::run_provenance::CallRecordScope> {
+    children
+        .iter()
+        .filter_map(|child| {
+            child
+                .tool_call
+                .map(|call| super::run_provenance::CallRecordScope {
+                    record: call,
+                    execution: child.execution,
+                })
+        })
+        .collect()
+}
+fn receipt_call_keys(
+    execution: Uuid,
+    receipts: &[Receipt],
+) -> Vec<super::run_provenance::CallRecordScope> {
+    receipts
+        .iter()
+        .map(|receipt| super::run_provenance::CallRecordScope {
+            record: receipt.invocation,
+            execution,
+        })
+        .collect()
 }

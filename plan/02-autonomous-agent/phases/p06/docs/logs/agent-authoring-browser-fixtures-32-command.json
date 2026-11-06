@@ -1,0 +1,11 @@
+{
+  "argv": [
+    "bash",
+    "scripts/test-network-isolation.sh",
+    "target/debug/deps/open_bots-c19a0b960dacdcef",
+    "dump_autonomous_agent_authoring_browser_fixtures",
+    "--ignored",
+    "--test-threads=4"
+  ],
+  "AGENT_AUTHORING_BROWSER_FIXTURES": "/Users/mac02/dev/openbot-recovery/.worktrees/autonomous-p06/plan/02-autonomous-agent/phases/p06/docs/logs/agent-authoring-browser-fixtures-32"
+}

@@ -1,0 +1,38 @@
+    Checking open_bots v0.1.0 (/Users/mac02/dev/openbot-recovery/.worktrees/autonomous-p06)
+error[E0308]: mismatched types
+  --> src/adapters/persistence/agent_publication/mod.rs:59:5
+   |
+59 |     super::workflow::authority::authorize_company(tx, scope.company, scope.actor).await
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `Result<(), AppError>`, found `Result<LevelActor, AppError>`
+   |
+   = note: expected enum `std::result::Result<(), _>`
+              found enum `std::result::Result<LevelActor, _>`
+
+error[E0308]: mismatched types
+  --> src/adapters/persistence/agent_publication/mod.rs:59:5
+   |
+59 |     super::workflow::authority::authorize_company(tx, scope.company, scope.actor).await
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `Result<(), AppError>`, found `Result<LevelActor, AppError>`
+   |
+   = note: expected enum `std::result::Result<(), _>`
+              found enum `std::result::Result<access_level::LevelActor, _>`
+
+error[E0277]: `domain::entities::mcp::McpToolName` doesn't implement `std::fmt::Display`
+   --> src/application/agent/authoring_reads.rs:196:31
+    |
+196 |             } => format!("MCP {remote_name} · connection {connection} · review {reviewed_version}"),
+    |                               ^^^^^^^^^^^^^ `domain::entities::mcp::McpToolName` cannot be formatted with the default formatter
+    |
+help: the trait `std::fmt::Display` is not implemented for `domain::entities::mcp::McpToolName`
+   --> src/domain/entities/mcp.rs:45:1
+    |
+ 45 | pub struct McpToolName(String);
+    | ^^^^^^^^^^^^^^^^^^^^^^
+    = note: in format strings you may be able to use `{:?}` (or {:#?} for pretty-print) instead
+    = note: required for `&domain::entities::mcp::McpToolName` to implement `std::fmt::Display`
+
+Some errors have detailed explanations: E0277, E0308.
+For more information about an error, try `rustc --explain E0277`.
+error: could not compile `open_bots` (lib) due to 2 previous errors
+warning: build failed, waiting for other jobs to finish...
+error: could not compile `open_bots` (lib test) due to 2 previous errors

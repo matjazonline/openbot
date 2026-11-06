@@ -1,0 +1,15 @@
+{
+  "checked_at": "2026-11-06T13:38:26.081473+00:00",
+  "branch": "autonomous/p06",
+  "head": "fb92a7b48aec030b685701eff31fba9f86f5ae19",
+  "source_digest": "50a47b19541804cf20c38506fa2a4808b0a538e853188fe5db180cad7a5eea54",
+  "exact_exclusions": [
+    "plan/02-autonomous-agent/phases/p06/docs"
+  ],
+  "decision": "AUTO-P06-G1-D1 revision 2",
+  "decision_sha256": "679876e01f1e6a8ac9bfebdbefa3657d7fd0985d00057ee5b3cc33849e511c37",
+  "authority_revision": 33,
+  "authority_pin_equal": true,
+  "authority_sha256": "50d773d89acdc9654ed7a72a70a1cb94326de5b0d2e840e2397c73d2f2b6b3d4",
+  "implementation_tests_run": false
+}

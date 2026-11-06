@@ -6,6 +6,7 @@ use super::*;
 use crate::application::workflow::reads::DefinitionSummary;
 use crate::application::workflow::templates::WorkflowTemplate;
 
+mod agent_picker;
 mod bindings;
 mod catalogue;
 mod editor;
@@ -15,6 +16,7 @@ mod sample;
 mod tools;
 mod versions;
 
+pub use agent_picker::*;
 pub use bindings::*;
 pub use catalogue::*;
 pub use editor::*;

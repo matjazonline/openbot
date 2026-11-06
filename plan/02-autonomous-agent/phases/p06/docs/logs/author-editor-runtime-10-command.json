@@ -1,0 +1,18 @@
+[
+  "bash",
+  "scripts/test-network-isolation.sh",
+  "target/debug/deps/open_bots-c19a0b960dacdcef",
+  "autonomous_agent_authoring_",
+  "autonomous_agent_views_",
+  "agent_api_tests::",
+  "ui_agents::form_tests::",
+  "agent_edit_pane",
+  "workflow_tool_routes_register_and_revoke",
+  "revoking_or_re_pointing_a_frozen_tool_stops_its_versions_bindings_as_the_warning_says",
+  "sample_direct_workflow_tool_child_and_message_have_zero_production_effects",
+  "workflow_routes_refuse_other_tenants_and_members",
+  "legacy_agent_fields_and_confirmation_attribute_are_escaped",
+  "every_delegated_action_has_a_branch_in_the_bundle",
+  "no_function_name_is_declared_twice_in_the_bundle",
+  "--test-threads=4"
+]

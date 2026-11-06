@@ -21,10 +21,15 @@ binding; canonical channels, actors, messages, threads, and deliveries are not e
 
 Agents run on **Rig**, the only agent runtime, and always as workflow model steps (`agent.run`,
 `ai.classify`, `decision.agent`). Credentials come from company model connections. An `agent.run`
-step appends the agent's attached skills to its prompt, declares its workflow tools, resumes from
+step uses the independently published agent revision selected at root admission, appends its
+ordered skills, declares its tools, resumes from
 its checkpoint after a restart, and validates the final answer against the step's
 `output_schema`. Tools, company HTTP MCP and approvals are workflow actions rather than
 agent-runtime tools. Rig executes in the server process and is not a sandbox.
+
+Configure and publish reusable capabilities from **Agents**, then select the agent in multiple
+workflows. Existing runs and children retain their captured revisions while current revocation
+still applies. See [agent authoring and API](docs/agent-authoring.md).
 
 See the [Rig configuration and operator guide](docs/rig.md) for tested examples, compatibility and
 limits, [custom tools](docs/custom_tools.md) for the current tool model, and the

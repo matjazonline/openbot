@@ -1,0 +1,21 @@
+✖ agent selectors preserve unsaved input, publication retries and navigation after an accepted write (10250.394791ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 10687.212375
+
+✖ failing tests:
+
+test at scripts/tests/agent-authoring-browser.mjs:17:1
+✖ agent selectors preserve unsaved input, publication retries and navigation after an accepted write (10250.394791ms)
+  locator.fill: Timeout 10000ms exceeded.
+  Call log:
+  [2m  - waiting for locator('#agent-pane > div form[hx-put]').first().locator('[name=name]')[22m
+  
+      at TestContext.<anonymous> (/Users/mac02/dev/openbot-recovery/.worktrees/autonomous-p06/scripts/tests/agent-authoring-browser.mjs:84:43) {
+    name: 'TimeoutError'
+  }

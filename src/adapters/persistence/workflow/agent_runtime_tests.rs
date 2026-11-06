@@ -888,3 +888,6 @@ mod autonomous_graph;
 
 #[path = "autonomous_agent_origin_schema_tests.rs"]
 mod origin_schema;
+
+#[path = "autonomous_agent_view_tests.rs"]
+mod autonomous_views;

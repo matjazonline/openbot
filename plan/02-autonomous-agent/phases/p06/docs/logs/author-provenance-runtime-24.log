@@ -1,0 +1,74 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+
+running 36 tests
+test adapters::http::routes::workflows::ui::authoring::tests::access_tests::every_workspace_write_refuses_a_cross_origin_cookie_post ... ok
+test adapters::http::routes::workflows::ui::runs::tests::board_view_tests::run_board_view_escapes_a_hostile_workflow_title ... ok
+test adapters::http::routes::workflows::ui::runs::tests::board_view_tests::run_board_view_filter_refuses_another_tenants_ids ... ok
+test adapters::http::routes::workflows::ui::runs::tests::board_view_tests::run_board_view_filter_reports_a_cut_option_list ... ok
+test adapters::http::routes::workflows::ui::runs::tests::board_view_tests::run_board_view_cut_column_links_to_the_list_with_its_scope ... ok
+test adapters::http::routes::workflows::ui::runs::tests::authorization_tests::reconciliation_and_step_refuse_foreign_and_hidden_channel_identities ... ok
+test adapters::http::routes::workflows::ui::runs::tests::board_view_tests::run_board_view_filter_scopes_both_views_alone_and_combined ... FAILED
+test adapters::http::routes::workflows::ui::runs::tests::board_view_tests::run_board_view_filter_switch_and_links_keep_the_scope ... FAILED
+test adapters::http::routes::workflows::ui::runs::tests::board_view_tests::run_board_view_live_moves_a_finished_run_out_of_the_window_on_a_later_read ... ok
+test adapters::http::routes::workflows::ui::runs::tests::a_run_with_a_child_shows_its_lineage_steps_and_controls_through_the_parent ... ok
+test adapters::http::routes::workflows::ui::runs::tests::board_view_tests::run_board_view_live_reconciles_a_change_before_subscribing_on_the_first_resync ... ok
+test adapters::http::routes::workflows::ui::runs::tests::board_view_tests::run_board_view_live_sends_no_wake_up_for_a_hidden_channel ... ok
+test adapters::http::routes::workflows::ui::runs::tests::board_view_tests::run_board_view_refuses_plain_members_and_other_tenants ... ok
+test adapters::http::routes::workflows::ui::runs::tests::board_view_tests::run_board_view_shows_six_columns_in_order_with_their_totals ... ok
+test adapters::http::routes::workflows::ui::runs::tests::controls_tests::a_redraw_repeats_its_keys_until_the_command_shows_on_the_page ... ok
+test adapters::http::routes::workflows::ui::runs::tests::controls_tests::an_accepted_action_shows_its_receipt_and_cancel_names_it ... ok
+test adapters::http::routes::workflows::ui::runs::tests::controls_tests::an_uncertain_action_is_annotated_from_the_pane_and_its_step_shows_the_attempt ... ok
+test adapters::http::routes::workflows::ui::runs::tests::events_tests::a_lagging_stream_asks_every_view_to_read_again ... ok
+test adapters::http::routes::workflows::ui::runs::tests::controls_tests::controls_act_at_the_revision_seen_and_say_what_they_did ... ok
+test adapters::http::routes::workflows::ui::runs::tests::every_runs_write_refuses_a_cross_origin_cookie_post ... ok
+test adapters::http::routes::workflows::ui::runs::tests::events_tests::the_event_stream_ticks_while_access_holds_and_ends_when_it_is_lost ... ok
+test adapters::http::routes::workflows::ui::runs::tests::pages_tests::an_unfinished_step_of_an_ended_run_reads_as_stopped ... ok
+test adapters::http::routes::workflows::ui::runs::tests::pages_tests::knowledge_view_run_pane_drops_input_parameter_and_action_payloads ... ok
+test adapters::http::routes::workflows::ui::runs::tests::pages_tests::reconciliation_is_offered_as_an_annotation_and_a_step_shows_usage_and_receipts ... ok
+test adapters::http::routes::workflows::ui::runs::tests::events_tests::the_event_stream_wakes_with_resync_first_and_names_only_visible_runs ... ok
+test adapters::http::routes::workflows::ui::runs::tests::board_view_tests::run_board_view_opens_the_pane_answers_its_region_and_leaves_the_list_alone ... ok
+test adapters::http::routes::workflows::ui::runs::tests::other_tenants_and_plain_members_reach_no_run_and_hostile_content_is_escaped ... ok
+test adapters::persistence::agent_publication::tests::authoring_views::autonomous_agent_views_authoring_separates_active_and_draft_and_omits_credentials_and_active_prompt ... ok
+test adapters::persistence::agent_publication::tests::authoring_views::autonomous_agent_views_history_pages_timestamp_ties_without_payloads_or_foreign_rows ... ok
+test adapters::persistence::workflow::tests::admission_tests::storage_tests::autonomous_agent_storage_tests::view_tests::autonomous_agent_views_bound_agent_and_workflow_dependencies_with_explicit_truncation ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_graph::descendants::tool_children::autonomous_agent_views_child_call_and_dependency_versions_use_root_manifest ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_views::autonomous_agent_views_action_call_origin_survives_current_revocation ... FAILED
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_views::autonomous_agent_views_keep_v1_v2_and_exact_targets_under_one_workflow_version ... FAILED
+test adapters::http::routes::workflows::ui::runs::tests::the_list_pages_over_runs_an_admin_cannot_see_and_labels_reruns_and_children ... ok
+test adapters::persistence::workflow::tests::message_tests::knowledge_views::knowledge_view_competing_readers_demotion_and_content_raise_use_final_facts ... ok
+test adapters::persistence::workflow::tests::message_tests::knowledge_views::knowledge_view_current_run_and_step_stamp_controls_payloads ... ok
+
+failures:
+
+---- adapters::http::routes::workflows::ui::runs::tests::board_view_tests::run_board_view_filter_scopes_both_views_alone_and_combined stdout ----
+
+thread 'adapters::http::routes::workflows::ui::runs::tests::board_view_tests::run_board_view_filter_scopes_both_views_alone_and_combined' (33153710) panicked at src/adapters/http/routes/workflows/ui/runs/runs_tests.rs:122:10:
+called `Result::unwrap()` on an `Err` value: App(BadRequest("Agent assistant must be published in this company before a workflow can reference it"))
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- adapters::http::routes::workflows::ui::runs::tests::board_view_tests::run_board_view_filter_switch_and_links_keep_the_scope stdout ----
+
+thread 'adapters::http::routes::workflows::ui::runs::tests::board_view_tests::run_board_view_filter_switch_and_links_keep_the_scope' (33153724) panicked at src/adapters/http/routes/workflows/ui/runs/runs_tests.rs:122:10:
+called `Result::unwrap()` on an `Err` value: App(BadRequest("Agent assistant must be published in this company before a workflow can reference it"))
+
+---- adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_views::autonomous_agent_views_action_call_origin_survives_current_revocation stdout ----
+
+thread 'adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_views::autonomous_agent_views_action_call_origin_survives_current_revocation' (33153950) panicked at src/adapters/persistence/workflow/autonomous_agent_view_tests.rs:161:10:
+called `Result::unwrap()` on an `Err` value: Internal("Invalid immutable run provenance")
+
+---- adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_views::autonomous_agent_views_keep_v1_v2_and_exact_targets_under_one_workflow_version stdout ----
+
+thread 'adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_views::autonomous_agent_views_keep_v1_v2_and_exact_targets_under_one_workflow_version' (33153973) panicked at src/adapters/persistence/workflow/autonomous_agent_view_tests.rs:33:5:
+assertion `left == right` failed
+  left: "support"
+ right: "Support"
+
+
+failures:
+    adapters::http::routes::workflows::ui::runs::tests::board_view_tests::run_board_view_filter_scopes_both_views_alone_and_combined
+    adapters::http::routes::workflows::ui::runs::tests::board_view_tests::run_board_view_filter_switch_and_links_keep_the_scope
+    adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_views::autonomous_agent_views_action_call_origin_survives_current_revocation
+    adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_views::autonomous_agent_views_keep_v1_v2_and_exact_targets_under_one_workflow_version
+
+test result: FAILED. 32 passed; 4 failed; 0 ignored; 0 measured; 2981 filtered out; finished in 11.06s
+

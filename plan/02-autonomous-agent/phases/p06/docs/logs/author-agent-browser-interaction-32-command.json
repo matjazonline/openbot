@@ -1,0 +1,14 @@
+{
+  "argv": [
+    "node",
+    "--test",
+    "--test-concurrency=1",
+    "scripts/tests/agent-authoring-browser.mjs",
+    "scripts/tests/workflow-agent-picker-browser.mjs"
+  ],
+  "environment": {
+    "AGENT_AUTHORING_BROWSER_FIXTURES": "/Users/mac02/dev/openbot-recovery/.worktrees/autonomous-p06/plan/02-autonomous-agent/phases/p06/docs/logs/agent-authoring-browser-fixtures-32",
+    "WORKFLOW_AGENT_BROWSER_FIXTURES": "/Users/mac02/dev/openbot-recovery/.worktrees/autonomous-p06/plan/02-autonomous-agent/phases/p06/docs/logs/workflow-agent-browser-fixtures-32",
+    "CHROME_PATH": "/Users/mac02/dev/openbot-recovery/.worktrees/autonomous-p03-browser-1193-jiexgad5/extracted/chrome-mac/headless_shell"
+  }
+}

@@ -5,7 +5,7 @@
 use super::*;
 
 impl Fixture {
-    async fn register(&self, workflow: Uuid, fields: &[(&str, &str)]) -> String {
+    pub(super) async fn register(&self, workflow: Uuid, fields: &[(&str, &str)]) -> String {
         register_tool(
             self.ui(self.owner),
             Path(workflow),
@@ -17,10 +17,75 @@ impl Fixture {
         .0
     }
 
-    async fn grant(&self, user: Uuid, agent: Uuid, fields: &[(&str, &str)]) -> AppResult<String> {
-        grant_agent_tools(self.ui(user), Path(agent), self.query(), form(fields))
+    pub(super) async fn publish_with_workflow_tool(
+        &self,
+        agent: Uuid,
+        name: &str,
+        workflow: Uuid,
+        version: Uuid,
+    ) {
+        use crate::application::agent::*;
+        use crate::domain::workflow::TypeName;
+        use crate::entities::agent_capability::*;
+        let cases = self.ui(self.owner).agents;
+        let stored = cases
+            .get_company_agent(self.owner, self.company, agent)
             .await
-            .map(|html| html.0)
+            .unwrap()
+            .unwrap();
+        let saved = cases
+            .update_agent(
+                self.owner,
+                self.company,
+                CompanyAgentUpdate {
+                    agent: AgentId::new(agent),
+                    expected_revision: stored.draft_revision,
+                    write: AgentWrite {
+                        name: stored.name,
+                        slug: stored.slug,
+                        provider: stored.provider,
+                        model: stored.model,
+                        ..Default::default()
+                    },
+                    tools: Some(vec![AgentToolAssignment {
+                        binding: None,
+                        alias: AgentToolAlias::parse(name).unwrap(),
+                        choice: AgentToolChoice::Workflow {
+                            registration: TypeName::parse(name).unwrap(),
+                            workflow: WorkflowId::new(workflow),
+                            version: VersionId::new(version),
+                            params_digest: AgentParameterDigest::of(&json!({})).unwrap(),
+                        },
+                    }]),
+                },
+            )
+            .await
+            .unwrap();
+        self.engine
+            .agent_publications()
+            .publish_agent(PublishAgent {
+                scope: AgentPublicationScope {
+                    company: CompanyId::new(self.company),
+                    actor: WorkflowActor::authenticated(self.owner).unwrap(),
+                    agent: AgentId::new(agent),
+                },
+                expected_draft_revision: saved.draft_revision,
+                expected_active_revision: self
+                    .engine
+                    .agent_authoring_reads()
+                    .authoring_state(AgentPublicationScope {
+                        company: CompanyId::new(self.company),
+                        actor: WorkflowActor::authenticated(self.owner).unwrap(),
+                        agent: AgentId::new(agent),
+                    })
+                    .await
+                    .unwrap()
+                    .active
+                    .map(|active| active.id),
+                key: AgentPublicationKey::parse(Uuid::new_v4().to_string()).unwrap(),
+            })
+            .await
+            .unwrap();
     }
 
     async fn agent_ids(&self, version: Uuid) -> Vec<Uuid> {
@@ -33,7 +98,7 @@ impl Fixture {
 }
 
 /// A workflow whose input and output a tool call can carry.
-fn tool_source(workflow: Uuid) -> String {
+pub(super) fn tool_source(workflow: Uuid) -> String {
     let mut source = example("data.map", workflow);
     source["input_schema"] = json!({"type": "object", "properties": {"key": {"type": "string"}}});
     source["output_schema"] = json!(true);
@@ -69,7 +134,9 @@ async fn a_tool_name_is_registered_re_pinned_re_pointed_and_revoked_saying_what_
         listed.contains("lookup") && listed.contains("Orders"),
         "{listed}"
     );
-    assert!(listed.contains("Revoking stops every published version that froze this tool"));
+    assert!(
+        listed.contains("Revoking refuses new runs whose selected agents need this workflow tool")
+    );
 
     // The name is taken: the form says what re-pinning does before anything is written.
     let asked = f
@@ -101,7 +168,7 @@ async fn a_tool_name_is_registered_re_pinned_re_pointed_and_revoked_saying_what_
         )
         .await;
     assert!(repinned.contains("Re-pinned lookup"), "{repinned}");
-    assert!(repinned.contains("Published versions keep calling the version they froze"));
+    assert!(repinned.contains("Published agents keep their pinned workflow version"));
 
     // From another workflow: re-pointing refuses the old pins, said first.
     let asked = f
@@ -203,135 +270,23 @@ async fn a_tool_name_is_registered_re_pinned_re_pointed_and_revoked_saying_what_
 }
 
 #[tokio::test]
-async fn an_agents_grants_save_against_the_list_seen_and_say_what_each_name_is() {
+async fn autonomous_agent_authoring_usage_refuses_members_and_foreign_agents() {
     let Some(f) = Fixture::new().await else {
         return;
     };
     let agent = f.agent("Assistant", "assistant").await;
-    let workflow = Uuid::new_v4();
-    let version = f
-        .published(workflow, "Orders", &tool_source(workflow))
-        .await;
-    f.register(
-        workflow,
-        &[
-            ("name", "lookup"),
-            ("version_id", &version.to_string()),
-            ("params_json", "{}"),
-        ],
-    )
-    .await;
-    let card = agent_tools(f.ui(f.owner), Path(agent), f.query())
-        .await
-        .unwrap()
-        .0;
-    assert!(
-        card.starts_with(r#"<section id="agent-workflow-tools""#),
-        "{card}"
-    );
-    assert!(card.contains("Registered workflow tools not granted") && card.contains("lookup"));
-
-    let saved = f
-        .grant(
-            f.owner,
-            agent,
-            &[
-                ("expected", ""),
-                ("tools", "lookup\n message.send \n\nhttp_lookup"),
-            ],
-        )
-        .await
-        .unwrap();
-    assert!(saved.contains("Saved 3 granted tools"), "{saved}");
-    assert!(saved.contains("workflow tool: registered for Orders"));
-    assert!(saved.contains("built-in message tool"));
-    assert!(saved.contains("resolved at publication"));
-    assert_eq!(
-        field_value(&saved, "expected"),
-        "lookup\nmessage.send\nhttp_lookup"
-    );
-
-    // The card was opened before that save: nothing changes and the typed text stays.
-    let stale = f
-        .grant(f.owner, agent, &[("expected", ""), ("tools", "lookup")])
-        .await
-        .unwrap();
-    assert!(
-        stale.contains("The grants changed since this card was shown"),
-        "{stale}"
-    );
-    assert!(stale.contains("\nlookup</textarea>"));
-    let provisioning = f
-        .grant(
-            f.owner,
-            agent,
-            &[
-                ("expected", "lookup\nmessage.send\nhttp_lookup"),
-                ("tools", "lookup\nlist_company_agents"),
-            ],
-        )
-        .await
-        .unwrap();
-    assert!(
-        provisioning.contains("Not saved: Provisioning tools"),
-        "{provisioning}"
-    );
-    let invalid = f
-        .grant(f.owner, agent, &[("expected", ""), ("tools", "Not A Name")])
-        .await
-        .unwrap();
-    assert!(invalid.contains("is not a valid tool name"), "{invalid}");
-    let granted = f
-        .engine
-        .authoring_reads()
-        .agent_tool_grants(CompanyId::new(f.company), agent)
-        .await
-        .unwrap()
-        .unwrap();
-    assert_eq!(granted, ["lookup", "message.send", "http_lookup"]);
-
-    // Another company's admin, naming its own company with this agent, finds no agent.
-    let f = &f;
-    let foreign = |user: Uuid, company: Uuid| {
-        let query = move || {
+    for (user, company) in [(f.stranger, f.other), (f.member, f.company)] {
+        let error = agent_usage(
+            f.ui(user),
+            Path(agent),
             Query(CompanyQuery {
                 company_id: company,
-            })
-        };
-        async move {
-            (
-                agent_tools(f.ui(user), Path(agent), query()).await.err(),
-                grant_agent_tools(
-                    f.ui(user),
-                    Path(agent),
-                    query(),
-                    form(&[
-                        ("expected", "lookup\nmessage.send\nhttp_lookup"),
-                        ("tools", ""),
-                    ]),
-                )
-                .await
-                .err(),
-                agent_usage(f.ui(user), Path(agent), query()).await.err(),
-            )
-        }
-    };
-    for (user, company) in [(f.stranger, f.other), (f.member, f.company)] {
-        let (read, write, usage) = foreign(user, company).await;
-        for error in [read, write, usage] {
-            assert!(matches!(error, Some(AppError::NotFound(_))), "{error:?}");
-        }
+            }),
+        )
+        .await
+        .err();
+        assert!(matches!(error, Some(AppError::NotFound(_))), "{error:?}");
     }
-    assert_eq!(
-        f.engine
-            .authoring_reads()
-            .agent_tool_grants(CompanyId::new(f.company), agent)
-            .await
-            .unwrap()
-            .unwrap()
-            .len(),
-        3
-    );
 }
 
 #[tokio::test]
@@ -340,6 +295,7 @@ async fn used_by_lists_a_binding_that_reaches_the_agent_only_through_a_child_dia
         return;
     };
     let agent = f.agent("Assistant", "assistant").await;
+    f.publish_usage_agent(agent).await;
     // The grandchild runs the agent; two children each call it; the parent calls both.
     let grandchild = Uuid::new_v4();
     let mut source = example("agent.run", grandchild);
@@ -442,145 +398,24 @@ async fn used_by_lists_a_binding_that_reaches_the_agent_only_through_a_child_dia
     );
 }
 
-/// What the revoke and re-point warnings say is what happens to a version that froze the tool
-/// (P07-D2 rev 4 §D2.2, §D2.7; F020): its binding can no longer be activated after a revoke,
-/// re-registering the name for the same workflow restores it, and pointing the name at another
-/// workflow stops it again.
-#[tokio::test]
-async fn revoking_or_re_pointing_a_frozen_tool_stops_its_versions_bindings_as_the_warning_says() {
-    let Some(f) = Fixture::new().await else {
-        return;
-    };
-    for fact in [
-        "their new runs are refused",
-        "their bindings can no longer be configured or activated",
-        "their agents' next calls to it are refused",
-        "A call already in progress still returns its result",
-        "Registering the name again for the same workflow restores them",
-    ] {
-        assert!(pages::REVOKE_WARNING.contains(fact), "{fact}");
+impl Fixture {
+    async fn publish_usage_agent(&self, agent: Uuid) {
+        use crate::application::agent::{AgentPublicationKey, AgentPublicationScope, PublishAgent};
+        let scope = AgentPublicationScope {
+            company: CompanyId::new(self.company),
+            actor: WorkflowActor::authenticated(self.owner).unwrap(),
+            agent: crate::entities::agent_capability::AgentId::new(agent),
+        };
+        let publications = self.engine.agent_publications();
+        let preview = publications.preview_agent(scope).await.unwrap();
+        publications
+            .publish_agent(PublishAgent {
+                scope,
+                expected_draft_revision: preview.draft_revision,
+                expected_active_revision: preview.active_revision,
+                key: AgentPublicationKey::parse(Uuid::new_v4().to_string()).unwrap(),
+            })
+            .await
+            .unwrap();
     }
-    for fact in [
-        "their new runs are refused",
-        "their bindings can no longer be configured or activated",
-        "A call already in progress still returns its result",
-    ] {
-        assert!(pages::REPOINT_WARNING.contains(fact), "{fact}");
-    }
-    assert!(!pages::REVOKE_WARNING.contains("already waiting"));
-    assert!(pages::REPIN_NOTE.contains("published versions keep running"));
-
-    let agent = f.agent("Assistant", "assistant").await;
-    let (tool, other) = (Uuid::new_v4(), Uuid::new_v4());
-    let tool_version = f
-        .published(tool, "Orders", &tool_source(tool))
-        .await
-        .to_string();
-    let other_version = f
-        .published(other, "Refunds", &tool_source(other))
-        .await
-        .to_string();
-    let registered = f
-        .register(
-            tool,
-            &[
-                ("name", "lookup"),
-                ("version_id", &tool_version),
-                ("params_json", "{}"),
-            ],
-        )
-        .await;
-    assert!(registered.contains("Registered lookup"), "{registered}");
-    f.grant(f.owner, agent, &[("expected", ""), ("tools", "lookup")])
-        .await
-        .unwrap();
-    // A version whose agent froze the tool, bound and active.
-    let workflow = Uuid::new_v4();
-    let version = f
-        .published(workflow, "Answer", &source_of("agent.run", workflow))
-        .await;
-    let binding = Uuid::new_v4();
-    let actor = WorkflowActor::authenticated(f.owner).unwrap();
-    use crate::adapters::http::routes::workflows::bindings as json_bindings;
-    json_bindings::configure_binding(
-        &f.engine,
-        f.company,
-        actor,
-        binding,
-        json_bindings::BindingRequest {
-            expected_state_revision: None,
-            association: crate::application::workflow::RelatedAssociation::Company,
-            version,
-            params: json!({}),
-            resources: BTreeMap::new(),
-            run_as: None,
-            message_trigger: None,
-        },
-    )
-    .await
-    .unwrap();
-    let state = |revision: u64, active: bool| {
-        json_bindings::set_binding_activity(&f.engine, f.company, actor, binding, revision, active)
-    };
-    assert!(state(1, true).await.unwrap().active);
-    let activate_in_page = |revision: u64| {
-        activate_binding(
-            f.ui(f.owner),
-            Path((workflow, binding)),
-            f.query(),
-            axum::Form(ActivityForm {
-                expected_state_revision: revision,
-            }),
-        )
-    };
-
-    let revoked = revoke_tool(
-        f.ui(f.owner),
-        f.query(),
-        form(&[("name", "lookup"), ("expected_revision", "1")]),
-    )
-    .await
-    .unwrap()
-    .0;
-    assert!(
-        revoked.contains("can no longer start runs or call it"),
-        "{revoked}"
-    );
-    state(2, false).await.unwrap();
-    let refused = activate_in_page(3).await.unwrap().0;
-    assert!(refused.contains("Not activated:"), "{refused}");
-    assert!(!state(3, true).await.is_ok_and(|state| state.active));
-
-    // The same name for the same workflow restores the version that froze it.
-    f.register(
-        tool,
-        &[
-            ("name", "lookup"),
-            ("version_id", &tool_version),
-            ("params_json", "{}"),
-        ],
-    )
-    .await;
-    let restored = activate_in_page(3).await.unwrap().0;
-    assert!(restored.contains("Activated binding"), "{restored}");
-
-    // Pointed at another workflow, it stops again.
-    let pointed = f
-        .register(
-            other,
-            &[
-                ("name", "lookup"),
-                ("version_id", &other_version),
-                ("params_json", "{}"),
-                ("expected_revision", "1"),
-            ],
-        )
-        .await;
-    assert!(
-        pointed.contains("Pointed lookup at this workflow"),
-        "{pointed}"
-    );
-    state(4, false).await.unwrap();
-    let refused = activate_in_page(5).await.unwrap().0;
-    assert!(refused.contains("Not activated:"), "{refused}");
 }

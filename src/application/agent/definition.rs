@@ -102,16 +102,20 @@ impl ResolvedAgentDefinition {
                 || !assignments.insert(assigned.assignment_id)
                 || skill.instructions.len() > MAX_AGENT_TEXT_BYTES
                 || skill.required_tools.len() > 32
-                || skill.required_tools.iter().any(|required| {
-                    !self
-                        .tools
-                        .iter()
-                        .any(|tool| tool.binding.alias.as_str() == required.as_str())
-                })
             {
-                return Err(invalid(
-                    "Invalid skill assignment or missing required agent tool",
-                ));
+                return Err(invalid("Invalid skill assignment"));
+            }
+            if let Some(required) = skill.required_tools.iter().find(|required| {
+                !self
+                    .tools
+                    .iter()
+                    .any(|tool| tool.binding.alias.as_str() == required.as_str())
+            }) {
+                return Err(invalid(&format!(
+                    "Skill {} requires tool alias {}. Add that tool to the agent draft before publishing.",
+                    skill.name.as_str(),
+                    required.as_str()
+                )));
             }
         }
         let mut declarations = BTreeSet::new();

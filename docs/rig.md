@@ -8,11 +8,13 @@ count it.
 
 ## Configure an agent
 
-In Agents, open an agent's settings (or create an agent) and save. Company and library forms use
-the same fields. Model connections and skills are separate settings. There is no runtime selector,
-no runtime configuration and no tool catalogue: the legacy native tools, built-in tools, agent MCP
-selections and executable skill tool steps were removed in phase 06C. Workflow tools an agent may
-use are named by its `workflow_tools` and dispatched by workflow actions, not by this runtime.
+In **Agents**, configure a company agent's model, instructions, ordered skills and typed tool
+bindings, then save, preview and publish its draft. HTTP/MCP connections, reviewed operations,
+connection grants, workflow registrations and shared skills remain separate settings. Agent
+publication selects an active revision independently of workflow versions; root admission captures
+that revision and its dependencies for retries and children. Library copying creates a company
+draft for explicit validation/publication. See [agent authoring and API](agent-authoring.md).
+There is no runtime selector or alternative agent engine.
 
 For `POST /api/companies/{company}/agents`, this is a minimal request. The company must already
 have a model connection and an enabled model; credentials are not part of this body.
@@ -46,16 +48,17 @@ model and capabilities before production use.
 
 | Capability | Rig behavior |
 | --- | --- |
-| Tools | The agent's `workflow_tools`, declared to the model and dispatched as workflow actions; the runtime has no built-in, native or MCP tools of its own |
+| Tools | The selected agent revision's typed built-in, HTTP, MCP and workflow bindings, declared to the model and dispatched through existing guarded action/child-workflow bridges |
 | Skills | Each attached skill's instructions are appended to the agent's prompt; the model follows them |
 | Context | The step's `context` input, whatever the workflow passes in (a `context.history` step's thread history, the trigger's input), fenced as untrusted JSON |
 | Structured final responses | Optional shared JSON Schema contract, enforced by the application |
-| Host access / delegation | No shell, filesystem, HTTP, provider-hosted tools, or Rig-managed sub-agent runtime |
+| Host access / delegation | No direct host shell/filesystem or separate Rig-managed agent runtime; configured HTTP/MCP operations require explicit bindings and current authority |
 | Streaming / multipart completions | Unsupported |
 
-Skills are prompt steps, not deterministic recipes: appending one to the prompt executes nothing.
-An agent attaches at most 16 skills, and a skill has at most 32 steps of up to 8,000 characters
-each. Only `agent.run` steps use an agent's skills and tools.
+Skills are ordered prompt instructions; attaching one does not execute a workflow step. An agent
+attaches at most 16 skills. Each skill has bounded instruction text and may require up to 32 tool
+aliases from that agent. Only `agent.run` uses skills and tools; `ai.classify` and `decision.agent`
+use the captured instructions/model only.
 
 ## Structured final answers
 
@@ -155,9 +158,11 @@ pilot evidence and recovery.
 In company settings, open **MCP servers**. Create a `streamable_http` connection with an endpoint,
 enabled state and authentication type (`none` or `bearer`). Save a bearer token separately, then
 use the connection test/refresh to initialize and discover tools. Review discovered schemas and
-grant tool names explicitly. Workflow MCP actions call granted tools; agents no longer select
-connections (removed in 06C). Definitions and encrypted secrets belong to the company and are
-separate from model credentials.
+grant tool names explicitly, then approve the operation and assign the exact connection, operation,
+reviewed version and remote tool name on the agent. Agents can reuse those concrete bindings in
+multiple workflows without duplicate MCP resource slots. Explicit `mcp.call` steps retain their own
+slot selection. Definitions and encrypted secrets belong to the company and are separate from
+model credentials.
 
 Saving checks local configuration, not connectivity or authentication. Refresh tests both enabled
 and disabled definitions; bearer connections require a token first. Discovery grants nothing.

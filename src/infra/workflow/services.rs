@@ -8,6 +8,10 @@ pub struct WorkflowServices {
     pub(super) worker_wakeups: Arc<Notify>,
 }
 impl WorkflowServices {
+    pub fn agent_authoring_reads(&self) -> &dyn crate::application::agent::AgentAuthoringReads {
+        &self.persistence
+    }
+
     pub fn agent_publications(&self) -> &dyn crate::application::agent::AgentPublications {
         &self.persistence
     }

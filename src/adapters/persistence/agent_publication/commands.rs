@@ -14,17 +14,22 @@ fn write_error(error: sqlx::Error) -> AppError {
 
 #[async_trait]
 impl AgentPublications for PostgresPersistence {
+    #[tracing::instrument(skip_all, fields(company=%scope.company.as_uuid(), agent=%scope.agent.as_uuid()))]
     async fn preview_agent(&self, scope: AgentPublicationScope) -> AppResult<AgentPreview> {
         let mut tx = self.pool().begin().await?;
         sqlx::query("SELECT set_config('lock_timeout','1000ms',true),set_config('statement_timeout','5000ms',true)").execute(&mut *tx).await?;
         let preview = LockedAgentPublication::lock(&mut tx, scope)
             .await?
             .preview()
-            .await?;
+            .await
+            .inspect_err(|error| {
+                tracing::warn!(failure = publication_failure(error), "Agent preview failed")
+            })?;
         tx.commit().await.map_err(write_error)?;
         Ok(preview)
     }
 
+    #[tracing::instrument(skip_all, fields(company=%request.scope.company.as_uuid(), agent=%request.scope.agent.as_uuid(), draft=request.expected_draft_revision.get()))]
     async fn publish_agent(&self, request: PublishAgent) -> AppResult<PublishedAgentRevision> {
         let mut tx = self.pool().begin().await?;
         sqlx::query("SELECT set_config('lock_timeout','1000ms',true),set_config('statement_timeout','5000ms',true)")
@@ -32,8 +37,15 @@ impl AgentPublications for PostgresPersistence {
         let result = LockedAgentPublication::lock(&mut tx, request.scope)
             .await?
             .publish(&request)
-            .await?;
+            .await
+            .inspect_err(|error| {
+                tracing::warn!(
+                    failure = publication_failure(error),
+                    "Agent publication failed"
+                )
+            })?;
         tx.commit().await.map_err(write_error)?;
+        tracing::info!(revision=%result.id.as_uuid(), "Agent publication request completed");
         Ok(result)
     }
 
@@ -90,6 +102,23 @@ impl AgentPublications for PostgresPersistence {
         let mut tx = begin_authorized(self, scope).await?;
         grants::revoke_on(&mut tx, scope, identity).await?;
         tx.commit().await.map_err(write_error)
+    }
+}
+
+fn publication_failure(error: &AppError) -> &'static str {
+    match error {
+        AppError::BadRequest(_) => "invalid_definition",
+        AppError::Conflict(_) | AppError::Superseded(_) => "conflict",
+        AppError::Forbidden(_) | AppError::InvalidCredentials => "forbidden",
+        AppError::NotFound(_) => "missing",
+        AppError::ServiceUnavailable(_) => "unavailable",
+        AppError::Database(_) | AppError::DatabaseTimeout(_) => "database",
+        AppError::Timeout(_) => "timeout",
+        AppError::Execution(_)
+        | AppError::WorkflowGuard(_)
+        | AppError::KnowledgeTrigger { .. }
+        | AppError::KnowledgeRelease { .. } => "execution_refused",
+        AppError::Internal(_) => "internal",
     }
 }
 

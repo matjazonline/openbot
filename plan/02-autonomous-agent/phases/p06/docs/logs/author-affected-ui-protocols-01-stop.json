@@ -1,0 +1,12 @@
+{
+  "root_pids": [
+    61483
+  ],
+  "owned_pids_signalled": [
+    61483,
+    61486,
+    61487,
+    61488
+  ],
+  "reason": "Browser protocols launched default Chromium without CHROME_PATH; missing cached-default executable failed before cleanup and left fixture HTTP servers open. Stop exact owned command subtree and rerun with verified surviving cached Chromium."
+}

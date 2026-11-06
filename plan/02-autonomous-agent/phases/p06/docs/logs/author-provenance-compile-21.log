@@ -1,0 +1,87 @@
+   Compiling open_bots v0.1.0 (/Users/mac02/dev/openbot-recovery/.worktrees/autonomous-p06)
+error[E0433]: cannot find type `Duration` in this scope
+  --> src/adapters/persistence/workflow/run_provenance/calls.rs:47:30
+   |
+47 |         tokio::time::timeout(Duration::from_secs(5), async {
+   |                              ^^^^^^^^ use of undeclared type `Duration`
+   |
+   = note: struct `crate::infra::workflow::tests::Duration` exists but is inaccessible
+help: consider importing this struct
+   |
+ 1 + use std::time::Duration;
+   |
+
+error[E0433]: cannot find type `Duration` in this scope
+   --> src/adapters/persistence/workflow/run_provenance/mod.rs:110:30
+    |
+110 |         tokio::time::timeout(Duration::from_secs(5), async {
+    |                              ^^^^^^^^ use of undeclared type `Duration`
+    |
+    = note: struct `crate::infra::workflow::tests::Duration` exists but is inaccessible
+help: consider importing this struct
+    |
+  2 + use std::time::Duration;
+    |
+
+warning: unused import: `StepView`
+  --> src/adapters/http/routes/workflows/ui/runs/mod.rs:14:56
+   |
+14 | use crate::application::workflow::run_views::{RunView, StepView};
+   |                                                        ^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+error[E0560]: struct `workflow_runs::step::StepBodyView<'_>` has no field named `agent`
+  --> src/adapters/persistence/workflow/jev_end_to_end_tests.rs:89:9
+   |
+89 |         agent: None,
+   |         ^^^^^ `workflow_runs::step::StepBodyView<'_>` does not have this field
+   |
+   = note: all struct fields are already assigned
+
+error[E0624]: method `call_provenance` is private
+   --> src/adapters/persistence/workflow/run_views.rs:463:14
+    |
+463 |               .call_provenance(
+    |                ^^^^^^^^^^^^^^^ private method
+    |
+   ::: src/adapters/persistence/workflow/run_provenance/calls.rs:31:5
+    |
+ 31 | /     pub(super) async fn call_provenance(
+ 32 | |         &self,
+ 33 | |         company: CompanyId,
+ 34 | |         run: RunId,
+ 35 | |         actions: &[CallRecordScope],
+ 36 | |         children: &[CallRecordScope],
+ 37 | |     ) -> AppResult<CallProvenancePage> {
+    | |______________________________________- private method defined here
+
+error[E0624]: method `call_provenance` is private
+   --> src/adapters/persistence/workflow/run_views.rs:561:14
+    |
+561 |               .call_provenance(
+    |                ^^^^^^^^^^^^^^^ private method
+    |
+   ::: src/adapters/persistence/workflow/run_provenance/calls.rs:31:5
+    |
+ 31 | /     pub(super) async fn call_provenance(
+ 32 | |         &self,
+ 33 | |         company: CompanyId,
+ 34 | |         run: RunId,
+ 35 | |         actions: &[CallRecordScope],
+ 36 | |         children: &[CallRecordScope],
+ 37 | |     ) -> AppResult<CallProvenancePage> {
+    | |______________________________________- private method defined here
+
+error[E0560]: struct `workflow_runs::step::StepBodyView<'_>` has no field named `agent`
+  --> src/adapters/persistence/workflow/knowledge_view_tests.rs:49:13
+   |
+49 |             agent: None,
+   |             ^^^^^ `workflow_runs::step::StepBodyView<'_>` does not have this field
+   |
+   = note: all struct fields are already assigned
+
+Some errors have detailed explanations: E0433, E0560, E0624.
+For more information about an error, try `rustc --explain E0433`.
+warning: `open_bots` (lib test) generated 1 warning
+error: could not compile `open_bots` (lib test) due to 6 previous errors; 1 warning emitted

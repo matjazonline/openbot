@@ -197,6 +197,7 @@ pub fn workflow_editor(view: &EditorView<'_>) -> String {
                 <span id="workflow-editor-status" class="text-sm" role="status" aria-live="polite"></span>
             </div>
         </form>
+        {agent_picker}
         {preview}
         {catalogue}
         {archive}"##,
@@ -212,6 +213,11 @@ pub fn workflow_editor(view: &EditorView<'_>) -> String {
             view.too_many_tools,
             disabled
         ),
+        agent_picker = if view.archived {
+            String::new()
+        } else {
+            super::agent_picker::workflow_agent_picker_loader(company_id, workflow)
+        },
         preview = view.preview_html.unwrap_or_default(),
         catalogue = catalogue_disclosure(company_id),
         archive = archive_form(view),

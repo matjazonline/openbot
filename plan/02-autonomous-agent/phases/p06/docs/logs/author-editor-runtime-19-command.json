@@ -1,0 +1,14 @@
+[
+  "bash",
+  "scripts/test-network-isolation.sh",
+  "target/debug/deps/open_bots-c19a0b960dacdcef",
+  "ui_agents::authoring::",
+  "autonomous_agent_authoring_workflow_registration_",
+  "autonomous_agent_authoring_competing_json_",
+  "agent_edit_pane",
+  "every_delegated_action_has_a_branch",
+  "no_function_name_is_declared_twice",
+  "ui_agents::form_tests::",
+  "a_tool_name_is_registered_re_pinned_re_pointed_and_revoked_saying_what_each_does",
+  "--test-threads=4"
+]

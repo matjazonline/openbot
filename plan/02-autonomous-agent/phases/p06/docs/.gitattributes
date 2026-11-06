@@ -1,0 +1,3 @@
+logs/*.log -whitespace
+logs/*.patch -whitespace
+logs/*.diff -whitespace

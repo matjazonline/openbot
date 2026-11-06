@@ -1,0 +1,12 @@
+{
+  "argv": [
+    "bash",
+    "scripts/test-network-isolation.sh",
+    "target/debug/deps/open_bots-c19a0b960dacdcef",
+    "dump_html_injection_browser_fixtures",
+    "--ignored",
+    "--test-threads=4"
+  ],
+  "HTML_INJECTION_BROWSER_FIXTURES": "/Users/mac02/dev/openbot-recovery/.worktrees/autonomous-p06/plan/02-autonomous-agent/phases/p06/docs/logs/html-injection-browser-fixtures-33",
+  "APP_JS_OUT": "/Users/mac02/dev/openbot-recovery/.worktrees/autonomous-p06/plan/02-autonomous-agent/phases/p06/docs/logs/html-injection-browser-fixtures-33/app.js"
+}

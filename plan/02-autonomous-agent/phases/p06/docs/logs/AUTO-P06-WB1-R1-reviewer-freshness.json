@@ -1,0 +1,30 @@
+{
+  "checked_at": "2026-11-06T18:46:52.600661+00:00",
+  "head": "fb92a7b48aec030b685701eff31fba9f86f5ae19",
+  "branch": "autonomous/p06",
+  "source_digest": "2ae1e93a0861c03b3ef1f223a109ad74f399ed30020f25d54904e794a6368e3c",
+  "exclusions": [
+    "plan/02-autonomous-agent/phases/p06/docs"
+  ],
+  "changed_paths": 104,
+  "authority_revision": 36,
+  "authority_sha256": "7e8af1c59d239facd7daf0674f734acd41cdb5da7675a95245934ca2274a098a",
+  "authority_pin_equal": true,
+  "decision_sha256": "679876e01f1e6a8ac9bfebdbefa3657d7fd0985d00057ee5b3cc33849e511c37",
+  "checks": [
+    {
+      "log": "AUTO-P06-WB1-R1-reviewer-native-01.log",
+      "sha256": "eb51b0c13b249cfb4593747684bfb499f8ed60e83fa196b3e42533ebad81e171",
+      "passed": 14,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "log": "AUTO-P06-WB1-R1-reviewer-native-02.log",
+      "sha256": "41b1677b915fbe327bbea26db50b34f734b1d09220a9dd904cf0217a4af10f34",
+      "passed": 6,
+      "failed": 0,
+      "ignored": 0
+    }
+  ]
+}

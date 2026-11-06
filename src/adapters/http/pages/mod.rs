@@ -35,6 +35,7 @@ fn parse_platform_address(
         .parse_platform_address(value)
 }
 
+mod agent_authoring;
 mod agent_library_multi_select;
 mod agent_settings;
 mod agents;
@@ -74,6 +75,7 @@ mod workflow_authoring;
 mod workflow_decision;
 mod workflow_runs;
 
+pub use agent_authoring::*;
 pub use agent_library_multi_select::*;
 pub use agent_settings::*;
 pub use agents::*;

@@ -1,0 +1,16 @@
+{
+  "argv": [
+    "node",
+    "--test",
+    "--test-concurrency=1",
+    "scripts/tests/team-autocomplete-browser.mjs",
+    "scripts/tests/html-injection-browser.mjs",
+    "scripts/tests/session-revocation-browser.mjs"
+  ],
+  "environment": {
+    "HTML_INJECTION_BROWSER_FIXTURES": "/Users/mac02/dev/openbot-recovery/.worktrees/autonomous-p06/plan/02-autonomous-agent/phases/p06/docs/logs/html-injection-browser-fixtures-33",
+    "APP_JS_OUT": "/Users/mac02/dev/openbot-recovery/.worktrees/autonomous-p06/plan/02-autonomous-agent/phases/p06/docs/logs/html-injection-browser-fixtures-33/app.js",
+    "SESSION_REVOCATION_BROWSER_FIXTURES": "/Users/mac02/dev/openbot-recovery/.worktrees/autonomous-p06/plan/02-autonomous-agent/phases/p06/docs/logs/session-revocation-browser-fixtures-33",
+    "CHROME_PATH": "/Users/mac02/dev/openbot-recovery/.worktrees/autonomous-p03-browser-1193-jiexgad5/extracted/chrome-mac/headless_shell"
+  }
+}

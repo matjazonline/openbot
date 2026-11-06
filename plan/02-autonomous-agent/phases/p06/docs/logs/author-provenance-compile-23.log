@@ -1,0 +1,39 @@
+   Compiling open_bots v0.1.0 (/Users/mac02/dev/openbot-recovery/.worktrees/autonomous-p06)
+error[E0369]: binary operation `==` cannot be applied to type `application::agent::publication::AgentGrantIdentity`
+   --> src/adapters/persistence/workflow/autonomous_agent_view_tests.rs:172:5
+    |
+172 | /     assert_eq!(
+173 | |         AgentGrantIdentity::Binding(call.tool.binding),
+174 | |         before.agent.as_ref().unwrap().bindings[0].binding
+175 | |     );
+    | |     ^
+    | |     |
+    | |_____application::agent::publication::AgentGrantIdentity
+    |       domain::entities::agent_capability::AgentBindingId
+    |
+note: an implementation of `PartialEq<domain::entities::agent_capability::AgentBindingId>` might be missing for `application::agent::publication::AgentGrantIdentity`
+   --> src/application/agent/publication.rs:69:1
+    |
+ 69 | pub enum AgentGrantIdentity {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ must implement `PartialEq<domain::entities::agent_capability::AgentBindingId>`
+
+error[E0277]: `application::agent::publication::AgentGrantIdentity` doesn't implement `std::fmt::Debug`
+   --> src/adapters/persistence/workflow/autonomous_agent_view_tests.rs:172:5
+    |
+172 | /     assert_eq!(
+173 | |         AgentGrantIdentity::Binding(call.tool.binding),
+174 | |         before.agent.as_ref().unwrap().bindings[0].binding
+175 | |     );
+    | |_____^ the trait `std::fmt::Debug` is not implemented for `application::agent::publication::AgentGrantIdentity`
+    |
+    = note: add `#[derive(Debug)]` to `application::agent::publication::AgentGrantIdentity` or manually `impl std::fmt::Debug for application::agent::publication::AgentGrantIdentity`
+help: consider annotating `application::agent::publication::AgentGrantIdentity` with `#[derive(Debug)]`
+   --> src/application/agent/publication.rs:69:1
+    |
+ 69 + #[derive(Debug)]
+ 70 | pub enum AgentGrantIdentity {
+    |
+
+Some errors have detailed explanations: E0277, E0369.
+For more information about an error, try `rustc --explain E0277`.
+error: could not compile `open_bots` (lib test) due to 2 previous errors

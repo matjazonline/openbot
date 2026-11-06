@@ -1,0 +1,29 @@
+{
+  "reported_tokens_saved": 175004,
+  "visible_metric_calls": 22,
+  "metrics": [
+    4841,
+    612,
+    3389,
+    5144,
+    369,
+    6498,
+    1348,
+    20466,
+    4840,
+    993,
+    24302,
+    3068,
+    8499,
+    2225,
+    326,
+    6016,
+    8446,
+    32749,
+    22912,
+    4755,
+    7674,
+    5532
+  ],
+  "note": "Visible metrics retained by preceding context summary after segment04, before current resumed turn. Previously not persisted; not included in current-turn segment06/07."
+}

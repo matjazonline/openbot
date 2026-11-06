@@ -1,0 +1,94 @@
+{
+  "resource": {
+    "owner": "p06/root",
+    "database": "p06_history_probe_df7f105383f94eef925e22f8d93e51d0",
+    "url": "postgres://mac02@127.0.0.1:55606/p06_history_probe_df7f105383f94eef925e22f8d93e51d0",
+    "disposable": true,
+    "purpose": "isolated architecture query-plan experiment; no application source/base schema mutation"
+  },
+  "seed_rows": 40000,
+  "target_agent_rows": 30000,
+  "other_agent_rows": 10000,
+  "before_execution_ms": 8.79,
+  "after_execution_ms": 0.031,
+  "before_nodes": [
+    {
+      "type": "Limit",
+      "actual_rows": 21.0,
+      "index": null,
+      "shared_hit_blocks": 2006
+    },
+    {
+      "type": "Sort",
+      "actual_rows": 21.0,
+      "index": null,
+      "shared_hit_blocks": 2006
+    },
+    {
+      "type": "Seq Scan",
+      "actual_rows": 30000.0,
+      "index": null,
+      "shared_hit_blocks": 2000
+    }
+  ],
+  "after_nodes": [
+    {
+      "type": "Limit",
+      "actual_rows": 21.0,
+      "index": null,
+      "shared_hit_blocks": 2
+    },
+    {
+      "type": "Index Scan",
+      "actual_rows": 21.0,
+      "index": "agent_revisions_history_idx",
+      "shared_hit_blocks": 2
+    }
+  ],
+  "first_displayed_revisions": [
+    30000,
+    29999,
+    29998,
+    29997,
+    29996,
+    29995,
+    29994,
+    29993,
+    29992,
+    29991,
+    29990,
+    29989,
+    29988,
+    29987,
+    29986,
+    29985,
+    29984,
+    29983,
+    29982,
+    29981
+  ],
+  "second_displayed_revisions": [
+    29980,
+    29979,
+    29978,
+    29977,
+    29976,
+    29975,
+    29974,
+    29973,
+    29972,
+    29971,
+    29970,
+    29969,
+    29968,
+    29967,
+    29966,
+    29965,
+    29964,
+    29963,
+    29962,
+    29961
+  ],
+  "pagination_exact": true,
+  "application_source_unchanged": true
+}

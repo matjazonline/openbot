@@ -301,6 +301,7 @@ async fn workspace(
                 .map(AvatarUrl::as_str)
                 .unwrap_or(""),
             advanced: true,
+            ..pages::AgentDraft::default()
         };
         rows.push_str(&format!(
                 r#"<form method="post" action="/ui/agent-library/{id}/save" class="card bg-base-200 p-4 space-y-4" data-submit="save-library-agent" data-agent-id="{id}">{fields}<div class="flex gap-2"><button class="btn btn-primary btn-sm">Save</button><button type="button" class="btn btn-error btn-outline btn-sm" data-action="delete-library-agent" data-agent-id="{id}">Delete</button></div></form>"#,

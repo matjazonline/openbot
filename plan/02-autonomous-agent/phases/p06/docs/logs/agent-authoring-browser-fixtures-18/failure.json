@@ -1,0 +1,9 @@
+{
+  "errors": [],
+  "queries": [
+    "http://127.0.0.1/ui/agents/e2986823-fccf-4231-9380-6af8b674c063/tool-catalog?company_id=d8e71e92-ce95-4658-a988-d28dd8181211",
+    "http://127.0.0.1/ui/agents/e2986823-fccf-4231-9380-6af8b674c063/tool-catalog?company_id=d8e71e92-ce95-4658-a988-d28dd8181211&kind=http",
+    "http://127.0.0.1/ui/agents/e2986823-fccf-4231-9380-6af8b674c063/tool-catalog?company_id=d8e71e92-ce95-4658-a988-d28dd8181211&kind=workflow"
+  ],
+  "writes": []
+}

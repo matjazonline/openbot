@@ -4,8 +4,6 @@
 //! revoke, grant against the list seen).
 use super::*;
 use crate::application::workflow::authoring::parameters_from_json;
-use crate::application::workflow::message::MessageKind;
-use crate::application::workflow::provisioning::is_builtin_provisioning_tool;
 use crate::application::workflow::reads::ToolTarget;
 use crate::application::workflow::tools::{WorkflowToolRegistration, WorkflowToolWrite};
 use crate::domain::workflow::TypeName;
@@ -116,7 +114,7 @@ pub(super) async fn revoke_tool(
     let (banner, error) = match outcome {
         Ok(()) => (
             Some(format!(
-                "Revoked {}. Published versions that froze it can no longer start runs or call it; a call already in progress still returns its result.",
+                "Revoked {}. New runs that need this agent tool and new calls to it are refused; a call already in progress still returns its result.",
                 name.as_str()
             )),
             None,
@@ -214,18 +212,18 @@ pub(super) async fn register_tool(
         Ok(registration) => {
             let message = match existing {
                 None => format!(
-                    "Registered {} for version {}. An agent calls it once it grants the name.",
+                    "Registered {} for version {}. Select this registered target in an agent draft, then publish the agent to use it.",
                     name.as_str(),
                     pages::short_id(version)
                 ),
                 Some(previous) if previous.workflow.as_uuid() == workflow => format!(
-                    "Re-pinned {} to version {} (revision {}). Published versions keep calling the version they froze.",
+                    "Re-pinned {} to version {} (revision {}). Published agents keep their pinned workflow version.",
                     name.as_str(),
                     pages::short_id(version),
                     registration.revision
                 ),
                 Some(_) => format!(
-                    "Pointed {} at this workflow, version {} (revision {}). Versions that froze the other workflow can no longer start runs or call it until they are republished.",
+                    "Pointed {} at this workflow, version {} (revision {}). Agent bindings to the old workflow refuse new runs and calls. Select the new target in the agent draft and publish the agent to use it.",
                     name.as_str(),
                     pages::short_id(version),
                     registration.revision
@@ -271,127 +269,6 @@ pub(super) async fn register_tool(
 }
 
 /// The grants card for `agent`, with the names it grants resolved against the registrations.
-async fn grants_card(
-    ui: &Ui,
-    company: Uuid,
-    agent: Uuid,
-    typed: Option<&str>,
-    banner: Option<&str>,
-    error: Option<&str>,
-) -> AppResult<String> {
-    let granted = ui
-        .engine
-        .authoring_reads()
-        .agent_tool_grants(super::company(company), agent)
-        .await?
-        .ok_or_else(|| AppError::NotFound("Agent not found".into()))?;
-    let (tools, targets) = ui.registrations(company).await?;
-    let label = |registration: &WorkflowToolRegistration| target_of(&targets, registration);
-    let resolutions: Vec<(String, pages::GrantResolution)> = granted
-        .iter()
-        .map(|name| {
-            let resolution = match tools.iter().find(|tool| tool.name.as_str() == name) {
-                Some(registration) => pages::GrantResolution::Workflow(label(registration)),
-                None if MessageKind::parse(name).is_some() => pages::GrantResolution::Message,
-                None if is_builtin_provisioning_tool(name) => pages::GrantResolution::Provisioning,
-                None => pages::GrantResolution::Elsewhere,
-            };
-            (name.clone(), resolution)
-        })
-        .collect();
-    let available: Vec<(String, String)> = tools
-        .iter()
-        .filter(|tool| !granted.iter().any(|name| name == tool.name.as_str()))
-        .map(|tool| (tool.name.as_str().to_owned(), label(tool)))
-        .collect();
-    Ok(pages::agent_tools_card(&pages::AgentToolsCard {
-        company_id: company,
-        agent,
-        granted: &granted,
-        typed,
-        expected: &granted,
-        resolutions: &resolutions,
-        available: &available,
-        banner,
-        error,
-    }))
-}
-
-/// GET /ui/workflows/agents/{agent}/tools — the agent pane's "Workflow tools" card.
-pub(super) async fn agent_tools(
-    ui: Ui,
-    Path(agent): Path<Uuid>,
-    Query(query): Query<CompanyQuery>,
-) -> AppResult<Html<String>> {
-    let company = ui.company(query.company_id).await?.id;
-    Ok(Html(
-        grants_card(&ui, company, agent, None, None, None).await?,
-    ))
-}
-
-/// POST /ui/workflows/agents/{agent}/tools — replace the grants, only while they are still the
-/// list the card was opened with.
-pub(super) async fn grant_agent_tools(
-    ui: Ui,
-    Path(agent): Path<Uuid>,
-    Query(query): Query<CompanyQuery>,
-    body: Bytes,
-) -> AppResult<Html<String>> {
-    let company = ui.company(query.company_id).await?.id;
-    let form = FormFields::parse(&body);
-    let typed = form.text("tools");
-    let names = |text: &str| -> Result<Vec<TypeName>, String> {
-        text.lines()
-            .map(str::trim)
-            .filter(|line| !line.is_empty())
-            .map(tool_name)
-            .collect()
-    };
-    let refused = |message: String| {
-        let typed = typed.clone();
-        let ui = &ui;
-        async move { grants_card(ui, company, agent, Some(&typed), None, Some(&message)).await }
-    };
-    let (expected, tools) = match (names(&form.text("expected")), names(&typed)) {
-        (Ok(expected), Ok(tools)) => (expected, tools),
-        (Err(message), _) | (_, Err(message)) => return Ok(Html(refused(message).await?)),
-    };
-    let outcome = ui
-        .engine
-        .workflow_tools()
-        .grant_agent_tools(
-            super::company(company),
-            ui.actor()?,
-            agent,
-            &expected,
-            &tools,
-        )
-        .await;
-    match outcome {
-        Ok(granted) => {
-            let message = format!(
-                "Saved {} granted tool{}. Workflows published from now on freeze them.",
-                granted.len(),
-                if granted.len() == 1 { "" } else { "s" }
-            );
-            Ok(Html(
-                grants_card(&ui, company, agent, None, Some(&message), None).await?,
-            ))
-        }
-        Err(AppError::Conflict(_)) => Ok(Html(
-            refused(
-                "The grants changed since this card was shown; nothing was saved. Your text is kept; the list below is the current one, and saving again replaces it."
-                    .into(),
-            )
-            .await?,
-        )),
-        Err(AppError::BadRequest(message)) => {
-            Ok(Html(refused(format!("Not saved: {message}")).await?))
-        }
-        Err(error) => Err(error),
-    }
-}
-
 /// GET /ui/workflows/agents/{agent}/usage — the agent pane's "Used by" card (F098.2).
 pub(super) async fn agent_usage(
     ui: Ui,

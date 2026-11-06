@@ -4,7 +4,7 @@ use super::*;
 /// WF-C003: registration with the revision the caller saw, revocation, and agent grants against
 /// the list the caller saw; a foreign version or agent is not found.
 #[tokio::test]
-async fn workflow_tool_routes_register_revoke_and_grant() {
+async fn workflow_tool_routes_register_and_revoke() {
     let Some(f) = Fixture::new().await else {
         return;
     };
@@ -65,131 +65,6 @@ async fn workflow_tool_routes_register_revoke_and_grant() {
     assert_eq!(listed.as_array().unwrap().len(), 1, "{listed}");
     assert_eq!(listed[0]["name"], "report.make");
 
-    let agent = AgentPersistence::create(
-        &f.persistence,
-        f.company,
-        AgentWrite {
-            name: "Reporter".into(),
-            slug: "reporter".into(),
-            ..Default::default()
-        },
-    )
-    .await
-    .unwrap()
-    .id;
-    let foreign = AgentPersistence::create(
-        &f.persistence,
-        f.other,
-        AgentWrite {
-            name: "Theirs".into(),
-            slug: "theirs".into(),
-            ..Default::default()
-        },
-    )
-    .await
-    .unwrap()
-    .id;
-    let grant = |user: Uuid, agent: Uuid, expected: Value, granted: Value| {
-        tools::grant(
-            f.state(),
-            by(user),
-            Path((f.company, agent)),
-            body(json!({"expected": expected, "tools": granted})),
-        )
-    };
-    let (status, granted) =
-        answer(grant(f.owner, agent, json!([]), json!(["report.make"])).await).await;
-    assert_eq!(status, StatusCode::OK, "{granted}");
-    assert_eq!(granted["tools"], json!(["report.make"]));
-    assert_eq!(
-        answer(grant(f.owner, agent, json!([]), json!(["message.reply"])).await)
-            .await
-            .0,
-        StatusCode::CONFLICT
-    );
-    assert_eq!(
-        answer(grant(f.owner, agent, json!(["report.make"]), json!(["a", "a"])).await)
-            .await
-            .0,
-        StatusCode::BAD_REQUEST
-    );
-    let many = (0..33)
-        .map(|index| format!("tool_{index}"))
-        .collect::<Vec<_>>();
-    assert_eq!(
-        answer(grant(f.owner, agent, json!(["report.make"]), json!(many)).await)
-            .await
-            .0,
-        StatusCode::BAD_REQUEST
-    );
-    // F061: a retry of the grant that applied finds its own list.
-    assert_eq!(
-        answer(grant(f.owner, agent, json!([]), json!(["report.make"])).await)
-            .await
-            .0,
-        StatusCode::OK
-    );
-    // F057: provisioning is the Agent Builder's; a grant cannot add it to another agent...
-    let (status, refused) = answer(
-        grant(
-            f.owner,
-            agent,
-            json!(["report.make"]),
-            json!(["report.make", "create_agent_channel"]),
-        )
-        .await,
-    )
-    .await;
-    assert_eq!(status, StatusCode::BAD_REQUEST, "{refused}");
-    // ...while the Builder, which holds it, keeps or drops it with its other grants.
-    let builder = AgentPersistence::create(
-        &f.persistence,
-        f.company,
-        AgentWrite {
-            name: "Builder".into(),
-            slug: "builder".into(),
-            ..Default::default()
-        },
-    )
-    .await
-    .unwrap()
-    .id;
-    let provisioning = json!(["list_company_agents", "create_agent_channel"]);
-    crate::adapters::persistence::agent_capability::assign_test_tool_names(
-        &f.persistence,
-        builder,
-        &["list_company_agents", "create_agent_channel"],
-    )
-    .await
-    .unwrap();
-    let kept = json!(["list_company_agents", "create_agent_channel", "report.make"]);
-    assert_eq!(
-        answer(grant(f.owner, builder, provisioning, kept.clone()).await)
-            .await
-            .0,
-        StatusCode::OK
-    );
-    assert_eq!(
-        answer(grant(f.owner, builder, kept, json!(["report.make"])).await)
-            .await
-            .0,
-        StatusCode::OK
-    );
-    for (user, target) in [(f.owner, foreign), (f.member, agent), (f.stranger, agent)] {
-        assert_eq!(
-            answer(grant(user, target, json!([]), json!([])).await)
-                .await
-                .0,
-            StatusCode::NOT_FOUND
-        );
-    }
-    let stored: Vec<String> = sqlx::query_scalar("SELECT ARRAY(SELECT alias FROM agent_draft_bindings WHERE agent_id=agents.id ORDER BY position) FROM agents WHERE id = $1")
-        .bind(agent)
-        .fetch_one(f.persistence.pool())
-        .await
-        .unwrap();
-    assert_eq!(stored, ["report.make"]);
-
     let revoke = |expected: i64| {
         tools::revoke(
             f.state(),
@@ -205,13 +80,25 @@ async fn workflow_tool_routes_register_revoke_and_grant() {
     assert_eq!(listed, json!([]));
 }
 
-/// Two grants racing from the same list the callers saw: the company lock serializes them, one
-/// applies and the other finds the list changed.
+/// The former global grant race now exercises the actual revision-checked JSON draft command.
 #[tokio::test]
-async fn competing_agent_grants_apply_once() {
+async fn autonomous_agent_authoring_competing_json_draft_writes_apply_once() {
+    use crate::use_cases::{agent::AgentUseCases, skill::SkillUseCases};
     let Some(f) = Fixture::new().await else {
         return;
     };
+    let shared = Arc::new(f.persistence.clone());
+    let agents = Arc::new(AgentUseCases::new(
+        shared.clone(),
+        shared.clone(),
+        shared.clone(),
+        shared.clone(),
+    ));
+    let skills = Arc::new(SkillUseCases::new(
+        shared.clone(),
+        shared.clone(),
+        shared.clone(),
+    ));
     let agent = AgentPersistence::create(
         &f.persistence,
         f.company,
@@ -222,36 +109,32 @@ async fn competing_agent_grants_apply_once() {
         },
     )
     .await
-    .unwrap()
-    .id;
-    let grant = |user: Uuid, tool: &'static str| {
-        let state = f.state();
+    .unwrap();
+    let save = |user, tool| {
+        let agents = agents.clone();
+        let skills = skills.clone();
         let company = f.company;
+        let agent = agent.clone();
         async move {
-            answer(
-                tools::grant(
-                    state,
-                    by(user),
-                    Path((company, agent)),
-                    body(json!({"expected": [], "tools": [tool]})),
-                )
-                .await,
-            )
-            .await
-            .0
+            crate::adapters::http::routes::agent::update_agent_json(State(agents), State(skills), by(user), Path((company, agent.id)), body(json!({
+                "expected_revision":agent.draft_revision,
+                "agent":{"name":"Raced","slug":"raced"},
+                "tool_assignments":[{"binding":null,"alias":if tool == "message_reply" {"message.reply"} else {"message.send"},"choice":{"kind":"builtin","tool":tool}}]
+            }))).await.map(IntoResponse::into_response).unwrap_or_else(IntoResponse::into_response).status()
         }
     };
-    let (first, second) = tokio::join!(
-        tokio::spawn(grant(f.owner, "first.tool")),
-        tokio::spawn(grant(f.admin, "second.tool"))
+    let (left, right) = tokio::join!(
+        save(f.owner, "message_reply"),
+        save(f.admin, "message_send")
     );
-    let mut statuses = [first.unwrap(), second.unwrap()];
+    let mut statuses = [left, right];
     statuses.sort();
     assert_eq!(statuses, [StatusCode::OK, StatusCode::CONFLICT]);
-    let stored: Vec<String> = sqlx::query_scalar("SELECT ARRAY(SELECT alias FROM agent_draft_bindings WHERE agent_id=agents.id ORDER BY position) FROM agents WHERE id = $1")
-        .bind(agent)
-        .fetch_one(f.persistence.pool())
-        .await
-        .unwrap();
-    assert_eq!(stored.len(), 1, "{stored:?}");
+    let (revision, bindings): (i64, i64) = sqlx::query_as("SELECT draft_revision, (SELECT count(*) FROM agent_draft_bindings WHERE agent_id=agents.id) FROM agents WHERE id=$1")
+        .bind(agent.id).fetch_one(f.persistence.pool()).await.unwrap();
+    assert_eq!(
+        revision,
+        i64::try_from(agent.draft_revision.get() + 1).unwrap()
+    );
+    assert_eq!(bindings, 1);
 }

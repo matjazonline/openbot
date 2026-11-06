@@ -1,0 +1,8 @@
+[
+  "bash",
+  "scripts/test-network-isolation.sh",
+  "target/debug/deps/open_bots-c19a0b960dacdcef",
+  "dump_autonomous_agent_authoring_browser_fixtures",
+  "--ignored",
+  "--test-threads=1"
+]

@@ -7,11 +7,13 @@
 /// even when the serialized representation would remain identical. Old revisions
 /// require an explicit compatible loader; they must never be silently recompiled.
 pub const SEMANTIC_REVISION: u32 = 7;
+mod agent_selection;
 mod analysis;
 mod binding;
 mod compile;
 mod fact_budget;
 mod rebase;
+pub use agent_selection::{AgentReferenceStep, agent_reference_steps, select_agent_reference};
 mod schema;
 mod schema_budget;
 mod shape;

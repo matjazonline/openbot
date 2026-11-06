@@ -1,0 +1,12 @@
+[
+  {
+    "database": "open_bots",
+    "fresh_migration_sha384": "c62d7f066a1ac9fc0780705cfe9d6f8baf3ca975663b0a1095850391947d2bd5de4133c32d4dab125ef16a7b52910622",
+    "owned_data_directory": "/Users/mac02/dev/openbot-recovery/.worktrees/pg-autonomous-p06"
+  },
+  {
+    "database": "open_bots_test",
+    "fresh_migration_sha384": "c62d7f066a1ac9fc0780705cfe9d6f8baf3ca975663b0a1095850391947d2bd5de4133c32d4dab125ef16a7b52910622",
+    "owned_data_directory": "/Users/mac02/dev/openbot-recovery/.worktrees/pg-autonomous-p06"
+  }
+]

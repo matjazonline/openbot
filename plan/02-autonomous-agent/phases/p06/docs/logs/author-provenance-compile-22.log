@@ -1,0 +1,36 @@
+   Compiling open_bots v0.1.0 (/Users/mac02/dev/openbot-recovery/.worktrees/autonomous-p06)
+error[E0599]: no method named `revoke_agent_binding` found for reference `&persistence::PostgresPersistence` in the current scope
+  --> src/adapters/persistence/workflow/autonomous_agent_view_tests.rs:61:7
+   |
+61 |     p.revoke_agent_binding(
+   |     --^^^^^^^^^^^^^^^^^^^^
+   |
+help: there is a method `get_binding` with a similar name
+   |
+61 -     p.revoke_agent_binding(
+61 +     p.get_binding(
+   |
+
+error[E0599]: no method named `revoke_agent_binding` found for reference `&persistence::PostgresPersistence` in the current scope
+   --> src/adapters/persistence/workflow/autonomous_agent_view_tests.rs:174:7
+    |
+174 |     p.revoke_agent_binding(
+    |     --^^^^^^^^^^^^^^^^^^^^
+    |
+help: there is a method `get_binding` with a similar name
+    |
+174 -     p.revoke_agent_binding(
+174 +     p.get_binding(
+    |
+
+warning: unused import: `AgentPublications`
+ --> src/adapters/persistence/workflow/autonomous_agent_view_tests.rs:2:56
+  |
+2 | use crate::application::agent::{AgentPublicationScope, AgentPublications, AgentToolChoice};
+  |                                                        ^^^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+For more information about this error, try `rustc --explain E0599`.
+warning: `open_bots` (lib test) generated 1 warning
+error: could not compile `open_bots` (lib test) due to 2 previous errors; 1 warning emitted

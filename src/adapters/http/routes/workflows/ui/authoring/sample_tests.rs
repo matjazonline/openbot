@@ -138,15 +138,8 @@ async fn sample_direct_workflow_tool_child_and_message_have_zero_production_effe
         "{}",
         registered.0
     );
-    let granted = grant_agent_tools(
-        f.ui(f.owner),
-        Path(agent),
-        f.query(),
-        form(&[("expected", ""), ("tools", "sample.send")]),
-    )
-    .await
-    .unwrap();
-    assert!(!granted.0.contains("alert-error"), "{}", granted.0);
+    f.publish_with_workflow_tool(agent, "sample.send", child, version)
+        .await;
     let workflow = Uuid::new_v4();
     f.draft(workflow, "Agent sample", &source_of("agent.run", workflow))
         .await;

@@ -328,3 +328,87 @@ async fn resume_once(setup: &AgentSetup, parent: &ClaimedWorkflow) -> ClaimedWor
     .unwrap()
     .unwrap()
 }
+
+#[tokio::test]
+async fn autonomous_agent_views_child_call_and_dependency_versions_use_root_manifest() {
+    use crate::application::workflow::run_views::{CallRecordKind, RunReadScope, RunViews};
+    let setup = Box::pin(agent_setup("http://127.0.0.1:1")).await;
+    let child = child_graph(&setup).await;
+    let root = root_graph(&setup, &child).await;
+    let p = &setup.fixture.persistence;
+    let AdmissionResult::Created(run) = admit_graph(&setup, &root, "views-root-before-repin")
+        .await
+        .unwrap()
+    else {
+        panic!("root admitted")
+    };
+    let claim = claim_run(&setup, run).await;
+    sqlx::query(
+        "UPDATE agents SET system_prompt='later child instructions' WHERE company_id=$1 AND id=$2",
+    )
+    .bind(setup.fixture.target.company.as_uuid())
+    .bind(child.agent.as_uuid())
+    .execute(p.pool())
+    .await
+    .unwrap();
+    let new_revision = setup.fixture.publish_agent(child.agent.as_uuid()).await;
+    let new_version = repin_child(&setup, &child).await;
+    assert_ne!(new_revision.id, child.revision.id);
+    assert_ne!(new_version, child.workflow.version);
+    let llm = scripted_llm(vec![LlmTurn::tool_call("child", json!({}))]).await;
+    register_scripted_agent_base_url(setup.agent, &llm.base_url);
+    assert!(matches!(
+        Box::pin(agent_runtime(&setup).execute(&WorkflowStepKind("agent.run".into()), &claim))
+            .await,
+        WorkflowHandlerOutcome::Suspended(_)
+    ));
+    assert_eq!(llm.finish().await.unwrap(), 1);
+    let scope = RunReadScope {
+        company: setup.fixture.target.company,
+        run,
+        viewer: setup.fixture.target.actor,
+    };
+    let root_view = p.run_view(scope).await.unwrap().unwrap();
+    let linked = &root_view.children[0];
+    let version = linked.dependency.as_ref().unwrap();
+    assert_eq!(version.workflow_id, child.workflow.workflow);
+    assert_eq!(version.version_id, child.workflow.version);
+    let child_view = p
+        .run_view(RunReadScope {
+            run: linked.run,
+            ..scope
+        })
+        .await
+        .unwrap()
+        .unwrap();
+    let dependencies = root_view.dependencies.as_ref().unwrap();
+    assert_eq!(child_view.dependencies.as_ref().unwrap(), dependencies);
+    assert_eq!(dependencies.root, run);
+    assert!(
+        dependencies
+            .agents
+            .iter()
+            .any(|agent| agent.agent_id == child.agent && agent.revision_id == child.revision.id)
+    );
+    assert!(dependencies.workflows.contains(version));
+    assert!(
+        !dependencies
+            .workflows
+            .iter()
+            .any(|workflow| workflow.version_id == new_version)
+    );
+    let origin = &root_view.calls.items[0];
+    assert_eq!(origin.kind, CallRecordKind::ChildToolCall);
+    assert_eq!(Some(origin.record), linked.tool_call);
+    assert_eq!(origin.origin.agent.as_uuid(), setup.agent);
+    assert!(
+        matches!(&origin.tool.target, crate::application::agent::AgentToolChoice::Workflow { workflow, version, .. }
+        if *workflow == child.workflow.workflow && *version == child.workflow.version)
+    );
+    let step = p
+        .step_view(scope, claim.fence.scope.execution.as_uuid())
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(step.calls, root_view.calls);
+}

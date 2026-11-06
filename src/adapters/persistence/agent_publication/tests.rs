@@ -6,6 +6,8 @@ use crate::use_cases::skill::{SkillManagementPersistence, SkillWrite};
 
 mod support;
 use support::*;
+mod authoring;
+mod authoring_views;
 mod http;
 mod mcp;
 mod native;

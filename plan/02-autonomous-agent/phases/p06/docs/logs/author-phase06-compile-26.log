@@ -1,0 +1,14 @@
+   Compiling open_bots v0.1.0 (/Users/mac02/dev/openbot-recovery/.worktrees/autonomous-p06)
+error[E0596]: cannot borrow `llm` as mutable, as it is not declared as mutable
+   --> src/adapters/persistence/workflow/autonomous_agent_authoring_mcp_tests.rs:181:20
+    |
+181 |     let observed = llm.observed();
+    |                    ^^^ cannot borrow as mutable
+    |
+help: consider changing this to be mutable
+    |
+118 |     let mut llm = scripted_llm(
+    |         +++
+
+For more information about this error, try `rustc --explain E0596`.
+error: could not compile `open_bots` (lib test) due to 1 previous error

@@ -62,6 +62,7 @@ impl Fixture {
                 shared.clone(),
                 shared.clone(),
                 shared.clone(),
+                shared.clone(),
             )),
             config: crate::adapters::http::routes::ui::stream_tests::test_config(),
             user,
@@ -571,12 +572,16 @@ fn selections_read_only_well_formed_connection_fields() {
 
 #[path = "access_tests.rs"]
 mod access_tests;
+#[path = "agent_picker_tests.rs"]
+mod agent_picker_tests;
 #[path = "bindings_tests.rs"]
 mod bindings_tests;
 #[path = "editor_tests.rs"]
 mod editor_tests;
 #[path = "publish_tests.rs"]
 mod publish_tests;
+#[path = "registration_authority_tests.rs"]
+mod registration_authority_tests;
 #[path = "tools_tests.rs"]
 mod tools_tests;
 

@@ -211,6 +211,7 @@ pub(super) fn library_agent_write(definition: &Agent) -> AgentWrite {
 pub struct AgentUseCases {
     company_persistence: Arc<dyn CompanyPersistence>,
     agent_persistence: Arc<dyn AgentPersistence>,
+    draft_persistence: Arc<dyn crate::application::agent::AgentDraftPersistence>,
     library_copy_persistence: Arc<dyn LibraryAgentCopyPersistence>,
     /// What writes a system prompt when an operator asks for one to be generated.
     ///
@@ -224,11 +225,13 @@ impl AgentUseCases {
     pub fn new(
         company_persistence: Arc<dyn CompanyPersistence>,
         agent_persistence: Arc<dyn AgentPersistence>,
+        draft_persistence: Arc<dyn crate::application::agent::AgentDraftPersistence>,
         library_copy_persistence: Arc<dyn LibraryAgentCopyPersistence>,
     ) -> Self {
         Self {
             company_persistence,
             agent_persistence,
+            draft_persistence,
             library_copy_persistence,
             prompt_classifier: None,
         }
@@ -512,18 +515,24 @@ impl AgentUseCases {
         &self,
         user_id: Uuid,
         company_id: Uuid,
-        agent_id: Uuid,
-        mut write: AgentWrite,
+        request: crate::application::agent::CompanyAgentUpdate,
     ) -> AppResult<Agent> {
+        let crate::application::agent::CompanyAgentUpdate {
+            agent,
+            expected_revision,
+            mut write,
+            tools,
+        } = request;
+        let agent_id = agent.as_uuid();
         self.verify_company_manager(user_id, company_id).await?;
 
-        let agent = self
+        let stored = self
             .agent_persistence
             .get_by_id(agent_id)
             .await?
             .ok_or_else(agent_not_found)?;
 
-        if agent.company_id != Some(company_id) {
+        if stored.company_id != Some(company_id) {
             return Err(agent_not_found());
         }
 
@@ -532,7 +541,18 @@ impl AgentUseCases {
 
         info!(%agent_id, %company_id, "Updating agent");
 
-        self.agent_persistence.update(agent_id, write).await
+        self.draft_persistence
+            .save_company_agent(crate::application::agent::SaveCompanyAgent {
+                scope: crate::application::agent::AgentPublicationScope {
+                    company: crate::domain::workflow::CompanyId::new(company_id),
+                    actor: crate::application::workflow::WorkflowActor::authenticated(user_id)?,
+                    agent,
+                },
+                expected_revision,
+                write,
+                tools,
+            })
+            .await
     }
 
     #[instrument(skip_all)]

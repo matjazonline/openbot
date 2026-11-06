@@ -121,6 +121,18 @@ jobs:
         run: |
           cargo test --locked --offline --lib dump_knowledge_browser_fixtures -- --ignored
           node --test scripts/tests/knowledge-browser.mjs
+      - name: Agent authoring browser protocol
+        env:
+          AGENT_AUTHORING_BROWSER_FIXTURES: /tmp/agent-authoring-browser
+        run: |
+          cargo test --locked --offline --lib dump_autonomous_agent_authoring_browser_fixtures -- --ignored
+          node --test scripts/tests/agent-authoring-browser.mjs
+      - name: Workflow agent selection browser protocol
+        env:
+          WORKFLOW_AGENT_BROWSER_FIXTURES: /tmp/workflow-agent-browser
+        run: |
+          cargo test --locked --offline --lib dump_autonomous_workflow_agent_picker_browser_fixtures -- --ignored
+          node --test scripts/tests/workflow-agent-picker-browser.mjs
       - name: Session revocation browser protocol
         env:
           SESSION_REVOCATION_BROWSER_FIXTURES: /tmp/session-revocation-browser

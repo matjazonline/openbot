@@ -1,0 +1,28 @@
+    Checking open_bots v0.1.0 (/Users/mac02/dev/openbot-recovery/.worktrees/autonomous-p06)
+error: mismatched closing delimiter: `}`
+   --> src/adapters/http/routes/ui_agents.rs:620:11
+    |
+596 |     async fn create_pane(&self, form: CreateForm<'_>) -> AppResult<String> {
+    |                                                                            - closing delimiter possibly meant for this
+...
+620 |         Ok(pages::agent_create_pane(&pages::AgentCreatePane {
+    |           ^ unclosed delimiter
+...
+635 |     }
+    |     ^ mismatched closing delimiter
+
+error: unexpected closing delimiter: `}`
+   --> src/adapters/http/routes/ui_agents.rs:732:1
+    |
+656 |     ) -> AppResult<String> {
+    |                            - the nearest open delimiter
+...
+699 |         }))
+    |           - missing open `(` for this delimiter
+...
+732 | }
+    | ^ unexpected closing delimiter
+
+error: could not compile `open_bots` (lib) due to 2 previous errors
+warning: build failed, waiting for other jobs to finish...
+error: could not compile `open_bots` (lib test) due to 2 previous errors

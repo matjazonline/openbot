@@ -67,6 +67,7 @@ mod reads;
 mod reply_waits;
 mod resources;
 mod rows;
+mod run_provenance;
 mod run_views;
 #[cfg(test)]
 pub(crate) mod schedule_test_support;

@@ -7,6 +7,7 @@ pub(super) const ADMISSION_DEADLINE_SECONDS: i32 = 24 * 60 * 60;
 
 #[async_trait]
 impl WorkflowAdmission for PostgresPersistence {
+    #[tracing::instrument(skip_all, fields(company=%command.company_id().as_uuid(), run=%command.proposed_run_id().as_uuid(), correlation=%command.causality().correlation_id().as_uuid()))]
     async fn admit(&self, command: &PreparedAdmission) -> AppResult<AdmissionResult> {
         let mut tx = self.pool.begin().await?;
         if command.admission_claim().is_some() {
@@ -54,6 +55,7 @@ impl WorkflowAdmission for PostgresPersistence {
             return Ok(AdmissionResult::Stale);
         }
         tx.commit().await?;
+        tracing::info!("Workflow admission committed");
         Ok(AdmissionResult::Created(command.proposed_run_id()))
     }
 }

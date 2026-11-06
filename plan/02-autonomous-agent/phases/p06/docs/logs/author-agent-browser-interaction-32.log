@@ -1,0 +1,10 @@
+✔ agent selectors preserve unsaved input, publication retries and navigation after an accepted write (1902.822ms)
+✔ workflow agent choices preserve source and ignore transformations after editing or navigation (802.197666ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 2
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 3062.206375

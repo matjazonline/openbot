@@ -1,0 +1,12 @@
+{
+  "argv": [
+    "node",
+    "--test",
+    "scripts/tests/sse-navigation.mjs",
+    "scripts/tests/agent-runtime.mjs",
+    "scripts/tests/workflow-runs.mjs",
+    "scripts/tests/workflow-conversations.mjs",
+    "scripts/tests/workflow-samples.mjs"
+  ],
+  "scope": "Affected shared application scripts and required phase06 agent/run/conversation/sample protocols"
+}

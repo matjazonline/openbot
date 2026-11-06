@@ -1,0 +1,4 @@
+BEGIN
+INSERT 0 1
+ERROR:  null value in column "id" of relation "company_members" violates not-null constraint
+DETAIL:  Failing row contains (null, 719df8bc-fd27-41b0-9528-02d88f605234, eb277b4d-84cf-4fb4-a946-992dedbfda29, owner, 9, 2026-11-06 14:39:46.535619+01).

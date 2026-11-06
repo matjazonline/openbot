@@ -1,0 +1,24 @@
+{
+  "argv": [
+    "bash",
+    "scripts/test-network-isolation.sh",
+    "target/debug/deps/open_bots-c19a0b960dacdcef",
+    "autonomous_agent_authoring_",
+    "autonomous_agent_views_",
+    "autonomous_agent_publication_",
+    "autonomous_agent_resolution_",
+    "autonomous_agent_skills_",
+    "builtin_agent_library::tests::",
+    "autonomous_agent_dispatch_mcp_without_workflow_slot_and_replay",
+    "no_function_name_is_declared_twice",
+    "every_delegated_action_has_a_branch",
+    "--test-threads=4"
+  ],
+  "environment": {
+    "DATABASE_URL": "postgres://mac02@127.0.0.1:55606/open_bots",
+    "TEST_DATABASE_URL": "postgres://mac02@127.0.0.1:55606/open_bots_test",
+    "SQLX_OFFLINE": "true",
+    "CARGO_INCREMENTAL": "0",
+    "RUST_MIN_STACK": "2097152"
+  }
+}

@@ -139,11 +139,15 @@ async fn claim_without_slots(fixture: &Fixture) -> ClaimedWorkflow {
     );
     let mut source: Value =
         serde_json::from_str(&registry::example("agent.run").unwrap().source).unwrap();
+    source["workflow_id"] = json!(fixture.target.workflow.to_string());
     source["resources"] = json!([]);
     let mut draft = fixture.save(None);
     draft.content.source = source.to_string();
     definitions.save(draft).await.unwrap();
-    let publication = fixture.publish();
+    let mut publication = fixture.publish();
+    publication.key =
+        IdempotencyKey::parse(format!("agent-mcp-publication:{}", fixture.target.workflow))
+            .unwrap();
     definitions.publish(publication.clone()).await.unwrap();
     let target = bind_without_slots(fixture, publication.version).await;
     let admission = WorkflowService::new(p.clone(), p.clone(), p.clone(), p.clone(), Preflight)
@@ -159,7 +163,11 @@ async fn claim_without_slots(fixture: &Fixture) -> ClaimedWorkflow {
             .unwrap(),
             correlation_id: CorrelationId::new(),
             binding_id: target.binding,
-            idempotency_key: IdempotencyKey::parse("agent-mcp-run").unwrap(),
+            idempotency_key: IdempotencyKey::parse(format!(
+                "agent-mcp-run:{}",
+                fixture.target.workflow
+            ))
+            .unwrap(),
             input: json!({}),
             rerun_of: None,
             delivery_policy: crate::application::workflow::DeliveryPolicy::Deliver,
@@ -387,3 +395,6 @@ async fn autonomous_agent_samples_mcp_without_slots_never_opens_the_server() {
     }
     assert_eq!(server.calls(), 0);
 }
+
+#[path = "autonomous_agent_authoring_mcp_tests.rs"]
+mod authoring_journey;

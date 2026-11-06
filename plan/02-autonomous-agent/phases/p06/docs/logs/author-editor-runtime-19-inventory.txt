@@ -1,0 +1,23 @@
+adapters::http::pages::tests::agent_edit_pane_keeps_a_rejected_save_in_the_form: test
+adapters::http::pages::tests::agent_edit_pane_prefills_the_stored_agent_and_offers_delete: test
+adapters::http::pages::tests::every_delegated_action_has_a_branch_in_the_bundle: test
+adapters::http::pages::tests::no_function_name_is_declared_twice_in_the_bundle: test
+adapters::http::routes::ui_agents::authoring::browser_fixtures::dump_autonomous_agent_authoring_browser_fixtures: test
+adapters::http::routes::ui_agents::authoring::catalog::tests::autonomous_agent_authoring_catalog_builtin_choices_do_not_offer_builder_or_slots: test
+adapters::http::routes::ui_agents::authoring::catalog::tests::autonomous_agent_authoring_catalog_connection_pages_are_scoped_bounded_and_complete: test
+adapters::http::routes::ui_agents::authoring::publication::tests::autonomous_agent_authoring_exact_binding_revoke_and_foreign_mutation_refusal: test
+adapters::http::routes::ui_agents::authoring::publication::tests::autonomous_agent_authoring_failed_publication_retains_original_request_and_does_not_save_editor: test
+adapters::http::routes::ui_agents::authoring::publication::tests::autonomous_agent_authoring_form_preserves_stale_input_tools_and_expected_revision: test
+adapters::http::routes::ui_agents::authoring::publication::tests::autonomous_agent_authoring_malformed_skill_csv_keeps_input_and_does_not_clear_assignments: test
+adapters::http::routes::ui_agents::authoring::publication::tests::autonomous_agent_authoring_missing_skill_tool_fails_shared_preview_without_changing_active: test
+adapters::http::routes::ui_agents::authoring::publication::tests::autonomous_agent_authoring_preview_publish_replay_and_deactivation_omit_canonical_payloads: test
+adapters::http::routes::ui_agents::authoring::publication::tests::autonomous_agent_authoring_skill_order_survives_classic_metadata_save_and_stale_rejection: test
+adapters::http::routes::ui_agents::authoring::publication::tests::autonomous_agent_authoring_skill_revocation_form_uses_exact_assignment_and_safe_panel: test
+adapters::http::routes::ui_agents::authoring::security_tests::autonomous_agent_authoring_every_publication_write_refuses_cross_origin_cookie_posts: test
+adapters::http::routes::ui_agents::authoring::security_tests::autonomous_agent_authoring_routes_mount_in_the_authenticated_application_router: test
+adapters::http::routes::ui_agents::form_tests::a_native_urlencoded_submission_builds_the_write: test
+adapters::http::routes::workflows::tests::tool_tests::autonomous_agent_authoring_competing_json_draft_writes_apply_once: test
+adapters::http::routes::workflows::ui::authoring::tests::registration_authority_tests::autonomous_agent_authoring_workflow_registration_revocation_refuses_admission_without_republishing_workflow: test
+adapters::http::routes::workflows::ui::authoring::tests::tools_tests::a_tool_name_is_registered_re_pinned_re_pointed_and_revoked_saying_what_each_does: test
+
+21 tests, 0 benchmarks

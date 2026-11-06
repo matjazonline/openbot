@@ -826,7 +826,7 @@ pub(super) fn ui_layout(title: &str, body: &str) -> String {
 
 pub(crate) fn application_javascript() -> String {
     format!(
-        "var CHIP_SELECTED_MARK = {selected:?};\nvar CHIP_ADD_MARK = {add:?};\nvar AGENT_REPLIED_MARK = {replied:?};\n{app}\n{legacy}\n{mailbox}\n{local}\n{skeletons}\n{schedules}\n{agents}\n{channels}\n{library}\n{delegation}\n{request_errors}\n{button_busy}\n{run_counts}\n{workflow_editor}\n{workflow_runs}\n{thread_history}",
+        "var CHIP_SELECTED_MARK = {selected:?};\nvar CHIP_ADD_MARK = {add:?};\nvar AGENT_REPLIED_MARK = {replied:?};\n{app}\n{legacy}\n{mailbox}\n{local}\n{skeletons}\n{schedules}\n{agents}\n{agent_authoring}\n{channels}\n{library}\n{delegation}\n{request_errors}\n{button_busy}\n{run_counts}\n{workflow_editor}\n{workflow_agent_picker}\n{workflow_runs}\n{thread_history}",
         selected = icon(Icon::Check, BUTTON_ICON),
         add = icon(Icon::Plus, BUTTON_ICON),
         replied = icon(Icon::Check, BUTTON_ICON),
@@ -837,6 +837,7 @@ pub(crate) fn application_javascript() -> String {
         skeletons = skeleton_script(),
         schedules = super::schedules::SCHEDULES_SCRIPT,
         agents = super::agent_settings::AGENT_SETTINGS_SCRIPT,
+        agent_authoring = super::agent_authoring::AGENT_AUTHORING_SCRIPT,
         channels = super::channel_settings::CHANNEL_SETTINGS_SCRIPT,
         library = super::agent_library_multi_select::AGENT_LIBRARY_SCRIPT,
         delegation = EVENT_DELEGATION_SCRIPT,
@@ -844,6 +845,7 @@ pub(crate) fn application_javascript() -> String {
         button_busy = BUTTON_BUSY_SCRIPT,
         run_counts = super::run_counts::RUN_COUNTS_SCRIPT,
         workflow_editor = super::workflow_authoring::WORKFLOW_EDITOR_SCRIPT,
+        workflow_agent_picker = super::workflow_authoring::WORKFLOW_AGENT_PICKER_SCRIPT,
         workflow_runs = super::workflow_runs::WORKFLOW_RUNS_SCRIPT,
         thread_history = super::thread_activity::THREAD_HISTORY_SCRIPT,
     )

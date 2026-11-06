@@ -195,6 +195,7 @@ fn service(
             persistence.clone(),
             persistence.clone(),
             persistence.clone(),
+            persistence.clone(),
         )
         .with_prompt_classifier(classifier),
     );
@@ -678,6 +679,7 @@ async fn onboarding_library_model_lookup_failure_remains_an_infrastructure_error
         .await
         .expect("fault installation must succeed");
     let agents = AgentUseCases::new(
+        f.persistence.clone(),
         f.persistence.clone(),
         f.persistence.clone(),
         f.persistence.clone(),
