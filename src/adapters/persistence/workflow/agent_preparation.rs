@@ -1,114 +1,45 @@
 //! Native `agent.run` preparation and its current-authority check. The check narrows a
 //! frozen selection to what the agent and company still allow; it never widens it.
-use super::http::{registered_on, runtime};
+use super::http::runtime;
 use super::*;
-use crate::application::agent::AgentKey;
 use crate::application::workflow::{
     agent::{AgentLaunch, AgentPreparation, AgentToolTarget, PreparedAgent, PreparedStep},
     lease::ClaimedWorkflow,
-    message::{MessageKind, is_trusted_message_snapshot},
     polling::WorkflowStepKind,
-    provisioning::is_trusted_provisioning_snapshot,
     registry::ModelStep,
 };
 use crate::entities::value_objects::ModelProvider;
 use secrecy::SecretString;
 use serde_json::Value;
 
-/// The selection fields of a prepared document this check relies on.
-struct Selected {
-    agent: Uuid,
-    provider: String,
-    model: String,
-    tools: Vec<String>,
-    skills: Vec<Uuid>,
-}
-impl Selected {
-    fn read(prepared: &Value) -> AppResult<Self> {
-        let selection = &prepared["selection"];
-        let agent = &selection["agent"];
-        let tools = agent["tools"]
-            .as_array()
-            .ok_or_else(invalid)?
-            .iter()
-            .map(|tool| tool.as_str().map(str::to_owned).ok_or_else(invalid))
-            .collect::<AppResult<_>>()?;
-        let skills = selection["skills"]
-            .as_array()
-            .ok_or_else(invalid)?
-            .iter()
-            .map(|skill| {
-                skill["skill_id"]
-                    .as_str()
-                    .and_then(|id| Uuid::parse_str(id).ok())
-                    .ok_or_else(invalid)
-            })
-            .collect::<AppResult<_>>()?;
-        Ok(Self {
-            agent: agent["agent_id"]
-                .as_str()
-                .and_then(|id| Uuid::parse_str(id).ok())
-                .ok_or_else(invalid)?,
-            provider: agent["model"]["provider"]
-                .as_str()
-                .ok_or_else(invalid)?
-                .into(),
-            model: agent["model"]["model"].as_str().ok_or_else(invalid)?.into(),
-            tools,
-            skills,
-        })
-    }
-}
-
-/// Authority-class locks (agent row, skill links, model connection) taken before local
-/// workflow locks (06-D5): the frozen agent must still belong to the company, still grant
-/// every frozen tool and still link every frozen skill, and its company model connection
-/// must still offer the frozen model. A removal committed first is observed; one committed
-/// later waits for this transaction. Additions after publication grant nothing until
-/// republish. ActionService still rechecks each tool's registration and policy.
+/// Reload the immutable definition named by the checkpoint; mutable draft edits grant nothing.
 pub(in crate::adapters::persistence::workflow) async fn current_on(
     db: &mut PgConnection,
-    company: CompanyId,
+    scope: crate::application::workflow::actions::ActionScope,
     prepared: &Value,
 ) -> AppResult<()> {
-    let selected = Selected::read(prepared)?;
-    let owner: Option<Uuid> =
-        sqlx::query_scalar("SELECT id FROM agents WHERE id=$1 AND company_id=$2 FOR SHARE")
-            .bind(selected.agent)
-            .bind(company.as_uuid())
-            .fetch_optional(&mut *db)
-            .await?;
-    owner.ok_or_else(revoked)?;
-    let grants =
-        super::super::agent_capability::bindings_on(db, Some(company.as_uuid()), selected.agent)
-            .await?
-            .into_iter()
-            .map(|binding| binding.alias.as_str().to_owned())
-            .collect::<Vec<_>>();
-    if selected.tools.iter().any(|tool| !grants.contains(tool)) {
-        return Err(revoked());
+    let identity: crate::application::workflow::agent_contract::AgentSelectionIdentity =
+        serde_json::from_value(prepared["selection"].clone()).map_err(|_| invalid())?;
+    let (actor, bundle): (Uuid, Vec<u8>) = sqlx::query_as(
+        "SELECT run.actor_id,stored.bundle FROM workflow_runs AS run JOIN workflow_bundles AS stored ON stored.company_id=run.company_id AND stored.digest=run.bundle_digest WHERE run.company_id=$1 AND run.id=$2 AND octet_length(stored.bundle)<=$3"
+    ).bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(MAX_BUNDLE_BYTES as i32)
+        .fetch_optional(&mut *db).await?.ok_or_else(missing)?;
+    let actor = WorkflowActor::authenticated(actor).map_err(|_| invalid())?;
+    let bundle = restore_bundle(
+        &bundle,
+        &crate::adapters::workflow_source::WorkflowSourceDecoder,
+    )?;
+    let selection =
+        super::agent_manifest::execution_selection_on(db, scope, actor, &bundle).await?;
+    if selection.manifest_id() != identity.manifest
+        || selection.agent().agent_id != identity.agent
+        || selection.revision().id != identity.revision
+        || selection.revision().digest != identity.digest
+        || selection.mode() != identity.mode
+    {
+        return Err(invalid());
     }
-    let linked: Vec<Uuid> = sqlx::query_scalar(
-        "SELECT skill_id FROM agent_skills WHERE agent_id=$1 AND skill_id=ANY($2)",
-    )
-    .bind(selected.agent)
-    .bind(&selected.skills)
-    .fetch_all(&mut *db)
-    .await?;
-    if selected.skills.iter().any(|skill| !linked.contains(skill)) {
-        return Err(revoked());
-    }
-    let models: Option<Vec<String>> = sqlx::query_scalar(
-        "SELECT models FROM company_model_connections WHERE company_id=$1 AND provider=$2 FOR SHARE",
-    )
-    .bind(company.as_uuid())
-    .bind(&selected.provider)
-    .fetch_optional(&mut *db)
-    .await?;
-    if !models.is_some_and(|models| models.contains(&selected.model)) {
-        return Err(revoked());
-    }
-    Ok(())
+    super::agent_authority::check_execution_on(db, scope, selection.agent(), identity.mode).await
 }
 
 /// Terminal: retrying cannot restore a revoked grant or connection.
@@ -117,62 +48,44 @@ fn revoked() -> AppError {
 }
 
 /// Concrete dispatch edges for the frozen selection; unsupported bindings fail here.
-async fn targets(
-    tx: &mut Transaction<'_, Postgres>,
-    facts: &runtime::RunFacts,
+fn targets(
     company: CompanyId,
-    tools: &[ToolSnapshot],
+    tools: &[crate::application::agent::ResolvedAgentTool],
 ) -> AppResult<Vec<AgentToolTarget>> {
-    let mut targets = Vec::with_capacity(tools.len());
-    for tool in tools {
-        let target = match tool.kind() {
-            ToolKind::Message => {
-                if MessageKind::parse(tool.contract.name.as_str()).is_none()
-                    || !is_trusted_message_snapshot(tool)?
-                {
-                    return Err(unsupported());
-                }
-                AgentToolTarget::Message {
-                    name: tool.contract.name.clone(),
-                }
-            }
-            // Only an MCP slot is a direct agent tool; a slot-bound HTTP selection belongs to
-            // its `http.request` step and is unsupported here (06-R016 F017).
-            ToolKind::Slot(slot) => {
-                let definition = facts.bundle.compiled().graph().definition();
-                if super::resources::slot_kind(definition, slot) != Some("mcp")
-                    || !facts.resources.contains_key(slot)
-                {
-                    return Err(unsupported());
-                }
-                AgentToolTarget::Mcp { slot: slot.clone() }
-            }
-            ToolKind::Provisioning => {
-                if !is_trusted_provisioning_snapshot(tool)? {
-                    return Err(unsupported());
-                }
-                AgentToolTarget::Provisioning {
-                    name: tool.contract.name.clone(),
-                }
-            }
-            ToolKind::Knowledge => {
-                super::authority::builtin_knowledge_tool(tool)?;
-                AgentToolTarget::Knowledge
-            }
-            ToolKind::Http => AgentToolTarget::Http {
-                connection: registered_on(tx, company, tool).await?,
-            },
-            // Its registration is checked at each call, so a revocation refuses the call rather
-            // than the whole agent step (07-D2 §D2.3).
-            ToolKind::Workflow(pin) => AgentToolTarget::Workflow { pin: pin.clone() },
-        };
-        targets.push(target);
-    }
-    Ok(targets)
-}
-
-fn unsupported() -> AppError {
-    AppError::BadRequest("Agent tool has no supported dispatch binding".into())
+    use crate::entities::agent_capability::{AgentBindingSource, AgentBuiltinTool};
+    tools
+        .iter()
+        .map(|tool| {
+            Ok(match &tool.binding.source {
+                AgentBindingSource::Http { connection, .. } => AgentToolTarget::Http {
+                    connection: *connection,
+                },
+                AgentBindingSource::Mcp { connection, .. } => AgentToolTarget::Mcp {
+                    connection: *connection,
+                },
+                AgentBindingSource::Workflow { .. } => AgentToolTarget::Workflow {
+                    pin: crate::application::workflow::agent_contract::agent_action_snapshot(
+                        company, tool,
+                    )?
+                    .workflow
+                    .ok_or_else(invalid)?,
+                },
+                AgentBindingSource::Builtin { tool } => match tool {
+                    AgentBuiltinTool::MessageSend | AgentBuiltinTool::MessageReply => {
+                        AgentToolTarget::Message {
+                            name: TypeName::parse(tool.name()).map_err(|_| invalid())?,
+                        }
+                    }
+                    AgentBuiltinTool::ListCompanyAgents | AgentBuiltinTool::CreateAgentChannel => {
+                        AgentToolTarget::Provisioning {
+                            name: TypeName::parse(tool.name()).map_err(|_| invalid())?,
+                        }
+                    }
+                    AgentBuiltinTool::SearchKnowledge => AgentToolTarget::Knowledge,
+                },
+            })
+        })
+        .collect()
 }
 
 #[async_trait]
@@ -197,15 +110,16 @@ impl AgentPreparation for PostgresPersistence {
         let step = ModelStep::of(definition.step_type.as_str()).ok_or_else(invalid)?;
         let kind = WorkflowStepKind(step.kind().into());
         let inputs = runtime::frozen_inputs(&mut tx, &facts, claim, &kind).await?;
-        let key = inputs
-            .get("agent")
-            .and_then(Value::as_str)
-            .and_then(AgentKey::parse)
-            .ok_or_else(invalid)?;
-        let selection = facts.bundle.resolve_agent(scope.company, &key)?;
+        let selection = super::agent_manifest::execution_selection_on(
+            &mut tx,
+            action,
+            facts.actor,
+            &facts.bundle,
+        )
+        .await?;
         let prepared = match step {
             ModelStep::AgentRun => {
-                let targets = targets(&mut tx, &facts, scope.company, selection.tools()).await?;
+                let targets = targets(scope.company, selection.tools())?;
                 PreparedAgent::new(selection, &inputs, PreparedStep::AgentRun { targets })?
             }
             ModelStep::Classify => {
@@ -234,8 +148,15 @@ impl AgentPreparation for PostgresPersistence {
             scope.company.as_uuid(),
             &provider,
         )
-        .await?
-        .ok_or_else(revoked)?;
+        .await?;
+        let Some(secret) = secret else {
+            return Err(super::agent_authority::authority_error_on(
+                &mut *self.pool().acquire().await?,
+                action,
+                revoked(),
+            )
+            .await?);
+        };
         Ok(AgentLaunch {
             prepared,
             secret: SecretString::from(secret),

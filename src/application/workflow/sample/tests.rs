@@ -30,9 +30,15 @@ fn source(kind: &str) -> Value {
 }
 fn build(
     source: &Value,
-    facts: DependencySnapshots,
+    mut facts: DependencySnapshots,
     children: Vec<Arc<PublishedBundle>>,
 ) -> Arc<PublishedBundle> {
+    let uses = agent_reference_uses(&decode(&source.to_string()).unwrap()).unwrap();
+    for reference in &mut facts.agents {
+        if let Some(usage) = uses.get(&reference.key) {
+            reference.uses = usage.clone();
+        }
+    }
     Arc::new(
         freeze(
             decode(&source.to_string()).unwrap(),
@@ -44,6 +50,86 @@ fn build(
         .unwrap(),
     )
 }
+// Explicit inert definitions for the legacy sample scenarios; production never derives
+// agent grants from workflow STEP tools.
+fn execute(bundle: Arc<PublishedBundle>, mut request: SampleRequest) -> AppResult<SampleReport> {
+    use crate::application::agent::{ModelSettings, ResolvedAgentDefinition, ResolvedAgentTool};
+    use crate::entities::agent_capability::{
+        AgentBindingId, AgentBindingSource, AgentToolAlias, AgentToolBinding,
+    };
+    if request.agents.is_empty() {
+        let mut seen = std::collections::BTreeSet::new();
+        let mut pending = vec![bundle.clone()];
+        while let Some(next) = pending.pop() {
+            for reference in &next.snapshots().agents {
+                if !seen.insert(reference.agent_id) {
+                    continue;
+                }
+                let tools = next
+                    .snapshots()
+                    .tools
+                    .iter()
+                    .enumerate()
+                    .map(|(index, tool)| {
+                        let source = if let Some(pin) = &tool.workflow {
+                            AgentBindingSource::Workflow {
+                                registration: tool.contract.name.clone(),
+                                workflow: pin.workflow_id,
+                                version: pin.version_id,
+                                params: pin.params.clone(),
+                            }
+                        } else if tool.contract.connection.is_some() {
+                            AgentBindingSource::Mcp {
+                                connection: Uuid::from_u128(7),
+                                operation: tool.contract.name.clone(),
+                                reviewed_version: Uuid::from_u128(8),
+                                remote_name: tool
+                                    .contract
+                                    .name
+                                    .as_str()
+                                    .to_owned()
+                                    .try_into()
+                                    .unwrap(),
+                            }
+                        } else {
+                            AgentBindingSource::Http {
+                                connection: Uuid::from_u128(7),
+                                operation: tool.contract.name.clone(),
+                            }
+                        };
+                        ResolvedAgentTool {
+                            binding: AgentToolBinding {
+                                id: AgentBindingId::new(Uuid::from_u128(100 + index as u128)),
+                                alias: AgentToolAlias::parse(tool.contract.name.as_str()).unwrap(),
+                                source,
+                            },
+                            input_schema: tool.contract.input_schema.clone(),
+                            output_schema: tool.contract.output_schema.clone(),
+                            policy: tool.policy.clone(),
+                            approval_required: false,
+                        }
+                    })
+                    .collect();
+                request.agents.push(ResolvedAgentDefinition {
+                    company_id: next.company_id(),
+                    agent_id: reference.agent_id,
+                    key: reference.key.clone(),
+                    instructions: "Sample instructions".into(),
+                    model: ModelSettings {
+                        provider: name("test"),
+                        model: "sample".into(),
+                        max_output_tokens: 1000,
+                    },
+                    tools,
+                    skills: vec![],
+                });
+            }
+            pending.extend(next.children().values().cloned());
+        }
+    }
+    super::execute(bundle, request)
+}
+
 fn response(output: Value) -> ScriptedResponse {
     ScriptedResponse {
         output,
@@ -61,6 +147,7 @@ fn script(workflow: u128, step: &str, outputs: Vec<Value>) -> StepScript {
 }
 fn request(scripts: Vec<StepScript>) -> SampleRequest {
     SampleRequest {
+        agents: vec![],
         input: json!({}),
         params: json!({}),
         scripts,
@@ -223,9 +310,7 @@ fn bounded_root_budget_and_external_kinds_never_fall_back() {
     }
     let mut raw = source("agent.run");
     raw["limits"]["root_budget"] = json!({"activations":1,"model_calls":1,"repetitions":1});
-    let mut facts = Fixture::AutonomousResponse.snapshots(company());
-    facts.agents[0].skills.clear();
-    facts.skills.clear();
+    let facts = Fixture::AutonomousResponse.snapshots(company());
     let bundle = build(&raw, facts, vec![]);
     let mut req = request(vec![script(1, "start", vec![json!("done")])]);
     req.scripts[0].responses[0].tools = vec![ScriptedToolCall {

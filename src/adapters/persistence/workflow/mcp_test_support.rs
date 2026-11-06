@@ -48,6 +48,7 @@ pub(super) struct ServerState {
     log: Mutex<Vec<String>>,
     auth: Mutex<Vec<String>>,
     arguments: Mutex<Vec<Value>>,
+    names: Mutex<Vec<String>>,
     tools: Mutex<Value>,
     call: Mutex<Call>,
     fail_initialize: AtomicBool,
@@ -77,6 +78,9 @@ impl McpServer {
     }
     pub(super) fn arguments(&self) -> Vec<Value> {
         self.state.arguments.lock().unwrap().clone()
+    }
+    pub(super) fn call_names(&self) -> Vec<String> {
+        self.state.names.lock().unwrap().clone()
     }
     pub(super) fn auth(&self) -> Vec<String> {
         self.state.auth.lock().unwrap().clone()
@@ -111,6 +115,7 @@ pub(in crate::adapters::persistence::workflow) async fn mcp_server(call: Call) -
         log: Mutex::default(),
         auth: Mutex::default(),
         arguments: Mutex::default(),
+        names: Mutex::default(),
         tools: Mutex::new(listed_tools()),
         call: Mutex::new(call),
         fail_initialize: AtomicBool::new(false),
@@ -182,6 +187,11 @@ async fn rpc(State(state): State<Arc<ServerState>>, headers: HeaderMap, body: By
 }
 
 async fn call(state: &ServerState, id: Value, message: &Value) -> Response {
+    state
+        .names
+        .lock()
+        .unwrap()
+        .push(message["params"]["name"].as_str().unwrap().to_owned());
     state
         .arguments
         .lock()
@@ -541,7 +551,9 @@ pub(super) fn kind() -> WorkflowStepKind {
 }
 pub(super) fn tool_call(model: &str) -> McpToolCall {
     McpToolCall {
-        slot: ResourceName::parse("service").unwrap(),
+        target: crate::application::workflow::mcp::McpToolTarget::Workflow {
+            slot: ResourceName::parse("service").unwrap(),
+        },
         tool: TypeName::parse(TOOL).unwrap(),
         arguments: json!({"customer_id":"c-42"}),
         call: ModelToolCallId::parse(model).unwrap(),

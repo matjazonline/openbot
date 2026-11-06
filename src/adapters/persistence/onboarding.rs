@@ -54,6 +54,11 @@ impl OnboardingPersistence for PostgresOnboarding {
         let mut tx = self.persistence.pool().begin().await?;
         sqlx::query("SELECT set_config('lock_timeout', '45s', true), set_config('statement_timeout', '45s', true), set_config('idle_in_transaction_session_timeout', '45s', true)")
             .execute(&mut *tx).await?;
+        sqlx::query_scalar::<_, Uuid>("SELECT id FROM users WHERE id=$1 FOR SHARE")
+            .bind(user_id)
+            .fetch_optional(&mut *tx)
+            .await?
+            .ok_or_else(company_not_found)?;
         let owner: Uuid =
             sqlx::query_scalar("SELECT user_id FROM companies WHERE id = $1 FOR NO KEY UPDATE")
                 .bind(company_id)
@@ -162,6 +167,17 @@ impl Session {
             &prepared.write.name,
         )
         .await?;
+        if prepared.write.provider.is_some() && prepared.write.model.is_some() {
+            super::agent_publication::publish_initial_on(
+                &mut self.tx,
+                crate::application::agent::AgentPublicationScope {
+                    company: CompanyId::new(self.company_id),
+                    actor: WorkflowActor::authenticated(self.user_id)?,
+                    agent: crate::entities::agent_capability::AgentId::new(prepared.id),
+                },
+            )
+            .await?;
+        }
         Ok(())
     }
 

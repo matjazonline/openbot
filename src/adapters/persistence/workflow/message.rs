@@ -155,11 +155,29 @@ impl MessageActionPreparation for PostgresPersistence {
     async fn message_tool_request(
         &self,
         scope: ActionScope,
-        kind: MessageKind,
-        arguments: Value,
+        call: &MessageToolCall,
     ) -> AppResult<ActionRequest> {
         let mut tx = begin_http(self).await?;
         let facts = facts(&mut tx, scope).await?;
+        if let crate::application::agent::ToolCallOrigin::Agent(origin) = call.origin {
+            let request = super::agent_origin::request_on(
+                &mut tx,
+                scope,
+                &facts,
+                origin,
+                &call.call,
+                call.arguments.clone(),
+            )
+            .await?;
+            if request.operation_key.as_str() != call.kind.name() {
+                return Err(missing());
+            }
+            tx.commit().await?;
+            return Ok(request);
+        }
+        super::agent_origin::require_workflow_origin(&mut tx, scope, &facts.bundle).await?;
+        let kind = call.kind;
+        let arguments = call.arguments.clone();
         let request = message_request(scope, &facts, kind, arguments)?;
         tx.commit().await?;
         Ok(request)

@@ -7,6 +7,9 @@ mod storage_checkpoint_tests;
 #[path = "harness_token_tests.rs"]
 mod tokens;
 
+#[path = "harness_model_fixture.rs"]
+mod model_support;
+
 fn model_request(reservation: &ModelReservation) -> WorkflowModelRequest {
     WorkflowModelRequest {
         reservation: reservation.clone(),
@@ -20,7 +23,7 @@ struct ModelFixture {
     write: WorkflowCheckpointWrite,
 }
 async fn opened() -> ModelFixture {
-    let native = native_row().await;
+    let native = model_support::fixture(Fixture::new().await, lease_source()).await;
     open_native(native).await
 }
 

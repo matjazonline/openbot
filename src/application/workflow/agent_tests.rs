@@ -1,29 +1,42 @@
 //! Native agent preparation is deterministic, delimited and never widens the selection.
 use super::*;
-use crate::application::agent::AgentKey;
+
 use crate::application::workflow::registry::ModelStep;
 use crate::application::workflow::{
     agent::{AgentToolTarget, PreparedAgent, PreparedStep},
     lease::{WorkflowAttempt, WorkflowFence, WorkflowGeneration, WorkflowWorkerId},
 };
-use crate::domain::workflow::ResourceName;
+
 use serde_json::json;
 
 fn selection(tools: Vec<&str>) -> ResolvedAgent {
-    let mut facts = snapshots();
-    facts.tools = tools
+    use crate::application::agent::ResolvedAgentTool;
+    use crate::entities::agent_capability::{
+        AgentBindingId, AgentBindingSource, AgentToolAlias, AgentToolBinding,
+    };
+    let mut definition = definition();
+    definition.tools = tools
         .iter()
-        .map(|tool| {
-            let mut snapshot = tool_snapshot("tool.call");
-            snapshot.contract.name = name(tool);
-            snapshot
+        .enumerate()
+        .map(|(index, alias)| {
+            let snapshot = tool_snapshot("tool.call");
+            ResolvedAgentTool {
+                binding: AgentToolBinding {
+                    id: AgentBindingId::new(Uuid::from_u128(100 + index as u128)),
+                    alias: AgentToolAlias::parse(*alias).unwrap(),
+                    source: AgentBindingSource::Http {
+                        connection: Uuid::from_u128(7),
+                        operation: name(alias),
+                    },
+                },
+                input_schema: snapshot.contract.input_schema,
+                output_schema: snapshot.contract.output_schema,
+                policy: snapshot.policy,
+                approval_required: false,
+            }
         })
         .collect();
-    facts.agents[0].tools = tools.iter().map(|tool| name(tool)).collect();
-    let bundle = build(&source("agent.run"), facts).unwrap();
-    bundle
-        .resolve_agent(company(), &AgentKey::parse("assistant").unwrap())
-        .unwrap()
+    resolved(definition).unwrap()
 }
 
 fn http() -> AgentToolTarget {
@@ -60,7 +73,7 @@ fn workflow_agent_preparation_declares_provider_safe_names_and_delimits_context(
         },
     )
     .unwrap();
-    assert_eq!(prepared.tools()[0].declared, "crm__lookup");
+    assert_eq!(prepared.tools()[0].declared.as_str(), "crm__lookup");
     assert!(
         prepared.tool("crm.lookup").is_none(),
         "only declarations dispatch"
@@ -100,7 +113,7 @@ fn workflow_agent_preparation_declares_provider_safe_names_and_delimits_context(
 #[test]
 fn workflow_agent_preparation_refuses_unsupported_or_colliding_bindings() {
     let mcp = AgentToolTarget::Mcp {
-        slot: ResourceName::parse("service").unwrap(),
+        connection: Uuid::from_u128(8),
     };
     assert!(
         PreparedAgent::new(
@@ -131,15 +144,12 @@ fn workflow_agent_preparation_refuses_unsupported_or_colliding_bindings() {
         )
         .is_err()
     );
+    let mut colliding = selection(vec!["a.b", "other"]).agent().clone();
+    colliding.tools[1].binding.alias =
+        crate::entities::agent_capability::AgentToolAlias::parse("a__b").unwrap();
     assert!(
-        PreparedAgent::new(
-            selection(vec!["a.b", "a__b"]),
-            &inputs(),
-            PreparedStep::AgentRun {
-                targets: vec![http(), http()]
-            }
-        )
-        .is_err()
+        colliding.validate().is_err(),
+        "encoded alias collisions fail before provider preparation"
     );
     let mut missing = inputs();
     missing.as_object_mut().unwrap().remove("context");
@@ -168,8 +178,9 @@ fn workflow_model_steps_prepare_tool_free_with_their_response_contracts() {
     assert_eq!(classify.step(), ModelStep::Classify);
     assert!(classify.tools().is_empty());
     let document = serde_json::to_value(&classify).unwrap();
-    assert_eq!(document["selection"]["agent"]["tools"], json!([]));
-    assert_eq!(document["selection"]["skills"], json!([]));
+    assert_eq!(document["selection"]["mode"], json!("model_only"));
+    assert!(document["selection"].get("tools").is_none());
+    assert!(document["selection"].get("skills").is_none());
     assert_eq!(
         classify.response_contract().unwrap().schema(),
         &classify_inputs["output_schema"]

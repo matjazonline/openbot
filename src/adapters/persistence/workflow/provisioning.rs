@@ -2,9 +2,13 @@
 //! and `provision_on`, the one-transaction assistant setup the `create_agent_channel` tool and
 //! the "Create assistant channel" command share.
 //!
-//! Lock order: the company row first (`prelock_on` on the tool path, `authorize_company` on the
-//! command path), then shared locks on members and principals, then only rows this transaction
-//! inserts. No existing channel, schedule or occurrence is touched.
+//! Lock order: requester/run-owner accounts precede company authorization on both tool and
+//! command paths. Current membership and source checks guard the atomic local resource writes.
+//! No existing channel, schedule or occurrence is touched; no network work runs under these locks.
+#[path = "provisioning_agent.rs"]
+mod agent;
+use agent::provision_agent_on;
+
 use super::action_dispatch::{LockedActionAuthority, SqlActionAuthority, SqlLocalAction};
 use super::http::begin_http;
 use super::http::runtime::{context, facts};
@@ -85,11 +89,29 @@ impl ProvisioningPreparation for PostgresPersistence {
     async fn provisioning_tool_request(
         &self,
         scope: ActionScope,
-        kind: ProvisioningKind,
-        arguments: Value,
+        call: &ProvisioningToolCall,
     ) -> AppResult<ActionRequest> {
         let mut tx = begin_http(self).await?;
         let facts = facts(&mut tx, scope).await?;
+        if let crate::application::agent::ToolCallOrigin::Agent(origin) = call.origin {
+            let request = super::agent_origin::request_on(
+                &mut tx,
+                scope,
+                &facts,
+                origin,
+                &call.call,
+                call.arguments.clone(),
+            )
+            .await?;
+            if request.operation_key.as_str() != call.kind.name() {
+                return Err(missing());
+            }
+            tx.commit().await?;
+            return Ok(request);
+        }
+        super::agent_origin::require_workflow_origin(&mut tx, scope, &facts.bundle).await?;
+        let kind = call.kind;
+        let arguments = call.arguments.clone();
         let tool = facts
             .bundle
             .snapshots()
@@ -229,11 +251,17 @@ async fn authorize_requester(
 ///
 /// Anything else (a root deeper than 64 levels, a source of another kind, a message root without
 /// its intent) has no requester, and provisioning is forbidden.
-async fn requester_on(
-    tx: &mut Transaction<'_, Postgres>,
+pub(super) async fn requester_on(
+    tx: &mut PgConnection,
     scope: ActionScope,
 ) -> AppResult<Option<WorkflowActor>> {
-    let root: Option<(Uuid, Uuid, Uuid)> = sqlx::query_as(
+    #[derive(sqlx::FromRow)]
+    struct RootRequester {
+        id: Uuid,
+        actor: Uuid,
+        trigger: Uuid,
+    }
+    let root: Option<RootRequester> = sqlx::query_as(
         "WITH RECURSIVE chain(id, parent, actor, trigger, depth) AS ( \
            SELECT id, parent_run_id, actor_id, trigger_id, 0 FROM workflow_runs \
            WHERE company_id = $1 AND id = $2 \
@@ -245,23 +273,23 @@ async fn requester_on(
     )
     .bind(scope.company.as_uuid())
     .bind(scope.run.as_uuid())
-    .fetch_optional(&mut **tx)
+    .fetch_optional(&mut *tx)
     .await?;
-    let Some((root, actor, trigger)) = root else {
+    let Some(root) = root else {
         return Ok(None);
     };
     let sources: Vec<String> = sqlx::query_scalar(
-        "SELECT source_key FROM workflow_admissions WHERE company_id = $1 AND run_id = $2",
+        "SELECT source_key FROM workflow_admissions WHERE company_id = $1 AND run_id = $2 LIMIT 2",
     )
     .bind(scope.company.as_uuid())
-    .bind(root)
-    .fetch_all(&mut **tx)
+    .bind(root.id)
+    .fetch_all(&mut *tx)
     .await?;
     let [source] = sources.as_slice() else {
         return Ok(None);
     };
     match requester_source(source) {
-        RequesterSource::RootActor => Ok(Some(WorkflowActor::authenticated(actor)?)),
+        RequesterSource::RootActor => Ok(Some(WorkflowActor::authenticated(root.actor)?)),
         RequesterSource::None => Ok(None),
         RequesterSource::Message(message) => {
             let author: Option<Uuid> = sqlx::query_scalar(
@@ -274,9 +302,9 @@ async fn requester_on(
                    AND intent.origin = 'application' AND principal.kind = 'person'",
             )
             .bind(scope.company.as_uuid())
-            .bind(trigger)
+            .bind(root.trigger)
             .bind(message)
-            .fetch_optional(&mut **tx)
+            .fetch_optional(&mut *tx)
             .await?
             .flatten();
             author.map(WorkflowActor::authenticated).transpose()
@@ -553,49 +581,12 @@ async fn provision_on(
         return Ok(Err(refusal));
     }
 
-    // 2. The agent.
-    let (agent_id, agent_slug) = match &provisioning.agent {
-        AssistantAgent::New(spec) => {
-            let mut write = match agent_write(tx, company, spec, &created_by).await? {
-                Ok(write) => write,
-                Err(refusal) => return Ok(Err(refusal)),
-            };
-            if let Err(error) = write.normalize() {
-                return Ok(Err(refused(error)));
-            }
-            if let Some(refusal) = malformed("agent slug", &write.slug) {
-                return Ok(Err(refusal));
-            }
-            let id = key.id("agent");
-            insert_agent_on(tx, id, Some(company.as_uuid()), &write).await?;
-            create_agent_principal_on(tx, company.as_uuid(), id, &write.name).await?;
-            (id, write.slug)
-        }
-        AssistantAgent::Existing(slug) => {
-            let agent: Option<(Uuid, String, Option<String>, Option<String>)> = sqlx::query_as(
-                "SELECT id, slug::text, provider, model FROM agents \
-                 WHERE company_id = $1 AND slug = $2 FOR KEY SHARE",
-            )
-            .bind(company.as_uuid())
-            .bind(slug.trim().to_lowercase())
-            .fetch_optional(&mut **tx)
-            .await?;
-            match agent {
-                None => {
-                    return Ok(Err(ProvisioningRefusal::Invalid(format!(
-                        "No agent named '{}' exists in this company",
-                        slug.trim()
-                    ))));
-                }
-                Some((_, _, None, _) | (_, _, _, None)) => {
-                    return Ok(Err(ProvisioningRefusal::Invalid(
-                        "Choose the agent's provider and model first: a workflow runs an agent only on an explicit model".into(),
-                    )));
-                }
-                Some((id, slug, _, _)) => (id, slug),
-            }
-        }
+    let agent = match provision_agent_on(tx, provisioning, &created_by).await? {
+        Ok(agent) => agent,
+        Err(refusal) => return Ok(Err(refusal)),
     };
+    let agent_id = agent.id.as_uuid();
+    let agent_slug = agent.slug.0;
 
     // 3. The team channel.
     let mut channel = channel_write(tx, provisioning, &created_by).await?;
@@ -932,6 +923,11 @@ impl AssistantChannels for AssistantChannelService {
         request: AssistantChannelRequest,
     ) -> AppResult<Provisioned<Value>> {
         let mut tx = self.persistence.pool().begin().await?;
+        sqlx::query_scalar::<_, Uuid>("SELECT id FROM users WHERE id=$1 FOR SHARE")
+            .bind(caller.user_id())
+            .fetch_optional(&mut *tx)
+            .await?
+            .ok_or_else(missing)?;
         super::authority::authorize_company(&mut tx, company, caller).await?;
         let result =
             assistant_channel_on(&mut tx, &self.templates, company, caller, request).await?;

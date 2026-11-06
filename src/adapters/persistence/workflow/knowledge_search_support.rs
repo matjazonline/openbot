@@ -131,7 +131,17 @@ impl SearchFixture {
         assert_eq!(llm.finish().await.unwrap(), 1);
         let checkpoint = self.checkpoint().await;
         let pending = checkpoint.pending_call().unwrap();
+        let scope = self.claim.fence.scope;
+        let prepared: Value = sqlx::query_scalar("SELECT workflow_prepared FROM task_harness_runs WHERE company_id=$1 AND workflow_run_id=$2 AND workflow_execution_id=$3 AND task_id=$4")
+            .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(scope.execution.as_uuid()).bind(scope.job.0).fetch_one(self.p().pool()).await.unwrap();
+        let tools: Vec<crate::application::workflow::agent::PreparedTool> =
+            serde_json::from_value(prepared["tools"].clone()).unwrap();
+        let tool = tools
+            .iter()
+            .find(|tool| tool.name.as_str() == SEARCH_KNOWLEDGE)
+            .unwrap();
         KnowledgeToolCall {
+            origin: crate::application::agent::ToolCallOrigin::Agent(tool.origin),
             call: crate::application::workflow::actions::ModelToolCallId::parse(
                 pending.invocation_id.0.to_string(),
             )
@@ -216,6 +226,7 @@ async fn configure_agent(f: &Fixture) -> Uuid {
     )
     .await
     .unwrap();
+    f.publish_agent(agent.id).await;
     agent.id
 }
 
@@ -309,6 +320,7 @@ impl AgentToolDispatch for PreparedOnly {
 
 pub(super) fn copy_call(call: &KnowledgeToolCall) -> KnowledgeToolCall {
     KnowledgeToolCall {
+        origin: call.origin,
         call: call.call.clone(),
         arguments: call.arguments.clone(),
     }

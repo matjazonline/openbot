@@ -1,0 +1,34 @@
+{
+  "latest": {
+    "checked_at": "2026-11-06T03:51:17.734888+00:00",
+    "fresh": true,
+    "interval_seconds": 900,
+    "next_check_at": "2026-11-06T04:06:17.734888+00:00",
+    "remaining_percent": 10.0,
+    "resets_at": 1794389522,
+    "sample_age_seconds": 10.195888,
+    "sample_timestamp": "2026-11-06T03:51:07.539Z",
+    "session": "01a1a6b2-c6b1-7103-9944-c1323c1d90a4",
+    "source": "/Users/mac02/.codex/sessions/2026/11/04/rollout-2026-11-04T14-14-56-01a1a6b2-c6b1-7103-9944-c1323c1d90a4.jsonl",
+    "stop_required": true,
+    "threshold_remaining_percent": 10.0,
+    "used_percent": 90.0,
+    "window_minutes": 10080
+  },
+  "stop": {
+    "checked_at": "2026-11-06T03:51:17.734888+00:00",
+    "fresh": true,
+    "interval_seconds": 900,
+    "next_check_at": "2026-11-06T04:06:17.734888+00:00",
+    "remaining_percent": 10.0,
+    "resets_at": 1794389522,
+    "sample_age_seconds": 10.195888,
+    "sample_timestamp": "2026-11-06T03:51:07.539Z",
+    "session": "01a1a6b2-c6b1-7103-9944-c1323c1d90a4",
+    "source": "/Users/mac02/.codex/sessions/2026/11/04/rollout-2026-11-04T14-14-56-01a1a6b2-c6b1-7103-9944-c1323c1d90a4.jsonl",
+    "stop_required": true,
+    "threshold_remaining_percent": 10.0,
+    "used_percent": 90.0,
+    "window_minutes": 10080
+  }
+}

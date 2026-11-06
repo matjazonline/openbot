@@ -505,14 +505,37 @@ impl LibraryAgentCopyPersistence for PostgresPersistence {
     async fn create_agent_from_library(
         &self,
         company_id: Uuid,
+        actor: crate::application::workflow::WorkflowActor,
         library_agent_id: Uuid,
         mut agent: AgentWrite,
     ) -> AppResult<Agent> {
         let agent_id = Uuid::new_v4();
         let mut tx = self.pool.begin().await.map_err(AppError::from)?;
+        sqlx::query_scalar::<_, Uuid>("SELECT id FROM users WHERE id=$1 FOR SHARE")
+            .bind(actor.user_id())
+            .fetch_optional(&mut *tx)
+            .await?
+            .ok_or_else(|| AppError::NotFound("Library installation actor".into()))?;
+        super::workflow::authority::authorize_company(
+            &mut tx,
+            crate::domain::workflow::CompanyId::new(company_id),
+            actor,
+        )
+        .await?;
         prepare_library_agent_on(&mut tx, company_id, library_agent_id, &mut agent).await?;
         insert_agent_on(&mut tx, agent_id, Some(company_id), &agent).await?;
         create_agent_principal_on(&mut tx, company_id, agent_id, &agent.name).await?;
+        if agent.provider.is_some() && agent.model.is_some() {
+            super::agent_publication::publish_initial_on(
+                &mut tx,
+                crate::application::agent::AgentPublicationScope {
+                    company: crate::domain::workflow::CompanyId::new(company_id),
+                    actor,
+                    agent: crate::entities::agent_capability::AgentId::new(agent_id),
+                },
+            )
+            .await?;
+        }
         tx.commit().await.map_err(AppError::from)?;
         AgentPersistence::get_by_id(self, agent_id)
             .await?

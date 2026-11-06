@@ -1,0 +1,38 @@
+{
+  "checked_at_utc": "2026-11-06T05:36:55.156929+00:00",
+  "worktree": "/Users/mac02/dev/openbot-recovery/.worktrees/autonomous-p03",
+  "branch": "autonomous/p03",
+  "head": "dc35ee426d8f88abdaf40562027ae69ad66863eb",
+  "review_base": "dc35ee426d8f88abdaf40562027ae69ad66863eb",
+  "decision_revision": "AUTO-P03-P04-G1-D1 effective revision2",
+  "decision_r2_sha256": "3ce2b6aef25509f59356a419951bd6cdb06aef0b1aa8d536c408828158c46768",
+  "decision_r1_sha256": "2a2ee9586598b9a48ac4a680925c8c9bd9507102c23b1b6e087f809f31e2bb54",
+  "coordination_authority": "/Users/mac02/dev/openbot-recovery/plan/02-autonomous-agent/COORDINATION.md",
+  "coordination_sha256": "3e9ec6f3e4cfe09501846736349e6ac663a01e6bde2b482d360d3db7f4a67f9a",
+  "coordination_pin_sha256": "3e9ec6f3e4cfe09501846736349e6ac663a01e6bde2b482d360d3db7f4a67f9a",
+  "coordination_pin_matches": true,
+  "source_digest": "12355398941034c0acd7a46e0c2a887cdeca6fda3441e96dc53655b55decd1bb",
+  "excludes": [
+    "plan/02-autonomous-agent/phases/p03/docs",
+    "plan/02-autonomous-agent/phases/p04/docs"
+  ],
+  "requested_reviewer_model": "gpt-6-astra",
+  "requested_reviewer_effort": "high",
+  "actual_runtime_settings": "not exposed",
+  "quota": {
+    "checked_at": "2026-11-06T05:23:32.662784+00:00",
+    "fresh": true,
+    "interval_seconds": 900,
+    "next_check_at": "2026-11-06T05:38:32.662784+00:00",
+    "remaining_percent": 8.0,
+    "resets_at": 1794389522,
+    "sample_age_seconds": 35.731784,
+    "sample_timestamp": "2026-11-06T05:22:56.931Z",
+    "session": "01a1a6b2-c6b1-7103-9944-c1323c1d90a4",
+    "source": "/Users/mac02/.codex/sessions/2026/11/04/rollout-2026-11-04T14-14-56-01a1a6b2-c6b1-7103-9944-c1323c1d90a4.jsonl",
+    "stop_required": false,
+    "threshold_remaining_percent": 3.0,
+    "used_percent": 92.0,
+    "window_minutes": 10080
+  }
+}

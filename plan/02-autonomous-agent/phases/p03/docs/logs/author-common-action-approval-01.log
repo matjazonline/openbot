@@ -1,0 +1,76 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+
+running 69 tests
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_receipt_tests::history_tests::workflow_action_history_numeric_subject_and_u64_revision_domain ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_receipt_tests::history_tests::workflow_action_history_direct_sql_reopen_rechecks_current_retention ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_receipt_tests::history_tests::workflow_action_history_direct_sql_forged_safe_retirement_rejected ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_receipt_tests::history_tests::workflow_action_history_remote_entry_append_only_and_receipt_requires_entry ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_receipt_tests::history_tests::workflow_action_history_matrix_shared_predicate_and_actual_rust_retirement ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_receipt_tests::history_tests::workflow_action_history_remote_entry_exact_provenance_and_deferred_fence ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_receipt_tests::history_tests::workflow_action_history_unsafe_sibling_and_129_fact_overflow ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_receipt_tests::uncertainty_tests::workflow_action_uncertainty_deferred_commit_failure_rolls_back_retirement ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_receipt_tests::resolution_tests::workflow_action_receipt_resolution_commit_waits_out_exhausted_pool_after_effect ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_receipt_tests::uncertainty_tests::workflow_action_uncertainty_parked_deadline_cancel_and_late_receipt_truth ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_receipt_tests::uncertainty_tests::workflow_action_uncertainty_root_budget_overrides_read_handler_default ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::audit_tests::workflow_action_audit_competing_commands_and_exact_replay ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_receipt_tests::uncertainty_tests::workflow_action_uncertainty_actual_effect_errors_and_exact_retirement ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_receipt_tests::resolution_tests::workflow_action_receipt_resolution_stalled_commit_against_completion ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::audit_tests::workflow_action_audit_sql_exact_actor_kind_and_unique_command_reference ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::audit_tests::workflow_action_audit_sql_orphan_immutability_and_other_kind_policy ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_receipt_tests::uncertainty_tests::workflow_action_uncertainty_pending_failures_consult_expired_action_proof ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::cancellation_order_tests::workflow_action_cancellation_return_lost_owner_precedes_denied_authority ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::replay_tests::workflow_action_replay_delayed_lock_cannot_shorten_retention_horizon ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::replay_tests::workflow_action_replay_approved_first_dispatch_stable_key_competing_tool_and_restart ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::replay_tests::workflow_action_replay_first_proof_crash_and_tampered_entry_stay_conservative ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::replay_tests::workflow_action_replay_frozen_policy_alone_does_not_register_provider_safety ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::replay_tests::workflow_action_replay_metadata_headers_and_changed_arguments_cannot_grant_retry ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::replay_tests::workflow_action_replay_unsupported_or_mismatched_contract_never_marks_or_polls ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::workflow_action_dispatch_competing_local_and_restart_receipt ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::replay_tests::workflow_action_replay_ambiguous_observations_never_issue_second_permit ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::cancellation_order_tests::workflow_action_cancellation_company_before_run_all_callers ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::workflow_action_dispatch_sql_commit_expiry_and_append_only_facts ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::workflow_action_dispatch_local_faults_rollback_every_write ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::workflow_action_dispatch_remote_marker_crash_response_and_no_replay ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::workflow_action_dispatch_stale_fences_scopes_protection_and_errors ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::workflow_action_dispatch_post_marker_revocation_cancel_and_expiry_refuse_entry ... ok
+test adapters::persistence::workflow::tests::http_tests::approval_tests::continuation_tests::workflow_action_approval_continuation_counter_and_history_cannot_be_forged ... ok
+test adapters::persistence::workflow::tests::http_tests::approval_tests::continuation_tests::workflow_action_approval_failure_retry_after_continuation_uses_failure_allowance ... ok
+test adapters::persistence::workflow::tests::http_tests::approval_tests::continuation_tests::workflow_action_approval_later_submission_competes_with_cancellation ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::workflow_action_dispatch_waiting_revokers_recheck_current_authority ... ok
+test adapters::persistence::workflow::tests::http_tests::approval_tests::continuation_tests::workflow_action_approval_later_expiry_and_rejection_preserve_first_decision ... ok
+test adapters::persistence::workflow::tests::http_tests::approval_tests::continuation_tests::workflow_action_approval_multiple_effects_resume_without_failure_debit_or_old_approval_reuse ... ok
+test adapters::persistence::workflow::tests::http_tests::approval_tests::continuation_tests::workflow_action_approval_old_comment_cannot_attach_to_later_wait ... ok
+test adapters::persistence::workflow::tests::http_tests::approval_tests::continuation_tests::workflow_action_approval_continuation_ceiling_refuses_without_resetting_failures ... ok
+test adapters::persistence::workflow::tests::http_tests::approval_tests::review_tests::workflow_action_approval_audit_kind_binding_preserves_ordinary_uniqueness ... ok
+test adapters::persistence::workflow::tests::http_tests::approval_tests::continuation_tests::workflow_action_approval_orphan_wait_and_foreign_audit_are_rejected ... ok
+test adapters::persistence::workflow::tests::http_tests::approval_tests::review_tests::workflow_action_approval_identical_operation_new_call_id_reuses_one_receipt ... ok
+test adapters::persistence::workflow::tests::http_tests::approval_tests::review_tests::workflow_action_approval_operator_retry_preserves_nonzero_continuation_witness ... ok
+test adapters::persistence::workflow::tests::http_tests::approval_tests::review_tests::workflow_action_approval_replay_preserves_result_after_later_successor ... ok
+test adapters::persistence::workflow::tests::http_tests::approval_tests::sql_tests::workflow_action_approval_digest_cannot_authorize_changed_arguments ... ok
+test adapters::persistence::workflow::tests::http_tests::approval_tests::sql_tests::workflow_action_approval_digest_fk_rejects_each_mismatch ... ok
+test adapters::persistence::workflow::tests::http_tests::approval_tests::review_tests::workflow_action_approval_same_arguments_different_target_or_operation_need_new_approval ... ok
+test adapters::persistence::workflow::tests::http_tests::approval_tests::sql_tests::workflow_action_approval_invalid_choice_data_and_digest_leave_open ... ok
+test adapters::persistence::workflow::tests::http_tests::approval_tests::sql_tests::workflow_action_approval_unprovable_notice_key_fails_without_park ... ok
+test adapters::persistence::workflow::tests::http_tests::approval_tests::workflow_action_approval_competing_reviewers_settle_once ... ok
+test adapters::persistence::workflow::tests::http_tests::approval_tests::workflow_action_approval_admin_demotion_refuses_park_and_submission ... ok
+test adapters::persistence::workflow::tests::http_tests::approval_tests::workflow_action_approval_expiry_fails_without_dispatch ... ok
+test adapters::persistence::workflow::tests::http_tests::approval_tests::sql_tests::workflow_action_approval_reopen_checks_transaction_choice_and_accounting ... ok
+test adapters::persistence::workflow::tests::http_tests::approval_tests::workflow_action_approval_dispatch_claims_next_attempt_and_dispatches_once ... ok
+test adapters::persistence::workflow::tests::http_tests::approval_tests::workflow_action_approval_last_failure_attempt_can_park_and_resume ... ok
+test adapters::persistence::workflow::tests::http_tests::approval_tests::workflow_action_approval_park_with_sixteen_approvers_commits_within_bound ... ok
+test adapters::persistence::workflow::tests::http_tests::approval_tests::workflow_action_approval_reject_registered_operation_has_http_failure ... ok
+test application::workflow::actions::authorization_tests::workflow_action_authorization_current_revocation_errors_policy_and_approval ... ok
+test application::workflow::actions::authorization_tests::workflow_action_authorization_exact_frozen_connection_slot ... ok
+test application::workflow::actions::authorization_tests::workflow_action_authorization_frozen_provenance_ceiling_and_binding ... ok
+test adapters::persistence::workflow::tests::http_tests::approval_tests::workflow_action_approval_reopen_without_submission_is_rejected ... ok
+test application::workflow::actions::tests::autonomous_agent_dispatch_origin_is_part_of_effect_identity_and_has_no_default ... ok
+test application::workflow::actions::tests::workflow_action_freeze_canonical_identity_binds_operation_target_and_contract ... ok
+test application::workflow::actions::tests::workflow_action_freeze_object_order_is_canonical_and_array_order_is_significant ... ok
+test application::workflow::actions::tests::workflow_action_freeze_rejects_schema_scope_depth_bytes_and_untrusted_restore ... ok
+test adapters::persistence::workflow::tests::http_tests::approval_tests::workflow_action_approval_submit_competes_with_expiry ... ok
+test adapters::persistence::workflow::tests::http_tests::approval_tests::resolution_tests::workflow_action_approval_race_lost_commit_ack_resolves_exact_park ... ok
+test application::workflow::actions::authorization_tests::workflow_action_authorization_lookup_timeouts_fail_closed ... ok
+
+test result: ok. 69 passed; 0 failed; 0 ignored; 0 measured; 2897 filtered out; finished in 39.51s
+
+

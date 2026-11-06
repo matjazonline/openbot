@@ -6,6 +6,7 @@ use crate::application::workflow::{
 use tokio_util::sync::CancellationToken;
 
 pub struct HttpToolCall {
+    pub origin: crate::application::agent::ToolCallOrigin,
     pub connection: Uuid,
     pub operation: TypeName,
     pub arguments: Value,

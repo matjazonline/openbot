@@ -1,0 +1,121 @@
+{
+  "pattern": "ActionPolicyContext",
+  "filesSearched": 1301,
+  "totalHits": 7,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/provisioning_dispatch_tests.rs#call",
+        "name": "call",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/provisioning_dispatch_tests.rs",
+        "span": "L111-L150"
+      },
+      "path": "src/adapters/persistence/workflow/provisioning_dispatch_tests.rs",
+      "inDegree": 8,
+      "hits": [
+        {
+          "line": 131,
+          "text": "context: ActionPolicyContext {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/actions/tests.rs#request",
+        "name": "request",
+        "kind": "function",
+        "path": "src/application/workflow/actions/tests.rs",
+        "span": "L9-L40"
+      },
+      "path": "src/application/workflow/actions/tests.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 34,
+          "text": "context: ActionPolicyContext {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/http_runtime.rs#context",
+        "name": "context",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/http_runtime.rs",
+        "span": "L62-L76"
+      },
+      "path": "src/adapters/persistence/workflow/http_runtime.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 62,
+          "text": "pub(in crate::adapters::persistence::workflow) fn context(facts: &RunFacts) -> ActionPolicyContext {"
+        },
+        {
+          "line": 63,
+          "text": "ActionPolicyContext {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/knowledge_history_race_tests.rs#request",
+        "name": "request",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/knowledge_history_race_tests.rs",
+        "span": "L43-L71"
+      },
+      "path": "src/adapters/persistence/workflow/knowledge_history_race_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 64,
+          "text": "context: ActionPolicyContext {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/actions/contracts.rs#ActionPolicyContext",
+        "name": "ActionPolicyContext",
+        "kind": "struct",
+        "path": "src/application/workflow/actions/contracts.rs",
+        "span": "L32-L36"
+      },
+      "path": "src/application/workflow/actions/contracts.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 32,
+          "text": "pub struct ActionPolicyContext {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/actions/service.rs#ActionRequest",
+        "name": "ActionRequest",
+        "kind": "struct",
+        "path": "src/application/workflow/actions/service.rs",
+        "span": "L12-L19"
+      },
+      "path": "src/application/workflow/actions/service.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 18,
+          "text": "pub context: ActionPolicyContext,"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 6,
+    "baselineChars": 57722
+  }
+}

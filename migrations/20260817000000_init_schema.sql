@@ -12458,3 +12458,33 @@ BEGIN
 END $$;
 CREATE TRIGGER agent_publication_request_immutable BEFORE UPDATE OR DELETE ON public.agent_publication_requests
     FOR EACH ROW EXECUTE FUNCTION public.guard_agent_publication_request();
+
+-- Agent calls retain the selected run universe and exact immutable binding in their recipe.
+ALTER TABLE public.run_dependency_manifests
+    ADD CONSTRAINT run_manifest_origin_target UNIQUE(company_id,run_id,manifest_id);
+ALTER TABLE public.agent_manifest_revisions
+    ADD CONSTRAINT manifest_agent_origin_target UNIQUE(company_id,manifest_id,agent_id,revision_id);
+ALTER TABLE public.workflow_action_intents
+    ADD COLUMN origin_kind text NOT NULL,
+    ADD COLUMN agent_manifest_id uuid,
+    ADD COLUMN agent_id uuid,
+    ADD COLUMN agent_revision_id uuid,
+    ADD COLUMN agent_binding_id uuid,
+    ADD CONSTRAINT workflow_action_origin_shape CHECK (
+        (origin_kind='workflow' AND num_nonnulls(agent_manifest_id,agent_id,agent_revision_id,agent_binding_id)=0)
+        OR (origin_kind='agent' AND num_nonnulls(agent_manifest_id,agent_id,agent_revision_id,agent_binding_id)=4)),
+    ADD CONSTRAINT workflow_action_origin_content CHECK (
+        (operation->'context'->'origin'=CASE origin_kind
+            WHEN 'workflow' THEN jsonb_build_object('kind','workflow')
+            WHEN 'agent' THEN jsonb_build_object('kind','agent','manifest',agent_manifest_id,
+                'agent',agent_id,'revision',agent_revision_id,'binding',agent_binding_id)
+        END) IS TRUE),
+    ADD CONSTRAINT workflow_action_origin_manifest_fk FOREIGN KEY(company_id,run_id,agent_manifest_id)
+        REFERENCES public.run_dependency_manifests(company_id,run_id,manifest_id)
+        DEFERRABLE INITIALLY DEFERRED,
+    ADD CONSTRAINT workflow_action_origin_selection_fk FOREIGN KEY(company_id,agent_manifest_id,agent_id,agent_revision_id)
+        REFERENCES public.agent_manifest_revisions(company_id,manifest_id,agent_id,revision_id)
+        DEFERRABLE INITIALLY DEFERRED,
+    ADD CONSTRAINT workflow_action_origin_binding_fk FOREIGN KEY(company_id,agent_revision_id,agent_binding_id)
+        REFERENCES public.agent_revision_bindings(company_id,revision_id,binding_id)
+        DEFERRABLE INITIALLY DEFERRED;

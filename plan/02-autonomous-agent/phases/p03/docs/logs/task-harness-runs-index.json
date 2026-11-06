@@ -1,0 +1,594 @@
+{
+  "pattern": "task_harness_runs",
+  "filesSearched": 1303,
+  "totalHits": 45,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/checkpoints.rs#load_on",
+        "name": "load_on",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/checkpoints.rs",
+        "span": "L325-L338"
+      },
+      "path": "src/adapters/persistence/workflow/checkpoints.rs",
+      "inDegree": 5,
+      "hits": [
+        {
+          "line": 327,
+          "text": "\"SELECT id,checkpoint,workflow_prepared,model_blocked_decision,model_request_id,model_generation,model_worker_id,model_attempt FROM task_harness_runs"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/checkpoints.rs#persist_on",
+        "name": "persist_on",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/checkpoints.rs",
+        "span": "L436-L485"
+      },
+      "path": "src/adapters/persistence/workflow/checkpoints.rs",
+      "inDegree": 5,
+      "hits": [
+        {
+          "line": 469,
+          "text": "let changed = sqlx::query(\"UPDATE task_harness_runs SET revision=$5,state=$6,checkpoint=$7,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/harness_owner_tests.rs#insert",
+        "name": "insert",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/harness_owner_tests.rs",
+        "span": "L84-L87"
+      },
+      "path": "src/adapters/persistence/workflow/harness_owner_tests.rs",
+      "inDegree": 5,
+      "hits": [
+        {
+          "line": 85,
+          "text": "sqlx::query(\"INSERT INTO task_harness_runs SELECT (jsonb_populate_record(NULL::task_harness_runs,$1)).*\")"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/harness_model_owner_tests.rs#stored",
+        "name": "stored",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/harness_model_owner_tests.rs",
+        "span": "L59-L65"
+      },
+      "path": "src/adapters/persistence/workflow/harness_model_owner_tests.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 60,
+          "text": "sqlx::query_scalar(\"SELECT to_jsonb(harness) FROM task_harness_runs AS harness WHERE id=$1\")"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/harness_model_owner_tests.rs#write_model",
+        "name": "write_model",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/harness_model_owner_tests.rs",
+        "span": "L33-L57"
+      },
+      "path": "src/adapters/persistence/workflow/harness_model_owner_tests.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 40,
+          "text": "\"UPDATE task_harness_runs SET revision=$2,checkpoint=$3,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/storage_checkpoint_tests.rs#case",
+        "name": "case",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/storage_checkpoint_tests.rs",
+        "span": "L101-L161"
+      },
+      "path": "src/adapters/persistence/workflow/storage_checkpoint_tests.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 121,
+          "text": "sqlx::query_scalar(\"SELECT to_jsonb(row) FROM task_harness_runs AS row WHERE id=$1\")"
+        },
+        {
+          "line": 155,
+          "text": "sqlx::query_scalar(\"SELECT to_jsonb(row) FROM task_harness_runs AS row WHERE id=$1\")"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/token_budget.rs#pending_gate",
+        "name": "pending_gate",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/token_budget.rs",
+        "span": "L182-L211"
+      },
+      "path": "src/adapters/persistence/workflow/token_budget.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 192,
+          "text": "let native:bool=sqlx::query_scalar(\"SELECT EXISTS(SELECT 1 FROM task_harness_runs AS checkpoint"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/checkpoints.rs#open_on",
+        "name": "open_on",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/checkpoints.rs",
+        "span": "L359-L392"
+      },
+      "path": "src/adapters/persistence/workflow/checkpoints.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 383,
+          "text": "sqlx::query(\"INSERT INTO task_harness_runs"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/knowledge_search_support.rs#checkpoint",
+        "name": "checkpoint",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/knowledge_search_support.rs",
+        "span": "L143-L149"
+      },
+      "path": "src/adapters/persistence/workflow/knowledge_search_support.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 145,
+          "text": "let value: Value = sqlx::query_scalar(\"SELECT checkpoint FROM task_harness_runs WHERE company_id=$1 AND workflow_run_id=$2 AND workflow_execution_id=$3 AND task"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/storage_checkpoint_tests.rs#snapshot",
+        "name": "snapshot",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/storage_checkpoint_tests.rs",
+        "span": "L41-L51"
+      },
+      "path": "src/adapters/persistence/workflow/storage_checkpoint_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 47,
+          "text": "'checkpoints',(SELECT jsonb_agg(to_jsonb(row) ORDER BY id) FROM task_harness_runs AS row),"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "plan/fix-app/integration/p08-main/docs/logs/verify-main-resources.py",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 12,
+          "text": "retired=int(query(\"SELECT count(*) FROM pg_attribute WHERE NOT attisdropped AND ((attrelid='background_tasks'::regclass AND attname IN ('task_type','payload','q"
+        },
+        {
+          "line": 14,
+          "text": "triggers=json.loads(query(\"SELECT json_agg(json_build_object('name',tgname,'definition',pg_get_triggerdef(oid))) FROM pg_trigger WHERE NOT tgisinternal AND tgre"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "plan/fix-app/phases/p08/docs/logs/implement-constant-columns.py",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 10,
+          "text": "for name in ['background_tasks_payload_object_check','background_tasks_queue_kind_check','background_tasks_workflow_shape_check','task_harness_runs_token_owner'"
+        },
+        {
+          "line": 85,
+          "text": "s=re.sub(r'\"INSERT INTO (?:public\\.)?(?:background_tasks|task_harness_runs)\\b(?:\\\\.|[^\"\\\\])*\"',rewrite,s)"
+        },
+        {
+          "line": 162,
+          "text": "let retired: i64 = sqlx::query_scalar(\"SELECT count(*) FROM pg_attribute WHERE NOT attisdropped AND ((attrelid='background_tasks'::regclass AND attname IN ('tas"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "plan/fix-app/phases/p08/docs/logs/implement-constant-columns.py#rewrite",
+        "name": "rewrite",
+        "kind": "function",
+        "path": "plan/fix-app/phases/p08/docs/logs/implement-constant-columns.py",
+        "span": "L55-L84"
+      },
+      "path": "plan/fix-app/phases/p08/docs/logs/implement-constant-columns.py",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 57,
+          "text": "head=re.match(r'(INSERT INTO (?:public\\.)?(background_tasks|task_harness_runs)\\s*\\()([^)]*)(\\)\\s*)(VALUES\\s*\\(|SELECT\\s+)',sql,re.I)"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "plan/fix-app/phases/p08/docs/logs/implement-missing-constraints.py",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 16,
+          "text": "-- Name: task_harness_runs; Type: TABLE; Schema: public; Owner: -"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "plan/fix-app/phases/p08/docs/logs/implement-nullability.py",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 19,
+          "text": "section('task_harness_runs',harness)"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "plan/fix-app/phases/p08/docs/logs/verify-step6-resources.py",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 12,
+          "text": "retired=int(query(\"SELECT count(*) FROM pg_attribute WHERE NOT attisdropped AND ((attrelid='background_tasks'::regclass AND attname IN ('task_type','payload','q"
+        },
+        {
+          "line": 14,
+          "text": "triggers=json.loads(query(\"SELECT json_agg(json_build_object('name',tgname,'definition',pg_get_triggerdef(oid))) FROM pg_trigger WHERE NOT tgisinternal AND tgre"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/agent.rs#agent_delete_error",
+        "name": "agent_delete_error",
+        "kind": "function",
+        "path": "src/adapters/persistence/agent.rs",
+        "span": "L428-L445"
+      },
+      "path": "src/adapters/persistence/agent.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 439,
+          "text": "\"task_harness_runs_company_id_agent_id_fkey\""
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/checkpoints.rs#blocked_workflow_model",
+        "name": "blocked_workflow_model",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/checkpoints.rs",
+        "span": "L209-L248"
+      },
+      "path": "src/adapters/persistence/workflow/checkpoints.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 226,
+          "text": "\"SELECT decision.token_proposal->'request'->'reservation' FROM task_harness_runs AS checkpoint"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/checkpoints.rs#authorize_on",
+        "name": "authorize_on",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/checkpoints.rs",
+        "span": "L310-L323"
+      },
+      "path": "src/adapters/persistence/workflow/checkpoints.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 312,
+          "text": "\"SELECT workflow_prepared FROM task_harness_runs WHERE company_id=$1"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/harness_owner_tests.rs#workflow_harness_owner_exact_scope_and_workflow_owner_only",
+        "name": "workflow_harness_owner_exact_scope_and_workflow_owner_only",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/harness_owner_tests.rs",
+        "span": "L90-L145"
+      },
+      "path": "src/adapters/persistence/workflow/harness_owner_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 139,
+          "text": "sqlx::query_scalar(\"SELECT workflow_prepared FROM task_harness_runs WHERE id=$1\")"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/harness_owner_tests.rs#workflow_harness_owner_mutation_and_expired_fence_refuse",
+        "name": "workflow_harness_owner_mutation_and_expired_fence_refuse",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/harness_owner_tests.rs",
+        "span": "L148-L211"
+      },
+      "path": "src/adapters/persistence/workflow/harness_owner_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 165,
+          "text": "\"UPDATE task_harness_runs SET revision=revision+1, checkpoint=jsonb_set(checkpoint,'{revision}',to_jsonb(revision+1)), {assignment} WHERE id=$1\","
+        },
+        {
+          "line": 178,
+          "text": "let sql = \"UPDATE task_harness_runs SET revision=revision+1,"
+        },
+        {
+          "line": 191,
+          "text": "let update = \"UPDATE task_harness_runs SET revision=revision+1,checkpoint=jsonb_set(checkpoint,'{revision}',to_jsonb(revision+1)) WHERE id=$1\";"
+        },
+        {
+          "line": 205,
+          "text": "let revision: i64 = sqlx::query_scalar(\"SELECT revision FROM task_harness_runs WHERE id=$1\")"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/harness_owner_tests.rs#workflow_harness_owner_competing_open_has_one_execution_identity",
+        "name": "workflow_harness_owner_competing_open_has_one_execution_identity",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/harness_owner_tests.rs",
+        "span": "L214-L249"
+      },
+      "path": "src/adapters/persistence/workflow/harness_owner_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 244,
+          "text": "let count: i64 = sqlx::query_scalar(\"SELECT count(*) FROM task_harness_runs\")"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/harness_owner_tests.rs#workflow_harness_owner_existing_foreign_agent_is_not_a_valid_owner",
+        "name": "workflow_harness_owner_existing_foreign_agent_is_not_a_valid_owner",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/harness_owner_tests.rs",
+        "span": "L255-L286"
+      },
+      "path": "src/adapters/persistence/workflow/harness_owner_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 279,
+          "text": "Some(\"task_harness_runs_company_id_agent_id_fkey\")"
+        },
+        {
+          "line": 281,
+          "text": "let count: i64 = sqlx::query_scalar(\"SELECT count(*) FROM task_harness_runs\")"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/harness_store_tests.rs#workflow_harness_owner_store_fence_and_actor_revocation",
+        "name": "workflow_harness_owner_store_fence_and_actor_revocation",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/harness_store_tests.rs",
+        "span": "L97-L145"
+      },
+      "path": "src/adapters/persistence/workflow/harness_store_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 139,
+          "text": "let saved: Value = sqlx::query_scalar(\"SELECT checkpoint FROM task_harness_runs WHERE id=$1\")"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/harness_store_tests.rs#workflow_harness_owner_store_new_claim_retains_checkpoint_and_debits_execution",
+        "name": "workflow_harness_owner_store_new_claim_retains_checkpoint_and_debits_execution",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/harness_store_tests.rs",
+        "span": "L148-L230"
+      },
+      "path": "src/adapters/persistence/workflow/harness_store_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 224,
+          "text": "let stored: Value = sqlx::query_scalar(\"SELECT jsonb_build_object('generation',workflow_generation,'worker',workflow_worker_id,'attempt',workflow_attempt) FROM "
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/harness_store_tests.rs#workflow_harness_owner_store_deferred_failure_rolls_back_open_and_debit",
+        "name": "workflow_harness_owner_store_deferred_failure_rolls_back_open_and_debit",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/harness_store_tests.rs",
+        "span": "L233-L300"
+      },
+      "path": "src/adapters/persistence/workflow/harness_store_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 247,
+          "text": "CREATE CONSTRAINT TRIGGER checkpoint_fault AFTER INSERT OR UPDATE ON task_harness_runs"
+        },
+        {
+          "line": 259,
+          "text": "let count: i64 = sqlx::query_scalar(\"SELECT count(*) FROM task_harness_runs\")"
+        },
+        {
+          "line": 264,
+          "text": "sqlx::raw_sql(\"DROP TRIGGER checkpoint_fault ON task_harness_runs;\")"
+        },
+        {
+          "line": 275,
+          "text": "\"CREATE CONSTRAINT TRIGGER checkpoint_fault AFTER UPDATE ON task_harness_runs"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/harness_token_atomic_tests.rs#workflow_harness_token_sql_cannot_change_proposal_or_grant_allowance",
+        "name": "workflow_harness_token_sql_cannot_change_proposal_or_grant_allowance",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/harness_token_atomic_tests.rs",
+        "span": "L52-L69"
+      },
+      "path": "src/adapters/persistence/workflow/harness_token_atomic_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 60,
+          "text": "\"UPDATE task_harness_runs SET model_blocked_decision=NULL,revision=revision+1,checkpoint=jsonb_set(checkpoint,'{revision}',to_jsonb(revision+1))\","
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/harness_token_tests.rs#workflow_harness_token_approval_never_admits_and_claim_consumes_exact_request",
+        "name": "workflow_harness_token_approval_never_admits_and_claim_consumes_exact_request",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/harness_token_tests.rs",
+        "span": "L59-L115"
+      },
+      "path": "src/adapters/persistence/workflow/harness_token_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 89,
+          "text": "sqlx::query(\"UPDATE task_harness_runs SET model_blocked_decision=NULL,revision=revision+1,checkpoint=jsonb_set(checkpoint,'{revision}',to_jsonb(revision+1)) WHE"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/job_schema_tests.rs#workflow_job_schema_rejects_foreign_execution_and_missing_owner",
+        "name": "workflow_job_schema_rejects_foreign_execution_and_missing_owner",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/job_schema_tests.rs",
+        "span": "L145-L191"
+      },
+      "path": "src/adapters/persistence/workflow/job_schema_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 179,
+          "text": "let retired: i64 = sqlx::query_scalar(\"SELECT count(*) FROM pg_attribute WHERE NOT attisdropped AND ((attrelid='background_tasks'::regclass AND attname IN ('tas"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/knowledge_search_support.rs#snapshot",
+        "name": "snapshot",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/knowledge_search_support.rs",
+        "span": "L151-L159"
+      },
+      "path": "src/adapters/persistence/workflow/knowledge_search_support.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 155,
+          "text": "FROM workflow_runs AS run JOIN task_harness_runs AS harness ON harness.company_id=run.company_id AND harness.workflow_run_id=run.id"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/model_usage_tests.rs#schema_constraint_live_usage_requires_run_and_history_has_no_runtime_owners",
+        "name": "schema_constraint_live_usage_requires_run_and_history_has_no_runtime_owners",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/model_usage_tests.rs",
+        "span": "L177-L240"
+      },
+      "path": "src/adapters/persistence/workflow/model_usage_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 222,
+          "text": "\"task_harness_runs\","
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/provisioning_runtime_tests.rs#builder_stops_a_listing_loop_once_its_result_repeats",
+        "name": "builder_stops_a_listing_loop_once_its_result_repeats",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/provisioning_runtime_tests.rs",
+        "span": "L393-L450"
+      },
+      "path": "src/adapters/persistence/workflow/provisioning_runtime_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 434,
+          "text": "FROM task_harness_runs AS harness JOIN workflow_runs AS run \\"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/workflow_tool_support.rs#saved_result",
+        "name": "saved_result",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/workflow_tool_support.rs",
+        "span": "L134-L142"
+      },
+      "path": "src/adapters/persistence/workflow/workflow_tool_support.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 136,
+          "text": "\"SELECT checkpoint->'invocations'->0->'result' FROM task_harness_runs WHERE workflow_execution_id=$1\","
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 19,
+    "baselineChars": 204505
+  }
+}

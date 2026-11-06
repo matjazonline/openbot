@@ -129,6 +129,7 @@ async fn call(
         },
         arguments,
         context: ActionPolicyContext {
+            origin: crate::application::agent::ToolCallOrigin::Workflow,
             actor: owner(f).user_id(),
             capability_ceiling: vec![contract.policy.capability.clone()],
             approval_required: false,
@@ -311,14 +312,24 @@ async fn provisioning_competing_claimants_create_one_assistant() {
             ("activated".into(), owner(&f).user_id())
         ]
     );
-    let (provider, model, tools): (Option<String>, Option<String>, Vec<String>) =
-        sqlx::query_as("SELECT provider, model, workflow_tools FROM agents WHERE slug = 'helper' AND company_id = $1")
+    #[derive(sqlx::FromRow)]
+    struct CreatedAgent {
+        provider: Option<String>,
+        model: Option<String>,
+        bindings: i64,
+    }
+    let created: CreatedAgent =
+        sqlx::query_as("SELECT agent.provider,agent.model,(SELECT count(*) FROM agent_draft_bindings AS binding WHERE binding.company_id=agent.company_id AND binding.agent_id=agent.id) AS bindings FROM agents AS agent WHERE agent.slug='helper' AND agent.company_id=$1")
             .bind(company(&f).as_uuid())
             .fetch_one(f.persistence().pool())
             .await
             .unwrap();
     assert_eq!(
-        (provider.as_deref(), model.as_deref(), tools.len()),
+        (
+            created.provider.as_deref(),
+            created.model.as_deref(),
+            created.bindings
+        ),
         (Some("openai"), Some("gpt-4o-mini"), 0)
     );
 }
@@ -786,16 +797,18 @@ async fn assistant_channel_commands_race_to_one_assistant() {
     assert_eq!(records, 2, "a refused command records nothing");
 }
 
-/// F047: an agent's grant of a provisioning name captures the trusted built-in, never an MCP
-/// tool of that name another step captured; that capture makes the grant ambiguous instead.
+/// Agent references cannot acquire or redirect capabilities through same-named STEP tools.
 #[tokio::test]
-async fn provisioning_grants_capture_the_built_in_or_refuse_an_ambiguous_capture() {
+async fn provisioning_agent_reference_keeps_its_own_published_binding() {
     use crate::adapters::persistence::workflow::agent_publication::{
         agent_selection, capture_agents_on,
     };
+    use crate::application::agent::{
+        AgentPublicationKey, AgentPublicationScope, AgentPublications, PublishAgent,
+    };
     use crate::application::workflow::compiler::{rebase_workflow_id, retarget_agent};
     let f = command_fixture().await;
-    AgentPersistence::create(
+    let agent = AgentPersistence::create(
         f.persistence(),
         company(&f).as_uuid(),
         AgentWrite {
@@ -837,27 +850,52 @@ async fn provisioning_grants_capture_the_built_in_or_refuse_an_ambiguous_capture
         let mut tx = f.persistence().pool().begin().await.unwrap();
         let result = capture_agents_on(&mut tx, company(&f), &selection, &mut captured).await;
         tx.rollback().await.unwrap();
-        result.map(|()| captured.snapshots.tools)
+        result.map(|()| captured.snapshots)
     };
-
-    let tools = capture(vec![]).await.unwrap();
-    let granted: Vec<_> = tools
-        .iter()
-        .filter(|tool| tool.contract.name.as_str() == CREATE_AGENT_CHANNEL)
-        .collect();
-    assert_eq!(granted.len(), 1);
-    assert!(is_trusted_provisioning_snapshot(granted[0]).unwrap());
+    assert!(
+        capture(vec![]).await.is_err(),
+        "ordinary drafts are not executable references"
+    );
+    let scope = AgentPublicationScope {
+        company: company(&f),
+        actor: owner(&f),
+        agent: crate::entities::agent_capability::AgentId::new(agent.id),
+    };
+    let preview = AgentPublications::preview_agent(f.persistence(), scope)
+        .await
+        .unwrap();
+    let published = AgentPublications::publish_agent(
+        f.persistence(),
+        PublishAgent {
+            scope,
+            expected_draft_revision: preview.draft_revision,
+            expected_active_revision: preview.active_revision,
+            key: AgentPublicationKey::parse("reference-fixture").unwrap(),
+        },
+    )
+    .await
+    .unwrap();
+    assert_eq!(published.definition.tools.len(), 1);
+    assert!(matches!(
+        published.definition.tools[0].binding.source,
+        crate::entities::agent_capability::AgentBindingSource::Builtin {
+            tool: crate::entities::agent_capability::AgentBuiltinTool::CreateAgentChannel
+        }
+    ));
+    let snapshots = capture(vec![]).await.unwrap();
+    assert!(snapshots.tools.is_empty());
+    assert_eq!(snapshots.agents.len(), 1);
+    assert_eq!(snapshots.agents[0].agent_id, scope.agent);
 
     let mut mcp =
         builtin_provisioning_snapshot(company(&f), ProvisioningKind::CreateAgentChannel).unwrap();
     mcp.contract.connection = Some(ResourceName::parse("crm").unwrap());
-    let Err(refused) = capture(vec![mcp]).await else {
-        panic!("an MCP tool of the granted name makes the grant ambiguous")
-    };
-    assert!(
-        matches!(&refused, AppError::BadRequest(message) if message.contains("conflicts")),
-        "{refused:?}"
+    let snapshots = capture(vec![mcp.clone()]).await.unwrap();
+    assert_eq!(
+        serde_json::to_value(&snapshots.tools).unwrap(),
+        json!([mcp])
     );
+    assert_eq!(snapshots.agents[0].agent_id, scope.agent);
 }
 
 #[path = "knowledge_provisioning_tests.rs"]

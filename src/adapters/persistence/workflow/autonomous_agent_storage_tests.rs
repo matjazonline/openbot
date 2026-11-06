@@ -5,6 +5,8 @@ use crate::domain::entities::agent_capability::*;
 #[path = "autonomous_agent_storage_support.rs"]
 mod support;
 use support::*;
+#[path = "autonomous_agent_storage_native_runs.rs"]
+mod native_runs;
 
 #[path = "autonomous_agent_storage_grant_race_tests.rs"]
 mod grant_race_tests;

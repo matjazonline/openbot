@@ -1,0 +1,769 @@
+{
+  "pattern": "fn decode",
+  "filesSearched": 1308,
+  "totalHits": 47,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/http/session.rs#decode_session",
+        "name": "decode_session",
+        "kind": "function",
+        "path": "src/adapters/http/session.rs",
+        "span": "L146-L166"
+      },
+      "path": "src/adapters/http/session.rs",
+      "inDegree": 4,
+      "hits": [
+        {
+          "line": 146,
+          "text": "fn decode_session(&self, token: &str) -> Option<SessionRecord> {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/domain/entities/company_resend_api.rs#decode_signing_secret",
+        "name": "decode_signing_secret",
+        "kind": "function",
+        "path": "src/domain/entities/company_resend_api.rs",
+        "span": "L36-L48"
+      },
+      "path": "src/domain/entities/company_resend_api.rs",
+      "inDegree": 4,
+      "hits": [
+        {
+          "line": 36,
+          "text": "pub fn decode_signing_secret(secret: &str) -> Option<Vec<u8>> {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/integration/mod.rs#decoded",
+        "name": "decoded",
+        "kind": "function",
+        "path": "src/adapters/persistence/integration/mod.rs",
+        "span": "L287-L294"
+      },
+      "path": "src/adapters/persistence/integration/mod.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 287,
+          "text": "fn decoded<T: serde::de::DeserializeOwned>("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/credentials/mod.rs#decode_base64",
+        "name": "decode_base64",
+        "kind": "function",
+        "path": "src/adapters/persistence/credentials/mod.rs",
+        "span": "L321-L325"
+      },
+      "path": "src/adapters/persistence/credentials/mod.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 321,
+          "text": "fn decode_base64(value: &str) -> Result<Vec<u8>, base64::DecodeError> {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/thread/message.rs#decode_response_contract",
+        "name": "decode_response_contract",
+        "kind": "function",
+        "path": "src/adapters/persistence/thread/message.rs",
+        "span": "L236-L248"
+      },
+      "path": "src/adapters/persistence/thread/message.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 236,
+          "text": "pub(super) fn decode_response_contract("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/thread/message.rs#decode_attachments",
+        "name": "decode_attachments",
+        "kind": "function",
+        "path": "src/adapters/persistence/thread/message.rs",
+        "span": "L252-L261"
+      },
+      "path": "src/adapters/persistence/thread/message.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 252,
+          "text": "pub(super) fn decode_attachments("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/sendgrid/inbound.rs#decode_provider_request",
+        "name": "decode_provider_request",
+        "kind": "function",
+        "path": "src/adapters/sendgrid/inbound.rs",
+        "span": "L106-L129"
+      },
+      "path": "src/adapters/sendgrid/inbound.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 106,
+          "text": "async fn decode_provider_request("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/storage/gcs.rs#decode_service_account_key",
+        "name": "decode_service_account_key",
+        "kind": "function",
+        "path": "src/adapters/storage/gcs.rs",
+        "span": "L396-L406"
+      },
+      "path": "src/adapters/storage/gcs.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 396,
+          "text": "fn decode_service_account_key(encoded: &str) -> anyhow::Result<ServiceAccountKey> {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/compiler/rebase.rs#decode",
+        "name": "decode",
+        "kind": "function",
+        "path": "src/application/workflow/compiler/rebase.rs",
+        "span": "L9-L9"
+      },
+      "path": "src/application/workflow/compiler/rebase.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 9,
+          "text": "fn decode(&self, source: &str) -> Result<super::DecodedSource, Diagnostic>;"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/publication/storage_tests.rs#decode",
+        "name": "decode",
+        "kind": "function",
+        "path": "src/application/workflow/publication/storage_tests.rs",
+        "span": "L132-L134"
+      },
+      "path": "src/application/workflow/publication/storage_tests.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 132,
+          "text": "fn decode(&self, _: &str) -> Result<DecodedSource, Diagnostic> {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/templates/validation_tests.rs#decode",
+        "name": "decode",
+        "kind": "function",
+        "path": "src/application/workflow/templates/validation_tests.rs",
+        "span": "L6-L8"
+      },
+      "path": "src/application/workflow/templates/validation_tests.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 6,
+          "text": "fn decode(&self, _: &str) -> Result<compiler::DecodedSource, Diagnostic> {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/domain/entities/value_objects.rs#decode_and_validate",
+        "name": "decode_and_validate",
+        "kind": "function",
+        "path": "src/domain/entities/value_objects.rs",
+        "span": "L292-L325"
+      },
+      "path": "src/domain/entities/value_objects.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 292,
+          "text": "fn decode_and_validate(raw: &str) -> Result<Vec<u8>, ThreadIndexParseError> {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/agent_publication/storage.rs#decode_revision",
+        "name": "decode_revision",
+        "kind": "function",
+        "path": "src/adapters/persistence/agent_publication/storage.rs",
+        "span": "L39-L61"
+      },
+      "path": "src/adapters/persistence/agent_publication/storage.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 39,
+          "text": "fn decode_revision("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/thread/message.rs#decode_participants",
+        "name": "decode_participants",
+        "kind": "function",
+        "path": "src/adapters/persistence/thread/message.rs",
+        "span": "L207-L233"
+      },
+      "path": "src/adapters/persistence/thread/message.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 207,
+          "text": "fn decode_participants(value: Value) -> AppResult<Vec<MessageParticipant>> {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/wakeups.rs#decode",
+        "name": "decode",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/wakeups.rs",
+        "span": "L45-L58"
+      },
+      "path": "src/adapters/persistence/workflow/wakeups.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 45,
+          "text": "fn decode(child: RunId, row: WakeupRow) -> AppResult<ParentWakeup> {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/workflow_tools.rs#decode",
+        "name": "decode",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/workflow_tools.rs",
+        "span": "L20-L28"
+      },
+      "path": "src/adapters/persistence/workflow/workflow_tools.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 20,
+          "text": "fn decode(self) -> AppResult<WorkflowToolRegistration> {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/resend_api/inbound.rs#decode_event",
+        "name": "decode_event",
+        "kind": "function",
+        "path": "src/adapters/resend_api/inbound.rs",
+        "span": "L137-L196"
+      },
+      "path": "src/adapters/resend_api/inbound.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 137,
+          "text": "async fn decode_event("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/sendgrid/inbound.rs#decode_sendgrid_request",
+        "name": "decode_sendgrid_request",
+        "kind": "function",
+        "path": "src/adapters/sendgrid/inbound.rs",
+        "span": "L60-L104"
+      },
+      "path": "src/adapters/sendgrid/inbound.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 60,
+          "text": "pub async fn decode_sendgrid_request("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/sendgrid/inbound.rs#decode_multipart",
+        "name": "decode_multipart",
+        "kind": "function",
+        "path": "src/adapters/sendgrid/inbound.rs",
+        "span": "L131-L169"
+      },
+      "path": "src/adapters/sendgrid/inbound.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 131,
+          "text": "async fn decode_multipart("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/services/inbound_event_worker.rs#decode_and_commit",
+        "name": "decode_and_commit",
+        "kind": "function",
+        "path": "src/application/services/inbound_event_worker.rs",
+        "span": "L272-L318"
+      },
+      "path": "src/application/services/inbound_event_worker.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 272,
+          "text": "async fn decode_and_commit("
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "plan/fix-app/phases/p08/docs/logs/implement-row-json.py",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 14,
+          "text": "i=s.index('pub(super) fn decode_attachments(')"
+        },
+        {
+          "line": 19,
+          "text": "pub(super) fn decode_response_contract("
+        },
+        {
+          "line": 51,
+          "text": "p=Path('src/adapters/persistence/harness_checkpoint.rs');s=p.read_text();old='''pub(super) fn decode(value: serde_json::Value) -> AppResult<RunCheckpoint> {"
+        },
+        {
+          "line": 54,
+          "text": "run.validate()?;''';new='''pub(super) fn decode(run_id: uuid::Uuid, value: serde_json::Value) -> AppResult<RunCheckpoint> {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/skill_library.rs#decode_cursor",
+        "name": "decode_cursor",
+        "kind": "function",
+        "path": "src/adapters/http/routes/skill_library.rs",
+        "span": "L116-L122"
+      },
+      "path": "src/adapters/http/routes/skill_library.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 116,
+          "text": "fn decode_cursor(value: &str) -> Option<SkillCursor> {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/harness_checkpoint.rs#decode",
+        "name": "decode",
+        "kind": "function",
+        "path": "src/adapters/persistence/harness_checkpoint.rs",
+        "span": "L7-L23"
+      },
+      "path": "src/adapters/persistence/harness_checkpoint.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 7,
+          "text": "pub(super) fn decode(run_id: uuid::Uuid, value: serde_json::Value) -> AppResult<RunCheckpoint> {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/knowledge/rows.rs#decode",
+        "name": "decode",
+        "kind": "function",
+        "path": "src/adapters/persistence/knowledge/rows.rs",
+        "span": "L14-L36"
+      },
+      "path": "src/adapters/persistence/knowledge/rows.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 14,
+          "text": "fn decode(self) -> AppResult<KnowledgeDocumentLayer> {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/knowledge/rows.rs#decode~2",
+        "name": "decode~2",
+        "kind": "function",
+        "path": "src/adapters/persistence/knowledge/rows.rs",
+        "span": "L91-L96"
+      },
+      "path": "src/adapters/persistence/knowledge/rows.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 91,
+          "text": "fn decode(rows: Vec<LayerRow>) -> AppResult<Vec<KnowledgeDocumentLayer>> {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/knowledge/search.rs#decode",
+        "name": "decode",
+        "kind": "function",
+        "path": "src/adapters/persistence/knowledge/search.rs",
+        "span": "L81-L91"
+      },
+      "path": "src/adapters/persistence/knowledge/search.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 81,
+          "text": "fn decode(row: ChunkRow) -> AppResult<StoredKnowledgeChunk> {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_audit_execution_transport.rs#decode_command_key",
+        "name": "decode_command_key",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_audit_execution_transport.rs",
+        "span": "L34-L38"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_audit_execution_transport.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 34,
+          "text": "fn decode_command_key<'de, D: serde::Deserializer<'de>>("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_audit_execution_transport.rs#decode",
+        "name": "decode",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_audit_execution_transport.rs",
+        "span": "L40-L53"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_audit_execution_transport.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 40,
+          "text": "pub(super) fn decode(error: AppError, case: AuditCase) -> DiagnosticEnvelope {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_command_probe_negative_tests.rs#decode_command_key",
+        "name": "decode_command_key",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_command_probe_negative_tests.rs",
+        "span": "L63-L67"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_command_probe_negative_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 63,
+          "text": "fn decode_command_key<'de, D: serde::Deserializer<'de>>("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_reopen_transport.rs#decode_command_key",
+        "name": "decode_command_key",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_reopen_transport.rs",
+        "span": "L36-L40"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_reopen_transport.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 36,
+          "text": "fn decode_command_key<'de, D: serde::Deserializer<'de>>("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_reopen_transport.rs#decode",
+        "name": "decode",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_reopen_transport.rs",
+        "span": "L42-L55"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_reopen_transport.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 42,
+          "text": "pub(super) fn decode(error: AppError, case: ReopenCase) -> DiagnosticEnvelope {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_state_witness_transport.rs#decode_command_key",
+        "name": "decode_command_key",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_state_witness_transport.rs",
+        "span": "L34-L38"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_state_witness_transport.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 34,
+          "text": "fn decode_command_key<'de, D: serde::Deserializer<'de>>("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_state_witness_transport.rs#decode",
+        "name": "decode",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_state_witness_transport.rs",
+        "span": "L39-L57"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_state_witness_transport.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 39,
+          "text": "pub(super) fn decode(error: AppError, mode: &str) -> Envelope {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/http.rs#decode",
+        "name": "decode",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/http.rs",
+        "span": "L66-L78"
+      },
+      "path": "src/adapters/persistence/workflow/http.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 66,
+          "text": "fn decode(self) -> AppResult<HttpConnection> {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/jev.rs#decode",
+        "name": "decode",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/jev.rs",
+        "span": "L23-L38"
+      },
+      "path": "src/adapters/persistence/workflow/jev.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 23,
+          "text": "fn decode(self) -> AppResult<JevConnection> {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/token_budget.rs#decode_refusal",
+        "name": "decode_refusal",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/token_budget.rs",
+        "span": "L118-L120"
+      },
+      "path": "src/adapters/persistence/workflow/token_budget.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 118,
+          "text": "fn decode_refusal(value: String) -> AppResult<crate::domain::workflow::TokenRefusal> {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/resend_api/inbound.rs#decode",
+        "name": "decode",
+        "kind": "function",
+        "path": "src/adapters/resend_api/inbound.rs",
+        "span": "L124-L129"
+      },
+      "path": "src/adapters/resend_api/inbound.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 124,
+          "text": "async fn decode(&self, event: &InboundEventRecord) -> InboundEventDecodeOutcome {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/workflow_source.rs#decode",
+        "name": "decode",
+        "kind": "function",
+        "path": "src/adapters/workflow_source.rs",
+        "span": "L17-L19"
+      },
+      "path": "src/adapters/workflow_source.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 17,
+          "text": "fn decode(&self, source: &str) -> Result<DecodedSource, Diagnostic> {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/workflow_source.rs#decode~2",
+        "name": "decode~2",
+        "kind": "function",
+        "path": "src/adapters/workflow_source.rs",
+        "span": "L124-L173"
+      },
+      "path": "src/adapters/workflow_source.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 124,
+          "text": "pub fn decode(source: &str) -> Result<DecodedSource, Diagnostic> {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/agent/definition.rs#decode",
+        "name": "decode",
+        "kind": "function",
+        "path": "src/application/agent/definition.rs",
+        "span": "L70-L78"
+      },
+      "path": "src/application/agent/definition.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 70,
+          "text": "pub fn decode(bytes: &[u8]) -> AppResult<Self> {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/agent/manifest.rs#decode",
+        "name": "decode",
+        "kind": "function",
+        "path": "src/application/agent/manifest.rs",
+        "span": "L47-L55"
+      },
+      "path": "src/application/agent/manifest.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 47,
+          "text": "pub fn decode(bytes: &[u8]) -> AppResult<Self> {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/services/inbound_event_worker_tests.rs#decode",
+        "name": "decode",
+        "kind": "function",
+        "path": "src/application/services/inbound_event_worker_tests.rs",
+        "span": "L366-L370"
+      },
+      "path": "src/application/services/inbound_event_worker_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 366,
+          "text": "async fn decode(&self, _event: &InboundEventRecord) -> InboundEventDecodeOutcome {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/transport/delivery.rs#decode",
+        "name": "decode",
+        "kind": "function",
+        "path": "src/application/transport/delivery.rs",
+        "span": "L316-L338"
+      },
+      "path": "src/application/transport/delivery.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 316,
+          "text": "pub fn decode<T: serde::de::DeserializeOwned>("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/transport/inbox.rs#decode",
+        "name": "decode",
+        "kind": "function",
+        "path": "src/application/transport/inbox.rs",
+        "span": "L401-L401"
+      },
+      "path": "src/application/transport/inbox.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 401,
+          "text": "async fn decode(&self, event: &InboundEventRecord) -> InboundEventDecodeOutcome;"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 34,
+    "baselineChars": 418244
+  }
+}

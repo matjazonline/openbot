@@ -1,0 +1,9 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+
+running 3 tests
+test adapters::persistence::skill::tests::picking_a_library_agent_copies_its_skills_with_the_agent_and_channel ... ok
+test adapters::http::routes::agent::api_tests::library_builder_copy_keeps_its_grants_on_an_explicit_model ... ok
+test adapters::persistence::onboarding::tests::onboarding_address_refusal_keeps_the_agent_and_other_channels ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 2947 filtered out; finished in 0.70s
+

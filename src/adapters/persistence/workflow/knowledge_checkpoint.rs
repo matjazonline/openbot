@@ -160,7 +160,12 @@ async fn load_call(
     let saved = load_on(tx, fence).await?.ok_or_else(missing)?;
     live(tx, fence, bound).await?;
     let frozen = frozen_selection(tx, fence).await?;
-    if serde_json::to_value(&frozen.selection).map_err(|_| invalid())?
+    if serde_json::to_value(
+        crate::application::workflow::agent_contract::AgentSelectionIdentity::from_selection(
+            &frozen.selection,
+        ),
+    )
+    .map_err(|_| invalid())?
         != saved.workflow_prepared["selection"]
     {
         return Err(missing());
@@ -233,7 +238,14 @@ async fn frozen_selection(
         .and_then(AgentKey::parse)
         .ok_or_else(missing)?;
     Ok(FrozenSelection {
-        selection: facts.bundle.resolve_agent(scope.company, &key)?,
+        selection: super::super::agent_manifest::selected_on(
+            tx,
+            scope.company,
+            scope.run,
+            facts.actor,
+            facts.bundle.agent_reference(scope.company, &key)?.agent_id,
+        )
+        .await?,
         access: KnowledgeSearchAccess {
             company: scope.company,
             ceiling: AccessLevel::try_from(row.ceiling).map_err(|_| invalid())?,

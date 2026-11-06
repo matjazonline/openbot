@@ -1,0 +1,9 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+
+running 3 tests
+test adapters::persistence::workflow::tests::child_publication_tests::workflow_child_publication_captures_only_selectable_children_of_the_company ... ok
+test adapters::persistence::workflow::tests::child_publication_tests::workflow_child_publication_publishes_the_shipped_revision_template_end_to_end ... ok
+test adapters::persistence::workflow::tests::child_publication_tests::workflow_child_publication_bounds_pins_and_bytes_before_reading_bundles ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 2963 filtered out; finished in 1.45s
+

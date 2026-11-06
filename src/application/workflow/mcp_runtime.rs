@@ -9,9 +9,21 @@ use secrecy::SecretString;
 use std::sync::{Arc, Mutex};
 use tokio_util::sync::CancellationToken;
 
-/// A direct agent MCP tool call. The slot resolves only through the run's saved binding.
+/// Workflow callers resolve a saved slot; an agent caller supplies its immutable binding origin.
+#[derive(Clone)]
+pub enum McpToolTarget {
+    Workflow {
+        slot: ResourceName,
+    },
+    Agent {
+        connection: uuid::Uuid,
+        origin: crate::application::agent::AgentToolOrigin,
+    },
+}
+
+/// A direct MCP tool call follows exactly one trusted target kind.
 pub struct McpToolCall {
-    pub slot: ResourceName,
+    pub target: McpToolTarget,
     pub tool: TypeName,
     pub arguments: Value,
     pub call: ModelToolCallId,

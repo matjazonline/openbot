@@ -1,0 +1,66 @@
+{
+  "pattern": "fn context",
+  "filesSearched": 416,
+  "totalHits": 3,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/http_runtime.rs#context",
+        "name": "context",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/http_runtime.rs",
+        "span": "L62-L76"
+      },
+      "path": "src/adapters/persistence/workflow/http_runtime.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 62,
+          "text": "pub(in crate::adapters::persistence::workflow) fn context(facts: &RunFacts) -> ActionPolicyContext {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/knowledge_checkpoint.rs#context_on",
+        "name": "context_on",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/knowledge_checkpoint.rs",
+        "span": "L85-L99"
+      },
+      "path": "src/adapters/persistence/workflow/knowledge_checkpoint.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 85,
+          "text": "async fn context_on("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/activation.rs#context",
+        "name": "context",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/activation.rs",
+        "span": "L185-L196"
+      },
+      "path": "src/adapters/persistence/workflow/activation.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 185,
+          "text": "pub(super) fn context(&self) -> Context<'_> {"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 3,
+    "baselineChars": 28333
+  }
+}

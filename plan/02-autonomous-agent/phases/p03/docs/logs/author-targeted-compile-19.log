@@ -1,0 +1,84 @@
+   Compiling open_bots v0.1.0 (/Users/mac02/dev/openbot-recovery/.worktrees/autonomous-p03)
+error[E0599]: the method `configure` exists for struct `BindingService<PostgresPersistence, PostgresPersistence, ..., ...>`, but its trait bounds were not satisfied
+   --> src/adapters/persistence/workflow/workflow_tool_closure_tests.rs:105:10
+    |
+104 |       let state = service
+    |  _________________-
+105 | |         .configure(ConfigureBinding {
+    | |         -^^^^^^^^^ method cannot be called due to unsatisfied trait bounds
+    | |_________|
+    |
+    |
+   ::: src/adapters/persistence/mod.rs:44:1
+    |
+ 44 |   pub struct PostgresPersistence {
+    |   ------------------------------ doesn't satisfy `_: WorkflowAuthorization`
+    |
+   ::: src/application/workflow/lifecycle/mod.rs:54:1
+    |
+ 54 |   pub struct BindingService<A, P, V, R> {
+    |   ------------------------------------- method `configure` not found for this struct
+    |
+note: trait bound `persistence::PostgresPersistence: application::workflow::authorization::WorkflowAuthorization` was not satisfied
+   --> src/application/workflow/lifecycle/bindings.rs:3:9
+    |
+  3 | impl<A: WorkflowAuthorization, P: BindingLifecycle, V: WorkflowDefinitions, R: ResourceDirectory>
+    |         ^^^^^^^^^^^^^^^^^^^^^ unsatisfied trait bound introduced here
+  4 |     BindingService<A, P, V, R>
+    |     --------------------------
+note: the trait `application::workflow::authorization::WorkflowAuthorization` must be implemented
+   --> src/application/workflow/authorization.rs:93:1
+    |
+ 93 | pub trait WorkflowAuthorization: Send + Sync {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    = note: the full name for the type has been written to '/Users/mac02/dev/openbot-recovery/.worktrees/autonomous-p03/target/debug/deps/open_bots-c19a0b960dacdcef.long-type-1029702830020984740.txt'
+    = note: consider using `--verbose` to print the full type name to the console
+
+error[E0599]: the method `activate` exists for struct `BindingService<PostgresPersistence, PostgresPersistence, ..., ...>`, but its trait bounds were not satisfied
+   --> src/adapters/persistence/workflow/workflow_tool_closure_tests.rs:118:10
+    |
+117 | /     service
+118 | |         .activate(SetBindingActivity {
+    | |         -^^^^^^^^ method cannot be called due to unsatisfied trait bounds
+    | |_________|
+    |
+    |
+   ::: src/adapters/persistence/mod.rs:44:1
+    |
+ 44 |   pub struct PostgresPersistence {
+    |   ------------------------------ doesn't satisfy `_: WorkflowAuthorization`
+    |
+   ::: src/application/workflow/lifecycle/mod.rs:54:1
+    |
+ 54 |   pub struct BindingService<A, P, V, R> {
+    |   ------------------------------------- method `activate` not found for this struct
+    |
+note: trait bound `persistence::PostgresPersistence: application::workflow::authorization::WorkflowAuthorization` was not satisfied
+   --> src/application/workflow/lifecycle/bindings.rs:3:9
+    |
+  3 | impl<A: WorkflowAuthorization, P: BindingLifecycle, V: WorkflowDefinitions, R: ResourceDirectory>
+    |         ^^^^^^^^^^^^^^^^^^^^^ unsatisfied trait bound introduced here
+  4 |     BindingService<A, P, V, R>
+    |     --------------------------
+note: the trait `application::workflow::authorization::WorkflowAuthorization` must be implemented
+   --> src/application/workflow/authorization.rs:93:1
+    |
+ 93 | pub trait WorkflowAuthorization: Send + Sync {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    = help: items from traits can only be used if the trait is implemented and in scope
+note: `application::workflow::activation::WorkflowActivation` defines an item `activate`, perhaps you need to implement it
+   --> src/application/workflow/activation.rs:131:1
+    |
+131 | pub trait WorkflowActivation: Send + Sync {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    = note: the full name for the type has been written to '/Users/mac02/dev/openbot-recovery/.worktrees/autonomous-p03/target/debug/deps/open_bots-c19a0b960dacdcef.long-type-1029702830020984740.txt'
+    = note: consider using `--verbose` to print the full type name to the console
+
+error[E0599]: no method named `as_uuid` found for struct `uuid::Uuid` in the current scope
+  --> src/adapters/persistence/workflow/workflow_tool_closure_tests.rs:59:83
+   |
+59 |     let target = bind_child_resource(&setup, RuntimeResourceId::new(connection.id.as_uuid())).await;
+   |                                                                                   ^^^^^^^ method not found in `uuid::Uuid`
+
+For more information about this error, try `rustc --explain E0599`.
+error: could not compile `open_bots` (lib test) due to 3 previous errors

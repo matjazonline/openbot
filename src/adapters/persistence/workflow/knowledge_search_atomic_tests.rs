@@ -290,9 +290,21 @@ async fn knowledge_search_busy_model_is_retryable_without_saving_an_empty_observ
 async fn knowledge_search_current_grant_revocation_blocks_saved_invocation_before_embedding() {
     let f = Box::pin(SearchFixture::new(AccessLevel::L5)).await;
     let call = f.prepare(json!({"query":"floor"})).await;
-    sqlx::query("DELETE FROM agent_draft_bindings WHERE agent_id=$1")
-        .bind(f.agent)
-        .execute(f.p().pool())
+    use crate::application::agent::{
+        AgentGrantIdentity, AgentPublicationScope, AgentPublications, ToolCallOrigin,
+    };
+    let ToolCallOrigin::Agent(origin) = call.origin else {
+        panic!("an agent-owned saved call is required")
+    };
+    f.p()
+        .revoke_agent_grant(
+            AgentPublicationScope {
+                company: f.fixture.target.company,
+                actor: f.fixture.target.actor,
+                agent: origin.agent,
+            },
+            AgentGrantIdentity::Binding(origin.binding),
+        )
         .await
         .unwrap();
     let before = f.snapshot().await;

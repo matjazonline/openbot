@@ -1,0 +1,1028 @@
+{
+  "pattern": "DependencySnapshots",
+  "filesSearched": 1301,
+  "totalHits": 63,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/provisioning_dispatch_tests.rs#claimed",
+        "name": "claimed",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/provisioning_dispatch_tests.rs",
+        "span": "L63-L108"
+      },
+      "path": "src/adapters/persistence/workflow/provisioning_dispatch_tests.rs",
+      "inDegree": 8,
+      "hits": [
+        {
+          "line": 87,
+          "text": "DependencySnapshots {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/publication/tests.rs#snapshots",
+        "name": "snapshots",
+        "kind": "function",
+        "path": "src/application/workflow/publication/tests.rs",
+        "span": "L42-L47"
+      },
+      "path": "src/application/workflow/publication/tests.rs",
+      "inDegree": 7,
+      "hits": [
+        {
+          "line": 42,
+          "text": "fn snapshots() -> DependencySnapshots {"
+        },
+        {
+          "line": 43,
+          "text": "DependencySnapshots {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/publication/tests.rs#build",
+        "name": "build",
+        "kind": "function",
+        "path": "src/application/workflow/publication/tests.rs",
+        "span": "L48-L56"
+      },
+      "path": "src/application/workflow/publication/tests.rs",
+      "inDegree": 6,
+      "hits": [
+        {
+          "line": 48,
+          "text": "fn build(source: &Value, snapshots: DependencySnapshots) -> Result<PublishedBundle, Diagnostic> {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/publication/tests.rs#child",
+        "name": "child",
+        "kind": "function",
+        "path": "src/application/workflow/publication/tests.rs",
+        "span": "L212-L223"
+      },
+      "path": "src/application/workflow/publication/tests.rs",
+      "inDegree": 6,
+      "hits": [
+        {
+          "line": 218,
+          "text": "DependencySnapshots::default(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/binding/tests.rs#bundle",
+        "name": "bundle",
+        "kind": "function",
+        "path": "src/application/workflow/binding/tests.rs",
+        "span": "L19-L35"
+      },
+      "path": "src/application/workflow/binding/tests.rs",
+      "inDegree": 4,
+      "hits": [
+        {
+          "line": 30,
+          "text": "publication::DependencySnapshots::default(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/sample/tests.rs#build",
+        "name": "build",
+        "kind": "function",
+        "path": "src/application/workflow/sample/tests.rs",
+        "span": "L31-L46"
+      },
+      "path": "src/application/workflow/sample/tests.rs",
+      "inDegree": 4,
+      "hits": [
+        {
+          "line": 33,
+          "text": "facts: DependencySnapshots,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_dispatch_tests.rs#initialize_action_on_claim",
+        "name": "initialize_action_on_claim",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_dispatch_tests.rs",
+        "span": "L115-L177"
+      },
+      "path": "src/adapters/persistence/workflow/action_dispatch_tests.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 145,
+          "text": "DependencySnapshots {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_runtime_mixed_tests.rs#mixed_requests",
+        "name": "mixed_requests",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_runtime_mixed_tests.rs",
+        "span": "L31-L100"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_runtime_mixed_tests.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 49,
+          "text": "DependencySnapshots {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/actions/authorization_tests.rs#authority",
+        "name": "authority",
+        "kind": "function",
+        "path": "src/application/workflow/actions/authorization_tests.rs",
+        "span": "L22-L54"
+      },
+      "path": "src/application/workflow/actions/authorization_tests.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 41,
+          "text": "publication::DependencySnapshots {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/publication/capabilities_tests.rs#capable",
+        "name": "capable",
+        "kind": "function",
+        "path": "src/application/workflow/publication/capabilities_tests.rs",
+        "span": "L14-L26"
+      },
+      "path": "src/application/workflow/publication/capabilities_tests.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 14,
+          "text": "fn capable() -> DependencySnapshots {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/publication/diagnostic_tests.rs#assert_diagnostic",
+        "name": "assert_diagnostic",
+        "kind": "function",
+        "path": "src/application/workflow/publication/diagnostic_tests.rs",
+        "span": "L3-L23"
+      },
+      "path": "src/application/workflow/publication/diagnostic_tests.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 5,
+          "text": "facts: DependencySnapshots,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/sample/tools_tests.rs#tool_bundle",
+        "name": "tool_bundle",
+        "kind": "function",
+        "path": "src/application/workflow/sample/tools_tests.rs",
+        "span": "L3-L37"
+      },
+      "path": "src/application/workflow/sample/tools_tests.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 9,
+          "text": "let child = build(&leaf, DependencySnapshots::default(), vec![]);"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/tests/snapshot_cases.rs#resource_binding",
+        "name": "resource_binding",
+        "kind": "function",
+        "path": "src/application/workflow/tests/snapshot_cases.rs",
+        "span": "L62-L103"
+      },
+      "path": "src/application/workflow/tests/snapshot_cases.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 77,
+          "text": "publication::DependencySnapshots::default(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/message.rs#message_builtins",
+        "name": "message_builtins",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/message.rs",
+        "span": "L484-L495"
+      },
+      "path": "src/adapters/persistence/workflow/message.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 486,
+          "text": "snapshots: publication::DependencySnapshots {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/publication/tests.rs#parent",
+        "name": "parent",
+        "kind": "function",
+        "path": "src/application/workflow/publication/tests.rs",
+        "span": "L224-L235"
+      },
+      "path": "src/application/workflow/publication/tests.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 232,
+          "text": "DependencySnapshots::default(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/publication/validation.rs#has_tool",
+        "name": "has_tool",
+        "kind": "function",
+        "path": "src/application/workflow/publication/validation.rs",
+        "span": "L120-L129"
+      },
+      "path": "src/application/workflow/publication/validation.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 120,
+          "text": "fn has_tool(name: &TypeName, snapshots: &DependencySnapshots) -> bool {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/publication/validation.rs#check_selection",
+        "name": "check_selection",
+        "kind": "function",
+        "path": "src/application/workflow/publication/validation.rs",
+        "span": "L131-L154"
+      },
+      "path": "src/application/workflow/publication/validation.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 134,
+          "text": "snapshots: &DependencySnapshots,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/fixtures/mod.rs#agent_snapshots",
+        "name": "agent_snapshots",
+        "kind": "function",
+        "path": "src/application/workflow/fixtures/mod.rs",
+        "span": "L86-L121"
+      },
+      "path": "src/application/workflow/fixtures/mod.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 86,
+          "text": "fn agent_snapshots(company: CompanyId) -> DependencySnapshots {"
+        },
+        {
+          "line": 87,
+          "text": "DependencySnapshots {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/publication/preflight.rs#unique_contracts",
+        "name": "unique_contracts",
+        "kind": "function",
+        "path": "src/application/workflow/publication/preflight.rs",
+        "span": "L148-L166"
+      },
+      "path": "src/application/workflow/publication/preflight.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 148,
+          "text": "fn unique_contracts(&self, snapshots: &DependencySnapshots) -> Result<(), Diagnostic> {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/publication/validation.rs#validate_skills",
+        "name": "validate_skills",
+        "kind": "function",
+        "path": "src/application/workflow/publication/validation.rs",
+        "span": "L30-L56"
+      },
+      "path": "src/application/workflow/publication/validation.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 32,
+          "text": "snapshots: &DependencySnapshots,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/publication/validation.rs#validate_tools",
+        "name": "validate_tools",
+        "kind": "function",
+        "path": "src/application/workflow/publication/validation.rs",
+        "span": "L58-L92"
+      },
+      "path": "src/application/workflow/publication/validation.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 60,
+          "text": "snapshots: &DependencySnapshots,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/publication/validation.rs#validate_agents",
+        "name": "validate_agents",
+        "kind": "function",
+        "path": "src/application/workflow/publication/validation.rs",
+        "span": "L156-L187"
+      },
+      "path": "src/application/workflow/publication/validation.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 157,
+          "text": "snapshots: &DependencySnapshots,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/tests.rs#configured",
+        "name": "configured",
+        "kind": "function",
+        "path": "src/application/workflow/tests.rs",
+        "span": "L63-L111"
+      },
+      "path": "src/application/workflow/tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 88,
+          "text": "publication::DependencySnapshots::default(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/http_publication.rs#capture",
+        "name": "capture",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/http_publication.rs",
+        "span": "L20-L58"
+      },
+      "path": "src/adapters/persistence/workflow/http_publication.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 52,
+          "text": "snapshots: publication::DependencySnapshots {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/http_tests.rs#capture",
+        "name": "capture",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/http_tests.rs",
+        "span": "L433-L445"
+      },
+      "path": "src/adapters/persistence/workflow/http_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 439,
+          "text": "snapshots: DependencySnapshots {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/mcp_publication.rs#capture",
+        "name": "capture",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/mcp_publication.rs",
+        "span": "L20-L56"
+      },
+      "path": "src/adapters/persistence/workflow/mcp_publication.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 50,
+          "text": "snapshots: publication::DependencySnapshots {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/provisioning_dispatch_tests.rs#provisioning_grants_capture_the_built_in_or_refuse_an_ambiguous_capture",
+        "name": "provisioning_grants_capture_the_built_in_or_refuse_an_ambiguous_capture",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/provisioning_dispatch_tests.rs",
+        "span": "L792-L861"
+      },
+      "path": "src/adapters/persistence/workflow/provisioning_dispatch_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 831,
+          "text": "snapshots: DependencySnapshots {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/schedule_test_support.rs#capture",
+        "name": "capture",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/schedule_test_support.rs",
+        "span": "L11-L20"
+      },
+      "path": "src/adapters/persistence/workflow/schedule_test_support.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 17,
+          "text": "snapshots: DependencySnapshots::default(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/tests.rs#capture",
+        "name": "capture",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/tests.rs",
+        "span": "L109-L118"
+      },
+      "path": "src/adapters/persistence/workflow/tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 115,
+          "text": "snapshots: DependencySnapshots::default(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/completion.rs#workflow_completion_declared_choice_and_terminal_schema",
+        "name": "workflow_completion_declared_choice_and_terminal_schema",
+        "kind": "function",
+        "path": "src/application/workflow/completion.rs",
+        "span": "L98-L152"
+      },
+      "path": "src/application/workflow/completion.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 107,
+          "text": "DependencySnapshots {"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/application/workflow/fixtures/mod.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 5,
+          "text": "use super::publication::{AgentSnapshot, DependencySnapshots, ToolSnapshot};"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/fixtures/mod.rs#snapshots",
+        "name": "snapshots",
+        "kind": "function",
+        "path": "src/application/workflow/fixtures/mod.rs",
+        "span": "L66-L79"
+      },
+      "path": "src/application/workflow/fixtures/mod.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 66,
+          "text": "pub fn snapshots(self, company: CompanyId) -> DependencySnapshots {"
+        },
+        {
+          "line": 74,
+          "text": "Self::McpLookup => DependencySnapshots {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/lifecycle/contracts.rs#PublicationDependencies",
+        "name": "PublicationDependencies",
+        "kind": "struct",
+        "path": "src/application/workflow/lifecycle/contracts.rs",
+        "span": "L90-L93"
+      },
+      "path": "src/application/workflow/lifecycle/contracts.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 91,
+          "text": "pub snapshots: publication::DependencySnapshots,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/publication/diagnostic_tests.rs#workflow_publication_duplicate_contracts_identify_the_dependency",
+        "name": "workflow_publication_duplicate_contracts_identify_the_dependency",
+        "kind": "function",
+        "path": "src/application/workflow/publication/diagnostic_tests.rs",
+        "span": "L26-L38"
+      },
+      "path": "src/application/workflow/publication/diagnostic_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 30,
+          "text": "DependencySnapshots {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/publication/mod.rs#PublishedBundle",
+        "name": "PublishedBundle",
+        "kind": "struct",
+        "path": "src/application/workflow/publication/mod.rs",
+        "span": "L28-L36"
+      },
+      "path": "src/application/workflow/publication/mod.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 31,
+          "text": "snapshots: DependencySnapshots,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/publication/mod.rs#snapshots",
+        "name": "snapshots",
+        "kind": "function",
+        "path": "src/application/workflow/publication/mod.rs",
+        "span": "L45-L47"
+      },
+      "path": "src/application/workflow/publication/mod.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 45,
+          "text": "pub fn snapshots(&self) -> &DependencySnapshots {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/publication/mod.rs#freeze",
+        "name": "freeze",
+        "kind": "function",
+        "path": "src/application/workflow/publication/mod.rs",
+        "span": "L108-L149"
+      },
+      "path": "src/application/workflow/publication/mod.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 112,
+          "text": "snapshots: DependencySnapshots,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/publication/mod.rs#manifest~2",
+        "name": "manifest~2",
+        "kind": "function",
+        "path": "src/application/workflow/publication/mod.rs",
+        "span": "L151-L185"
+      },
+      "path": "src/application/workflow/publication/mod.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 155,
+          "text": "snapshots: &DependencySnapshots,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/publication/preflight.rs#validate",
+        "name": "validate",
+        "kind": "function",
+        "path": "src/application/workflow/publication/preflight.rs",
+        "span": "L9-L56"
+      },
+      "path": "src/application/workflow/publication/preflight.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 10,
+          "text": "snapshots: &DependencySnapshots,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/publication/storage.rs#StoredVersion",
+        "name": "StoredVersion",
+        "kind": "struct",
+        "path": "src/application/workflow/publication/storage.rs",
+        "span": "L20-L29"
+      },
+      "path": "src/application/workflow/publication/storage.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 27,
+          "text": "snapshots: &'a DependencySnapshots,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/publication/storage.rs#LoadedVersion",
+        "name": "LoadedVersion",
+        "kind": "struct",
+        "path": "src/application/workflow/publication/storage.rs",
+        "span": "L42-L51"
+      },
+      "path": "src/application/workflow/publication/storage.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 49,
+          "text": "snapshots: DependencySnapshots,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/publication/tests.rs#workflow_publication_mcp_contract_policy_and_resource_are_frozen_together",
+        "name": "workflow_publication_mcp_contract_policy_and_resource_are_frozen_together",
+        "kind": "function",
+        "path": "src/application/workflow/publication/tests.rs",
+        "span": "L172-L205"
+      },
+      "path": "src/application/workflow/publication/tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 174,
+          "text": "let facts = DependencySnapshots {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/publication/tests.rs#workflow_publication_rejects_missing_duplicate_foreign_recursive_and_wrong_child_versions",
+        "name": "workflow_publication_rejects_missing_duplicate_foreign_recursive_and_wrong_child_versions",
+        "kind": "function",
+        "path": "src/application/workflow/publication/tests.rs",
+        "span": "L259-L284"
+      },
+      "path": "src/application/workflow/publication/tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 269,
+          "text": "DependencySnapshots::default(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/publication/tests.rs#workflow_publication_rejects_deep_and_aggregate_schema_facts_before_copying",
+        "name": "workflow_publication_rejects_deep_and_aggregate_schema_facts_before_copying",
+        "kind": "function",
+        "path": "src/application/workflow/publication/tests.rs",
+        "span": "L287-L302"
+      },
+      "path": "src/application/workflow/publication/tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 289,
+          "text": "let mut facts = DependencySnapshots {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/publication/tests.rs#workflow_publication_bounds_child_depth_and_pins_transitive_content",
+        "name": "workflow_publication_bounds_child_depth_and_pins_transitive_content",
+        "kind": "function",
+        "path": "src/application/workflow/publication/tests.rs",
+        "span": "L305-L327"
+      },
+      "path": "src/application/workflow/publication/tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 318,
+          "text": "DependencySnapshots::default(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/publication/tests.rs#workflow_publication_rejects_conflicting_transitive_version_content",
+        "name": "workflow_publication_rejects_conflicting_transitive_version_content",
+        "kind": "function",
+        "path": "src/application/workflow/publication/tests.rs",
+        "span": "L330-L353"
+      },
+      "path": "src/application/workflow/publication/tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 342,
+          "text": "DependencySnapshots::default(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/publication/tests.rs#workflow_publication_dependency_errors_name_the_problem_and_source_field",
+        "name": "workflow_publication_dependency_errors_name_the_problem_and_source_field",
+        "kind": "function",
+        "path": "src/application/workflow/publication/tests.rs",
+        "span": "L356-L386"
+      },
+      "path": "src/application/workflow/publication/tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 377,
+          "text": "let mut facts = DependencySnapshots {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/publication/tests.rs#workflow_publication_freezes_workflow_tool_pins_like_children",
+        "name": "workflow_publication_freezes_workflow_tool_pins_like_children",
+        "kind": "function",
+        "path": "src/application/workflow/publication/tests.rs",
+        "span": "L423-L522"
+      },
+      "path": "src/application/workflow/publication/tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 455,
+          "text": "DependencySnapshots {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/publication/types.rs#DependencySnapshots",
+        "name": "DependencySnapshots",
+        "kind": "struct",
+        "path": "src/application/workflow/publication/types.rs",
+        "span": "L101-L105"
+      },
+      "path": "src/application/workflow/publication/types.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 101,
+          "text": "pub struct DependencySnapshots {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/publication/validation.rs#validate",
+        "name": "validate",
+        "kind": "function",
+        "path": "src/application/workflow/publication/validation.rs",
+        "span": "L6-L28"
+      },
+      "path": "src/application/workflow/publication/validation.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 8,
+          "text": "snapshots: &DependencySnapshots,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/sample/jev_tests.rs#jev_box_sample_uses_only_scripted_answers_and_inert_metadata",
+        "name": "jev_box_sample_uses_only_scripted_answers_and_inert_metadata",
+        "kind": "function",
+        "path": "src/application/workflow/sample/jev_tests.rs",
+        "span": "L4-L22"
+      },
+      "path": "src/application/workflow/sample/jev_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 7,
+          "text": "let bundle = build(&fixture[\"source\"], DependencySnapshots::default(), vec![]);"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/sample/jev_tests.rs#workflow_sample_jev_mixed_thresholds_automatic_and_human_paths",
+        "name": "workflow_sample_jev_mixed_thresholds_automatic_and_human_paths",
+        "kind": "function",
+        "path": "src/application/workflow/sample/jev_tests.rs",
+        "span": "L25-L52"
+      },
+      "path": "src/application/workflow/sample/jev_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 28,
+          "text": "let bundle = build(&fixture[\"source\"], DependencySnapshots::default(), vec![]);"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/sample/jev_tests.rs#jev_box_sample_rejects_tools_tokens_and_invalid_box",
+        "name": "jev_box_sample_rejects_tools_tokens_and_invalid_box",
+        "kind": "function",
+        "path": "src/application/workflow/sample/jev_tests.rs",
+        "span": "L55-L76"
+      },
+      "path": "src/application/workflow/sample/jev_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 58,
+          "text": "let bundle = build(&fixture[\"source\"], DependencySnapshots::default(), vec![]);"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/sample/tests.rs#pure_and_scripted_routing_share_compiled_validation",
+        "name": "pure_and_scripted_routing_share_compiled_validation",
+        "kind": "function",
+        "path": "src/application/workflow/sample/tests.rs",
+        "span": "L77-L123"
+      },
+      "path": "src/application/workflow/sample/tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 80,
+          "text": "DependencySnapshots::default(),"
+        },
+        {
+          "line": 88,
+          "text": "DependencySnapshots::default(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/sample/tests.rs#missing_invalid_unused_and_oversized_scripts_fail_explicitly",
+        "name": "missing_invalid_unused_and_oversized_scripts_fail_explicitly",
+        "kind": "function",
+        "path": "src/application/workflow/sample/tests.rs",
+        "span": "L171-L202"
+      },
+      "path": "src/application/workflow/sample/tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 184,
+          "text": "let pure = build(&source(\"data.map\"), DependencySnapshots::default(), vec![]);"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/sample/tests.rs#bounded_root_budget_and_external_kinds_never_fall_back",
+        "name": "bounded_root_budget_and_external_kinds_never_fall_back",
+        "kind": "function",
+        "path": "src/application/workflow/sample/tests.rs",
+        "span": "L204-L239"
+      },
+      "path": "src/application/workflow/sample/tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 217,
+          "text": "let bundle = build(&source(kind), DependencySnapshots::default(), vec![]);"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/sample/tests.rs#descendants_cannot_replenish_root_budgets_and_report_size_is_bounded",
+        "name": "descendants_cannot_replenish_root_budgets_and_report_size_is_bounded",
+        "kind": "function",
+        "path": "src/application/workflow/sample/tests.rs",
+        "span": "L242-L296"
+      },
+      "path": "src/application/workflow/sample/tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 279,
+          "text": "build(&raw, DependencySnapshots::default(), vec![]),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/sample/tools_tests.rs#protected_step_workflow_tool_needs_approval_and_executes_child",
+        "name": "protected_step_workflow_tool_needs_approval_and_executes_child",
+        "kind": "function",
+        "path": "src/application/workflow/sample/tools_tests.rs",
+        "span": "L114-L153"
+      },
+      "path": "src/application/workflow/sample/tools_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 130,
+          "text": "DependencySnapshots {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/tests/authorization_cases/resources.rs#unresolved_resources_cannot_enter_admission_configuration",
+        "name": "unresolved_resources_cannot_enter_admission_configuration",
+        "kind": "function",
+        "path": "src/application/workflow/tests/authorization_cases/resources.rs",
+        "span": "L5-L49"
+      },
+      "path": "src/application/workflow/tests/authorization_cases/resources.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 15,
+          "text": "publication::DependencySnapshots::default(),"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 28,
+    "baselineChars": 268499
+  }
+}

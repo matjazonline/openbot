@@ -27,28 +27,13 @@ impl AgentPublications for PostgresPersistence {
     }
 
     async fn publish_agent(&self, request: PublishAgent) -> AppResult<PublishedAgentRevision> {
-        let mut tx = begin_authorized(self, request.scope).await?;
-        if let Some(result) = storage::replay_on(&mut tx, &request).await? {
-            tx.commit().await.map_err(write_error)?;
-            return Ok(result);
-        }
-        let draft: i64 =
-            sqlx::query_scalar("SELECT draft_revision FROM agents WHERE company_id=$1 AND id=$2")
-                .bind(request.scope.company.as_uuid())
-                .bind(request.scope.agent.as_uuid())
-                .fetch_one(&mut *tx)
-                .await?;
-        if draft != request.expected_draft_revision.get() as i64
-            || storage::active_on(&mut tx, request.scope).await? != request.expected_active_revision
-        {
-            return Err(conflict());
-        }
-        let (draft, definition) = capture::capture_on(&mut tx, request.scope).await?;
-        if draft != request.expected_draft_revision {
-            return Err(conflict());
-        }
-        let result = storage::insert_revision_on(&mut tx, request.scope, draft, definition).await?;
-        storage::activate_on(&mut tx, &request, &result).await?;
+        let mut tx = self.pool().begin().await?;
+        sqlx::query("SELECT set_config('lock_timeout','1000ms',true),set_config('statement_timeout','5000ms',true)")
+            .execute(&mut *tx).await?;
+        let result = LockedAgentPublication::lock(&mut tx, request.scope)
+            .await?
+            .publish(&request)
+            .await?;
         tx.commit().await.map_err(write_error)?;
         Ok(result)
     }
@@ -107,4 +92,31 @@ impl AgentPublications for PostgresPersistence {
         grants::revoke_on(&mut tx, scope, identity).await?;
         tx.commit().await.map_err(write_error)
     }
+}
+
+pub(super) async fn publish_on(
+    tx: &mut Transaction<'_, Postgres>,
+    request: &PublishAgent,
+) -> AppResult<PublishedAgentRevision> {
+    if let Some(result) = storage::replay_on(tx, request).await? {
+        return Ok(result);
+    }
+    let draft: i64 =
+        sqlx::query_scalar("SELECT draft_revision FROM agents WHERE company_id=$1 AND id=$2")
+            .bind(request.scope.company.as_uuid())
+            .bind(request.scope.agent.as_uuid())
+            .fetch_one(&mut **tx)
+            .await?;
+    if draft != request.expected_draft_revision.get() as i64
+        || storage::active_on(tx, request.scope).await? != request.expected_active_revision
+    {
+        return Err(conflict());
+    }
+    let (draft, definition) = capture::capture_on(tx, request.scope).await?;
+    if draft != request.expected_draft_revision {
+        return Err(conflict());
+    }
+    let result = storage::insert_revision_on(tx, request.scope, draft, definition).await?;
+    storage::activate_on(tx, request, &result).await?;
+    Ok(result)
 }

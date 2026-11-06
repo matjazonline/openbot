@@ -1,0 +1,8 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+
+running 2 tests
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_tests::workflow_tool_typed_errors_reach_the_model_without_fabricated_success ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_tests::workflow_tool_resumes_the_pending_call_after_a_child_human_decision ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 2954 filtered out; finished in 1.37s
+

@@ -47,7 +47,7 @@ impl WorkflowAdmission for PostgresPersistence {
             return Ok(AdmissionResult::Stale);
         }
         authorize_token_reviewers(&mut tx, command).await?;
-        resources::check_readiness(&mut tx, command.binding()).await?;
+        resources::check_readiness(&mut tx, command.binding().as_ref().into()).await?;
         admission_write::create(&mut tx, command, &source).await?;
         if !settle_claim(&mut tx, command, command.proposed_run_id()).await? {
             tx.rollback().await?;

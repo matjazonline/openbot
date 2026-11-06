@@ -85,6 +85,7 @@ async fn workflow_action_approval_old_comment_cannot_attach_to_later_wait() {
 
 pub(super) fn call(setup: &Setup, index: usize) -> HttpToolCall {
     HttpToolCall {
+        origin: crate::application::agent::ToolCallOrigin::Workflow,
         connection: setup.connection.id,
         operation: TypeName::parse("registered.request").unwrap(),
         arguments: json!({"method":"POST","path":"/messages","body":{"message":format!("message-{index}")}}),

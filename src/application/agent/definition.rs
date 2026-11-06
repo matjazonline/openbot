@@ -114,6 +114,7 @@ impl ResolvedAgentDefinition {
                 ));
             }
         }
+        let mut declarations = BTreeSet::new();
         for tool in &self.tools {
             if tool.policy.policy_revision == 0
                 || serde_json::to_vec(tool)
@@ -124,6 +125,11 @@ impl ResolvedAgentDefinition {
                 return Err(invalid("Invalid or oversized agent tool contract"));
             }
             validate_tool_schema(tool)?;
+            if !declarations.insert(super::AgentModelToolName::for_alias(&tool.binding.alias)?) {
+                return Err(invalid(
+                    "Agent aliases produce an ambiguous model function name",
+                ));
+            }
         }
         if serde_json::to_vec(self)
             .map_err(|_| invalid("Invalid agent definition"))?

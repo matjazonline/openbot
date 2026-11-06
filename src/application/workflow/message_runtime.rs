@@ -61,7 +61,7 @@ where
     ) -> AppResult<MessageObservation> {
         let request = self
             .persistence
-            .message_tool_request(tool_scope(fence), call.kind, call.arguments)
+            .message_tool_request(tool_scope(fence), &call)
             .await?;
         let arguments = MessageArguments::parse(call.kind, &request.arguments)?;
         let intent = ActionService::new(self.persistence.clone())

@@ -42,6 +42,7 @@ pub fn validate_knowledge_observation(
 }
 
 pub struct KnowledgeToolCall {
+    pub origin: crate::application::agent::ToolCallOrigin,
     pub call: ModelToolCallId,
     pub arguments: Value,
 }
@@ -103,7 +104,7 @@ pub fn require_knowledge_invocation<'a>(
     if selection.company_id() != fence.scope.company
         || checkpoint.identity.company_id != fence.scope.company.as_uuid()
         || checkpoint.identity.task_id != fence.scope.job.0
-        || checkpoint.identity.agent_id != selection.agent().agent_id
+        || checkpoint.identity.agent_id != selection.agent().agent_id.as_uuid()
     {
         return Err(missing());
     }
@@ -115,26 +116,43 @@ pub fn require_knowledge_invocation<'a>(
         .ok_or_else(missing)?;
     let matching: Vec<_> = tools
         .iter()
-        .filter(|tool| tool.declared == saved.call.tool_id.as_str())
+        .filter(|tool| tool.declared.as_str() == saved.call.tool_id.as_str())
         .collect();
     let [tool] = matching.as_slice() else {
         return Err(missing());
     };
-    if tool.target != AgentToolTarget::Knowledge
+    if call.origin != crate::application::agent::ToolCallOrigin::Agent(tool.origin)
+        || tool.target != AgentToolTarget::Knowledge
         || tool.name.as_str() != SEARCH_KNOWLEDGE
         || tool.input_schema != knowledge_tool_schemas().input
     {
         return Err(missing());
     }
-    let frozen: Vec<_> = selection
+    let snapshot = selection
         .tools()
         .iter()
-        .filter(|tool| tool.contract.name.as_str() == SEARCH_KNOWLEDGE)
-        .collect();
-    let [snapshot] = frozen.as_slice() else {
+        .find(|entry| entry.binding.id == tool.origin.binding)
+        .ok_or_else(missing)?;
+    let expected =
+        crate::application::workflow::agent_contract::AgentSelectionIdentity::from_selection(
+            selection,
+        )
+        .tool_origin(snapshot.binding.id);
+    if tool.origin != expected
+        || !matches!(
+            snapshot.binding.source,
+            crate::entities::agent_capability::AgentBindingSource::Builtin {
+                tool: crate::entities::agent_capability::AgentBuiltinTool::SearchKnowledge
+            }
+        )
+    {
         return Err(missing());
-    };
-    if snapshot.company_id != fence.scope.company || !is_trusted_knowledge_snapshot(snapshot)? {
+    }
+    let contract = crate::application::workflow::agent_contract::agent_action_snapshot(
+        selection.company_id(),
+        snapshot,
+    )?;
+    if !is_trusted_knowledge_snapshot(&contract)? {
         return Err(missing());
     }
     match saved.state {

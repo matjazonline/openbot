@@ -398,8 +398,7 @@ pub trait MessageActionPreparation: Send + Sync {
     async fn message_tool_request(
         &self,
         scope: ActionScope,
-        kind: MessageKind,
-        arguments: Value,
+        call: &MessageToolCall,
     ) -> AppResult<ActionRequest>;
     /// Read-only resolution of destinations and the reply source. Errors are refusals.
     async fn message_routes(
@@ -427,6 +426,7 @@ pub trait MessageDispatch: Send + Sync {
 
 /// A direct agent message tool call (port seam; the agent host is phase 06/08).
 pub struct MessageToolCall {
+    pub origin: crate::application::agent::ToolCallOrigin,
     pub kind: MessageKind,
     pub arguments: Value,
     pub call: ModelToolCallId,

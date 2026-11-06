@@ -1,0 +1,45 @@
+    Checking open_bots v0.1.0 (/Users/mac02/dev/openbot-recovery/.worktrees/autonomous-p03)
+error[E0425]: cannot find value `reviewed` in this scope
+   --> src/adapters/persistence/agent_publication/tools.rs:239:53
+    |
+239 |     let tool: ToolSnapshot = serde_json::from_value(reviewed.snapshot).map_err(|_| invalid())?;
+    |                                                     ^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find type `ConfiguredBinding` in this scope
+   --> src/adapters/persistence/workflow/workflow_tool_calls.rs:47:18
+    |
+ 47 |     binding: Arc<ConfiguredBinding>,
+    |                  ^^^^^^^^^^^^^^^^^
+    |
+   ::: src/application/workflow/lifecycle/contracts.rs:137:1
+    |
+137 | pub struct ConfigureBinding {
+    | --------------------------- similarly named struct `ConfigureBinding` defined here
+    |
+help: a struct with a similar name exists
+    |
+ 47 -     binding: Arc<ConfiguredBinding>,
+ 47 +     binding: Arc<ConfigureBinding>,
+    |
+help: consider importing this struct
+    |
+  6 + use crate::application::workflow::binding::ConfiguredBinding;
+    |
+
+error[E0425]: cannot find value `reviewed` in this scope
+   --> src/adapters/persistence/agent_publication/tools.rs:239:53
+    |
+239 |     let tool: ToolSnapshot = serde_json::from_value(reviewed.snapshot).map_err(|_| invalid())?;
+    |                                                     ^^^^^^^^ not found in this scope
+    |
+note: function `crate::adapters::persistence::workflow::tests::message_tests::ingress_tests::knowledge_e2e::mcp::mcp_fixture::reviewed` exists but is inaccessible
+   --> src/adapters/persistence/workflow/mcp_test_support.rs:264:1
+    |
+264 | fn reviewed() -> Vec<McpDiscoveredTool> {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ not accessible
+
+For more information about this error, try `rustc --explain E0425`.
+error: could not compile `open_bots` (lib) due to 2 previous errors
+warning: build failed, waiting for other jobs to finish...
+error: could not compile `open_bots` (lib test) due to 2 previous errors
+error: `cargo check` failed with status: exit status: 101

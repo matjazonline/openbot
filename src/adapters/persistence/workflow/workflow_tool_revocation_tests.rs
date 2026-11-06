@@ -7,12 +7,11 @@ use crate::application::workflow::{
     activation::ActivationRequest,
     agent::AgentToolObservation,
     children::WorkflowChildren,
-    lifecycle::{LifecycleError, PublicationDependencies, PublicationDirectory},
-    tools::{TOOL_REVOKED, WorkflowToolWrite, WorkflowTools},
+    lifecycle::{PublicationDependencies, PublicationDirectory},
+    tools::{WorkflowToolWrite, WorkflowTools},
 };
 
 use crate::services::test_support::{LlmTurn, register_scripted_agent_base_url, scripted_llm};
-use std::collections::BTreeMap;
 
 use super::workflow_tool_support::*;
 
@@ -42,10 +41,9 @@ async fn child_version(setup: &ToolSetup, parent: ActivationRequest) -> VersionI
 /// Dispatch a call with the bound parent's frozen pin in a new run; it must park.
 async fn parked_call(setup: &ToolSetup, key: &str) -> ActivationRequest {
     let claim = setup.claim(key).await;
-    let call = setup.call(
-        setup.frozen_pin(setup.parent).await,
-        json!({"question": key}),
-    );
+    let call = setup
+        .call(setup.initial_pin(), json!({"question": key}), &claim)
+        .await;
     assert!(matches!(
         setup.dispatch(&claim, &call).await.unwrap(),
         AgentToolObservation::Parked(_)
@@ -63,7 +61,7 @@ async fn delivered(setup: &ToolSetup, scope: ActivationRequest, question: &str) 
         .await
         .unwrap()
         .unwrap();
-    let pin = setup.frozen_pin(setup.parent).await;
+    let pin = setup.initial_pin();
     // The replay matches the saved call by id, so read it back from the call's wait.
     let call: Uuid = sqlx::query_scalar(
         "SELECT child_tool_call_id FROM workflow_waits WHERE run_id=$1 AND child_tool_call_id IS NOT NULL",
@@ -72,7 +70,9 @@ async fn delivered(setup: &ToolSetup, scope: ActivationRequest, question: &str) 
     .fetch_one(p.pool())
     .await
     .unwrap();
-    let mut replay = setup.call(pin, json!({"question": question}));
+    let mut replay = setup
+        .call(pin, json!({"question": question}), &continued)
+        .await;
     replay.call = ToolCallId::new(call);
     let AgentToolObservation::Completed(result) =
         setup.dispatch(&continued, &replay).await.unwrap()
@@ -85,23 +85,45 @@ async fn delivered(setup: &ToolSetup, scope: ActivationRequest, question: &str) 
 
 /// A new run of the bound parent is refused, as for any unavailable dependency.
 async fn refused_admission(setup: &ToolSetup, key: &str) {
-    let refused = setup
+    let roots = async || {
+        sqlx::query_scalar::<_, i64>("SELECT count(*) FROM workflow_runs WHERE company_id=$1")
+            .bind(setup.fixture.target.company.as_uuid())
+            .fetch_one(setup.persistence().pool())
+            .await
+            .unwrap()
+    };
+    let before = roots().await;
+    let error = setup
         .admit(setup.target, TriggerId::new(Uuid::new_v4()), key)
-        .await;
-    assert!(matches!(refused, Err(AppError::NotFound(_))), "{refused:?}");
+        .await
+        .unwrap_err();
+    match &error {
+        AppError::NotFound(_) => {}
+        AppError::BadRequest(message) if message.contains("Selected agent authority") => {}
+        _ => panic!("unexpected admission error: {error:?}"),
+    }
+    assert_eq!(
+        roots().await,
+        before,
+        "a revoked dependency cannot leave a partial run"
+    );
 }
 
 /// A running agent's next call: refused as revoked, with no child.
 async fn refused_call(setup: &ToolSetup, claim: &ClaimedWorkflow) {
-    let call = setup.call(
-        setup.frozen_pin(setup.parent).await,
-        json!({"question": "q"}),
-    );
-    let AgentToolObservation::Completed(refusal) = setup.dispatch(claim, &call).await.unwrap()
+    let llm = scripted_llm(vec![]).await;
+    register_scripted_agent_base_url(setup.agent, &llm.base_url);
+    let WorkflowHandlerOutcome::Completed(Err(failure)) =
+        Box::pin(setup.runtime().execute(&kind(), claim)).await
     else {
-        panic!("a refused call answers at once");
+        panic!("current authority must refuse the agent")
     };
-    assert_eq!(refusal["error"]["code"], TOOL_REVOKED);
+    assert_eq!(failure.failure.code().as_str(), "agent.rejected");
+    assert_eq!(
+        llm.finish().await.unwrap(),
+        0,
+        "a revoked source cannot enter a provider"
+    );
     assert_eq!(
         children(setup.persistence(), claim.fence.scope.run).await,
         0
@@ -166,10 +188,19 @@ async fn workflow_tool_repin_and_archive_leave_published_workflows_on_their_froz
         delivered(&setup, scope, "after-repin").await,
         json!({"choice": "approve", "answer": "after-repin"})
     );
-    // A republish freezes the new pin.
+    // Workflow republication keeps the durable reference; the agent revision owns its pin.
     let republished = publish_parent(&setup.fixture, "republish").await.unwrap();
-    assert_eq!(setup.frozen_pin(republished).await.version_id, v2);
-    // A re-pin between capture and publish refuses that publication.
+    let reference = p
+        .selectable_version(setup.fixture.target.company, republished)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        reference.snapshots().agents[0].agent_id.as_uuid(),
+        setup.agent
+    );
+    assert_eq!(setup.initial_pin().version_id, setup.child);
+    // A registration repin cannot change the durable workflow agent reference.
     let source = registry::example("agent.run").unwrap().source;
     let racing = RepinAfterCapture {
         inner: child_publication::ChildPublicationDirectory {
@@ -185,7 +216,7 @@ async fn workflow_tool_repin_and_archive_leave_published_workflows_on_their_froz
         company: setup.fixture.target.company,
         version: setup.child,
     };
-    let refused = publish_through(
+    let captured = publish_through(
         &setup.fixture,
         setup.fixture.target.workflow,
         "repinned-during-publish",
@@ -193,14 +224,13 @@ async fn workflow_tool_repin_and_archive_leave_published_workflows_on_their_froz
         racing,
     )
     .await;
-    assert!(
-        matches!(
-            refused,
-            Err(LifecycleError::Application(AppError::NotFound(_)))
-        ),
-        "{:?}",
-        refused.err().map(|error| format!("{error:?}"))
-    );
+    let captured = captured.unwrap();
+    let bundle = p
+        .selectable_version(setup.fixture.target.company, captured)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(bundle.snapshots().agents[0].agent_id.as_uuid(), setup.agent);
     assert_eq!(setup.registration().await.version, setup.child);
     // Archiving the pinned workflow does not stop the published parent; a new publication
     // cannot capture it.
@@ -227,131 +257,27 @@ async fn workflow_tool_repin_and_archive_leave_published_workflows_on_their_froz
         delivered(&setup, scope, "after-archive").await["answer"],
         "after-archive"
     );
-    let message = match publish_parent(&setup.fixture, "after-archive").await {
-        Err(LifecycleError::Application(AppError::BadRequest(message))) => message,
-        other => panic!("{:?}", other.err().map(|error| format!("{error:?}"))),
-    };
-    assert!(message.contains("archived or missing"), "{message}");
-}
-
-#[tokio::test]
-async fn workflow_tool_revocation_refuses_new_runs_and_calls_while_parked_calls_deliver() {
-    let setup = Box::pin(ToolSetup::new(echo_child())).await;
-    let p = setup.persistence();
-    let (company, admin) = (setup.fixture.target.company, setup.fixture.target.actor);
-    // F021: admission and its replay hold for a workflow whose agent grants a workflow tool.
-    let trigger = TriggerId::new(Uuid::new_v4());
-    let AdmissionResult::Created(run) = setup.admit(setup.target, trigger, "replay").await.unwrap()
-    else {
-        panic!("admits");
-    };
-    assert_eq!(
-        setup.admit(setup.target, trigger, "replay").await.unwrap(),
-        AdmissionResult::Replayed(run)
-    );
-
-    // A call parked before the revocation, and a running agent that has not called yet.
-    let parked = parked_call(&setup, "parked-before-revoke").await;
-    let running = setup.claim("running-at-revoke").await;
-    setup.revoke().await;
-    refused_admission(&setup, "after-revoke").await;
-    let bindings = BindingService::new(Preflight, p.clone(), p.clone(), p.clone());
-    let target = BindingTarget {
-        company,
-        actor: admin,
-        binding: WorkflowBindingId::new(Uuid::new_v4()),
-    };
-    let readiness = match bindings
-        .configure(ConfigureBinding {
-            target,
-            expected: None,
-            association: RelatedAssociation::Company,
-            version: setup.parent,
-            params: json!({}),
-            resources: BTreeMap::new(),
-            run_as: None,
-            message_trigger: None,
+    publish_parent(&setup.fixture, "after-archive")
+        .await
+        .unwrap();
+    use crate::application::agent::{AgentPublicationScope, AgentPublications};
+    let error = p
+        .preview_agent(AgentPublicationScope {
+            company: setup.fixture.target.company,
+            actor: setup.fixture.target.actor,
+            agent: crate::entities::agent_capability::AgentId::new(setup.agent),
         })
         .await
-    {
-        Err(error) => Err(error),
-        Ok(state) => bindings
-            .activate(SetBindingActivity {
-                target,
-                expected: state.revision,
-            })
-            .await
-            .map(|_| ()),
-    };
+        .err()
+        .expect("a new agent publication cannot freeze an archived draft target");
     assert!(
-        matches!(
-            readiness,
-            Err(LifecycleError::Application(AppError::NotFound(_)))
-        ),
-        "{:?}",
-        readiness.err().map(|error| format!("{error:?}"))
+        matches!(error,AppError::BadRequest(ref message) if message.contains("archived or missing")),
+        "{error:?}"
     );
-    refused_call(&setup, &running).await;
-    setup.cancel(running.fence.scope, "running-at-revoke").await;
-    assert_eq!(
-        delivered(&setup, parked, "parked-before-revoke").await["answer"],
-        "parked-before-revoke"
-    );
-
-    // Registering the name again for the same workflow re-enables the frozen pin.
-    p.register_workflow_tool(
-        company,
-        admin,
-        WorkflowToolWrite {
-            name: TypeName::parse(TOOL).unwrap(),
-            workflow: child_workflow(),
-            version: setup.child,
-            params: json!({"reviewer": setup.reviewer.to_string()}),
-            expected: None,
-        },
-    )
-    .await
-    .unwrap();
-    assert!(matches!(
-        setup
-            .admit(
-                setup.target,
-                TriggerId::new(Uuid::new_v4()),
-                "re-registered"
-            )
-            .await
-            .unwrap(),
-        AdmissionResult::Created(_)
-    ));
-
-    // F025/F026: pointing the name at another workflow refuses the old pin like a revocation.
-    let other = WorkflowId::new(Uuid::from_u128(CHILD + 1));
-    let other_version = setup.fixture.publish_workflow(other, echo_child()).await;
-    let parked = parked_call(&setup, "parked-before-repoint").await;
-    let running = setup.claim("running-at-repoint").await;
-    setup.repin(other, other_version).await;
-    refused_admission(&setup, "after-repoint").await;
-    refused_call(&setup, &running).await;
-    setup
-        .cancel(running.fence.scope, "running-at-repoint")
-        .await;
-    assert_eq!(
-        delivered(&setup, parked, "parked-before-repoint").await["answer"],
-        "parked-before-repoint"
-    );
-
-    // Back on the same workflow at another version: the next call runs the frozen version.
-    let v2 = publish_child(
-        &setup.fixture,
-        child_workflow(),
-        echo_child_v2(),
-        "child-v2",
-    )
-    .await;
-    setup.repin(child_workflow(), v2).await;
-    let scope = parked_call(&setup, "after-repin").await;
-    assert_eq!(child_version(&setup, scope).await, setup.child);
 }
+
+#[path = "workflow_tool_current_authority_tests.rs"]
+mod current_authority;
 
 /// F024: a stored child bundle is held to the run rule, not the publication rule. A new parent of
 /// the agent workflow publishes, admits and runs it after the tool was re-pinned, and the
@@ -388,14 +314,15 @@ async fn workflow_tool_stored_children_keep_their_frozen_pin_until_the_tool_is_r
         .unwrap()
         .unwrap();
     let stored = &bundle.children()[&setup.parent];
-    let pin = stored
-        .snapshots()
-        .tools
-        .iter()
-        .find_map(|tool| (tool.contract.name.as_str() == TOOL).then(|| tool.workflow.clone()))
-        .flatten()
-        .unwrap();
-    assert_eq!(pin.version_id, setup.child);
+    assert_eq!(stored.snapshots().agents[0].agent_id.as_uuid(), setup.agent);
+    assert!(
+        stored
+            .snapshots()
+            .tools
+            .iter()
+            .all(|tool| tool.contract.name.as_str() != TOOL)
+    );
+    assert!(stored.children().is_empty());
 
     // It binds and admits, and its child's agent calls the tool from inside the child run.
     let target = Box::pin(bound(&setup.fixture, outer)).await;
@@ -439,23 +366,29 @@ async fn workflow_tool_stored_children_keep_their_frozen_pin_until_the_tool_is_r
     assert_eq!(llm.finish().await.unwrap(), 2);
     assert_eq!(children(p, agent.run).await, 1);
 
-    // Once the tool is revoked, no new parent can pin the stored workflow.
+    // Publication still references the historical child; admission must check its agent closure.
     setup.revoke().await;
-    let refused = setup
+    let version = VersionId::new(Uuid::new_v4());
+    setup
         .fixture
         .publish_source(
             &setup.fixture.service(),
             WorkflowId::new(Uuid::from_u128(0x0a02)),
             caller(0x0a02).to_string(),
-            VersionId::new(Uuid::new_v4()),
+            version,
         )
-        .await;
+        .await
+        .unwrap();
+    let target = Box::pin(bound(&setup.fixture, version)).await;
     assert!(
-        matches!(
-            refused,
-            Err(LifecycleError::Application(AppError::NotFound(_)))
-        ),
-        "{:?}",
-        refused.err().map(|error| format!("{error:?}"))
+        setup
+            .admit(
+                target,
+                TriggerId::new(Uuid::new_v4()),
+                "revoked-stored-agent"
+            )
+            .await
+            .is_err()
     );
+    assert_eq!(children(p, agent.run).await, 1);
 }

@@ -43,6 +43,7 @@ fn reconciliation_is_offered_as_an_annotation_and_a_step_shows_usage_and_receipt
 
     let hostile = format!("<{}>alert(1)</script>", "script");
     let step_view = StepView {
+        agent: None,
         payload_restricted: false,
         execution: Uuid::new_v4(),
         step: "lookup".into(),

@@ -368,6 +368,7 @@ pub trait AssistantChannels: Send + Sync {
 /// One saved model call of a provisioning tool.
 #[derive(Debug, Clone)]
 pub struct ProvisioningToolCall {
+    pub origin: crate::application::agent::ToolCallOrigin,
     pub kind: ProvisioningKind,
     pub arguments: Value,
     pub call: ModelToolCallId,
@@ -379,8 +380,7 @@ pub trait ProvisioningPreparation: Send + Sync {
     async fn provisioning_tool_request(
         &self,
         scope: ActionScope,
-        kind: ProvisioningKind,
-        arguments: Value,
+        call: &ProvisioningToolCall,
     ) -> AppResult<ActionRequest>;
 }
 
@@ -426,8 +426,7 @@ impl<P: ProvisioningPreparation + ActionIntents + Clone, D: ActionDispatch>
             .persistence
             .provisioning_tool_request(
                 crate::application::workflow::message::tool_scope(fence),
-                call.kind,
-                call.arguments,
+                &call,
             )
             .await?;
         let intent = ActionService::new(self.persistence.clone())

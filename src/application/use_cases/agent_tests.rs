@@ -127,6 +127,7 @@ impl LibraryAgentCopyPersistence for MockAgentPersistence {
     async fn create_agent_from_library(
         &self,
         company_id: Uuid,
+        _actor: crate::application::workflow::WorkflowActor,
         _library_agent_id: Uuid,
         agent: AgentWrite,
     ) -> AppResult<Agent> {

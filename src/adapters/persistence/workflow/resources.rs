@@ -41,13 +41,30 @@ impl ResourceDirectory for PostgresPersistence {
     }
 }
 
+pub(super) struct ReadinessSelection<'a> {
+    pub company: CompanyId,
+    pub bundle: &'a PublishedBundle,
+    pub resources:
+        &'a std::collections::BTreeMap<crate::domain::workflow::ResourceName, RuntimeResourceId>,
+}
+
+impl<'a> From<&'a binding::ConfiguredBinding> for ReadinessSelection<'a> {
+    fn from(binding: &'a binding::ConfiguredBinding) -> Self {
+        Self {
+            company: binding.company_id(),
+            bundle: binding.bundle(),
+            resources: binding.resources(),
+        }
+    }
+}
+
 pub(super) async fn check_readiness(
     tx: &mut Transaction<'_, Postgres>,
-    configuration: &binding::ConfiguredBinding,
+    configuration: ReadinessSelection<'_>,
 ) -> AppResult<()> {
-    let company = configuration.company_id();
-    let definition = configuration.bundle().compiled().graph().definition();
-    for tool in &configuration.bundle().snapshots().tools {
+    let company = configuration.company;
+    let definition = configuration.bundle.compiled().graph().definition();
+    for tool in &configuration.bundle.snapshots().tools {
         let slot = match tool.kind() {
             ToolKind::Message => {
                 authority::builtin_message_tool(tool)?;
@@ -79,7 +96,7 @@ pub(super) async fn check_readiness(
             ToolKind::Slot(slot) => slot,
         };
         let id = configuration
-            .resources()
+            .resources
             .get(slot)
             .ok_or_else(missing)?
             .as_uuid();
@@ -100,30 +117,32 @@ pub(super) async fn check_readiness(
         }
     }
     for requirement in &configuration
-        .bundle()
+        .bundle
         .compiled()
         .graph()
         .definition()
         .resources
     {
-        let id = configuration.resources()[&requirement.slot];
-        let status = inspect_on(tx, configuration.company_id(), id)
+        let id = *configuration
+            .resources
+            .get(&requirement.slot)
+            .ok_or_else(missing)?;
+        let status = inspect_on(tx, configuration.company, id)
             .await?
             .ok_or_else(missing)?;
-        validate_resource(configuration.company_id(), id, requirement, &status)?;
+        validate_resource(configuration.company, id, requirement, &status)?;
     }
-    jev_binding_models(tx, configuration).await
+    jev_binding_models(tx, &configuration).await
 }
 
 async fn jev_binding_models(
     tx: &mut Transaction<'_, Postgres>,
-    configuration: &binding::ConfiguredBinding,
+    configuration: &ReadinessSelection<'_>,
 ) -> AppResult<()> {
-    for (slot, models) in
-        crate::application::workflow::jev::required_models(configuration.bundle())?
+    for (slot, models) in crate::application::workflow::jev::required_models(configuration.bundle)?
     {
-        let id = configuration.resources().get(&slot).ok_or_else(missing)?;
-        let connection = jev::connection_on(tx, configuration.company_id(), id.as_uuid())
+        let id = configuration.resources.get(&slot).ok_or_else(missing)?;
+        let connection = jev::connection_on(tx, configuration.company, id.as_uuid())
             .await?
             .ok_or_else(jev::revoked)?;
         if !connection.enabled || !models.is_subset(&connection.models) {

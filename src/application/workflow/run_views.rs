@@ -135,7 +135,18 @@ pub struct Attempt {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+pub struct SelectedAgentSummary {
+    pub agent_id: crate::entities::agent_capability::AgentId,
+    pub revision_id: crate::entities::agent_capability::AgentRevisionId,
+    pub key: String,
+    pub model: String,
+    pub tools: Vec<String>,
+    pub skills: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub struct StepView {
+    pub agent: Option<SelectedAgentSummary>,
     pub payload_restricted: bool,
     pub execution: Uuid,
     pub step: String,
@@ -204,6 +215,7 @@ impl StepView {
             return;
         }
         self.payload_restricted = true;
+        self.agent = None;
         self.frozen_inputs = None;
         self.committed_output = None;
         self.frozen_choice = None;

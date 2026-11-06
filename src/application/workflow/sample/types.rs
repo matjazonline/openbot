@@ -8,9 +8,10 @@ pub(super) const MAX_DEPTH: usize = 8;
 pub(super) const MAX_TOOL_CALLS: usize = 64;
 
 /// Only inert data crosses the sample boundary. No production binding or continuation is accepted.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct SampleRequest {
+    pub agents: Vec<crate::application::agent::ResolvedAgentDefinition>,
     pub input: Value,
     pub params: Value,
     #[serde(default)]

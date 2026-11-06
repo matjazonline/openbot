@@ -686,22 +686,14 @@ pub(super) fn selected(mut response: Response) -> Response {
     response
 }
 
-/// The agent a model step ran, by the handle its frozen inputs name, from the run's bundle.
-fn frozen_agent<'a>(
-    bundle: &'a crate::application::workflow::publication::PublishedBundle,
-    step: &StepView,
-) -> Option<pages::FrozenAgentView<'a>> {
-    let handle = step.frozen_inputs.as_ref()?.get("agent")?.as_str()?;
-    let agent = bundle
-        .snapshots()
-        .agents
-        .iter()
-        .find(|agent| agent.key.as_str() == handle)?;
+/// The step read already applied a fresh viewer check to its run-selected summary.
+fn frozen_agent(step: &StepView) -> Option<pages::FrozenAgentView<'_>> {
+    let agent = step.agent.as_ref()?;
     Some(pages::FrozenAgentView {
-        handle: agent.key.as_str(),
-        model: format!("{} / {}", agent.model.provider.as_str(), agent.model.model),
-        tools: agent.tools.iter().map(|tool| tool.as_str()).collect(),
-        skills: agent.skills.iter().map(|skill| skill.as_str()).collect(),
+        handle: &agent.key,
+        model: agent.model.clone(),
+        tools: agent.tools.iter().map(String::as_str).collect(),
+        skills: agent.skills.iter().map(String::as_str).collect(),
     })
 }
 
@@ -727,15 +719,7 @@ async fn step(
         )
         .await?
         .ok_or_else(|| AppError::NotFound("Workflow step not found".into()))?;
-    let bundle = ui
-        .engine
-        .run_views()
-        .run_bundle(company_id, RunId::new(run))
-        .await?;
-    let agent = bundle
-        .as_deref()
-        .filter(|_| !step.payload_restricted)
-        .and_then(|bundle| frozen_agent(bundle, &step));
+    let agent = frozen_agent(&step);
     Ok(Html(pages::run_step_body(&pages::StepBodyView {
         company_id: company,
         step: &step,

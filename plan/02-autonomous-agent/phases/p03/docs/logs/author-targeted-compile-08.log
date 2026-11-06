@@ -1,0 +1,40 @@
+   Compiling open_bots v0.1.0 (/Users/mac02/dev/openbot-recovery/.worktrees/autonomous-p03)
+error[E0369]: binary operation `==` cannot be applied to type `Vec<application::workflow::publication::types::ToolSnapshot>`
+   --> src/adapters/persistence/workflow/provisioning_dispatch_tests.rs:863:5
+    |
+863 |     assert_eq!(snapshots.tools,vec![mcp]);
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |     |
+    |     Vec<application::workflow::publication::types::ToolSnapshot>
+    |     Vec<application::workflow::publication::types::ToolSnapshot>
+    |
+note: an implementation of `PartialEq` might be missing for `application::workflow::publication::types::ToolSnapshot`
+   --> src/application/workflow/publication/types.rs:42:1
+    |
+ 42 | pub struct ToolSnapshot {
+    | ^^^^^^^^^^^^^^^^^^^^^^^ must implement `PartialEq`
+help: consider annotating `application::workflow::publication::types::ToolSnapshot` with `#[derive(PartialEq)]`
+   --> src/application/workflow/publication/types.rs:42:1
+    |
+ 42 + #[derive(PartialEq)]
+ 43 | pub struct ToolSnapshot {
+    |
+
+error[E0277]: `application::workflow::publication::types::ToolSnapshot` doesn't implement `std::fmt::Debug`
+   --> src/adapters/persistence/workflow/provisioning_dispatch_tests.rs:863:5
+    |
+863 |     assert_eq!(snapshots.tools,vec![mcp]);
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ unsatisfied trait bound
+    |
+help: the trait `std::fmt::Debug` is not implemented for `application::workflow::publication::types::ToolSnapshot`
+   --> src/application/workflow/publication/types.rs:42:1
+    |
+ 42 | pub struct ToolSnapshot {
+    | ^^^^^^^^^^^^^^^^^^^^^^^
+    = note: add `#[derive(Debug)]` to `application::workflow::publication::types::ToolSnapshot` or manually `impl std::fmt::Debug for application::workflow::publication::types::ToolSnapshot`
+help: the trait `std::fmt::Debug` is implemented for `Vec<T, A>`
+   --> /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/mod.rs:4242:0
+
+Some errors have detailed explanations: E0277, E0369.
+For more information about an error, try `rustc --explain E0277`.
+error: could not compile `open_bots` (lib test) due to 3 previous errors

@@ -98,7 +98,8 @@ async fn run_sample(
         serde_json::from_str(raw)
             .map_err(|error| AppError::BadRequest(format!("Invalid sample JSON: {error}")))
     };
-    let request = SampleRequest {
+    let mut request = SampleRequest {
+        agents: vec![],
         input: parse(&inputs.input)?,
         params: parse(&inputs.params)?,
         scripts: serde_json::from_str(&inputs.scripts)
@@ -115,5 +116,22 @@ async fn run_sample(
         &mcp,
     )
     .await?;
+    let actor = ui.actor()?;
+    for agent in bundle.frozen_agent_ids() {
+        let scope = crate::application::agent::AgentPublicationScope {
+            company: super::company(company),
+            actor,
+            agent: crate::entities::agent_capability::AgentId::new(agent),
+        };
+        let revision = ui
+            .engine
+            .agent_publications()
+            .active_agent_revision(scope)
+            .await?
+            .ok_or_else(|| {
+                AppError::BadRequest("A sample agent has no active published revision".into())
+            })?;
+        request.agents.push(revision.definition);
+    }
     Ok(ui.engine.sample(bundle, request)?)
 }

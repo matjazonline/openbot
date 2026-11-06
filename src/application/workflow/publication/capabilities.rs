@@ -1,132 +1,157 @@
-//! Frozen agent capabilities (06-D5): exactly the agent's saved tools and skills, in
-//! saved order. Nothing at a step, classifier or skill can add or replace them. Current
-//! revocation is a separate execution-time check, never a source of new grants.
+//! Workflows retain identities; execution resolves one immutable revision from its run manifest.
 use super::*;
 use crate::app_error::{AppError, AppResult};
-use crate::application::agent::{AgentKey, SkillSnapshot};
-use serde::Serialize;
+use crate::application::agent::{
+    AgentKey, PublishedAgentRevision, ResolvedAgentDefinition, ResolvedAgentSkill,
+    ResolvedAgentTool,
+};
+use crate::entities::agent_capability::DependencyManifestId;
+use std::collections::BTreeMap;
 
-/// Constructed only from a validated publication. Serialized content is trace
-/// data, not a permission token; execution must recheck current authority.
-#[derive(Clone, Serialize)]
+#[derive(Clone)]
 pub struct ResolvedAgent {
-    company_id: CompanyId,
-    agent: AgentSnapshot,
-    tools: Vec<ToolSnapshot>,
-    skills: Vec<SkillSnapshot>,
+    manifest: DependencyManifestId,
+    revision: PublishedAgentRevision,
+    mode: AgentUseMode,
 }
 
 impl ResolvedAgent {
+    pub fn from_revision(
+        manifest: DependencyManifestId,
+        revision: PublishedAgentRevision,
+    ) -> AppResult<Self> {
+        if manifest.as_uuid().is_nil()
+            || revision.id.as_uuid().is_nil()
+            || revision.definition.content_hash()? != revision.digest
+        {
+            return Err(AppError::Internal("Invalid selected agent revision".into()));
+        }
+        Ok(Self {
+            manifest,
+            revision,
+            mode: AgentUseMode::Tools,
+        })
+    }
     pub fn company_id(&self) -> CompanyId {
-        self.company_id
+        self.revision.definition.company_id
     }
-    pub fn agent(&self) -> &AgentSnapshot {
-        &self.agent
+    pub fn agent(&self) -> &ResolvedAgentDefinition {
+        &self.revision.definition
     }
-    pub fn tools(&self) -> &[ToolSnapshot] {
-        &self.tools
+    pub fn revision(&self) -> &PublishedAgentRevision {
+        &self.revision
     }
-    pub fn skills(&self) -> &[SkillSnapshot] {
-        &self.skills
+    pub fn manifest_id(&self) -> DependencyManifestId {
+        self.manifest
     }
-    /// The same frozen agent with no tools or skills, for tool-free model steps
-    /// (`ai.classify`, `decision.agent`; 06-D6 C/D). Narrowing only: the prepared document
-    /// then records no capability, so current authority checks only agent and model.
+    pub fn mode(&self) -> AgentUseMode {
+        self.mode
+    }
+    pub fn tools(&self) -> &[ResolvedAgentTool] {
+        if self.mode == AgentUseMode::ModelOnly {
+            &[]
+        } else {
+            &self.revision.definition.tools
+        }
+    }
+    pub fn skills(&self) -> &[ResolvedAgentSkill] {
+        if self.mode == AgentUseMode::ModelOnly {
+            &[]
+        } else {
+            &self.revision.definition.skills
+        }
+    }
     pub fn model_only(mut self) -> Self {
-        self.agent.tools.clear();
-        self.agent.skills.clear();
-        self.tools.clear();
-        self.skills.clear();
+        self.mode = AgentUseMode::ModelOnly;
         self
     }
 }
 
 impl PublishedBundle {
-    /// The frozen agent with exactly its saved tools and skills. Publication already
-    /// validated every reference and each skill's required tools against these tools.
-    pub fn resolve_agent(&self, company: CompanyId, key: &AgentKey) -> AppResult<ResolvedAgent> {
+    pub fn agent_reference(
+        &self,
+        company: CompanyId,
+        key: &AgentKey,
+    ) -> AppResult<&AgentReference> {
         if company != self.company_id {
-            return Err(AppError::NotFound("Agent bundle".into()));
+            return Err(AppError::NotFound("Agent reference".into()));
         }
-        let saved = self
-            .snapshots
+        self.snapshots
             .agents
             .iter()
             .find(|agent| &agent.key == key)
-            .ok_or_else(|| AppError::BadRequest("Agent is absent from the frozen bundle".into()))?;
-        validation::check_selection(&saved.tools, &saved.skills, &self.snapshots)
-            .map_err(AppError::BadRequest)?;
-        let tools = saved
-            .tools
-            .iter()
-            .map(|name| {
-                self.snapshots
-                    .tools
-                    .iter()
-                    .find(|tool| &tool.contract.name == name)
-                    .cloned()
-                    .ok_or_else(|| AppError::BadRequest("Agent tool is not frozen".into()))
+            .ok_or_else(|| {
+                AppError::BadRequest("Agent is outside the published reference universe".into())
             })
-            .collect::<AppResult<_>>()?;
-        let skills = saved
-            .skills
-            .iter()
-            .map(|name| {
-                self.snapshots
-                    .skills
-                    .iter()
-                    .find(|skill| &skill.name == name)
-                    .cloned()
-                    .ok_or_else(|| AppError::BadRequest("Agent skill is not frozen".into()))
-            })
-            .collect::<AppResult<_>>()?;
-        Ok(ResolvedAgent {
-            company_id: company,
-            agent: saved.clone(),
-            tools,
-            skills,
-        })
     }
 }
 
-/// The finite set of agent keys a draft's `agent.run`/`decision.agent` steps can select
-/// (06-D5): a literal key, or a `/params/<name>` reference whose declared parameter schema
-/// is a finite string enum. Any other selector is refused, so capture never guesses.
-pub fn agent_universe(decoded: &compiler::DecodedSource) -> Result<Vec<AgentKey>, String> {
+/// Every declared candidate and its actual source uses, independently of the first branch run.
+pub fn agent_reference_uses(
+    decoded: &compiler::DecodedSource,
+) -> Result<BTreeMap<AgentKey, Vec<AgentReferenceUse>>, String> {
     let parsed = compiler::parse_workflow(decoded, VersionId::new(uuid::Uuid::nil()))
         .map_err(|diagnostic| diagnostic.message.into_string())?;
-    let definition = &parsed.definition;
-    let mut keys = std::collections::BTreeSet::new();
+    reference_uses(&parsed.definition)
+}
+
+pub(super) fn reference_uses(
+    definition: &crate::domain::workflow::WorkflowDefinition,
+) -> Result<BTreeMap<AgentKey, Vec<AgentReferenceUse>>, String> {
+    let mut references: BTreeMap<AgentKey, Vec<AgentReferenceUse>> = BTreeMap::new();
     for (id, step) in &definition.steps {
-        if crate::application::workflow::registry::ModelStep::of(step.step_type.as_str()).is_none()
-        {
+        let Some(kind) =
+            crate::application::workflow::registry::ModelStep::of(step.step_type.as_str())
+        else {
             continue;
-        }
+        };
+        let mode = if kind == crate::application::workflow::registry::ModelStep::AgentRun {
+            AgentUseMode::Tools
+        } else {
+            AgentUseMode::ModelOnly
+        };
         let refused =
             || format!("Step {id}: dynamic agent selection requires a finite set of agent keys");
-        match step.inputs.get("agent") {
+        let options = match step.inputs.get("agent") {
             Some(crate::domain::workflow::Binding::Literal(Value::String(key))) => {
-                keys.insert(key.clone());
+                vec![key.clone()]
             }
             Some(crate::domain::workflow::Binding::Reference(reference))
                 if reference.root_name() == "params" && reference.tail().len() == 1 =>
             {
-                let options = definition
+                definition
                     .parameter_schema
                     .as_ref()
                     .and_then(|schema| {
                         schema["properties"][&reference.tail()[0]]["enum"].as_array()
                     })
-                    .filter(|options| !options.is_empty())
-                    .ok_or_else(refused)?;
-                for option in options {
-                    keys.insert(option.as_str().ok_or_else(refused)?.to_owned());
-                }
+                    .filter(|options| !options.is_empty() && options.len() <= MAX_DEPENDENCIES)
+                    .ok_or_else(refused)?
+                    .iter()
+                    .map(|option| option.as_str().map(str::to_owned).ok_or_else(refused))
+                    .collect::<Result<Vec<_>, _>>()?
             }
             _ => return Err(refused()),
+        };
+        for option in options {
+            let key =
+                AgentKey::parse(&option).ok_or_else(|| format!("Invalid agent key {option}"))?;
+            let uses = references.entry(key).or_default();
+            let source = AgentReferenceUse {
+                step: id.clone(),
+                mode,
+            };
+            if !uses.contains(&source) {
+                uses.push(source);
+            }
+            if references.len() > MAX_DEPENDENCIES {
+                return Err("Agent reference universe exceeds 256 selections".into());
+            }
         }
     }
-    keys.into_iter()
-        .map(|key| AgentKey::parse(&key).ok_or_else(|| format!("Invalid agent key {key}")))
-        .collect()
+    Ok(references)
+}
+
+pub fn agent_universe(decoded: &compiler::DecodedSource) -> Result<Vec<AgentKey>, String> {
+    Ok(agent_reference_uses(decoded)?.into_keys().collect())
 }

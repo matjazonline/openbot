@@ -66,7 +66,7 @@ impl WorkflowBinding<'_> {
             .tools()
             .iter()
             .map(|tool| ToolDefinition {
-                name: tool.declared.clone(),
+                name: tool.declared.as_str().to_owned(),
                 description: match tool.target {
                     crate::application::workflow::agent::AgentToolTarget::Knowledge => {
                         crate::application::workflow::knowledge::KNOWLEDGE_TOOL_DESCRIPTION.into()
@@ -334,7 +334,7 @@ where
                 provider: &selection.model.provider.as_str().into(),
                 model: &selection.model.model.as_str().into(),
                 secret: &launch.secret,
-                endpoint: endpoint(selection.agent_id).as_deref(),
+                endpoint: endpoint(selection.agent_id.as_uuid()).as_deref(),
             })
             .map_err(|_| invalid("Rig model configuration unavailable"))?;
         let secret = launch.secret.expose_secret();

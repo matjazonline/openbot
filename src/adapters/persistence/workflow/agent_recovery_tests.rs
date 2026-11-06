@@ -409,6 +409,71 @@ async fn workflow_agent_run_unanswered_effect_is_terminal_and_reconciled() {
 /// effect; lease expiry then reconciles instead of granting a retry that could repeat it.
 #[tokio::test]
 async fn workflow_agent_run_crash_during_effect_is_indeterminate_and_reconciled() {
+    unknown_effect_after_revocation(None).await;
+}
+
+#[tokio::test]
+async fn autonomous_agent_recovery_binding_revocation_preserves_unknown_effect() {
+    unknown_effect_after_revocation(Some(PendingRevocation::Binding)).await;
+}
+
+#[tokio::test]
+async fn autonomous_agent_recovery_model_removal_preserves_unknown_effect() {
+    unknown_effect_after_revocation(Some(PendingRevocation::Model)).await;
+}
+
+enum PendingRevocation {
+    Binding,
+    Model,
+}
+
+async fn revoke_pending(setup: &AgentSetup, revoke: PendingRevocation) {
+    use crate::application::agent::{AgentGrantIdentity, AgentPublicationScope, AgentPublications};
+    let p = &setup.fixture.persistence;
+    let scope = AgentPublicationScope {
+        company: setup.fixture.target.company,
+        actor: setup.fixture.target.actor,
+        agent: crate::entities::agent_capability::AgentId::new(setup.agent),
+    };
+    match revoke {
+        PendingRevocation::Binding => {
+            let revision = p.active_agent_revision(scope).await.unwrap().unwrap();
+            p.revoke_agent_grant(
+                scope,
+                AgentGrantIdentity::Binding(revision.definition.tools[0].binding.id),
+            )
+            .await
+            .unwrap();
+        }
+        PendingRevocation::Model => {
+            // Removing a model is permitted once the mutable draft no longer uses it;
+            // this must not change the admitted revision or erase its pending effect.
+            AgentPersistence::update(
+                p,
+                setup.agent,
+                AgentWrite {
+                    name: "Assistant".into(),
+                    slug: "assistant".into(),
+                    provider: None,
+                    model: None,
+                    ..Default::default()
+                },
+            )
+            .await
+            .unwrap();
+            CompanyPersistence::replace_model_connections_for_user(
+                p,
+                scope.actor.user_id(),
+                scope.company.as_uuid(),
+                vec![],
+            )
+            .await
+            .unwrap();
+        }
+    }
+}
+
+async fn unknown_effect_after_revocation(revoke: Option<PendingRevocation>) {
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let origin = format!("http://{}", listener.local_addr().unwrap());
     let setup = Box::pin(agent_setup(&origin)).await;
@@ -432,6 +497,9 @@ async fn workflow_agent_run_crash_during_effect_is_indeterminate_and_reconciled(
     crash_at(&runtime, &setup.claim, arrival).await;
     let p = &setup.fixture.persistence;
     let scope = setup.claim.fence.scope;
+    if let Some(revoke) = revoke {
+        revoke_pending(&setup, revoke).await;
+    }
     let duplicate = Box::pin(runtime.execute(&kind(), &setup.claim)).await;
     let failure = duplicate.completed_result().unwrap_err().failure;
     assert_eq!(failure.code().as_str(), "agent.effect_unknown");
@@ -453,6 +521,7 @@ async fn workflow_agent_run_crash_during_effect_is_indeterminate_and_reconciled(
     assert_eq!(dispatches(p, scope.run).await, 1);
     assert_eq!(llm.finish().await.unwrap(), 1);
     server.abort();
+    let _ = server.await;
 }
 
 /// F019(i): a parameter-enum agent selector captures every listed agent at publication and
@@ -500,6 +569,9 @@ async fn workflow_agent_run_dynamic_selection_runs_the_bound_agent() {
     )
     .await
     .unwrap();
+    for agent in &agents {
+        fixture.publish_agent(*agent).await;
+    }
     let definitions = DefinitionService::new(
         Preflight,
         p.clone(),
@@ -522,11 +594,17 @@ async fn workflow_agent_run_dynamic_selection_runs_the_bound_agent() {
     definitions.save(draft).await.unwrap();
     let publication = fixture.publish();
     definitions.publish(publication.clone()).await.unwrap();
-    let frozen: Vec<String> = sqlx::query_scalar("SELECT DISTINCT agent->>'key' FROM workflow_versions AS version, jsonb_array_elements((convert_from(version.bundle,'UTF8')::jsonb)->'versions') AS stored, jsonb_array_elements(stored->'snapshots'->'agents') AS agent WHERE version.id=$1 ORDER BY 1")
-        .bind(publication.version.as_uuid())
-        .fetch_all(p.pool())
+    let published = p
+        .selectable_version(company, publication.version)
         .await
+        .unwrap()
         .unwrap();
+    let frozen: Vec<_> = published
+        .snapshots()
+        .agents
+        .iter()
+        .map(|agent| agent.key.as_str())
+        .collect();
     assert_eq!(
         frozen,
         vec!["sales", "support"],

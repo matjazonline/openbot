@@ -1,7 +1,7 @@
 use super::*;
 use crate::adapters::workflow_source::decode;
 use crate::application::agent::{
-    ActionEffect, ActionRecovery, AgentKey, ApprovedActionPolicy, ModelSettings, SkillSnapshot,
+    ActionEffect, ActionRecovery, AgentKey, ApprovedActionPolicy, ModelSettings,
 };
 use crate::domain::workflow::{ResourceName, RunId, RunMetadata, TypeName, WorkflowId};
 use uuid::Uuid;
@@ -24,11 +24,23 @@ fn name(value: &str) -> TypeName {
 fn source(kind: &str) -> Value {
     serde_json::from_str(&registry::example(kind).unwrap().source).unwrap()
 }
-fn agent() -> AgentSnapshot {
-    AgentSnapshot {
-        agent_id: uuid::Uuid::from_u128(1),
+fn agent() -> AgentReference {
+    AgentReference {
+        agent_id: crate::entities::agent_capability::AgentId::new(Uuid::from_u128(1)),
         company_id: company(),
         key: AgentKey::parse("assistant").unwrap(),
+        uses: vec![AgentReferenceUse {
+            step: StepId::parse("start").unwrap(),
+            mode: AgentUseMode::Tools,
+        }],
+    }
+}
+
+fn definition() -> crate::application::agent::ResolvedAgentDefinition {
+    crate::application::agent::ResolvedAgentDefinition {
+        company_id: company(),
+        agent_id: agent().agent_id,
+        key: agent().key,
         instructions: "Answer using the supplied context".into(),
         model: ModelSettings {
             provider: name("test"),
@@ -39,13 +51,45 @@ fn agent() -> AgentSnapshot {
         skills: vec![],
     }
 }
+
+fn resolved(
+    definition: crate::application::agent::ResolvedAgentDefinition,
+) -> crate::app_error::AppResult<ResolvedAgent> {
+    use crate::application::agent::PublishedAgentRevision;
+    use crate::entities::agent_capability::{
+        AgentDraftRevision, AgentRevisionId, DependencyManifestId,
+    };
+    let digest = definition.content_hash()?;
+    ResolvedAgent::from_revision(
+        DependencyManifestId::new(Uuid::from_u128(90)),
+        PublishedAgentRevision {
+            id: AgentRevisionId::new(Uuid::from_u128(91)),
+            draft_revision: AgentDraftRevision::new(1).unwrap(),
+            definition,
+            digest,
+        },
+    )
+}
 fn snapshots() -> DependencySnapshots {
     DependencySnapshots {
         agents: vec![agent()],
         ..Default::default()
     }
 }
-fn build(source: &Value, snapshots: DependencySnapshots) -> Result<PublishedBundle, Diagnostic> {
+fn build(
+    source: &Value,
+    mut snapshots: DependencySnapshots,
+) -> Result<PublishedBundle, Diagnostic> {
+    // Fixture uses follow authored source; malformed-reference tests call freeze directly.
+    if let Ok(decoded) = decode(&source.to_string())
+        && let Ok(uses) = agent_reference_uses(&decoded)
+    {
+        for reference in &mut snapshots.agents {
+            if let Some(usage) = uses.get(&reference.key) {
+                reference.uses = usage.clone();
+            }
+        }
+    }
     freeze(
         decode(&source.to_string())?,
         company(),
@@ -69,53 +113,49 @@ fn tool_snapshot(kind: &str) -> ToolSnapshot {
 }
 
 #[test]
-fn workflow_publication_freezes_agents_skills_and_hashes() {
+fn autonomous_agent_workflow_reference_hashes_identity_and_step_tools_without_behavior() {
     let source = source("agent.run");
-    let mut facts = snapshots();
-    facts.tools.push(tool_snapshot("tool.call"));
-    facts.skills.push(SkillSnapshot {
-        company_id: company(),
-        skill_id: Uuid::from_u128(11),
-        name: name("support"),
-        instructions: "Follow the support policy".into(),
-        required_tools: vec![name("lookup")],
-    });
-    facts.agents[0].tools.push(name("lookup"));
-    facts.agents[0].skills.push(name("support"));
+    let facts = snapshots();
     let original = build(&source, facts.clone()).unwrap();
-    let original_manifest = original.manifest().clone();
-    let identical = build(&source, facts.clone()).unwrap();
-    assert_eq!(original.content_hash(), identical.content_hash());
-    for edit in 0..5 {
-        let mut changed = facts.clone();
-        match edit {
-            0 => changed.agents[0].instructions.push_str(" updated"),
-            1 => changed.skills[0].instructions.push_str(" updated"),
-            2 => changed.agents[0].model.max_output_tokens += 1,
-            3 => changed.skills[0].skill_id = Uuid::from_u128(12),
-            _ => changed.tools[0].policy.policy_revision += 1,
-        }
-        let later = build(&source, changed).unwrap();
-        assert_ne!(original.content_hash(), later.content_hash());
-        assert_eq!(original.manifest(), &original_manifest);
+    let stored = store_bundle(&original).unwrap();
+    let json = String::from_utf8(stored).unwrap();
+    for field in [
+        "instructions",
+        "max_output_tokens",
+        "required_tools",
+        "system_prompt",
+    ] {
+        assert!(!json.contains(field), "workflow must not embed {field}");
     }
-    assert_eq!(original.snapshots().agents[0].skills, vec![name("support")]);
-    assert!(original.manifest()["dependency_hashes"]["agents"][0].is_string());
+    let mut changed = facts.clone();
+    changed.agents[0].agent_id =
+        crate::entities::agent_capability::AgentId::new(Uuid::from_u128(2));
+    assert_ne!(
+        original.content_hash(),
+        build(&source, changed).unwrap().content_hash()
+    );
+    let mut changed = facts;
+    changed.tools.push(tool_snapshot("tool.call"));
+    assert_ne!(
+        original.content_hash(),
+        build(&source, changed).unwrap().content_hash()
+    );
+    assert_eq!(
+        original.content_hash(),
+        build(&source, snapshots()).unwrap().content_hash()
+    );
 }
 
 #[test]
 fn workflow_publication_rejects_incomplete_foreign_duplicate_and_oversized_dependencies() {
     let source = source("agent.run");
-    for variant in 0..8 {
+    for variant in 0..5 {
         let mut facts = snapshots();
         match variant {
             0 => facts.agents.clear(),
             1 => facts.agents[0].company_id = CompanyId::new(Uuid::nil()),
             2 => facts.agents.push(agent()),
-            3 => facts.agents[0].tools.push(name("missing")),
-            4 => facts.agents[0].skills.push(name("missing")),
-            5 => facts.agents[0].instructions = "x".repeat(registry::MAX_TEXT + 1),
-            6 => facts.agents[0].model.max_output_tokens = 0,
+            3 => facts.agents[0].key = AgentKey::parse("unknown").unwrap(),
             _ => facts.agents = vec![agent(); MAX_DEPENDENCIES + 1],
         }
         assert!(build(&source, facts).is_err(), "variant {variant}");
@@ -123,27 +163,30 @@ fn workflow_publication_rejects_incomplete_foreign_duplicate_and_oversized_depen
 }
 
 #[test]
-fn workflow_publication_validates_skill_requirements_without_granting_tools() {
+fn autonomous_agent_workflow_reference_rejects_embedded_behavior_and_wrong_use_mode() {
+    let source = source("agent.run");
+    let bundle = build(&source, snapshots()).unwrap();
+    let mut embedded = serde_json::to_value(bundle.snapshots()).unwrap();
+    embedded["agents"][0]["instructions"] = json!("injected");
+    assert!(serde_json::from_value::<DependencySnapshots>(embedded).is_err());
     let mut facts = snapshots();
-    facts.tools.push(tool_snapshot("tool.call"));
-    facts.skills.push(SkillSnapshot {
-        company_id: company(),
-        skill_id: Uuid::from_u128(11),
-        name: name("support"),
-        instructions: "Help".into(),
-        required_tools: vec![name("lookup")],
-    });
-    facts.agents[0].skills.push(name("support"));
-    assert!(build(&source("agent.run"), facts.clone()).is_err());
-    facts.agents[0].tools.push(name("lookup"));
-    assert!(build(&source("agent.run"), facts).is_ok());
+    facts.agents[0].uses[0].mode = AgentUseMode::ModelOnly;
+    assert!(
+        freeze(
+            decode(&source.to_string()).unwrap(),
+            company(),
+            VersionId::new(Uuid::from_u128(10)),
+            facts,
+            vec![]
+        )
+        .is_err()
+    );
 }
 
 #[test]
 fn workflow_publication_runtime_agent_selection_uses_only_frozen_catalogue() {
     let mut source = source("agent.run");
-    source["parameter_schema"] =
-        json!({"type":"object","required":["agent"],"properties":{"agent":{"type":"string"}}});
+    source["parameter_schema"] = json!({"type":"object","required":["agent"],"properties":{"agent":{"type":"string","enum":["assistant"]}}});
     source["steps"]["start"]["with"]["agent"] = json!({"ref":"/params/agent"});
     let bundle = build(&source, snapshots()).unwrap();
     let outputs = BTreeMap::new();
@@ -162,7 +205,10 @@ fn workflow_publication_runtime_agent_selection_uses_only_frozen_catalogue() {
         let result = bundle.prepare_step_inputs(&StepId::parse("start").unwrap(), &context);
         assert_eq!(result.is_ok(), selected == "assistant");
         if let Err(error) = result {
-            assert_eq!(&*error.field_path, "/steps/start/with/agent");
+            assert_eq!(
+                &*error.field_path, "/params",
+                "the closed enum rejects the undeclared selector before step evaluation"
+            );
             assert!(error.span.line > 0);
         }
     }
@@ -386,15 +432,12 @@ fn workflow_publication_dependency_errors_name_the_problem_and_source_field() {
 }
 
 #[test]
-fn workflow_publication_ambiguous_agent_tool_fails_publication() {
+fn autonomous_agent_workflow_reference_does_not_resolve_agent_tools_from_step_slots() {
     let mut facts = snapshots();
     facts.tools = vec![tool_snapshot("tool.call"), tool_snapshot("mcp.call")];
-    facts.agents[0].tools = vec![name("lookup")];
     let mut source = source("agent.run");
     source["resources"] = json!([{"slot":"service","kind":"mcp"}]);
-    let error = build(&source, facts).err().unwrap();
-    assert_eq!(error.code, "publication.selection");
-    assert!(error.message.contains("lookup is missing or ambiguous"));
+    assert!(build(&source, facts).is_ok());
 }
 
 #[test]
@@ -402,14 +445,15 @@ fn workflow_publication_requires_and_hashes_trusted_agent_identity() {
     let source = source("agent.run");
     let original = build(&source, snapshots()).unwrap();
     let mut changed = snapshots();
-    changed.agents[0].agent_id = Uuid::from_u128(2);
+    changed.agents[0].agent_id =
+        crate::entities::agent_capability::AgentId::new(Uuid::from_u128(2));
     let replaced = build(&source, changed).unwrap();
     assert_ne!(
         original.content_hash().as_str(),
         replaced.content_hash().as_str()
     );
     let mut invalid = snapshots();
-    invalid.agents[0].agent_id = Uuid::nil();
+    invalid.agents[0].agent_id = crate::entities::agent_capability::AgentId::new(Uuid::nil());
     assert_eq!(
         build(&source, invalid).err().unwrap().code,
         "publication.agent_identity"
@@ -446,8 +490,7 @@ fn workflow_publication_freezes_workflow_tool_pins_like_children() {
         }
     };
     let publish = |parent: &Value, tool: Option<ToolSnapshot>, children| {
-        let mut agent = agent();
-        agent.tools = tool.iter().map(|tool| tool.contract.name.clone()).collect();
+        let agent = agent();
         freeze(
             decode(&parent.to_string()).unwrap(),
             company(),
@@ -455,7 +498,6 @@ fn workflow_publication_freezes_workflow_tool_pins_like_children() {
             DependencySnapshots {
                 agents: vec![agent],
                 tools: tool.into_iter().collect(),
-                ..Default::default()
             },
             children,
         )

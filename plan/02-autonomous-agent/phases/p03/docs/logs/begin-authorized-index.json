@@ -1,0 +1,168 @@
+{
+  "pattern": "begin_authorized",
+  "filesSearched": 1303,
+  "totalHits": 9,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/agent_publication/mod.rs#begin_authorized",
+        "name": "begin_authorized",
+        "kind": "function",
+        "path": "src/adapters/persistence/agent_publication/mod.rs",
+        "span": "L32-L53"
+      },
+      "path": "src/adapters/persistence/agent_publication/mod.rs",
+      "inDegree": 8,
+      "hits": [
+        {
+          "line": 32,
+          "text": "async fn begin_authorized("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/agent_publication/tests/races.rs#prepare",
+        "name": "prepare",
+        "kind": "function",
+        "path": "src/adapters/persistence/agent_publication/tests/races.rs",
+        "span": "L12-L25"
+      },
+      "path": "src/adapters/persistence/agent_publication/tests/races.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 16,
+          "text": "let mut tx = begin_authorized(&f.p, f.scope).await.unwrap();"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/agent_publication/commands.rs#preview_agent",
+        "name": "preview_agent",
+        "kind": "function",
+        "path": "src/adapters/persistence/agent_publication/commands.rs",
+        "span": "L17-L27"
+      },
+      "path": "src/adapters/persistence/agent_publication/commands.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 18,
+          "text": "let mut tx = begin_authorized(self, scope).await?;"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/agent_publication/commands.rs#publish_agent",
+        "name": "publish_agent",
+        "kind": "function",
+        "path": "src/adapters/persistence/agent_publication/commands.rs",
+        "span": "L29-L54"
+      },
+      "path": "src/adapters/persistence/agent_publication/commands.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 30,
+          "text": "let mut tx = begin_authorized(self, request.scope).await?;"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/agent_publication/commands.rs#active_agent_revision",
+        "name": "active_agent_revision",
+        "kind": "function",
+        "path": "src/adapters/persistence/agent_publication/commands.rs",
+        "span": "L56-L71"
+      },
+      "path": "src/adapters/persistence/agent_publication/commands.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 60,
+          "text": "let mut tx = begin_authorized(self, scope).await?;"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/agent_publication/commands.rs#published_agent_revision",
+        "name": "published_agent_revision",
+        "kind": "function",
+        "path": "src/adapters/persistence/agent_publication/commands.rs",
+        "span": "L73-L82"
+      },
+      "path": "src/adapters/persistence/agent_publication/commands.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 78,
+          "text": "let mut tx = begin_authorized(self, scope).await?;"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/agent_publication/commands.rs#deactivate_agent",
+        "name": "deactivate_agent",
+        "kind": "function",
+        "path": "src/adapters/persistence/agent_publication/commands.rs",
+        "span": "L84-L99"
+      },
+      "path": "src/adapters/persistence/agent_publication/commands.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 89,
+          "text": "let mut tx = begin_authorized(self, scope).await?;"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/agent_publication/commands.rs#revoke_agent_grant",
+        "name": "revoke_agent_grant",
+        "kind": "function",
+        "path": "src/adapters/persistence/agent_publication/commands.rs",
+        "span": "L101-L109"
+      },
+      "path": "src/adapters/persistence/agent_publication/commands.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 106,
+          "text": "let mut tx = begin_authorized(self, scope).await?;"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/agent_publication/tests/races.rs#autonomous_agent_publication_actual_skill_deletion_serializes_before_capture",
+        "name": "autonomous_agent_publication_actual_skill_deletion_serializes_before_capture",
+        "kind": "function",
+        "path": "src/adapters/persistence/agent_publication/tests/races.rs",
+        "span": "L78-L118"
+      },
+      "path": "src/adapters/persistence/agent_publication/tests/races.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 95,
+          "text": "let mut publication = begin_authorized(&f.p, f.scope).await.unwrap();"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 3,
+    "baselineChars": 12101
+  }
+}

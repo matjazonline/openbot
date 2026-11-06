@@ -47,46 +47,29 @@ fn source_order(binding: &AgentToolBinding) -> SourceOrder<'_> {
     }
 }
 
-struct RegisteredTool {
-    tool: ToolSnapshot,
-    approval_required: bool,
+pub(in crate::adapters::persistence) struct RegisteredTool {
+    pub(in crate::adapters::persistence) tool: ToolSnapshot,
+    pub(in crate::adapters::persistence) approval_required: bool,
+}
+
+pub(in crate::adapters::persistence) fn ordered_bindings<'a>(
+    bindings: impl IntoIterator<Item = &'a AgentToolBinding>,
+) -> Vec<&'a AgentToolBinding> {
+    let mut ordered: Vec<_> = bindings.into_iter().collect();
+    ordered.sort_by(|left, right| source_order(left).cmp(&source_order(right)));
+    ordered
 }
 
 pub(super) async fn resolve_tools(
-    tx: &mut Transaction<'_, Postgres>,
+    tx: &mut PgConnection,
     company: CompanyId,
     bindings: &[AgentToolBinding],
 ) -> AppResult<Vec<ResolvedAgentTool>> {
     validate_agent_bindings(bindings).map_err(AppError::BadRequest)?;
-    let mut ordered: Vec<_> = bindings.iter().collect();
-    ordered.sort_by(|left, right| source_order(left).cmp(&source_order(right)));
+    let ordered = ordered_bindings(bindings);
     let mut resolved = BTreeMap::new();
     for binding in ordered {
         let captured = match &binding.source {
-            AgentBindingSource::Builtin { tool } => RegisteredTool {
-                tool: builtin(company, *tool)?,
-                approval_required: false,
-            },
-            AgentBindingSource::Http {
-                connection,
-                operation,
-            } => http_tool(tx, company, *connection, operation).await?,
-            AgentBindingSource::Mcp {
-                connection,
-                operation,
-                reviewed_version,
-                remote_name,
-            } => {
-                mcp_tool(
-                    tx,
-                    company,
-                    *connection,
-                    operation,
-                    *reviewed_version,
-                    remote_name.as_str(),
-                )
-                .await?
-            }
             AgentBindingSource::Workflow {
                 registration,
                 workflow,
@@ -112,6 +95,7 @@ pub(super) async fn resolve_tools(
                     approval_required: false,
                 }
             }
+            source => direct_registration_on(tx, company, source).await?,
         };
         resolved.insert(
             binding.id,
@@ -122,6 +106,41 @@ pub(super) async fn resolve_tools(
         .iter()
         .map(|binding| resolved.remove(&binding.id).ok_or_else(invalid))
         .collect()
+}
+
+/// The same current owner validation for publication and live use of direct agent tools.
+pub(in crate::adapters::persistence) async fn direct_registration_on(
+    db: &mut PgConnection,
+    company: CompanyId,
+    source: &AgentBindingSource,
+) -> AppResult<RegisteredTool> {
+    match source {
+        AgentBindingSource::Builtin { tool } => Ok(RegisteredTool {
+            tool: builtin(company, *tool)?,
+            approval_required: false,
+        }),
+        AgentBindingSource::Http {
+            connection,
+            operation,
+        } => http_tool(db, company, *connection, operation).await,
+        AgentBindingSource::Mcp {
+            connection,
+            operation,
+            reviewed_version,
+            remote_name,
+        } => {
+            mcp_tool(
+                db,
+                company,
+                *connection,
+                operation,
+                *reviewed_version,
+                remote_name.as_str(),
+            )
+            .await
+        }
+        AgentBindingSource::Workflow { .. } => Err(invalid()),
+    }
 }
 
 fn resolved_registration(
@@ -193,7 +212,7 @@ async fn credential_ready(
 }
 
 async fn http_tool(
-    tx: &mut Transaction<'_, Postgres>,
+    tx: &mut PgConnection,
     company: CompanyId,
     connection: Uuid,
     operation: &TypeName,
@@ -214,7 +233,7 @@ async fn http_tool(
     .bind(company.as_uuid())
     .bind(connection)
     .bind(operation.as_str())
-    .fetch_optional(&mut **tx)
+    .fetch_optional(&mut *tx)
     .await?
     .ok_or_else(unavailable)?;
     let tool: ToolSnapshot = serde_json::from_value(snapshot).map_err(|_| invalid())?;
@@ -229,8 +248,15 @@ async fn http_tool(
     })
 }
 
+#[derive(sqlx::FromRow)]
+struct ReviewedMcpOperation {
+    snapshot: serde_json::Value,
+    approval_required: bool,
+    version: Uuid,
+}
+
 async fn mcp_tool(
-    tx: &mut Transaction<'_, Postgres>,
+    tx: &mut PgConnection,
     company: CompanyId,
     connection: Uuid,
     operation: &TypeName,
@@ -253,24 +279,24 @@ async fn mcp_tool(
     .bind(company.as_uuid())
     .bind(connection)
     .bind(remote_name)
-    .fetch_optional(&mut **tx)
+    .fetch_optional(&mut *tx)
     .await?
     .ok_or_else(unavailable)?;
-    let (snapshot, approval_required, version): (serde_json::Value, bool, Uuid) = sqlx::query_as(
+    let reviewed: ReviewedMcpOperation = sqlx::query_as(
         "SELECT snapshot,approval_required,version FROM workflow_mcp_operations WHERE company_id=$1 \
          AND connection_id=$2 AND name=$3 AND revoked_at IS NULL FOR SHARE"
     ).bind(company.as_uuid()).bind(connection).bind(operation.as_str())
-        .fetch_optional(&mut **tx).await?.ok_or_else(unavailable)?;
-    if version != reviewed_version {
+        .fetch_optional(&mut *tx).await?.ok_or_else(unavailable)?;
+    if reviewed.version != reviewed_version {
         return Err(unavailable());
     }
-    let tool: ToolSnapshot = serde_json::from_value(snapshot).map_err(|_| invalid())?;
+    let tool: ToolSnapshot = serde_json::from_value(reviewed.snapshot).map_err(|_| invalid())?;
     if tool.contract.name.as_str() != remote_name {
         return Err(unavailable());
     }
     McpOperation {
         tool: tool.clone(),
-        approval_required,
+        approval_required: reviewed.approval_required,
     }
     .validate(
         company,
@@ -285,6 +311,6 @@ async fn mcp_tool(
     )?;
     Ok(RegisteredTool {
         tool,
-        approval_required,
+        approval_required: reviewed.approval_required,
     })
 }

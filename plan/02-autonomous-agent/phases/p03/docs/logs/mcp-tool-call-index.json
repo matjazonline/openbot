@@ -1,0 +1,177 @@
+{
+  "pattern": "McpToolCall",
+  "filesSearched": 1301,
+  "totalHits": 11,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/workflow_agent/mod.rs#invocation",
+        "name": "invocation",
+        "kind": "function",
+        "path": "src/adapters/workflow_agent/mod.rs",
+        "span": "L76-L123"
+      },
+      "path": "src/adapters/workflow_agent/mod.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 88,
+          "text": "AgentToolTarget::Mcp { slot } => ToolInvocation::Mcp(Box::new(McpToolCall {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/workflow_mcp/mod.rs#call_tool",
+        "name": "call_tool",
+        "kind": "function",
+        "path": "src/adapters/workflow_mcp/mod.rs",
+        "span": "L57-L65"
+      },
+      "path": "src/adapters/workflow_mcp/mod.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 60,
+          "text": "call: McpToolCall,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/mcp_runtime.rs#mcp_tool_request",
+        "name": "mcp_tool_request",
+        "kind": "function",
+        "path": "src/application/workflow/mcp_runtime.rs",
+        "span": "L29-L33"
+      },
+      "path": "src/application/workflow/mcp_runtime.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 32,
+          "text": "call: &McpToolCall,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/mcp_runtime.rs#mcp_tool_request",
+        "name": "mcp_tool_request",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/mcp_runtime.rs",
+        "span": "L78-L95"
+      },
+      "path": "src/adapters/persistence/workflow/mcp_runtime.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 81,
+          "text": "call: &McpToolCall,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/mcp_test_support.rs#tool_call",
+        "name": "tool_call",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/mcp_test_support.rs",
+        "span": "L542-L549"
+      },
+      "path": "src/adapters/persistence/workflow/mcp_test_support.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 542,
+          "text": "pub(super) fn tool_call(model: &str) -> McpToolCall {"
+        },
+        {
+          "line": 543,
+          "text": "McpToolCall {"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/workflow_agent/mod.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 18,
+          "text": "mcp::McpToolCall,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/workflow_agent/mod.rs#ToolInvocation",
+        "name": "ToolInvocation",
+        "kind": "enum",
+        "path": "src/adapters/workflow_agent/mod.rs",
+        "span": "L68-L75"
+      },
+      "path": "src/adapters/workflow_agent/mod.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 70,
+          "text": "Mcp(Box<McpToolCall>),"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/workflow_mcp/mod.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 18,
+          "text": "mcp::{McpActions, McpToolCall},"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/mcp_runtime.rs#McpToolCall",
+        "name": "McpToolCall",
+        "kind": "struct",
+        "path": "src/application/workflow/mcp_runtime.rs",
+        "span": "L13-L18"
+      },
+      "path": "src/application/workflow/mcp_runtime.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 13,
+          "text": "pub struct McpToolCall {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/mcp_runtime.rs#call_tool",
+        "name": "call_tool",
+        "kind": "function",
+        "path": "src/application/workflow/mcp_runtime.rs",
+        "span": "L95-L113"
+      },
+      "path": "src/application/workflow/mcp_runtime.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 98,
+          "text": "call: McpToolCall,"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 5,
+    "baselineChars": 48631
+  }
+}

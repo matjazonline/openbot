@@ -52,7 +52,7 @@ pub(super) async fn save_binding_on(
     let change = validate_change(command, current.as_ref())?;
     if !matches!(change, Change::Deactivate) {
         verify_selection(tx, configuration).await?;
-        resources::check_readiness(tx, configuration).await?;
+        resources::check_readiness(tx, configuration.as_ref().into()).await?;
         check_run_as(tx, command, current.as_ref()).await?;
         if state.active && configuration.message_trigger().is_some() {
             check_message_binding_cap(tx, command).await?;

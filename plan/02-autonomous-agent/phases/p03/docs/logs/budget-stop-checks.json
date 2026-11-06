@@ -1,0 +1,54 @@
+{
+  "recorded_at": "2026-11-06T03:54:48.116446+00:00",
+  "status": "STOPPED_WEEKLY_QUOTA",
+  "quota": {
+    "checked_at": "2026-11-06T03:51:17.734888+00:00",
+    "fresh": true,
+    "interval_seconds": 900,
+    "next_check_at": "2026-11-06T04:06:17.734888+00:00",
+    "remaining_percent": 10.0,
+    "resets_at": 1794389522,
+    "sample_age_seconds": 10.195888,
+    "sample_timestamp": "2026-11-06T03:51:07.539Z",
+    "session": "01a1a6b2-c6b1-7103-9944-c1323c1d90a4",
+    "source": "/Users/mac02/.codex/sessions/2026/11/04/rollout-2026-11-04T14-14-56-01a1a6b2-c6b1-7103-9944-c1323c1d90a4.jsonl",
+    "stop_required": true,
+    "threshold_remaining_percent": 10.0,
+    "used_percent": 90.0,
+    "window_minutes": 10080
+  },
+  "stop_marker": "/Users/mac02/dev/openbot-recovery/.worktrees/knowledge-tooling/autonomous-weekly-quota/STOP-WEEKLY-QUOTA.json",
+  "checks": {
+    "quality_affected_02": {
+      "exit_code": 101,
+      "passed": 75,
+      "failed": 1,
+      "ignored": 0,
+      "seconds": 37.18,
+      "failure": "workflow_child_publication_publishes_the_shipped_revision_template_end_to_end",
+      "source": "src/adapters/persistence/workflow/child_publication_tests.rs:232"
+    },
+    "clippy_04": {
+      "exit_code": 1,
+      "status": "interrupted via TTY Ctrl-C for user budget stop; no PASS"
+    },
+    "fmt_12": {
+      "exit_code": 0
+    },
+    "source_diffcheck_03": {
+      "exit_code": 0
+    },
+    "graft_build_03": {
+      "exit_code": 0
+    },
+    "quota_watcher": {
+      "exit_code": 20
+    }
+  },
+  "remaining_owned_compilers_terminated": [],
+  "source_head": "dc35ee426d8f88abdaf40562027ae69ad66863eb",
+  "primary_main": "dc35ee426d8f88abdaf40562027ae69ad66863eb",
+  "origin_main": "ce93ff340a54db18770d8a5eec1c1d2008c5e5b1",
+  "coordination_revision": 18,
+  "coordination_sha256": "208ed2a36a34879d684d26d851b7875b92561374819042d332e91c79ddc6348b"
+}

@@ -172,6 +172,7 @@
     }
   },
   "sample": {
+    "agents": [],
     "input": {},
     "params": {},
     "scripts": [
@@ -223,6 +224,7 @@
     ]
   },
   "uncertain_sample": {
+    "agents": [],
     "input": {},
     "params": {},
     "scripts": [

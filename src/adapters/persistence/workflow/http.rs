@@ -78,12 +78,12 @@ impl ConnectionRow {
     }
 }
 pub(in crate::adapters::persistence) async fn connection_on(
-    tx: &mut Transaction<'_, Postgres>,
+    tx: &mut PgConnection,
     company: CompanyId,
     id: Uuid,
 ) -> AppResult<Option<HttpConnection>> {
     sqlx::query_as::<_, ConnectionRow>("SELECT connection.company_id, connection.id, connection.origin, connection.enabled, connection.bearer, connection.revision, connection.access_level::smallint AS access_level, EXISTS(SELECT 1 FROM workflow_http_credentials AS credential WHERE credential.company_id=connection.company_id AND credential.connection_id=connection.id) AS secret_set FROM workflow_http_connections AS connection WHERE connection.company_id=$1 AND connection.id=$2 FOR SHARE OF connection")
-        .bind(company.as_uuid()).bind(id).fetch_optional(&mut **tx).await?.map(ConnectionRow::decode).transpose()
+        .bind(company.as_uuid()).bind(id).fetch_optional(&mut *tx).await?.map(ConnectionRow::decode).transpose()
 }
 async fn edit_on(
     tx: &mut Transaction<'_, Postgres>,
@@ -401,6 +401,7 @@ impl PostgresPersistence {
         )
         .await?;
         live_run_on(&mut tx, request).await?;
+        super::agent_origin::current_on(&mut tx, request).await?;
         let connection = connection_on(&mut tx, company, id)
             .await?
             .ok_or_else(missing)?;

@@ -8,6 +8,10 @@ pub struct WorkflowServices {
     pub(super) worker_wakeups: Arc<Notify>,
 }
 impl WorkflowServices {
+    pub fn agent_publications(&self) -> &dyn crate::application::agent::AgentPublications {
+        &self.persistence
+    }
+
     fn authorizer(&self) -> ProductionAuthorizer {
         LifecycleAuthorizer::new(
             self.persistence.clone(),

@@ -11,7 +11,7 @@ mod validation;
 use super::compiler::{self, CompiledWorkflow, DecodedSource, Diagnostic, PreparedInputs};
 use super::registry::{self, CatalogueFacts};
 use crate::domain::workflow::{CompanyId, Context, StepId, VersionId};
-pub use capabilities::{ResolvedAgent, agent_universe};
+pub use capabilities::{ResolvedAgent, agent_reference_uses, agent_universe};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
@@ -67,7 +67,12 @@ impl PublishedBundle {
             if !visited.insert(next.compiled.graph().definition().version_id) {
                 continue;
             }
-            agents.extend(next.snapshots.agents.iter().map(|agent| agent.agent_id));
+            agents.extend(
+                next.snapshots
+                    .agents
+                    .iter()
+                    .map(|agent| agent.agent_id.as_uuid()),
+            );
             pending.extend(next.children.values().map(AsRef::as_ref));
         }
         agents
@@ -113,6 +118,14 @@ pub fn freeze(
     children: Vec<Arc<PublishedBundle>>,
 ) -> Result<PublishedBundle, Diagnostic> {
     let parsed = compiler::parse_workflow(&decoded, version_id)?;
+    let references = capabilities::reference_uses(&parsed.definition).map_err(|reason| {
+        Diagnostic::at(
+            "publication.agent",
+            &reason,
+            "/steps",
+            parsed.locations["/steps"],
+        )
+    })?;
     preflight::validate(&snapshots, &children, &parsed)?;
     let child_facts = dependencies::capture(company_id, &parsed, children, &snapshots.tools)?;
     let facts = CatalogueFacts {
@@ -128,7 +141,7 @@ pub fn freeze(
             .collect(),
     };
     let compiled = registry::compile(decoded, version_id, &facts, &child_facts.graph)?;
-    validation::validate(company_id, &snapshots, &compiled)?;
+    validation::validate(company_id, &snapshots, &compiled, &references)?;
     let manifest = manifest(
         company_id,
         version_id,
@@ -174,7 +187,7 @@ fn manifest(
         })
         .collect::<BTreeMap<_, _>>();
     let manifest = json!({
-        "format":"workflow-publication-v1", "company_id":company_id,
+        "format":"workflow-publication-v2", "company_id":company_id,
         "version_id":version_id, "compiled_hash":compiled.content_hash(),
         "dependencies":dependencies, "dependency_hashes":dependency_hashes,
         "child_hashes":child_hashes,

@@ -1,0 +1,49 @@
+{
+  "pattern": "frozen_agent_ids",
+  "filesSearched": 1301,
+  "totalHits": 2,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/definitions.rs#insert_version",
+        "name": "insert_version",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/definitions.rs",
+        "span": "L259-L293"
+      },
+      "path": "src/adapters/persistence/workflow/definitions.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 285,
+          "text": ".frozen_agent_ids()"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/publication/mod.rs#frozen_agent_ids",
+        "name": "frozen_agent_ids",
+        "kind": "function",
+        "path": "src/application/workflow/publication/mod.rs",
+        "span": "L62-L74"
+      },
+      "path": "src/application/workflow/publication/mod.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 62,
+          "text": "pub fn frozen_agent_ids(&self) -> std::collections::BTreeSet<uuid::Uuid> {"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 2,
+    "baselineChars": 17175
+  }
+}

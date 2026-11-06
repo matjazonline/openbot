@@ -1,0 +1,10 @@
+{
+  "time_utc": "2026-11-05T23:30:20.845109+00:00",
+  "head": "dc35ee426d8f88abdaf40562027ae69ad66863eb",
+  "source_snapshot": "base:   dc35ee426d8f88abdaf40562027ae69ad66863eb\ndigest: dd7a60fc8a58fac0edef457fdc4d6d619b1d6af60013958c291cf756d392133c\nfiles:",
+  "authority_unchanged": true,
+  "authority_matches_p03_pin": true,
+  "decision_unchanged": true,
+  "decision_exact_substring_of_TASK": true,
+  "only_review_records_written": true
+}

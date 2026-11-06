@@ -146,7 +146,7 @@ async fn knowledge_run_level_sql_freeze_constraint_matches_pure_release_matrix()
             let id = Uuid::new_v4();
             let digest = format!("{:032x}{:032x}", id.as_u128(), source.as_u128());
             let mut tx = setup.pool().begin().await.unwrap();
-            let result=sqlx::query("INSERT INTO workflow_action_intents(company_id,run_id,execution_id,id,operation_key,operation_digest,argument_digest,idempotency_key,operation,policy_decision,content_level_at_freeze,destination_level_at_freeze) SELECT company_id,run_id,execution_id,$2,operation_key,$3,argument_digest,'workflow-action:v1:'||$3,operation,policy_decision,$4::smallint,$5::smallint FROM workflow_action_intents WHERE id=$1")
+            let result=sqlx::query("INSERT INTO workflow_action_intents(company_id,run_id,execution_id,id,operation_key,operation_digest,argument_digest,idempotency_key,operation,policy_decision,content_level_at_freeze,destination_level_at_freeze,origin_kind,agent_manifest_id,agent_id,agent_revision_id,agent_binding_id) SELECT company_id,run_id,execution_id,$2,operation_key,$3,argument_digest,'workflow-action:v1:'||$3,operation,policy_decision,$4::smallint,$5::smallint,origin_kind,agent_manifest_id,agent_id,agent_revision_id,agent_binding_id FROM workflow_action_intents WHERE id=$1")
             .bind(source).bind(id).bind(digest).bind(content.as_i16()).bind(destination.as_i16()).execute(&mut *tx).await;
             assert_eq!(
                 result.is_ok(),

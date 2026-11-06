@@ -1,31 +1,23 @@
 use super::*;
-use crate::domain::workflow::TypeName;
-use crate::entities::skill::MAX_SKILL_INSTRUCTIONS_BYTES;
 use std::collections::BTreeSet;
-
-// The skill editor refuses what this check would: a saved skill must publish.
-const _: () = assert!(MAX_SKILL_INSTRUCTIONS_BYTES == registry::MAX_TEXT);
 
 pub(super) fn validate(
     snapshots: &DependencySnapshots,
     children: &[Arc<PublishedBundle>],
     parsed: &compiler::ParsedWorkflow,
 ) -> Result<(), Diagnostic> {
+    let fail = |code, reason| Diagnostic::at(code, reason, "/steps", parsed.locations["/steps"]);
     let count = snapshots
         .agents
         .len()
-        .saturating_add(snapshots.skills.len())
         .saturating_add(snapshots.tools.len())
         .saturating_add(children.len());
     if count > MAX_DEPENDENCIES {
-        return Err(Diagnostic::at(
+        return Err(fail(
             "publication.limit",
-            "At most 256 dependency snapshots are allowed",
-            "/steps",
-            parsed.locations["/steps"],
+            "At most 256 workflow dependency selections are allowed",
         ));
     }
-    // Bound borrowed content before cloning facts or serializing the manifest.
     let mut budget = compiler::FactBudget::new(parsed.locations["/steps"]);
     for tool in &snapshots.tools {
         for schema in tool.schemas() {
@@ -37,131 +29,47 @@ pub(super) fn validate(
         budget.schema(definition.input_schema.as_ref().expect("compiled schema"))?;
         budget.schema(definition.output_schema.as_ref().expect("compiled schema"))?;
     }
-    let check = SnapshotCheck { parsed };
-    for agent in &snapshots.agents {
-        check.agent(agent)?;
+    for reference in &snapshots.agents {
+        if reference.agent_id.as_uuid().is_nil()
+            || reference.uses.is_empty()
+            || reference.uses.len() > parsed.definition.steps.len()
+        {
+            return Err(fail(
+                "publication.agent_identity",
+                "Agent references require a trusted UUID and declared source uses",
+            ));
+        }
     }
-    for skill in &snapshots.skills {
-        check.text("skill", skill.name.as_str(), &skill.instructions)?;
-        check.selection(
-            "skill",
-            skill.name.as_str(),
-            "required_tools",
-            &skill.required_tools,
-        )?;
+    let mut tools = BTreeSet::new();
+    for tool in &snapshots.tools {
+        let contract = &tool.contract;
+        if !tools.insert((&contract.connection, &contract.name)) {
+            let field = "tool";
+            let path = parsed.definition.steps.iter().find_map(|(id, step)| {
+                matches!(step.inputs.get(field), Some(crate::domain::workflow::Binding::Literal(value)) if value.as_str() == Some(contract.name.as_str()))
+                    .then(|| format!("/steps/{id}/with/{field}"))
+            }).unwrap_or_else(|| "/steps".into());
+            let span = parsed
+                .locations
+                .get(&path)
+                .copied()
+                .unwrap_or(parsed.locations["/steps"]);
+            return Err(Diagnostic::at(
+                "publication.duplicate",
+                &format!(
+                    "tool {}: has duplicate snapshots for connection {}",
+                    contract.name.as_str(),
+                    contract
+                        .connection
+                        .as_ref()
+                        .map(|slot| slot.as_str())
+                        .unwrap_or("native")
+                ),
+                &path,
+                span,
+            ));
+        }
     }
-    check.unique_contracts(snapshots)?;
     budget.charge(snapshots)?;
     Ok(())
-}
-
-struct SnapshotCheck<'a> {
-    parsed: &'a compiler::ParsedWorkflow,
-}
-
-impl SnapshotCheck<'_> {
-    fn error(&self, field: &str, name: &str, code: &'static str, reason: &str) -> Diagnostic {
-        let path = validation::dependency_path(&self.parsed.definition, field, name);
-        Diagnostic::at(
-            code,
-            &format!("{field} {name}: {reason}"),
-            &path,
-            compiler::input_span(&self.parsed.locations, &path),
-        )
-    }
-
-    fn text(&self, field: &str, name: &str, text: &str) -> Result<(), Diagnostic> {
-        if text.len() > registry::MAX_TEXT {
-            return Err(self.error(
-                field,
-                name,
-                "publication.limit",
-                &format!("instructions exceed {} bytes", registry::MAX_TEXT),
-            ));
-        }
-        Ok(())
-    }
-
-    fn selection(
-        &self,
-        field: &str,
-        name: &str,
-        list: &str,
-        values: &[TypeName],
-    ) -> Result<(), Diagnostic> {
-        if values.len() > registry::MAX_SELECTIONS {
-            return Err(self.error(
-                field,
-                name,
-                "publication.limit",
-                &format!("{list} exceeds {} selections", registry::MAX_SELECTIONS),
-            ));
-        }
-        let mut seen = BTreeSet::new();
-        for value in values {
-            if !seen.insert(value) {
-                return Err(self.error(
-                    field,
-                    name,
-                    "publication.duplicate",
-                    &format!("{list} repeats selection {value}"),
-                ));
-            }
-        }
-        Ok(())
-    }
-
-    fn agent(&self, agent: &AgentSnapshot) -> Result<(), Diagnostic> {
-        let name = agent.key.as_str();
-        if agent.agent_id.is_nil() {
-            return Err(self.error(
-                "agent",
-                name,
-                "publication.agent_identity",
-                "requires a trusted agent UUID",
-            ));
-        }
-        self.text("agent", name, &agent.instructions)?;
-        if agent.model.model.is_empty() || agent.model.model.len() > registry::MAX_IDENTIFIER {
-            return Err(self.error(
-                "agent",
-                name,
-                "publication.model",
-                &format!(
-                    "model name must contain 1..={} bytes",
-                    registry::MAX_IDENTIFIER
-                ),
-            ));
-        }
-        if !(1..=131_072).contains(&agent.model.max_output_tokens) {
-            return Err(self.error(
-                "agent",
-                name,
-                "publication.model",
-                "max_output_tokens must be in 1..=131072",
-            ));
-        }
-        self.selection("agent", name, "tools", &agent.tools)?;
-        self.selection("agent", name, "skills", &agent.skills)
-    }
-
-    fn unique_contracts(&self, snapshots: &DependencySnapshots) -> Result<(), Diagnostic> {
-        let mut tools = BTreeSet::new();
-        for tool in &snapshots.tools {
-            let contract = &tool.contract;
-            if !tools.insert((&contract.connection, &contract.name)) {
-                let slot = contract
-                    .connection
-                    .as_ref()
-                    .map_or("native", |s| s.as_str());
-                return Err(self.error(
-                    "tool",
-                    contract.name.as_str(),
-                    "publication.duplicate",
-                    &format!("has duplicate snapshots for connection {slot}"),
-                ));
-            }
-        }
-        Ok(())
-    }
 }

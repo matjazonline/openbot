@@ -1,0 +1,19 @@
+   Compiling open_bots v0.1.0 (/Users/mac02/dev/openbot-recovery/.worktrees/autonomous-p03)
+error[E0308]: `?` operator has incompatible types
+   --> src/adapters/persistence/workflow/agent_preparation.rs:153:22
+    |
+153 |                 &mut self.pool().acquire().await?,
+    |                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `PgConnection`, found `PoolConnection<Postgres>`
+    |
+    = note: `?` operator cannot convert from `sqlx::pool::PoolConnection<sqlx::Postgres>` to `sqlx::PgConnection`
+    = note: expected struct `sqlx::PgConnection`
+               found struct `sqlx::pool::PoolConnection<sqlx::Postgres>`
+note: return type inferred to be `sqlx::PgConnection` here
+   --> src/adapters/persistence/workflow/agent_preparation.rs:90:1
+    |
+ 90 | #[async_trait]
+    | ^^^^^^^^^^^^^^
+    = note: this error originates in the attribute macro `async_trait` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+For more information about this error, try `rustc --explain E0308`.
+error: could not compile `open_bots` (lib test) due to 1 previous error

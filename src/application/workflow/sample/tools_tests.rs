@@ -29,9 +29,6 @@ fn tool_bundle() -> Arc<PublishedBundle> {
         }),
     };
     let mut facts = Fixture::AutonomousResponse.snapshots(company());
-    facts.agents[0].skills.clear();
-    facts.skills.clear();
-    facts.agents[0].tools.push(tool.contract.name.clone());
     facts.tools.push(tool);
     build(&source("agent.run"), facts, vec![child])
 }
@@ -157,9 +154,6 @@ fn direct_mcp_tool_uses_the_production_result_envelope() {
     let mut raw = source("agent.run");
     raw["resources"] = json!([{"slot":"tickets","kind":"mcp"}]);
     let mut facts = Fixture::AutonomousResponse.snapshots(company());
-    facts.agents[0].skills.clear();
-    facts.skills.clear();
-    facts.agents[0].tools = vec![name("lookup_tickets")];
     facts.tools = Fixture::McpLookup.snapshots(company()).tools;
     let bundle = build(&raw, facts, vec![]);
     let input = json!({"limit":2,"include_closed":false,"labels":[],"filter":{"owner":null}});

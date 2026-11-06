@@ -160,8 +160,8 @@ async fn sql_effect_park(setup: &Setup, source: Uuid) -> Result<(), sqlx::Error>
     let digest = format!("{:032x}{:032x}", invocation.as_u128(), source.as_u128());
     let mut tx = setup.pool().begin().await?;
     sqlx::query(
-        "INSERT INTO workflow_action_intents (company_id,run_id,execution_id,id,operation_key,operation_digest,argument_digest,idempotency_key,operation,policy_decision,content_level_at_freeze,destination_level_at_freeze) \
-         SELECT company_id,run_id,execution_id,$2,operation_key,$3,argument_digest,'workflow-action:v1:'||$3,operation,policy_decision,content_level_at_freeze,destination_level_at_freeze FROM workflow_action_intents WHERE id=$1",
+        "INSERT INTO workflow_action_intents (company_id,run_id,execution_id,id,operation_key,operation_digest,argument_digest,idempotency_key,operation,policy_decision,content_level_at_freeze,destination_level_at_freeze,origin_kind,agent_manifest_id,agent_id,agent_revision_id,agent_binding_id) \
+         SELECT company_id,run_id,execution_id,$2,operation_key,$3,argument_digest,'workflow-action:v1:'||$3,operation,policy_decision,content_level_at_freeze,destination_level_at_freeze,origin_kind,agent_manifest_id,agent_id,agent_revision_id,agent_binding_id FROM workflow_action_intents WHERE id=$1",
     )
     .bind(source)
     .bind(invocation)

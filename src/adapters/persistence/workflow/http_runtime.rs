@@ -61,6 +61,7 @@ fn request(
 /// The run's actor and the frozen bundle's capability ceiling.
 pub(in crate::adapters::persistence::workflow) fn context(facts: &RunFacts) -> ActionPolicyContext {
     ActionPolicyContext {
+        origin: crate::application::agent::ToolCallOrigin::Workflow,
         actor: facts.actor.user_id(),
         capability_ceiling: facts
             .bundle
@@ -176,6 +177,26 @@ impl HttpActionPreparation for PostgresPersistence {
     ) -> AppResult<ActionRequest> {
         let mut tx = begin_http(self).await?;
         let facts = facts(&mut tx, scope).await?;
+        if let crate::application::agent::ToolCallOrigin::Agent(origin) = call.origin {
+            let result = super::super::agent_origin::request_on(
+                &mut tx,
+                scope,
+                &facts,
+                origin,
+                &call.call,
+                call.arguments.clone(),
+            )
+            .await?;
+            if result.operation_key != call.operation
+                || http_target(&result.target)? != call.connection
+            {
+                return Err(missing());
+            }
+            ready_on(&mut tx, &result).await?;
+            tx.commit().await?;
+            return Ok(result);
+        }
+        super::super::agent_origin::require_workflow_origin(&mut tx, scope, &facts.bundle).await?;
         let tool = facts
             .bundle
             .snapshots()

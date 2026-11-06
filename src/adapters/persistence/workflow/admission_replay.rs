@@ -93,7 +93,7 @@ async fn replay(
     .await?;
     authority::supported_publication(tx, configuration.bundle(), workflow_tools::ToolCheck::Run)
         .await?;
-    resources::check_readiness(tx, &configuration).await?;
+    resources::check_readiness(tx, configuration.as_ref().into()).await?;
     Ok(AdmissionResult::Replayed(RunId::new(run)))
 }
 

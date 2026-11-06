@@ -1,0 +1,127 @@
+ M migrations/20260817000000_init_schema.sql
+ M samples/jev-image.json
+ M samples/jev-triage.json
+ M scripts/workflow-sample-boundary.py
+ M src/adapters/harness/rig/workflow.rs
+ M src/adapters/http/pages/workflow_authoring/preview.rs
+ M src/adapters/http/routes/workflows/ui/authoring/sample.rs
+ M src/adapters/http/routes/workflows/ui/runs/mod.rs
+ M src/adapters/http/routes/workflows/ui/runs/pages_tests.rs
+ M src/adapters/persistence/agent_publication/commands.rs
+ M src/adapters/persistence/agent_publication/mod.rs
+ M src/adapters/persistence/agent_publication/storage.rs
+ M src/adapters/persistence/agent_publication/tools.rs
+ M src/adapters/persistence/channel.rs
+ M src/adapters/persistence/mod.rs
+ M src/adapters/persistence/onboarding.rs
+ M src/adapters/persistence/skill_tests.rs
+ M src/adapters/persistence/workflow/action_approval_continuation_tests.rs
+ M src/adapters/persistence/workflow/action_approval_message_tests.rs
+ M src/adapters/persistence/workflow/action_authority.rs
+ M src/adapters/persistence/workflow/action_history_tests.rs
+ M src/adapters/persistence/workflow/action_reconciliation/mod.rs
+ M src/adapters/persistence/workflow/actions.rs
+ M src/adapters/persistence/workflow/admission.rs
+ M src/adapters/persistence/workflow/admission_replay.rs
+ M src/adapters/persistence/workflow/admission_write.rs
+ M src/adapters/persistence/workflow/agent_preparation.rs
+ M src/adapters/persistence/workflow/agent_publication.rs
+ M src/adapters/persistence/workflow/agent_recovery_tests.rs
+ M src/adapters/persistence/workflow/agent_runtime_tests.rs
+ M src/adapters/persistence/workflow/autonomous_agent_storage_manifest_tests.rs
+ M src/adapters/persistence/workflow/autonomous_agent_storage_tests.rs
+ M src/adapters/persistence/workflow/bindings.rs
+ M src/adapters/persistence/workflow/checkpoints.rs
+ M src/adapters/persistence/workflow/children.rs
+ M src/adapters/persistence/workflow/harness_model_store_tests.rs
+ M src/adapters/persistence/workflow/harness_token_tests.rs
+ M src/adapters/persistence/workflow/http.rs
+ M src/adapters/persistence/workflow/http_runtime.rs
+ M src/adapters/persistence/workflow/http_tests.rs
+ M src/adapters/persistence/workflow/knowledge_checkpoint.rs
+ M src/adapters/persistence/workflow/knowledge_history_race_tests.rs
+ M src/adapters/persistence/workflow/knowledge_message_tests.rs
+ M src/adapters/persistence/workflow/knowledge_search_atomic_tests.rs
+ M src/adapters/persistence/workflow/knowledge_search_support.rs
+ M src/adapters/persistence/workflow/mcp.rs
+ M src/adapters/persistence/workflow/mcp_agent_tests.rs
+ M src/adapters/persistence/workflow/mcp_runtime.rs
+ M src/adapters/persistence/workflow/mcp_test_support.rs
+ M src/adapters/persistence/workflow/message.rs
+ M src/adapters/persistence/workflow/message_park_continuation_tests.rs
+ M src/adapters/persistence/workflow/message_sql_tests.rs
+ M src/adapters/persistence/workflow/message_test_support.rs
+ M src/adapters/persistence/workflow/mod.rs
+ M src/adapters/persistence/workflow/provisioning.rs
+ M src/adapters/persistence/workflow/provisioning_dispatch_tests.rs
+ M src/adapters/persistence/workflow/provisioning_runtime_tests.rs
+ M src/adapters/persistence/workflow/resources.rs
+ M src/adapters/persistence/workflow/run_views.rs
+ M src/adapters/persistence/workflow/tests.rs
+ M src/adapters/persistence/workflow/workflow_tool_calls.rs
+ M src/adapters/persistence/workflow/workflow_tool_race_tests.rs
+ M src/adapters/persistence/workflow/workflow_tool_registration_tests.rs
+ M src/adapters/persistence/workflow/workflow_tool_revocation_tests.rs
+ M src/adapters/persistence/workflow/workflow_tool_support.rs
+ M src/adapters/persistence/workflow/workflow_tool_tests.rs
+ M src/adapters/workflow_agent/mod.rs
+ M src/application/agent/definition.rs
+ M src/application/agent/mod.rs
+ M src/application/use_cases/agent.rs
+ M src/application/use_cases/agent_tests.rs
+ M src/application/workflow/actions/authorization.rs
+ M src/application/workflow/actions/authorization_tests.rs
+ M src/application/workflow/actions/contracts.rs
+ M src/application/workflow/actions/freeze.rs
+ M src/application/workflow/actions/tests.rs
+ M src/application/workflow/agent.rs
+ M src/application/workflow/agent_tests.rs
+ M src/application/workflow/compiler/mod.rs
+ M src/application/workflow/completion.rs
+ M src/application/workflow/fixtures/mod.rs
+ M src/application/workflow/fixtures/tests.rs
+ M src/application/workflow/http_runtime.rs
+ M src/application/workflow/knowledge/ports.rs
+ M src/application/workflow/mcp_runtime.rs
+ M src/application/workflow/message.rs
+ M src/application/workflow/message_runtime.rs
+ M src/application/workflow/mod.rs
+ M src/application/workflow/provisioning.rs
+ M src/application/workflow/publication/capabilities.rs
+ M src/application/workflow/publication/capabilities_tests.rs
+ M src/application/workflow/publication/diagnostic_tests.rs
+ M src/application/workflow/publication/mod.rs
+ M src/application/workflow/publication/preflight.rs
+ M src/application/workflow/publication/storage.rs
+ M src/application/workflow/publication/tests.rs
+ M src/application/workflow/publication/types.rs
+ M src/application/workflow/publication/validation.rs
+ M src/application/workflow/run_views.rs
+ M src/application/workflow/sample/mod.rs
+ M src/application/workflow/sample/tests.rs
+ M src/application/workflow/sample/tools.rs
+ M src/application/workflow/sample/tools_tests.rs
+ M src/application/workflow/sample/types.rs
+ M src/application/workflow/tools.rs
+ M src/infra/workflow/services.rs
+?? plan/02-autonomous-agent/phases/p03/
+?? plan/02-autonomous-agent/phases/p04/
+?? src/adapters/persistence/workflow/agent_authority.rs
+?? src/adapters/persistence/workflow/agent_manifest/
+?? src/adapters/persistence/workflow/agent_origin.rs
+?? src/adapters/persistence/workflow/autonomous_agent_admission_tests.rs
+?? src/adapters/persistence/workflow/autonomous_agent_child_selection_tests.rs
+?? src/adapters/persistence/workflow/autonomous_agent_graph_tests.rs
+?? src/adapters/persistence/workflow/autonomous_agent_storage_native_runs.rs
+?? src/adapters/persistence/workflow/harness_model_fixture.rs
+?? src/adapters/persistence/workflow/mcp_agent_authority_tests.rs
+?? src/adapters/persistence/workflow/mcp_agent_isolation_tests.rs
+?? src/adapters/persistence/workflow/provisioning_agent.rs
+?? src/adapters/persistence/workflow/provisioning_requester_lock_tests.rs
+?? src/adapters/persistence/workflow/workflow_tool_closure_tests.rs
+?? src/adapters/persistence/workflow/workflow_tool_current_authority_tests.rs
+?? src/adapters/persistence/workflow/workflow_tool_reference_tests.rs
+?? src/adapters/persistence/workflow/workflow_tool_saved_call_support.rs
+?? src/application/agent/tool_name.rs
+?? src/application/agent/tool_origin.rs
+?? src/application/workflow/agent_contract.rs

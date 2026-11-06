@@ -1,0 +1,1081 @@
+{
+  "pattern": "ActionRequest",
+  "filesSearched": 1301,
+  "totalHits": 68,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/application/workflow/actions/service.rs#prepare_step",
+        "name": "prepare_step",
+        "kind": "function",
+        "path": "src/application/workflow/actions/service.rs",
+        "span": "L83-L86"
+      },
+      "path": "src/application/workflow/actions/service.rs",
+      "inDegree": 29,
+      "hits": [
+        {
+          "line": 83,
+          "text": "pub async fn prepare_step(&self, request: ActionRequest) -> AppResult<ActionIntent> {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/actions/service.rs#prepare_tool",
+        "name": "prepare_tool",
+        "kind": "function",
+        "path": "src/application/workflow/actions/service.rs",
+        "span": "L87-L94"
+      },
+      "path": "src/application/workflow/actions/service.rs",
+      "inDegree": 12,
+      "hits": [
+        {
+          "line": 89,
+          "text": "request: ActionRequest,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/actions/authorization.rs#validate_resource",
+        "name": "validate_resource",
+        "kind": "function",
+        "path": "src/application/workflow/actions/authorization.rs",
+        "span": "L97-L115"
+      },
+      "path": "src/application/workflow/actions/authorization.rs",
+      "inDegree": 11,
+      "hits": [
+        {
+          "line": 98,
+          "text": "request: &ActionRequest,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/provisioning_dispatch_tests.rs#call",
+        "name": "call",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/provisioning_dispatch_tests.rs",
+        "span": "L111-L150"
+      },
+      "path": "src/adapters/persistence/workflow/provisioning_dispatch_tests.rs",
+      "inDegree": 8,
+      "hits": [
+        {
+          "line": 123,
+          "text": "let request = ActionRequest {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_tests.rs#setup",
+        "name": "setup",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_tests.rs",
+        "span": "L5-L14"
+      },
+      "path": "src/adapters/persistence/workflow/action_tests.rs",
+      "inDegree": 7,
+      "hits": [
+        {
+          "line": 5,
+          "text": "async fn setup() -> (AdmissionFixture, ActionRequest) {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/actions/authorization_tests.rs#request",
+        "name": "request",
+        "kind": "function",
+        "path": "src/application/workflow/actions/authorization_tests.rs",
+        "span": "L15-L21"
+      },
+      "path": "src/application/workflow/actions/authorization_tests.rs",
+      "inDegree": 5,
+      "hits": [
+        {
+          "line": 15,
+          "text": "fn request() -> ActionRequest {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/actions/authorization_tests.rs#subject",
+        "name": "subject",
+        "kind": "function",
+        "path": "src/application/workflow/actions/authorization_tests.rs",
+        "span": "L55-L63"
+      },
+      "path": "src/application/workflow/actions/authorization_tests.rs",
+      "inDegree": 4,
+      "hits": [
+        {
+          "line": 55,
+          "text": "fn subject(request: &ActionRequest) -> ApprovalSubject {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/actions/authorization.rs#validate_current_authority",
+        "name": "validate_current_authority",
+        "kind": "function",
+        "path": "src/application/workflow/actions/authorization.rs",
+        "span": "L117-L129"
+      },
+      "path": "src/application/workflow/actions/authorization.rs",
+      "inDegree": 4,
+      "hits": [
+        {
+          "line": 118,
+          "text": "request: &ActionRequest,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/actions/authorization_tests.rs#authority",
+        "name": "authority",
+        "kind": "function",
+        "path": "src/application/workflow/actions/authorization_tests.rs",
+        "span": "L22-L54"
+      },
+      "path": "src/application/workflow/actions/authorization_tests.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 22,
+          "text": "fn authority(request: ActionRequest) -> ActionRunAuthority {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/actions/tests.rs#request",
+        "name": "request",
+        "kind": "function",
+        "path": "src/application/workflow/actions/tests.rs",
+        "span": "L9-L40"
+      },
+      "path": "src/application/workflow/actions/tests.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 9,
+          "text": "pub(crate) fn request(scope: ActionScope) -> ActionRequest {"
+        },
+        {
+          "line": 10,
+          "text": "ActionRequest {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/message_runtime.rs#publish",
+        "name": "publish",
+        "kind": "function",
+        "path": "src/application/workflow/message_runtime.rs",
+        "span": "L128-L156"
+      },
+      "path": "src/application/workflow/message_runtime.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 130,
+          "text": "request: &ActionRequest,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/http_runtime.rs#request",
+        "name": "request",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/http_runtime.rs",
+        "span": "L33-L60"
+      },
+      "path": "src/adapters/persistence/workflow/http_runtime.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 39,
+          "text": ") -> AppResult<ActionRequest> {"
+        },
+        {
+          "line": 52,
+          "text": "Ok(ActionRequest {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/http_runtime.rs#ready_on",
+        "name": "ready_on",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/http_runtime.rs",
+        "span": "L106-L112"
+      },
+      "path": "src/adapters/persistence/workflow/http_runtime.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 106,
+          "text": "async fn ready_on(tx: &mut Transaction<'_, Postgres>, request: &ActionRequest) -> AppResult<()> {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/http.rs#live_run_on",
+        "name": "live_run_on",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/http.rs",
+        "span": "L434-L441"
+      },
+      "path": "src/adapters/persistence/workflow/http.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 436,
+          "text": "request: &ActionRequest,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/mcp_runtime.rs#request",
+        "name": "request",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/mcp_runtime.rs",
+        "span": "L10-L43"
+      },
+      "path": "src/adapters/persistence/workflow/mcp_runtime.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 16,
+          "text": ") -> AppResult<ActionRequest> {"
+        },
+        {
+          "line": 32,
+          "text": "Ok(ActionRequest {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/message.rs#message_request",
+        "name": "message_request",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/message.rs",
+        "span": "L98-L128"
+      },
+      "path": "src/adapters/persistence/workflow/message.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 103,
+          "text": ") -> AppResult<ActionRequest> {"
+        },
+        {
+          "line": 117,
+          "text": "Ok(ActionRequest {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/mcp_runtime.rs#mcp_use",
+        "name": "mcp_use",
+        "kind": "function",
+        "path": "src/application/workflow/mcp_runtime.rs",
+        "span": "L46-L46"
+      },
+      "path": "src/application/workflow/mcp_runtime.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 46,
+          "text": "async fn mcp_use(&self, request: &ActionRequest) -> AppResult<McpUse>;"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/mcp_runtime.rs#dispatch_prepared",
+        "name": "dispatch_prepared",
+        "kind": "function",
+        "path": "src/application/workflow/mcp_runtime.rs",
+        "span": "L137-L176"
+      },
+      "path": "src/application/workflow/mcp_runtime.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 139,
+          "text": "request: ActionRequest,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/mcp_runtime.rs#connect_checked",
+        "name": "connect_checked",
+        "kind": "function",
+        "path": "src/application/workflow/mcp_runtime.rs",
+        "span": "L273-L296"
+      },
+      "path": "src/application/workflow/mcp_runtime.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 276,
+          "text": "request: &ActionRequest,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_approval_message_tests.rs#message_step_request",
+        "name": "message_step_request",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_approval_message_tests.rs",
+        "span": "L12-L20"
+      },
+      "path": "src/adapters/persistence/workflow/action_approval_message_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 16,
+          "text": ") -> AppResult<ActionRequest> {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_approval_message_tests.rs#message_tool_request",
+        "name": "message_tool_request",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_approval_message_tests.rs",
+        "span": "L21-L28"
+      },
+      "path": "src/adapters/persistence/workflow/action_approval_message_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 26,
+          "text": ") -> AppResult<ActionRequest> {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_approval_message_tests.rs#message_routes",
+        "name": "message_routes",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_approval_message_tests.rs",
+        "span": "L29-L35"
+      },
+      "path": "src/adapters/persistence/workflow/action_approval_message_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 31,
+          "text": "request: &ActionRequest,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/http_reconciliation_integration_tests.rs#refuse_historical",
+        "name": "refuse_historical",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/http_reconciliation_integration_tests.rs",
+        "span": "L103-L162"
+      },
+      "path": "src/adapters/persistence/workflow/http_reconciliation_integration_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 105,
+          "text": "request: &ActionRequest,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/http_reconciliation_integration_tests.rs#recover_applied",
+        "name": "recover_applied",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/http_reconciliation_integration_tests.rs",
+        "span": "L164-L219"
+      },
+      "path": "src/adapters/persistence/workflow/http_reconciliation_integration_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 164,
+          "text": "async fn recover_applied(setup: &Setup, request: &ActionRequest, provider: &Provider) {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/knowledge_history_race_tests.rs#request",
+        "name": "request",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/knowledge_history_race_tests.rs",
+        "span": "L43-L71"
+      },
+      "path": "src/adapters/persistence/workflow/knowledge_history_race_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 49,
+          "text": ") -> ActionRequest {"
+        },
+        {
+          "line": 52,
+          "text": "ActionRequest {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/mcp.rs#current_on",
+        "name": "current_on",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/mcp.rs",
+        "span": "L152-L165"
+      },
+      "path": "src/adapters/persistence/workflow/mcp.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 154,
+          "text": "request: &ActionRequest,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/actions/authorization.rs#validate_current_policy",
+        "name": "validate_current_policy",
+        "kind": "function",
+        "path": "src/application/workflow/actions/authorization.rs",
+        "span": "L179-L191"
+      },
+      "path": "src/application/workflow/actions/authorization.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 180,
+          "text": "request: &ActionRequest,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/actions/freeze.rs#freeze",
+        "name": "freeze",
+        "kind": "function",
+        "path": "src/application/workflow/actions/freeze.rs",
+        "span": "L12-L47"
+      },
+      "path": "src/application/workflow/actions/freeze.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 12,
+          "text": "pub(super) fn freeze(mut request: ActionRequest) -> AppResult<FrozenAction> {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/actions/freeze.rs#validate_scope",
+        "name": "validate_scope",
+        "kind": "function",
+        "path": "src/application/workflow/actions/freeze.rs",
+        "span": "L54-L84"
+      },
+      "path": "src/application/workflow/actions/freeze.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 54,
+          "text": "fn validate_scope(request: &mut ActionRequest) -> AppResult<()> {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/actions/freeze.rs#validate_arguments",
+        "name": "validate_arguments",
+        "kind": "function",
+        "path": "src/application/workflow/actions/freeze.rs",
+        "span": "L86-L109"
+      },
+      "path": "src/application/workflow/actions/freeze.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 86,
+          "text": "fn validate_arguments(request: &ActionRequest, arguments: &Value) -> AppResult<()> {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/http_runtime.rs#http_step_request",
+        "name": "http_step_request",
+        "kind": "function",
+        "path": "src/application/workflow/http_runtime.rs",
+        "span": "L16-L20"
+      },
+      "path": "src/application/workflow/http_runtime.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 20,
+          "text": ") -> AppResult<ActionRequest>;"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/http_runtime.rs#http_tool_request",
+        "name": "http_tool_request",
+        "kind": "function",
+        "path": "src/application/workflow/http_runtime.rs",
+        "span": "L21-L25"
+      },
+      "path": "src/application/workflow/http_runtime.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 25,
+          "text": ") -> AppResult<ActionRequest>;"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/mcp_runtime.rs#mcp_step_request",
+        "name": "mcp_step_request",
+        "kind": "function",
+        "path": "src/application/workflow/mcp_runtime.rs",
+        "span": "L24-L28"
+      },
+      "path": "src/application/workflow/mcp_runtime.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 28,
+          "text": ") -> AppResult<ActionRequest>;"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/mcp_runtime.rs#mcp_tool_request",
+        "name": "mcp_tool_request",
+        "kind": "function",
+        "path": "src/application/workflow/mcp_runtime.rs",
+        "span": "L29-L33"
+      },
+      "path": "src/application/workflow/mcp_runtime.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 33,
+          "text": ") -> AppResult<ActionRequest>;"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/message_runtime.rs#plan",
+        "name": "plan",
+        "kind": "function",
+        "path": "src/application/workflow/message_runtime.rs",
+        "span": "L158-L211"
+      },
+      "path": "src/application/workflow/message_runtime.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 160,
+          "text": "request: &ActionRequest,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/message_runtime.rs#plan_email",
+        "name": "plan_email",
+        "kind": "function",
+        "path": "src/application/workflow/message_runtime.rs",
+        "span": "L213-L266"
+      },
+      "path": "src/application/workflow/message_runtime.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 215,
+          "text": "request: &ActionRequest,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/provisioning.rs#provisioning_tool_request",
+        "name": "provisioning_tool_request",
+        "kind": "function",
+        "path": "src/application/workflow/provisioning.rs",
+        "span": "L379-L384"
+      },
+      "path": "src/application/workflow/provisioning.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 384,
+          "text": ") -> AppResult<ActionRequest>;"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_tests.rs#counts",
+        "name": "counts",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_tests.rs",
+        "span": "L16-L34"
+      },
+      "path": "src/adapters/persistence/workflow/action_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 16,
+          "text": "async fn counts(f: &AdmissionFixture, request: &ActionRequest) -> (i64, i64) {"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/persistence/workflow/decision_approvals.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 4,
+          "text": "ActionDispatchRequest, ActionRequest, ActionTarget, ApprovalSubject, FrozenAction,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/decision_approvals.rs#approved_request",
+        "name": "approved_request",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/decision_approvals.rs",
+        "span": "L18-L25"
+      },
+      "path": "src/adapters/persistence/workflow/decision_approvals.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 20,
+          "text": "request: &ActionRequest,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/http_reconciliation_integration_support.rs#capture",
+        "name": "capture",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/http_reconciliation_integration_support.rs",
+        "span": "L115-L131"
+      },
+      "path": "src/adapters/persistence/workflow/http_reconciliation_integration_support.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 115,
+          "text": "pub async fn capture(setup: &Setup, request: &ActionRequest, truth: Truth) -> Arc<Self> {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/http_reconciliation_integration_support.rs#command",
+        "name": "command",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/http_reconciliation_integration_support.rs",
+        "span": "L163-L200"
+      },
+      "path": "src/adapters/persistence/workflow/http_reconciliation_integration_support.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 165,
+          "text": "request: &ActionRequest,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/http_runtime.rs#http_step_request",
+        "name": "http_step_request",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/http_runtime.rs",
+        "span": "L116-L171"
+      },
+      "path": "src/adapters/persistence/workflow/http_runtime.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 120,
+          "text": ") -> AppResult<ActionRequest> {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/http_runtime.rs#http_tool_request",
+        "name": "http_tool_request",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/http_runtime.rs",
+        "span": "L172-L194"
+      },
+      "path": "src/adapters/persistence/workflow/http_runtime.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 176,
+          "text": ") -> AppResult<ActionRequest> {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/mcp_runtime.rs#mcp_step_request",
+        "name": "mcp_step_request",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/mcp_runtime.rs",
+        "span": "L47-L77"
+      },
+      "path": "src/adapters/persistence/workflow/mcp_runtime.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 51,
+          "text": ") -> AppResult<ActionRequest> {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/mcp_runtime.rs#mcp_tool_request",
+        "name": "mcp_tool_request",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/mcp_runtime.rs",
+        "span": "L78-L95"
+      },
+      "path": "src/adapters/persistence/workflow/mcp_runtime.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 82,
+          "text": ") -> AppResult<ActionRequest> {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/mcp.rs#mcp_use",
+        "name": "mcp_use",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/mcp.rs",
+        "span": "L296-L333"
+      },
+      "path": "src/adapters/persistence/workflow/mcp.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 296,
+          "text": "async fn mcp_use(&self, request: &ActionRequest) -> AppResult<McpUse> {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/message.rs#message_step_request",
+        "name": "message_step_request",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/message.rs",
+        "span": "L132-L153"
+      },
+      "path": "src/adapters/persistence/workflow/message.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 136,
+          "text": ") -> AppResult<ActionRequest> {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/message.rs#message_tool_request",
+        "name": "message_tool_request",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/message.rs",
+        "span": "L155-L166"
+      },
+      "path": "src/adapters/persistence/workflow/message.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 160,
+          "text": ") -> AppResult<ActionRequest> {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/message.rs#message_routes",
+        "name": "message_routes",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/message.rs",
+        "span": "L168-L196"
+      },
+      "path": "src/adapters/persistence/workflow/message.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 170,
+          "text": "request: &ActionRequest,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/provisioning.rs#provisioning_tool_request",
+        "name": "provisioning_tool_request",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/provisioning.rs",
+        "span": "L85-L119"
+      },
+      "path": "src/adapters/persistence/workflow/provisioning.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 90,
+          "text": ") -> AppResult<ActionRequest> {"
+        },
+        {
+          "line": 106,
+          "text": "let request = ActionRequest {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/actions/authorization_tests.rs#Store",
+        "name": "Store",
+        "kind": "struct",
+        "path": "src/application/workflow/actions/authorization_tests.rs",
+        "span": "L14-L14"
+      },
+      "path": "src/application/workflow/actions/authorization_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 14,
+          "text": "struct Store(ActionRequest);"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/actions/authorization_tests.rs#Directory",
+        "name": "Directory",
+        "kind": "struct",
+        "path": "src/application/workflow/actions/authorization_tests.rs",
+        "span": "L74-L77"
+      },
+      "path": "src/application/workflow/actions/authorization_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 75,
+          "text": "request: ActionRequest,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/actions/authorization_tests.rs#Policies",
+        "name": "Policies",
+        "kind": "struct",
+        "path": "src/application/workflow/actions/authorization_tests.rs",
+        "span": "L123-L126"
+      },
+      "path": "src/application/workflow/actions/authorization_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 124,
+          "text": "request: ActionRequest,"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/application/workflow/actions/freeze.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 2,
+          "text": "use super::service::{ActionRequest, FrozenAction};"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/actions/service.rs#ActionRequest",
+        "name": "ActionRequest",
+        "kind": "struct",
+        "path": "src/application/workflow/actions/service.rs",
+        "span": "L12-L19"
+      },
+      "path": "src/application/workflow/actions/service.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 12,
+          "text": "pub struct ActionRequest {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/actions/service.rs#FrozenAction",
+        "name": "FrozenAction",
+        "kind": "struct",
+        "path": "src/application/workflow/actions/service.rs",
+        "span": "L22-L28"
+      },
+      "path": "src/application/workflow/actions/service.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 23,
+          "text": "pub(super) request: ActionRequest,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/actions/service.rs#request",
+        "name": "request",
+        "kind": "function",
+        "path": "src/application/workflow/actions/service.rs",
+        "span": "L30-L32"
+      },
+      "path": "src/application/workflow/actions/service.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 30,
+          "text": "pub fn request(&self) -> &ActionRequest {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/mcp_runtime.rs#open",
+        "name": "open",
+        "kind": "function",
+        "path": "src/application/workflow/mcp_runtime.rs",
+        "span": "L249-L262"
+      },
+      "path": "src/application/workflow/mcp_runtime.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 249,
+          "text": "async fn open(&self, request: &ActionRequest) -> Result<(), Failure> {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/message.rs#message_step_request",
+        "name": "message_step_request",
+        "kind": "function",
+        "path": "src/application/workflow/message.rs",
+        "span": "L393-L397"
+      },
+      "path": "src/application/workflow/message.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 397,
+          "text": ") -> AppResult<ActionRequest>;"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/message.rs#message_tool_request",
+        "name": "message_tool_request",
+        "kind": "function",
+        "path": "src/application/workflow/message.rs",
+        "span": "L398-L403"
+      },
+      "path": "src/application/workflow/message.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 403,
+          "text": ") -> AppResult<ActionRequest>;"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/message.rs#message_routes",
+        "name": "message_routes",
+        "kind": "function",
+        "path": "src/application/workflow/message.rs",
+        "span": "L405-L409"
+      },
+      "path": "src/application/workflow/message.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 407,
+          "text": "request: &ActionRequest,"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 23,
+    "baselineChars": 300208
+  }
+}

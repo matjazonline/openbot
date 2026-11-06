@@ -6,15 +6,17 @@
 use super::*;
 use crate::app_error::ExecutionFailure;
 use crate::application::workflow::{
+    actions::{ActionOriginAuthority, ActionScope},
     activation::ActivationRequest,
     agent::AgentToolObservation,
+    binding::ConfiguredBinding,
     lease::WorkflowFence,
     tools::*,
     waits::{WaitFailureReason, WaitProgress},
 };
 use children::{ChildOrigin, ChildStart};
 use serde_json::Value;
-use std::time::Duration;
+use std::{sync::Arc, time::Duration};
 
 #[async_trait]
 impl WorkflowToolDispatch for PostgresPersistence {
@@ -41,48 +43,68 @@ struct CallWait {
     child_run_id: Uuid,
 }
 
-pub(super) async fn call_on(
+struct AuthorizedCall {
+    action_scope: ActionScope,
+    binding: Arc<ConfiguredBinding>,
+    origin: ActionOriginAuthority,
+    registration: Option<WorkflowToolRegistration>,
+}
+
+// Preserve account/company/source authority locks before locking the live execution fence.
+async fn authorize_call_on(
     db: &mut PgConnection,
-    fence: WorkflowFence,
+    scope: ActivationRequest,
     call: &WorkflowToolCall,
-) -> AppResult<AgentToolObservation> {
-    let scope = fence.scope;
-    // 0. Authority before run (the existing lock order): a revocation or re-point waits for us.
-    let registration = workflow_tools::registration_on(db, scope.company, &call.name).await?;
-    // 1. The run, execution and job under the live fence.
-    if !lease::lock_fence(db, fence, Duration::from_secs(1)).await? {
-        return Err(AppError::Execution(ExecutionFailure::OwnershipLost));
-    }
-    // 2. The replay after the continuation: the call's child already finished.
-    let existing = sqlx::query_as::<_, CallWait>(
-        "SELECT state, child_run_id FROM workflow_waits \
-         WHERE company_id=$1 AND run_id=$2 AND execution_id=$3 AND child_tool_call_id=$4",
+) -> AppResult<AuthorizedCall> {
+    let action_scope = ActionScope {
+        company: scope.company,
+        run: scope.run,
+        execution: scope.execution,
+    };
+    let actor = action_authority::prelock_on(db, action_scope)
+        .await?
+        .ok_or_else(missing)?;
+    let binding_id: Uuid = sqlx::query_scalar(
+        "SELECT binding_id FROM workflow_runs WHERE company_id=$1 AND id=$2 AND actor_id=$3",
     )
     .bind(scope.company.as_uuid())
     .bind(scope.run.as_uuid())
-    .bind(scope.execution.as_uuid())
-    .bind(call.call.as_uuid())
+    .bind(actor.user_id())
     .fetch_optional(&mut *db)
+    .await?
+    .ok_or_else(missing)?;
+    let binding = admission_binding::read_saved_binding(
+        db,
+        scope.company,
+        WorkflowBindingId::new(binding_id),
+        scope.run.as_uuid(),
+    )
     .await?;
-    if let Some(wait) = existing {
-        // The park closed the job, so a waiting call cannot coexist with a live fence.
-        if wait.state != "completed" {
-            return Err(invalid());
-        }
-        return match call_result(db, scope, wait.child_run_id).await? {
-            CallResult::Deliver(result) => Ok(AgentToolObservation::Completed(result)),
-            CallResult::InvalidOutput => Err(invalid()),
-        };
-    }
-    // 3. The run rule (P07-Q2): the name is still registered for the same workflow.
-    if registration.is_none_or(|current| current.workflow != call.pin.workflow_id) {
-        return Ok(AgentToolObservation::Completed(tool_error(
-            TOOL_REVOKED,
-            "This workflow tool is no longer available",
-        )));
-    }
-    let run: (Uuid, chrono::DateTime<chrono::Utc>, String, i16) = sqlx::query_as(
-        "SELECT run.binding_id, run.deadline, execution.step_id, job.continuation_count \
+    let origin =
+        super::agent_origin::workflow_tool_on(db, action_scope, call, actor, binding.bundle())
+            .await?;
+    let registration = workflow_tools::registration_on(db, scope.company, &call.name).await?;
+    Ok(AuthorizedCall {
+        action_scope,
+        binding,
+        origin,
+        registration,
+    })
+}
+
+#[derive(sqlx::FromRow)]
+struct ParentContinuation {
+    deadline: chrono::DateTime<chrono::Utc>,
+    step_id: String,
+    continuation_count: i16,
+}
+
+async fn parent_continuation_on(
+    db: &mut PgConnection,
+    scope: ActivationRequest,
+) -> AppResult<ParentContinuation> {
+    sqlx::query_as(
+        "SELECT run.deadline, execution.step_id, job.continuation_count \
          FROM workflow_runs AS run \
          JOIN workflow_executions AS execution ON execution.company_id=run.company_id AND execution.run_id=run.id \
          JOIN background_tasks AS job ON job.company_id=execution.company_id AND job.workflow_execution_id=execution.id \
@@ -92,41 +114,93 @@ pub(super) async fn call_on(
     .bind(scope.run.as_uuid())
     .bind(scope.execution.as_uuid())
     .bind(scope.job.0)
-    .fetch_one(&mut *db)
+    .fetch_one(db)
+    .await
+    .map_err(Into::into)
+}
+
+async fn replayed_call_on(
+    db: &mut PgConnection,
+    scope: ActivationRequest,
+    call: &WorkflowToolCall,
+) -> AppResult<Option<AgentToolObservation>> {
+    let wait = sqlx::query_as::<_, CallWait>(
+        "SELECT state, child_run_id FROM workflow_waits \
+         WHERE company_id=$1 AND run_id=$2 AND execution_id=$3 AND child_tool_call_id=$4",
+    )
+    .bind(scope.company.as_uuid())
+    .bind(scope.run.as_uuid())
+    .bind(scope.execution.as_uuid())
+    .bind(call.call.as_uuid())
+    .fetch_optional(&mut *db)
     .await?;
-    let (binding_id, deadline, step, continuations) = run;
-    let binding = admission_binding::read_saved_binding(
+    let Some(wait) = wait else { return Ok(None) };
+    // The park closed the job, so a waiting call cannot coexist with a live fence.
+    if wait.state != "completed" {
+        return Err(invalid());
+    }
+    match call_result(db, scope, wait.child_run_id).await? {
+        CallResult::Deliver(result) => Ok(Some(AgentToolObservation::Completed(result))),
+        CallResult::InvalidOutput => Err(invalid()),
+    }
+}
+
+pub(super) async fn call_on(
+    db: &mut PgConnection,
+    fence: WorkflowFence,
+    call: &WorkflowToolCall,
+) -> AppResult<AgentToolObservation> {
+    let scope = fence.scope;
+    let authorized = authorize_call_on(db, scope, call).await?;
+    if !lease::lock_fence(db, fence, Duration::from_secs(1)).await? {
+        return Err(AppError::Execution(ExecutionFailure::OwnershipLost));
+    }
+    if let Some(observation) = replayed_call_on(db, scope, call).await? {
+        return Ok(observation);
+    }
+    if authorized
+        .registration
+        .is_none_or(|current| current.workflow != call.pin.workflow_id)
+    {
+        return Ok(AgentToolObservation::Completed(tool_error(
+            TOOL_REVOKED,
+            "This workflow tool is no longer available",
+        )));
+    }
+    let run = parent_continuation_on(db, scope).await?;
+    if let ActionOriginAuthority::Agent(selection) = &authorized.origin {
+        super::agent_authority::check_execution_on(
+            db,
+            authorized.action_scope,
+            selection.agent(),
+            AgentUseMode::Tools,
+        )
+        .await?;
+    }
+    let child = super::agent_manifest::workflow_bundle_on(
         db,
         scope.company,
-        WorkflowBindingId::new(binding_id),
-        scope.run.as_uuid(),
+        scope.run,
+        call.pin.workflow_id,
+        call.pin.version_id,
     )
     .await?;
-    let child = binding
-        .bundle()
-        .children()
-        .get(&call.pin.version_id)
-        .ok_or_else(invalid)?;
-    // 4. Arguments the child refuses go back to the model; nothing is created.
     if let Err(diagnostic) = child.compiled().validate_input(&call.arguments) {
         return Ok(AgentToolObservation::Completed(tool_error(
             CHILD_INVALID_INPUT,
             &diagnostic.message,
         )));
     }
-    // 5. A parked call must be able to continue its job.
-    if continuations >= super::WORKFLOW_JOB_CONTINUATION_LIMIT {
+    if run.continuation_count >= super::WORKFLOW_JOB_CONTINUATION_LIMIT {
         return Ok(AgentToolObservation::Completed(tool_error(
             TOOL_LIMIT,
             "This agent step cannot start another workflow tool call",
         )));
     }
-    // 6. The child's own configuration: frozen params, the parent's resources for its slots.
     let configured =
-        children::child_binding(&binding, call.pin.version_id, call.pin.params.clone())?
+        children::configured_child(&authorized.binding, child, call.pin.params.clone())?
             .ok_or_else(invalid)?;
-    // 7. The child and the parent's wait, keyed by the saved call.
-    let step = StepId::parse(step).map_err(|_| invalid())?;
+    let step = StepId::parse(run.step_id).map_err(|_| invalid())?;
     let parked = children::create_on(
         db,
         scope,
@@ -138,11 +212,10 @@ pub(super) async fn call_on(
             },
             binding: &configured,
             input: &call.arguments,
-            deadline,
+            deadline: run.deadline,
         },
     )
     .await?;
-    // 8. Close the fenced attempt and job; the run waits on the child.
     park_on(db, fence, parked.wait.as_uuid()).await?;
     Ok(AgentToolObservation::Parked(parked.wait))
 }
@@ -178,20 +251,21 @@ pub(super) enum CallResult {
 #[derive(sqlx::FromRow)]
 struct ChildOutcome {
     content_level: i16,
+    workflow_id: Uuid,
     version_id: Uuid,
     terminal_state: Option<String>,
     terminal_execution_id: Option<Uuid>,
 }
 
 /// The call's result from immutable facts: the child's terminal `parent_wakeup` fact, its
-/// committed output and the parent's frozen copy of the pinned bundle.
+/// committed output and the parent's exact manifest member for the pinned bundle.
 pub(super) async fn call_result(
     db: &mut PgConnection,
     scope: ActivationRequest,
     child: Uuid,
 ) -> AppResult<CallResult> {
     let outcome = sqlx::query_as::<_, ChildOutcome>(
-        "SELECT child.version_id, child.content_level::smallint AS content_level, event.terminal_state, event.terminal_execution_id \
+        "SELECT child.workflow_id, child.version_id, child.content_level::smallint AS content_level, event.terminal_state, event.terminal_execution_id \
          FROM workflow_runs AS child \
          LEFT JOIN workflow_run_events AS event ON event.company_id = child.company_id \
            AND event.run_id = child.id AND event.sequence = child.terminal_wakeup_sequence \
@@ -221,25 +295,14 @@ pub(super) async fn call_result(
             .fetch_optional(&mut *db)
             .await?
             .ok_or_else(invalid)?;
-            let binding_id: Uuid = sqlx::query_scalar(
-                "SELECT binding_id FROM workflow_runs WHERE company_id=$1 AND id=$2",
-            )
-            .bind(scope.company.as_uuid())
-            .bind(scope.run.as_uuid())
-            .fetch_one(&mut *db)
-            .await?;
-            let binding = admission_binding::read_saved_binding(
+            let pinned = super::agent_manifest::workflow_bundle_on(
                 db,
                 scope.company,
-                WorkflowBindingId::new(binding_id),
-                scope.run.as_uuid(),
+                scope.run,
+                WorkflowId::new(outcome.workflow_id),
+                VersionId::new(outcome.version_id),
             )
             .await?;
-            let pinned = binding
-                .bundle()
-                .children()
-                .get(&VersionId::new(outcome.version_id))
-                .ok_or_else(invalid)?;
             if pinned.compiled().validate_output(&output).is_err() {
                 return Ok(CallResult::InvalidOutput);
             }

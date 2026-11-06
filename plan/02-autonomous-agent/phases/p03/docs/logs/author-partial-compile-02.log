@@ -1,0 +1,339 @@
+    Checking tokio v1.50.0
+    Checking tokio-util v0.7.19
+    Checking tower v0.5.2
+    Checking tokio-rustls v0.26.4
+    Checking tokio-rustls v0.24.1
+    Checking hickory-proto v0.24.4
+    Checking lettre v0.11.23
+    Checking tower-http v0.6.11
+    Checking h2 v0.4.15
+    Checking tokio-stream v0.1.17
+    Checking sqlx-core v0.8.6
+    Checking hyper v1.7.0
+    Checking sqlx-postgres v0.8.6
+    Checking hickory-resolver v0.24.4
+    Checking hyper-util v0.1.16
+    Checking mail-auth v0.6.1
+    Checking hyper-rustls v0.27.9
+    Checking axum v0.8.4
+    Checking reqwest v0.13.4
+    Checking rig-core v0.42.0
+    Checking rmcp v1.8.0
+    Checking sqlx v0.8.6
+    Checking axum-extra v0.10.1
+    Checking rig-agent v0.42.0
+    Checking open_bots v0.1.0 (/Users/mac02/dev/openbot-recovery/.worktrees/autonomous-p03)
+error[E0432]: unresolved import `super::publication::AgentSnapshot`
+ --> src/application/workflow/fixtures/mod.rs:5:26
+  |
+5 | use super::publication::{AgentSnapshot, DependencySnapshots, ToolSnapshot};
+  |                          ^^^^^^^^^^^^^ no `AgentSnapshot` in `application::workflow::publication`
+
+error[E0425]: cannot find type `Value` in this scope
+  --> src/adapters/persistence/workflow/agent_authority.rs:79:40
+   |
+79 | ...   let (snapshot, approval): (Value, bool) = sqlx::query_as("SELECT snapshot,approval_required FROM workflow_http_operations WHER...
+   |                                  ^^^^^ not found in this scope
+   |
+help: there is an enum variant `crate::application::workflow::compiler::SourceNode::Value`; try using the variant's enum
+   |
+79 -             let (snapshot, approval): (Value, bool) = sqlx::query_as("SELECT snapshot,approval_required FROM workflow_http_operations WHERE company_id=$1 AND connection_id=$2 AND name=$3 AND revoked_at IS NULL FOR SHARE")
+79 +             let (snapshot, approval): (crate::application::workflow::compiler::SourceNode, bool) = sqlx::query_as("SELECT snapshot,approval_required FROM workflow_http_operations WHERE company_id=$1 AND connection_id=$2 AND name=$3 AND revoked_at IS NULL FOR SHARE")
+   |
+
+error[E0425]: cannot find type `Value` in this scope
+   --> src/adapters/persistence/workflow/agent_authority.rs:114:47
+    |
+114 |     let (version, snapshot, approval): (Uuid, Value, bool) = sqlx::query_as("SELECT version,snapshot,approval_required FROM workflo...
+    |                                               ^^^^^ not found in this scope
+    |
+help: there is an enum variant `crate::application::workflow::compiler::SourceNode::Value`; try using the variant's enum
+    |
+114 -     let (version, snapshot, approval): (Uuid, Value, bool) = sqlx::query_as("SELECT version,snapshot,approval_required FROM workflow_mcp_operations WHERE company_id=$1 AND connection_id=$2 AND name=$3 AND revoked_at IS NULL FOR SHARE")
+114 +     let (version, snapshot, approval): (Uuid, crate::application::workflow::compiler::SourceNode, bool) = sqlx::query_as("SELECT version,snapshot,approval_required FROM workflow_mcp_operations WHERE company_id=$1 AND connection_id=$2 AND name=$3 AND revoked_at IS NULL FOR SHARE")
+    |
+
+error[E0433]: cannot find type `Binding` in this scope
+  --> src/application/workflow/publication/validation.rs:84:51
+   |
+84 |             matches!(step.inputs.get(field), Some(Binding::Literal(v)) if v.as_str() == Some(name))
+   |                                                   ^^^^^^^ use of undeclared type `Binding`
+   |
+note: type alias `crate::adapters::harness::rig::execution::Binding` exists but is inaccessible
+  --> src/adapters/harness/rig/execution.rs:31:1
+   |
+31 | pub(super) type Binding<'a> = Box<super::workflow::WorkflowBinding<'a>>;
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ not accessible
+help: consider importing this enum through its public re-export
+   |
+ 1 + use crate::workflow::Binding;
+   |
+
+warning: unused import: `TypeName`
+ --> src/application/workflow/publication/types.rs:3:64
+  |
+3 | use crate::domain::workflow::{CompanyId, ResourceName, StepId, TypeName, VersionId, WorkflowId};
+  |                                                                ^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+error[E0308]: mismatched types
+   --> src/adapters/harness/rig/workflow.rs:337:36
+    |
+337 |                 endpoint: endpoint(selection.agent_id).as_deref(),
+    |                           -------- ^^^^^^^^^^^^^^^^^^ expected `Uuid`, found `AgentId`
+    |                           |
+    |                           arguments to this function are incorrect
+    |
+note: function defined here
+   --> src/adapters/harness/rig/workflow.rs:356:4
+    |
+356 | fn endpoint(agent: uuid::Uuid) -> Option<String> {
+    |    ^^^^^^^^ -----------------
+
+error[E0308]: mismatched types
+  --> src/adapters/persistence/workflow/agent_authority.rs:74:47
+   |
+74 |             let current = http::connection_on(tx, company, *connection).await?.ok_or_else(revoked)?;
+   |                           ------------------- ^^ expected `&mut Transaction<'_, Postgres>`, found `&mut PgConnection`
+   |                           |
+   |                           arguments to this function are incorrect
+   |
+   = note: expected mutable reference `&mut sqlx::Transaction<'_, sqlx::Postgres>`
+              found mutable reference `&mut sqlx::PgConnection`
+note: function defined here
+  --> src/adapters/persistence/workflow/http.rs:80:47
+   |
+80 | pub(in crate::adapters::persistence) async fn connection_on(
+   |                                               ^^^^^^^^^^^^^
+81 |     tx: &mut Transaction<'_, Postgres>,
+   |     ----------------------------------
+
+error[E0277]: the trait bound `capabilities::ResolvedAgent: serde::Serialize` is not satisfied
+   --> src/adapters/persistence/workflow/knowledge_checkpoint.rs:163:30
+    |
+163 |     if serde_json::to_value(&frozen.selection).map_err(|_| invalid())?
+    |        --------------------  ^^^^^^^^^^^^^^^^ unsatisfied trait bound
+    |        |
+    |        required by a bound introduced by this call
+    |
+help: the trait `application::agent::_::_serde::Serialize` is not implemented for `capabilities::ResolvedAgent`
+   --> src/application/workflow/publication/capabilities.rs:11:1
+    |
+ 11 | pub struct ResolvedAgent {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^
+    = note: for local types consider adding `#[derive(serde::Serialize)]` to your `capabilities::ResolvedAgent` type
+    = note: for types from other crates check whether the crate offers a `serde` feature flag
+    = help: the following other types implement trait `application::agent::_::_serde::Serialize`:
+              &'a T
+              &'a mut T
+              ()
+              (T,)
+              (T0, T1)
+              (T0, T1, T2)
+              (T0, T1, T2, T3)
+              (T0, T1, T2, T3, T4)
+            and 1259 others
+    = note: required for `&capabilities::ResolvedAgent` to implement `application::agent::_::_serde::Serialize`
+note: required by a bound in `serde_json::to_value`
+   --> /Users/mac02/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde_json-1.0.151/src/value/mod.rs:997:8
+    |
+995 | pub fn to_value<T>(value: T) -> Result<Value, Error>
+    |        -------- required by a bound in this function
+996 | where
+997 |     T: Serialize,
+    |        ^^^^^^^^^ required by this bound in `to_value`
+    = note: the full name for the type has been written to '/Users/mac02/dev/openbot-recovery/.worktrees/autonomous-p03/target/debug/deps/open_bots-965338bb461d5ca0.long-type-14906171938320965749.txt'
+    = note: consider using `--verbose` to print the full type name to the console
+
+error[E0599]: no method named `resolve_agent` found for struct `std::sync::Arc<application::workflow::publication::PublishedBundle>` in the current scope
+   --> src/adapters/persistence/workflow/knowledge_checkpoint.rs:236:33
+    |
+236 |         selection: facts.bundle.resolve_agent(scope.company, &key)?,
+    |                                 ^^^^^^^^^^^^^ method not found in `std::sync::Arc<application::workflow::publication::PublishedBundle>`
+
+error[E0308]: mismatched types
+  --> src/adapters/harness/rig/workflow.rs:69:23
+   |
+69 |                 name: tool.declared.clone(),
+   |                       ^^^^^^^^^^^^^^^^^^^^^ expected `String`, found `AgentModelToolName`
+
+error[E0308]: mismatched types
+  --> src/adapters/http/pages/workflow_authoring/preview.rs:90:30
+   |
+90 |                         .get(&agent.agent_id)
+   |                          --- ^^^^^^^^^^^^^^^ expected `&Uuid`, found `&AgentId`
+   |                          |
+   |                          arguments to this method are incorrect
+   |
+   = note: expected reference `&uuid::Uuid`
+              found reference `&domain::entities::agent_capability::AgentId`
+note: method defined here
+  --> /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/collections/btree/map.rs:718:11
+
+error[E0609]: no field `model` on type `&application::workflow::publication::types::AgentReference`
+  --> src/adapters/http/pages/workflow_authoring/preview.rs:95:51
+   |
+95 |                 provider = escape_html_text(agent.model.provider.as_str()),
+   |                                                   ^^^^^ unknown field
+   |
+   = note: available fields are: `company_id`, `agent_id`, `key`, `uses`
+
+error[E0609]: no field `model` on type `&application::workflow::publication::types::AgentReference`
+  --> src/adapters/http/pages/workflow_authoring/preview.rs:96:49
+   |
+96 |                 model = escape_html_text(&agent.model.model),
+   |                                                 ^^^^^ unknown field
+   |
+   = note: available fields are: `company_id`, `agent_id`, `key`, `uses`
+
+error[E0609]: no field `tools` on type `&application::workflow::publication::types::AgentReference`
+  --> src/adapters/http/pages/workflow_authoring/preview.rs:97:56
+   |
+97 |                 tools = escape_html_text(&names(&agent.tools, "no tools")),
+   |                                                        ^^^^^ unknown field
+   |
+   = note: available fields are: `company_id`, `agent_id`, `key`, `uses`
+
+error[E0609]: no field `skills` on type `&application::workflow::publication::types::AgentReference`
+  --> src/adapters/http/pages/workflow_authoring/preview.rs:98:57
+   |
+98 |                 skills = escape_html_text(&names(&agent.skills, "no skills")),
+   |                                                         ^^^^^^ unknown field
+   |
+   = note: available fields are: `company_id`, `agent_id`, `key`, `uses`
+
+error[E0609]: no field `model` on type `&application::workflow::publication::types::AgentReference`
+   --> src/adapters/http/routes/workflows/ui/runs/mod.rs:702:41
+    |
+702 |         model: format!("{} / {}", agent.model.provider.as_str(), agent.model.model),
+    |                                         ^^^^^ unknown field
+    |
+    = note: available fields are: `company_id`, `agent_id`, `key`, `uses`
+
+error[E0609]: no field `model` on type `&application::workflow::publication::types::AgentReference`
+   --> src/adapters/http/routes/workflows/ui/runs/mod.rs:702:72
+    |
+702 |         model: format!("{} / {}", agent.model.provider.as_str(), agent.model.model),
+    |                                                                        ^^^^^ unknown field
+    |
+    = note: available fields are: `company_id`, `agent_id`, `key`, `uses`
+
+error[E0609]: no field `tools` on type `&application::workflow::publication::types::AgentReference`
+   --> src/adapters/http/routes/workflows/ui/runs/mod.rs:703:22
+    |
+703 |         tools: agent.tools.iter().map(|tool| tool.as_str()).collect(),
+    |                      ^^^^^ unknown field
+    |
+    = note: available fields are: `company_id`, `agent_id`, `key`, `uses`
+
+error[E0609]: no field `skills` on type `&application::workflow::publication::types::AgentReference`
+   --> src/adapters/http/routes/workflows/ui/runs/mod.rs:704:23
+    |
+704 |         skills: agent.skills.iter().map(|skill| skill.as_str()).collect(),
+    |                       ^^^^^^ unknown field
+    |
+    = note: available fields are: `company_id`, `agent_id`, `key`, `uses`
+
+error[E0609]: no field `slot` on type `&'life1 application::workflow::mcp::runtime::McpToolCall`
+  --> src/adapters/persistence/workflow/mcp_runtime.rs:88:19
+   |
+88 |             &call.slot,
+   |                   ^^^^ unknown field
+   |
+   = note: available fields are: `target`, `tool`, `arguments`, `call`
+
+error[E0560]: struct `application::workflow::publication::types::DependencySnapshots` has no field named `skills`
+   --> src/application/workflow/fixtures/mod.rs:102:9
+    |
+102 |         skills: vec![SkillSnapshot {
+    |         ^^^^^^ `application::workflow::publication::types::DependencySnapshots` does not have this field
+    |
+    = note: all struct fields are already assigned
+
+error[E0277]: can't compare `uuid::Uuid` with `domain::entities::agent_capability::AgentId`
+   --> src/application/workflow/knowledge/ports.rs:107:41
+    |
+107 |         || checkpoint.identity.agent_id != selection.agent().agent_id
+    |                                         ^^ no implementation for `uuid::Uuid == domain::entities::agent_capability::AgentId`
+    |
+    = help: the trait `PartialEq<domain::entities::agent_capability::AgentId>` is not implemented for `uuid::Uuid`
+help: the following other types implement trait `PartialEq<Rhs>`
+   --> /Users/mac02/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/uuid-1.26.1/src/lib.rs:445:32
+    |
+445 | #[derive(Clone, Copy, Eq, Ord, PartialEq, PartialOrd)]
+    |                                ^^^^^^^^^ `uuid::Uuid` implements `PartialEq`
+    |
+   ::: /Users/mac02/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/uuid-1.26.1/src/non_nil.rs:56:1
+    |
+ 56 | impl PartialEq<NonNilUuid> for Uuid {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `uuid::Uuid` implements `PartialEq<NonNilUuid>`
+
+error[E0308]: mismatched types
+   --> src/application/workflow/knowledge/ports.rs:119:41
+    |
+119 |         .filter(|tool| tool.declared == saved.call.tool_id.as_str())
+    |                        -------------    ^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `AgentModelToolName`, found `&str`
+    |                        |
+    |                        expected because this is `tool_name::AgentModelToolName`
+
+error[E0609]: no field `contract` on type `&&application::agent::definition::ResolvedAgentTool`
+   --> src/application/workflow/knowledge/ports.rs:133:29
+    |
+133 |         .filter(|tool| tool.contract.name.as_str() == SEARCH_KNOWLEDGE)
+    |                             ^^^^^^^^ unknown field
+    |
+    = note: available fields are: `binding`, `input_schema`, `output_schema`, `policy`, `approval_required`
+
+error[E0609]: no field `company_id` on type `&&application::agent::definition::ResolvedAgentTool`
+   --> src/application/workflow/knowledge/ports.rs:138:17
+    |
+138 |     if snapshot.company_id != fence.scope.company || !is_trusted_knowledge_snapshot(snapshot)? {
+    |                 ^^^^^^^^^^ unknown field
+    |
+    = note: available fields are: `binding`, `input_schema`, `output_schema`, `policy`, `approval_required`
+
+error[E0308]: mismatched types
+   --> src/application/workflow/knowledge/ports.rs:138:85
+    |
+138 |     if snapshot.company_id != fence.scope.company || !is_trusted_knowledge_snapshot(snapshot)? {
+    |                                                       ----------------------------- ^^^^^^^^ expected `&ToolSnapshot`, found `&&ResolvedAgentTool`
+    |                                                       |
+    |                                                       arguments to this function are incorrect
+    |
+    = note: expected reference `&application::workflow::publication::types::ToolSnapshot`
+               found reference `&&application::agent::definition::ResolvedAgentTool`
+note: function defined here
+   --> src/application/workflow/knowledge/builtin.rs:79:8
+    |
+ 79 | pub fn is_trusted_knowledge_snapshot(snapshot: &ToolSnapshot) -> AppResult<bool> {
+    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ -----------------------
+
+error[E0308]: mismatched types
+   --> src/application/workflow/publication/mod.rs:117:45
+    |
+117 |         Diagnostic::at("publication.agent", reason, "/steps", parsed.locations["/steps"])
+    |         --------------                      ^^^^^^ expected `&str`, found `String`
+    |         |
+    |         arguments to this function are incorrect
+    |
+note: associated function defined here
+   --> src/application/workflow/compiler/source.rs:49:12
+    |
+ 49 |     pub fn at(code: &'static str, message: &str, field_path: &str, span: SourceSpan) -> Self {
+    |            ^^                     -------------
+help: consider borrowing here
+    |
+117 |         Diagnostic::at("publication.agent", &reason, "/steps", parsed.locations["/steps"])
+    |                                             +
+
+error[E0599]: no method named `resolve_agent` found for reference `&std::sync::Arc<application::workflow::publication::PublishedBundle>` in the current scope
+  --> src/application/workflow/sample/tools.rs:38:28
+   |
+38 |         let agent = bundle.resolve_agent(bundle.company_id(), &key)?;
+   |                            ^^^^^^^^^^^^^ method not found in `&std::sync::Arc<application::workflow::publication::PublishedBundle>`
+
+Some errors have detailed explanations: E0277, E0308, E0425, E0432, E0433, E0560, E0599, E0609.
+For more information about an error, try `rustc --explain E0277`.
+warning: `open_bots` (lib) generated 1 warning
+error: could not compile `open_bots` (lib) due to 27 previous errors; 1 warning emitted

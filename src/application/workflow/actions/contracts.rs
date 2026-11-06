@@ -33,6 +33,7 @@ pub struct ActionPolicyContext {
     pub actor: Uuid,
     pub capability_ceiling: Vec<TypeName>,
     pub approval_required: bool,
+    pub origin: crate::application::agent::ToolCallOrigin,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]

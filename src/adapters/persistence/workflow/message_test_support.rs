@@ -410,6 +410,7 @@ pub(super) async fn tool(
         .call_tool(
             setup.claim.fence,
             crate::application::workflow::message::MessageToolCall {
+                origin: crate::application::agent::ToolCallOrigin::Workflow,
                 kind: crate::application::workflow::message::MessageKind::Send,
                 arguments,
                 call: crate::application::workflow::actions::ModelToolCallId::parse(call).unwrap(),

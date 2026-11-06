@@ -1,6 +1,7 @@
 use super::registry::ToolContract;
-use crate::application::agent::{AgentKey, ApprovedActionPolicy, ModelSettings, SkillSnapshot};
-use crate::domain::workflow::{CompanyId, ResourceName, TypeName, VersionId, WorkflowId};
+use crate::application::agent::{AgentKey, ApprovedActionPolicy};
+use crate::domain::workflow::{CompanyId, ResourceName, StepId, VersionId, WorkflowId};
+use crate::entities::agent_capability::AgentId;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -14,15 +15,27 @@ impl ContentHash {
 }
 
 #[derive(Clone, Serialize, Deserialize)]
-pub struct AgentSnapshot {
+#[serde(deny_unknown_fields)]
+pub struct AgentReference {
     pub company_id: CompanyId,
-    /// Trusted identity for ownership checks and usage attribution; never model input.
-    pub agent_id: uuid::Uuid,
+    pub agent_id: AgentId,
+    /// Authored name remains a source lookup key even after the agent is renamed.
     pub key: AgentKey,
-    pub instructions: String,
-    pub model: ModelSettings,
-    pub tools: Vec<TypeName>,
-    pub skills: Vec<TypeName>,
+    pub uses: Vec<AgentReferenceUse>,
+}
+
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AgentReferenceUse {
+    pub step: StepId,
+    pub mode: AgentUseMode,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum AgentUseMode {
+    ModelOnly,
+    Tools,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -98,9 +111,9 @@ impl ToolSnapshot {
 /// The complete finite selection universe for this version. Agent/profile names
 /// from runtime bindings can only choose captured entries; no live fallback.
 #[derive(Default, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct DependencySnapshots {
-    pub agents: Vec<AgentSnapshot>,
-    pub skills: Vec<SkillSnapshot>,
+    pub agents: Vec<AgentReference>,
     pub tools: Vec<ToolSnapshot>,
 }
 

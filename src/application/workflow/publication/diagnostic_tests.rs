@@ -38,36 +38,27 @@ fn workflow_publication_duplicate_contracts_identify_the_dependency() {
 }
 
 #[test]
-fn workflow_publication_invalid_agent_settings_identify_the_field() {
+fn autonomous_agent_workflow_reference_unknown_key_identifies_the_field() {
     let mut facts = snapshots();
-    facts.agents[0].model.model.clear();
+    facts.agents[0].key = AgentKey::parse("other").unwrap();
     assert_diagnostic(
         &source("agent.run"),
         facts,
-        "publication.model",
+        "publication.agent",
         "agent",
-        "agent assistant: model name must contain",
-    );
-    let mut facts = snapshots();
-    facts.agents[0].model.max_output_tokens = 0;
-    assert_diagnostic(
-        &source("agent.run"),
-        facts,
-        "publication.model",
-        "agent",
-        "agent assistant: max_output_tokens must be in 1..=131072",
+        "assistant: has missing or inconsistent source uses",
     );
 }
 
 #[test]
 fn workflow_publication_duplicate_selections_identify_the_list_and_member() {
     let mut facts = snapshots();
-    facts.agents[0].tools = vec![name("lookup"), name("lookup")];
+    facts.agents.push(agent());
     assert_diagnostic(
         &source("agent.run"),
         facts,
         "publication.duplicate",
         "agent",
-        "agent assistant: tools repeats selection lookup",
+        "agent assistant: has duplicate snapshots",
     );
 }

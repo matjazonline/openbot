@@ -524,7 +524,9 @@ impl RunViews for PostgresPersistence {
             self.children(company, run, Some(execution), MAX_STEP_ITEMS)
                 .await?,
         );
+        let agent = selected_agent_summary(self, company, run, &row).await?;
         let mut view = StepView {
+            agent,
             payload_restricted: false,
             execution,
             step: row.step_id,
@@ -594,4 +596,63 @@ impl RunViews for PostgresPersistence {
             })
             .transpose()
     }
+}
+
+/// Display only the immutable revision selected by this run, before the final visibility read.
+async fn selected_agent_summary(
+    persistence: &PostgresPersistence,
+    company: CompanyId,
+    run: RunId,
+    step: &StepRow,
+) -> AppResult<Option<SelectedAgentSummary>> {
+    let Some(key) = step
+        .frozen_inputs
+        .as_ref()
+        .and_then(|inputs| inputs["agent"].as_str())
+        .and_then(crate::application::agent::AgentKey::parse)
+    else {
+        return Ok(None);
+    };
+    let bundle = persistence
+        .run_bundle(company, run)
+        .await?
+        .ok_or_else(missing)?;
+    let reference = bundle.agent_reference(company, &key)?;
+    let row: Option<(Uuid, String)> = sqlx::query_as(
+        "SELECT revision.id,revision.content FROM run_dependency_manifests AS ownership \
+         JOIN agent_manifest_revisions AS selection ON selection.company_id=ownership.company_id AND selection.manifest_id=ownership.manifest_id \
+         JOIN agent_revisions AS revision ON revision.company_id=selection.company_id AND revision.agent_id=selection.agent_id AND revision.id=selection.revision_id \
+         WHERE ownership.company_id=$1 AND ownership.run_id=$2 AND selection.agent_id=$3 AND octet_length(revision.content)<=$4"
+    ).bind(company.as_uuid()).bind(run.as_uuid()).bind(reference.agent_id.as_uuid())
+        .bind(crate::application::agent::MAX_AGENT_DEFINITION_BYTES as i32).fetch_optional(persistence.pool()).await?;
+    let (revision, content) = row.ok_or_else(missing)?;
+    let agent = crate::application::agent::ResolvedAgentDefinition::decode(content.as_bytes())?;
+    let model_only = !reference
+        .uses
+        .iter()
+        .any(|usage| usage.step.as_str() == step.step_id && usage.mode == AgentUseMode::Tools);
+    Ok(Some(SelectedAgentSummary {
+        agent_id: agent.agent_id,
+        revision_id: crate::entities::agent_capability::AgentRevisionId::new(revision),
+        key: reference.key.as_str().to_owned(),
+        model: format!("{} / {}", agent.model.provider.as_str(), agent.model.model),
+        tools: if model_only {
+            vec![]
+        } else {
+            agent
+                .tools
+                .iter()
+                .map(|tool| tool.binding.alias.as_str().to_owned())
+                .collect()
+        },
+        skills: if model_only {
+            vec![]
+        } else {
+            agent
+                .skills
+                .iter()
+                .map(|skill| skill.skill.name.as_str().to_owned())
+                .collect()
+        },
+    }))
 }

@@ -153,6 +153,14 @@ pub(super) fn child_binding(
         .get(&version)
         .cloned()
         .ok_or_else(|| AppError::Internal("Pinned child workflow bundle is missing".into()))?;
+    configured_child(parent, bundle, params)
+}
+
+pub(super) fn configured_child(
+    parent: &ConfiguredBinding,
+    bundle: Arc<PublishedBundle>,
+    params: Value,
+) -> AppResult<Option<ConfiguredBinding>> {
     let slots: BTreeSet<_> = bundle
         .compiled()
         .graph()
@@ -233,34 +241,92 @@ pub(super) async fn create_on(
     .await?;
     let association = binding_rows::association_from_columns(parent.channel_id, parent.thread_id)?;
     let child = RunId::new(Uuid::new_v4());
+    let coordinates = child_coordinates(scope, start)?;
+    let trigger = TriggerRef::new(
+        scope.company,
+        TriggerId::new(Uuid::new_v4()),
+        TriggerSource::Child {
+            parent: coordinates.cause,
+        },
+    )
+    .map_err(|_| invalid())?;
+    insert_child_on(db, scope, start, &parent, child, &trigger, association).await?;
+    admission_write::insert_first_job(
+        db,
+        &FirstJob {
+            company: scope.company,
+            run: child,
+            execution: ExecutionId::new(Uuid::new_v4()),
+            entry: &start.binding.bundle().compiled().graph().definition().entry,
+            association,
+            correlation: parent.correlation_id,
+        },
+    )
+    .await?;
+    admission_write::insert_admission(
+        db,
+        scope.company,
+        start.binding.id(),
+        &admission_binding::SourceKey::from_trigger(&trigger),
+        child,
+    )
+    .await?;
+    admission_write::insert_admitted(db, scope.company, child, parent.actor_id).await?;
+    let wait = Uuid::new_v4();
+    // The stored deadline answers every replay, as for the other waits.
+    let deadline: DateTime<Utc> = sqlx::query_scalar("INSERT INTO workflow_waits(company_id,run_id,execution_id,id,reason,deadline,created_at,child_run_id,child_ordinal,child_tool_call_id,parked_attempt_number) VALUES($1,$2,$3,$4,'child_run',$5,clock_timestamp(),$6,$7,$8,$9) RETURNING deadline")
+        .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(scope.execution.as_uuid()).bind(wait)
+        .bind(start.deadline).bind(child.as_uuid()).bind(coordinates.ordinal).bind(coordinates.call).bind(coordinates.attempt)
+        .fetch_one(&mut *db).await?;
+    Ok(ParkedWorkflow {
+        wait: WaitId::new(wait),
+        deadline,
+    })
+}
+
+struct ChildCoordinates {
+    cause: ChildCause,
+    ordinal: Option<i32>,
+    call: Option<Uuid>,
+    attempt: Option<i32>,
+}
+
+fn child_coordinates(
+    scope: ActivationRequest,
+    start: &ChildStart<'_>,
+) -> AppResult<ChildCoordinates> {
     let execution = ExecutionRef::new(
         scope.company,
         scope.run,
         scope.execution,
         start.step.clone(),
     );
-    let (parent_cause, ordinal, call, attempt) = match start.origin {
-        ChildOrigin::Round(ordinal) => (
-            ChildCause::Step(ChildStepRef::new(execution, ordinal)),
-            Some(i32::try_from(ordinal.get()).map_err(|_| invalid())?),
-            None,
-            None,
-        ),
-        ChildOrigin::Call { call, attempt } => (
-            ChildCause::ToolCall(ChildToolCallRef::new(execution, call)),
-            None,
-            Some(call.as_uuid()),
-            Some(attempt),
-        ),
-    };
-    let trigger = TriggerRef::new(
-        scope.company,
-        TriggerId::new(Uuid::new_v4()),
-        TriggerSource::Child {
-            parent: parent_cause,
+    Ok(match start.origin {
+        ChildOrigin::Round(ordinal) => ChildCoordinates {
+            cause: ChildCause::Step(ChildStepRef::new(execution, ordinal)),
+            ordinal: Some(i32::try_from(ordinal.get()).map_err(|_| invalid())?),
+            call: None,
+            attempt: None,
         },
-    )
-    .map_err(|_| invalid())?;
+        ChildOrigin::Call { call, attempt } => ChildCoordinates {
+            cause: ChildCause::ToolCall(ChildToolCallRef::new(execution, call)),
+            ordinal: None,
+            call: Some(call.as_uuid()),
+            attempt: Some(attempt),
+        },
+    })
+}
+
+// Insert the child and prove exact root-manifest membership on the caller's transaction.
+async fn insert_child_on(
+    db: &mut PgConnection,
+    scope: ActivationRequest,
+    start: &ChildStart<'_>,
+    parent: &ParentRun,
+    child: RunId,
+    trigger: &TriggerRef,
+    association: RelatedAssociation,
+) -> AppResult<()> {
     admission_write::insert_run(
         db,
         &RunRow {
@@ -287,35 +353,15 @@ pub(super) async fn create_on(
         },
     )
     .await?;
-    admission_write::insert_first_job(
-        db,
-        &FirstJob {
-            company: scope.company,
-            run: child,
-            execution: ExecutionId::new(Uuid::new_v4()),
-            entry: &start.binding.bundle().compiled().graph().definition().entry,
-            association,
-            correlation: parent.correlation_id,
-        },
-    )
-    .await?;
-    admission_write::insert_admission(
+    let definition = start.binding.bundle().compiled().graph().definition();
+    super::agent_manifest::attach_child_on(
         db,
         scope.company,
-        start.binding.id(),
-        &admission_binding::SourceKey::from_trigger(&trigger),
+        scope.run,
         child,
+        definition.workflow_id,
+        definition.version_id,
     )
     .await?;
-    admission_write::insert_admitted(db, scope.company, child, parent.actor_id).await?;
-    let wait = Uuid::new_v4();
-    // The stored deadline answers every replay, as for the other waits.
-    let deadline: DateTime<Utc> = sqlx::query_scalar("INSERT INTO workflow_waits(company_id,run_id,execution_id,id,reason,deadline,created_at,child_run_id,child_ordinal,child_tool_call_id,parked_attempt_number) VALUES($1,$2,$3,$4,'child_run',$5,clock_timestamp(),$6,$7,$8,$9) RETURNING deadline")
-        .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(scope.execution.as_uuid()).bind(wait)
-        .bind(start.deadline).bind(child.as_uuid()).bind(ordinal).bind(call).bind(attempt)
-        .fetch_one(&mut *db).await?;
-    Ok(ParkedWorkflow {
-        wait: WaitId::new(wait),
-        deadline,
-    })
+    Ok(())
 }

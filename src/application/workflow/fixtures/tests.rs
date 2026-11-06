@@ -129,11 +129,12 @@ fn workflow_fixtures_autonomous_omission_uses_frozen_saved_defaults() {
             .all(|s| s.step_type.as_str() != "ai.classify")
     );
     let saved = &bundle.snapshots().agents[0];
-    assert_eq!(saved.tools[0].as_str(), "knowledge.search");
-    assert_eq!(saved.skills[0].as_str(), "support");
+    assert_eq!(saved.uses.len(), 1);
+    assert_eq!(saved.uses[0].mode, publication::AgentUseMode::Tools);
     assert_eq!(inputs.value()["context"]["untrusted_message"], "Help");
     let mut changed = Fixture::AutonomousResponse.snapshots(company());
-    changed.agents[0].instructions = "New instructions".into();
+    changed.agents[0].agent_id =
+        crate::entities::agent_capability::AgentId::new(Uuid::from_u128(3));
     let later = publication::freeze(
         decode(Fixture::AutonomousResponse.source()).unwrap(),
         company(),
@@ -143,10 +144,9 @@ fn workflow_fixtures_autonomous_omission_uses_frozen_saved_defaults() {
     )
     .unwrap();
     assert_ne!(bundle.content_hash(), later.content_hash());
-    assert!(
-        bundle.snapshots().agents[0]
-            .instructions
-            .starts_with("Draft")
+    assert_eq!(
+        bundle.snapshots().agents[0].agent_id.as_uuid(),
+        Uuid::from_u128(1)
     );
 }
 

@@ -144,6 +144,43 @@ async fn recorded(
 }
 
 impl Fixture {
+    async fn publish_agent(
+        &self,
+        agent: Uuid,
+    ) -> crate::application::agent::PublishedAgentRevision {
+        use crate::application::agent::{
+            AgentPublicationKey, AgentPublicationScope, AgentPublications, PublishAgent,
+        };
+        let scope = AgentPublicationScope {
+            company: self.target.company,
+            actor: self.target.actor,
+            agent: crate::entities::agent_capability::AgentId::new(agent),
+        };
+        let preview = AgentPublications::preview_agent(&self.persistence, scope)
+            .await
+            .unwrap();
+        AgentPublications::publish_agent(
+            &self.persistence,
+            PublishAgent {
+                scope,
+                expected_draft_revision: preview.draft_revision,
+                expected_active_revision: preview.active_revision,
+                key: AgentPublicationKey::parse(format!(
+                    "fixture:{}:{}:{}",
+                    agent,
+                    preview.draft_revision.get(),
+                    preview
+                        .active_revision
+                        .map(|id| id.as_uuid().to_string())
+                        .unwrap_or_else(|| "initial".into())
+                ))
+                .unwrap(),
+            },
+        )
+        .await
+        .unwrap()
+    }
+
     async fn new() -> Self {
         let db = Arc::new(
             own_database()

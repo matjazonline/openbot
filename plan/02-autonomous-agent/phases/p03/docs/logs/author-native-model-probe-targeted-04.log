@@ -1,0 +1,26 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+
+running 2 tests
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::tokens::workflow_harness_token_approval_never_admits_and_claim_consumes_exact_request ... FAILED
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::workflow_harness_model_store_competing_admission_and_settlement ... FAILED
+
+failures:
+
+---- adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::tokens::workflow_harness_token_approval_never_admits_and_claim_consumes_exact_request stdout ----
+
+thread 'adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::tokens::workflow_harness_token_approval_never_admits_and_claim_consumes_exact_request' (32256094) panicked at src/adapters/persistence/workflow/harness_model_fixture.rs:86:48:
+called `Result::unwrap()` on an `Err` value: Validation(Diagnostic { code: "binding.type", message: "Literal does not match destination schema", field_path: "/steps/start/with/task", span: SourceSpan { start: 482, end: 483, line: 1, column: 483 }, instance_path: None, schema_path: None })
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::workflow_harness_model_store_competing_admission_and_settlement stdout ----
+
+thread 'adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::workflow_harness_model_store_competing_admission_and_settlement' (32256095) panicked at src/adapters/persistence/workflow/harness_model_fixture.rs:86:48:
+called `Result::unwrap()` on an `Err` value: Validation(Diagnostic { code: "binding.type", message: "Literal does not match destination schema", field_path: "/steps/start/with/task", span: SourceSpan { start: 416, end: 417, line: 1, column: 417 }, instance_path: None, schema_path: None })
+
+
+failures:
+    adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::tokens::workflow_harness_token_approval_never_admits_and_claim_consumes_exact_request
+    adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::workflow_harness_model_store_competing_admission_and_settlement
+
+test result: FAILED. 0 passed; 2 failed; 0 ignored; 0 measured; 2964 filtered out; finished in 0.72s
+

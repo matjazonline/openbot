@@ -1,0 +1,39 @@
+    Checking open_bots v0.1.0 (/Users/mac02/dev/openbot-recovery/.worktrees/autonomous-p03)
+warning: unused imports: `AgentKey` and `ModelSettings`
+ --> src/application/workflow/completion.rs:4:33
+  |
+4 | use crate::application::agent::{AgentKey, ModelSettings};
+  |                                 ^^^^^^^^  ^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+error[E0560]: struct `persistence::workflow::mcp::publication_owner::McpPublicationSelection` has no field named `target`
+   --> src/adapters/persistence/workflow/mcp_test_support.rs:422:13
+    |
+422 |             target: crate::application::workflow::mcp::McpToolTarget::Workflow { slot: ResourceName::parse("service").unwrap() },
+    |             ^^^^^^ `persistence::workflow::mcp::publication_owner::McpPublicationSelection` does not have this field
+    |
+    = note: available fields are: `slot`
+
+error[E0609]: no field `tools` on type `application::workflow::publication::types::AgentReference`
+   --> src/application/workflow/publication/tests.rs:435:15
+    |
+435 |         agent.tools = tool.iter().map(|tool| tool.contract.name.clone()).collect();
+    |               ^^^^^ unknown field
+    |
+    = note: available fields are: `company_id`, `agent_id`, `key`, `uses`
+
+warning: variable does not need to be mutable
+   --> src/application/workflow/sample/tests.rs:262:9
+    |
+262 |     let mut facts = Fixture::AutonomousResponse.snapshots(company());
+    |         ----^^^^^
+    |         |
+    |         help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+Some errors have detailed explanations: E0560, E0609.
+For more information about an error, try `rustc --explain E0560`.
+warning: `open_bots` (lib test) generated 2 warnings
+error: could not compile `open_bots` (lib test) due to 2 previous errors; 2 warnings emitted

@@ -1,0 +1,100 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+
+running 54 tests
+test application::workflow::fixtures::tests::workflow_fixtures_autonomous_omission_uses_frozen_saved_defaults ... ok
+test application::workflow::fixtures::tests::workflow_fixtures_reply_templates_pass_the_subject_and_history_to_the_agent ... ok
+test application::workflow::fixtures::tests::workflow_fixtures_successor_maps_human_feedback_and_data_explicitly ... ok
+test application::workflow::fixtures::tests::workflow_fixtures_review_routes_human_edits_and_requires_rejection_feedback ... ok
+test application::workflow::publication::tests::agent_tests::workflow_agent_preparation_declares_provider_safe_names_and_delimits_context ... ok
+test application::workflow::fixtures::tests::workflow_fixtures_revision_escalation_reaches_a_specialist_with_artifact_and_feedback ... ok
+test application::workflow::fixtures::tests::workflow_fixtures_revision_contract_pins_rounds_and_accepted_data ... ok
+test application::workflow::publication::tests::agent_tests::workflow_agent_preparation_refuses_unsupported_or_colliding_bindings ... ok
+test application::workflow::fixtures::tests::workflow_fixtures_revision_rounds_carry_feedback_and_never_approve_on_exhaustion ... ok
+test application::workflow::fixtures::tests::workflow_fixtures_triage_selects_declared_routes_and_default ... ok
+test application::workflow::publication::tests::capabilities_tests::autonomous_agent_definition_skill_requirements_are_agent_local ... ok
+test application::workflow::publication::tests::agent_tests::workflow_model_steps_prepare_tool_free_with_their_response_contracts ... ok
+test application::workflow::publication::tests::autonomous_agent_workflow_reference_does_not_resolve_agent_tools_from_step_slots ... ok
+test application::workflow::publication::tests::capabilities_tests::workflow_capabilities_agent_without_saved_capabilities_receives_none ... ok
+test application::workflow::publication::tests::capabilities_tests::workflow_capabilities_agent_universe_is_literal_or_finite_parameter_enum ... ok
+test application::workflow::publication::tests::autonomous_agent_workflow_reference_rejects_embedded_behavior_and_wrong_use_mode ... ok
+test application::workflow::publication::tests::capabilities_tests::workflow_capabilities_agent_receives_exactly_its_saved_tools_and_skills_in_order ... ok
+test application::workflow::publication::tests::capabilities_tests::workflow_capabilities_refuse_other_company_and_unknown_agent ... ok
+test application::workflow::publication::tests::diagnostic_tests::autonomous_agent_workflow_reference_unknown_key_identifies_the_field ... ok
+test application::workflow::publication::tests::capabilities_tests::workflow_capabilities_step_and_workflow_narrowing_inputs_are_rejected ... ok
+test application::workflow::publication::tests::diagnostic_tests::workflow_publication_duplicate_selections_identify_the_list_and_member ... ok
+test application::workflow::publication::tests::autonomous_agent_workflow_reference_hashes_identity_and_step_tools_without_behavior ... ok
+test application::workflow::publication::tests::capabilities_tests::workflow_capabilities_classify_captures_and_requires_its_agent ... ok
+test application::workflow::publication::tests::workflow_publication_children_pin_content_schemas_and_transitive_hashes ... ok
+test application::workflow::publication::tests::workflow_publication_freezes_workflow_tool_pins_like_children ... ok
+test application::workflow::publication::tests::diagnostic_tests::workflow_publication_duplicate_contracts_identify_the_dependency ... FAILED
+test application::workflow::publication::tests::workflow_publication_rejects_conflicting_transitive_version_content ... ok
+test application::workflow::publication::tests::workflow_publication_rejects_incomplete_foreign_duplicate_and_oversized_dependencies ... ok
+test application::workflow::publication::tests::workflow_publication_rejects_missing_duplicate_foreign_recursive_and_wrong_child_versions ... ok
+test application::workflow::publication::tests::workflow_publication_bounds_child_depth_and_pins_transitive_content ... ok
+test application::workflow::publication::tests::workflow_publication_runtime_agent_selection_uses_only_frozen_catalogue ... FAILED
+test application::workflow::publication::tests::workflow_publication_requires_and_hashes_trusted_agent_identity ... ok
+test application::workflow::publication::tests::workflow_publication_rejects_deep_and_aggregate_schema_facts_before_copying ... ok
+test application::workflow::sample::tests::jev_tests::jev_box_sample_rejects_tools_tokens_and_invalid_box ... FAILED
+test application::workflow::sample::tests::jev_tests::jev_box_sample_uses_only_scripted_answers_and_inert_metadata ... FAILED
+test application::workflow::sample::tests::jev_tests::workflow_sample_jev_mixed_thresholds_automatic_and_human_paths ... FAILED
+test application::workflow::sample::tests::bounded_root_budget_and_external_kinds_never_fall_back ... ok
+test application::workflow::sample::tests::missing_invalid_unused_and_oversized_scripts_fail_explicitly ... ok
+test application::workflow::sample::tests::pure_and_scripted_routing_share_compiled_validation ... ok
+test application::workflow::fixtures::tests::workflow_fixtures_invalid_variants_return_source_located_errors ... ok
+test application::workflow::publication::tests::workflow_publication_dependency_errors_name_the_problem_and_source_field ... ok
+test application::workflow::sample::tests::tools_tests::direct_agent_tools_and_pinned_workflow_tools_stay_in_sample ... ok
+test application::workflow::fixtures::tests::workflow_fixtures_mcp_preserves_typed_arguments_results_and_missing_default ... ok
+test application::workflow::fixtures::tests::workflow_fixtures_all_compile_and_freeze_with_real_child_content ... ok
+test application::workflow::fixtures::tests::workflow_fixtures_mcp_required_result_and_recursive_child_are_rejected ... ok
+test application::workflow::publication::tests::workflow_publication_mcp_contract_policy_and_resource_are_frozen_together ... ok
+test application::workflow::sample::tests::tools_tests::protected_step_workflow_tool_needs_approval_and_executes_child ... ok
+test application::workflow::fixtures::tests::workflow_fixtures_taking_a_message_accept_the_standard_message_input ... ok
+test application::workflow::sample::tests::tools_tests::direct_mcp_tool_uses_the_production_result_envelope ... ok
+test application::workflow::sample::tests::tools_tests::direct_tool_inputs_and_outputs_are_validated ... ok
+test application::workflow::fixtures::tests::workflow_fixtures_mcp_constructed_arguments_check_allof_contracts ... ok
+test application::workflow::fixtures::tests::workflow_fixtures_nested_defaults_and_allof_keep_compile_work_bounded ... ok
+test application::workflow::sample::tests::repeated_human_revision_carries_edited_artifact_feedback_and_captures_reply ... ok
+test application::workflow::sample::tests::descendants_cannot_replenish_root_budgets_and_report_size_is_bounded ... ok
+
+failures:
+
+---- application::workflow::publication::tests::diagnostic_tests::workflow_publication_duplicate_contracts_identify_the_dependency stdout ----
+
+thread 'application::workflow::publication::tests::diagnostic_tests::workflow_publication_duplicate_contracts_identify_the_dependency' (32075000) panicked at src/application/workflow/publication/diagnostic_tests.rs:12:5:
+assertion `left == right` failed
+  left: "/steps"
+ right: "/steps/start/with/tool"
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- application::workflow::publication::tests::workflow_publication_runtime_agent_selection_uses_only_frozen_catalogue stdout ----
+
+thread 'application::workflow::publication::tests::workflow_publication_runtime_agent_selection_uses_only_frozen_catalogue' (32075014) panicked at src/application/workflow/publication/tests.rs:153:13:
+assertion `left == right` failed
+  left: "/params"
+ right: "/steps/start/with/agent"
+
+---- application::workflow::sample::tests::jev_tests::jev_box_sample_rejects_tools_tokens_and_invalid_box stdout ----
+
+thread 'application::workflow::sample::tests::jev_tests::jev_box_sample_rejects_tools_tokens_and_invalid_box' (32075021) panicked at src/application/workflow/sample/jev_tests.rs:72:78:
+called `Result::unwrap()` on an `Err` value: Error("missing field `agents`", line: 0, column: 0)
+
+---- application::workflow::sample::tests::jev_tests::jev_box_sample_uses_only_scripted_answers_and_inert_metadata stdout ----
+
+thread 'application::workflow::sample::tests::jev_tests::jev_box_sample_uses_only_scripted_answers_and_inert_metadata' (32075022) panicked at src/application/workflow/sample/jev_tests.rs:11:59:
+called `Result::unwrap()` on an `Err` value: Error("missing field `agents`", line: 0, column: 0)
+
+---- application::workflow::sample::tests::jev_tests::workflow_sample_jev_mixed_thresholds_automatic_and_human_paths stdout ----
+
+thread 'application::workflow::sample::tests::jev_tests::workflow_sample_jev_mixed_thresholds_automatic_and_human_paths' (32075023) panicked at src/application/workflow/sample/jev_tests.rs:32:59:
+called `Result::unwrap()` on an `Err` value: Error("missing field `agents`", line: 0, column: 0)
+
+
+failures:
+    application::workflow::publication::tests::diagnostic_tests::workflow_publication_duplicate_contracts_identify_the_dependency
+    application::workflow::publication::tests::workflow_publication_runtime_agent_selection_uses_only_frozen_catalogue
+    application::workflow::sample::tests::jev_tests::jev_box_sample_rejects_tools_tokens_and_invalid_box
+    application::workflow::sample::tests::jev_tests::jev_box_sample_uses_only_scripted_answers_and_inert_metadata
+    application::workflow::sample::tests::jev_tests::workflow_sample_jev_mixed_thresholds_automatic_and_human_paths
+
+test result: FAILED. 49 passed; 5 failed; 0 ignored; 0 measured; 2892 filtered out; finished in 0.49s
+

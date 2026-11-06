@@ -226,7 +226,10 @@ async fn restore_on(
     {
         return Err(invalid());
     }
+    let actor = WorkflowActor::authenticated(run.actor_id)?;
+    let origin = super::agent_origin::authority_on(tx, action.request(), actor, &bundle).await?;
     let frozen = ActionRunAuthority {
+        origin,
         action,
         actor: WorkflowActor::authenticated(run.actor_id)?,
         bundle,

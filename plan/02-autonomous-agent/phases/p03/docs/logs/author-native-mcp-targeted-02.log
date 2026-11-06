@@ -1,0 +1,27 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+
+running 3 tests
+test adapters::persistence::workflow::tests::admission_tests::storage_tests::autonomous_agent_storage_tests::manifest_tests::autonomous_agent_storage_manifest_retention_races_preserve_surviving_revisions ... FAILED
+test adapters::persistence::workflow::tests::admission_tests::storage_tests::autonomous_agent_storage_tests::manifest_tests::autonomous_agent_storage_manifest_seals_selection_and_accepts_only_its_tree ... FAILED
+test adapters::persistence::workflow::tests::mcp_tests::agent_tests::autonomous_agent_dispatch_mcp_without_workflow_slot_and_replay ... ok
+
+failures:
+
+---- adapters::persistence::workflow::tests::admission_tests::storage_tests::autonomous_agent_storage_tests::manifest_tests::autonomous_agent_storage_manifest_retention_races_preserve_surviving_revisions stdout ----
+
+thread 'adapters::persistence::workflow::tests::admission_tests::storage_tests::autonomous_agent_storage_tests::manifest_tests::autonomous_agent_storage_manifest_retention_races_preserve_surviving_revisions' (32097703) panicked at src/adapters/persistence/workflow/autonomous_agent_storage_native_runs.rs:62:23:
+called `Result::unwrap()` on an `Err` value: Database(PgDatabaseError { severity: Error, code: "23514", message: "Workflow child run has no parent child_run wait", detail: None, hint: None, position: None, where: Some("PL/pgSQL function check_workflow_child_parent_wait() line 16 at RAISE"), schema: None, table: None, column: None, data_type: None, constraint: Some("workflow_guard:check_workflow_child_parent_wait"), file: Some("pl_exec.c"), line: Some(3923), routine: Some("exec_stmt_raise") })
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- adapters::persistence::workflow::tests::admission_tests::storage_tests::autonomous_agent_storage_tests::manifest_tests::autonomous_agent_storage_manifest_seals_selection_and_accepts_only_its_tree stdout ----
+
+thread 'adapters::persistence::workflow::tests::admission_tests::storage_tests::autonomous_agent_storage_tests::manifest_tests::autonomous_agent_storage_manifest_seals_selection_and_accepts_only_its_tree' (32097704) panicked at src/adapters/persistence/workflow/autonomous_agent_storage_native_runs.rs:62:23:
+called `Result::unwrap()` on an `Err` value: Database(PgDatabaseError { severity: Error, code: "23514", message: "Workflow child run has no parent child_run wait", detail: None, hint: None, position: None, where: Some("PL/pgSQL function check_workflow_child_parent_wait() line 16 at RAISE"), schema: None, table: None, column: None, data_type: None, constraint: Some("workflow_guard:check_workflow_child_parent_wait"), file: Some("pl_exec.c"), line: Some(3923), routine: Some("exec_stmt_raise") })
+
+
+failures:
+    adapters::persistence::workflow::tests::admission_tests::storage_tests::autonomous_agent_storage_tests::manifest_tests::autonomous_agent_storage_manifest_retention_races_preserve_surviving_revisions
+    adapters::persistence::workflow::tests::admission_tests::storage_tests::autonomous_agent_storage_tests::manifest_tests::autonomous_agent_storage_manifest_seals_selection_and_accepts_only_its_tree
+
+test result: FAILED. 1 passed; 2 failed; 0 ignored; 0 measured; 2943 filtered out; finished in 2.38s
+

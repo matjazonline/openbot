@@ -388,7 +388,19 @@ async fn picking_a_library_agent_copies_its_skills_with_the_agent_and_channel() 
         ..Default::default()
     };
     let created = persistence
-        .create_agent_from_library(company_id, source_agent.id, company_write)
+        .create_agent_from_library(
+            company_id,
+            crate::application::workflow::WorkflowActor::authenticated(
+                sqlx::query_scalar("SELECT user_id FROM companies WHERE id=$1")
+                    .bind(company_id)
+                    .fetch_one(persistence.pool())
+                    .await
+                    .unwrap(),
+            )
+            .unwrap(),
+            source_agent.id,
+            company_write,
+        )
         .await
         .unwrap();
     let snapshot = persistence

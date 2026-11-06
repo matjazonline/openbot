@@ -32,6 +32,7 @@ pub(crate) fn request(scope: ActionScope) -> ActionRequest {
         },
         arguments: json!({"value":1}),
         context: ActionPolicyContext {
+            origin: crate::application::agent::ToolCallOrigin::Workflow,
             actor: Uuid::new_v4(),
             capability_ceiling: vec![TypeName::parse("fixture.write").unwrap()],
             approval_required: false,
@@ -46,6 +47,44 @@ fn scope() -> ActionScope {
         run: RunId::new(Uuid::new_v4()),
         execution: ExecutionId::new(Uuid::new_v4()),
     }
+}
+
+#[test]
+fn autonomous_agent_dispatch_origin_is_part_of_effect_identity_and_has_no_default() {
+    use crate::application::agent::{AgentToolOrigin, ToolCallOrigin};
+    use crate::entities::agent_capability::{
+        AgentBindingId, AgentId, AgentRevisionId, DependencyManifestId,
+    };
+    let mut request = request(scope());
+    let workflow = freeze::freeze(request.clone()).unwrap();
+    let origin = AgentToolOrigin {
+        manifest: DependencyManifestId::new(Uuid::from_u128(1)),
+        agent: AgentId::new(Uuid::from_u128(2)),
+        revision: AgentRevisionId::new(Uuid::from_u128(3)),
+        binding: AgentBindingId::new(Uuid::from_u128(4)),
+    };
+    request.context.origin = ToolCallOrigin::Agent(origin);
+    let first = freeze::freeze(request.clone()).unwrap();
+    assert_ne!(first.idempotency_key(), workflow.idempotency_key());
+    for field in ["manifest", "agent", "revision", "binding"] {
+        let mut saved = first.saved_operation().clone();
+        saved["context"]["origin"][field] = json!(Uuid::new_v4());
+        let changed = FrozenAction::restore(saved).unwrap();
+        assert_ne!(
+            first.idempotency_key(),
+            changed.idempotency_key(),
+            "{field}"
+        );
+        assert_eq!(first.argument_digest(), changed.argument_digest());
+    }
+    let mut missing = first.saved_operation().clone();
+    missing["context"].as_object_mut().unwrap().remove("origin");
+    assert!(FrozenAction::restore(missing).is_err());
+    request.context.origin = ToolCallOrigin::Agent(AgentToolOrigin {
+        binding: AgentBindingId::new(Uuid::nil()),
+        ..origin
+    });
+    assert!(freeze::freeze(request).is_err());
 }
 
 #[test]

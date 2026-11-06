@@ -33,19 +33,41 @@ impl ActionAuthorities for PostgresPersistence {
 /// the run lock. Keep a denied authority distinct from operational errors so receipt
 /// return can still report known lost ownership before reporting access denial.
 pub(super) async fn prelock_on(
-    tx: &mut Transaction<'_, Postgres>,
+    tx: &mut PgConnection,
     scope: ActionScope,
 ) -> AppResult<Option<WorkflowActor>> {
     let actor: Option<Uuid> =
         sqlx::query_scalar("SELECT actor_id FROM workflow_runs WHERE company_id=$1 AND id=$2")
             .bind(scope.company.as_uuid())
             .bind(scope.run.as_uuid())
-            .fetch_optional(&mut **tx)
+            .fetch_optional(&mut *tx)
             .await?;
     let Some(actor) = actor else { return Ok(None) };
+    // Provisioning may act for a signed-in message author instead of the run owner.
+    // Both accounts precede the company lock; this hint never authorizes the effect.
+    let requester = super::provisioning::requester_on(tx, scope).await?;
+    let mut accounts = vec![actor];
+    if let Some(requester) = requester {
+        accounts.push(requester.user_id());
+    }
+    accounts.sort_unstable();
+    accounts.dedup();
+    let locked: Vec<Uuid> =
+        sqlx::query_scalar("SELECT id FROM users WHERE id=ANY($1) ORDER BY id FOR SHARE")
+            .bind(&accounts)
+            .fetch_all(&mut *tx)
+            .await?;
+    if !locked.contains(&actor) {
+        return Err(missing());
+    }
     let actor = WorkflowActor::authenticated(actor)?;
     match authority::authorize_company(tx, scope.company, actor).await {
-        Ok(_) => Ok(Some(actor)),
+        Ok(_) => {
+            if super::provisioning::requester_on(tx, scope).await? != requester {
+                return Err(conflict());
+            }
+            Ok(Some(actor))
+        }
         Err(AppError::NotFound(_)) => Ok(None),
         Err(error) => Err(error),
     }
@@ -111,7 +133,18 @@ pub(super) async fn load_on(
     if !active {
         return Err(conflict());
     }
+    let origin = super::agent_origin::authority_on(tx, action.request(), actor, &bundle).await?;
+    if let ActionOriginAuthority::Agent(selection) = &origin {
+        super::agent_authority::check_execution_on(
+            tx,
+            scope,
+            selection.agent(),
+            AgentUseMode::Tools,
+        )
+        .await?;
+    }
     Ok(ActionRunAuthority {
+        origin,
         action,
         actor,
         bundle,

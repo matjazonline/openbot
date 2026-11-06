@@ -6,10 +6,14 @@ mod definition;
 mod manifest;
 mod publication;
 mod resolution;
+mod tool_name;
+mod tool_origin;
 pub use definition::*;
 pub use manifest::*;
 pub use publication::*;
 pub use resolution::*;
+pub use tool_name::*;
+pub use tool_origin::*;
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize)]
 #[serde(transparent)]

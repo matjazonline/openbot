@@ -319,7 +319,16 @@ async fn authorize_on(tx: &mut PgConnection, fence: WorkflowFence) -> AppResult<
     .fetch_optional(&mut *tx)
     .await?
     .ok_or_else(missing)?;
-    super::agent_preparation::current_on(tx, fence.scope.company, &prepared).await
+    super::agent_preparation::current_on(
+        tx,
+        crate::application::workflow::actions::ActionScope {
+            company: fence.scope.company,
+            run: fence.scope.run,
+            execution: fence.scope.execution,
+        },
+        &prepared,
+    )
+    .await
 }
 
 async fn load_on(tx: &mut PgConnection, fence: WorkflowFence) -> AppResult<Option<Saved>> {

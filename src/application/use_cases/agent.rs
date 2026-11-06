@@ -126,6 +126,7 @@ pub trait LibraryAgentCopyPersistence: Send + Sync {
     async fn create_agent_from_library(
         &self,
         company_id: Uuid,
+        actor: crate::application::workflow::WorkflowActor,
         library_agent_id: Uuid,
         agent: AgentWrite,
     ) -> AppResult<Agent>;
@@ -359,7 +360,12 @@ impl AgentUseCases {
         let inherited = write.provider.is_none();
         let agent = self
             .library_copy_persistence
-            .create_agent_from_library(company_id, library_agent_id, write)
+            .create_agent_from_library(
+                company_id,
+                crate::application::workflow::WorkflowActor::authenticated(user_id)?,
+                library_agent_id,
+                write,
+            )
             .await?;
         if inherited && let (Some(provider), Some(model)) = (&agent.provider, &agent.model) {
             warnings.push(ProvisioningWarning {

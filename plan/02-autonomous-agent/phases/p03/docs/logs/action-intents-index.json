@@ -1,0 +1,701 @@
+{
+  "pattern": "workflow_action_intents",
+  "filesSearched": 1301,
+  "totalHits": 43,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/workflows/ui/authoring/sample_tests.rs#counts",
+        "name": "counts",
+        "kind": "function",
+        "path": "src/adapters/http/routes/workflows/ui/authoring/sample_tests.rs",
+        "span": "L11-L31"
+      },
+      "path": "src/adapters/http/routes/workflows/ui/authoring/sample_tests.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 17,
+          "text": "\"workflow_action_intents\","
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/message_sql_tests.rs#sql_intent",
+        "name": "sql_intent",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/message_sql_tests.rs",
+        "span": "L12-L21"
+      },
+      "path": "src/adapters/persistence/workflow/message_sql_tests.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 16,
+          "text": "\"INSERT INTO workflow_action_intents (company_id,run_id,execution_id,id,operation_key,operation_digest,argument_digest,idempotency_key,operation,policy_decision"
+        },
+        {
+          "line": 17,
+          "text": "SELECT company_id,run_id,execution_id,$2,operation_key,$3,argument_digest,'workflow-action:v1:'||$3,operation,policy_decision,content_level_at_freeze,destinatio"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_cancellation_order_tests.rs#assert_cancelled",
+        "name": "assert_cancelled",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_cancellation_order_tests.rs",
+        "span": "L302-L330"
+      },
+      "path": "src/adapters/persistence/workflow/action_cancellation_order_tests.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 325,
+          "text": "let intents: i64 = sqlx::query_scalar(\"SELECT count(*) FROM workflow_action_intents\")"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_dispatch.rs#authorize_prelocked_on",
+        "name": "authorize_prelocked_on",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_dispatch.rs",
+        "span": "L96-L169"
+      },
+      "path": "src/adapters/persistence/workflow/action_dispatch.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 138,
+          "text": "\"SELECT id FROM workflow_action_intents WHERE company_id=$1 AND run_id=$2 \\"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_history_tests.rs#cloned_intent",
+        "name": "cloned_intent",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_history_tests.rs",
+        "span": "L149-L164"
+      },
+      "path": "src/adapters/persistence/workflow/action_history_tests.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 160,
+          "text": "sqlx::query(\"INSERT INTO workflow_action_intents (company_id,run_id,execution_id,id,operation_key,operation_digest,argument_digest,idempotency_key,operation,pol"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_receipts.rs#verify_entry_on",
+        "name": "verify_entry_on",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_receipts.rs",
+        "span": "L138-L166"
+      },
+      "path": "src/adapters/persistence/workflow/action_receipts.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 149,
+          "text": "JOIN workflow_action_intents AS intent ON intent.company_id=entry.company_id AND intent.id=entry.invocation_id \\"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_eligibility_invariant_tests.rs#no_action_history",
+        "name": "no_action_history",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_eligibility_invariant_tests.rs",
+        "span": "L141-L165"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_eligibility_invariant_tests.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 147,
+          "text": "\"workflow_action_intents\","
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_eligibility_poison_tests.rs#unchanged_history",
+        "name": "unchanged_history",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_eligibility_poison_tests.rs",
+        "span": "L103-L119"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_eligibility_poison_tests.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 112,
+          "text": "\"workflow_action_intents\","
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_eligibility_remaining_tests.rs#retained_accounting",
+        "name": "retained_accounting",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_eligibility_remaining_tests.rs",
+        "span": "L53-L69"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_eligibility_remaining_tests.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 62,
+          "text": "\"workflow_action_intents\","
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_live_boundary_tests.rs#invoke",
+        "name": "invoke",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_live_boundary_tests.rs",
+        "span": "L515-L534"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_live_boundary_tests.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 528,
+          "text": "let entry: Uuid = sqlx::query_scalar(\"SELECT ledger.entry_id FROM fixture_evidence_ledger AS ledger JOIN workflow_action_intents AS intent ON intent.id=ledger.i"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_sibling_tests.rs#preserved_history",
+        "name": "preserved_history",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_sibling_tests.rs",
+        "span": "L130-L165"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_sibling_tests.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 135,
+          "text": "\"workflow_action_intents\","
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation/mod.rs#restore_on",
+        "name": "restore_on",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation/mod.rs",
+        "span": "L198-L237"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation/mod.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 215,
+          "text": "let operation: Value = sqlx::query_scalar(\"SELECT operation FROM workflow_action_intents WHERE company_id=$1 AND run_id=$2 AND execution_id=$3 AND id=$4 AND arg"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_authority.rs#load_on",
+        "name": "load_on",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_authority.rs",
+        "span": "L54-L120"
+      },
+      "path": "src/adapters/persistence/workflow/action_authority.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 75,
+          "text": "\"SELECT operation FROM workflow_action_intents WHERE company_id=$1 AND run_id=$2 \\"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_authority_tests.rs#assert_owner_absent",
+        "name": "assert_owner_absent",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_authority_tests.rs",
+        "span": "L347-L362"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_authority_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 354,
+          "text": "\"workflow_action_intents\","
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_claim_race_tests.rs#assert_race_history",
+        "name": "assert_race_history",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_claim_race_tests.rs",
+        "span": "L316-L385"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_claim_race_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 345,
+          "text": "\"workflow_action_intents\","
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_control_serialization_tests.rs#preserved_history",
+        "name": "preserved_history",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_control_serialization_tests.rs",
+        "span": "L95-L124"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_control_serialization_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 100,
+          "text": "\"workflow_action_intents\","
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_owner_lifecycle_tests.rs#assert_deleted",
+        "name": "assert_deleted",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_owner_lifecycle_tests.rs",
+        "span": "L166-L191"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_owner_lifecycle_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 172,
+          "text": "\"workflow_action_intents\","
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_proof_tests.rs#competing_proof",
+        "name": "competing_proof",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_proof_tests.rs",
+        "span": "L140-L204"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_proof_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 195,
+          "text": "\"workflow_action_intents\","
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_snapshot_binding_tests.rs#unchanged_coverage_control",
+        "name": "unchanged_coverage_control",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_snapshot_binding_tests.rs",
+        "span": "L56-L117"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_snapshot_binding_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 94,
+          "text": "\"workflow_action_intents\","
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_snapshot_binding_tests.rs#entry_change",
+        "name": "entry_change",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_snapshot_binding_tests.rs",
+        "span": "L164-L236"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_snapshot_binding_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 217,
+          "text": "\"workflow_action_intents\","
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_snapshot_receipt_tests.rs#settle_after_receipt",
+        "name": "settle_after_receipt",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_snapshot_receipt_tests.rs",
+        "span": "L106-L174"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_snapshot_receipt_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 142,
+          "text": "\"workflow_action_intents\","
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_snapshot_receipt_tests.rs#validate_settlement",
+        "name": "validate_settlement",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_snapshot_receipt_tests.rs",
+        "span": "L176-L232"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_snapshot_receipt_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 193,
+          "text": "\"workflow_action_intents\","
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/actions.rs#read",
+        "name": "read",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/actions.rs",
+        "span": "L56-L63"
+      },
+      "path": "src/adapters/persistence/workflow/actions.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 59,
+          "text": "\"SELECT id,operation,argument_digest,idempotency_key,policy_decision FROM workflow_action_intents \\"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/actions.rs#insert",
+        "name": "insert",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/actions.rs",
+        "span": "L65-L86"
+      },
+      "path": "src/adapters/persistence/workflow/actions.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 78,
+          "text": "\"INSERT INTO workflow_action_intents \\"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/decision_approvals.rs#view_proposal",
+        "name": "view_proposal",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/decision_approvals.rs",
+        "span": "L150-L158"
+      },
+      "path": "src/adapters/persistence/workflow/decision_approvals.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 155,
+          "text": "let (invocation, operation): (Uuid, Value) = sqlx::query_as(\"SELECT intent.id,intent.operation FROM workflow_decisions AS decision JOIN workflow_action_intents "
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/decision_approvals.rs#fail",
+        "name": "fail",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/decision_approvals.rs",
+        "span": "L183-L210"
+      },
+      "path": "src/adapters/persistence/workflow/decision_approvals.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 189,
+          "text": "let operation: Value = sqlx::query_scalar(\"SELECT intent.operation FROM workflow_decisions AS decision JOIN workflow_action_intents AS intent ON intent.company_"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/message_park_continuation_tests.rs#sql_effect_park",
+        "name": "sql_effect_park",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/message_park_continuation_tests.rs",
+        "span": "L149-L254"
+      },
+      "path": "src/adapters/persistence/workflow/message_park_continuation_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 163,
+          "text": "\"INSERT INTO workflow_action_intents (company_id,run_id,execution_id,id,operation_key,operation_digest,argument_digest,idempotency_key,operation,policy_decision"
+        },
+        {
+          "line": 164,
+          "text": "SELECT company_id,run_id,execution_id,$2,operation_key,$3,argument_digest,'workflow-action:v1:'||$3,operation,policy_decision,content_level_at_freeze,destinatio"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/message_publish.rs#resolve_on",
+        "name": "resolve_on",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/message_publish.rs",
+        "span": "L473-L510"
+      },
+      "path": "src/adapters/persistence/workflow/message_publish.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 492,
+          "text": "\"SELECT operation FROM workflow_action_intents WHERE company_id=$1 AND run_id=$2 \\"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "plan/01-knowledge-access-levels/phases/p03/docs/logs/implement-D1-level-storage.py",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 49,
+          "text": "columns('workflow_action_intents','    content_level_at_freeze public.access_level NOT NULL,\\n    destination_level_at_freeze public.access_level NOT NULL,\\n')"
+        },
+        {
+          "line": 50,
+          "text": "constraint('workflow_action_intents','    CONSTRAINT workflow_action_knowledge_bounds CHECK (content_level_at_freeze <= destination_level_at_freeze)')"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_cancellation_boundary_tests.rs#workflow_action_cancellation_prepared_and_protected_refuse_after_command",
+        "name": "workflow_action_cancellation_prepared_and_protected_refuse_after_command",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_cancellation_boundary_tests.rs",
+        "span": "L174-L216"
+      },
+      "path": "src/adapters/persistence/workflow/action_cancellation_boundary_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 191,
+          "text": "assert_eq!(rows(&before, \"workflow_action_intents\").len(), 1);"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_history_tests.rs#workflow_action_history_numeric_subject_and_u64_revision_domain",
+        "name": "workflow_action_history_numeric_subject_and_u64_revision_domain",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_history_tests.rs",
+        "span": "L167-L224"
+      },
+      "path": "src/adapters/persistence/workflow/action_history_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 170,
+          "text": "sqlx::query_scalar(\"SELECT operation FROM workflow_action_intents WHERE id=$1\")"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_history_tests.rs#workflow_action_history_unsafe_sibling_and_129_fact_overflow",
+        "name": "workflow_action_history_unsafe_sibling_and_129_fact_overflow",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_history_tests.rs",
+        "span": "L227-L257"
+      },
+      "path": "src/adapters/persistence/workflow/action_history_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 230,
+          "text": "sqlx::query_scalar(\"SELECT operation FROM workflow_action_intents WHERE id=$1\")"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_prior_bounds_tests.rs#ENTRY_PRESERVES",
+        "name": "ENTRY_PRESERVES",
+        "kind": "constant",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_prior_bounds_tests.rs",
+        "span": "L133-L140"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_prior_bounds_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 134,
+          "text": "\"workflow_action_intents\","
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_provider_tests.rs#invoke",
+        "name": "invoke",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_provider_tests.rs",
+        "span": "L35-L66"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_provider_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 38,
+          "text": "let invocation = sqlx::query_scalar::<_, Uuid>(\"SELECT id FROM workflow_action_intents WHERE company_id=$1 AND execution_id=$2 AND argument_digest=$3\")"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_tests.rs#counts",
+        "name": "counts",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_tests.rs",
+        "span": "L16-L34"
+      },
+      "path": "src/adapters/persistence/workflow/action_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 18,
+          "text": "\"SELECT count(*) FROM workflow_action_intents WHERE company_id=$1 AND run_id=$2\","
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_tests.rs#workflow_action_schema_fk_immutable_and_cancelled_new_intent_fail_closed",
+        "name": "workflow_action_schema_fk_immutable_and_cancelled_new_intent_fail_closed",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_tests.rs",
+        "span": "L101-L131"
+      },
+      "path": "src/adapters/persistence/workflow/action_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 108,
+          "text": "assert!(sqlx::query(\"UPDATE workflow_action_intents SET argument_digest=repeat('0',64) WHERE company_id=$1 AND id=$2\")"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/decision_approvals.rs#approved_request",
+        "name": "approved_request",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/decision_approvals.rs",
+        "span": "L18-L25"
+      },
+      "path": "src/adapters/persistence/workflow/decision_approvals.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 23,
+          "text": "Ok(sqlx::query_scalar(\"SELECT EXISTS(SELECT 1 FROM workflow_decisions AS decision JOIN workflow_waits AS wait ON wait.company_id=decision.company_id AND wait.id"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/knowledge_history_race_tests.rs#freeze_facts",
+        "name": "freeze_facts",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/knowledge_history_race_tests.rs",
+        "span": "L72-L75"
+      },
+      "path": "src/adapters/persistence/workflow/knowledge_history_race_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 73,
+          "text": "sqlx::query_scalar(\"SELECT jsonb_build_object('content',content_level_at_freeze,'destination',destination_level_at_freeze) FROM workflow_action_intents WHERE id"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/knowledge_message_tests.rs#knowledge_run_level_sql_freeze_constraint_matches_pure_release_matrix",
+        "name": "knowledge_run_level_sql_freeze_constraint_matches_pure_release_matrix",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/knowledge_message_tests.rs",
+        "span": "L131-L165"
+      },
+      "path": "src/adapters/persistence/workflow/knowledge_message_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 149,
+          "text": "let result=sqlx::query(\"INSERT INTO workflow_action_intents(company_id,run_id,execution_id,id,operation_key,operation_digest,argument_digest,idempotency_key,ope"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/knowledge_reply_tests.rs#knowledge_run_level_race_cc_commit_after_destination_snapshot_is_ordered_after_that_freeze",
+        "name": "knowledge_run_level_race_cc_commit_after_destination_snapshot_is_ordered_after_that_freeze",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/knowledge_reply_tests.rs",
+        "span": "L82-L138"
+      },
+      "path": "src/adapters/persistence/workflow/knowledge_reply_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 101,
+          "text": "sqlx::query_scalar(\"SELECT operation FROM workflow_action_intents WHERE id=$1\")"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 32,
+    "baselineChars": 487162
+  }
+}

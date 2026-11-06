@@ -62,6 +62,7 @@ fn request(
         },
         arguments: json!({"content":{"subject":"Racing branch","body":body},"destinations":[{"kind":kind,"id":destination.to_string()}]}),
         context: ActionPolicyContext {
+            origin: crate::application::agent::ToolCallOrigin::Workflow,
             actor: f.binding.target.actor.user_id(),
             capability_ceiling: vec![contract.policy.capability.clone()],
             approval_required: false,

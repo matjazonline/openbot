@@ -28,6 +28,10 @@ struct ScriptKey {
     step: StepId,
 }
 struct Session {
+    agents: BTreeMap<
+        crate::entities::agent_capability::AgentId,
+        crate::application::agent::ResolvedAgentDefinition,
+    >,
     scripts: BTreeMap<ScriptKey, VecDeque<ScriptedResponse>>,
     budget: RootBudgetLimits,
     report: SampleReport,
@@ -80,8 +84,19 @@ pub fn execute(bundle: Arc<PublishedBundle>, request: SampleRequest) -> AppResul
     if request.scripts.len() > MAX_SAMPLE_STEPS as usize {
         return Err(refused("Sample exceeds 128 script keys"));
     }
+    let mut agents = BTreeMap::new();
+    for agent in request.agents {
+        agent.validate()?;
+        if agent.company_id != bundle.company_id()
+            || agents.len() >= super::publication::MAX_DEPENDENCIES
+            || agents.insert(agent.agent_id, agent).is_some()
+        {
+            return Err(refused("Invalid sample agent definitions"));
+        }
+    }
     let scripts = script_queues(request.scripts)?;
     let mut session = Session {
+        agents,
         scripts,
         budget: bundle
             .compiled()

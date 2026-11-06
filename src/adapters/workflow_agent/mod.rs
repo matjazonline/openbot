@@ -15,7 +15,7 @@ use crate::{
         http::HttpToolCall,
         knowledge::{KnowledgeToolCall, KnowledgeToolDispatch},
         lease::WorkflowFence,
-        mcp::McpToolCall,
+        mcp::{McpToolCall, McpToolTarget},
         message::{MessageObservation, MessageToolCall},
         provisioning::ProvisioningToolCall,
         tools::{TOOL_LIMIT, WorkflowToolCall, WorkflowToolDispatch, tool_error},
@@ -80,18 +80,23 @@ fn invocation(
 ) -> AppResult<ToolInvocation> {
     Ok(match &tool.target {
         AgentToolTarget::Http { connection } => ToolInvocation::Http(Box::new(HttpToolCall {
+            origin: crate::application::agent::ToolCallOrigin::Agent(tool.origin),
             connection: *connection,
             operation: tool.name.clone(),
             arguments,
             call,
         })),
-        AgentToolTarget::Mcp { slot } => ToolInvocation::Mcp(Box::new(McpToolCall {
-            slot: slot.clone(),
+        AgentToolTarget::Mcp { connection } => ToolInvocation::Mcp(Box::new(McpToolCall {
+            target: McpToolTarget::Agent {
+                connection: *connection,
+                origin: tool.origin,
+            },
             tool: tool.name.clone(),
             arguments,
             call,
         })),
         AgentToolTarget::Workflow { pin } => ToolInvocation::Workflow(Box::new(WorkflowToolCall {
+            origin: crate::application::agent::ToolCallOrigin::Agent(tool.origin),
             name: tool.name.clone(),
             pin: pin.clone(),
             call: ToolCallId::new(
@@ -102,6 +107,7 @@ fn invocation(
         })),
         AgentToolTarget::Provisioning { .. } => {
             ToolInvocation::Provisioning(Box::new(ProvisioningToolCall {
+                origin: crate::application::agent::ToolCallOrigin::Agent(tool.origin),
                 kind: tool
                     .provisioning_kind()
                     .ok_or_else(|| AppError::BadRequest("Unknown provisioning tool".into()))?,
@@ -110,15 +116,18 @@ fn invocation(
             }))
         }
         AgentToolTarget::Message { .. } => ToolInvocation::Message(Box::new(MessageToolCall {
+            origin: crate::application::agent::ToolCallOrigin::Agent(tool.origin),
             kind: tool
                 .message_kind()
                 .ok_or_else(|| AppError::BadRequest("Unknown message tool".into()))?,
             arguments,
             call,
         })),
-        AgentToolTarget::Knowledge => {
-            ToolInvocation::Knowledge(Box::new(KnowledgeToolCall { call, arguments }))
-        }
+        AgentToolTarget::Knowledge => ToolInvocation::Knowledge(Box::new(KnowledgeToolCall {
+            origin: crate::application::agent::ToolCallOrigin::Agent(tool.origin),
+            call,
+            arguments,
+        })),
     })
 }
 #[async_trait]

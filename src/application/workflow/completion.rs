@@ -1,7 +1,5 @@
 //! Validated successful progression. Failure recovery and parking have separate owners.
 use super::{activation::*, batch::*, lease::FencedWorkflowResult, publication::PublishedBundle};
-#[cfg(test)]
-use crate::application::agent::{AgentKey, ModelSettings};
 use crate::application::app_error::{AppError, AppResult};
 use crate::domain::workflow::{ChoiceName, RouteSelection, TransitionTarget};
 use async_trait::async_trait;
@@ -90,7 +88,7 @@ pub fn prepare_io(
 mod tests {
     use super::*;
     use crate::application::workflow::{publication::*, registry};
-    use crate::domain::workflow::{CompanyId, ExecutionId, StepId, TypeName, VersionId};
+    use crate::domain::workflow::{CompanyId, ExecutionId, StepId, VersionId};
     use serde_json::json;
     use uuid::Uuid;
 
@@ -105,18 +103,14 @@ mod tests {
             company,
             VersionId::new(Uuid::new_v4()),
             DependencySnapshots {
-                agents: vec![AgentSnapshot {
-                    agent_id: uuid::Uuid::from_u128(1),
+                agents: vec![AgentReference {
+                    agent_id: crate::entities::agent_capability::AgentId::new(Uuid::from_u128(1)),
                     company_id: company,
-                    key: AgentKey::parse("reviewer").unwrap(),
-                    instructions: "Review".into(),
-                    model: ModelSettings {
-                        provider: TypeName::parse("test").unwrap(),
-                        model: "scripted".into(),
-                        max_output_tokens: 100,
-                    },
-                    tools: vec![],
-                    skills: vec![],
+                    key: crate::application::agent::AgentKey::parse("reviewer").unwrap(),
+                    uses: vec![AgentReferenceUse {
+                        step: StepId::parse("start").unwrap(),
+                        mode: AgentUseMode::ModelOnly,
+                    }],
                 }],
                 ..Default::default()
             },

@@ -19,7 +19,7 @@ pub(super) async fn active_on(
     Ok(id.map(AgentRevisionId::new))
 }
 
-pub(super) async fn revision_on(
+pub(in crate::adapters::persistence) async fn revision_on(
     db: &mut PgConnection,
     scope: AgentPublicationScope,
     id: AgentRevisionId,

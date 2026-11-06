@@ -1,0 +1,2 @@
+⬆ graft 0.28.0 → 0.28.1 available: run `graft upgrade` (restart your agent after).
+✗ invalid pattern "async fn agent(": Invalid regular expression: /async fn agent(/: Unterminated group

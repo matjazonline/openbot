@@ -1,0 +1,117 @@
+{
+  "pattern": "SEMANTIC_REVISION",
+  "filesSearched": 1309,
+  "totalHits": 6,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/application/workflow/publication/storage.rs#restore_bundle",
+        "name": "restore_bundle",
+        "kind": "function",
+        "path": "src/application/workflow/publication/storage.rs",
+        "span": "L116-L173"
+      },
+      "path": "src/application/workflow/publication/storage.rs",
+      "inDegree": 18,
+      "hits": [
+        {
+          "line": 126,
+          "text": "|| stored.compiler_revision != compiler::SEMANTIC_REVISION"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/publication/storage.rs#store_bundle",
+        "name": "store_bundle",
+        "kind": "function",
+        "path": "src/application/workflow/publication/storage.rs",
+        "span": "L75-L112"
+      },
+      "path": "src/application/workflow/publication/storage.rs",
+      "inDegree": 16,
+      "hits": [
+        {
+          "line": 105,
+          "text": "compiler_revision: compiler::SEMANTIC_REVISION,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/budget_schema_tests.rs#workflow_budget_current_compiler_admission_activates",
+        "name": "workflow_budget_current_compiler_admission_activates",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/budget_schema_tests.rs",
+        "span": "L267-L278"
+      },
+      "path": "src/adapters/persistence/workflow/budget_schema_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 276,
+          "text": "json!({\"compiler\":crate::application::workflow::compiler::SEMANTIC_REVISION,\"activations\":1})"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/compiler/mod.rs#SEMANTIC_REVISION",
+        "name": "SEMANTIC_REVISION",
+        "kind": "constant",
+        "path": "src/application/workflow/compiler/mod.rs",
+        "span": "L9-L9"
+      },
+      "path": "src/application/workflow/compiler/mod.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 9,
+          "text": "pub const SEMANTIC_REVISION: u32 = 6;"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/publication/storage_tests.rs#workflow_root_budget_storage_roundtrip_and_old_semantics_refusal",
+        "name": "workflow_root_budget_storage_roundtrip_and_old_semantics_refusal",
+        "kind": "function",
+        "path": "src/application/workflow/publication/storage_tests.rs",
+        "span": "L42-L82"
+      },
+      "path": "src/application/workflow/publication/storage_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 73,
+          "text": "stored[\"compiler_revision\"] = json!(compiler::SEMANTIC_REVISION);"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/publication/storage_tests.rs#workflow_storage_rejects_incompatible_compiler_before_rebuilding",
+        "name": "workflow_storage_rejects_incompatible_compiler_before_rebuilding",
+        "kind": "function",
+        "path": "src/application/workflow/publication/storage_tests.rs",
+        "span": "L129-L142"
+      },
+      "path": "src/application/workflow/publication/storage_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 138,
+          "text": "stored[\"compiler_revision\"] = json!(compiler::SEMANTIC_REVISION + 1);"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 4,
+    "baselineChars": 29262
+  }
+}

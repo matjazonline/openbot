@@ -6,7 +6,7 @@ use compiler::SourceDecoder;
 use serde::{Deserialize, Serialize};
 use std::io::{self, Write};
 
-const FORMAT: &str = "workflow-bundle-storage-v1";
+const FORMAT: &str = "workflow-bundle-storage-v2";
 
 #[derive(Serialize)]
 struct StoredBundle<'a> {

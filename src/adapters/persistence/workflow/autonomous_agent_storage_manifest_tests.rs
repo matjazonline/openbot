@@ -2,8 +2,7 @@ use super::*;
 
 #[tokio::test]
 async fn autonomous_agent_storage_manifest_seals_selection_and_accepts_only_its_tree() {
-    let source = serde_json::from_str(&registry::example("data.map").unwrap().source).unwrap();
-    let (f, scopes) = AdmissionFixture::chain(source, 1).await;
+    let (f, scopes) = super::native_runs::unsealed_chain().await;
     let agent = new_agent(&f, Vec::new()).await;
     let revision = save_revision(&f, &definition(&f, agent.id, Vec::new())).await;
     let value = manifest_for(&f, scopes[0].run, agent.id, revision).await;
@@ -21,7 +20,7 @@ async fn autonomous_agent_storage_manifest_seals_selection_and_accepts_only_its_
     attach_run(&f, scopes[1].run, scopes[0].run, manifest)
         .await
         .unwrap();
-    let other = admitted(&f, "wrong-tree").await;
+    let other = super::native_runs::unsealed_root(&f, "wrong-tree").await;
     native_rejection(
         attach_run(&f, other.run, scopes[0].run, manifest)
             .await
@@ -69,8 +68,7 @@ async fn autonomous_agent_storage_manifest_seals_selection_and_accepts_only_its_
 
 #[tokio::test]
 async fn autonomous_agent_storage_manifest_retention_races_preserve_surviving_revisions() {
-    let source = serde_json::from_str(&registry::example("data.map").unwrap().source).unwrap();
-    let (f, scopes) = AdmissionFixture::chain(source, 1).await;
+    let (f, scopes) = super::native_runs::unsealed_chain().await;
     let agent = new_agent(&f, Vec::new()).await;
     let revision = save_revision(&f, &definition(&f, agent.id, Vec::new())).await;
     let manifest = save_manifest(
@@ -82,7 +80,7 @@ async fn autonomous_agent_storage_manifest_retention_races_preserve_surviving_re
         .await
         .unwrap();
     usage(&f, scopes[1], Some("reported")).await;
-    let survivor = admitted(&f, "surviving-root").await;
+    let survivor = super::native_runs::unsealed_root(&f, "surviving-root").await;
     let survivor_manifest = save_manifest(
         &f,
         &manifest_for(&f, survivor.run, agent.id, revision).await,

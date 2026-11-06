@@ -21,10 +21,9 @@ impl MessageActionPreparation for ProtectedMessages {
     async fn message_tool_request(
         &self,
         scope: ActionScope,
-        kind: MessageKind,
-        arguments: Value,
+        call: &MessageToolCall,
     ) -> AppResult<ActionRequest> {
-        self.0.message_tool_request(scope, kind, arguments).await
+        self.0.message_tool_request(scope, call).await
     }
     async fn message_routes(
         &self,

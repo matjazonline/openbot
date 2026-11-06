@@ -1,0 +1,72 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+
+running 18 tests
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_race_tests::workflow_tool_reopened_attempt_lost_before_saving_replays_the_same_result ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_race_tests::workflow_tool_cancel_and_dispatch_never_leave_a_live_child_under_a_cancelled_run ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_race_tests::workflow_tool_cancel_and_continuation_settle_the_call_once ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_race_tests::workflow_tool_dispatch_after_or_during_lease_expiry_starts_nothing ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_registration_tests::workflow_tool_pins_and_grants_stay_within_the_agents_company ... FAILED
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_race_tests::workflow_tool_schema_guards_refuse_parks_reopens_and_lineage_written_by_hand ... FAILED
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_registration_tests::workflow_tool_publication_freezes_the_child_contract_and_refuses_conflicts ... FAILED
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_registration_tests::workflow_tool_registration_commands_keep_revisions_authority_and_bounds ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_revocation_tests::workflow_tool_repin_and_archive_leave_published_workflows_on_their_frozen_version ... FAILED
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_revocation_tests::workflow_tool_stored_children_keep_their_frozen_pin_until_the_tool_is_revoked ... FAILED
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_revocation_tests::workflow_tool_revocation_refuses_new_runs_and_calls_while_parked_calls_deliver ... FAILED
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_tests::knowledge_run_level_workflow_tool_child_and_saved_result_replay_taint_parent_atomically ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_tests::workflow_tool_child_output_outside_the_pinned_schema_fails_the_parent_wait ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_tests::workflow_tool_child_failure_limit_and_result_bound_are_typed_errors ... FAILED
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_tests::workflow_tool_dispatch_starts_one_child_per_call_and_one_resumer_continues ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_tests::workflow_tool_parent_cancel_cascades_and_a_restarted_worker_resumes_the_call ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_tests::workflow_tool_resumes_the_pending_call_after_a_child_human_decision ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_tests::workflow_tool_typed_errors_reach_the_model_without_fabricated_success ... ok
+
+failures:
+
+---- adapters::persistence::workflow::tests::message_tests::workflow_tool_registration_tests::workflow_tool_pins_and_grants_stay_within_the_agents_company stdout ----
+
+thread 'adapters::persistence::workflow::tests::message_tests::workflow_tool_registration_tests::workflow_tool_pins_and_grants_stay_within_the_agents_company' (32181179) panicked at src/adapters/persistence/workflow/workflow_tool_registration_tests.rs:385:10:
+called `Option::unwrap()` on a `None` value
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- adapters::persistence::workflow::tests::message_tests::workflow_tool_race_tests::workflow_tool_schema_guards_refuse_parks_reopens_and_lineage_written_by_hand stdout ----
+
+thread 'adapters::persistence::workflow::tests::message_tests::workflow_tool_race_tests::workflow_tool_schema_guards_refuse_parks_reopens_and_lineage_written_by_hand' (32181166) panicked at src/adapters/persistence/workflow/workflow_tool_race_tests.rs:401:10:
+called `Result::unwrap()` on an `Err` value: Internal("Pinned child workflow bundle is missing")
+
+---- adapters::persistence::workflow::tests::message_tests::workflow_tool_registration_tests::workflow_tool_publication_freezes_the_child_contract_and_refuses_conflicts stdout ----
+
+thread 'adapters::persistence::workflow::tests::message_tests::workflow_tool_registration_tests::workflow_tool_publication_freezes_the_child_contract_and_refuses_conflicts' (32181187) panicked at src/adapters/persistence/workflow/workflow_tool_registration_tests.rs:453:10:
+called `Option::unwrap()` on a `None` value
+
+---- adapters::persistence::workflow::tests::message_tests::workflow_tool_revocation_tests::workflow_tool_repin_and_archive_leave_published_workflows_on_their_frozen_version stdout ----
+
+thread 'adapters::persistence::workflow::tests::message_tests::workflow_tool_revocation_tests::workflow_tool_repin_and_archive_leave_published_workflows_on_their_frozen_version' (32181218) panicked at src/adapters/persistence/workflow/workflow_tool_revocation_tests.rs:205:5:
+None
+
+---- adapters::persistence::workflow::tests::message_tests::workflow_tool_revocation_tests::workflow_tool_stored_children_keep_their_frozen_pin_until_the_tool_is_revoked stdout ----
+
+thread 'adapters::persistence::workflow::tests::message_tests::workflow_tool_revocation_tests::workflow_tool_stored_children_keep_their_frozen_pin_until_the_tool_is_revoked' (32181237) panicked at src/adapters/persistence/workflow/workflow_tool_revocation_tests.rs:406:10:
+called `Option::unwrap()` on a `None` value
+
+---- adapters::persistence::workflow::tests::message_tests::workflow_tool_revocation_tests::workflow_tool_revocation_refuses_new_runs_and_calls_while_parked_calls_deliver stdout ----
+
+thread 'adapters::persistence::workflow::tests::message_tests::workflow_tool_revocation_tests::workflow_tool_revocation_refuses_new_runs_and_calls_while_parked_calls_deliver' (32181234) panicked at src/adapters/persistence/workflow/workflow_tool_revocation_tests.rs:295:5:
+None
+
+---- adapters::persistence::workflow::tests::message_tests::workflow_tool_tests::workflow_tool_child_failure_limit_and_result_bound_are_typed_errors stdout ----
+
+thread 'adapters::persistence::workflow::tests::message_tests::workflow_tool_tests::workflow_tool_child_failure_limit_and_result_bound_are_typed_errors' (32181263) panicked at src/adapters/persistence/workflow/workflow_tool_saved_call_support.rs:40:14:
+the real driver saved this call
+
+
+failures:
+    adapters::persistence::workflow::tests::message_tests::workflow_tool_race_tests::workflow_tool_schema_guards_refuse_parks_reopens_and_lineage_written_by_hand
+    adapters::persistence::workflow::tests::message_tests::workflow_tool_registration_tests::workflow_tool_pins_and_grants_stay_within_the_agents_company
+    adapters::persistence::workflow::tests::message_tests::workflow_tool_registration_tests::workflow_tool_publication_freezes_the_child_contract_and_refuses_conflicts
+    adapters::persistence::workflow::tests::message_tests::workflow_tool_revocation_tests::workflow_tool_repin_and_archive_leave_published_workflows_on_their_frozen_version
+    adapters::persistence::workflow::tests::message_tests::workflow_tool_revocation_tests::workflow_tool_revocation_refuses_new_runs_and_calls_while_parked_calls_deliver
+    adapters::persistence::workflow::tests::message_tests::workflow_tool_revocation_tests::workflow_tool_stored_children_keep_their_frozen_pin_until_the_tool_is_revoked
+    adapters::persistence::workflow::tests::message_tests::workflow_tool_tests::workflow_tool_child_failure_limit_and_result_bound_are_typed_errors
+
+test result: FAILED. 11 passed; 7 failed; 0 ignored; 0 measured; 2938 filtered out; finished in 7.26s
+

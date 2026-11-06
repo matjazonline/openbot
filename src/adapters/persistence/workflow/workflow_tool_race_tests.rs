@@ -9,11 +9,10 @@ use std::time::Duration;
 
 use super::workflow_tool_support::*;
 
-async fn call_for(setup: &ToolSetup, question: &str) -> WorkflowToolCall {
-    setup.call(
-        setup.frozen_pin(setup.parent).await,
-        json!({"question": question}),
-    )
+async fn call_for(setup: &ToolSetup, question: &str, claim: &ClaimedWorkflow) -> WorkflowToolCall {
+    setup
+        .call(setup.initial_pin(), json!({"question": question}), claim)
+        .await
 }
 
 /// The parent's state, its children, and the children not yet terminal.
@@ -42,7 +41,7 @@ async fn job_status(p: &PostgresPersistence, scope: ActivationRequest) -> (Strin
 /// Dispatch a call in a new run; it parks.
 async fn parked_call(setup: &ToolSetup, key: &str) -> (ActivationRequest, WorkflowToolCall) {
     let claim = setup.claim(key).await;
-    let call = call_for(setup, key).await;
+    let call = call_for(setup, key, &claim).await;
     assert!(matches!(
         setup.dispatch(&claim, &call).await.unwrap(),
         AgentToolObservation::Parked(_)
@@ -73,8 +72,8 @@ async fn workflow_tool_cancel_and_dispatch_never_leave_a_live_child_under_a_canc
     let p = setup.persistence();
     // Cancel first: the dispatch finds no fence and starts nothing.
     let claim = setup.claim("cancel-first").await;
+    let call = call_for(&setup, "q", &claim).await;
     setup.cancel(claim.fence.scope, "cancel-first").await;
-    let call = call_for(&setup, "q").await;
     assert!(setup.dispatch(&claim, &call).await.is_err());
     assert_eq!(
         lineage(p, claim.fence.scope.run).await,
@@ -89,7 +88,7 @@ async fn workflow_tool_cancel_and_dispatch_never_leave_a_live_child_under_a_canc
         let key = format!("race-{round}");
         let claim = setup.claim(&key).await;
         let scope = claim.fence.scope;
-        let call = call_for(&setup, &key).await;
+        let call = call_for(&setup, &key, &claim).await;
         let command = racing_cancel(&setup, scope, &key).await;
         let (cancelled, dispatched) =
             tokio::join!(p.cancel(command), setup.dispatch(&claim, &call));
@@ -110,9 +109,9 @@ async fn workflow_tool_cancel_and_dispatch_never_leave_a_live_child_under_a_canc
 async fn workflow_tool_dispatch_after_or_during_lease_expiry_starts_nothing() {
     let setup = Box::pin(ToolSetup::new(echo_child())).await;
     let p = setup.persistence();
-    let call = call_for(&setup, "q").await;
     // An expired lease: the park's fenced completion is refused and nothing commits.
     let claim = setup.claim("expired").await;
+    let call = call_for(&setup, "q", &claim).await;
     let scope = claim.fence.scope;
     sqlx::query("UPDATE background_tasks SET locked_at=clock_timestamp()-interval '10 seconds',lock_expires_at=clock_timestamp()-interval '1 second' WHERE id=$1")
         .bind(scope.job.0)
@@ -131,6 +130,7 @@ async fn workflow_tool_dispatch_after_or_during_lease_expiry_starts_nothing() {
     // row is held, so inserting the child waits past the expiry; the park is then refused and
     // the whole call rolls back.
     let claim = setup.claim("expires-inside").await;
+    let call = call_for(&setup, "q", &claim).await;
     let scope = claim.fence.scope;
     let mut blocker = p.pool().begin().await.unwrap();
     sqlx::query("SELECT id FROM workflow_versions WHERE id=$1 FOR UPDATE")
@@ -360,7 +360,7 @@ async fn workflow_tool_schema_guards_refuse_parks_reopens_and_lineage_written_by
         let scope = claim.fence.scope;
         let mut tx = p.pool().begin().await.unwrap();
         let mismatch = if origin == "call" {
-            let call = call_for(&setup, "q").await;
+            let call = call_for(&setup, "q", &claim).await;
             workflow_tool_calls::call_on(&mut tx, claim.fence, &call)
                 .await
                 .unwrap();
@@ -397,7 +397,16 @@ async fn round_child(db: &mut PgConnection, setup: &ToolSetup, scope: Activation
     )
     .await
     .unwrap();
-    let configured = children::child_binding(&binding, setup.child, json!({"reviewer": "x"}))
+    let bundle = super::super::agent_manifest::workflow_bundle_on(
+        db,
+        scope.company,
+        scope.run,
+        WorkflowId::new(Uuid::from_u128(CHILD)),
+        setup.child,
+    )
+    .await
+    .unwrap();
+    let configured = children::configured_child(&binding, bundle, json!({"reviewer": "x"}))
         .unwrap()
         .unwrap();
     children::create_on(

@@ -9,6 +9,7 @@ pub(super) async fn create(
     command: &PreparedAdmission,
     source: &SourceKey,
 ) -> AppResult<()> {
+    let manifest = super::agent_manifest::capture_on(tx, command).await?;
     let knowledge = super::knowledge::admission_levels_on(tx, command).await?;
     insert_run(
         tx,
@@ -29,6 +30,7 @@ pub(super) async fn create(
         },
     )
     .await?;
+    super::agent_manifest::persist_on(tx, &manifest).await?;
     insert_first_job(
         tx,
         &FirstJob {

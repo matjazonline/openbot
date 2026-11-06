@@ -18,7 +18,7 @@ use crate::application::{
         company::{CompanyModelConnectionWrite, CompanyPersistence},
     },
     workflow::{
-        lifecycle::PublicationDependencies, publication::AgentSnapshot,
+        lifecycle::PublicationDependencies, publication::AgentReference,
         templates::CompanyWorkflowDraft, worker::WorkflowHandler,
     },
 };
@@ -31,7 +31,7 @@ const HTTP_OK: &str = "HTTP/1.1 200 OK\r\ncontent-type: application/json\r\ncont
 /// A caller-supplied (forged) agent snapshot: the SQL owner must refuse it at publish.
 struct ForgedAgents {
     http: http::HttpPublicationDirectory,
-    agent: AgentSnapshot,
+    agent: AgentReference,
 }
 #[async_trait]
 impl PublicationDirectory for ForgedAgents {
@@ -151,9 +151,10 @@ async fn agent_setup_source(
         .await
         .unwrap();
     }
+    fixture.publish_agent(agent.id).await;
     let directory = AgentPublicationDirectory {
         persistence: p.clone(),
-        inner: http_directory(p, &connection),
+        inner: Preflight,
     };
     let definitions =
         DefinitionService::new(Preflight, p.clone(), WorkflowSourceDecoder, directory);
@@ -290,7 +291,7 @@ async fn workflow_agent_publication_refuses_forged_snapshot_and_keeps_frozen_ver
     let p = &setup.fixture.persistence;
     // A caller-supplied snapshot granting an extra tool never becomes a grant.
     let mut forged = setup_agent_snapshot(&setup).await;
-    forged.tools.push(TypeName::parse("message.send").unwrap());
+    forged.agent_id = crate::entities::agent_capability::AgentId::new(Uuid::new_v4());
     let definitions = DefinitionService::new(
         Preflight,
         p.clone(),
@@ -348,6 +349,7 @@ async fn workflow_agent_run_refuses_removed_tool_grant_before_provider_entry() {
         .execute(p.pool())
         .await
         .unwrap();
+    setup.fixture.publish_agent(setup.agent).await;
     let outcome = Box::pin(
         agent_runtime(&setup).execute(&WorkflowStepKind("agent.run".into()), &setup.claim),
     )
@@ -366,7 +368,7 @@ async fn workflow_agent_run_refuses_removed_tool_grant_before_provider_entry() {
 }
 
 /// The snapshot the production capture derives for the fixture agent.
-async fn setup_agent_snapshot(setup: &AgentSetup) -> AgentSnapshot {
+async fn setup_agent_snapshot(setup: &AgentSetup) -> AgentReference {
     let bundle_json: Vec<u8> =
         sqlx::query_scalar("SELECT bundle FROM workflow_versions WHERE company_id=$1 LIMIT 1")
             .bind(setup.fixture.target.company.as_uuid())
@@ -503,7 +505,7 @@ async fn workflow_agent_run_competing_revocation_refuses_admission() {
         .execute(&mut *revoke)
         .await
         .unwrap();
-    sqlx::query("DELETE FROM agent_draft_bindings WHERE agent_id=$1")
+    sqlx::query("UPDATE agent_binding_grants SET revoked_at=clock_timestamp() WHERE agent_id=$1 AND revoked_at IS NULL")
         .bind(setup.agent)
         .execute(&mut *revoke)
         .await
@@ -531,13 +533,12 @@ async fn workflow_agent_run_competing_revocation_refuses_admission() {
 
 /// 06-D5 F014: capture refuses agents a workflow cannot run.
 #[tokio::test]
-async fn workflow_agent_capture_refuses_unrunnable_agents() {
+async fn autonomous_agent_workflow_reference_checks_eligibility_while_admission_checks_readiness() {
     let (origin, _server) = server(HTTP_OK).await;
     let setup = Box::pin(agent_setup(&origin)).await;
     let p = &setup.fixture.persistence;
     let publish = |key: &'static str| {
         let fixture = &setup.fixture;
-        let connection = &setup.connection;
         async move {
             let definitions = DefinitionService::new(
                 Preflight,
@@ -545,7 +546,7 @@ async fn workflow_agent_capture_refuses_unrunnable_agents() {
                 WorkflowSourceDecoder,
                 AgentPublicationDirectory {
                     persistence: p.clone(),
-                    inner: http_directory(p, connection),
+                    inner: Preflight,
                 },
             );
             let mut request = fixture.publish();
@@ -569,7 +570,19 @@ async fn workflow_agent_capture_refuses_unrunnable_agents() {
             .execute(p.pool())
             .await
             .unwrap();
-        assert!(publish(key).await.is_err(), "{key}");
+        assert!(
+            publish(key).await.is_ok(),
+            "a published identity remains eligible: {key}"
+        );
+        let service = WorkflowService::new(p.clone(), p.clone(), p.clone(), p.clone(), Preflight);
+        let admitted = service
+            .admit(autonomous_admission::request(&setup, key, Uuid::new_v4()).await)
+            .await;
+        assert_eq!(
+            admitted.is_ok(),
+            key == "no-model",
+            "only live selected sources control new admission: {key}"
+        );
     }
 }
 
@@ -577,7 +590,7 @@ async fn workflow_agent_capture_refuses_unrunnable_agents() {
 /// operation to the agent refuses publication with an actionable error instead of
 /// preparing the grant as an MCP slot.
 #[tokio::test]
-async fn workflow_agent_capture_refuses_slot_bound_http_grant() {
+async fn autonomous_agent_workflow_reference_step_http_slot_does_not_change_agent_binding() {
     let (origin, _server) = server(HTTP_OK).await;
     let setup = Box::pin(agent_setup(&origin)).await;
     let p = &setup.fixture.persistence;
@@ -606,15 +619,30 @@ async fn workflow_agent_capture_refuses_slot_bound_http_grant() {
     let mut request = setup.fixture.publish();
     request.expected = DraftRevision::new(2).unwrap();
     request.key = IdempotencyKey::parse("slot-bound-grant").unwrap();
-    let Err(crate::application::workflow::lifecycle::LifecycleError::Application(
-        AppError::BadRequest(message),
-    )) = definitions.publish(request).await
-    else {
-        panic!("a slot-bound HTTP grant must refuse publication");
-    };
+    let bundle = definitions.publish(request).await.unwrap();
+    assert_eq!(bundle.snapshots().agents[0].agent_id.as_uuid(), setup.agent);
+    assert_eq!(
+        bundle.snapshots().tools[0]
+            .contract
+            .connection
+            .as_ref()
+            .unwrap()
+            .as_str(),
+        "service"
+    );
+    let selected = crate::application::agent::AgentPublications::active_agent_revision(
+        p,
+        crate::application::agent::AgentPublicationScope {
+            company: setup.fixture.target.company,
+            actor: setup.fixture.target.actor,
+            agent: crate::entities::agent_capability::AgentId::new(setup.agent),
+        },
+    )
+    .await
+    .unwrap()
+    .unwrap();
     assert!(
-        message.contains("conflicts with another tool of the same name"),
-        "{message}"
+        matches!(selected.definition.tools[0].binding.source,crate::entities::agent_capability::AgentBindingSource::Http { connection, .. } if connection == setup.connection.id)
     );
 }
 
@@ -631,6 +659,7 @@ async fn workflow_agent_run_refuses_unlinked_skill_before_provider_entry() {
         .execute(p.pool())
         .await
         .unwrap();
+    setup.fixture.publish_agent(setup.agent).await;
     let outcome = Box::pin(
         agent_runtime(&setup).execute(&WorkflowStepKind("agent.run".into()), &setup.claim),
     )
@@ -649,7 +678,7 @@ async fn workflow_agent_run_refuses_unlinked_skill_before_provider_entry() {
 
 /// 06-D5 F014: an agent edit committed while publish waits on the agent row fails publish.
 #[tokio::test]
-async fn workflow_agent_publish_competing_agent_edit_fails_publication() {
+async fn autonomous_agent_workflow_reference_competing_draft_edit_preserves_reference() {
     let (origin, _server) = server(HTTP_OK).await;
     let setup = Box::pin(agent_setup(&origin)).await;
     let p = &setup.fixture.persistence;
@@ -682,8 +711,8 @@ async fn workflow_agent_publish_competing_agent_edit_fails_publication() {
     };
     let (published, ()) = tokio::join!(Box::pin(publish), commit);
     assert!(
-        published.is_err(),
-        "publish must not freeze a concurrently edited agent"
+        published.is_ok(),
+        "ordinary draft edits preserve the published agent identity reference"
     );
 }
 
@@ -846,3 +875,9 @@ async fn knowledge_run_level_model_continues_after_refused_http_tool_without_egr
         }
     );
 }
+
+#[path = "autonomous_agent_admission_tests.rs"]
+mod autonomous_admission;
+
+#[path = "autonomous_agent_graph_tests.rs"]
+mod autonomous_graph;

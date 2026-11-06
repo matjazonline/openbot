@@ -1,0 +1,69 @@
+   Compiling open_bots v0.1.0 (/Users/mac02/dev/openbot-recovery/.worktrees/autonomous-p03)
+error[E0277]: the trait bound `ReadinessSelection<'_>: From<&Arc<ConfiguredBinding>>` is not satisfied
+  --> src/adapters/persistence/workflow/admission_replay.rs:96:53
+   |
+96 |     resources::check_readiness(tx, (&configuration).into()).await?;
+   |                                                     ^^^^ unsatisfied trait bound
+   |
+   = help: consider casting the `&std::sync::Arc<application::workflow::binding::ConfiguredBinding>` value to `&application::workflow::binding::ConfiguredBinding`
+help: the trait `std::convert::From<&std::sync::Arc<application::workflow::binding::ConfiguredBinding>>` is not implemented for `ReadinessSelection<'_>`
+  --> src/adapters/persistence/workflow/resources.rs:44:1
+   |
+44 | pub(super) struct ReadinessSelection<'a> {
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   = note: required for `&std::sync::Arc<application::workflow::binding::ConfiguredBinding>` to implement `Into<ReadinessSelection<'_>>`
+   = note: the full name for the type has been written to '/Users/mac02/dev/openbot-recovery/.worktrees/autonomous-p03/target/debug/deps/open_bots-c19a0b960dacdcef.long-type-1993683516067174758.txt'
+   = note: consider using `--verbose` to print the full type name to the console
+help: consider dereferencing here
+   |
+96 |     resources::check_readiness(tx, (&(*configuration)).into()).await?;
+   |                                      ++             +
+
+error[E0277]: the trait bound `ReadinessSelection<'_>: From<&Arc<ConfiguredBinding>>` is not satisfied
+  --> src/adapters/persistence/workflow/bindings.rs:55:54
+   |
+55 |         resources::check_readiness(tx, configuration.into()).await?;
+   |                                                      ^^^^ unsatisfied trait bound
+   |
+   = help: consider casting the `&std::sync::Arc<application::workflow::binding::ConfiguredBinding>` value to `&application::workflow::binding::ConfiguredBinding`
+help: the trait `std::convert::From<&std::sync::Arc<application::workflow::binding::ConfiguredBinding>>` is not implemented for `ReadinessSelection<'_>`
+  --> src/adapters/persistence/workflow/resources.rs:44:1
+   |
+44 | pub(super) struct ReadinessSelection<'a> {
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+help: the trait `From<&std::sync::Arc<application::workflow::binding::ConfiguredBinding>>` is not implemented for `ReadinessSelection<'_>`
+      but trait `From<&application::workflow::binding::ConfiguredBinding>` is implemented for it
+  --> src/adapters/persistence/workflow/resources.rs:51:1
+   |
+51 | impl<'a> From<&'a binding::ConfiguredBinding> for ReadinessSelection<'a> {
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   = help: for that trait implementation, expected `application::workflow::binding::ConfiguredBinding`, found `std::sync::Arc<application::workflow::binding::ConfiguredBinding>`
+   = note: required for `&std::sync::Arc<application::workflow::binding::ConfiguredBinding>` to implement `Into<ReadinessSelection<'_>>`
+   = note: the full name for the type has been written to '/Users/mac02/dev/openbot-recovery/.worktrees/autonomous-p03/target/debug/deps/open_bots-c19a0b960dacdcef.long-type-5535815015657953071.txt'
+   = note: consider using `--verbose` to print the full type name to the console
+
+error[E0277]: the trait bound `ReadinessSelection<'_>: From<&Arc<ConfiguredBinding>>` is not satisfied
+  --> src/adapters/persistence/workflow/admission.rs:50:63
+   |
+50 |         resources::check_readiness(&mut tx, command.binding().into()).await?;
+   |                                                               ^^^^ unsatisfied trait bound
+   |
+   = help: consider casting the `&std::sync::Arc<application::workflow::binding::ConfiguredBinding>` value to `&application::workflow::binding::ConfiguredBinding`
+help: the trait `std::convert::From<&std::sync::Arc<application::workflow::binding::ConfiguredBinding>>` is not implemented for `ReadinessSelection<'_>`
+  --> src/adapters/persistence/workflow/resources.rs:44:1
+   |
+44 | pub(super) struct ReadinessSelection<'a> {
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+help: the trait `From<&std::sync::Arc<application::workflow::binding::ConfiguredBinding>>` is not implemented for `ReadinessSelection<'_>`
+      but trait `From<&application::workflow::binding::ConfiguredBinding>` is implemented for it
+  --> src/adapters/persistence/workflow/resources.rs:51:1
+   |
+51 | impl<'a> From<&'a binding::ConfiguredBinding> for ReadinessSelection<'a> {
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   = help: for that trait implementation, expected `application::workflow::binding::ConfiguredBinding`, found `std::sync::Arc<application::workflow::binding::ConfiguredBinding>`
+   = note: required for `&std::sync::Arc<application::workflow::binding::ConfiguredBinding>` to implement `Into<ReadinessSelection<'_>>`
+   = note: the full name for the type has been written to '/Users/mac02/dev/openbot-recovery/.worktrees/autonomous-p03/target/debug/deps/open_bots-c19a0b960dacdcef.long-type-8763038398882745307.txt'
+   = note: consider using `--verbose` to print the full type name to the console
+
+For more information about this error, try `rustc --explain E0277`.
+error: could not compile `open_bots` (lib test) due to 3 previous errors

@@ -74,6 +74,7 @@ async fn workflow_http_registered_tool_and_direct_model_call_share_receipt() {
         .unwrap();
     server.await.unwrap();
     let call = HttpToolCall {
+        origin: crate::application::agent::ToolCallOrigin::Workflow,
         connection: setup.connection.id,
         operation: TypeName::parse("registered.request").unwrap(),
         arguments: json!({"method":"POST","path":"/messages","body":{"message":"hello"}}),

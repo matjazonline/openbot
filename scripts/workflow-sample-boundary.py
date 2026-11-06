@@ -20,6 +20,7 @@ PURE = {
     'decisions::hex_digest', 'decisions::prepare_submission', 'decisions::reviewer_deadline',
     'publication::PublishedBundle', 'publication::ContentHash', 'publication::AgentKey',
     'publication::ToolKind', 'publication::ToolSnapshot', 'publication::ActionEffect',
+    'publication::MAX_DEPENDENCIES', 'agent_contract::agent_action_snapshot',
     'publication::ToolKind::Workflow', 'publication::ActionEffect::Read', 'publication::ActionEffect::Write',
     'registry::ModelStep', 'registry::mcp_tool_result', 'mcp::mcp_result_is_error',
 }
@@ -66,6 +67,10 @@ def normalize(path, module):
 def permitted(path):
     if path==SAMPLE or path.startswith(SAMPLE+'::'):return True
     if path.startswith('crate::domain::workflow::'):return True
+    if path in ('crate::application::agent::ResolvedAgentDefinition','crate::entities::agent_capability::AgentId',
+                'crate::application::agent::AgentKey','crate::application::agent::ActionEffect',
+                'crate::entities::agent_capability::AgentBindingSource::Mcp',
+                'crate::application::agent::ActionEffect::Read','crate::application::agent::ActionEffect::Write'):return True
     if path in ('crate::app_error::AppError','crate::app_error::AppResult'):return True
     prefix='crate::application::workflow::'
     if path.startswith(prefix):return path[len(prefix):] in PURE

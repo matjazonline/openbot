@@ -25,7 +25,8 @@ pub(super) fn freeze(mut request: ActionRequest) -> AppResult<FrozenAction> {
     // Bind effect identity to the actual operation/target and approved contract, never attempts
     // or use-time policy lookups. Context changes conflict with the existing frozen intent.
     let operation = json!({"scope":request.scope,"key":request.operation_key,
-        "target":request.target,"contract":request.contract,"arguments":request.arguments});
+        "target":request.target,"contract":request.contract,"arguments":request.arguments,
+        "origin":request.context.origin});
     let operation = canonical(&operation, MAX_OPERATION_BYTES)?;
     let operation_digest = digest(&operation)?;
     let saved = canonical(
@@ -52,6 +53,7 @@ pub(super) fn restore(saved: Value) -> AppResult<FrozenAction> {
 }
 
 fn validate_scope(request: &mut ActionRequest) -> AppResult<()> {
+    request.context.origin.validate()?;
     if request.scope.company != request.contract.company_id
         || request.contract.policy.policy_revision == 0
         || request.context.actor.is_nil()

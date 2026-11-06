@@ -1,0 +1,100 @@
+{
+  "pattern": "INSERT INTO workflow_action_intents",
+  "filesSearched": 1303,
+  "totalHits": 5,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/message_sql_tests.rs#sql_intent",
+        "name": "sql_intent",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/message_sql_tests.rs",
+        "span": "L12-L21"
+      },
+      "path": "src/adapters/persistence/workflow/message_sql_tests.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 16,
+          "text": "\"INSERT INTO workflow_action_intents (company_id,run_id,execution_id,id,operation_key,operation_digest,argument_digest,idempotency_key,operation,policy_decision"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_history_tests.rs#cloned_intent",
+        "name": "cloned_intent",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_history_tests.rs",
+        "span": "L149-L164"
+      },
+      "path": "src/adapters/persistence/workflow/action_history_tests.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 160,
+          "text": "sqlx::query(\"INSERT INTO workflow_action_intents (company_id,run_id,execution_id,id,operation_key,operation_digest,argument_digest,idempotency_key,operation,pol"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/actions.rs#insert",
+        "name": "insert",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/actions.rs",
+        "span": "L65-L86"
+      },
+      "path": "src/adapters/persistence/workflow/actions.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 78,
+          "text": "\"INSERT INTO workflow_action_intents \\"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/message_park_continuation_tests.rs#sql_effect_park",
+        "name": "sql_effect_park",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/message_park_continuation_tests.rs",
+        "span": "L149-L254"
+      },
+      "path": "src/adapters/persistence/workflow/message_park_continuation_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 163,
+          "text": "\"INSERT INTO workflow_action_intents (company_id,run_id,execution_id,id,operation_key,operation_digest,argument_digest,idempotency_key,operation,policy_decision"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/knowledge_message_tests.rs#knowledge_run_level_sql_freeze_constraint_matches_pure_release_matrix",
+        "name": "knowledge_run_level_sql_freeze_constraint_matches_pure_release_matrix",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/knowledge_message_tests.rs",
+        "span": "L131-L165"
+      },
+      "path": "src/adapters/persistence/workflow/knowledge_message_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 149,
+          "text": "let result=sqlx::query(\"INSERT INTO workflow_action_intents(company_id,run_id,execution_id,id,operation_key,operation_digest,argument_digest,idempotency_key,ope"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 5,
+    "baselineChars": 84290
+  }
+}

@@ -89,6 +89,7 @@ pub trait WorkflowTools: Send + Sync {
 /// One saved model call of a workflow tool: the frozen pin and the call's identity.
 #[derive(Debug, Clone)]
 pub struct WorkflowToolCall {
+    pub origin: crate::application::agent::ToolCallOrigin,
     pub name: TypeName,
     pub pin: WorkflowToolPin,
     pub call: ToolCallId,

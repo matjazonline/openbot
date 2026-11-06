@@ -8,7 +8,6 @@ use crate::adapters::persistence::workflow::http::{
 use crate::application::agent::{ActionEffect, ActionRecovery, ApprovedActionPolicy};
 use crate::application::workflow::{
     http::{HttpConnectionWrite, HttpConnections, HttpOperation, HttpOrigin},
-    lifecycle::LifecycleError,
     publication::WorkflowToolPin,
     tools::{MAX_WORKFLOW_TOOLS, WorkflowToolWrite, WorkflowTools},
 };
@@ -46,7 +45,7 @@ async fn registrations(p: &PostgresPersistence, company: CompanyId) -> i64 {
         .unwrap()
 }
 
-/// Grant the fixture's `assistant` exactly `tools`.
+/// Change only the mutable draft; execution changes require explicit publication.
 async fn grant(setup: &ToolSetup, tools: &[&str]) {
     crate::adapters::persistence::agent_capability::assign_test_tool_names(
         setup.persistence(),
@@ -57,22 +56,8 @@ async fn grant(setup: &ToolSetup, tools: &[&str]) {
     .unwrap();
 }
 
-fn bad_request(result: LifecycleResult<VersionId>) -> String {
-    match result {
-        Err(LifecycleError::Application(AppError::BadRequest(message))) => message,
-        Err(LifecycleError::Validation(diagnostic)) => panic!("{}", diagnostic.code),
-        Err(LifecycleError::Application(error)) => panic!("{error:?}"),
-        Ok(_) => panic!("publication must be refused"),
-    }
-}
-
-fn diagnostic(result: LifecycleResult<VersionId>) -> &'static str {
-    match result {
-        Err(LifecycleError::Validation(diagnostic)) => diagnostic.code,
-        Err(LifecycleError::Application(error)) => panic!("{error:?}"),
-        Ok(_) => panic!("publication must be refused"),
-    }
-}
+#[path = "workflow_tool_closure_tests.rs"]
+mod closure;
 
 #[tokio::test]
 async fn workflow_tool_registration_commands_keep_revisions_authority_and_bounds() {
@@ -371,29 +356,47 @@ async fn workflow_tool_pins_and_grants_stay_within_the_agents_company() {
 
     // A's own registration freezes A's child, though B registered the same name.
     grant(&setup, &[TOOL]).await;
+    let published = setup.fixture.publish_agent(setup.agent).await;
     let version = publish_parent(&setup.fixture, "own-grant").await.unwrap();
     let bundle = p
         .selectable_version(company, version)
         .await
         .unwrap()
         .unwrap();
-    let tool = bundle
-        .snapshots()
-        .tools
-        .iter()
-        .find(|tool| tool.contract.name.as_str() == TOOL)
-        .unwrap();
+    let tool = crate::application::workflow::agent_contract::agent_action_snapshot(
+        company,
+        &published.definition.tools[0],
+    )
+    .unwrap();
     assert_eq!(tool.company_id, company);
     assert_eq!(
         tool.workflow,
         Some(WorkflowToolPin {
             workflow_id: child_workflow(),
             version_id: setup.child,
-            params: json!({"reviewer": setup.reviewer.to_string()}),
+            params: json!({"reviewer":setup.reviewer.to_string()})
         })
     );
-    assert_eq!(bundle.children().len(), 1);
-    assert_eq!(bundle.children()[&setup.child].company_id(), company);
+    assert_eq!(bundle.snapshots().agents[0].agent_id.as_uuid(), setup.agent);
+    assert!(
+        bundle
+            .snapshots()
+            .tools
+            .iter()
+            .all(|tool| tool.contract.name.as_str() != TOOL),
+        "agent child capabilities are not copied into STEP tools"
+    );
+    assert!(bundle.children().is_empty());
+    let AdmissionResult::Created(run) = setup
+        .admit(setup.target, TriggerId::new(Uuid::new_v4()), "scoped-pin")
+        .await
+        .unwrap()
+    else {
+        panic!("new admission")
+    };
+    let captured:Uuid = sqlx::query_scalar("SELECT member.company_id FROM run_dependency_manifests AS ownership JOIN agent_manifest_workflows AS member ON member.company_id=ownership.company_id AND member.manifest_id=ownership.manifest_id WHERE ownership.company_id=$1 AND ownership.run_id=$2 AND member.version_id=$3")
+        .bind(company.as_uuid()).bind(run.as_uuid()).bind(setup.child.as_uuid()).fetch_one(p.pool()).await.unwrap();
+    assert_eq!(captured, company.as_uuid());
     // And B's registrations are not A's to list.
     assert!(
         p.workflow_tools(company, admin)
@@ -426,176 +429,5 @@ fn http_operation(company: CompanyId, tool: &str) -> HttpOperation {
     }
 }
 
-/// A granted workflow tool freezes the child's own contract and its params; a same-name HTTP
-/// operation or captured step tool is refused as ambiguous (F022); the child's resource slots
-/// must be the parent's; a tool cannot reach the root workflow.
-#[tokio::test]
-async fn workflow_tool_publication_freezes_the_child_contract_and_refuses_conflicts() {
-    let setup = Box::pin(ToolSetup::new(echo_child())).await;
-    let p = setup.persistence();
-    let (company, admin) = (setup.fixture.target.company, setup.fixture.target.actor);
-    let bundle = p
-        .selectable_version(company, setup.parent)
-        .await
-        .unwrap()
-        .unwrap();
-    let child = p
-        .selectable_version(company, setup.child)
-        .await
-        .unwrap()
-        .unwrap();
-    let definition = child.compiled().graph().definition();
-    let tool = bundle
-        .snapshots()
-        .tools
-        .iter()
-        .find(|tool| tool.contract.name.as_str() == TOOL)
-        .unwrap();
-    assert_eq!(tool.contract.connection, None);
-    assert_eq!(
-        Some(&tool.contract.input_schema),
-        definition.input_schema.as_ref()
-    );
-    assert_eq!(
-        Some(&tool.contract.output_schema),
-        definition.output_schema.as_ref()
-    );
-    assert_eq!(tool.policy.capability.as_str(), "workflow.tool");
-    assert_eq!(tool.policy.recovery, ActionRecovery::SafeRepeat);
-    assert_eq!(
-        tool.workflow.as_ref().unwrap().params,
-        json!({"reviewer": setup.reviewer.to_string()})
-    );
-    assert_eq!(
-        bundle.children()[&setup.child].content_hash(),
-        child.content_hash()
-    );
-
-    // A same-name HTTP operation makes the agent's grant ambiguous.
-    let connection = p
-        .create_http(
-            company,
-            admin,
-            HttpConnectionWrite {
-                origin: HttpOrigin::parse("https://tools.example.test").unwrap(),
-                bearer: false,
-            },
-        )
-        .await
-        .unwrap();
-    let connection = p
-        .register_http_operation(
-            company,
-            admin,
-            connection.id,
-            connection.revision,
-            http_operation(company, TOOL),
-        )
-        .await
-        .unwrap();
-    // An HTTP operation never carries a workflow pin.
-    let mut pinned = http_operation(company, "pinned.request");
-    pinned.tool.workflow = Some(setup.frozen_pin(setup.parent).await);
-    assert!(matches!(
-        p.register_http_operation(company, admin, connection.id, connection.revision, pinned)
-            .await,
-        Err(AppError::BadRequest(_))
-    ));
-    let message = bad_request(publish_parent(&setup.fixture, "http-same-name").await);
-    assert!(
-        message.contains("registered both as a workflow and as an HTTP operation"),
-        "{message}"
-    );
-    // A step's captured tool of the same name is not the registration either (F022).
-    let mut slotted: Value =
-        serde_json::from_str(&registry::example("agent.run").unwrap().source).unwrap();
-    slotted["resources"] = json!([{"slot":"service","kind":"http"}]);
-    let selection = HttpPublicationDirectory {
-        persistence: p.clone(),
-        selections: vec![HttpPublicationSelection {
-            connection: connection.id,
-            slot: Some(ResourceName::parse("service").unwrap()),
-            operation: name(TOOL),
-        }],
-    };
-    let message = bad_request(
-        publish_parent_with(
-            &setup.fixture,
-            "step-same-name",
-            slotted.to_string(),
-            selection,
-        )
-        .await,
-    );
-    assert!(
-        message.contains("conflicts with another tool of the same name"),
-        "{message}"
-    );
-    p.revoke_http_operation(
-        company,
-        admin,
-        connection.id,
-        connection.revision,
-        name(TOOL),
-    )
-    .await
-    .unwrap();
-
-    // The child's resource slots must be declared by the parent.
-    let mut slotted_child = echo_child();
-    slotted_child["resources"] = json!([{"slot":"service","kind":"mcp"}]);
-    let slotted_workflow = WorkflowId::new(Uuid::from_u128(CHILD + 1));
-    let slotted_version = setup
-        .fixture
-        .publish_workflow(slotted_workflow, slotted_child)
-        .await;
-    p.register_workflow_tool(
-        company,
-        admin,
-        create(
-            "slotted.review",
-            slotted_workflow,
-            slotted_version,
-            json!({"reviewer": "x"}),
-        ),
-    )
-    .await
-    .unwrap();
-    grant(&setup, &["slotted.review"]).await;
-    assert_eq!(
-        diagnostic(publish_parent(&setup.fixture, "undeclared-slot").await),
-        "publication.workflow_tool"
-    );
-    let mut declared: Value =
-        serde_json::from_str(&registry::example("agent.run").unwrap().source).unwrap();
-    declared["resources"] = json!([{"slot":"service","kind":"mcp"}]);
-    publish_parent_with(
-        &setup.fixture,
-        "declared-slot",
-        declared.to_string(),
-        message::MessagePublicationDirectory {
-            persistence: p.clone(),
-        },
-    )
-    .await
-    .unwrap();
-
-    // A tool pinned to a version of the parent itself is recursion.
-    p.register_workflow_tool(
-        company,
-        admin,
-        create(
-            "self.review",
-            setup.fixture.target.workflow,
-            setup.parent,
-            json!({}),
-        ),
-    )
-    .await
-    .unwrap();
-    grant(&setup, &["self.review"]).await;
-    assert_eq!(
-        diagnostic(publish_parent(&setup.fixture, "recursive").await),
-        "publication.recursion"
-    );
-}
+#[path = "workflow_tool_reference_tests.rs"]
+mod references;

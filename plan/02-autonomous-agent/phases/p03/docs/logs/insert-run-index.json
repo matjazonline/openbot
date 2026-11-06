@@ -1,0 +1,210 @@
+{
+  "pattern": "insert_run",
+  "filesSearched": 416,
+  "totalHits": 13,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/children.rs#create_on",
+        "name": "create_on",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/children.rs",
+        "span": "L221-L321"
+      },
+      "path": "src/adapters/persistence/workflow/children.rs",
+      "inDegree": 5,
+      "hits": [
+        {
+          "line": 264,
+          "text": "admission_write::insert_run("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/run_schema_tests.rs#insert_run",
+        "name": "insert_run",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/run_schema_tests.rs",
+        "span": "L33-L48"
+      },
+      "path": "src/adapters/persistence/workflow/run_schema_tests.rs",
+      "inDegree": 5,
+      "hits": [
+        {
+          "line": 33,
+          "text": "async fn insert_run("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/job_schema_tests.rs#new",
+        "name": "new",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/job_schema_tests.rs",
+        "span": "L20-L60"
+      },
+      "path": "src/adapters/persistence/workflow/job_schema_tests.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 39,
+          "text": "insert_run("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/job_association_tests.rs#scoped_execution",
+        "name": "scoped_execution",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/job_association_tests.rs",
+        "span": "L23-L41"
+      },
+      "path": "src/adapters/persistence/workflow/job_association_tests.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 34,
+          "text": "insert_run(&mut db, &f.binding, run, association)"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/admission_write.rs#insert_run",
+        "name": "insert_run",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/admission_write.rs",
+        "span": "L120-L156"
+      },
+      "path": "src/adapters/persistence/workflow/admission_write.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 120,
+          "text": "pub(super) async fn insert_run(db: &mut PgConnection, row: &RunRow<'_>) -> AppResult<()> {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/admission_write.rs#create",
+        "name": "create",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/admission_write.rs",
+        "span": "L7-L61"
+      },
+      "path": "src/adapters/persistence/workflow/admission_write.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 13,
+          "text": "insert_run("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/run_schema_tests.rs#workflow_run_schema_preserves_snapshot_refuses_binding_removal_and_scopes_children",
+        "name": "workflow_run_schema_preserves_snapshot_refuses_binding_removal_and_scopes_children",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/run_schema_tests.rs",
+        "span": "L72-L139"
+      },
+      "path": "src/adapters/persistence/workflow/run_schema_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 80,
+          "text": "insert_run(&mut db, &f, run, RunAssociation::default())"
+        },
+        {
+          "line": 83,
+          "text": "insert_run(&mut db, &f, sibling, RunAssociation::default())"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/run_schema_tests.rs#compete_admission",
+        "name": "compete_admission",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/run_schema_tests.rs",
+        "span": "L141-L153"
+      },
+      "path": "src/adapters/persistence/workflow/run_schema_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 147,
+          "text": "insert_run(&mut tx, f, run, RunAssociation::default()).await?;"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/run_schema_tests.rs#workflow_run_schema_competing_source_claims_rollback_losing_run_and_scope_aliases",
+        "name": "workflow_run_schema_competing_source_claims_rollback_losing_run_and_scope_aliases",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/run_schema_tests.rs",
+        "span": "L156-L197"
+      },
+      "path": "src/adapters/persistence/workflow/run_schema_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 192,
+          "text": "insert_run(&mut db, &f, sibling, RunAssociation::default())"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/run_schema_tests.rs#workflow_run_schema_final_audit_failure_rolls_back_all_admission_records",
+        "name": "workflow_run_schema_final_audit_failure_rolls_back_all_admission_records",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/run_schema_tests.rs",
+        "span": "L200-L249"
+      },
+      "path": "src/adapters/persistence/workflow/run_schema_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 207,
+          "text": "insert_run("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/run_schema_tests.rs#workflow_run_schema_history_membership_roundtrip_scope_and_bounds",
+        "name": "workflow_run_schema_history_membership_roundtrip_scope_and_bounds",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/run_schema_tests.rs",
+        "span": "L303-L386"
+      },
+      "path": "src/adapters/persistence/workflow/run_schema_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 310,
+          "text": "insert_run("
+        },
+        {
+          "line": 321,
+          "text": "insert_run(&mut db, &f, other_run, RunAssociation::default())"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 5,
+    "baselineChars": 53377
+  }
+}

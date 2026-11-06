@@ -1,0 +1,33 @@
+   Compiling open_bots v0.1.0 (/Users/mac02/dev/openbot-recovery/.worktrees/autonomous-p03)
+error[E0599]: no method named `clone` found for struct `application::workflow::mcp::runtime::McpToolCall` in the current scope
+  --> src/adapters/persistence/workflow/mcp_agent_authority_tests.rs:25:58
+   |
+25 |         Box::pin(runtime.call_tool(run.claim.fence, call.clone(), &cancel)),
+   |                                                          ^^^^^ method not found in `application::workflow::mcp::runtime::McpToolCall`
+   |
+  ::: src/application/workflow/mcp_runtime.rs:25:1
+   |
+25 | pub struct McpToolCall {
+   | ---------------------- method `clone` not found for this struct
+   |
+   = help: items from traits can only be used if the trait is implemented and in scope
+   = note: the following trait defines an item `clone`, perhaps you need to implement it:
+           candidate #1: `Clone`
+
+error[E0599]: no method named `clone` found for struct `application::workflow::mcp::runtime::McpToolCall` in the current scope
+   --> src/adapters/persistence/workflow/mcp_agent_authority_tests.rs:124:46
+    |
+124 |             .call_tool(run.claim.fence, call.clone(), &cancel)
+    |                                              ^^^^^ method not found in `application::workflow::mcp::runtime::McpToolCall`
+    |
+   ::: src/application/workflow/mcp_runtime.rs:25:1
+    |
+ 25 | pub struct McpToolCall {
+    | ---------------------- method `clone` not found for this struct
+    |
+    = help: items from traits can only be used if the trait is implemented and in scope
+    = note: the following trait defines an item `clone`, perhaps you need to implement it:
+            candidate #1: `Clone`
+
+For more information about this error, try `rustc --explain E0599`.
+error: could not compile `open_bots` (lib test) due to 2 previous errors

@@ -60,6 +60,7 @@
     }
   },
   "sample": {
+    "agents": [],
     "input": {},
     "params": {},
     "scripts": [

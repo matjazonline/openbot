@@ -1,0 +1,88 @@
+    Checking open_bots v0.1.0 (/Users/mac02/dev/openbot-recovery/.worktrees/autonomous-p03)
+error[E0425]: cannot find type `AppResult` in this scope
+  --> src/application/workflow/completion.rs:34:10
+   |
+34 |     ) -> AppResult<Option<CommittedWorkflowStep>>;
+   |          ^^^^^^^^^
+   |
+  --> /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/result.rs:557:0
+   |
+   = note: similarly named enum `Result` defined here
+help: an enum with a similar name exists
+   |
+34 -     ) -> AppResult<Option<CommittedWorkflowStep>>;
+34 +     ) -> Result<Option<CommittedWorkflowStep>>;
+   |
+help: consider importing this type alias
+   |
+ 2 + use crate::app_error::AppResult;
+   |
+
+error[E0425]: cannot find type `AppResult` in this scope
+  --> src/application/workflow/completion.rs:59:6
+   |
+59 | ) -> AppResult<PureCompletion> {
+   |      ^^^^^^^^^
+   |
+  --> /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/result.rs:557:0
+   |
+   = note: similarly named enum `Result` defined here
+help: an enum with a similar name exists
+   |
+59 - ) -> AppResult<PureCompletion> {
+59 + ) -> Result<PureCompletion> {
+   |
+help: consider importing this type alias
+   |
+ 2 + use crate::app_error::AppResult;
+   |
+
+error[E0433]: cannot find type `AppError` in this scope
+  --> src/application/workflow/completion.rs:66:24
+   |
+66 |         .ok_or_else(|| AppError::BadRequest("Unknown workflow step".into()))?;
+   |                        ^^^^^^^^ use of undeclared type `AppError`
+   |
+help: consider importing this enum
+   |
+ 2 + use crate::app_error::AppError;
+   |
+
+error[E0433]: cannot find type `AppError` in this scope
+  --> src/application/workflow/completion.rs:68:20
+   |
+68 |         return Err(AppError::Conflict(
+   |                    ^^^^^^^^ use of undeclared type `AppError`
+   |
+help: consider importing this enum
+   |
+ 2 + use crate::app_error::AppError;
+   |
+
+error[E0433]: cannot find type `AppError` in this scope
+  --> src/application/workflow/completion.rs:78:36
+   |
+78 |                     .ok_or_else(|| AppError::BadRequest("Missing workflow choice".into()))?,
+   |                                    ^^^^^^^^ use of undeclared type `AppError`
+   |
+help: consider importing this enum
+   |
+ 2 + use crate::app_error::AppError;
+   |
+
+error[E0433]: cannot find type `AppError` in this scope
+  --> src/application/workflow/completion.rs:80:26
+   |
+80 |             .map_err(|_| AppError::BadRequest("Invalid workflow choice".into()))?,
+   |                          ^^^^^^^^ use of undeclared type `AppError`
+   |
+help: consider importing this enum
+   |
+ 2 + use crate::app_error::AppError;
+   |
+
+Some errors have detailed explanations: E0425, E0433.
+For more information about an error, try `rustc --explain E0425`.
+error: could not compile `open_bots` (lib) due to 6 previous errors
+warning: build failed, waiting for other jobs to finish...
+error: `cargo check` failed with status: exit status: 101

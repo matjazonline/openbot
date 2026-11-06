@@ -1,0 +1,30 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+
+running 4 tests
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::atomic::knowledge_search_current_grant_revocation_blocks_saved_invocation_before_embedding ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::recovery::autonomous_agent_recovery_model_removal_preserves_unknown_effect ... FAILED
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::recovery::workflow_agent_run_dynamic_selection_runs_the_bound_agent ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::recovery::autonomous_agent_recovery_binding_revocation_preserves_unknown_effect ... FAILED
+
+failures:
+
+---- adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::recovery::autonomous_agent_recovery_model_removal_preserves_unknown_effect stdout ----
+
+thread 'adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::recovery::autonomous_agent_recovery_model_removal_preserves_unknown_effect' (32167334) panicked at src/adapters/persistence/workflow/agent_recovery_tests.rs:455:10:
+called `Result::unwrap()` on an `Err` value: BadRequest("Assistant still uses a model this change removes. Point it at an enabled model first.")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::recovery::autonomous_agent_recovery_binding_revocation_preserves_unknown_effect stdout ----
+
+thread 'adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::recovery::autonomous_agent_recovery_binding_revocation_preserves_unknown_effect' (32167333) panicked at src/adapters/persistence/workflow/agent_recovery_tests.rs:488:5:
+assertion `left == right` failed
+  left: "agent.rejected"
+ right: "agent.effect_unknown"
+
+
+failures:
+    adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::recovery::autonomous_agent_recovery_binding_revocation_preserves_unknown_effect
+    adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::recovery::autonomous_agent_recovery_model_removal_preserves_unknown_effect
+
+test result: FAILED. 2 passed; 2 failed; 0 ignored; 0 measured; 2952 filtered out; finished in 1.72s
+

@@ -35,22 +35,38 @@ impl Session {
             .and_then(Value::as_str)
             .and_then(AgentKey::parse)
             .ok_or_else(|| refused("Invalid frozen agent selection"))?;
-        let agent = bundle.resolve_agent(bundle.company_id(), &key)?;
+        let reference = bundle.agent_reference(bundle.company_id(), &key)?;
+        let agent = self
+            .agents
+            .get(&reference.agent_id)
+            .ok_or_else(|| refused("Sample agent definition is missing"))?
+            .clone();
         for (index, call) in calls.into_iter().enumerate() {
             if self.report.usage.direct_tool_calls >= MAX_TOOL_CALLS {
                 return Err(refused("Sample exceeds 64 direct tool calls"));
             }
             self.report.usage.direct_tool_calls += 1;
             let tool = agent
-                .tools()
+                .tools
                 .iter()
-                .find(|tool| tool.contract.name == call.name)
+                .find(|tool| tool.binding.alias.as_str() == call.name.as_str())
                 .ok_or_else(|| refused("Scripted tool is not granted to this frozen agent"))?;
+            let mut snapshot = crate::application::workflow::agent_contract::agent_action_snapshot(
+                bundle.company_id(),
+                tool,
+            )?;
+            if matches!(
+                tool.binding.source,
+                crate::entities::agent_capability::AgentBindingSource::Mcp { .. }
+            ) {
+                snapshot.contract.output_schema =
+                    super::super::registry::mcp_tool_result(&snapshot.contract.output_schema);
+            }
             self.tool(
                 bundle,
                 frame,
                 &path.child(format!("tool-{}:{}", index + 1, call.name.as_str())),
-                tool,
+                &snapshot,
                 call.input,
                 call.output,
             )?;

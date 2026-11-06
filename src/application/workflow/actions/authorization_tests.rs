@@ -46,6 +46,7 @@ fn authority(request: ActionRequest) -> ActionRunAuthority {
     )
     .unwrap();
     ActionRunAuthority {
+        origin: crate::application::workflow::actions::ActionOriginAuthority::Workflow,
         actor: WorkflowActor::authenticated(request.context.actor).unwrap(),
         action: freeze::freeze(request).unwrap(),
         bundle: Arc::new(bundle),

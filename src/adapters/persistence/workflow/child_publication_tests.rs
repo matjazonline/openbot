@@ -166,39 +166,7 @@ async fn workflow_child_publication_bounds_pins_and_bytes_before_reading_bundles
 /// (no tools or skills), and pinned children are captured from stored versions.
 #[tokio::test]
 async fn workflow_child_publication_publishes_the_shipped_revision_template_end_to_end() {
-    let mut f = Fixture::new().await;
-    f.persistence = PostgresPersistence::with_credential_cipher(
-        f.persistence.pool().clone(),
-        CredentialCipher::for_test(),
-    );
-    let company = f.target.company.as_uuid();
-    AgentPersistence::create(
-        &f.persistence,
-        company,
-        AgentWrite {
-            name: "Assistant".into(),
-            slug: "assistant".into(),
-            provider: Some(SCRIPTED_PROVIDER.into()),
-            model: Some(SCRIPTED_MODEL.into()),
-            system_prompt: Some("Draft a reply.".into()),
-            ..Default::default()
-        },
-    )
-    .await
-    .unwrap();
-    CompanyPersistence::replace_model_connections_for_user(
-        &f.persistence,
-        f.target.actor.user_id(),
-        company,
-        vec![CompanyModelConnectionWrite {
-            provider: SCRIPTED_PROVIDER.into(),
-            api_key: Some("scripted-key".into()),
-            models: vec![SCRIPTED_MODEL.into()],
-            is_default: true,
-        }],
-    )
-    .await
-    .unwrap();
+    let f = published_template_fixture().await;
     let service = DefinitionService::new(
         Preflight,
         f.persistence.clone(),
@@ -245,4 +213,42 @@ async fn workflow_child_publication_publishes_the_shipped_revision_template_end_
     assert_eq!(bundle.children().len(), 1);
     let pinned = &bundle.children()[&Template::HumanRevisionRound.version_id()];
     assert_eq!(pinned.content_hash(), round.content_hash());
+}
+
+async fn published_template_fixture() -> Fixture {
+    let mut f = Fixture::new().await;
+    f.persistence = PostgresPersistence::with_credential_cipher(
+        f.persistence.pool().clone(),
+        CredentialCipher::for_test(),
+    );
+    let company = f.target.company.as_uuid();
+    let agent = AgentPersistence::create(
+        &f.persistence,
+        company,
+        AgentWrite {
+            name: "Assistant".into(),
+            slug: "assistant".into(),
+            provider: Some(SCRIPTED_PROVIDER.into()),
+            model: Some(SCRIPTED_MODEL.into()),
+            system_prompt: Some("Draft a reply.".into()),
+            ..Default::default()
+        },
+    )
+    .await
+    .unwrap();
+    CompanyPersistence::replace_model_connections_for_user(
+        &f.persistence,
+        f.target.actor.user_id(),
+        company,
+        vec![CompanyModelConnectionWrite {
+            provider: SCRIPTED_PROVIDER.into(),
+            api_key: Some("scripted-key".into()),
+            models: vec![SCRIPTED_MODEL.into()],
+            is_default: true,
+        }],
+    )
+    .await
+    .unwrap();
+    f.publish_agent(agent.id).await;
+    f
 }

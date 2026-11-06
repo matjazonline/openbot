@@ -188,10 +188,9 @@ async fn workflow_tool_dispatch_starts_one_child_per_call_and_one_resumer_contin
     let p = setup.persistence();
     let claim = setup.claim("duplicate-dispatch").await;
     let scope = claim.fence.scope;
-    let call = setup.call(
-        setup.frozen_pin(setup.parent).await,
-        json!({"question": "Twice?"}),
-    );
+    let call = setup
+        .call(setup.initial_pin(), json!({"question": "Twice?"}), &claim)
+        .await;
     // Two dispatches of one saved call under one fence: one parks, the other finds the fence
     // closed by the park; a later one too.
     let (one, two) = tokio::join!(setup.dispatch(&claim, &call), setup.dispatch(&claim, &call));
@@ -261,7 +260,7 @@ async fn replayed(setup: &ToolSetup, key: &str, arguments: Value) -> Value {
     let p = setup.persistence();
     let claim = setup.claim(key).await;
     let scope = claim.fence.scope;
-    let call = setup.call(setup.frozen_pin(setup.parent).await, arguments);
+    let call = setup.call(setup.initial_pin(), arguments, &claim).await;
     assert!(matches!(
         setup.dispatch(&claim, &call).await.unwrap(),
         AgentToolObservation::Parked(_)
@@ -299,8 +298,16 @@ async fn workflow_tool_child_failure_limit_and_result_bound_are_typed_errors() {
     let failed = replayed(&setup, "fails", json!({"question": "q", "choice": "maybe"})).await;
     assert_eq!(failed["error"]["code"], CHILD_FAILED, "{failed}");
     // A result larger than a tool result may be.
-    let large = json!({"question": "x".repeat(140_000), "choice": "approve"});
-    let oversized = replayed(&setup, "oversized", large).await;
+    let mut large = choice_child();
+    large["steps"]["answer"]["with"]["value"]["object"]["answer"] =
+        json!({"literal":"x".repeat(140_000)});
+    let large_setup = Box::pin(ToolSetup::new(large)).await;
+    let oversized = replayed(
+        &large_setup,
+        "oversized",
+        json!({"question":"q","choice":"approve"}),
+    )
+    .await;
     assert_eq!(
         oversized["error"]["code"], TOOL_RESULT_TOO_LARGE,
         "{oversized}"
@@ -330,10 +337,13 @@ async fn workflow_tool_child_failure_limit_and_result_bound_are_typed_errors() {
         .await
         .unwrap()
         .unwrap();
-    let call = setup.call(
-        setup.frozen_pin(setup.parent).await,
-        json!({"question": "q", "choice": "approve"}),
-    );
+    let call = setup
+        .call(
+            setup.initial_pin(),
+            json!({"question": "q", "choice": "approve"}),
+            &claim,
+        )
+        .await;
     let AgentToolObservation::Completed(limited) = setup.dispatch(&claim, &call).await.unwrap()
     else {
         panic!("the limit answers at once");
@@ -348,10 +358,9 @@ async fn workflow_tool_child_output_outside_the_pinned_schema_fails_the_parent_w
     let p = setup.persistence();
     let claim = setup.claim("invalid-output").await;
     let scope = claim.fence.scope;
-    let call = setup.call(
-        setup.frozen_pin(setup.parent).await,
-        json!({"question": "q"}),
-    );
+    let call = setup
+        .call(setup.initial_pin(), json!({"question": "q"}), &claim)
+        .await;
     setup.dispatch(&claim, &call).await.unwrap();
     let child = setup.finish_child(scope).await;
     // Corrupted outside the runtime (triggers bypassed for this one raw update), as only a
@@ -403,10 +412,9 @@ async fn workflow_tool_parent_cancel_cascades_and_a_restarted_worker_resumes_the
     // Cancelling the parked parent cancels the call's child.
     let claim = setup.claim("cancel-parent").await;
     let scope = claim.fence.scope;
-    let call = setup.call(
-        setup.frozen_pin(setup.parent).await,
-        json!({"question": "q"}),
-    );
+    let call = setup
+        .call(setup.initial_pin(), json!({"question": "q"}), &claim)
+        .await;
     setup.dispatch(&claim, &call).await.unwrap();
     let child = setup.child_of(scope).await;
     setup.cancel(scope, "cancel-parent").await;

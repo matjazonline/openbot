@@ -1,0 +1,2067 @@
+{
+  "pattern": "PublishedBundle",
+  "filesSearched": 1301,
+  "totalHits": 135,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/application/workflow/publication/storage.rs#store_bundle",
+        "name": "store_bundle",
+        "kind": "function",
+        "path": "src/application/workflow/publication/storage.rs",
+        "span": "L75-L112"
+      },
+      "path": "src/application/workflow/publication/storage.rs",
+      "inDegree": 15,
+      "hits": [
+        {
+          "line": 75,
+          "text": "pub fn store_bundle(bundle: &PublishedBundle) -> AppResult<Vec<u8>> {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/publication/storage.rs#restore_bundle",
+        "name": "restore_bundle",
+        "kind": "function",
+        "path": "src/application/workflow/publication/storage.rs",
+        "span": "L116-L173"
+      },
+      "path": "src/application/workflow/publication/storage.rs",
+      "inDegree": 15,
+      "hits": [
+        {
+          "line": 119,
+          "text": ") -> AppResult<Arc<PublishedBundle>> {"
+        },
+        {
+          "line": 140,
+          "text": "let mut restored = BTreeMap::<VersionId, Arc<PublishedBundle>>::new();"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/fixtures/tests.rs#bundle",
+        "name": "bundle",
+        "kind": "function",
+        "path": "src/application/workflow/fixtures/tests.rs",
+        "span": "L30-L32"
+      },
+      "path": "src/application/workflow/fixtures/tests.rs",
+      "inDegree": 11,
+      "hits": [
+        {
+          "line": 30,
+          "text": "fn bundle(fixture: Fixture) -> PublishedBundle {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/completion.rs#prepare_io",
+        "name": "prepare_io",
+        "kind": "function",
+        "path": "src/application/workflow/completion.rs",
+        "span": "L56-L87"
+      },
+      "path": "src/application/workflow/completion.rs",
+      "inDegree": 7,
+      "hits": [
+        {
+          "line": 57,
+          "text": "bundle: &PublishedBundle,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/workflows/definitions.rs#publish_draft",
+        "name": "publish_draft",
+        "kind": "function",
+        "path": "src/adapters/http/routes/workflows/definitions.rs",
+        "span": "L281-L310"
+      },
+      "path": "src/adapters/http/routes/workflows/definitions.rs",
+      "inDegree": 6,
+      "hits": [
+        {
+          "line": 287,
+          "text": ") -> WorkflowResult<(VersionId, Arc<PublishedBundle>)> {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/tests.rs#publish_source",
+        "name": "publish_source",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/tests.rs",
+        "span": "L217-L238"
+      },
+      "path": "src/adapters/persistence/workflow/tests.rs",
+      "inDegree": 6,
+      "hits": [
+        {
+          "line": 223,
+          "text": ") -> LifecycleResult<Arc<PublishedBundle>> {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/batch.rs#validate_completion",
+        "name": "validate_completion",
+        "kind": "function",
+        "path": "src/application/workflow/batch.rs",
+        "span": "L117-L161"
+      },
+      "path": "src/application/workflow/batch.rs",
+      "inDegree": 6,
+      "hits": [
+        {
+          "line": 118,
+          "text": "bundle: &PublishedBundle,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/publication/tests.rs#build",
+        "name": "build",
+        "kind": "function",
+        "path": "src/application/workflow/publication/tests.rs",
+        "span": "L48-L56"
+      },
+      "path": "src/application/workflow/publication/tests.rs",
+      "inDegree": 6,
+      "hits": [
+        {
+          "line": 48,
+          "text": "fn build(source: &Value, snapshots: DependencySnapshots) -> Result<PublishedBundle, Diagnostic> {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/publication/tests.rs#child",
+        "name": "child",
+        "kind": "function",
+        "path": "src/application/workflow/publication/tests.rs",
+        "span": "L212-L223"
+      },
+      "path": "src/application/workflow/publication/tests.rs",
+      "inDegree": 6,
+      "hits": [
+        {
+          "line": 212,
+          "text": "fn child(source: &Value) -> Arc<PublishedBundle> {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/binding/tests.rs#bundle",
+        "name": "bundle",
+        "kind": "function",
+        "path": "src/application/workflow/binding/tests.rs",
+        "span": "L19-L35"
+      },
+      "path": "src/application/workflow/binding/tests.rs",
+      "inDegree": 4,
+      "hits": [
+        {
+          "line": 19,
+          "text": "fn bundle() -> Arc<PublishedBundle> {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/sample/tests.rs#build",
+        "name": "build",
+        "kind": "function",
+        "path": "src/application/workflow/sample/tests.rs",
+        "span": "L31-L46"
+      },
+      "path": "src/application/workflow/sample/tests.rs",
+      "inDegree": 4,
+      "hits": [
+        {
+          "line": 34,
+          "text": "children: Vec<Arc<PublishedBundle>>,"
+        },
+        {
+          "line": 35,
+          "text": ") -> Arc<PublishedBundle> {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/workflows/definitions.rs#validate_draft",
+        "name": "validate_draft",
+        "kind": "function",
+        "path": "src/adapters/http/routes/workflows/definitions.rs",
+        "span": "L167-L184"
+      },
+      "path": "src/adapters/http/routes/workflows/definitions.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 175,
+          "text": ") -> WorkflowResult<Arc<PublishedBundle>> {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/authority.rs#supported_publication",
+        "name": "supported_publication",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/authority.rs",
+        "span": "L115-L164"
+      },
+      "path": "src/adapters/persistence/workflow/authority.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 117,
+          "text": "bundle: &PublishedBundle,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/binding/mod.rs#configuration_error",
+        "name": "configuration_error",
+        "kind": "function",
+        "path": "src/application/workflow/binding/mod.rs",
+        "span": "L180-L192"
+      },
+      "path": "src/application/workflow/binding/mod.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 181,
+          "text": "bundle: &PublishedBundle,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/fixtures/tests.rs#build",
+        "name": "build",
+        "kind": "function",
+        "path": "src/application/workflow/fixtures/tests.rs",
+        "span": "L15-L29"
+      },
+      "path": "src/application/workflow/fixtures/tests.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 15,
+          "text": "fn build(fixture: Fixture, source: &str) -> Result<PublishedBundle, Diagnostic> {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/fixtures/tests.rs#prepare",
+        "name": "prepare",
+        "kind": "function",
+        "path": "src/application/workflow/fixtures/tests.rs",
+        "span": "L49-L71"
+      },
+      "path": "src/application/workflow/fixtures/tests.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 50,
+          "text": "bundle: &PublishedBundle,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/jev.rs#required_models",
+        "name": "required_models",
+        "kind": "function",
+        "path": "src/application/workflow/jev.rs",
+        "span": "L129-L165"
+      },
+      "path": "src/application/workflow/jev.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 130,
+          "text": "bundle: &PublishedBundle,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/lifecycle/definitions.rs#check_bundle",
+        "name": "check_bundle",
+        "kind": "function",
+        "path": "src/application/workflow/lifecycle/definitions.rs",
+        "span": "L277-L291"
+      },
+      "path": "src/application/workflow/lifecycle/definitions.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 278,
+          "text": "bundle: &PublishedBundle,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/publication/storage_tests.rs#fixture_bundle",
+        "name": "fixture_bundle",
+        "kind": "function",
+        "path": "src/application/workflow/publication/storage_tests.rs",
+        "span": "L6-L18"
+      },
+      "path": "src/application/workflow/publication/storage_tests.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 6,
+          "text": "fn fixture_bundle(fixture: Fixture) -> Arc<PublishedBundle> {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/sample/tests.rs#fixture",
+        "name": "fixture",
+        "kind": "function",
+        "path": "src/application/workflow/sample/tests.rs",
+        "span": "L15-L27"
+      },
+      "path": "src/application/workflow/sample/tests.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 15,
+          "text": "fn fixture(kind: Fixture) -> Arc<PublishedBundle> {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/sample/tools_tests.rs#tool_bundle",
+        "name": "tool_bundle",
+        "kind": "function",
+        "path": "src/application/workflow/sample/tools_tests.rs",
+        "span": "L3-L37"
+      },
+      "path": "src/application/workflow/sample/tools_tests.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 3,
+          "text": "fn tool_bundle() -> Arc<PublishedBundle> {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/activation.rs#outputs",
+        "name": "outputs",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/activation.rs",
+        "span": "L232-L276"
+      },
+      "path": "src/adapters/persistence/workflow/activation.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 236,
+          "text": "bundle: &PublishedBundle,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/binding_rows.rs#read_version",
+        "name": "read_version",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/binding_rows.rs",
+        "span": "L74-L89"
+      },
+      "path": "src/adapters/persistence/workflow/binding_rows.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 78,
+          "text": ") -> AppResult<Arc<PublishedBundle>> {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/child_publication_tests.rs#attempt",
+        "name": "attempt",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/child_publication_tests.rs",
+        "span": "L51-L61"
+      },
+      "path": "src/adapters/persistence/workflow/child_publication_tests.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 55,
+          "text": ") -> LifecycleResult<Arc<PublishedBundle>> {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/child_publication_tests.rs#missing",
+        "name": "missing",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/child_publication_tests.rs",
+        "span": "L65-L76"
+      },
+      "path": "src/adapters/persistence/workflow/child_publication_tests.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 65,
+          "text": "fn missing(result: LifecycleResult<Arc<PublishedBundle>>, step: &str) {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/workflow_tools.rs#pinned_bundle",
+        "name": "pinned_bundle",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/workflow_tools.rs",
+        "span": "L108-L122"
+      },
+      "path": "src/adapters/persistence/workflow/workflow_tools.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 113,
+          "text": ") -> AppResult<Option<Arc<PublishedBundle>>> {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/activation.rs#input_dependencies",
+        "name": "input_dependencies",
+        "kind": "function",
+        "path": "src/application/workflow/activation.rs",
+        "span": "L34-L95"
+      },
+      "path": "src/application/workflow/activation.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 34,
+          "text": "pub fn input_dependencies(bundle: &PublishedBundle, step: &StepId) -> AppResult<BTreeSet<StepId>> {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/activation.rs#prepare_activation",
+        "name": "prepare_activation",
+        "kind": "function",
+        "path": "src/application/workflow/activation.rs",
+        "span": "L115-L128"
+      },
+      "path": "src/application/workflow/activation.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 116,
+          "text": "bundle: &PublishedBundle,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/batch.rs#execute_pure",
+        "name": "execute_pure",
+        "kind": "function",
+        "path": "src/application/workflow/batch.rs",
+        "span": "L86-L115"
+      },
+      "path": "src/application/workflow/batch.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 87,
+          "text": "bundle: &PublishedBundle,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/children.rs#child_completion",
+        "name": "child_completion",
+        "kind": "function",
+        "path": "src/application/workflow/children.rs",
+        "span": "L78-L85"
+      },
+      "path": "src/application/workflow/children.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 79,
+          "text": "bundle: &PublishedBundle,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/decisions.rs#prepare_submission",
+        "name": "prepare_submission",
+        "kind": "function",
+        "path": "src/application/workflow/decisions.rs",
+        "span": "L318-L329"
+      },
+      "path": "src/application/workflow/decisions.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 319,
+          "text": "bundle: &PublishedBundle,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/lifecycle/definitions.rs#compile",
+        "name": "compile",
+        "kind": "function",
+        "path": "src/application/workflow/lifecycle/definitions.rs",
+        "span": "L188-L198"
+      },
+      "path": "src/application/workflow/lifecycle/definitions.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 193,
+          "text": ") -> LifecycleResult<Arc<PublishedBundle>> {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/lifecycle/definitions.rs#compile_bundle",
+        "name": "compile_bundle",
+        "kind": "function",
+        "path": "src/application/workflow/lifecycle/definitions.rs",
+        "span": "L204-L249"
+      },
+      "path": "src/application/workflow/lifecycle/definitions.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 210,
+          "text": ") -> LifecycleResult<PublishedBundle> {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/lifecycle/test_support.rs#selectable",
+        "name": "selectable",
+        "kind": "function",
+        "path": "src/application/workflow/lifecycle/test_support.rs",
+        "span": "L194-L202"
+      },
+      "path": "src/application/workflow/lifecycle/test_support.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 198,
+          "text": ") -> Option<Arc<PublishedBundle>> {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/publication/capabilities_tests.rs#resolve",
+        "name": "resolve",
+        "kind": "function",
+        "path": "src/application/workflow/publication/capabilities_tests.rs",
+        "span": "L28-L30"
+      },
+      "path": "src/application/workflow/publication/capabilities_tests.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 28,
+          "text": "fn resolve(bundle: &PublishedBundle) -> Result<ResolvedAgent, crate::app_error::AppError> {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/publication/tests.rs#parent",
+        "name": "parent",
+        "kind": "function",
+        "path": "src/application/workflow/publication/tests.rs",
+        "span": "L224-L235"
+      },
+      "path": "src/application/workflow/publication/tests.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 226,
+          "text": "children: Vec<Arc<PublishedBundle>>,"
+        },
+        {
+          "line": 227,
+          "text": ") -> Result<PublishedBundle, Diagnostic> {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/sample/tools.rs#step_tool",
+        "name": "step_tool",
+        "kind": "function",
+        "path": "src/application/workflow/sample/tools.rs",
+        "span": "L7-L23"
+      },
+      "path": "src/application/workflow/sample/tools.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 9,
+          "text": "bundle: &PublishedBundle,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/pages/workflow_authoring/preview.rs#dependency_digest",
+        "name": "dependency_digest",
+        "kind": "function",
+        "path": "src/adapters/http/pages/workflow_authoring/preview.rs",
+        "span": "L54-L63"
+      },
+      "path": "src/adapters/http/pages/workflow_authoring/preview.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 54,
+          "text": "pub fn dependency_digest(bundle: &PublishedBundle) -> String {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/workflows/ui/runs/mod.rs#frozen_agent",
+        "name": "frozen_agent",
+        "kind": "function",
+        "path": "src/adapters/http/routes/workflows/ui/runs/mod.rs",
+        "span": "L690-L706"
+      },
+      "path": "src/adapters/http/routes/workflows/ui/runs/mod.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 691,
+          "text": "bundle: &'a crate::application::workflow::publication::PublishedBundle,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/agent_publication.rs#verify_on",
+        "name": "verify_on",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/agent_publication.rs",
+        "span": "L157-L194"
+      },
+      "path": "src/adapters/persistence/workflow/agent_publication.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 159,
+          "text": "bundle: &PublishedBundle,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/batch.rs#run_steps",
+        "name": "run_steps",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/batch.rs",
+        "span": "L104-L174"
+      },
+      "path": "src/adapters/persistence/workflow/batch.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 107,
+          "text": "bundle: &PublishedBundle,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/completion.rs#prepare_result",
+        "name": "prepare_result",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/completion.rs",
+        "span": "L288-L308"
+      },
+      "path": "src/adapters/persistence/workflow/completion.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 289,
+          "text": "bundle: &PublishedBundle,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/definitions.rs#publish_on",
+        "name": "publish_on",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/definitions.rs",
+        "span": "L183-L223"
+      },
+      "path": "src/adapters/persistence/workflow/definitions.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 186,
+          "text": ") -> AppResult<Arc<PublishedBundle>> {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/definitions.rs#verify_children",
+        "name": "verify_children",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/definitions.rs",
+        "span": "L236-L258"
+      },
+      "path": "src/adapters/persistence/workflow/definitions.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 238,
+          "text": "bundle: &PublishedBundle,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/jev.rs#publication_on",
+        "name": "publication_on",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/jev.rs",
+        "span": "L202-L215"
+      },
+      "path": "src/adapters/persistence/workflow/jev.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 204,
+          "text": "bundle: &PublishedBundle,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/pending_recovery.rs#prepare_pure",
+        "name": "prepare_pure",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/pending_recovery.rs",
+        "span": "L172-L204"
+      },
+      "path": "src/adapters/persistence/workflow/pending_recovery.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 175,
+          "text": "bundle: &PublishedBundle,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/provisioning.rs#compiled",
+        "name": "compiled",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/provisioning.rs",
+        "span": "L825-L874"
+      },
+      "path": "src/adapters/persistence/workflow/provisioning.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 831,
+          "text": ") -> AppResult<Provisioned<PublishedBundle>> {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/waits.rs#is_wait",
+        "name": "is_wait",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/waits.rs",
+        "span": "L338-L363"
+      },
+      "path": "src/adapters/persistence/workflow/waits.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 341,
+          "text": "bundle: &PublishedBundle,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/activation.rs#prepare_inputs",
+        "name": "prepare_inputs",
+        "kind": "function",
+        "path": "src/application/workflow/activation.rs",
+        "span": "L98-L107"
+      },
+      "path": "src/application/workflow/activation.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 99,
+          "text": "bundle: &PublishedBundle,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/batch.rs#is_pure",
+        "name": "is_pure",
+        "kind": "function",
+        "path": "src/application/workflow/batch.rs",
+        "span": "L69-L84"
+      },
+      "path": "src/application/workflow/batch.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 70,
+          "text": "bundle: &PublishedBundle,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/binding/mod.rs#validate_slots",
+        "name": "validate_slots",
+        "kind": "function",
+        "path": "src/application/workflow/binding/mod.rs",
+        "span": "L153-L178"
+      },
+      "path": "src/application/workflow/binding/mod.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 155,
+          "text": "bundle: &PublishedBundle,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/lifecycle/definitions.rs#publish",
+        "name": "publish",
+        "kind": "function",
+        "path": "src/application/workflow/lifecycle/definitions.rs",
+        "span": "L68-L133"
+      },
+      "path": "src/application/workflow/lifecycle/definitions.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 68,
+          "text": "pub async fn publish(&self, request: PublishDraft) -> LifecycleResult<Arc<PublishedBundle>> {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/lifecycle/provisioned.rs#provisioned_publication",
+        "name": "provisioned_publication",
+        "kind": "function",
+        "path": "src/application/workflow/lifecycle/provisioned.rs",
+        "span": "L8-L29"
+      },
+      "path": "src/application/workflow/lifecycle/provisioned.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 11,
+          "text": "bundle: Arc<PublishedBundle>,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/lifecycle/provisioned.rs#provisioned_binding",
+        "name": "provisioned_binding",
+        "kind": "function",
+        "path": "src/application/workflow/lifecycle/provisioned.rs",
+        "span": "L39-L88"
+      },
+      "path": "src/application/workflow/lifecycle/provisioned.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 44,
+          "text": "bundle: Arc<PublishedBundle>,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/publication/dependencies.rs#workflow_tool",
+        "name": "workflow_tool",
+        "kind": "function",
+        "path": "src/application/workflow/publication/dependencies.rs",
+        "span": "L117-L153"
+      },
+      "path": "src/application/workflow/publication/dependencies.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 121,
+          "text": "child: &PublishedBundle,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/publication/dependencies.rs#dependency_graph",
+        "name": "dependency_graph",
+        "kind": "function",
+        "path": "src/application/workflow/publication/dependencies.rs",
+        "span": "L181-L242"
+      },
+      "path": "src/application/workflow/publication/dependencies.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 183,
+          "text": "children: &BTreeMap<VersionId, Arc<PublishedBundle>>,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/publication/storage.rs#restore_version",
+        "name": "restore_version",
+        "kind": "function",
+        "path": "src/application/workflow/publication/storage.rs",
+        "span": "L179-L207"
+      },
+      "path": "src/application/workflow/publication/storage.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 181,
+          "text": "restored: &BTreeMap<VersionId, Arc<PublishedBundle>>,"
+        },
+        {
+          "line": 183,
+          "text": ") -> AppResult<PublishedBundle> {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/sample/children.rs#repeat_decision",
+        "name": "repeat_decision",
+        "kind": "function",
+        "path": "src/application/workflow/sample/children.rs",
+        "span": "L87-L124"
+      },
+      "path": "src/application/workflow/sample/children.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 88,
+          "text": "bundle: &PublishedBundle,"
+        },
+        {
+          "line": 91,
+          "text": "child: &PublishedBundle,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/sample/dispatch.rs#jev",
+        "name": "jev",
+        "kind": "function",
+        "path": "src/application/workflow/sample/dispatch.rs",
+        "span": "L67-L91"
+      },
+      "path": "src/application/workflow/sample/dispatch.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 69,
+          "text": "bundle: &PublishedBundle,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/sample/dispatch.rs#external_step",
+        "name": "external_step",
+        "kind": "function",
+        "path": "src/application/workflow/sample/dispatch.rs",
+        "span": "L93-L138"
+      },
+      "path": "src/application/workflow/sample/dispatch.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 95,
+          "text": "bundle: &PublishedBundle,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/sample/dispatch.rs#workflow_tool_step",
+        "name": "workflow_tool_step",
+        "kind": "function",
+        "path": "src/application/workflow/sample/dispatch.rs",
+        "span": "L140-L170"
+      },
+      "path": "src/application/workflow/sample/dispatch.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 142,
+          "text": "bundle: &Arc<PublishedBundle>,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/sample/dispatch.rs#model",
+        "name": "model",
+        "kind": "function",
+        "path": "src/application/workflow/sample/dispatch.rs",
+        "span": "L172-L191"
+      },
+      "path": "src/application/workflow/sample/dispatch.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 174,
+          "text": "bundle: &Arc<PublishedBundle>,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/sample/dispatch.rs#human",
+        "name": "human",
+        "kind": "function",
+        "path": "src/application/workflow/sample/dispatch.rs",
+        "span": "L213-L255"
+      },
+      "path": "src/application/workflow/sample/dispatch.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 214,
+          "text": "bundle: &PublishedBundle,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/sample/mod.rs#run",
+        "name": "run",
+        "kind": "function",
+        "path": "src/application/workflow/sample/mod.rs",
+        "span": "L158-L208"
+      },
+      "path": "src/application/workflow/sample/mod.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 158,
+          "text": "fn run(&mut self, bundle: Arc<PublishedBundle>, mut frame: Frame) -> AppResult<Value> {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/sample/tools.rs#tool",
+        "name": "tool",
+        "kind": "function",
+        "path": "src/application/workflow/sample/tools.rs",
+        "span": "L60-L118"
+      },
+      "path": "src/application/workflow/sample/tools.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 62,
+          "text": "bundle: &Arc<PublishedBundle>,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/waits.rs#specification",
+        "name": "specification",
+        "kind": "function",
+        "path": "src/application/workflow/waits.rs",
+        "span": "L159-L199"
+      },
+      "path": "src/application/workflow/waits.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 160,
+          "text": "bundle: &PublishedBundle,"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "scripts/workflow-sample-boundary.py",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 21,
+          "text": "'publication::PublishedBundle', 'publication::ContentHash', 'publication::AgentKey',"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/http/pages/workflow_authoring/preview.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 6,
+          "text": "use crate::application::workflow::publication::{PublishedBundle, ToolKind};"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/pages/workflow_authoring/preview.rs#PreviewView",
+        "name": "PreviewView",
+        "kind": "struct",
+        "path": "src/adapters/http/pages/workflow_authoring/preview.rs",
+        "span": "L11-L22"
+      },
+      "path": "src/adapters/http/pages/workflow_authoring/preview.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 16,
+          "text": "pub bundle: &'a PublishedBundle,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/pages/workflow_authoring/preview.rs#frozen_tools",
+        "name": "frozen_tools",
+        "kind": "function",
+        "path": "src/adapters/http/pages/workflow_authoring/preview.rs",
+        "span": "L220-L254"
+      },
+      "path": "src/adapters/http/pages/workflow_authoring/preview.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 220,
+          "text": "fn frozen_tools(bundle: &PublishedBundle) -> String {"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/http/routes/workflows/definitions.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 10,
+          "text": "use crate::application::workflow::publication::PublishedBundle;"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/http/routes/workflows/ui/authoring/mod.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 15,
+          "text": "use crate::application::workflow::publication::PublishedBundle;"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/workflows/ui/authoring/mod.rs#EditorState",
+        "name": "EditorState",
+        "kind": "struct",
+        "path": "src/adapters/http/routes/workflows/ui/authoring/mod.rs",
+        "span": "L143-L150"
+      },
+      "path": "src/adapters/http/routes/workflows/ui/authoring/mod.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 148,
+          "text": "preview: Option<(u64, Arc<PublishedBundle>)>,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/definitions.rs#selectable_version",
+        "name": "selectable_version",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/definitions.rs",
+        "span": "L110-L129"
+      },
+      "path": "src/adapters/persistence/workflow/definitions.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 114,
+          "text": ") -> AppResult<Option<Arc<PublishedBundle>>> {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/definitions.rs#publish",
+        "name": "publish",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/definitions.rs",
+        "span": "L170-L177"
+      },
+      "path": "src/adapters/persistence/workflow/definitions.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 170,
+          "text": "async fn publish(&self, prepared: PreparedPublication) -> AppResult<Arc<PublishedBundle>> {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/http_runtime.rs#RunFacts",
+        "name": "RunFacts",
+        "kind": "struct",
+        "path": "src/adapters/persistence/workflow/http_runtime.rs",
+        "span": "L6-L11"
+      },
+      "path": "src/adapters/persistence/workflow/http_runtime.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 8,
+          "text": "pub(in crate::adapters::persistence::workflow) bundle: std::sync::Arc<PublishedBundle>,"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/persistence/workflow/run_views.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 5,
+          "text": "use crate::application::workflow::publication::{PublishedBundle, restore_bundle};"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/run_views.rs#run_bundle",
+        "name": "run_bundle",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/run_views.rs",
+        "span": "L576-L596"
+      },
+      "path": "src/adapters/persistence/workflow/run_views.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 580,
+          "text": ") -> AppResult<Option<Arc<PublishedBundle>>> {"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/persistence/workflow/workflow_tools.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 6,
+          "text": "use crate::application::workflow::publication::{PublishedBundle, WorkflowToolPin, restore_bundle};"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/application/workflow/actions/authorization.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 5,
+          "text": "use crate::application::workflow::publication::{PublishedBundle, ToolSnapshot};"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/actions/authorization.rs#ActionRunAuthority",
+        "name": "ActionRunAuthority",
+        "kind": "struct",
+        "path": "src/application/workflow/actions/authorization.rs",
+        "span": "L14-L19"
+      },
+      "path": "src/application/workflow/actions/authorization.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 17,
+          "text": "pub bundle: Arc<PublishedBundle>,"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/application/workflow/activation.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 2,
+          "text": "use super::{CompanyId, publication::PublishedBundle};"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/application/workflow/batch.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 3,
+          "text": "activation::ActivatedExecution, activation::ActivationRequest, publication::PublishedBundle,"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/application/workflow/binding/mod.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 9,
+          "text": "use super::publication::PublishedBundle;"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/binding/mod.rs#ConfiguredBinding",
+        "name": "ConfiguredBinding",
+        "kind": "struct",
+        "path": "src/application/workflow/binding/mod.rs",
+        "span": "L36-L39"
+      },
+      "path": "src/application/workflow/binding/mod.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 38,
+          "text": "bundle: Arc<PublishedBundle>,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/binding/mod.rs#new",
+        "name": "new",
+        "kind": "function",
+        "path": "src/application/workflow/binding/mod.rs",
+        "span": "L42-L60"
+      },
+      "path": "src/application/workflow/binding/mod.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 44,
+          "text": "bundle: Arc<PublishedBundle>,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/binding/mod.rs#bundle",
+        "name": "bundle",
+        "kind": "function",
+        "path": "src/application/workflow/binding/mod.rs",
+        "span": "L83-L85"
+      },
+      "path": "src/application/workflow/binding/mod.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 83,
+          "text": "pub fn bundle(&self) -> &Arc<PublishedBundle> {"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/application/workflow/children.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 7,
+          "text": "publication::PublishedBundle,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/children.rs#RepeatRule",
+        "name": "RepeatRule",
+        "kind": "struct",
+        "path": "src/application/workflow/children.rs",
+        "span": "L46-L50"
+      },
+      "path": "src/application/workflow/children.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 49,
+          "text": "pub child: &'a PublishedBundle,"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/application/workflow/completion.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 2,
+          "text": "use super::{activation::*, batch::*, lease::FencedWorkflowResult, publication::PublishedBundle};"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/application/workflow/decisions.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 9,
+          "text": "publication::PublishedBundle,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/decisions.rs#specification",
+        "name": "specification",
+        "kind": "function",
+        "path": "src/application/workflow/decisions.rs",
+        "span": "L260-L281"
+      },
+      "path": "src/application/workflow/decisions.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 261,
+          "text": "bundle: &PublishedBundle,"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/application/workflow/fixtures/tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 4,
+          "text": "use crate::application::workflow::publication::{self, PublishedBundle};"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/application/workflow/jev.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 2,
+          "text": "use super::{WorkflowActor, lease::ClaimedWorkflow, publication::PublishedBundle};"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/lifecycle/contracts.rs#PublishedCommand",
+        "name": "PublishedCommand",
+        "kind": "struct",
+        "path": "src/application/workflow/lifecycle/contracts.rs",
+        "span": "L82-L88"
+      },
+      "path": "src/application/workflow/lifecycle/contracts.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 87,
+          "text": "pub bundle: Arc<PublishedBundle>,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/lifecycle/contracts.rs#PublicationDependencies",
+        "name": "PublicationDependencies",
+        "kind": "struct",
+        "path": "src/application/workflow/lifecycle/contracts.rs",
+        "span": "L90-L93"
+      },
+      "path": "src/application/workflow/lifecycle/contracts.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 92,
+          "text": "pub children: Vec<Arc<PublishedBundle>>,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/lifecycle/definitions.rs#validate",
+        "name": "validate",
+        "kind": "function",
+        "path": "src/application/workflow/lifecycle/definitions.rs",
+        "span": "L47-L66"
+      },
+      "path": "src/application/workflow/lifecycle/definitions.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 51,
+          "text": ") -> LifecycleResult<Arc<PublishedBundle>> {"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/application/workflow/lifecycle/mod.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 15,
+          "text": "use super::publication::PublishedBundle;"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/lifecycle/ports.rs#selectable_version",
+        "name": "selectable_version",
+        "kind": "function",
+        "path": "src/application/workflow/lifecycle/ports.rs",
+        "span": "L19-L23"
+      },
+      "path": "src/application/workflow/lifecycle/ports.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 23,
+          "text": ") -> AppResult<Option<Arc<PublishedBundle>>>;"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/lifecycle/ports.rs#publish",
+        "name": "publish",
+        "kind": "function",
+        "path": "src/application/workflow/lifecycle/ports.rs",
+        "span": "L33-L33"
+      },
+      "path": "src/application/workflow/lifecycle/ports.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 33,
+          "text": "async fn publish(&self, command: PreparedPublication) -> AppResult<Arc<PublishedBundle>>;"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/lifecycle/test_support.rs#Memory",
+        "name": "Memory",
+        "kind": "struct",
+        "path": "src/application/workflow/lifecycle/test_support.rs",
+        "span": "L10-L22"
+      },
+      "path": "src/application/workflow/lifecycle/test_support.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 13,
+          "text": "pub versions: HashMap<(CompanyId, VersionId), Arc<PublishedBundle>>,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/lifecycle/test_support.rs#selectable_version",
+        "name": "selectable_version",
+        "kind": "function",
+        "path": "src/application/workflow/lifecycle/test_support.rs",
+        "span": "L130-L137"
+      },
+      "path": "src/application/workflow/lifecycle/test_support.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 134,
+          "text": ") -> AppResult<Option<Arc<PublishedBundle>>> {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/lifecycle/test_support.rs#publish",
+        "name": "publish",
+        "kind": "function",
+        "path": "src/application/workflow/lifecycle/test_support.rs",
+        "span": "L156-L191"
+      },
+      "path": "src/application/workflow/lifecycle/test_support.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 156,
+          "text": "async fn publish(&self, command: PreparedPublication) -> AppResult<Arc<PublishedBundle>> {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/lifecycle/test_support.rs#published",
+        "name": "published",
+        "kind": "function",
+        "path": "src/application/workflow/lifecycle/test_support.rs",
+        "span": "L336-L342"
+      },
+      "path": "src/application/workflow/lifecycle/test_support.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 336,
+          "text": "pub(super) async fn published(store: &Store) -> Arc<PublishedBundle> {"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/application/workflow/publication/capabilities.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 44,
+          "text": "impl PublishedBundle {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/publication/dependencies.rs#ChildFacts",
+        "name": "ChildFacts",
+        "kind": "struct",
+        "path": "src/application/workflow/publication/dependencies.rs",
+        "span": "L5-L10"
+      },
+      "path": "src/application/workflow/publication/dependencies.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 8,
+          "text": "pub children: BTreeMap<VersionId, Arc<PublishedBundle>>,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/publication/dependencies.rs#capture",
+        "name": "capture",
+        "kind": "function",
+        "path": "src/application/workflow/publication/dependencies.rs",
+        "span": "L28-L112"
+      },
+      "path": "src/application/workflow/publication/dependencies.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 31,
+          "text": "children: Vec<Arc<PublishedBundle>>,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/publication/mod.rs#PublishedBundle",
+        "name": "PublishedBundle",
+        "kind": "struct",
+        "path": "src/application/workflow/publication/mod.rs",
+        "span": "L28-L36"
+      },
+      "path": "src/application/workflow/publication/mod.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 28,
+          "text": "pub struct PublishedBundle {"
+        },
+        {
+          "line": 32,
+          "text": "children: BTreeMap<VersionId, Arc<PublishedBundle>>,"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/application/workflow/publication/mod.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 38,
+          "text": "impl PublishedBundle {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/publication/mod.rs#children",
+        "name": "children",
+        "kind": "function",
+        "path": "src/application/workflow/publication/mod.rs",
+        "span": "L48-L50"
+      },
+      "path": "src/application/workflow/publication/mod.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 48,
+          "text": "pub fn children(&self) -> &BTreeMap<VersionId, Arc<PublishedBundle>> {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/publication/mod.rs#freeze",
+        "name": "freeze",
+        "kind": "function",
+        "path": "src/application/workflow/publication/mod.rs",
+        "span": "L108-L149"
+      },
+      "path": "src/application/workflow/publication/mod.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 113,
+          "text": "children: Vec<Arc<PublishedBundle>>,"
+        },
+        {
+          "line": 114,
+          "text": ") -> Result<PublishedBundle, Diagnostic> {"
+        },
+        {
+          "line": 140,
+          "text": "Ok(PublishedBundle {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/publication/mod.rs#manifest~2",
+        "name": "manifest~2",
+        "kind": "function",
+        "path": "src/application/workflow/publication/mod.rs",
+        "span": "L151-L185"
+      },
+      "path": "src/application/workflow/publication/mod.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 156,
+          "text": "children: &BTreeMap<VersionId, Arc<PublishedBundle>>,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/publication/preflight.rs#validate",
+        "name": "validate",
+        "kind": "function",
+        "path": "src/application/workflow/publication/preflight.rs",
+        "span": "L9-L56"
+      },
+      "path": "src/application/workflow/publication/preflight.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 11,
+          "text": "children: &[Arc<PublishedBundle>],"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/publication/tests.rs#workflow_publication_freezes_workflow_tool_pins_like_children",
+        "name": "workflow_publication_freezes_workflow_tool_pins_like_children",
+        "kind": "function",
+        "path": "src/application/workflow/publication/tests.rs",
+        "span": "L423-L522"
+      },
+      "path": "src/application/workflow/publication/tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 425,
+          "text": "let tool = |child: &PublishedBundle| {"
+        },
+        {
+          "line": 463,
+          "text": "let refused = |result: Result<PublishedBundle, Diagnostic>, code: &str| {"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/application/workflow/run_views.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 5,
+          "text": "use super::publication::PublishedBundle;"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/run_views.rs#run_bundle",
+        "name": "run_bundle",
+        "kind": "function",
+        "path": "src/application/workflow/run_views.rs",
+        "span": "L176-L180"
+      },
+      "path": "src/application/workflow/run_views.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 180,
+          "text": ") -> AppResult<Option<Arc<PublishedBundle>>>;"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/sample/children.rs#child_step",
+        "name": "child_step",
+        "kind": "function",
+        "path": "src/application/workflow/sample/children.rs",
+        "span": "L9-L84"
+      },
+      "path": "src/application/workflow/sample/children.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 11,
+          "text": "bundle: &Arc<PublishedBundle>,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/sample/dispatch.rs#step",
+        "name": "step",
+        "kind": "function",
+        "path": "src/application/workflow/sample/dispatch.rs",
+        "span": "L15-L65"
+      },
+      "path": "src/application/workflow/sample/dispatch.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 17,
+          "text": "bundle: &Arc<PublishedBundle>,"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/application/workflow/sample/mod.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 7,
+          "text": "publication::PublishedBundle,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/sample/mod.rs#execute",
+        "name": "execute",
+        "kind": "function",
+        "path": "src/application/workflow/sample/mod.rs",
+        "span": "L75-L129"
+      },
+      "path": "src/application/workflow/sample/mod.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 75,
+          "text": "pub fn execute(bundle: Arc<PublishedBundle>, request: SampleRequest) -> AppResult<SampleReport> {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/sample/mod.rs#response",
+        "name": "response",
+        "kind": "function",
+        "path": "src/application/workflow/sample/mod.rs",
+        "span": "L210-L223"
+      },
+      "path": "src/application/workflow/sample/mod.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 210,
+          "text": "fn response(&mut self, bundle: &PublishedBundle, step: &StepId) -> AppResult<ScriptedResponse> {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/sample/tools.rs#agent_tools",
+        "name": "agent_tools",
+        "kind": "function",
+        "path": "src/application/workflow/sample/tools.rs",
+        "span": "L24-L59"
+      },
+      "path": "src/application/workflow/sample/tools.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 26,
+          "text": "bundle: &Arc<PublishedBundle>,"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/application/workflow/waits.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 6,
+          "text": "publication::PublishedBundle,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/waits.rs#prepare",
+        "name": "prepare",
+        "kind": "function",
+        "path": "src/application/workflow/waits.rs",
+        "span": "L200-L207"
+      },
+      "path": "src/application/workflow/waits.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 201,
+          "text": "bundle: &PublishedBundle,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/infra/workflow/services.rs#selectable_bundle",
+        "name": "selectable_bundle",
+        "kind": "function",
+        "path": "src/infra/workflow/services.rs",
+        "span": "L60-L73"
+      },
+      "path": "src/infra/workflow/services.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 65,
+          "text": "Option<Arc<crate::application::workflow::publication::PublishedBundle>>,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/infra/workflow/services.rs#sample",
+        "name": "sample",
+        "kind": "function",
+        "path": "src/infra/workflow/services.rs",
+        "span": "L92-L98"
+      },
+      "path": "src/infra/workflow/services.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 94,
+          "text": "bundle: Arc<crate::application::workflow::publication::PublishedBundle>,"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 54,
+    "baselineChars": 545559
+  }
+}

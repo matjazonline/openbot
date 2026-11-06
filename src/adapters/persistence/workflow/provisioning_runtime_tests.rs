@@ -6,6 +6,9 @@ use super::*;
 use crate::application::use_cases::thread::IngressOrigin;
 use crate::application::workflow::provisioning::*;
 
+#[path = "provisioning_requester_lock_tests.rs"]
+mod requester_locks;
+
 /// The Agent Builder on the scripted model, granted the provisioning tools, answering its team
 /// channel `builder` through the shipped autonomous template ("Create assistant channel", run
 /// by the owner). Returns the Builder channel's binding.

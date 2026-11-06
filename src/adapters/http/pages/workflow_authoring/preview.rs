@@ -62,43 +62,17 @@ pub fn dependency_digest(bundle: &PublishedBundle) -> String {
     format!("{:x}", Sha256::digest(captured))
 }
 
-fn names(list: &[crate::domain::workflow::TypeName], none: &str) -> String {
-    if list.is_empty() {
-        none.to_owned()
-    } else {
-        list.iter()
-            .map(|name| name.as_str())
-            .collect::<Vec<_>>()
-            .join(", ")
-    }
-}
-
-/// Every agent this version freezes, once (06-D5): its model and exactly its saved tools and
-/// skills. A step names one of them literally or through a `/params` enum.
+/// A workflow stores identities and source uses; its run chooses revisions at admission.
 fn frozen_agents(view: &PreviewView<'_>) -> String {
-    view.bundle
-        .snapshots()
-        .agents
-        .iter()
-        .map(|agent| {
-            format!(
-                r#"<li class="py-2"><span class="font-semibold">{name}</span> <span class="font-mono text-xs opacity-70">@{handle}</span> · <span class="font-mono text-xs">{provider} / {model}</span>
-                    <p class="text-xs">Uses the agent's tools and skills <span class="opacity-60">(source: the agent, frozen at publication)</span></p>
-                    <p class="font-mono text-xs">tools: {tools}</p><p class="font-mono text-xs">skills: {skills}</p></li>"#,
-                name = escape_html_text(
-                    view.agent_names
-                        .get(&agent.agent_id)
-                        .map(String::as_str)
-                        .unwrap_or(agent.key.as_str())
-                ),
-                handle = escape_html_text(agent.key.as_str()),
-                provider = escape_html_text(agent.model.provider.as_str()),
-                model = escape_html_text(&agent.model.model),
-                tools = escape_html_text(&names(&agent.tools, "no tools")),
-                skills = escape_html_text(&names(&agent.skills, "no skills")),
-            )
-        })
-        .collect()
+    view.bundle.snapshots().agents.iter().map(|agent| {
+        let name = view.agent_names.get(&agent.agent_id.as_uuid()).map(String::as_str).unwrap_or(agent.key.as_str());
+        let uses = agent.uses.iter().map(|usage| format!("{} ({})", usage.step, match usage.mode {
+            crate::application::workflow::publication::AgentUseMode::ModelOnly => "model only",
+            crate::application::workflow::publication::AgentUseMode::Tools => "agent tools and skills",
+        })).collect::<Vec<_>>().join(", ");
+        format!(r#"<li class="py-2"><span class="font-semibold">{}</span> <span class="font-mono text-xs opacity-70">@{}</span><p class="text-xs">The published agent revision is selected when a run starts.</p><p class="text-xs">{}</p></li>"#,
+            escape_html_text(name), escape_html_text(agent.key.as_str()), escape_html_text(&uses))
+    }).collect()
 }
 
 /// Which frozen agent each model step runs, and whether its kind uses the agent's tools.

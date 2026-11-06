@@ -11,7 +11,13 @@ use std::time::Duration;
 use uuid::Uuid;
 
 /// Loaded from the authoritative saved run, never reconstructed from the action caller.
+pub enum ActionOriginAuthority {
+    Workflow,
+    Agent(Box<crate::application::workflow::publication::ResolvedAgent>),
+}
+
 pub struct ActionRunAuthority {
+    pub origin: ActionOriginAuthority,
     pub action: FrozenAction,
     pub actor: WorkflowActor,
     pub bundle: Arc<PublishedBundle>,
@@ -142,6 +148,18 @@ pub(crate) fn validate_run_authority(
         || authority.resources.len() > 256
     {
         return Err(denied());
+    }
+    match (&request.context.origin, &authority.origin) {
+        (
+            crate::application::agent::ToolCallOrigin::Agent(_),
+            ActionOriginAuthority::Agent(selection),
+        ) => {
+            return crate::application::workflow::agent_contract::validate_agent_action(
+                request, selection,
+            );
+        }
+        (crate::application::agent::ToolCallOrigin::Workflow, ActionOriginAuthority::Workflow) => {}
+        _ => return Err(denied()),
     }
     let tools = &authority.bundle.snapshots().tools;
     let ceiling: BTreeSet<_> = tools.iter().map(|tool| &tool.policy.capability).collect();

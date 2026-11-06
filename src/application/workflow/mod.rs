@@ -6,6 +6,7 @@
 pub mod actions;
 pub mod activation;
 pub mod agent;
+pub(crate) mod agent_contract;
 pub mod authoring;
 mod authorization;
 pub mod batch;

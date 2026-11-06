@@ -1,0 +1,20 @@
+{
+  "recorded_at": "2026-11-06T05:49:37.362623+00:00",
+  "state": "STOPPED_BY_USER",
+  "branch": "autonomous/p03",
+  "remote_checkpoint": "origin/autonomous/p03",
+  "accepted_main": "dc35ee426d8f88abdaf40562027ae69ad66863eb",
+  "review_base": "dc35ee426d8f88abdaf40562027ae69ad66863eb",
+  "pre_checkpoint_source_digest": "12355398941034c0acd7a46e0c2a887cdeca6fda3441e96dc53655b55decd1bb",
+  "source_patch_sha256": "0e4098e6fb33388baa989b57f0a4b42518e6fc94ab668a68d730baa37bd7a701",
+  "snapshot_excludes": [
+    "plan/02-autonomous-agent/phases/p03/docs",
+    "plan/02-autonomous-agent/phases/p04/docs"
+  ],
+  "architecture_review": "AUTO-P03-P04-G1-R2-N1 PENDING",
+  "implementation_accepted": false,
+  "quota_stop_remaining_percent": 3,
+  "last_remaining_percent": 7,
+  "monitor_stopped": true,
+  "source_commit": "checkpoint branch tip; resolve after commit/checkout"
+}

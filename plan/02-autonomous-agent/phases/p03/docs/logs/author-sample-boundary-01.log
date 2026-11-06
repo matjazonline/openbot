@@ -1,0 +1,4 @@
+/Users/mac02/dev/openbot-recovery/.worktrees/autonomous-p03/src/application/workflow/sample/dispatch.rs: forbidden sample dependency crate::application::agent::ActionEffect
+/Users/mac02/dev/openbot-recovery/.worktrees/autonomous-p03/src/application/workflow/sample/dispatch.rs: forbidden sample dependency crate::application::agent::ActionEffect::Read
+/Users/mac02/dev/openbot-recovery/.worktrees/autonomous-p03/src/application/workflow/sample/dispatch.rs: forbidden sample dependency crate::application::agent::ActionEffect::Write
+/Users/mac02/dev/openbot-recovery/.worktrees/autonomous-p03/src/application/workflow/sample/tools.rs: forbidden sample dependency crate::application::agent::AgentKey

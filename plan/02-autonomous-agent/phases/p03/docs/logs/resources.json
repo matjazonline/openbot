@@ -1,0 +1,16 @@
+{
+  "worktree": "/Users/mac02/dev/openbot-recovery/.worktrees/autonomous-p03",
+  "branch": "autonomous/p03",
+  "base": "dc35ee426d8f88abdaf40562027ae69ad66863eb",
+  "postgres_data": "/Users/mac02/dev/openbot-recovery/.worktrees/pg-autonomous-p03",
+  "postgres_socket": "/Users/mac02/dev/openbot-recovery/.worktrees/pg-autonomous-p03-socket",
+  "postgres_port": 55603,
+  "databases": [
+    "open_bots",
+    "open_bots_test"
+  ],
+  "target": "/Users/mac02/dev/openbot-recovery/.worktrees/autonomous-p03/target",
+  "target_isolation": "APFS COW; distinct inode verified",
+  "env_mode": "0600",
+  "env_ignored": true
+}

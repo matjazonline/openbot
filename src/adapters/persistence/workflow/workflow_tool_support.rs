@@ -37,6 +37,9 @@ use crate::application::{
 use crate::domain::entities::correlation::CorrelationId;
 use crate::services::test_support::{SCRIPTED_MODEL, SCRIPTED_PROVIDER};
 
+#[path = "workflow_tool_saved_call_support.rs"]
+mod saved_calls;
+
 pub(super) const TOOL: &str = "refund.review";
 /// The provider-safe declaration the scripted model calls.
 pub(super) const DECLARED: &str = "refund__review";
@@ -165,6 +168,7 @@ pub(super) struct ToolSetup {
     pub(super) child: VersionId,
     pub(super) parent: VersionId,
     pub(super) target: BindingTarget,
+    published: crate::application::agent::PublishedAgentRevision,
 }
 
 impl ToolSetup {
@@ -229,6 +233,7 @@ impl ToolSetup {
         )
         .await
         .unwrap();
+        let published = fixture.publish_agent(agent).await;
         let parent = publish_parent(&fixture, "publication").await.unwrap();
         let target = Box::pin(bound(&fixture, parent)).await;
         Self {
@@ -238,6 +243,7 @@ impl ToolSetup {
             child,
             parent,
             target,
+            published,
         }
     }
 
@@ -283,28 +289,22 @@ impl ToolSetup {
     }
 
     /// The pin `version` of the parent froze for the tool.
-    pub(super) async fn frozen_pin(&self, version: VersionId) -> WorkflowToolPin {
-        self.persistence()
-            .selectable_version(self.fixture.target.company, version)
-            .await
-            .unwrap()
-            .unwrap()
-            .snapshots()
+    /// This fixture's initial agent revision owns the child pin, independently of the parent workflow version.
+    pub(super) fn initial_pin(&self) -> WorkflowToolPin {
+        let tool = self
+            .published
+            .definition
             .tools
             .iter()
-            .find(|tool| tool.contract.name.as_str() == TOOL)
-            .and_then(|tool| tool.workflow.clone())
-            .unwrap()
-    }
-
-    /// A new saved call of the tool with `pin`, as the agent dispatches it.
-    pub(super) fn call(&self, pin: WorkflowToolPin, arguments: Value) -> WorkflowToolCall {
-        WorkflowToolCall {
-            name: TypeName::parse(TOOL).unwrap(),
-            pin,
-            call: ToolCallId::new(Uuid::new_v4()),
-            arguments,
-        }
+            .find(|tool| tool.binding.alias.as_str() == TOOL)
+            .unwrap();
+        crate::application::workflow::agent_contract::agent_action_snapshot(
+            self.fixture.target.company,
+            tool,
+        )
+        .unwrap()
+        .workflow
+        .unwrap()
     }
 
     /// Dispatch `call` under `claim`'s fence.

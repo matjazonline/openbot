@@ -1,0 +1,47 @@
+    Checking open_bots v0.1.0 (/Users/mac02/dev/openbot-recovery/.worktrees/autonomous-p03)
+error: call to `std::mem::drop` with a value that does not implement `Drop`. Dropping such a type only extends its contained lifetimes
+  --> src/adapters/persistence/agent_publication/mod.rs:39:5
+   |
+39 |     drop(LockedAgentPublication::lock(&mut tx, scope).await?);
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+note: argument has type `adapters::persistence::agent_publication::LockedAgentPublication<'_, '_>`
+  --> src/adapters/persistence/agent_publication/mod.rs:39:10
+   |
+39 |     drop(LockedAgentPublication::lock(&mut tx, scope).await?);
+   |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#drop_non_drop
+   = note: `-D clippy::drop-non-drop` implied by `-D warnings`
+   = help: to override `-D warnings` add `#[allow(clippy::drop_non_drop)]`
+
+error: could not compile `open_bots` (lib) due to 1 previous error
+warning: build failed, waiting for other jobs to finish...
+error: this expression creates a reference which is immediately dereferenced by the compiler
+   --> src/adapters/persistence/workflow/mcp_agent_tests.rs:177:26
+    |
+177 |                 composer(&p),
+    |                          ^^ help: change this to: `p`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#needless_borrow
+    = note: `-D clippy::needless-borrow` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::needless_borrow)]`
+
+error: this expression creates a reference which is immediately dereferenced by the compiler
+   --> src/adapters/persistence/workflow/mcp_agent_tests.rs:182:22
+    |
+182 |         Some(notices(&p)),
+    |                      ^^ help: change this to: `p`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#needless_borrow
+
+error: struct update has no effect, all the fields in the struct have already been specified
+   --> src/application/workflow/publication/tests.rs:501:19
+    |
+501 |                 ..Default::default()
+    |                   ^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#needless_update
+    = note: `-D clippy::needless-update` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::needless_update)]`
+
+error: could not compile `open_bots` (lib test) due to 4 previous errors

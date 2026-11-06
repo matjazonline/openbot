@@ -82,13 +82,34 @@ impl McpActionPreparation for PostgresPersistence {
     ) -> AppResult<ActionRequest> {
         let mut tx = begin_http(self).await?;
         let facts = facts(&mut tx, scope).await?;
-        let result = request(
-            scope,
-            &facts,
-            &call.slot,
-            call.tool.as_str(),
-            call.arguments.clone(),
-        )?;
+        let result = match &call.target {
+            crate::application::workflow::mcp::McpToolTarget::Workflow { slot } => {
+                super::super::agent_origin::require_workflow_origin(&mut tx, scope, &facts.bundle)
+                    .await?;
+                request(
+                    scope,
+                    &facts,
+                    slot,
+                    call.tool.as_str(),
+                    call.arguments.clone(),
+                )?
+            }
+            crate::application::workflow::mcp::McpToolTarget::Agent { connection, origin } => {
+                let result = super::super::agent_origin::request_on(
+                    &mut tx,
+                    scope,
+                    &facts,
+                    *origin,
+                    &call.call,
+                    call.arguments.clone(),
+                )
+                .await?;
+                if result.operation_key != call.tool || mcp_target(&result.target)? != *connection {
+                    return Err(missing());
+                }
+                result
+            }
+        };
         current_on(&mut tx, &result).await?;
         tx.commit().await?;
         Ok(result)

@@ -7,7 +7,7 @@ pub(crate) mod account_identity;
 pub mod agent;
 mod agent_binding_selection;
 pub(crate) mod agent_capability;
-mod agent_publication;
+pub(in crate::adapters::persistence) mod agent_publication;
 pub mod attention;
 mod auth_attempts;
 pub mod channel;

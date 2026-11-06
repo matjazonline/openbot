@@ -1,0 +1,339 @@
+{
+  "pattern": "AgentToolTarget",
+  "filesSearched": 1301,
+  "totalHits": 35,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/harness/rig/workflow.rs#definitions",
+        "name": "definitions",
+        "kind": "function",
+        "path": "src/adapters/harness/rig/workflow.rs",
+        "span": "L64-L79"
+      },
+      "path": "src/adapters/harness/rig/workflow.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 71,
+          "text": "crate::application::workflow::agent::AgentToolTarget::Knowledge => {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/agent_preparation.rs#targets",
+        "name": "targets",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/agent_preparation.rs",
+        "span": "L120-L172"
+      },
+      "path": "src/adapters/persistence/workflow/agent_preparation.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 125,
+          "text": ") -> AppResult<Vec<AgentToolTarget>> {"
+        },
+        {
+          "line": 135,
+          "text": "AgentToolTarget::Message {"
+        },
+        {
+          "line": 148,
+          "text": "AgentToolTarget::Mcp { slot: slot.clone() }"
+        },
+        {
+          "line": 154,
+          "text": "AgentToolTarget::Provisioning {"
+        },
+        {
+          "line": 160,
+          "text": "AgentToolTarget::Knowledge"
+        },
+        {
+          "line": 162,
+          "text": "ToolKind::Http => AgentToolTarget::Http {"
+        },
+        {
+          "line": 167,
+          "text": "ToolKind::Workflow(pin) => AgentToolTarget::Workflow { pin: pin.clone() },"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/workflow_agent/mod.rs#invocation",
+        "name": "invocation",
+        "kind": "function",
+        "path": "src/adapters/workflow_agent/mod.rs",
+        "span": "L76-L123"
+      },
+      "path": "src/adapters/workflow_agent/mod.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 82,
+          "text": "AgentToolTarget::Http { connection } => ToolInvocation::Http(Box::new(HttpToolCall {"
+        },
+        {
+          "line": 88,
+          "text": "AgentToolTarget::Mcp { slot } => ToolInvocation::Mcp(Box::new(McpToolCall {"
+        },
+        {
+          "line": 94,
+          "text": "AgentToolTarget::Workflow { pin } => ToolInvocation::Workflow(Box::new(WorkflowToolCall {"
+        },
+        {
+          "line": 103,
+          "text": "AgentToolTarget::Provisioning { .. } => {"
+        },
+        {
+          "line": 112,
+          "text": "AgentToolTarget::Message { .. } => ToolInvocation::Message(Box::new(MessageToolCall {"
+        },
+        {
+          "line": 119,
+          "text": "AgentToolTarget::Knowledge => {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/agent.rs#message_kind",
+        "name": "message_kind",
+        "kind": "function",
+        "path": "src/application/workflow/agent.rs",
+        "span": "L67-L72"
+      },
+      "path": "src/application/workflow/agent.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 69,
+          "text": "AgentToolTarget::Message { name } => MessageKind::parse(name.as_str()),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/agent.rs#provisioning_kind",
+        "name": "provisioning_kind",
+        "kind": "function",
+        "path": "src/application/workflow/agent.rs",
+        "span": "L73-L82"
+      },
+      "path": "src/application/workflow/agent.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 77,
+          "text": "AgentToolTarget::Provisioning { name } => {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/agent.rs#prepared_tool",
+        "name": "prepared_tool",
+        "kind": "function",
+        "path": "src/application/workflow/agent.rs",
+        "span": "L262-L285"
+      },
+      "path": "src/application/workflow/agent.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 262,
+          "text": "fn prepared_tool(snapshot: &ToolSnapshot, target: AgentToolTarget) -> AppResult<PreparedTool> {"
+        },
+        {
+          "line": 265,
+          "text": "(AgentToolTarget::Message { name: target }, ToolKind::Message) => target == &name,"
+        },
+        {
+          "line": 266,
+          "text": "(AgentToolTarget::Provisioning { name: target }, ToolKind::Provisioning) => target == &name,"
+        },
+        {
+          "line": 267,
+          "text": "(AgentToolTarget::Knowledge, ToolKind::Knowledge) => {"
+        },
+        {
+          "line": 270,
+          "text": "(AgentToolTarget::Mcp { slot }, ToolKind::Slot(frozen)) => frozen == slot,"
+        },
+        {
+          "line": 271,
+          "text": "(AgentToolTarget::Http { .. }, ToolKind::Http) => true,"
+        },
+        {
+          "line": 272,
+          "text": "(AgentToolTarget::Workflow { pin }, ToolKind::Workflow(frozen)) => frozen == pin,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/knowledge/ports.rs#require_knowledge_invocation",
+        "name": "require_knowledge_invocation",
+        "kind": "function",
+        "path": "src/application/workflow/knowledge/ports.rs",
+        "span": "L96-L151"
+      },
+      "path": "src/application/workflow/knowledge/ports.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 123,
+          "text": "if tool.target != AgentToolTarget::Knowledge"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/persistence/workflow/agent_preparation.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 7,
+          "text": "agent::{AgentLaunch, AgentPreparation, AgentToolTarget, PreparedAgent, PreparedStep},"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/workflow_agent/mod.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 14,
+          "text": "agent::{AgentToolDispatch, AgentToolObservation, AgentToolTarget, PreparedTool},"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/application/workflow/agent_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 6,
+          "text": "agent::{AgentToolTarget, PreparedAgent, PreparedStep},"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/agent_tests.rs#http",
+        "name": "http",
+        "kind": "function",
+        "path": "src/application/workflow/agent_tests.rs",
+        "span": "L29-L33"
+      },
+      "path": "src/application/workflow/agent_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 29,
+          "text": "fn http() -> AgentToolTarget {"
+        },
+        {
+          "line": 30,
+          "text": "AgentToolTarget::Http {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/agent_tests.rs#workflow_agent_preparation_refuses_unsupported_or_colliding_bindings",
+        "name": "workflow_agent_preparation_refuses_unsupported_or_colliding_bindings",
+        "kind": "function",
+        "path": "src/application/workflow/agent_tests.rs",
+        "span": "L101-L154"
+      },
+      "path": "src/application/workflow/agent_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 102,
+          "text": "let mcp = AgentToolTarget::Mcp {"
+        },
+        {
+          "line": 121,
+          "text": "let message = AgentToolTarget::Message {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/agent.rs#AgentToolTarget",
+        "name": "AgentToolTarget",
+        "kind": "enum",
+        "path": "src/application/workflow/agent.rs",
+        "span": "L35-L55"
+      },
+      "path": "src/application/workflow/agent.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 35,
+          "text": "pub enum AgentToolTarget {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/agent.rs#PreparedTool",
+        "name": "PreparedTool",
+        "kind": "struct",
+        "path": "src/application/workflow/agent.rs",
+        "span": "L59-L65"
+      },
+      "path": "src/application/workflow/agent.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 64,
+          "text": "pub target: AgentToolTarget,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/agent.rs#PreparedStep",
+        "name": "PreparedStep",
+        "kind": "enum",
+        "path": "src/application/workflow/agent.rs",
+        "span": "L89-L93"
+      },
+      "path": "src/application/workflow/agent.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 90,
+          "text": "AgentRun { targets: Vec<AgentToolTarget> },"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/application/workflow/knowledge/ports.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 9,
+          "text": "agent::{AgentToolObservation, AgentToolTarget, PreparedTool},"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 6,
+    "baselineChars": 59739
+  }
+}

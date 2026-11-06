@@ -1,0 +1,26 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+
+running 2 tests
+test adapters::persistence::workflow::tests::admission_tests::storage_tests::autonomous_agent_storage_tests::manifest_tests::autonomous_agent_storage_manifest_seals_selection_and_accepts_only_its_tree ... FAILED
+test adapters::persistence::workflow::tests::admission_tests::storage_tests::autonomous_agent_storage_tests::manifest_tests::autonomous_agent_storage_manifest_retention_races_preserve_surviving_revisions ... FAILED
+
+failures:
+
+---- adapters::persistence::workflow::tests::admission_tests::storage_tests::autonomous_agent_storage_tests::manifest_tests::autonomous_agent_storage_manifest_seals_selection_and_accepts_only_its_tree stdout ----
+
+thread 'adapters::persistence::workflow::tests::admission_tests::storage_tests::autonomous_agent_storage_tests::manifest_tests::autonomous_agent_storage_manifest_seals_selection_and_accepts_only_its_tree' (32090132) panicked at src/adapters/persistence/workflow/autonomous_agent_storage_support.rs:120:34:
+called `Result::unwrap()` on an `Err` value: Database(PgDatabaseError { severity: Error, code: "23505", message: "duplicate key value violates unique constraint \"agent_dependency_manifests_company_id_root_run_id_key\"", detail: Some("Key (company_id, root_run_id)=(e7aca48b-1d25-48f2-a24e-68a7bf994cec, e1a80986-3547-4307-8cf7-c8c5cd59477d) already exists."), hint: None, position: None, where: None, schema: Some("public"), table: Some("agent_dependency_manifests"), column: None, data_type: None, constraint: Some("agent_dependency_manifests_company_id_root_run_id_key"), file: Some("nbtinsert.c"), line: Some(673), routine: Some("_bt_check_unique") })
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- adapters::persistence::workflow::tests::admission_tests::storage_tests::autonomous_agent_storage_tests::manifest_tests::autonomous_agent_storage_manifest_retention_races_preserve_surviving_revisions stdout ----
+
+thread 'adapters::persistence::workflow::tests::admission_tests::storage_tests::autonomous_agent_storage_tests::manifest_tests::autonomous_agent_storage_manifest_retention_races_preserve_surviving_revisions' (32090131) panicked at src/adapters/persistence/workflow/autonomous_agent_storage_support.rs:120:34:
+called `Result::unwrap()` on an `Err` value: Database(PgDatabaseError { severity: Error, code: "23505", message: "duplicate key value violates unique constraint \"agent_dependency_manifests_company_id_root_run_id_key\"", detail: Some("Key (company_id, root_run_id)=(043c8bec-d232-40d2-bbc5-9fff764ab3ca, 2b09a875-a27c-4b1e-8a48-7dd370d09d05) already exists."), hint: None, position: None, where: None, schema: Some("public"), table: Some("agent_dependency_manifests"), column: None, data_type: None, constraint: Some("agent_dependency_manifests_company_id_root_run_id_key"), file: Some("nbtinsert.c"), line: Some(673), routine: Some("_bt_check_unique") })
+
+
+failures:
+    adapters::persistence::workflow::tests::admission_tests::storage_tests::autonomous_agent_storage_tests::manifest_tests::autonomous_agent_storage_manifest_retention_races_preserve_surviving_revisions
+    adapters::persistence::workflow::tests::admission_tests::storage_tests::autonomous_agent_storage_tests::manifest_tests::autonomous_agent_storage_manifest_seals_selection_and_accepts_only_its_tree
+
+test result: FAILED. 0 passed; 2 failed; 0 ignored; 0 measured; 2944 filtered out; finished in 1.11s
+

@@ -33,22 +33,7 @@ async fn configured_source(mut source: Value) -> TokenFixture {
     let reviewer = member(&fixture, "admin").await;
     source["limits"]["root_budget"] = json!({"activations":10,"model_calls":10,"repetitions":10,
         "tokens":{"max_tokens":150,"reviewers":[{"kind":"user","id":reviewer}]}});
-    let binding = BindingFixture::from_fixture(fixture, source).await;
-    let f = AdmissionFixture::with_binding(binding).await;
-    let admission = f.prepare(f.request("tokens", f.manual())).await;
-    f.persistence().admit(&admission).await.unwrap();
-    let job = sqlx::query_scalar("SELECT id FROM background_tasks WHERE workflow_execution_id=$1")
-        .bind(admission.first_execution_id().as_uuid())
-        .fetch_one(f.persistence().pool())
-        .await
-        .unwrap();
-    let scope = ActivationRequest {
-        company: admission.company_id(),
-        run: admission.proposed_run_id(),
-        execution: admission.first_execution_id(),
-        job: WorkflowJobId(job),
-    };
-    let model = open_native(native_for(f, scope).await).await;
+    let model = open_native(model_support::fixture(fixture, source).await).await;
     TokenFixture {
         model,
         reviewer: WorkflowActor::authenticated(reviewer).unwrap(),

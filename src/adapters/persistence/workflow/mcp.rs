@@ -303,6 +303,7 @@ impl McpActionUse for PostgresPersistence {
         )
         .await?;
         live_run_on(&mut tx, request).await?;
+        super::agent_origin::current_on(&mut tx, request).await?;
         let (connection, decision) = current_on(&mut tx, request).await?;
         let envelope: Option<String> = sqlx::query_scalar(
             "SELECT envelope FROM company_mcp_credentials WHERE company_id=$1 AND connection_id=$2",

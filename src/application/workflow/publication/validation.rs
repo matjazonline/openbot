@@ -1,5 +1,5 @@
 use super::*;
-use crate::domain::workflow::{Binding, TypeName};
+use crate::domain::workflow::Binding;
 use std::collections::BTreeSet;
 use std::io::{self, Write};
 
@@ -7,6 +7,7 @@ pub(super) fn validate(
     company_id: CompanyId,
     snapshots: &DependencySnapshots,
     compiled: &CompiledWorkflow,
+    expected: &BTreeMap<crate::application::agent::AgentKey, Vec<AgentReferenceUse>>,
 ) -> Result<(), Diagnostic> {
     let mut agents = BTreeSet::new();
     for agent in &snapshots.agents {
@@ -19,40 +20,9 @@ pub(super) fn validate(
         if !agents.insert(&agent.key) {
             return Err(fail("publication.duplicate", "has duplicate snapshots"));
         }
-        check_selection(&agent.tools, &agent.skills, snapshots)
-            .map_err(|reason| fail("publication.selection", &reason))?;
     }
-    validate_skills(company_id, snapshots, compiled)?;
     validate_tools(company_id, snapshots, compiled)?;
-    validate_agents(snapshots, compiled)
-}
-
-fn validate_skills(
-    company_id: CompanyId,
-    snapshots: &DependencySnapshots,
-    compiled: &CompiledWorkflow,
-) -> Result<(), Diagnostic> {
-    let mut skills = BTreeSet::new();
-    for skill in &snapshots.skills {
-        let fail = |code: &'static str, reason: &str| {
-            dependency_error(compiled, "skill", skill.name.as_str(), code, reason)
-        };
-        if skill.company_id != company_id {
-            return Err(fail("publication.ownership", "belongs to another company"));
-        }
-        if !skills.insert(&skill.name) {
-            return Err(fail("publication.duplicate", "has duplicate snapshots"));
-        }
-        for tool in &skill.required_tools {
-            if !has_tool(tool, snapshots) {
-                return Err(fail(
-                    "publication.selection",
-                    &format!("requires missing or ambiguous tool {tool}"),
-                ));
-            }
-        }
-    }
-    Ok(())
+    validate_agents(snapshots, compiled, expected)
 }
 
 fn validate_tools(
@@ -117,70 +87,32 @@ pub(super) fn dependency_path(
         .unwrap_or_else(|| "/steps".into())
 }
 
-fn has_tool(name: &TypeName, snapshots: &DependencySnapshots) -> bool {
-    // Name-only capability selections cannot disambiguate identical tool names on
-    // different connections. Explicit mcp.call selections retain their slot key.
-    snapshots
-        .tools
-        .iter()
-        .filter(|t| &t.contract.name == name)
-        .count()
-        == 1
-}
-
-pub(super) fn check_selection(
-    tools: &[TypeName],
-    skills: &[TypeName],
-    snapshots: &DependencySnapshots,
-) -> Result<(), String> {
-    for tool in tools {
-        if !has_tool(tool, snapshots) {
-            return Err(format!(
-                "Tool {tool} is missing or ambiguous in the frozen catalogue"
-            ));
-        }
-    }
-    for name in skills {
-        let Some(skill) = snapshots.skills.iter().find(|s| &s.name == name) else {
-            return Err(format!("Skill {name} is missing from the frozen catalogue"));
-        };
-        for required in &skill.required_tools {
-            if !tools.contains(required) {
-                return Err(format!("Skill {name} requires unselected tool {required}"));
-            }
-        }
-    }
-    Ok(())
-}
-
 fn validate_agents(
     snapshots: &DependencySnapshots,
     compiled: &CompiledWorkflow,
+    expected: &BTreeMap<crate::application::agent::AgentKey, Vec<AgentReferenceUse>>,
 ) -> Result<(), Diagnostic> {
-    for (id, step) in &compiled.graph().definition().steps {
-        if crate::application::workflow::registry::ModelStep::of(step.step_type.as_str()).is_none()
+    if snapshots.agents.len() != expected.len() {
+        return Err(error(
+            compiled,
+            "/steps",
+            "publication.agent",
+            "Supply exactly the declared finite agent reference universe",
+        ));
+    }
+    for (key, uses) in expected {
+        if !snapshots
+            .agents
+            .iter()
+            .any(|reference| &reference.key == key && &reference.uses == uses)
         {
-            continue;
-        }
-        let path = format!("/steps/{id}/with/agent");
-        let fail = || {
-            error(
+            return Err(dependency_error(
                 compiled,
-                &path,
+                "agent",
+                key.as_str(),
                 "publication.agent",
-                "Supply the selected agent snapshot, or a finite catalogue for a runtime selector",
-            )
-        };
-        if snapshots.agents.is_empty() {
-            return Err(fail());
-        }
-        if let Some(Binding::Literal(value)) = step.inputs.get("agent")
-            && !snapshots
-                .agents
-                .iter()
-                .any(|a| Some(a.key.as_str()) == value.as_str())
-        {
-            return Err(fail());
+                "has missing or inconsistent source uses",
+            ));
         }
     }
     Ok(())
