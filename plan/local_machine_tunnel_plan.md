@@ -4,6 +4,10 @@
 > when needed. Do not add data backfills, dual reads/writes, legacy decoders, compatibility shims,
 > or staged rollouts for existing data.
 
+Status: superseded for company-owned local agents by [Cloudroom local agents](cloudroom-local/README.md).
+The sketches below are historical proposals, not implemented configuration or current application
+interfaces. The successor uses Cloudroom's local server and an outbound Openbot plugin connection.
+
 This document outlines the architectural design and implementation plan for executing OpenCode agent prompts on a user's **local machine** using a persistent reverse WebSocket tunnel (Pattern B).
 
 With this pattern, the user runs a local daemon (`opencode-tunnel` or `opencode serve`) on their machine. The daemon establishes a secure, outbound-only WebSocket connection back to `openbots`. No open incoming ports, static IPs, or public tunneling services (like Ngrok or Cloudflare Tunnels) are required.
