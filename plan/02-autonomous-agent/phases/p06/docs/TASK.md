@@ -158,3 +158,7 @@ AUTO-P06-WB1-R1-N1 PASS, no findings, reviewer20PASS. Root independently recompu
 
 ### Record staging correction
 Source staging matched104 accepted path hashes. git diff --cached --check found trailing whitespace only in generated/captured browser HTML; commit did not run. Kept raw evidence unchanged and archived exact bytes in logs/raw-browser-evidence.tar.gz plus file/archive hashes raw-browser-evidence.json; unstaged only those evidence files. First archive attempt mixed relative/absolute pathlib paths and stopped before index edits; corrected. Source unchanged. Full diagnostic retained record-staging-whitespace-01.txt. No weakened check or affected implementation re-review required.
+
+
+### Accepted source commit bridge
+Source1b9fbcda9c2824814c89a038d676de1a4a77185f committed after accepted104-path staged hash comparison and cached whitespace PASS. Root verifies committed bytes match all104 reviewed source hashes. C009r1/I009r1 at authority38 carry accepted06 producer and preserve external main planning commits. Metadata-only update next; no new implementation edits/review needed. Raw browser HTML29files retained exactly in archive instead of rewriting whitespace.

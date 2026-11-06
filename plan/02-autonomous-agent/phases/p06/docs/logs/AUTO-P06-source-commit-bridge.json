@@ -1,0 +1,11 @@
+{
+  "accepted_digest": "2ae1e93a0861c03b3ef1f223a109ad74f399ed30020f25d54904e794a6368e3c",
+  "source_commit": "1b9fbcda9c2824814c89a038d676de1a4a77185f",
+  "parent": "fb92a7b48aec030b685701eff31fba9f86f5ae19",
+  "source_path_count": 104,
+  "all_reviewed_source_bytes_match_commit": true,
+  "workflow_record_changes_only_since_acceptance": true,
+  "raw_generated_html_archive": "raw-browser-evidence.tar.gz",
+  "root": "/root",
+  "checked_at": "2026-11-06T18:52:58.515012+00:00"
+}
