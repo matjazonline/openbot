@@ -250,6 +250,14 @@ const NO_BACKWARD_COMPATIBILITY_NOTES: &[&str] = &[
     "plan/standard-operating-procedures/07-controlled-improvement-experiments.md",
     "plan/standard-operating-procedures/08-integration-verification-and-release.md",
     "plan/tenant-owned-execution-backends.md",
+    "plan/vault-google/README.md",
+    "plan/vault-google/01-contracts-and-ownership.md",
+    "plan/vault-google/02-vault-storage-and-management.md",
+    "plan/vault-google/03-connection-bindings-and-authority.md",
+    "plan/vault-google/04-google-authorization.md",
+    "plan/vault-google/05-token-resolution-and-refresh.md",
+    "plan/vault-google/06-workflow-integration-and-authoring.md",
+    "plan/vault-google/07-integration-verification-and-operations.md",
 ];
 
 async fn serve() -> anyhow::Result<()> {
