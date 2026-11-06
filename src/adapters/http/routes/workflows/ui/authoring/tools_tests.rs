@@ -295,7 +295,7 @@ async fn used_by_lists_a_binding_that_reaches_the_agent_only_through_a_child_dia
         return;
     };
     let agent = f.agent("Assistant", "assistant").await;
-    f.publish_usage_agent(agent).await;
+    f.publish_agent(agent).await;
     // The grandchild runs the agent; two children each call it; the parent calls both.
     let grandchild = Uuid::new_v4();
     let mut source = example("agent.run", grandchild);
@@ -396,26 +396,4 @@ async fn used_by_lists_a_binding_that_reaches_the_agent_only_through_a_child_dia
         gone.contains("No binding's version froze this agent"),
         "{gone}"
     );
-}
-
-impl Fixture {
-    async fn publish_usage_agent(&self, agent: Uuid) {
-        use crate::application::agent::{AgentPublicationKey, AgentPublicationScope, PublishAgent};
-        let scope = AgentPublicationScope {
-            company: CompanyId::new(self.company),
-            actor: WorkflowActor::authenticated(self.owner).unwrap(),
-            agent: crate::entities::agent_capability::AgentId::new(agent),
-        };
-        let publications = self.engine.agent_publications();
-        let preview = publications.preview_agent(scope).await.unwrap();
-        publications
-            .publish_agent(PublishAgent {
-                scope,
-                expected_draft_revision: preview.draft_revision,
-                expected_active_revision: preview.active_revision,
-                key: AgentPublicationKey::parse(Uuid::new_v4().to_string()).unwrap(),
-            })
-            .await
-            .unwrap();
-    }
 }

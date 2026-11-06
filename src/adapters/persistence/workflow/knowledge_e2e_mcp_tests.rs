@@ -83,6 +83,7 @@ async fn configure_connection(
     )
     .await
     .unwrap();
+    j.d.fixture.publish_agent(agent).await;
     j.d.mcp_selections = vec![McpPublicationSelection {
         connection: connection.id,
         slot: ResourceName::parse("service").unwrap(),

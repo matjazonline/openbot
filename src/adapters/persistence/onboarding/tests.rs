@@ -169,6 +169,21 @@ impl Fixture {
                 .await?,
         )
     }
+    async fn rename_agent(&self, agent: Uuid) {
+        AgentPersistence::update(
+            self.persistence.as_ref(),
+            agent,
+            AgentWrite {
+                name: "Archived desk".into(),
+                slug: "archived".into(),
+                provider: Some("openai".into()),
+                model: Some("gpt-4o-mini".into()),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+    }
     async fn totals(&self) -> (i64, i64, i64) {
         sqlx::query_as(
             "SELECT (SELECT count(*) FROM agents WHERE company_id IS NOT NULL), \
@@ -310,7 +325,8 @@ async fn onboarding_address_refusal_keeps_the_agent_and_other_channels() {
 }
 
 #[tokio::test]
-async fn onboarding_same_key_reuses_results_and_new_key_after_deletion_is_fresh() {
+async fn onboarding_same_key_replays_and_new_key_after_channel_deletion_and_agent_rename_is_fresh()
+{
     let f = Fixture::new(false).await;
     let library = f.library("desk", "Desk").await;
     let key = Uuid::new_v4();
@@ -325,7 +341,7 @@ async fn onboarding_same_key_reuses_results_and_new_key_after_deletion_is_fresh(
     )
     .unwrap();
     // A channel with workflow configuration is intentionally retained. This private fixture has
-    // no runs; remove its unused binding before exercising the supported channel/agent deletion.
+    // no runs; remove its unused binding before exercising channel deletion.
     let removed =
         sqlx::query("DELETE FROM workflow_bindings WHERE company_id = $1 AND channel_id = $2")
             .bind(f.company)
@@ -338,12 +354,15 @@ async fn onboarding_same_key_reuses_results_and_new_key_after_deletion_is_fresh(
     ChannelPersistence::delete(f.persistence.as_ref(), channel)
         .await
         .unwrap();
-    AgentPersistence::delete(f.persistence.as_ref(), first[0].agent.id)
-        .await
-        .unwrap();
+    assert!(matches!(
+        AgentPersistence::delete(f.persistence.as_ref(), first[0].agent.id).await,
+        Err(AppError::Conflict(_))
+    ));
+    f.rename_agent(first[0].agent.id).await;
     let fresh = f.onboard(Uuid::new_v4(), &[library], false).await.unwrap();
     assert_ne!(ids(&first), ids(&fresh));
-    assert_eq!(f.totals().await, (1, 1, 2));
+    assert_ne!(first[0].agent.id, fresh[0].agent.id);
+    assert_eq!(f.totals().await, (2, 1, 2));
 }
 
 #[tokio::test]
@@ -351,19 +370,7 @@ async fn onboarding_new_key_after_rename_does_not_replay_an_old_channel() {
     let f = Fixture::new(false).await;
     let library = f.library("desk", "Desk").await;
     let first = f.onboard(Uuid::new_v4(), &[library], false).await.unwrap();
-    AgentPersistence::update(
-        f.persistence.as_ref(),
-        first[0].agent.id,
-        AgentWrite {
-            name: "Archived desk".into(),
-            slug: "archived".into(),
-            provider: Some("openai".into()),
-            model: Some("gpt-4o-mini".into()),
-            ..Default::default()
-        },
-    )
-    .await
-    .unwrap();
+    f.rename_agent(first[0].agent.id).await;
     let fresh = f.onboard(Uuid::new_v4(), &[library], false).await.unwrap();
     assert_ne!(fresh[0].agent.id, first[0].agent.id);
     assert!(matches!(
@@ -754,19 +761,7 @@ async fn onboarding_new_owner_with_new_key_does_not_replay_the_previous_owners_c
     let f = Fixture::new(false).await;
     let library = f.library("desk", "Desk").await;
     let first = f.onboard(Uuid::new_v4(), &[library], false).await.unwrap();
-    AgentPersistence::update(
-        f.persistence.as_ref(),
-        first[0].agent.id,
-        AgentWrite {
-            name: "Archive".into(),
-            slug: "archive".into(),
-            provider: Some("openai".into()),
-            model: Some("gpt-4o-mini".into()),
-            ..Default::default()
-        },
-    )
-    .await
-    .unwrap();
+    f.rename_agent(first[0].agent.id).await;
     let owner = f
         .persistence
         .create_user("new-owner", "new-owner@example.test", "hash")
@@ -774,6 +769,17 @@ async fn onboarding_new_owner_with_new_key_does_not_replay_the_previous_owners_c
         .unwrap()
         .id;
     transfer_company_ownership(&f.db.pool, f.company, owner, CompanyAccessRole::Admin).await;
+    let mut membership = f.db.pool.begin().await.unwrap();
+    crate::adapters::persistence::participant::create_person_principal_on(
+        &mut membership,
+        f.company,
+        owner,
+        "new-owner",
+        "new-owner@example.test",
+    )
+    .await
+    .unwrap();
+    membership.commit().await.unwrap();
     let fresh = completed(
         f.service
             .onboard(

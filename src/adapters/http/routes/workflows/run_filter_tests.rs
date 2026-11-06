@@ -3,9 +3,15 @@
 //! through a pinned child — combined with the other filters and the cursor, and only ever for an
 //! agent of the company being listed.
 use super::*;
+use crate::application::agent::{
+    AgentPublicationKey, AgentPublicationScope, AgentPublications, PublishAgent,
+};
+use crate::application::workflow::WorkflowActor;
+use crate::domain::workflow::CompanyId;
+use crate::entities::agent_capability::AgentId;
 
 impl Fixture {
-    /// An agent of `company` on an enabled model connection, as publication requires.
+    /// A published agent of `company` on an enabled model connection.
     pub(super) async fn model_agent(&self, company: Uuid, slug: &str) -> Uuid {
         sqlx::query(
             "INSERT INTO company_model_connections(company_id, provider, api_key, models) \
@@ -15,7 +21,7 @@ impl Fixture {
         .execute(self.persistence.pool())
         .await
         .unwrap();
-        AgentPersistence::create(
+        let agent = AgentPersistence::create(
             &self.persistence,
             company,
             AgentWrite {
@@ -27,8 +33,27 @@ impl Fixture {
             },
         )
         .await
-        .unwrap()
-        .id
+        .unwrap();
+        let user = if company == self.company {
+            self.owner
+        } else {
+            assert_eq!(company, self.other);
+            self.stranger
+        };
+        self.persistence
+            .publish_agent(PublishAgent {
+                scope: AgentPublicationScope {
+                    company: CompanyId::new(company),
+                    actor: WorkflowActor::authenticated(user).unwrap(),
+                    agent: AgentId::new(agent.id),
+                },
+                expected_draft_revision: agent.draft_revision,
+                expected_active_revision: None,
+                key: AgentPublicationKey::parse(Uuid::new_v4().to_string()).unwrap(),
+            })
+            .await
+            .unwrap();
+        agent.id
     }
 
     /// `source` saved over draft `revision` of `workflow` and published: the new version.
@@ -329,7 +354,19 @@ async fn run_agent_filter_finds_only_an_agent_of_the_company() {
     let (status, page) = f.runs_page(f.stranger, f.other, by_agent(mine)).await;
     assert_eq!(status, StatusCode::NOT_FOUND, "{page}");
 
-    let idle = f.model_agent(company, "idle").await;
+    // Draft-only agents can be deleted; published revisions must retain their identity.
+    let idle = AgentPersistence::create(
+        &f.persistence,
+        company,
+        AgentWrite {
+            name: "Idle".into(),
+            slug: "idle".into(),
+            ..Default::default()
+        },
+    )
+    .await
+    .unwrap()
+    .id;
     assert!(f.listed(owner, company, by_agent(idle)).await.is_empty());
     AgentPersistence::delete(&f.persistence, idle)
         .await

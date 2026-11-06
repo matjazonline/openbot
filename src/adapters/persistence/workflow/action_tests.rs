@@ -5,11 +5,12 @@ use crate::application::workflow::actions::*;
 async fn setup() -> (AdmissionFixture, ActionRequest) {
     let (fixture, execution) = fixture().await;
     fixture.persistence().activate(execution).await.unwrap();
-    let request = action_request(ActionScope {
+    let mut request = action_request(ActionScope {
         company: execution.company,
         run: execution.run,
         execution: execution.execution,
     });
+    request.context.actor = fixture.binding.target.actor.user_id();
     (fixture, request)
 }
 
@@ -156,8 +157,7 @@ async fn workflow_action_numeric_jsonb_roundtrip_preserves_digest_and_replay() {
 
 #[tokio::test]
 async fn workflow_action_authority_sql_scope_actor_and_current_membership() {
-    let (f, mut request) = setup().await;
-    request.context.actor = f.binding.target.actor.user_id();
+    let (f, request) = setup().await;
     let service = ActionService::new(f.persistence().clone());
     let intent = service
         .prepare_tool(
@@ -211,8 +211,7 @@ async fn workflow_action_authority_sql_scope_actor_and_current_membership() {
 
 #[tokio::test]
 async fn workflow_action_authority_revocation_contender_blocks_then_rechecks() {
-    let (f, mut request) = setup().await;
-    request.context.actor = f.binding.target.actor.user_id();
+    let (f, request) = setup().await;
     let intent = ActionService::new(f.persistence().clone())
         .prepare_step(request.clone())
         .await
@@ -244,8 +243,7 @@ async fn workflow_action_authority_revocation_contender_blocks_then_rechecks() {
 
 #[tokio::test]
 async fn workflow_action_authority_run_lock_wait_cannot_cross_deadline() {
-    let (f, mut request) = setup().await;
-    request.context.actor = f.binding.target.actor.user_id();
+    let (f, request) = setup().await;
     let intent = ActionService::new(f.persistence().clone())
         .prepare_step(request.clone())
         .await

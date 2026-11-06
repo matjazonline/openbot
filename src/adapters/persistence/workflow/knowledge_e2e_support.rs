@@ -135,6 +135,7 @@ async fn configure(d: &Deployment, audience: Audience) {
     )
     .await
     .unwrap();
+    d.fixture.publish_agent(agent).await;
     ChannelPersistence::update(
         d.p(),
         ChannelUpdate {

@@ -212,6 +212,26 @@ impl Fixture {
         .unwrap()
         .id
     }
+
+    async fn publish_agent(&self, agent: Uuid) {
+        use crate::application::agent::{AgentPublicationKey, AgentPublicationScope, PublishAgent};
+        let scope = AgentPublicationScope {
+            company: CompanyId::new(self.company),
+            actor: WorkflowActor::authenticated(self.owner).unwrap(),
+            agent: crate::entities::agent_capability::AgentId::new(agent),
+        };
+        let publications = self.engine.agent_publications();
+        let preview = publications.preview_agent(scope).await.unwrap();
+        publications
+            .publish_agent(PublishAgent {
+                scope,
+                expected_draft_revision: preview.draft_revision,
+                expected_active_revision: preview.active_revision,
+                key: AgentPublicationKey::parse(Uuid::new_v4().to_string()).unwrap(),
+            })
+            .await
+            .unwrap();
+    }
 }
 
 fn form(fields: &[(&str, &str)]) -> Bytes {

@@ -809,7 +809,7 @@ pub(super) fn agent_avatar_field(id_prefix: &str, draft: &AgentDraft<'_>) -> Str
         Ok(stored) => stored,
         Err(message) => {
             return format!(
-                r#"<label class="form-control">Agent Picture<input type="text" class="input input-bordered" name="avatar_url" value="{value}" aria-invalid="true"><span class="text-error">{message}</span></label>"#,
+                r#"<label class="form-control">Agent Picture<input type="text" class="input" name="avatar_url" value="{value}" aria-invalid="true"><span class="text-error">{message}</span></label>"#,
                 value = escape_html_attr(draft.avatar_url),
                 message = escape_html_text(&message)
             );

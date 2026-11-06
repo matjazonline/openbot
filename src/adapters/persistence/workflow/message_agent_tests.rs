@@ -29,11 +29,7 @@ use crate::services::test_support::{
     LlmTurn, SCRIPTED_MODEL, SCRIPTED_PROVIDER, register_scripted_agent_base_url, scripted_llm,
 };
 
-#[tokio::test]
-async fn workflow_agent_message_tool_parks_on_delivery_and_continues_with_its_receipt() {
-    let fixture = Fixture::new().await;
-    let channel = new_channel(&fixture, "runs").await;
-    let user = member(&fixture, "member").await;
+async fn published_message_agent(fixture: &Fixture) -> Uuid {
     let p = fixture.persistence.clone();
     let company = fixture.target.company;
     let agent = AgentPersistence::create(
@@ -68,6 +64,18 @@ async fn workflow_agent_message_tool_parks_on_delivery_and_continues_with_its_re
     )
     .await
     .unwrap();
+    fixture.publish_agent(agent.id).await;
+    agent.id
+}
+
+#[tokio::test]
+async fn workflow_agent_message_tool_parks_on_delivery_and_continues_with_its_receipt() {
+    let fixture = Fixture::new().await;
+    let channel = new_channel(&fixture, "runs").await;
+    let user = member(&fixture, "member").await;
+    // Keep publication setup off the stock test thread's stack.
+    let agent = Box::pin(published_message_agent(&fixture)).await;
+    let p = fixture.persistence.clone();
     let definitions = DefinitionService::new(
         Preflight,
         p.clone(),
@@ -96,7 +104,7 @@ async fn workflow_agent_message_tool_parks_on_delivery_and_continues_with_its_re
         LlmTurn::text("\"sent\""),
     ])
     .await;
-    register_scripted_agent_base_url(agent.id, &llm.base_url);
+    register_scripted_agent_base_url(agent, &llm.base_url);
     let runtime = WorkflowAgentRuntime::new(
         ProviderRegistry::standard().unwrap(),
         p.clone(),

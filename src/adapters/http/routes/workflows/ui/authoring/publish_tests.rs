@@ -1,4 +1,4 @@
-//! Publication from the editor: the preview of frozen agents and selected connections, a publish
+//! Publication from the editor: the preview of agent references and selected connections, a publish
 //! that moves no binding, compare, stale and conflicting publishes, and MCP selections.
 use super::*;
 
@@ -153,31 +153,12 @@ async fn a_publish_of_a_revision_that_is_no_longer_the_draft_is_refused_in_the_e
 }
 
 #[tokio::test]
-async fn an_agent_step_previews_the_agents_frozen_tools_and_skills() {
+async fn an_agent_step_previews_the_published_agent_reference_and_use() {
     let Some(f) = Fixture::new().await else {
         return;
     };
-    sqlx::query(
-        "INSERT INTO company_model_connections(company_id, provider, api_key, models) \
-         VALUES ($1, 'openai', 'fixture-key', '{gpt-test}')",
-    )
-    .bind(f.company)
-    .execute(f.persistence.pool())
-    .await
-    .unwrap();
-    AgentPersistence::create(
-        &f.persistence,
-        f.company,
-        AgentWrite {
-            name: "Assistant".into(),
-            slug: "assistant".into(),
-            provider: Some("openai".into()),
-            model: Some("gpt-test".into()),
-            ..Default::default()
-        },
-    )
-    .await
-    .unwrap();
+    let agent = f.agent("Assistant", "assistant").await;
+    f.publish_agent(agent).await;
     let workflow = Uuid::new_v4();
     let source = source_of("agent.run", workflow);
     f.draft(workflow, "Agent", &source).await;
@@ -194,10 +175,10 @@ async fn an_agent_step_previews_the_agents_frozen_tools_and_skills() {
         .await
         .unwrap();
     assert!(html.contains("Revision 2 is valid"), "{html}");
-    assert!(html.contains("Uses the agent's tools and skills"));
-    assert!(html.contains("source: the agent, frozen at publication"));
-    assert!(html.contains("tools: no tools") && html.contains("skills: no skills"));
-    assert!(html.contains("openai / gpt-test"));
+    assert!(html.contains("Assistant"));
+    assert!(html.contains(r#"agent <span class="font-mono">@assistant</span>"#));
+    assert!(html.contains("start (agent tools and skills)"));
+    assert!(html.contains("The published agent revision is selected when a run starts."));
 }
 
 #[tokio::test]
@@ -312,32 +293,13 @@ async fn an_mcp_step_validates_publishes_through_the_selected_slot_and_locates_b
 }
 
 #[tokio::test]
-async fn a_parameter_selected_agent_step_previews_every_frozen_candidate() {
+async fn a_parameter_selected_agent_step_previews_every_published_candidate() {
     let Some(f) = Fixture::new().await else {
         return;
     };
-    sqlx::query(
-        "INSERT INTO company_model_connections(company_id, provider, api_key, models) \
-         VALUES ($1, 'openai', 'fixture-key', '{gpt-test}')",
-    )
-    .bind(f.company)
-    .execute(f.persistence.pool())
-    .await
-    .unwrap();
     for slug in ["assistant", "helper"] {
-        AgentPersistence::create(
-            &f.persistence,
-            f.company,
-            AgentWrite {
-                name: format!("Agent {slug}"),
-                slug: slug.into(),
-                provider: Some("openai".into()),
-                model: Some("gpt-test".into()),
-                ..Default::default()
-            },
-        )
-        .await
-        .unwrap();
+        let agent = f.agent(&format!("Agent {slug}"), slug).await;
+        f.publish_agent(agent).await;
     }
     let workflow = Uuid::new_v4();
     let mut source = example("agent.run", workflow);
@@ -362,9 +324,10 @@ async fn a_parameter_selected_agent_step_previews_every_frozen_candidate() {
     assert!(html.contains("Revision 2 is valid"), "{html}");
     assert!(html.contains("Agent assistant") && html.contains("Agent helper"));
     assert_eq!(
-        html.matches("tools: no tools").count(),
+        html.matches("The published agent revision is selected when a run starts.")
+            .count(),
         2,
-        "each candidate's tools"
+        "each candidate's published reference"
     );
     assert!(html.contains(r#"the agent named by <span class="font-mono">/params/agent</span> at run time, one of @assistant, @helper"#));
 }
@@ -416,28 +379,9 @@ async fn a_parameter_selected_step_lists_its_own_parameters_agents() {
     let Some(f) = Fixture::new().await else {
         return;
     };
-    sqlx::query(
-        "INSERT INTO company_model_connections(company_id, provider, api_key, models) \
-         VALUES ($1, 'openai', 'fixture-key', '{gpt-test}')",
-    )
-    .bind(f.company)
-    .execute(f.persistence.pool())
-    .await
-    .unwrap();
     for slug in ["assistant", "helper"] {
-        AgentPersistence::create(
-            &f.persistence,
-            f.company,
-            AgentWrite {
-                name: format!("Agent {slug}"),
-                slug: slug.into(),
-                provider: Some("openai".into()),
-                model: Some("gpt-test".into()),
-                ..Default::default()
-            },
-        )
-        .await
-        .unwrap();
+        let agent = f.agent(&format!("Agent {slug}"), slug).await;
+        f.publish_agent(agent).await;
     }
     // `start` names @assistant literally; `second` picks from an enum holding only @helper.
     let workflow = Uuid::new_v4();
