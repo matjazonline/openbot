@@ -1,6 +1,6 @@
 # Autonomous-agent phase05 — TASK
 
-Status: investigation; original05A/B/C not yet accepted.
+Status: original05A/B/C COMPLETE, independently accepted and local-main integrated at source a82d337ab651f6e345db24a8f4f128cd69a93a06. Historical entries below retain their original state.
 Workflow: implement-astra-reviewed-2-2. Root/A /root (Sol6.1/xhigh userconfirmed); independentB unassigned until first review; requested Astra/high/forknone. Actual host model settings unexposed. Context compaction threshold unexposed; durable checkpoints retained.
 Worktree: /Users/mac02/dev/openbot-recovery/.worktrees/autonomous-p05; branch autonomous/p05; starting/reviewbase77a215858950ab3b18eebf65ab33efafb079e078. No preexisting dirty changes. Recordroot: /Users/mac02/dev/openbot-recovery/.worktrees/autonomous-p05/plan/02-autonomous-agent/phases/p05/docs.
 Authority: /Users/mac02/dev/openbot-recovery/plan/02-autonomous-agent/COORDINATION.md, writer/root, revision27 immutablepinlogs/coordination-r27.md. Acknowledged I001r2/I002r1/I003r2/I004–I005r1/I006r3/I007r2/C001–C006r1, no pending conflicts.
@@ -65,3 +65,7 @@ Authorityr29byte-identicalpinchecked beforefreeze; activeI001r2/I002r1/I003r2/I0
 ## Root acceptance
 
 Wholeoriginal05A+B+C ACCEPTEDinphase at414d408bd281c2be552264aa75534ad47639f3c461fb454031222e685f803a1a after savedAUTO-P05-WB1-R1-N1 PASS, allreviewnotes/findings read, independent12PASS7.80s, rootdigest/authorityr29 recheckedunchanged. No unresolvedfindings/gaps. Codecommit/localintegration/checkpointpush next;06/07stilloutstanding. See logs/AUTO-P05-root-acceptance.json.
+
+## Completed integration
+
+Acceptedsource/code+records a82d337ab651f6e345db24a8f4f128cd69a93a06 localmain identicalFF verified. Authorityr30 pinsacceptedproducer; exactsourcefullpatchSHA70743196a4b14efc2bee3c6947d091d50ce3c10a487aaf63ae7a2e6ffa43f20b unchanged. Metadata-onlyfollowup/ownbranchbackupnext; remote main staysdc35ee4 untilwholeplancomplete. No codechangeafterPASS.

@@ -1,0 +1,11 @@
+{
+  "accepted_source_commit": "a82d337ab651f6e345db24a8f4f128cd69a93a06",
+  "local_main": "a82d337ab651f6e345db24a8f4f128cd69a93a06",
+  "source_patch_sha256": "70743196a4b14efc2bee3c6947d091d50ce3c10a487aaf63ae7a2e6ffa43f20b",
+  "protected_files_preserved": {
+    "/Users/mac02/dev/openbot-recovery/plan/fix-app/COORDINATION.md": "573f77d2e362b036080b5c522a9c7515892c6e7dbf31c1c054156697020ea72f",
+    "/Users/mac02/dev/openbot-recovery/plan/01-knowledge-access-levels/COORDINATION.md": "adcb7e538bb0f63433e72244c8e447cf051699325435626d52d7e5eaadca9fcd",
+    "/Users/mac02/dev/openbot-recovery/plan/02-autonomous-agent/COORDINATION.md": "51e842119a0b2a7641e65cd5231167cf06e418ee9fe4a83b11fb62b7c82088df"
+  },
+  "remote_main_unchanged": "dc35ee426d8f88abdaf40562027ae69ad66863eb"
+}
