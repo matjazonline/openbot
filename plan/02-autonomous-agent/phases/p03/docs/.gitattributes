@@ -1,0 +1,5 @@
+# Preserve exact captured verification output and applicable patch receipts.
+# Application source and authored Markdown retain normal whitespace checks.
+logs/*.log -whitespace
+logs/*.patch -whitespace
+logs/*.diff -whitespace

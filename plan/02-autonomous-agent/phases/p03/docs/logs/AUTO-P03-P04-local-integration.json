@@ -1,0 +1,12 @@
+{
+  "at": "2026-11-06T12:29:32.209710+00:00",
+  "main": "b4a26c5af078c3eec89b7c5ad929aa484b996689",
+  "source_patch_sha256": "2b3b2f9a92cbe085e32bdb4a7c79cb97d8e38e05b2e611b9d3c9de103e698350",
+  "protected_files_unchanged": {
+    "plan/fix-app/COORDINATION.md": "573f77d2e362b036080b5c522a9c7515892c6e7dbf31c1c054156697020ea72f",
+    "plan/01-knowledge-access-levels/COORDINATION.md": "adcb7e538bb0f63433e72244c8e447cf051699325435626d52d7e5eaadca9fcd",
+    "plan/02-autonomous-agent/COORDINATION.md": "a2b053edda2ad617558fe902acd18cb7f79205c539fce13e6c1a1f1b4155417b"
+  },
+  "remote_main": "dc35ee426d8f88abdaf40562027ae69ad66863eb",
+  "publication": "local integration only; remote checkpoint branch pending"
+}
