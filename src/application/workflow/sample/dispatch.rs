@@ -184,7 +184,7 @@ impl Session {
                 return Err(refused("This model step is tool-free"));
             }
             approval(&activation.inputs, response.approval)?;
-            self.agent_tools(bundle, frame, activation, path, response.tools)?;
+            self.agent_tools(bundle, frame, activation, path, &response)?;
             self.charge(BudgetResource::ModelCall)?;
         }
         prepare_io(bundle, activation, response.output)
@@ -254,7 +254,14 @@ fn human(
     prepare_submission(bundle, activation, &command)
 }
 fn approval(inputs: &Value, approved: Option<bool>) -> AppResult<()> {
-    if inputs.get("approval").is_some() && approved != Some(true) {
+    if inputs.get("approval").is_some() {
+        require_approval(approved)?;
+    }
+    Ok(())
+}
+
+pub(super) fn require_approval(approved: Option<bool>) -> AppResult<()> {
+    if approved != Some(true) {
         return Err(refused(
             "This protected request needs an explicit approval:true in its sample response",
         ));

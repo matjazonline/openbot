@@ -1,0 +1,21 @@
+{
+  "status": "ACCEPTED_IN_PHASE_INTEGRATION_PENDING",
+  "at": "2026-11-06T12:26:40.604842+00:00",
+  "review_note": "AUTO-P03-P04-WB1-R2-N1",
+  "digest": "c2aee1f58aa2165ab3cf018541477627598a81c7f459e450b817075eb7f697d2",
+  "head": "499ef2879b29ac7530744aa6ab499f75724e6648",
+  "base": "dc35ee426d8f88abdaf40562027ae69ad66863eb",
+  "source_patch_sha256": "2b3b2f9a92cbe085e32bdb4a7c79cb97d8e38e05b2e611b9d3c9de103e698350",
+  "excludes": [
+    "plan/02-autonomous-agent/phases/p03/docs",
+    "plan/02-autonomous-agent/phases/p04/docs"
+  ],
+  "authority_revision": 25,
+  "all_findings_closed": [
+    "F1",
+    "F2",
+    "F3",
+    "F4"
+  ],
+  "targeted_only": true
+}

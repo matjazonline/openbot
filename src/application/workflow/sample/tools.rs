@@ -27,7 +27,7 @@ impl Session {
         frame: &Frame,
         activation: &ActivatedExecution,
         path: &SamplePath,
-        calls: Vec<ScriptedToolCall>,
+        response: &ScriptedResponse,
     ) -> AppResult<()> {
         let key = activation
             .inputs
@@ -41,7 +41,7 @@ impl Session {
             .get(&reference.agent_id)
             .ok_or_else(|| refused("Sample agent definition is missing"))?
             .clone();
-        for (index, call) in calls.into_iter().enumerate() {
+        for (index, call) in response.tools.iter().enumerate() {
             if self.report.usage.direct_tool_calls >= MAX_TOOL_CALLS {
                 return Err(refused("Sample exceeds 64 direct tool calls"));
             }
@@ -51,6 +51,9 @@ impl Session {
                 .iter()
                 .find(|tool| tool.binding.alias.as_str() == call.name.as_str())
                 .ok_or_else(|| refused("Scripted tool is not granted to this frozen agent"))?;
+            if tool.approval_required {
+                super::dispatch::require_approval(response.approval)?;
+            }
             let mut snapshot = crate::application::workflow::agent_contract::agent_action_snapshot(
                 bundle.company_id(),
                 tool,
@@ -67,8 +70,8 @@ impl Session {
                 frame,
                 &path.child(format!("tool-{}:{}", index + 1, call.name.as_str())),
                 &snapshot,
-                call.input,
-                call.output,
+                call.input.clone(),
+                call.output.clone(),
             )?;
         }
         Ok(())

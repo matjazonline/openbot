@@ -1,0 +1,145 @@
+diff --git a/src/adapters/persistence/workflow/agent_manifest/capture_tests.rs b/src/adapters/persistence/workflow/agent_manifest/capture_tests.rs
+new file mode 100644
+index 0000000000000000000000000000000000000000..be7ccfc15b71e44d9874c955df0cfb936602d190
+--- /dev/null
++++ b/src/adapters/persistence/workflow/agent_manifest/capture_tests.rs
+@@ -0,0 +1,49 @@
++use super::*;
++
++#[tokio::test]
++async fn autonomous_agent_admission_capacity_refuses_before_lookup_or_retaining_an_extra_member() {
++    let Some(pool) = crate::adapters::persistence::test_support::test_pool().await else {
++        return;
++    };
++    let agent = AgentId::new(Uuid::new_v4());
++    let workflow = WorkflowId::new(Uuid::new_v4());
++    let mut closure = Closure {
++        company: CompanyId::new(Uuid::new_v4()),
++        actor: WorkflowActor::authenticated(Uuid::new_v4()).unwrap(),
++        resources: BTreeMap::new(),
++        agents: BTreeMap::from([(agent, AgentRevisionId::new(Uuid::new_v4()))]),
++        workflows: (1..MAX_AGENT_DEPENDENCIES)
++            .map(|_| (VersionId::new(Uuid::new_v4()), workflow))
++            .collect(),
++        deadline: Instant::now() + Duration::from_secs(5),
++    };
++    let new_workflow = Node::Workflow(workflow, VersionId::new(Uuid::new_v4()));
++    let new_agent = Node::Agent(AgentId::new(Uuid::new_v4()), AgentUseMode::Tools);
++    let mut tx = pool.begin().await.unwrap();
++    // There are deliberately no backing rows for these new identities. A lookup
++    // would return "unavailable", while the capacity guard must reject them first.
++    for node in [new_workflow, new_agent] {
++        let error = closure
++            .edges_on(&mut tx, node)
++            .await
++            .err()
++            .expect("capacity must be refused before looking up an extra identity");
++        assert!(error.to_string().contains("at most 256"), "{error}");
++        assert_eq!(closure.agents.len() + closure.workflows.len(), 256);
++    }
++    tx.rollback().await.unwrap();
++
++    // The unique-selection bound is independent of traversal use views.
++    for mode in [AgentUseMode::Tools, AgentUseMode::ModelOnly] {
++        closure
++            .check_node_capacity(Node::Agent(agent, mode))
++            .unwrap();
++    }
++    let version = *closure.workflows.keys().next().unwrap();
++    closure
++        .check_node_capacity(Node::Workflow(workflow, version))
++        .unwrap();
++    closure.workflows.remove(&version);
++    closure.check_node_capacity(new_workflow).unwrap();
++    closure.check_node_capacity(new_agent).unwrap();
++}
+diff --git a/src/adapters/persistence/workflow/agent_manifest/mod.rs b/src/adapters/persistence/workflow/agent_manifest/mod.rs
+index 278fd0461f8103e2934ca664b572b7c4f82e2cf2..447cbdcd0fb4a1c80f85037d443ab01332fa94f9 100644
+--- a/src/adapters/persistence/workflow/agent_manifest/mod.rs
++++ b/src/adapters/persistence/workflow/agent_manifest/mod.rs
+@@ -11,6 +11,9 @@ use std::time::{Duration, Instant};
+ 
+ mod capture;
+ mod storage;
++#[cfg(test)]
++#[path = "capture_tests.rs"]
++mod tests;
+ pub(super) use storage::{
+     attach_child_on, execution_selection_on, persist_on, selected_on, workflow_bundle_on,
+ };
+@@ -30,6 +33,15 @@ fn refused() -> AppError {
+     )
+ }
+ 
++fn check_selection_bound(count: usize) -> AppResult<()> {
++    if count > MAX_AGENT_DEPENDENCIES {
++        return Err(AppError::BadRequest(format!(
++            "A run may select at most {MAX_AGENT_DEPENDENCIES} agent and workflow definitions"
++        )));
++    }
++    Ok(())
++}
++
+ /// The caller already owns the company serialization lock. No network work runs here.
+ pub(super) async fn capture_on(
+     tx: &mut Transaction<'_, Postgres>,
+@@ -81,11 +93,7 @@ pub(super) async fn capture_on(
+ 
+ impl Closure {
+     fn within_bound(&self) -> AppResult<()> {
+-        if self.agents.len() + self.workflows.len() > MAX_AGENT_DEPENDENCIES {
+-            return Err(AppError::BadRequest(format!(
+-                "A run may select at most {MAX_AGENT_DEPENDENCIES} agent and workflow definitions"
+-            )));
+-        }
++        check_selection_bound(self.agents.len() + self.workflows.len())?;
+         if Instant::now() >= self.deadline {
+             return Err(AppError::Timeout(
+                 "Agent dependency capture exceeded five seconds".into(),
+@@ -94,6 +102,14 @@ impl Closure {
+         Ok(())
+     }
+ 
++    fn check_node_capacity(&self, node: Node) -> AppResult<()> {
++        let selected = match node {
++            Node::Workflow(_, version) => self.workflows.contains_key(&version),
++            Node::Agent(agent, _) => self.agents.contains_key(&agent),
++        };
++        check_selection_bound(self.agents.len() + self.workflows.len() + usize::from(!selected))
++    }
++
+     async fn walk(&mut self, tx: &mut Transaction<'_, Postgres>, root: Node) -> AppResult<()> {
+         let mut walker = DependencyWalker::new(root);
+         while let Some(node) = walker.next()? {
+@@ -109,6 +125,9 @@ impl Closure {
+         tx: &mut Transaction<'_, Postgres>,
+         node: Node,
+     ) -> AppResult<Vec<Node>> {
++        // Refuse a new selection before map insertion or an active-pointer lookup.
++        // Different use views of a selected agent do not consume another selection.
++        self.check_node_capacity(node)?;
+         let children = match node {
+             Node::Workflow(workflow, version) => self.workflow_edges(tx, workflow, version).await?,
+             Node::Agent(agent, mode) => self.agent_edges(tx, agent, mode).await?,
+diff --git a/src/adapters/persistence/workflow/autonomous_agent_graph_tests.rs b/src/adapters/persistence/workflow/autonomous_agent_graph_tests.rs
+index 6a2b2f36683502113134d6f98ed6683f371354aa..c729da4288561172f086609396d41cf4d9ae5192 100644
+--- a/src/adapters/persistence/workflow/autonomous_agent_graph_tests.rs
++++ b/src/adapters/persistence/workflow/autonomous_agent_graph_tests.rs
+@@ -338,8 +338,16 @@ async fn autonomous_agent_admission_node_limit_covers_the_complete_dynamic_unive
+         candidates.push(key);
+     }
+     let mut source = model_source(&AgentKey::parse("assistant").unwrap(), ModelStep::AgentRun);
+-    source["parameter_schema"] = json!({"type":"object","properties":{"selected":{"type":"string","enum":candidates}},"required":["selected"],"additionalProperties":false});
++    source["parameter_schema"] = json!({"type":"object","properties":{"selected":{"type":"string","enum":&candidates[..255]}},"required":["selected"],"additionalProperties":false});
+     source["steps"]["start"]["with"]["agent"] = json!({"ref":"/params/selected"});
++    let boundary = publish_graph(&setup, source.clone(), json!({"selected":"assistant"})).await;
++    assert!(matches!(
++        admit_graph(&setup, &boundary, "exactly-256-selected-nodes")
++            .await
++            .unwrap(),
++        AdmissionResult::Created(_)
++    ));
++    source["parameter_schema"]["properties"]["selected"]["enum"] = json!(candidates);
+     let graph = publish_graph(&setup, source, json!({"selected":"assistant"})).await;
+     let before: i64 = sqlx::query_scalar("SELECT count(*) FROM workflow_runs WHERE company_id=$1")
+         .bind(company.as_uuid())

@@ -10,6 +10,9 @@ mod tokens;
 #[path = "harness_model_fixture.rs"]
 mod model_support;
 
+#[path = "checkpoint_authority_order_tests.rs"]
+mod authority_order;
+
 fn model_request(reservation: &ModelReservation) -> WorkflowModelRequest {
     WorkflowModelRequest {
         reservation: reservation.clone(),

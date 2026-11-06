@@ -1,5 +1,9 @@
 use super::*;
 use crate::application::agent::{ActionEffect, ActionRecovery, ApprovedActionPolicy};
+
+#[path = "approval_tests.rs"]
+mod approvals;
+
 fn tool_bundle() -> Arc<PublishedBundle> {
     let mut leaf = source("memory.save");
     leaf["workflow_id"] = json!(Uuid::from_u128(2));

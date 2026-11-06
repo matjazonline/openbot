@@ -1,0 +1,104 @@
+{
+  "graft_calls": 14,
+  "graft_reported_saved": 60551,
+  "current_long_functions_in_prior_audit_files": [
+    {
+      "file": "src/adapters/http/routes/workflows/ui/runs/pages_tests.rs",
+      "symbol": "reconciliation_is_offered_as_an_annotation_and_a_step_shows_usage_and_receipts",
+      "start": 9,
+      "end": 108,
+      "lines": 100
+    },
+    {
+      "file": "src/adapters/persistence/workflow/agent_recovery_tests.rs",
+      "symbol": "workflow_agent_run_dynamic_selection_runs_the_bound_agent",
+      "start": 530,
+      "end": 682,
+      "lines": 153
+    },
+    {
+      "file": "src/adapters/persistence/workflow/agent_runtime_tests.rs",
+      "symbol": "agent_setup_source",
+      "start": 85,
+      "end": 189,
+      "lines": 105
+    },
+    {
+      "file": "src/adapters/persistence/workflow/children.rs",
+      "symbol": "park_on",
+      "start": 33,
+      "end": 115,
+      "lines": 83
+    },
+    {
+      "file": "src/adapters/persistence/workflow/message_park_continuation_tests.rs",
+      "symbol": "sql_effect_park",
+      "start": 149,
+      "end": 254,
+      "lines": 106
+    },
+    {
+      "file": "src/adapters/persistence/workflow/provisioning.rs",
+      "symbol": "provision_on",
+      "start": 569,
+      "end": 705,
+      "lines": 137
+    },
+    {
+      "file": "src/adapters/persistence/workflow/provisioning_dispatch_tests.rs",
+      "symbol": "provisioning_competing_claimants_create_one_assistant",
+      "start": 234,
+      "end": 335,
+      "lines": 102
+    },
+    {
+      "file": "src/adapters/persistence/workflow/provisioning_dispatch_tests.rs",
+      "symbol": "provisioning_agent_reference_keeps_its_own_published_binding",
+      "start": 802,
+      "end": 899,
+      "lines": 98
+    },
+    {
+      "file": "src/adapters/persistence/workflow/workflow_tool_race_tests.rs",
+      "symbol": "workflow_tool_schema_guards_refuse_parks_reopens_and_lineage_written_by_hand",
+      "start": 291,
+      "end": 382,
+      "lines": 92
+    },
+    {
+      "file": "src/adapters/persistence/workflow/workflow_tool_registration_tests.rs",
+      "symbol": "workflow_tool_registration_commands_keep_revisions_authority_and_bounds",
+      "start": 63,
+      "end": 268,
+      "lines": 206
+    },
+    {
+      "file": "src/adapters/persistence/workflow/workflow_tool_registration_tests.rs",
+      "symbol": "workflow_tool_pins_and_grants_stay_within_the_agents_company",
+      "start": 274,
+      "end": 408,
+      "lines": 135
+    },
+    {
+      "file": "src/adapters/persistence/workflow/workflow_tool_revocation_tests.rs",
+      "symbol": "workflow_tool_repin_and_archive_leave_published_workflows_on_their_frozen_version",
+      "start": 173,
+      "end": 277,
+      "lines": 105
+    },
+    {
+      "file": "src/adapters/persistence/workflow/workflow_tool_revocation_tests.rs",
+      "symbol": "workflow_tool_stored_children_keep_their_frozen_pin_until_the_tool_is_revoked",
+      "start": 286,
+      "end": 394,
+      "lines": 109
+    },
+    {
+      "file": "src/application/workflow/publication/tests.rs",
+      "symbol": "workflow_publication_freezes_workflow_tool_pins_like_children",
+      "start": 467,
+      "end": 564,
+      "lines": 98
+    }
+  ]
+}

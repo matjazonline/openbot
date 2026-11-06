@@ -12,6 +12,9 @@ use crate::entities::agent_capability::{
 #[path = "autonomous_agent_child_selection_tests.rs"]
 mod descendants;
 
+#[path = "autonomous_agent_sample_closure_tests.rs"]
+mod samples;
+
 struct GraphWorkflow {
     workflow: WorkflowId,
     version: VersionId,
@@ -338,8 +341,16 @@ async fn autonomous_agent_admission_node_limit_covers_the_complete_dynamic_unive
         candidates.push(key);
     }
     let mut source = model_source(&AgentKey::parse("assistant").unwrap(), ModelStep::AgentRun);
-    source["parameter_schema"] = json!({"type":"object","properties":{"selected":{"type":"string","enum":candidates}},"required":["selected"],"additionalProperties":false});
+    source["parameter_schema"] = json!({"type":"object","properties":{"selected":{"type":"string","enum":&candidates[..255]}},"required":["selected"],"additionalProperties":false});
     source["steps"]["start"]["with"]["agent"] = json!({"ref":"/params/selected"});
+    let boundary = publish_graph(&setup, source.clone(), json!({"selected":"assistant"})).await;
+    assert!(matches!(
+        admit_graph(&setup, &boundary, "exactly-256-selected-nodes")
+            .await
+            .unwrap(),
+        AdmissionResult::Created(_)
+    ));
+    source["parameter_schema"]["properties"]["selected"]["enum"] = json!(candidates);
     let graph = publish_graph(&setup, source, json!({"selected":"assistant"})).await;
     let before: i64 = sqlx::query_scalar("SELECT count(*) FROM workflow_runs WHERE company_id=$1")
         .bind(company.as_uuid())

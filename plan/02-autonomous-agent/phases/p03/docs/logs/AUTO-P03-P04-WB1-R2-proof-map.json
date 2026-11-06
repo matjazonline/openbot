@@ -1,0 +1,60 @@
+{
+  "F1": {
+    "code": [
+      "checkpoints.rs::authorize_on",
+      "checkpoint_models.rs::reserve_on",
+      "checkpoint_updates.rs::update_on"
+    ],
+    "tests": [
+      "autonomous_agent_authority_checkpoint_model_reservation_serializes_with_preview",
+      "autonomous_agent_authority_checkpoint_saved_call_serializes_with_preview"
+    ],
+    "evidence": [
+      "author-correction-runtime-04.log",
+      "author-correction-runtime-05.log",
+      "author-correction-runtime-06.log"
+    ],
+    "assertions": "Real account/company holder; pg_blocking_pids proves checkpoint queued before actual LockedAgentPublication agent UPDATE/preview; both public checkpoint paths progress. Typed OwnershipLost preserved; no authority after local fence."
+  },
+  "F2": {
+    "code": [
+      "sample/dispatch.rs::require_approval",
+      "sample/tools.rs::agent_tools"
+    ],
+    "tests": [
+      "autonomous_agent_samples_protected_http_binding_requires_explicit_simulated_approval",
+      "autonomous_agent_samples_protected_child_binding_requires_explicit_simulated_approval"
+    ],
+    "evidence": [
+      "author-correction-runtime-05.log"
+    ],
+    "assertions": "Canonical protected binding: None/false => Stopped, approval diagnostic, no effects; true => Completed/effects. Existing STEP approval cases retained."
+  },
+  "F3": {
+    "tests": [
+      "autonomous_agent_samples_nested_aliases_and_model_only_leaf_keep_exact_sealed_configuration",
+      "autonomous_agent_samples_draft_cycle_is_refused_without_activation_or_production_effects",
+      "autonomous_agent_samples_combined_capture_depth_accepts_32_and_refuses_34",
+      "autonomous_agent_samples_unique_draft_selections_accept_256_and_refuse_257",
+      "autonomous_agent_samples_aggregate_draft_bytes_are_bounded_without_publication",
+      "autonomous_agent_samples_workflow_payload_limit_covers_adapter_cache_and_sealed_input",
+      "autonomous_agent_samples_message_steps_keep_metadata_and_generic_message_tools_stay_forbidden"
+    ],
+    "evidence": [
+      "author-correction-runtime-05.log",
+      "author-correction-runtime-06.log"
+    ],
+    "assertions": "Actual sample read-service nested A(run)->middle B(run)->leaf A(model-only), same child alias/different targets, exact agent/workflow identities, no production writes. Old config/effects stable after real active publication and same-workflow registration repin. Fresh stale-draft capture refuses; explicit new binding incarnation/version reselection yields new hash/new child version without activation. Actual read-service cycle/depth32/34/count256/257/aggregate16x15KiB vs17x15KiB; individual text under16KiB. Adapter cache AND sealed-input actual serialized workflow sum below/above4MiB. No bound raised. Discovered unused message descriptors excluded only from ephemeral sample metadata; dedicated message STEP works and generic selectable messaging remains forbidden."
+  },
+  "F4": {
+    "tests": [
+      "autonomous_agent_storage_action_origin_native_scope_selection_binding_and_content",
+      "autonomous_agent_storage_action_origin_populated_collector_and_company_cascade"
+    ],
+    "evidence": [
+      "author-correction-runtime-04.log",
+      "author-correction-runtime-05.log"
+    ],
+    "assertions": "Genuine counted HTTP+LLM two-run history, both admittedv1 then executed afterv2 adds a binding;4model requests/2POSTs and no new alias advertised to old runs. Strict native workflow snapshot guard restored. Native valid intent control plus wrong run manifest/revision selection/binding/real foreign-tenant agent/shape/JSON-column mismatch check exact SQLSTATE+constraint; rollback every probe. Real competing collectors retire one populated root/history while other manifest/revision/intent/dispatch/receipt survives; company cascade with surviving populated action history removes it and preserves foreign tenant revision."
+  }
+}

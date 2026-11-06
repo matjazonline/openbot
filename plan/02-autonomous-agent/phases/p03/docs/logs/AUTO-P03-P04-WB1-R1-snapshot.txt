@@ -1,0 +1,6 @@
+base:   499ef2879b29ac7530744aa6ab499f75724e6648
+digest: d106c6da3adde82efe1f7823ca9c21f50ac0725db2ef7da55de6f05429a3331e
+files:
+  src/adapters/persistence/workflow/agent_manifest/capture_tests.rs
+  src/adapters/persistence/workflow/agent_manifest/mod.rs
+  src/adapters/persistence/workflow/autonomous_agent_graph_tests.rs

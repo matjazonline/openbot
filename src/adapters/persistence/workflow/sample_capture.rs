@@ -17,6 +17,10 @@ use crate::entities::agent_capability::AgentId;
 use std::collections::BTreeMap;
 use std::time::{Duration, Instant};
 
+#[cfg(test)]
+#[path = "sample_capture_bounds_tests.rs"]
+mod bounds;
+
 pub struct SampleCapture {
     pub persistence: PostgresPersistence,
     pub http: Vec<http::HttpPublicationSelection>,
@@ -100,7 +104,25 @@ impl SampleCapture {
             .await?
             .ok_or_else(missing)?;
         check_draft(&state, target, expected)?;
+        let decoder = crate::adapters::workflow_source::WorkflowSourceDecoder;
+        let decoded = decoder
+            .decode(state.draft.source())
+            .map_err(|error| AppError::BadRequest(error.message.to_string()))?;
+        let parsed = crate::application::workflow::compiler::parse_workflow(
+            &decoded,
+            VersionId::new(Uuid::nil()),
+        )
+        .map_err(|error| AppError::BadRequest(error.message.to_string()))?;
         let mut captured = message::message_builtins(target.company)?;
+        // Samples need the metadata used by their STEP consumers. Unused global
+        // message descriptors must not consume the declared agent universe budget.
+        captured.snapshots.tools.retain(|tool| {
+            parsed
+                .definition
+                .steps
+                .values()
+                .any(|step| step.step_type.as_str() == tool.contract.name.as_str())
+        });
         captured
             .snapshots
             .tools
@@ -111,10 +133,6 @@ impl SampleCapture {
             .extend(mcp::capture_publication_on(tx, target.company, &self.mcp).await?);
         agent_publication::capture_sample_agents_on(tx, &state.draft, &mut captured).await?;
         let captured = child_publication::capture_on(tx, &state.draft, captured).await?;
-        let decoder = crate::adapters::workflow_source::WorkflowSourceDecoder;
-        let decoded = decoder
-            .decode(state.draft.source())
-            .map_err(|error| AppError::BadRequest(error.message.to_string()))?;
         Ok(Arc::new(
             compile_bundle(
                 decoded,

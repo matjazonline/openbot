@@ -1,0 +1,54 @@
+[
+  {
+    "log": "author-native-compile-40.log",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "--offline",
+      "--lib",
+      "--no-run"
+    ],
+    "exit_code": 0,
+    "seconds": 106.87,
+    "finished_at": "2026-11-06T10:23:50.426236+00:00"
+  },
+  {
+    "log": "author-native-focused-03.log",
+    "command": [
+      "bash",
+      "scripts/test-network-isolation.sh",
+      "target/debug/deps/open_bots-c19a0b960dacdcef",
+      "autonomous_agent_workflow_reference_",
+      "autonomous_agent_admission_",
+      "autonomous_agent_dispatch_",
+      "autonomous_agent_authority_",
+      "autonomous_agent_recovery_",
+      "autonomous_agent_samples_",
+      "autonomous_agent_publication_",
+      "autonomous_agent_resolution_",
+      "autonomous_agent_skills_",
+      "child_publication_tests::",
+      "--test-threads=4"
+    ],
+    "exit_code": 0,
+    "seconds": 13.02,
+    "finished_at": "2026-11-06T10:24:03.442385+00:00"
+  },
+  {
+    "log": "author-clippy-07.log",
+    "command": [
+      "cargo",
+      "clippy",
+      "--locked",
+      "--offline",
+      "--all-targets",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "exit_code": 0,
+    "seconds": 71.81,
+    "finished_at": "2026-11-06T10:25:15.254587+00:00"
+  }
+]

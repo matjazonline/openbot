@@ -1,0 +1,13 @@
+{
+  "command": [
+    "scripts/test-network-isolation.sh",
+    "target/debug/deps/open_bots-c19a0b960dacdcef",
+    "autonomous_agent_authority_checkpoint_",
+    "autonomous_agent_samples_",
+    "autonomous_agent_storage_action_origin_",
+    "--test-threads=4"
+  ],
+  "start": "2026-11-06T12:19:31.618452+00:00",
+  "end": "2026-11-06T12:19:36.532760+00:00",
+  "exit": 0
+}

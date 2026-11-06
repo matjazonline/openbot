@@ -1,0 +1,22 @@
+   Compiling open_bots v0.1.0 (/Users/mac02/dev/openbot-recovery/.worktrees/autonomous-p03)
+error[E0277]: `DependencyNode` doesn't implement `std::fmt::Debug`
+  --> src/adapters/persistence/workflow/agent_manifest/capture_tests.rs:26:59
+   |
+26 |         let error = closure.edges_on(&mut tx, node).await.unwrap_err();
+   |                                                           ^^^^^^^^^^ the trait `std::fmt::Debug` is not implemented for `DependencyNode`
+   |
+   = note: add `#[derive(Debug)]` to `DependencyNode` or manually `impl std::fmt::Debug for DependencyNode`
+help: the trait `std::fmt::Debug` is implemented for `Vec<T, A>`
+  --> /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/mod.rs:4242:0
+   = note: required for `Vec<DependencyNode>` to implement `std::fmt::Debug`
+note: required by a bound in `std::result::Result::<T, E>::unwrap_err`
+  --> /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/result.rs:1324:4
+help: consider annotating `DependencyNode` with `#[derive(Debug)]`
+  --> src/application/agent/dependency.rs:10:1
+   |
+10 + #[derive(Debug)]
+11 | pub(crate) enum DependencyNode {
+   |
+
+For more information about this error, try `rustc --explain E0277`.
+error: could not compile `open_bots` (lib test) due to 1 previous error

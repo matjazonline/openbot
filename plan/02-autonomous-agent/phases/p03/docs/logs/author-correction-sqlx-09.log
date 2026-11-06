@@ -1,0 +1,12 @@
+    Checking open_bots v0.1.0 (/Users/mac02/dev/openbot-recovery/.worktrees/autonomous-p03)
+warning: unused import: `lease::*`
+ --> src/adapters/persistence/workflow/autonomous_agent_origin_fixture.rs:3:51
+  |
+3 | use crate::application::workflow::{activation::*, lease::*};
+  |                                                   ^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: `open_bots` (lib test) generated 1 warning (run `cargo fix --lib -p open_bots --tests` to apply 1 suggestion)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 59.22s
+query data written to .sqlx in the current directory; please check this into version control

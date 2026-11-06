@@ -1,0 +1,33 @@
+{
+  "batch": "AUTO-P03-P04-WB1-R1",
+  "status": "FROZEN_REVIEW_PENDING",
+  "recorded_at": "2026-11-06T10:34:45.674368+00:00",
+  "phase_start": "dc35ee426d8f88abdaf40562027ae69ad66863eb",
+  "review_base": "dc35ee426d8f88abdaf40562027ae69ad66863eb",
+  "head": "499ef2879b29ac7530744aa6ab499f75724e6648",
+  "digest": "d106c6da3adde82efe1f7823ca9c21f50ac0725db2ef7da55de6f05429a3331e",
+  "excludes": [
+    "plan/02-autonomous-agent/phases/p03/docs",
+    "plan/02-autonomous-agent/phases/p04/docs"
+  ],
+  "coordination_revision": 25,
+  "coordination_sha256": "a2b053edda2ad617558fe902acd18cb7f79205c539fce13e6c1a1f1b4155417b",
+  "reviewer": "/root/autonomous_p03_p04_reviewer_resume",
+  "requested_reviewer_settings": "gpt-6-astra/high/forknone",
+  "actual_settings": "not exposed",
+  "author": "/root userconfirmedSol6.1/xhigh",
+  "checks": {
+    "compile40": "PASS1m46",
+    "runtime_native03": "PASS70/0failed/0ignored11.27s",
+    "clippy07": "PASSalltargets1m11",
+    "runtime_sample02": "PASS21/0failed/0ignored3.68s prior capacity correction",
+    "browser_protocol04": "PASS17/0failed/0skipped47.46s",
+    "fmt25_diff05": "PASS",
+    "sample_boundary06_negative07": "PASS+4negative tests",
+    "graft_build05": "PASS",
+    "sqlx07": "PASSalltargets; unchanged queries since",
+    "migration_checksums02": "PASS both owned DBs"
+  },
+  "architecture": "AUTO-P03-P04-G1-R1-N1 and G1-R2-N1 effectiveD1r2, originalr1+sampleaddendum3ce2b6a...",
+  "later_phases": "Original05\u201307 not accepted"
+}

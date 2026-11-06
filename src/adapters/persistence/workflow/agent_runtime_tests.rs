@@ -881,3 +881,6 @@ mod autonomous_admission;
 
 #[path = "autonomous_agent_graph_tests.rs"]
 mod autonomous_graph;
+
+#[path = "autonomous_agent_origin_schema_tests.rs"]
+mod origin_schema;

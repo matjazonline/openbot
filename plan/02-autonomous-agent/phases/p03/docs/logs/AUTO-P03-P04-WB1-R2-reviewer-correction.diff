@@ -1,0 +1,1816 @@
+diff --git a/src/adapters/persistence/workflow/agent_runtime_tests.rs b/src/adapters/persistence/workflow/agent_runtime_tests.rs
+index 3af11eb8..24ee52d6 100644
+--- a/src/adapters/persistence/workflow/agent_runtime_tests.rs
++++ b/src/adapters/persistence/workflow/agent_runtime_tests.rs
+@@ -881,3 +881,6 @@ mod autonomous_admission;
+ 
+ #[path = "autonomous_agent_graph_tests.rs"]
+ mod autonomous_graph;
++
++#[path = "autonomous_agent_origin_schema_tests.rs"]
++mod origin_schema;
+diff --git a/src/adapters/persistence/workflow/autonomous_agent_graph_tests.rs b/src/adapters/persistence/workflow/autonomous_agent_graph_tests.rs
+index c729da42..0fff6f2e 100644
+--- a/src/adapters/persistence/workflow/autonomous_agent_graph_tests.rs
++++ b/src/adapters/persistence/workflow/autonomous_agent_graph_tests.rs
+@@ -12,6 +12,9 @@ use crate::entities::agent_capability::{
+ #[path = "autonomous_agent_child_selection_tests.rs"]
+ mod descendants;
+ 
++#[path = "autonomous_agent_sample_closure_tests.rs"]
++mod samples;
++
+ struct GraphWorkflow {
+     workflow: WorkflowId,
+     version: VersionId,
+diff --git a/src/adapters/persistence/workflow/autonomous_agent_origin_fixture.rs b/src/adapters/persistence/workflow/autonomous_agent_origin_fixture.rs
+new file mode 100644
+index 00000000..e1cf15e2
+--- /dev/null
++++ b/src/adapters/persistence/workflow/autonomous_agent_origin_fixture.rs
+@@ -0,0 +1,201 @@
++use super::*;
++use crate::application::agent::{AgentPublicationScope, AgentPublications, PublishedAgentRevision};
++use crate::application::workflow::activation::*;
++use crate::entities::agent_capability::{AgentBindingId, AgentId, AgentToolAlias};
++
++pub(super) struct OriginHistory {
++    pub setup: Box<AgentSetup>,
++    pub survivor: RunId,
++    pub original: Value,
++    pub later: PublishedAgentRevision,
++    pub foreign: PublishedAgentRevision,
++}
++
++async fn foreign_agent(setup: &AgentSetup) -> PublishedAgentRevision {
++    let mut fixture = Fixture::in_database(setup.fixture._db.clone(), "-origin-foreign").await;
++    fixture.persistence = setup.fixture.persistence.clone();
++    CompanyPersistence::replace_model_connections_for_user(
++        &fixture.persistence,
++        fixture.target.actor.user_id(),
++        fixture.target.company.as_uuid(),
++        vec![CompanyModelConnectionWrite {
++            provider: SCRIPTED_PROVIDER.into(),
++            api_key: Some("test-key".into()),
++            models: vec![SCRIPTED_MODEL.into()],
++            is_default: true,
++        }],
++    )
++    .await
++    .unwrap();
++    let agent = AgentPersistence::create(
++        &fixture.persistence,
++        fixture.target.company.as_uuid(),
++        AgentWrite {
++            name: "Foreign origin".into(),
++            slug: "foreign-origin".into(),
++            provider: Some(SCRIPTED_PROVIDER.into()),
++            model: Some(SCRIPTED_MODEL.into()),
++            ..Default::default()
++        },
++    )
++    .await
++    .unwrap();
++    fixture.publish_agent(agent.id).await
++}
++
++async fn publish_later(setup: &AgentSetup) -> PublishedAgentRevision {
++    let p = &setup.fixture.persistence;
++    let scope = AgentPublicationScope {
++        company: setup.fixture.target.company,
++        actor: setup.fixture.target.actor,
++        agent: AgentId::new(setup.agent),
++    };
++    let original = p.active_agent_revision(scope).await.unwrap().unwrap();
++    let binding = original.definition.tools[0].binding.clone();
++    let mut additional = binding.clone();
++    additional.id = AgentBindingId::new(Uuid::new_v4());
++    additional.alias = AgentToolAlias::parse("additional.request").unwrap();
++    AgentPersistence::update(
++        p,
++        setup.agent,
++        AgentWrite {
++            name: "Assistant".into(),
++            slug: "assistant".into(),
++            provider: Some(SCRIPTED_PROVIDER.into()),
++            model: Some(SCRIPTED_MODEL.into()),
++            system_prompt: Some("A later active definition".into()),
++            tool_bindings: Some(vec![binding, additional]),
++            ..Default::default()
++        },
++    )
++    .await
++    .unwrap();
++    setup.fixture.publish_agent(setup.agent).await
++}
++
++async fn survivor(setup: &AgentSetup) -> RunId {
++    let p = &setup.fixture.persistence;
++    let request =
++        super::super::autonomous_admission::request(setup, "origin-surviving-run", Uuid::new_v4())
++            .await;
++    match WorkflowService::new(p.clone(), p.clone(), p.clone(), p.clone(), Preflight)
++        .admit(request)
++        .await
++        .unwrap()
++    {
++        AdmissionResult::Created(run) => run,
++        _ => panic!("a distinct logical run must be admitted"),
++    }
++}
++
++async fn claim(setup: &AgentSetup, run: RunId) -> ClaimedWorkflow {
++    let p = &setup.fixture.persistence;
++    let execution: Uuid =
++        sqlx::query_scalar("SELECT id FROM workflow_executions WHERE company_id=$1 AND run_id=$2")
++            .bind(setup.fixture.target.company.as_uuid())
++            .bind(run.as_uuid())
++            .fetch_one(p.pool())
++            .await
++            .unwrap();
++    let job: Uuid = sqlx::query_scalar(
++        "SELECT id FROM background_tasks WHERE company_id=$1 AND workflow_execution_id=$2",
++    )
++    .bind(setup.fixture.target.company.as_uuid())
++    .bind(execution)
++    .fetch_one(p.pool())
++    .await
++    .unwrap();
++    p.claim_io(
++        ActivationRequest {
++            company: setup.fixture.target.company,
++            run,
++            execution: ExecutionId::new(execution),
++            job: WorkflowJobId(job),
++        },
++        WorkflowWorkerId(Uuid::new_v4()),
++        lease(),
++    )
++    .await
++    .unwrap()
++    .unwrap()
++}
++
++async fn run_both(setup: &AgentSetup, survivor: RunId) {
++    let turn = || {
++        LlmTurn::tool_call(
++            "registered__request",
++            json!({"method":"POST","path":"/messages","body":{"message":"hello"}}),
++        )
++    };
++    let mut llm = scripted_llm(vec![
++        turn(),
++        LlmTurn::text("\"done\""),
++        turn(),
++        LlmTurn::text("\"done\""),
++    ])
++    .await;
++    register_scripted_agent_base_url(setup.agent, &llm.base_url);
++    let runtime = agent_runtime(setup);
++    let kind = WorkflowStepKind("agent.run".into());
++    assert_eq!(
++        Box::pin(runtime.execute(&kind, &setup.claim))
++            .await
++            .completed_result()
++            .unwrap(),
++        json!("done")
++    );
++    let queued = claim(setup, survivor).await;
++    assert_eq!(
++        Box::pin(runtime.execute(&kind, &queued))
++            .await
++            .completed_result()
++            .unwrap(),
++        json!("done")
++    );
++    for request in llm.observed() {
++        assert!(
++            !request["tools"].to_string().contains("additional__request"),
++            "old selections cannot expand on publication"
++        );
++    }
++    assert_eq!(llm.finish().await.unwrap(), 4);
++}
++
++pub(super) async fn populated() -> OriginHistory {
++    let (origin, server) = servers(2).await;
++    let setup = Box::new(Box::pin(agent_setup(&origin)).await);
++    let foreign = foreign_agent(&setup).await;
++    // These fixtures normally permit frozen-row fault injection. This proof uses
++    // genuine history with the strict native run guard restored as well.
++    sqlx::query("ALTER TABLE workflow_runs ENABLE TRIGGER workflow_run_snapshot_immutable")
++        .execute(setup.fixture.persistence.pool())
++        .await
++        .unwrap();
++    let survivor = survivor(&setup).await;
++    let later = publish_later(&setup).await;
++    Box::pin(run_both(&setup, survivor)).await;
++    let requests = server.await.unwrap();
++    assert_eq!(requests.len(), 2);
++    assert!(
++        requests
++            .iter()
++            .all(|request| request.starts_with("POST /messages"))
++    );
++    let original:Value=sqlx::query_scalar("SELECT to_jsonb(intent) FROM workflow_action_intents AS intent WHERE company_id=$1 AND run_id=$2 AND origin_kind='agent'")
++        .bind(setup.fixture.target.company.as_uuid()).bind(setup.claim.fence.scope.run.as_uuid()).fetch_one(setup.fixture.persistence.pool()).await.unwrap();
++    let old_binding: Uuid = serde_json::from_value(original["agent_binding_id"].clone()).unwrap();
++    assert!(
++        later
++            .definition
++            .tools
++            .iter()
++            .any(|tool| tool.binding.id.as_uuid() == old_binding)
++    );
++    OriginHistory {
++        setup,
++        survivor,
++        original,
++        later,
++        foreign,
++    }
++}
+diff --git a/src/adapters/persistence/workflow/autonomous_agent_origin_schema_tests.rs b/src/adapters/persistence/workflow/autonomous_agent_origin_schema_tests.rs
+new file mode 100644
+index 00000000..54b0e110
+--- /dev/null
++++ b/src/adapters/persistence/workflow/autonomous_agent_origin_schema_tests.rs
+@@ -0,0 +1,251 @@
++use super::*;
++use crate::application::workflow::storage::*;
++
++#[path = "autonomous_agent_origin_fixture.rs"]
++mod support;
++
++#[derive(Debug)]
++enum NativeFailure {
++    Manifest,
++    Selection,
++    Binding,
++    Shape,
++    Content,
++}
++impl NativeFailure {
++    fn constraint(&self) -> &'static str {
++        match self {
++            Self::Manifest => "workflow_action_origin_manifest_fk",
++            Self::Selection => "workflow_action_origin_selection_fk",
++            Self::Binding => "workflow_action_origin_binding_fk",
++            Self::Shape => "workflow_action_origin_shape",
++            Self::Content => "workflow_action_origin_content",
++        }
++    }
++    fn code(&self) -> &'static str {
++        match self {
++            Self::Shape | Self::Content => "23514",
++            _ => "23503",
++        }
++    }
++}
++
++fn native_row(original: &Value, patch: Value) -> Value {
++    let mut row = original.clone();
++    let id = Uuid::new_v4();
++    let digest = id.simple().to_string().repeat(2);
++    row["id"] = json!(id);
++    row["operation_digest"] = json!(digest);
++    row["idempotency_key"] = json!(format!("workflow-action:v1:{digest}"));
++    row.as_object_mut()
++        .unwrap()
++        .extend(patch.as_object().unwrap().clone());
++    let origin = if row["origin_kind"] == "workflow" {
++        json!({"kind":"workflow"})
++    } else {
++        json!({"kind":"agent","manifest":row["agent_manifest_id"],"agent":row["agent_id"],"revision":row["agent_revision_id"],"binding":row["agent_binding_id"]})
++    };
++    row["operation"]["context"]["origin"] = origin;
++    row
++}
++
++async fn native_check(p: &PostgresPersistence, row: Value, expected: Option<NativeFailure>) {
++    let mut tx = p.pool().begin().await.unwrap();
++    // Deliberately bypass application guards; reseeded digest/key values satisfy
++    // the unrelated uniqueness/format constraints. Every candidate is rolled back.
++    let inserted=sqlx::query("INSERT INTO workflow_action_intents SELECT (jsonb_populate_record(NULL::workflow_action_intents,$1)).*")
++        .bind(row).execute(&mut *tx).await;
++    let result = match inserted {
++        Ok(_) => {
++            sqlx::query("SET CONSTRAINTS ALL IMMEDIATE")
++                .execute(&mut *tx)
++                .await
++        }
++        Err(error) => Err(error),
++    };
++    if let Some(expected) = expected {
++        let error = result.unwrap_err();
++        let error = error.as_database_error().expect("native constraint error");
++        assert_eq!(
++            error.code().as_deref(),
++            Some(expected.code()),
++            "{expected:?}: {error}"
++        );
++        assert_eq!(error.constraint(), Some(expected.constraint()), "{error}");
++    } else {
++        result.unwrap();
++    }
++    tx.rollback().await.unwrap();
++}
++
++#[derive(Debug, PartialEq, sqlx::FromRow)]
++struct ActionHistory {
++    intents: i64,
++    dispatches: i64,
++    receipts: i64,
++}
++
++async fn history(p: &PostgresPersistence, company: CompanyId, run: RunId) -> ActionHistory {
++    sqlx::query_as("SELECT
++        (SELECT count(*) FROM workflow_action_intents WHERE company_id=$1 AND run_id=$2) AS intents,
++        (SELECT count(*) FROM workflow_action_dispatches WHERE company_id=$1 AND run_id=$2) AS dispatches,
++        (SELECT count(*) FROM workflow_action_receipts WHERE company_id=$1 AND run_id=$2) AS receipts")
++        .bind(company.as_uuid()).bind(run.as_uuid()).fetch_one(p.pool()).await.unwrap()
++}
++
++struct OriginCase {
++    patch: Value,
++    failure: NativeFailure,
++}
++
++#[tokio::test]
++async fn autonomous_agent_storage_action_origin_native_scope_selection_binding_and_content() {
++    let f = support::populated().await;
++    let p = &f.setup.fixture.persistence;
++    let company = f.setup.fixture.target.company;
++    let run = f.setup.claim.fence.scope.run;
++    let before = history(p, company, run).await;
++    assert_eq!(
++        before,
++        ActionHistory {
++            intents: 1,
++            dispatches: 1,
++            receipts: 1
++        }
++    );
++    native_check(p, native_row(&f.original, json!({})), None).await;
++    let survivor_manifest: Uuid = sqlx::query_scalar(
++        "SELECT manifest_id FROM run_dependency_manifests WHERE company_id=$1 AND run_id=$2",
++    )
++    .bind(company.as_uuid())
++    .bind(f.survivor.as_uuid())
++    .fetch_one(p.pool())
++    .await
++    .unwrap();
++    let additional = f
++        .later
++        .definition
++        .tools
++        .iter()
++        .find(|tool| tool.binding.alias.as_str() == "additional.request")
++        .unwrap()
++        .binding
++        .id;
++    let cases = [
++        OriginCase {
++            patch: json!({"agent_manifest_id":survivor_manifest}),
++            failure: NativeFailure::Manifest,
++        },
++        OriginCase {
++            patch: json!({"agent_revision_id":f.later.id}),
++            failure: NativeFailure::Selection,
++        },
++        OriginCase {
++            patch: json!({"agent_binding_id":additional}),
++            failure: NativeFailure::Binding,
++        },
++        OriginCase {
++            patch: json!({"agent_id":f.foreign.definition.agent_id}),
++            failure: NativeFailure::Selection,
++        },
++        OriginCase {
++            patch: json!({"origin_kind":"workflow"}),
++            failure: NativeFailure::Shape,
++        },
++    ];
++    for case in cases {
++        native_check(p, native_row(&f.original, case.patch), Some(case.failure)).await;
++    }
++    let mut disagreement = native_row(&f.original, json!({}));
++    disagreement["operation"]["context"]["origin"]["binding"] = json!(Uuid::new_v4());
++    native_check(p, disagreement, Some(NativeFailure::Content)).await;
++    assert_eq!(before, history(p, company, run).await);
++}
++
++async fn old_root(f: &support::OriginHistory) -> RetentionRoot {
++    let p = &f.setup.fixture.persistence;
++    let scope = f.setup.claim.fence.scope;
++    let current = p.head(scope.company, scope.run).await.unwrap().unwrap();
++    let result = p
++        .cancel(CancelCommand {
++            company_id: scope.company,
++            run_id: scope.run,
++            actor: f.setup.fixture.target.actor,
++            command_key: IdempotencyKey::parse("origin-history-retire").unwrap(),
++            expected_revision: current.revision,
++        })
++        .await
++        .unwrap();
++    assert!(matches!(result, CancelResult::Applied { .. }));
++    let finished_at=sqlx::query_scalar("UPDATE workflow_runs SET finished_at=clock_timestamp()-interval '91 days' WHERE company_id=$1 AND id=$2 RETURNING finished_at")
++        .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).fetch_one(p.pool()).await.unwrap();
++    RetentionRoot {
++        company: scope.company,
++        run: scope.run,
++        finished_at,
++    }
++}
++
++#[tokio::test]
++async fn autonomous_agent_storage_action_origin_populated_collector_and_company_cascade() {
++    let f = support::populated().await;
++    let p = &f.setup.fixture.persistence;
++    let company = f.setup.fixture.target.company;
++    let run = f.setup.claim.fence.scope.run;
++    let populated = ActionHistory {
++        intents: 1,
++        dispatches: 1,
++        receipts: 1,
++    };
++    let empty = ActionHistory {
++        intents: 0,
++        dispatches: 0,
++        receipts: 0,
++    };
++    assert_eq!(history(p, company, run).await, populated);
++    assert_eq!(history(p, company, f.survivor).await, populated);
++    let root = old_root(&f).await;
++    let (left, right) = tokio::join!(p.retire_tree(root), p.retire_tree(root));
++    assert_eq!(
++        usize::from(left.unwrap().is_some()) + usize::from(right.unwrap().is_some()),
++        1
++    );
++    assert_eq!(history(p, company, run).await, empty);
++    assert_eq!(history(p, company, f.survivor).await, populated);
++    let retained:Uuid=sqlx::query_scalar("SELECT member.revision_id FROM run_dependency_manifests AS owner JOIN agent_manifest_revisions AS member ON member.company_id=owner.company_id AND member.manifest_id=owner.manifest_id WHERE owner.company_id=$1 AND owner.run_id=$2 AND member.agent_id=$3")
++        .bind(company.as_uuid()).bind(f.survivor.as_uuid()).bind(f.setup.agent).fetch_one(p.pool()).await.unwrap();
++    assert_eq!(json!(retained), f.original["agent_revision_id"]);
++    let gone: i64 = sqlx::query_scalar(
++        "SELECT count(*) FROM run_dependency_manifests WHERE company_id=$1 AND run_id=$2",
++    )
++    .bind(company.as_uuid())
++    .bind(run.as_uuid())
++    .fetch_one(p.pool())
++    .await
++    .unwrap();
++    assert_eq!(gone, 0);
++    sqlx::query("DELETE FROM companies WHERE id=$1")
++        .bind(company.as_uuid())
++        .execute(p.pool())
++        .await
++        .unwrap();
++    assert_eq!(history(p, company, f.survivor).await, empty);
++    let revisions: i64 =
++        sqlx::query_scalar("SELECT count(*) FROM agent_revisions WHERE company_id=$1")
++            .bind(company.as_uuid())
++            .fetch_one(p.pool())
++            .await
++            .unwrap();
++    assert_eq!(revisions, 0);
++    let foreign: i64 =
++        sqlx::query_scalar("SELECT count(*) FROM agent_revisions WHERE company_id=$1 AND id=$2")
++            .bind(f.foreign.definition.company_id.as_uuid())
++            .bind(f.foreign.id.as_uuid())
++            .fetch_one(p.pool())
++            .await
++            .unwrap();
++    assert_eq!(
++        foreign, 1,
++        "the unrelated tenant's retained revision must survive"
++    );
++}
+diff --git a/src/adapters/persistence/workflow/autonomous_agent_sample_bounds_tests.rs b/src/adapters/persistence/workflow/autonomous_agent_sample_bounds_tests.rs
+new file mode 100644
+index 00000000..5251f126
+--- /dev/null
++++ b/src/adapters/persistence/workflow/autonomous_agent_sample_bounds_tests.rs
+@@ -0,0 +1,279 @@
++use super::*;
++
++fn root_response(workflow: WorkflowId) -> Value {
++    json!({"workflow_id":workflow,"step":"start","responses":[{"output":"done"}]})
++}
++
++fn dynamic_source(candidates: &[String]) -> Value {
++    let mut source = model_source(&AgentKey::parse("assistant").unwrap(), ModelStep::AgentRun);
++    source["parameter_schema"] = json!({"type":"object","properties":{
++        "selected":{"type":"string","enum":candidates}},"required":["selected"],"additionalProperties":false});
++    source["steps"]["start"]["with"]["agent"] = json!({"ref":"/params/selected"});
++    source
++}
++
++#[tokio::test]
++async fn autonomous_agent_samples_message_steps_keep_metadata_and_generic_message_tools_stay_forbidden()
++ {
++    let setup = Box::pin(agent_setup("http://127.0.0.1:1")).await;
++    let result = json!({"status":"accepted","messages":[{
++        "destination":{"kind":"reply","id":Uuid::from_u128(700)},
++        "message_id":Uuid::from_u128(701),"status":"accepted"}]});
++    for kind in ["message.reply", "tool.call"] {
++        let mut source: Value =
++            serde_json::from_str(&registry::example(kind).unwrap().source).unwrap();
++        if kind == "tool.call" {
++            source["steps"]["start"]["with"]["tool"] = json!({"literal":"message.reply"});
++            source["steps"]["start"]["with"]["arguments"] = json!({"literal":{
++                "content":{"body":"hello"},"source_message":Uuid::from_u128(5)}});
++        }
++        let target = DefinitionTarget {
++            workflow: WorkflowId::new(Uuid::new_v4()),
++            ..setup.fixture.target
++        };
++        save_source(&setup, target, None, source).await;
++        let request = sample_request(vec![json!({"workflow_id":target.workflow,
++            "step":"start","responses":[{"output":result}]})]);
++        let before = production_counts(&setup).await;
++        let captured = capture_service(&setup)
++            .capture(target, DraftRevision::new(1).unwrap(), request)
++            .await;
++        if kind == "tool.call" {
++            let error = captured
++                .err()
++                .expect("messaging remains a STEP, not a generic selectable tool");
++            assert!(
++                error.to_string().contains("not a selectable tool"),
++                "{error}"
++            );
++            assert_eq!(before, production_counts(&setup).await);
++            continue;
++        }
++        let frozen = captured.unwrap();
++        let report = crate::application::workflow::sample::execute(frozen).unwrap();
++        assert_eq!(
++            report.status,
++            SampleStatus::Completed,
++            "{kind}: {:?}",
++            report.diagnostic
++        );
++        assert_eq!(report.effects.len(), 1);
++        assert!(report.agent_selections.is_empty());
++        assert_eq!(before, production_counts(&setup).await);
++    }
++}
++
++async fn save_source(
++    setup: &AgentSetup,
++    target: DefinitionTarget,
++    expected: Option<DraftRevision>,
++    mut source: Value,
++) {
++    let p = &setup.fixture.persistence;
++    let fixture = Fixture {
++        _db: setup.fixture._db.clone(),
++        persistence: p.clone(),
++        target,
++    };
++    let service = DefinitionService::new(
++        Preflight,
++        p.clone(),
++        WorkflowSourceDecoder,
++        AgentPublicationDirectory {
++            persistence: p.clone(),
++            inner: Preflight,
++        },
++    );
++    source["workflow_id"] = json!(target.workflow);
++    let mut draft = fixture.save(expected);
++    draft.content.source = source.to_string();
++    service.save(draft).await.unwrap();
++}
++
++#[tokio::test]
++async fn autonomous_agent_samples_draft_cycle_is_refused_without_activation_or_production_effects()
++{
++    let setup = Box::pin(agent_setup("http://127.0.0.1:1")).await;
++    let root = publish_graph(
++        &setup,
++        model_source(&AgentKey::parse("assistant").unwrap(), ModelStep::AgentRun),
++        json!({}),
++    )
++    .await;
++    let cycle = register_child(&setup, &root, "sample_cycle").await;
++    // The active agent still has its old HTTP definition; only its draft is cyclic.
++    assistant_binding(&setup, cycle, "Cyclic draft").await;
++    let before = production_counts(&setup).await;
++    let error = capture_service(&setup)
++        .capture(
++            target(&setup, &root),
++            DraftRevision::new(1).unwrap(),
++            sample_request(vec![]),
++        )
++        .await
++        .err()
++        .expect("the draft-only closed graph must reject a cycle");
++    assert!(error.to_string().contains("cycle"), "{error}");
++    assert_eq!(before, production_counts(&setup).await);
++}
++
++#[tokio::test]
++async fn autonomous_agent_samples_combined_capture_depth_accepts_32_and_refuses_34() {
++    let setup = Box::pin(agent_setup("http://127.0.0.1:1")).await;
++    let mut graph = publish_graph(
++        &setup,
++        model_source(&AgentKey::parse("assistant").unwrap(), ModelStep::AgentRun),
++        json!({}),
++    )
++    .await;
++    for level in 1..=16 {
++        let binding = register_child(&setup, &graph, &format!("sample_depth_{level}")).await;
++        let key = AgentKey::parse(format!("sample-depth-{level}")).unwrap();
++        let agent = draft_agent(&setup, &key, "Depth capture".into(), vec![binding]).await;
++        setup.fixture.publish_agent(agent.as_uuid()).await;
++        graph = publish_graph(&setup, model_source(&key, ModelStep::AgentRun), json!({})).await;
++        if level == 15 {
++            let before = production_counts(&setup).await;
++            let sealed = capture_service(&setup)
++                .capture(
++                    target(&setup, &graph),
++                    DraftRevision::new(1).unwrap(),
++                    sample_request(vec![root_response(graph.workflow)]),
++                )
++                .await
++                .unwrap();
++            let report = crate::application::workflow::sample::execute(sealed).unwrap();
++            assert_eq!(
++                report.status,
++                SampleStatus::Completed,
++                "{:?}",
++                report.diagnostic
++            );
++            assert_eq!(report.agent_selections.len(), 16);
++            assert_eq!(report.workflow_selections.len(), 16);
++            assert!(report.effects.is_empty());
++            assert_eq!(before, production_counts(&setup).await);
++        }
++    }
++    let before = production_counts(&setup).await;
++    let error = capture_service(&setup)
++        .capture(
++            target(&setup, &graph),
++            DraftRevision::new(1).unwrap(),
++            sample_request(vec![]),
++        )
++        .await
++        .err()
++        .expect("depth34 must be rejected during capture");
++    assert!(error.to_string().contains("depth exceeds 32"), "{error}");
++    assert_eq!(before, production_counts(&setup).await);
++}
++
++#[tokio::test]
++async fn autonomous_agent_samples_unique_draft_selections_accept_256_and_refuse_257() {
++    let setup = Box::pin(agent_setup("http://127.0.0.1:1")).await;
++    let mut candidates = vec!["assistant".to_owned()];
++    for index in 1..255 {
++        let key = AgentKey::parse(format!("sample-candidate-{index}")).unwrap();
++        draft_agent(&setup, &key, "Draft candidate".into(), vec![]).await;
++        candidates.push(key.as_str().to_owned());
++    }
++    let target = DefinitionTarget {
++        workflow: WorkflowId::new(Uuid::new_v4()),
++        ..setup.fixture.target
++    };
++    save_source(&setup, target, None, dynamic_source(&candidates)).await;
++    let mut request = sample_request(vec![root_response(target.workflow)]);
++    request.params = json!({"selected":"assistant"});
++    let before = production_counts(&setup).await;
++    let capture = capture_service(&setup);
++    let sealed = capture
++        .capture(target, DraftRevision::new(1).unwrap(), request.clone())
++        .await
++        .unwrap();
++    let report = crate::application::workflow::sample::execute(sealed).unwrap();
++    assert_eq!(
++        report.status,
++        SampleStatus::Completed,
++        "{:?}",
++        report.diagnostic
++    );
++    assert_eq!(report.agent_selections.len(), 255);
++    assert_eq!(report.workflow_selections.len(), 1);
++    assert!(report.effects.is_empty());
++    assert_eq!(before, production_counts(&setup).await);
++    let last = AgentKey::parse("sample-candidate-255").unwrap();
++    draft_agent(&setup, &last, "Last draft".into(), vec![]).await;
++    candidates.push(last.as_str().to_owned());
++    save_source(
++        &setup,
++        target,
++        Some(DraftRevision::new(1).unwrap()),
++        dynamic_source(&candidates),
++    )
++    .await;
++    let before = production_counts(&setup).await;
++    let error = capture
++        .capture(target, DraftRevision::new(2).unwrap(), request)
++        .await
++        .err()
++        .expect("the complete256candidate universe plusroot must exceed capacity");
++    assert!(
++        error
++            .to_string()
++            .contains("Too many sample dependency selections"),
++        "{error}"
++    );
++    assert_eq!(before, production_counts(&setup).await);
++}
++
++#[tokio::test]
++async fn autonomous_agent_samples_aggregate_draft_bytes_are_bounded_without_publication() {
++    let setup = Box::pin(agent_setup("http://127.0.0.1:1")).await;
++    let mut candidates = vec![];
++    for index in 0..16 {
++        let key = AgentKey::parse(format!("sample-large-{index}")).unwrap();
++        draft_agent(&setup, &key, "x".repeat(15 * 1024), vec![]).await;
++        candidates.push(key.as_str().to_owned());
++    }
++    let target = DefinitionTarget {
++        workflow: WorkflowId::new(Uuid::new_v4()),
++        ..setup.fixture.target
++    };
++    save_source(&setup, target, None, dynamic_source(&candidates)).await;
++    let mut request = sample_request(vec![root_response(target.workflow)]);
++    request.params = json!({"selected":candidates[0]});
++    let capture = capture_service(&setup);
++    let before = production_counts(&setup).await;
++    let sealed = capture
++        .capture(target, DraftRevision::new(1).unwrap(), request.clone())
++        .await
++        .unwrap();
++    let report = crate::application::workflow::sample::execute(sealed).unwrap();
++    assert_eq!(
++        report.status,
++        SampleStatus::Completed,
++        "{:?}",
++        report.diagnostic
++    );
++    assert_eq!(report.agent_selections.len(), 16);
++    assert_eq!(before, production_counts(&setup).await);
++    let last = AgentKey::parse("sample-large-16").unwrap();
++    draft_agent(&setup, &last, "x".repeat(15 * 1024), vec![]).await;
++    candidates.push(last.as_str().to_owned());
++    save_source(
++        &setup,
++        target,
++        Some(DraftRevision::new(1).unwrap()),
++        dynamic_source(&candidates),
++    )
++    .await;
++    let before = production_counts(&setup).await;
++    let error = capture
++        .capture(target, DraftRevision::new(2).unwrap(), request)
++        .await
++        .err()
++        .expect("aggregatecanonicaldraftbytes must be limited before execution");
++    assert!(error.to_string().contains("256 KiB"), "{error}");
++    assert_eq!(before, production_counts(&setup).await);
++}
+diff --git a/src/adapters/persistence/workflow/autonomous_agent_sample_closure_tests.rs b/src/adapters/persistence/workflow/autonomous_agent_sample_closure_tests.rs
+new file mode 100644
+index 00000000..c5966c07
+--- /dev/null
++++ b/src/adapters/persistence/workflow/autonomous_agent_sample_closure_tests.rs
+@@ -0,0 +1,367 @@
++use super::*;
++use crate::application::workflow::sample::{SampleReport, SampleRequest, SampleStatus};
++use crate::application::workflow::sample_capture::SampleDefinitionCapture;
++
++#[path = "autonomous_agent_sample_bounds_tests.rs"]
++mod bounds;
++
++fn capture_service(setup: &AgentSetup) -> crate::adapters::persistence::workflow::SampleCapture {
++    crate::adapters::persistence::workflow::SampleCapture {
++        persistence: setup.fixture.persistence.clone(),
++        http: vec![],
++        mcp: vec![],
++        refused_kinds: &[],
++    }
++}
++
++fn target(setup: &AgentSetup, graph: &GraphWorkflow) -> DefinitionTarget {
++    DefinitionTarget {
++        workflow: graph.workflow,
++        ..setup.fixture.target
++    }
++}
++
++fn sample_request(responses: Vec<Value>) -> SampleRequest {
++    SampleRequest {
++        input: json!({}),
++        params: json!({}),
++        scripts: serde_json::from_value(Value::Array(responses)).unwrap(),
++        agents: vec![],
++    }
++}
++
++#[derive(Debug, PartialEq, sqlx::FromRow)]
++struct ProductionCounts {
++    runs: i64,
++    revisions: i64,
++    actions: i64,
++    checkpoints: i64,
++}
++
++async fn production_counts(setup: &AgentSetup) -> ProductionCounts {
++    sqlx::query_as(
++        "SELECT (SELECT count(*) FROM workflow_runs WHERE company_id=$1) AS runs,
++         (SELECT count(*) FROM agent_revisions WHERE company_id=$1) AS revisions,
++         (SELECT count(*) FROM workflow_action_intents WHERE company_id=$1) AS actions,
++         (SELECT count(*) FROM task_harness_runs WHERE company_id=$1) AS checkpoints",
++    )
++    .bind(setup.fixture.target.company.as_uuid())
++    .fetch_one(setup.fixture.persistence.pool())
++    .await
++    .unwrap()
++}
++
++async fn draft_agent(
++    setup: &AgentSetup,
++    key: &AgentKey,
++    instructions: String,
++    tools: Vec<AgentToolBinding>,
++) -> AgentId {
++    let agent = AgentPersistence::create(
++        &setup.fixture.persistence,
++        setup.fixture.target.company.as_uuid(),
++        AgentWrite {
++            name: key.as_str().to_owned(),
++            slug: key.as_str().to_owned(),
++            provider: Some(SCRIPTED_PROVIDER.into()),
++            model: Some(SCRIPTED_MODEL.into()),
++            system_prompt: Some(instructions),
++            tool_bindings: Some(tools),
++            ..Default::default()
++        },
++    )
++    .await
++    .unwrap();
++    AgentId::new(agent.id)
++}
++
++async fn assistant_binding(setup: &AgentSetup, binding: AgentToolBinding, instructions: &str) {
++    AgentPersistence::update(
++        &setup.fixture.persistence,
++        setup.agent,
++        AgentWrite {
++            name: "Assistant".into(),
++            slug: "assistant".into(),
++            provider: Some(SCRIPTED_PROVIDER.into()),
++            model: Some(SCRIPTED_MODEL.into()),
++            system_prompt: Some(instructions.into()),
++            tool_bindings: Some(vec![binding]),
++            ..Default::default()
++        },
++    )
++    .await
++    .unwrap();
++}
++
++struct NestedSample {
++    setup: Box<AgentSetup>,
++    root: GraphWorkflow,
++    middle: GraphWorkflow,
++    leaf: GraphWorkflow,
++    second: AgentId,
++    root_binding: AgentToolBinding,
++}
++
++async fn nested_sample() -> NestedSample {
++    let setup = Box::new(Box::pin(agent_setup("http://127.0.0.1:1")).await);
++    let assistant = AgentKey::parse("assistant").unwrap();
++    // The same agent's classify view is a leaf even though its run view owns children.
++    let leaf = publish_graph(
++        &setup,
++        model_source(&assistant, ModelStep::Classify),
++        json!({}),
++    )
++    .await;
++    let leaf_binding = register_child(&setup, &leaf, "sample_leaf").await;
++    let second_key = AgentKey::parse("sample-second").unwrap();
++    let second = draft_agent(
++        &setup,
++        &second_key,
++        "Second agent".into(),
++        vec![leaf_binding],
++    )
++    .await;
++    setup.fixture.publish_agent(second.as_uuid()).await;
++    let middle = publish_graph(
++        &setup,
++        model_source(&second_key, ModelStep::AgentRun),
++        json!({}),
++    )
++    .await;
++    let root_binding = register_child(&setup, &middle, "sample_middle").await;
++    assistant_binding(&setup, root_binding.clone(), "Initial sample instructions").await;
++    setup.fixture.publish_agent(setup.agent).await;
++    let root = publish_graph(
++        &setup,
++        model_source(&assistant, ModelStep::AgentRun),
++        json!({}),
++    )
++    .await;
++    NestedSample {
++        setup,
++        root,
++        middle,
++        leaf,
++        second,
++        root_binding,
++    }
++}
++
++fn nested_request(f: &NestedSample) -> SampleRequest {
++    sample_request(vec![
++        json!({"workflow_id":f.root.workflow,"step":"start","responses":[{
++            "output":"root", "tools":[{"name":"child","input":{},"output":null}]
++        }]}),
++        json!({"workflow_id":f.middle.workflow,"step":"start","responses":[{
++            "output":"middle", "tools":[{"name":"child","input":{},"output":null}]
++        }]}),
++        json!({"workflow_id":f.leaf.workflow,"step":"start","responses":[{"output":"support"}]}),
++    ])
++}
++
++async fn republish_middle(f: &NestedSample) -> VersionId {
++    let p = &f.setup.fixture.persistence;
++    let fixture = Fixture {
++        _db: f.setup.fixture._db.clone(),
++        persistence: p.clone(),
++        target: target(&f.setup, &f.middle),
++    };
++    let directory =
++        crate::adapters::persistence::workflow::child_publication::ChildPublicationDirectory {
++            persistence: p.clone(),
++            inner: AgentPublicationDirectory {
++                persistence: p.clone(),
++                inner: Preflight,
++            },
++        };
++    let service = DefinitionService::new(Preflight, p.clone(), WorkflowSourceDecoder, directory);
++    let mut source = model_source(
++        &AgentKey::parse("sample-second").unwrap(),
++        ModelStep::AgentRun,
++    );
++    source["workflow_id"] = json!(f.middle.workflow);
++    source["steps"]["start"]["with"]["context"] = json!({"literal":"A later child definition"});
++    let mut draft = fixture.save(Some(DraftRevision::new(1).unwrap()));
++    draft.content.source = source.to_string();
++    service.save(draft).await.unwrap();
++    let mut publication = fixture.publish();
++    publication.expected = DraftRevision::new(2).unwrap();
++    publication.version = VersionId::new(Uuid::new_v4());
++    publication.key = IdempotencyKey::parse("sample-middle-v2").unwrap();
++    let version = publication.version;
++    service.publish(publication).await.unwrap();
++    let registration = p
++        .workflow_tools(fixture.target.company, fixture.target.actor)
++        .await
++        .unwrap()
++        .into_iter()
++        .find(|r| r.name.as_str() == "sample_middle")
++        .unwrap();
++    p.register_workflow_tool(
++        fixture.target.company,
++        fixture.target.actor,
++        WorkflowToolWrite {
++            version,
++            expected: Some(registration.revision),
++            name: registration.name,
++            workflow: f.middle.workflow,
++            params: json!({}),
++        },
++    )
++    .await
++    .unwrap();
++    version
++}
++
++fn assert_nested_selection(f: &NestedSample, report: &SampleReport) {
++    assert_eq!(
++        report.status,
++        SampleStatus::Completed,
++        "{:?}",
++        report.diagnostic
++    );
++    assert_eq!(report.usage.direct_tool_calls, 2);
++    assert_eq!(report.usage.model_calls, 5);
++    let agents: std::collections::BTreeSet<_> =
++        report.agent_selections.iter().map(|a| a.agent_id).collect();
++    assert_eq!(
++        agents,
++        [AgentId::new(f.setup.agent), f.second]
++            .into_iter()
++            .collect()
++    );
++    let workflows: std::collections::BTreeSet<_> = report
++        .workflow_selections
++        .iter()
++        .map(|w| (w.workflow_id, w.version_id))
++        .collect();
++    assert_eq!(
++        workflows,
++        [
++            (f.root.workflow, VersionId::new(Uuid::nil())),
++            (f.middle.workflow, f.middle.version),
++            (f.leaf.workflow, f.leaf.version)
++        ]
++        .into_iter()
++        .collect()
++    );
++}
++
++fn assert_same_sample(report: &SampleReport, replay: &SampleReport) {
++    assert_eq!(
++        replay.status,
++        SampleStatus::Completed,
++        "{:?}",
++        replay.diagnostic
++    );
++    assert_eq!(report.configuration_hash, replay.configuration_hash);
++    assert_eq!(
++        serde_json::to_value(&report.workflow_selections).unwrap(),
++        serde_json::to_value(&replay.workflow_selections).unwrap()
++    );
++    assert_eq!(
++        serde_json::to_value(&report.effects).unwrap(),
++        serde_json::to_value(&replay.effects).unwrap()
++    );
++}
++
++async fn capture_reselected_draft(
++    f: &NestedSample,
++    capture: &impl SampleDefinitionCapture,
++    version: VersionId,
++) -> SampleReport {
++    let stale = capture
++        .capture(
++            target(&f.setup, &f.root),
++            DraftRevision::new(1).unwrap(),
++            nested_request(f),
++        )
++        .await
++        .err()
++        .expect("fresh draft capture must refuse a stale reviewed child contract");
++    assert!(
++        stale.to_string().contains("reviewed contract changed"),
++        "{stale}"
++    );
++    let mut binding = f.root_binding.clone();
++    binding.id = AgentBindingId::new(Uuid::new_v4());
++    let AgentBindingSource::Workflow { version: pin, .. } = &mut binding.source else {
++        panic!("the nested fixture owns a workflow binding")
++    };
++    *pin = version;
++    assistant_binding(&f.setup, binding, "Explicitly reselected child contract").await;
++    let current = capture
++        .capture(
++            target(&f.setup, &f.root),
++            DraftRevision::new(1).unwrap(),
++            nested_request(f),
++        )
++        .await
++        .unwrap();
++    crate::application::workflow::sample::execute(current).unwrap()
++}
++
++#[tokio::test]
++async fn autonomous_agent_samples_nested_aliases_and_model_only_leaf_keep_exact_sealed_configuration()
++ {
++    let f = nested_sample().await;
++    let capture = capture_service(&f.setup);
++    let before = production_counts(&f.setup).await;
++    let first = capture
++        .capture(
++            target(&f.setup, &f.root),
++            DraftRevision::new(1).unwrap(),
++            nested_request(&f),
++        )
++        .await
++        .unwrap();
++    let old = capture
++        .capture(
++            target(&f.setup, &f.root),
++            DraftRevision::new(1).unwrap(),
++            nested_request(&f),
++        )
++        .await
++        .unwrap();
++    let report = crate::application::workflow::sample::execute(first).unwrap();
++    assert_nested_selection(&f, &report);
++    assert_eq!(before, production_counts(&f.setup).await);
++
++    assistant_binding(
++        &f.setup,
++        f.root_binding.clone(),
++        "Changed active instructions",
++    )
++    .await;
++    f.setup.fixture.publish_agent(f.setup.agent).await;
++    let later_child = republish_middle(&f).await;
++    assert_ne!(later_child, f.middle.version);
++    let after_changes = production_counts(&f.setup).await;
++    let replay = crate::application::workflow::sample::execute(old).unwrap();
++    assert_same_sample(&report, &replay);
++    let current = capture_reselected_draft(&f, &capture, later_child).await;
++    assert_eq!(
++        current.status,
++        SampleStatus::Completed,
++        "{:?}",
++        current.diagnostic
++    );
++    assert_ne!(current.configuration_hash, report.configuration_hash);
++    assert!(
++        current
++            .workflow_selections
++            .iter()
++            .any(|w| w.version_id == later_child)
++    );
++    assert!(
++        !current
++            .workflow_selections
++            .iter()
++            .any(|w| w.version_id == f.middle.version)
++    );
++    assert_eq!(after_changes, production_counts(&f.setup).await);
++    capture
++        .authorize_release(target(&f.setup, &f.root))
++        .await
++        .unwrap();
++}
+diff --git a/src/adapters/persistence/workflow/checkpoint_authority_order_tests.rs b/src/adapters/persistence/workflow/checkpoint_authority_order_tests.rs
+new file mode 100644
+index 00000000..017e23e3
+--- /dev/null
++++ b/src/adapters/persistence/workflow/checkpoint_authority_order_tests.rs
+@@ -0,0 +1,147 @@
++use super::*;
++use crate::application::agent::AgentPublicationScope;
++use crate::application::workflow::checkpoints::WorkflowCheckpointUpdate;
++use crate::entities::agent_capability::AgentId;
++use crate::services::harness::runs::{InvocationId, SavedToolCall};
++use std::future::Future;
++
++async fn blocked_by(p: &PostgresPersistence, publisher: i32) {
++    tokio::time::timeout(std::time::Duration::from_secs(3), async {
++        loop {
++            let waiting: bool = sqlx::query_scalar(
++                "SELECT EXISTS(SELECT 1 FROM pg_stat_activity AS waiting
++                 WHERE waiting.datname=current_database() AND waiting.wait_event_type='Lock'
++                   AND $1=ANY(pg_blocking_pids(waiting.pid)))",
++            )
++            .bind(publisher)
++            .fetch_one(p.pool())
++            .await
++            .unwrap();
++            if waiting {
++                break;
++            }
++            tokio::time::sleep(std::time::Duration::from_millis(5)).await;
++        }
++    })
++    .await
++    .expect("the checkpoint must actually wait on the preview's company lock");
++}
++
++async fn preview_race<T>(f: &ModelFixture, checkpoint: impl Future<Output = AppResult<T>>) -> T {
++    let p = f.native.fixture.persistence();
++    let target = f.native.fixture.binding.target;
++    let scope = AgentPublicationScope {
++        company: target.company,
++        actor: target.actor,
++        agent: AgentId::new(f.run.identity.agent_id),
++    };
++    let mut publishing = p.pool().begin().await.unwrap();
++    let publisher: i32 = sqlx::query_scalar("SELECT pg_backend_pid()")
++        .fetch_one(&mut *publishing)
++        .await
++        .unwrap();
++    sqlx::query_scalar::<_, Uuid>("SELECT id FROM users WHERE id=$1 FOR SHARE")
++        .bind(scope.actor.user_id())
++        .fetch_one(&mut *publishing)
++        .await
++        .unwrap();
++    crate::adapters::persistence::workflow::authority::authorize_company(
++        &mut publishing,
++        scope.company,
++        scope.actor,
++    )
++    .await
++    .unwrap();
++    // The real publication witness requests agent UPDATE only once the actual
++    // checkpoint is queued on our company lock. Old agent→company order deadlocks.
++    let preview = async {
++        blocked_by(p, publisher).await;
++        let preview =
++            crate::adapters::persistence::agent_publication::LockedAgentPublication::lock(
++                &mut publishing,
++                scope,
++            )
++            .await
++            .unwrap()
++            .preview()
++            .await
++            .unwrap();
++        assert_eq!(preview.definition.agent_id, scope.agent);
++        publishing.commit().await.unwrap();
++    };
++    // Keep the checkpoint→agent future off the stock test thread stack.
++    let (result, ()) = tokio::time::timeout(std::time::Duration::from_secs(5), async {
++        tokio::join!(Box::pin(checkpoint), preview)
++    })
++    .await
++    .expect("preview and checkpoint must serialize without deadlock");
++    result.unwrap()
++}
++
++#[tokio::test]
++async fn autonomous_agent_authority_checkpoint_model_reservation_serializes_with_preview() {
++    let f = opened().await;
++    let p = f.native.fixture.persistence();
++    let outcome = preview_race(
++        &f,
++        p.reserve_workflow_model(f.write, model_request(&reservation()), None),
++    )
++    .await;
++    assert!(matches!(outcome, WorkflowModelAdmission::New(_)));
++    assert_eq!(accounting(&f).await["calls"], 1);
++}
++
++async fn saved_call(f: &ModelFixture) -> (WorkflowCheckpointWrite, InvocationId) {
++    let p = f.native.fixture.persistence();
++    let request = reservation();
++    let WorkflowModelAdmission::New(permit) = p
++        .reserve_workflow_model(f.write, model_request(&request), None)
++        .await
++        .unwrap()
++    else {
++        panic!("model request must be admitted")
++    };
++    let mut write = WorkflowCheckpointWrite {
++        expected_revision: permit.consume().revision,
++        ..f.write
++    };
++    let invocation = InvocationId(Uuid::new_v4());
++    let mut turn = response(&request);
++    turn.calls = vec![SavedToolCall {
++        invocation_id: invocation,
++        call_id: invocation.0.to_string(),
++        item_id: None,
++        tool_id: "saved_tool".into(),
++        arguments: json!({}),
++    }];
++    let WorkflowModelSettlement::Saved(outcome) =
++        p.settle_workflow_model(write, turn, None).await.unwrap()
++    else {
++        panic!("model response must be saved")
++    };
++    let WriteOutcome::Applied(run) = *outcome else {
++        panic!("model response must advance the checkpoint")
++    };
++    write.expected_revision = run.revision;
++    (write, invocation)
++}
++
++#[tokio::test]
++async fn autonomous_agent_authority_checkpoint_saved_call_serializes_with_preview() {
++    let f = opened().await;
++    let p = f.native.fixture.persistence();
++    let (write, invocation) = saved_call(&f).await;
++    let outcome = preview_race(
++        &f,
++        p.update_workflow_checkpoint(
++            write,
++            WorkflowCheckpointUpdate::PrepareInvocation(invocation),
++        ),
++    )
++    .await;
++    let WriteOutcome::Applied(run) = outcome else {
++        panic!("the saved invocation must advance after preview releases company")
++    };
++    assert_eq!(run.invocations.len(), 1);
++    assert!(run.invocations[0].result.is_none());
++}
+diff --git a/src/adapters/persistence/workflow/checkpoint_models.rs b/src/adapters/persistence/workflow/checkpoint_models.rs
+index 15ccf9f2..252ecff7 100644
+--- a/src/adapters/persistence/workflow/checkpoint_models.rs
++++ b/src/adapters/persistence/workflow/checkpoint_models.rs
+@@ -19,7 +19,9 @@ pub(super) async fn reserve_on(
+         return Ok(End::Rollback(Admission::OwnershipLost));
+     }
+     // Revocation linearizes against admission: checked under authority locks.
+-    authorize_on(tx, write.fence).await?;
++    if authorize_on(tx, write.fence).await?.is_none() {
++        return Ok(End::Rollback(Admission::OwnershipLost));
++    }
+     if !lock_owner(tx, write.fence, bound).await? {
+         return Ok(End::Rollback(Admission::OwnershipLost));
+     }
+diff --git a/src/adapters/persistence/workflow/checkpoint_updates.rs b/src/adapters/persistence/workflow/checkpoint_updates.rs
+index f08e1e52..a0e321ac 100644
+--- a/src/adapters/persistence/workflow/checkpoint_updates.rs
++++ b/src/adapters/persistence/workflow/checkpoint_updates.rs
+@@ -9,8 +9,10 @@ pub(super) async fn update_on(
+ ) -> AppResult<End<Outcome>> {
+     // A saved call is dispatched, or re-dispatched after approval, only under
+     // current agent/model authority; replay of the preparation rechecks it too.
+-    if matches!(update, WorkflowCheckpointUpdate::PrepareInvocation(_)) {
+-        authorize_on(tx, write.fence).await?;
++    if matches!(update, WorkflowCheckpointUpdate::PrepareInvocation(_))
++        && authorize_on(tx, write.fence).await?.is_none()
++    {
++        return Ok(End::Rollback(WriteOutcome::OwnershipLost));
+     }
+     if !lock_owner(tx, write.fence, bound).await? {
+         return Ok(End::Rollback(WriteOutcome::OwnershipLost));
+diff --git a/src/adapters/persistence/workflow/checkpoints.rs b/src/adapters/persistence/workflow/checkpoints.rs
+index fb7c9b85..57964edf 100644
+--- a/src/adapters/persistence/workflow/checkpoints.rs
++++ b/src/adapters/persistence/workflow/checkpoints.rs
+@@ -307,7 +307,10 @@ async fn live(tx: &mut PgConnection, fence: WorkflowFence, bound: &WriteBound) -
+ 
+ /// Current agent/model authority for the immutable prepared selection, taken in the
+ /// authority class before any local workflow lock. Missing preparation fails closed.
+-async fn authorize_on(tx: &mut PgConnection, fence: WorkflowFence) -> AppResult<()> {
++async fn authorize_on(
++    tx: &mut PgConnection,
++    fence: WorkflowFence,
++) -> AppResult<Option<WorkflowActor>> {
+     let prepared: Value = sqlx::query_scalar(
+         "SELECT workflow_prepared FROM task_harness_runs WHERE company_id=$1
+           AND workflow_run_id=$2 AND workflow_execution_id=$3 AND task_id=$4",
+@@ -319,16 +322,18 @@ async fn authorize_on(tx: &mut PgConnection, fence: WorkflowFence) -> AppResult<
+     .fetch_optional(&mut *tx)
+     .await?
+     .ok_or_else(missing)?;
+-    super::agent_preparation::current_on(
+-        tx,
+-        crate::application::workflow::actions::ActionScope {
+-            company: fence.scope.company,
+-            run: fence.scope.run,
+-            execution: fence.scope.execution,
+-        },
+-        &prepared,
+-    )
+-    .await
++    let scope = ActionScope {
++        company: fence.scope.company,
++        run: fence.scope.run,
++        execution: fence.scope.execution,
++    };
++    // The saved read holds no row lock. Publication owns account/company before
++    // agent rows; keep that order, then let callers take the local owner fence.
++    let Some(actor) = action_authority::prelock_on(tx, scope).await? else {
++        return Ok(None);
++    };
++    super::agent_preparation::current_on(tx, scope, &prepared).await?;
++    Ok(Some(actor))
+ }
+ 
+ async fn load_on(tx: &mut PgConnection, fence: WorkflowFence) -> AppResult<Option<Saved>> {
+diff --git a/src/adapters/persistence/workflow/harness_model_store_tests.rs b/src/adapters/persistence/workflow/harness_model_store_tests.rs
+index b8ec3d86..38f3f2e7 100644
+--- a/src/adapters/persistence/workflow/harness_model_store_tests.rs
++++ b/src/adapters/persistence/workflow/harness_model_store_tests.rs
+@@ -10,6 +10,9 @@ mod tokens;
+ #[path = "harness_model_fixture.rs"]
+ mod model_support;
+ 
++#[path = "checkpoint_authority_order_tests.rs"]
++mod authority_order;
++
+ fn model_request(reservation: &ModelReservation) -> WorkflowModelRequest {
+     WorkflowModelRequest {
+         reservation: reservation.clone(),
+diff --git a/src/adapters/persistence/workflow/sample_capture.rs b/src/adapters/persistence/workflow/sample_capture.rs
+index 234f2de4..5ad756a9 100644
+--- a/src/adapters/persistence/workflow/sample_capture.rs
++++ b/src/adapters/persistence/workflow/sample_capture.rs
+@@ -17,6 +17,10 @@ use crate::entities::agent_capability::AgentId;
+ use std::collections::BTreeMap;
+ use std::time::{Duration, Instant};
+ 
++#[cfg(test)]
++#[path = "sample_capture_bounds_tests.rs"]
++mod bounds;
++
+ pub struct SampleCapture {
+     pub persistence: PostgresPersistence,
+     pub http: Vec<http::HttpPublicationSelection>,
+@@ -100,7 +104,25 @@ impl SampleCapture {
+             .await?
+             .ok_or_else(missing)?;
+         check_draft(&state, target, expected)?;
++        let decoder = crate::adapters::workflow_source::WorkflowSourceDecoder;
++        let decoded = decoder
++            .decode(state.draft.source())
++            .map_err(|error| AppError::BadRequest(error.message.to_string()))?;
++        let parsed = crate::application::workflow::compiler::parse_workflow(
++            &decoded,
++            VersionId::new(Uuid::nil()),
++        )
++        .map_err(|error| AppError::BadRequest(error.message.to_string()))?;
+         let mut captured = message::message_builtins(target.company)?;
++        // Samples need the metadata used by their STEP consumers. Unused global
++        // message descriptors must not consume the declared agent universe budget.
++        captured.snapshots.tools.retain(|tool| {
++            parsed
++                .definition
++                .steps
++                .values()
++                .any(|step| step.step_type.as_str() == tool.contract.name.as_str())
++        });
+         captured
+             .snapshots
+             .tools
+@@ -111,10 +133,6 @@ impl SampleCapture {
+             .extend(mcp::capture_publication_on(tx, target.company, &self.mcp).await?);
+         agent_publication::capture_sample_agents_on(tx, &state.draft, &mut captured).await?;
+         let captured = child_publication::capture_on(tx, &state.draft, captured).await?;
+-        let decoder = crate::adapters::workflow_source::WorkflowSourceDecoder;
+-        let decoded = decoder
+-            .decode(state.draft.source())
+-            .map_err(|error| AppError::BadRequest(error.message.to_string()))?;
+         Ok(Arc::new(
+             compile_bundle(
+                 decoded,
+diff --git a/src/adapters/persistence/workflow/sample_capture_bounds_tests.rs b/src/adapters/persistence/workflow/sample_capture_bounds_tests.rs
+new file mode 100644
+index 00000000..7946d8aa
+--- /dev/null
++++ b/src/adapters/persistence/workflow/sample_capture_bounds_tests.rs
+@@ -0,0 +1,157 @@
++use super::*;
++use crate::application::agent::{
++    ActionEffect, ActionRecovery, ApprovedActionPolicy, ModelSettings, ResolvedAgentTool,
++};
++use crate::application::workflow::publication::{DependencySnapshots, ToolSnapshot, freeze};
++use crate::entities::agent_capability::{
++    AgentBindingId, AgentBindingSource, AgentToolAlias, AgentToolBinding,
++};
++use serde_json::{Value, json};
++
++fn name(value: &str) -> crate::domain::workflow::TypeName {
++    crate::domain::workflow::TypeName::parse(value).unwrap()
++}
++
++fn padded_workflow(company: CompanyId, index: u128) -> Arc<PublishedBundle> {
++    let mut source: Value =
++        serde_json::from_str(&registry::example("memory.save").unwrap().source).unwrap();
++    source["workflow_id"] = json!(Uuid::from_u128(1000 + index));
++    source["input_schema"] = json!({"type":"object"});
++    source["parameter_schema"] = json!({"type":"object"});
++    source["output_schema"] = json!({"type":"object"});
++    let tools = (0..24).map(|tool| ToolSnapshot {
++        company_id: company,
++        contract: registry::ToolContract {
++            name: name(&format!("padding_{tool}")), connection:None,
++            input_schema: json!({"type":"object","properties":{"value":{"type":"string","enum":["x".repeat(10_000)]}}}),
++            output_schema: json!({"type":"object"}),
++        },
++        policy: ApprovedActionPolicy { capability:name("http.request"),policy_revision:1,effect:ActionEffect::Read,recovery:ActionRecovery::SafeRepeat },
++        workflow:None,
++    }).collect();
++    Arc::new(
++        freeze(
++            crate::adapters::workflow_source::decode(&source.to_string()).unwrap(),
++            company,
++            VersionId::new(Uuid::from_u128(2000 + index)),
++            DependencySnapshots {
++                tools,
++                ..Default::default()
++            },
++            vec![],
++        )
++        .unwrap(),
++    )
++}
++
++fn root_workflow(company: CompanyId) -> Arc<PublishedBundle> {
++    let fixture = crate::application::workflow::fixtures::Fixture::AutonomousResponse;
++    let decoded =
++        crate::adapters::workflow_source::decode(&registry::example("agent.run").unwrap().source)
++            .unwrap();
++    let uses = crate::application::workflow::publication::agent_reference_uses(&decoded).unwrap();
++    let mut facts = fixture.snapshots(company);
++    for reference in &mut facts.agents {
++        reference.uses = uses[&reference.key].clone();
++    }
++    Arc::new(
++        freeze(
++            decoded,
++            company,
++            VersionId::new(Uuid::from_u128(100)),
++            facts,
++            vec![],
++        )
++        .unwrap(),
++    )
++}
++
++fn request(root: &PublishedBundle, children: &[Arc<PublishedBundle>]) -> SampleRequest {
++    let reference = &root.snapshots().agents[0];
++    let tools = children
++        .iter()
++        .enumerate()
++        .map(|(index, child)| {
++            let definition = child.compiled().graph().definition();
++            ResolvedAgentTool {
++                binding: AgentToolBinding {
++                    id: AgentBindingId::new(Uuid::from_u128(3000 + index as u128)),
++                    alias: AgentToolAlias::parse(format!("child_{index}")).unwrap(),
++                    source: AgentBindingSource::Workflow {
++                        registration: name(&format!("child_{index}")),
++                        workflow: definition.workflow_id,
++                        version: definition.version_id,
++                        params: json!({}),
++                    },
++                },
++                input_schema: definition.input_schema.clone().unwrap(),
++                output_schema: definition.output_schema.clone().unwrap(),
++                policy: ApprovedActionPolicy {
++                    capability: name("workflow.tool"),
++                    policy_revision: 1,
++                    effect: ActionEffect::Write,
++                    recovery: ActionRecovery::SafeRepeat,
++                },
++                approval_required: false,
++            }
++        })
++        .collect();
++    SampleRequest {
++        input:json!({}),params:json!({}),
++        agents:vec![ResolvedAgentDefinition { company_id:root.company_id(),agent_id:reference.agent_id,key:reference.key.clone(),instructions:"Bounded sample".into(),
++            model:ModelSettings {provider:name("test"),model:"sample".into(),max_output_tokens:1000},tools,skills:vec![] }],
++        scripts:serde_json::from_value(json!([{"workflow_id":root.compiled().graph().definition().workflow_id,"step":"start","responses":[{"output":"done"}]}])).unwrap(),
++    }
++}
++
++#[test]
++fn autonomous_agent_samples_workflow_payload_limit_covers_adapter_cache_and_sealed_input() {
++    let company = CompanyId::new(Uuid::from_u128(800));
++    let root = root_workflow(company);
++    let mut bytes = store_bundle(&root).unwrap().len();
++    let mut children = vec![];
++    for index in 1..=32 {
++        let child = padded_workflow(company, index);
++        let size = store_bundle(&child).unwrap().len();
++        assert!(size < MAX_AGENT_MANIFEST_BYTES);
++        children.push(child);
++        bytes += size;
++        if bytes > MAX_AGENT_MANIFEST_BYTES {
++            break;
++        }
++    }
++    assert!(bytes > MAX_AGENT_MANIFEST_BYTES);
++    let extra = children.pop().unwrap();
++    assert!(!children.is_empty());
++    let target = DefinitionTarget {
++        company,
++        actor: WorkflowActor::authenticated(Uuid::new_v4()).unwrap(),
++        workflow: root.compiled().graph().definition().workflow_id,
++    };
++    let mut cache = Closure::new(target, Instant::now() + Duration::from_secs(5));
++    cache.cache(root.clone()).unwrap();
++    for child in &children {
++        cache.cache(child.clone()).unwrap();
++    }
++    assert!(cache.workflow_bytes <= MAX_AGENT_MANIFEST_BYTES);
++    let error = cache.cache(extra.clone()).unwrap_err();
++    assert!(error.to_string().contains("4 MiB"), "{error}");
++    assert_eq!(cache.workflows.len(), children.len() + 1);
++
++    let sealed =
++        PreparedSample::new(root.clone(), request(&root, &children), children.clone()).unwrap();
++    let report = crate::application::workflow::sample::execute(sealed).unwrap();
++    assert_eq!(
++        report.status,
++        crate::application::workflow::sample::SampleStatus::Completed,
++        "{:?}",
++        report.diagnostic
++    );
++    assert_eq!(report.workflow_selections.len(), children.len() + 1);
++    assert!(report.effects.is_empty());
++    children.push(extra);
++    let error = PreparedSample::new(root.clone(), request(&root, &children), children)
++        .err()
++        .expect("aggregateworkflows must fail before sample execution");
++    assert!(error.to_string().contains("4 MiB"), "{error}");
++}
+diff --git a/src/application/workflow/sample/approval_tests.rs b/src/application/workflow/sample/approval_tests.rs
+new file mode 100644
+index 00000000..51e11d0e
+--- /dev/null
++++ b/src/application/workflow/sample/approval_tests.rs
+@@ -0,0 +1,118 @@
++use super::*;
++use crate::application::agent::{ModelSettings, ResolvedAgentDefinition, ResolvedAgentTool};
++use crate::entities::agent_capability::{
++    AgentBindingId, AgentBindingSource, AgentToolAlias, AgentToolBinding,
++};
++
++fn protected_request(
++    bundle: &Arc<PublishedBundle>,
++    tool: ResolvedAgentTool,
++    output: Option<Value>,
++) -> SampleRequest {
++    let reference = &bundle.snapshots().agents[0];
++    let mut request = request(vec![
++        script(1, "start", vec![json!("done")]),
++        script(2, "start", vec![json!({"saved_ids":["sample-only"]})]),
++    ]);
++    request.scripts[0].responses[0].tools = vec![ScriptedToolCall {
++        name: name(tool.binding.alias.as_str()),
++        input: json!({}),
++        output,
++    }];
++    request.agents = vec![ResolvedAgentDefinition {
++        company_id: bundle.company_id(),
++        agent_id: reference.agent_id,
++        key: reference.key.clone(),
++        instructions: "Test a protected canonical binding".into(),
++        model: ModelSettings {
++            provider: name("test"),
++            model: "sample".into(),
++            max_output_tokens: 1000,
++        },
++        tools: vec![tool],
++        skills: vec![],
++    }];
++    request
++}
++
++fn assert_explicit_approval(bundle: Arc<PublishedBundle>, request: SampleRequest) {
++    for approval in [None, Some(false), Some(true)] {
++        let mut request = request.clone();
++        request.scripts[0].responses[0].approval = approval;
++        let report = super::super::super::execute(
++            PreparedSample::new(bundle.clone(), request, vec![]).unwrap(),
++        )
++        .unwrap();
++        if approval == Some(true) {
++            complete(&report);
++            assert!(!report.effects.is_empty());
++        } else {
++            assert!(matches!(report.status, SampleStatus::Stopped));
++            assert!(report.diagnostic.unwrap().contains("approval:true"));
++            assert!(
++                report.effects.is_empty(),
++                "approval precedes the simulated effect"
++            );
++        }
++    }
++}
++
++#[test]
++fn autonomous_agent_samples_protected_http_binding_requires_explicit_simulated_approval() {
++    let bundle = build(
++        &source("agent.run"),
++        Fixture::AutonomousResponse.snapshots(company()),
++        vec![],
++    );
++    let tool = ResolvedAgentTool {
++        binding: AgentToolBinding {
++            id: AgentBindingId::new(Uuid::from_u128(501)),
++            alias: AgentToolAlias::parse("crm.write").unwrap(),
++            source: AgentBindingSource::Http {
++                connection: Uuid::from_u128(7),
++                operation: name("crm.write"),
++            },
++        },
++        input_schema: json!({"type":"object"}),
++        output_schema: json!({"type":"object"}),
++        policy: ApprovedActionPolicy {
++            capability: name("http.request"),
++            policy_revision: 1,
++            effect: ActionEffect::Write,
++            recovery: ActionRecovery::SafeRepeat,
++        },
++        approval_required: true,
++    };
++    let request = protected_request(&bundle, tool, Some(json!({})));
++    assert_explicit_approval(bundle, request);
++}
++
++#[test]
++fn autonomous_agent_samples_protected_child_binding_requires_explicit_simulated_approval() {
++    let bundle = tool_bundle();
++    let snapshot = bundle
++        .snapshots()
++        .tools
++        .iter()
++        .find(|tool| tool.contract.name.as_str() == "memory.child")
++        .unwrap();
++    let pin = snapshot.workflow.as_ref().unwrap();
++    let tool = ResolvedAgentTool {
++        binding: AgentToolBinding {
++            id: AgentBindingId::new(Uuid::from_u128(502)),
++            alias: AgentToolAlias::parse("memory.child").unwrap(),
++            source: AgentBindingSource::Workflow {
++                registration: snapshot.contract.name.clone(),
++                workflow: pin.workflow_id,
++                version: pin.version_id,
++                params: pin.params.clone(),
++            },
++        },
++        input_schema: snapshot.contract.input_schema.clone(),
++        output_schema: snapshot.contract.output_schema.clone(),
++        policy: snapshot.policy.clone(),
++        approval_required: true,
++    };
++    let request = protected_request(&bundle, tool, None);
++    assert_explicit_approval(bundle, request);
++}
+diff --git a/src/application/workflow/sample/dispatch.rs b/src/application/workflow/sample/dispatch.rs
+index ce17f79a..a37efc85 100644
+--- a/src/application/workflow/sample/dispatch.rs
++++ b/src/application/workflow/sample/dispatch.rs
+@@ -184,7 +184,7 @@ impl Session {
+                 return Err(refused("This model step is tool-free"));
+             }
+             approval(&activation.inputs, response.approval)?;
+-            self.agent_tools(bundle, frame, activation, path, response.tools)?;
++            self.agent_tools(bundle, frame, activation, path, &response)?;
+             self.charge(BudgetResource::ModelCall)?;
+         }
+         prepare_io(bundle, activation, response.output)
+@@ -254,7 +254,14 @@ fn human(
+     prepare_submission(bundle, activation, &command)
+ }
+ fn approval(inputs: &Value, approved: Option<bool>) -> AppResult<()> {
+-    if inputs.get("approval").is_some() && approved != Some(true) {
++    if inputs.get("approval").is_some() {
++        require_approval(approved)?;
++    }
++    Ok(())
++}
++
++pub(super) fn require_approval(approved: Option<bool>) -> AppResult<()> {
++    if approved != Some(true) {
+         return Err(refused(
+             "This protected request needs an explicit approval:true in its sample response",
+         ));
+diff --git a/src/application/workflow/sample/tools.rs b/src/application/workflow/sample/tools.rs
+index aa5e3597..ab6d85fe 100644
+--- a/src/application/workflow/sample/tools.rs
++++ b/src/application/workflow/sample/tools.rs
+@@ -27,7 +27,7 @@ impl Session {
+         frame: &Frame,
+         activation: &ActivatedExecution,
+         path: &SamplePath,
+-        calls: Vec<ScriptedToolCall>,
++        response: &ScriptedResponse,
+     ) -> AppResult<()> {
+         let key = activation
+             .inputs
+@@ -41,7 +41,7 @@ impl Session {
+             .get(&reference.agent_id)
+             .ok_or_else(|| refused("Sample agent definition is missing"))?
+             .clone();
+-        for (index, call) in calls.into_iter().enumerate() {
++        for (index, call) in response.tools.iter().enumerate() {
+             if self.report.usage.direct_tool_calls >= MAX_TOOL_CALLS {
+                 return Err(refused("Sample exceeds 64 direct tool calls"));
+             }
+@@ -51,6 +51,9 @@ impl Session {
+                 .iter()
+                 .find(|tool| tool.binding.alias.as_str() == call.name.as_str())
+                 .ok_or_else(|| refused("Scripted tool is not granted to this frozen agent"))?;
++            if tool.approval_required {
++                super::dispatch::require_approval(response.approval)?;
++            }
+             let mut snapshot = crate::application::workflow::agent_contract::agent_action_snapshot(
+                 bundle.company_id(),
+                 tool,
+@@ -67,8 +70,8 @@ impl Session {
+                 frame,
+                 &path.child(format!("tool-{}:{}", index + 1, call.name.as_str())),
+                 &snapshot,
+-                call.input,
+-                call.output,
++                call.input.clone(),
++                call.output.clone(),
+             )?;
+         }
+         Ok(())
+diff --git a/src/application/workflow/sample/tools_tests.rs b/src/application/workflow/sample/tools_tests.rs
+index 01d582f4..ea08acc1 100644
+--- a/src/application/workflow/sample/tools_tests.rs
++++ b/src/application/workflow/sample/tools_tests.rs
+@@ -1,5 +1,9 @@
+ use super::*;
+ use crate::application::agent::{ActionEffect, ActionRecovery, ApprovedActionPolicy};
++
++#[path = "approval_tests.rs"]
++mod approvals;
++
+ fn tool_bundle() -> Arc<PublishedBundle> {
+     let mut leaf = source("memory.save");
+     leaf["workflow_id"] = json!(Uuid::from_u128(2));

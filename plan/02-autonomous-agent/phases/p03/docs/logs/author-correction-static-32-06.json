@@ -1,0 +1,27 @@
+[
+  {
+    "log": "author-fmt-check-32.log",
+    "exit_code": 0,
+    "seconds": 2.14
+  },
+  {
+    "log": "author-diff-check-06.log",
+    "exit_code": 0,
+    "seconds": 0.01
+  },
+  {
+    "log": "author-sample-boundary-08.log",
+    "exit_code": 0,
+    "seconds": 0.03
+  },
+  {
+    "log": "author-sample-boundary-negative-09.log",
+    "exit_code": 0,
+    "seconds": 0.08
+  },
+  {
+    "log": "author-graft-build-06.log",
+    "exit_code": 0,
+    "seconds": 1.92
+  }
+]

@@ -1,0 +1,31 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+
+running 25 tests
+test adapters::http::routes::workflows::ui::authoring::tests::sample_tests::sample_direct_workflow_tool_child_and_message_have_zero_production_effects ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::sample_tests::autonomous_agent_samples_release_rechecks_admin_after_competing_role_revocation ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::sample_tests::autonomous_agent_samples_keep_old_capture_and_hash_after_draft_changes ... ok
+test adapters::persistence::workflow::agent_manifest::tests::autonomous_agent_admission_capacity_refuses_before_lookup_or_retaining_an_extra_member ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::sample_tests::sample_mcp_fixture_never_contacts_selected_endpoint_and_rejects_foreign_selection ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_admission::autonomous_agent_admission_competing_duplicates_and_publication_share_one_complete_selection ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_admission::autonomous_agent_admission_revisions_are_selected_at_admission_and_replay_before_activation ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_admission::autonomous_agent_authority_checkpoint_requires_the_exact_selected_agent_identity ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_graph::autonomous_agent_admission_cycle_refuses_atomically_but_model_only_is_a_leaf ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_graph::autonomous_agent_admission_combined_depth_is_bounded_across_agent_workflow_edges ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_graph::descendants::autonomous_agent_admission_descendant_keeps_the_parent_selection_after_new_publication ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::recovery::autonomous_agent_recovery_binding_revocation_preserves_unknown_effect ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::model_steps::workflow_model_steps_check_only_the_capabilities_they_use ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_graph::autonomous_agent_admission_node_limit_covers_the_complete_dynamic_universe ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::recovery::autonomous_agent_recovery_model_removal_preserves_unknown_effect ... ok
+test adapters::persistence::workflow::tests::mcp_tests::agent_tests::autonomous_agent_samples_mcp_without_slots_never_opens_the_server ... ok
+test adapters::persistence::workflow::tests::mcp_tests::agent_tests::autonomous_agent_dispatch_mcp_without_workflow_slot_and_replay ... ok
+test adapters::persistence::workflow::tests::mcp_tests::agent_tests::isolation::authority::autonomous_agent_authority_mcp_binding_revocation_during_discovery_has_no_effect ... ok
+test adapters::persistence::workflow::tests::mcp_tests::agent_tests::isolation::authority::autonomous_agent_authority_mcp_credential_rotation_before_open_keeps_binding_and_replay ... ok
+test adapters::persistence::workflow::tests::mcp_tests::agent_tests::isolation::authority::autonomous_agent_recovery_mcp_cancellation_closes_session_and_preserves_one_possible_effect ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_registration_tests::closure::autonomous_agent_admission_checks_resources_of_agent_owned_child_workflows ... ok
+test application::workflow::actions::tests::autonomous_agent_dispatch_origin_is_part_of_effect_identity_and_has_no_default ... ok
+test adapters::persistence::workflow::tests::mcp_tests::agent_tests::isolation::autonomous_agent_dispatch_same_alias_keeps_two_connections_origins_and_receipts_isolated ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_registration_tests::references::autonomous_agent_admission_rejects_a_newly_published_self_workflow_binding ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_revocation_tests::current_authority::autonomous_agent_authority_workflow_repoint_requires_new_binding_publication ... ok
+
+test result: ok. 25 passed; 0 failed; 0 ignored; 0 measured; 2945 filtered out; finished in 8.69s
+

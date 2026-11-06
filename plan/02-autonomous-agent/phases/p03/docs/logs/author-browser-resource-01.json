@@ -1,0 +1,8 @@
+{
+  "resource": "/Users/mac02/dev/openbot-recovery/.worktrees/autonomous-p03-browser-1193-jiexgad5",
+  "browser": "/Users/mac02/dev/openbot-recovery/.worktrees/autonomous-p03-browser-1193-jiexgad5/extracted/chrome-mac/headless_shell",
+  "revision": 1193,
+  "archive_sha256": "412e3b12e4479d93965c638a7a7415ceb44c1eab7241363e36bfe57d70704926",
+  "extraction": "system unzip",
+  "recorded_at": "2026-11-06T10:32:03.043492+00:00"
+}

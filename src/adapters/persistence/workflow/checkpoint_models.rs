@@ -19,7 +19,9 @@ pub(super) async fn reserve_on(
         return Ok(End::Rollback(Admission::OwnershipLost));
     }
     // Revocation linearizes against admission: checked under authority locks.
-    authorize_on(tx, write.fence).await?;
+    if authorize_on(tx, write.fence).await?.is_none() {
+        return Ok(End::Rollback(Admission::OwnershipLost));
+    }
     if !lock_owner(tx, write.fence, bound).await? {
         return Ok(End::Rollback(Admission::OwnershipLost));
     }

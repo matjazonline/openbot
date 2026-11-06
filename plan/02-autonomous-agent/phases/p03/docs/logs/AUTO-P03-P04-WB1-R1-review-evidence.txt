@@ -1,0 +1,439 @@
+
+src/adapters/persistence/workflow/checkpoint_updates.rs:4-18
+4: pub(super) async fn update_on(
+5:     tx: &mut Transaction<'_, Postgres>,
+6:     write: WorkflowCheckpointWrite,
+7:     update: WorkflowCheckpointUpdate,
+8:     bound: &WriteBound,
+9: ) -> AppResult<End<Outcome>> {
+10:     // A saved call is dispatched, or re-dispatched after approval, only under
+11:     // current agent/model authority; replay of the preparation rechecks it too.
+12:     if matches!(update, WorkflowCheckpointUpdate::PrepareInvocation(_)) {
+13:         authorize_on(tx, write.fence).await?;
+14:     }
+15:     if !lock_owner(tx, write.fence, bound).await? {
+16:         return Ok(End::Rollback(WriteOutcome::OwnershipLost));
+17:     }
+18:     let saved = load_on(tx, write.fence).await?.ok_or_else(missing)?;
+
+src/adapters/persistence/workflow/checkpoint_models.rs:11-27
+11: pub(super) async fn reserve_on(
+12:     tx: &mut Transaction<'_, Postgres>,
+13:     write: WorkflowCheckpointWrite,
+14:     request: &WorkflowModelRequest,
+15:     notices: Option<&crate::application::workflow::decisions::DecisionNotices>,
+16:     bound: &WriteBound,
+17: ) -> AppResult<End<Admission>> {
+18:     if !token_budget::prelock_reviewers(tx, write.fence.scope).await? {
+19:         return Ok(End::Rollback(Admission::OwnershipLost));
+20:     }
+21:     // Revocation linearizes against admission: checked under authority locks.
+22:     authorize_on(tx, write.fence).await?;
+23:     if !lock_owner(tx, write.fence, bound).await? {
+24:         return Ok(End::Rollback(Admission::OwnershipLost));
+25:     }
+26:     let saved = load_on(tx, write.fence).await?.ok_or_else(missing)?;
+27:     let current = decode(saved.id, saved.checkpoint.clone())?;
+
+src/adapters/persistence/workflow/checkpoints.rs:268-294
+268: async fn lock_owner(
+269:     tx: &mut Transaction<'_, Postgres>,
+270:     fence: WorkflowFence,
+271:     bound: &WriteBound,
+272: ) -> AppResult<bool> {
+273:     let scope = ActionScope {
+274:         company: fence.scope.company,
+275:         run: fence.scope.run,
+276:         execution: fence.scope.execution,
+277:     };
+278:     let Some(actor) = action_authority::prelock_on(tx, scope).await? else {
+279:         return Ok(false);
+280:     };
+281:     if !lease::lock_fence(tx, fence, bound.server_timeout()).await? {
+282:         return Ok(false);
+283:     }
+284:     let current: Uuid =
+285:         sqlx::query_scalar("SELECT actor_id FROM workflow_runs WHERE company_id=$1 AND id=$2")
+286:             .bind(scope.company.as_uuid())
+287:             .bind(scope.run.as_uuid())
+288:             .fetch_one(&mut **tx)
+289:             .await?;
+290:     Ok(current == actor.user_id()
+291:         && lease::live_window(tx, fence, bound.started())
+292:             .await?
+293:             .is_some())
+294: }
+
+src/adapters/persistence/workflow/checkpoints.rs:310-332
+310: async fn authorize_on(tx: &mut PgConnection, fence: WorkflowFence) -> AppResult<()> {
+311:     let prepared: Value = sqlx::query_scalar(
+312:         "SELECT workflow_prepared FROM task_harness_runs WHERE company_id=$1
+313:           AND workflow_run_id=$2 AND workflow_execution_id=$3 AND task_id=$4",
+314:     )
+315:     .bind(fence.scope.company.as_uuid())
+316:     .bind(fence.scope.run.as_uuid())
+317:     .bind(fence.scope.execution.as_uuid())
+318:     .bind(fence.scope.job.0)
+319:     .fetch_optional(&mut *tx)
+320:     .await?
+321:     .ok_or_else(missing)?;
+322:     super::agent_preparation::current_on(
+323:         tx,
+324:         crate::application::workflow::actions::ActionScope {
+325:             company: fence.scope.company,
+326:             run: fence.scope.run,
+327:             execution: fence.scope.execution,
+328:         },
+329:         &prepared,
+330:     )
+331:     .await
+332: }
+
+src/adapters/persistence/workflow/agent_preparation.rs:16-43
+16: pub(in crate::adapters::persistence::workflow) async fn current_on(
+17:     db: &mut PgConnection,
+18:     scope: crate::application::workflow::actions::ActionScope,
+19:     prepared: &Value,
+20: ) -> AppResult<()> {
+21:     let identity: crate::application::workflow::agent_contract::AgentSelectionIdentity =
+22:         serde_json::from_value(prepared["selection"].clone()).map_err(|_| invalid())?;
+23:     let (actor, bundle): (Uuid, Vec<u8>) = sqlx::query_as(
+24:         "SELECT run.actor_id,stored.bundle FROM workflow_runs AS run JOIN workflow_bundles AS stored ON stored.company_id=run.company_id AND stored.digest=run.bundle_digest WHERE run.company_id=$1 AND run.id=$2 AND octet_length(stored.bundle)<=$3"
+25:     ).bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(MAX_BUNDLE_BYTES as i32)
+26:         .fetch_optional(&mut *db).await?.ok_or_else(missing)?;
+27:     let actor = WorkflowActor::authenticated(actor).map_err(|_| invalid())?;
+28:     let bundle = restore_bundle(
+29:         &bundle,
+30:         &crate::adapters::workflow_source::WorkflowSourceDecoder,
+31:     )?;
+32:     let selection =
+33:         super::agent_manifest::execution_selection_on(db, scope, actor, &bundle).await?;
+34:     if selection.manifest_id() != identity.manifest
+35:         || selection.agent().agent_id != identity.agent
+36:         || selection.revision().id != identity.revision
+37:         || selection.revision().digest != identity.digest
+38:         || selection.mode() != identity.mode
+39:     {
+40:         return Err(invalid());
+41:     }
+42:     super::agent_authority::check_execution_on(db, scope, selection.agent(), identity.mode).await
+43: }
+
+src/adapters/persistence/workflow/action_authority.rs:33-74
+33: /// the run lock. Keep a denied authority distinct from operational errors so receipt
+34: /// return can still report known lost ownership before reporting access denial.
+35: pub(super) async fn prelock_on(
+36:     tx: &mut PgConnection,
+37:     scope: ActionScope,
+38: ) -> AppResult<Option<WorkflowActor>> {
+39:     let actor: Option<Uuid> =
+40:         sqlx::query_scalar("SELECT actor_id FROM workflow_runs WHERE company_id=$1 AND id=$2")
+41:             .bind(scope.company.as_uuid())
+42:             .bind(scope.run.as_uuid())
+43:             .fetch_optional(&mut *tx)
+44:             .await?;
+45:     let Some(actor) = actor else { return Ok(None) };
+46:     // Provisioning may act for a signed-in message author instead of the run owner.
+47:     // Both accounts precede the company lock; this hint never authorizes the effect.
+48:     let requester = super::provisioning::requester_on(tx, scope).await?;
+49:     let mut accounts = vec![actor];
+50:     if let Some(requester) = requester {
+51:         accounts.push(requester.user_id());
+52:     }
+53:     accounts.sort_unstable();
+54:     accounts.dedup();
+55:     let locked: Vec<Uuid> =
+56:         sqlx::query_scalar("SELECT id FROM users WHERE id=ANY($1) ORDER BY id FOR SHARE")
+57:             .bind(&accounts)
+58:             .fetch_all(&mut *tx)
+59:             .await?;
+60:     if !locked.contains(&actor) {
+61:         return Err(missing());
+62:     }
+63:     let actor = WorkflowActor::authenticated(actor)?;
+64:     match authority::authorize_company(tx, scope.company, actor).await {
+65:         Ok(_) => {
+66:             if super::provisioning::requester_on(tx, scope).await? != requester {
+67:                 return Err(conflict());
+68:             }
+69:             Ok(Some(actor))
+70:         }
+71:         Err(AppError::NotFound(_)) => Ok(None),
+72:         Err(error) => Err(error),
+73:     }
+74: }
+
+src/adapters/persistence/workflow/authority.rs:45-81
+45: pub(crate) async fn authorize_company(
+46:     db: &mut PgConnection,
+47:     company: CompanyId,
+48:     actor: WorkflowActor,
+49: ) -> AppResult<crate::entities::access_level::LevelActor> {
+50:     use crate::adapters::persistence::participant::{membership_from_db, reader_level};
+51:     use crate::entities::access_level::LevelActor;
+52:     let owner: Uuid =
+53:         sqlx::query_scalar("SELECT user_id FROM companies WHERE id = $1 FOR NO KEY UPDATE")
+54:             .bind(company.as_uuid())
+55:             .fetch_optional(&mut *db)
+56:             .await?
+57:             .ok_or_else(missing)?;
+58:     #[derive(sqlx::FromRow)]
+59:     struct MemberAuthority {
+60:         role: String,
+61:         access_level: i16,
+62:     }
+63:     let facts=sqlx::query_as::<_,MemberAuthority>(
+64:         "SELECT member.role, member.access_level::smallint AS access_level FROM company_members AS member \
+65:          JOIN principals AS principal ON principal.company_id=member.company_id AND principal.user_id=member.user_id \
+66:          WHERE member.company_id=$1 AND member.user_id=$2 AND principal.kind='person' \
+67:          FOR SHARE OF member,principal")
+68:         .bind(company.as_uuid()).bind(actor.user_id()).fetch_optional(db).await?.ok_or_else(missing)?;
+69:     let membership = membership_from_db(Some(&facts.role))?;
+70:     if membership.is_owner() != (owner == actor.user_id()) {
+71:         return Err(invalid());
+72:     }
+73:     let access_level = reader_level(actor.user_id(), membership, Some(facts.access_level))?;
+74:     if !membership.manages_company_operations() {
+75:         return Err(missing());
+76:     }
+77:     Ok(LevelActor {
+78:         membership,
+79:         access_level,
+80:     })
+81: }
+
+src/adapters/persistence/workflow/agent_authority.rs:49-91
+49: pub(super) async fn check_definition_on(
+50:     tx: &mut PgConnection,
+51:     definition: &ResolvedAgentDefinition,
+52:     mode: AgentUseMode,
+53: ) -> AppResult<()> {
+54:     let company = definition.company_id;
+55:     let agent = definition.agent_id.as_uuid();
+56:     sqlx::query_scalar::<_, Uuid>("SELECT id FROM agents WHERE company_id=$1 AND id=$2 FOR SHARE")
+57:         .bind(company.as_uuid())
+58:         .bind(agent)
+59:         .fetch_optional(&mut *tx)
+60:         .await?
+61:         .ok_or_else(revoked)?;
+62:     let available: bool = sqlx::query_scalar(
+63:         "SELECT CASE WHEN cardinality(models) BETWEEN 1 AND $4 THEN $3=ANY(models) ELSE FALSE END \
+64:          FROM company_model_connections WHERE company_id=$1 AND provider=$2 FOR SHARE",
+65:     )
+66:     .bind(company.as_uuid())
+67:     .bind(definition.model.provider.as_str())
+68:     .bind(&definition.model.model)
+69:     .bind(crate::use_cases::company::MAX_MODELS_PER_CONNECTION as i32)
+70:     .fetch_optional(&mut *tx)
+71:     .await?
+72:     .ok_or_else(revoked)?;
+73:     if !available {
+74:         return Err(revoked());
+75:     }
+76:     if mode == AgentUseMode::ModelOnly {
+77:         return Ok(());
+78:     }
+79:     let ordered = super::super::agent_publication::tools::ordered_bindings(
+80:         definition.tools.iter().map(|tool| &tool.binding),
+81:     );
+82:     for binding in ordered {
+83:         let tool = definition
+84:             .tools
+85:             .iter()
+86:             .find(|tool| tool.binding.id == binding.id)
+87:             .ok_or_else(invalid)?;
+88:         check_source_on(tx, company, tool).await?;
+89:     }
+90:     check_grants_on(tx, definition).await
+91: }
+
+src/adapters/persistence/agent_publication/mod.rs:50-69
+50:     pub(in crate::adapters::persistence) async fn lock(
+51:         tx: &'a mut Transaction<'db, Postgres>,
+52:         scope: AgentPublicationScope,
+53:     ) -> AppResult<Self> {
+54:         sqlx::query_scalar::<_, Uuid>("SELECT id FROM users WHERE id=$1 FOR SHARE")
+55:             .bind(scope.actor.user_id())
+56:             .fetch_optional(&mut **tx)
+57:             .await?
+58:             .ok_or_else(missing)?;
+59:         super::workflow::authority::authorize_company(tx, scope.company, scope.actor).await?;
+60:         sqlx::query_scalar::<_, Uuid>(
+61:             "SELECT id FROM agents WHERE company_id=$1 AND id=$2 FOR UPDATE",
+62:         )
+63:         .bind(scope.company.as_uuid())
+64:         .bind(scope.agent.as_uuid())
+65:         .fetch_optional(&mut **tx)
+66:         .await?
+67:         .ok_or_else(missing)?;
+68:         Ok(Self { tx, scope })
+69:     }
+
+src/application/workflow/sample/tools.rs:24-75
+24:     pub(super) fn agent_tools(
+25:         &mut self,
+26:         bundle: &Arc<PublishedBundle>,
+27:         frame: &Frame,
+28:         activation: &ActivatedExecution,
+29:         path: &SamplePath,
+30:         calls: Vec<ScriptedToolCall>,
+31:     ) -> AppResult<()> {
+32:         let key = activation
+33:             .inputs
+34:             .get("agent")
+35:             .and_then(Value::as_str)
+36:             .and_then(AgentKey::parse)
+37:             .ok_or_else(|| refused("Invalid frozen agent selection"))?;
+38:         let reference = bundle.agent_reference(bundle.company_id(), &key)?;
+39:         let agent = self
+40:             .agents
+41:             .get(&reference.agent_id)
+42:             .ok_or_else(|| refused("Sample agent definition is missing"))?
+43:             .clone();
+44:         for (index, call) in calls.into_iter().enumerate() {
+45:             if self.report.usage.direct_tool_calls >= MAX_TOOL_CALLS {
+46:                 return Err(refused("Sample exceeds 64 direct tool calls"));
+47:             }
+48:             self.report.usage.direct_tool_calls += 1;
+49:             let tool = agent
+50:                 .tools
+51:                 .iter()
+52:                 .find(|tool| tool.binding.alias.as_str() == call.name.as_str())
+53:                 .ok_or_else(|| refused("Scripted tool is not granted to this frozen agent"))?;
+54:             let mut snapshot = crate::application::workflow::agent_contract::agent_action_snapshot(
+55:                 bundle.company_id(),
+56:                 tool,
+57:             )?;
+58:             if matches!(
+59:                 tool.binding.source,
+60:                 crate::entities::agent_capability::AgentBindingSource::Mcp { .. }
+61:             ) {
+62:                 snapshot.contract.output_schema =
+63:                     super::super::registry::mcp_tool_result(&snapshot.contract.output_schema);
+64:             }
+65:             self.tool(
+66:                 bundle,
+67:                 frame,
+68:                 &path.child(format!("tool-{}:{}", index + 1, call.name.as_str())),
+69:                 &snapshot,
+70:                 call.input,
+71:                 call.output,
+72:             )?;
+73:         }
+74:         Ok(())
+75:     }
+
+src/application/workflow/sample/dispatch.rs:172-193
+172:     fn model(
+173:         &mut self,
+174:         bundle: &Arc<PublishedBundle>,
+175:         frame: &Frame,
+176:         activation: &ActivatedExecution,
+177:         path: &SamplePath,
+178:         model: ModelStep,
+179:         response: ScriptedResponse,
+180:     ) -> AppResult<PureCompletion> {
+181:         self.charge_model_tokens(response.tokens)?;
+182:         if !response.tools.is_empty() {
+183:             if !model.uses_capabilities() {
+184:                 return Err(refused("This model step is tool-free"));
+185:             }
+186:             approval(&activation.inputs, response.approval)?;
+187:             self.agent_tools(bundle, frame, activation, path, response.tools)?;
+188:             self.charge(BudgetResource::ModelCall)?;
+189:         }
+190:         prepare_io(bundle, activation, response.output)
+191:     }
+192:     fn charge_model_tokens(&mut self, scripted_tokens: u32) -> AppResult<()> {
+193:         self.charge(BudgetResource::ModelCall)?;
+
+src/application/workflow/sample/dispatch.rs:256-263
+256: fn approval(inputs: &Value, approved: Option<bool>) -> AppResult<()> {
+257:     if inputs.get("approval").is_some() && approved != Some(true) {
+258:         return Err(refused(
+259:             "This protected request needs an explicit approval:true in its sample response",
+260:         ));
+261:     }
+262:     Ok(())
+263: }
+
+src/adapters/persistence/workflow/autonomous_agent_storage_manifest_tests.rs:70-120
+70: async fn autonomous_agent_storage_manifest_retention_races_preserve_surviving_revisions() {
+71:     let (f, scopes) = super::native_runs::unsealed_chain().await;
+72:     let agent = new_agent(&f, Vec::new()).await;
+73:     let revision = save_revision(&f, &definition(&f, agent.id, Vec::new())).await;
+74:     let manifest = save_manifest(
+75:         &f,
+76:         &manifest_for(&f, scopes[0].run, agent.id, revision).await,
+77:     )
+78:     .await;
+79:     attach_run(&f, scopes[1].run, scopes[0].run, manifest)
+80:         .await
+81:         .unwrap();
+82:     usage(&f, scopes[1], Some("reported")).await;
+83:     let survivor = super::native_runs::unsealed_root(&f, "surviving-root").await;
+84:     let survivor_manifest = save_manifest(
+85:         &f,
+86:         &manifest_for(&f, survivor.run, agent.id, revision).await,
+87:     )
+88:     .await;
+89:     let live_root = RetentionRoot {
+90:         company: survivor.company,
+91:         run: survivor.run,
+92:         finished_at: Utc::now() - Duration::days(91),
+93:     };
+94:     assert_eq!(f.persistence().retire_tree(live_root).await.unwrap(), None);
+95:     let root = old(&f, scopes[0]).await;
+96:     let (left, right) = tokio::join!(
+97:         f.persistence().retire_tree(root),
+98:         f.persistence().retire_tree(root)
+99:     );
+100:     assert_eq!(
+101:         usize::from(left.unwrap().is_some()) + usize::from(right.unwrap().is_some()),
+102:         1
+103:     );
+104:     assert_eq!(count(&f, "agent_dependency_manifests").await, 1);
+105:     let remaining: Uuid = sqlx::query_scalar("SELECT id FROM agent_dependency_manifests")
+106:         .fetch_one(f.persistence().pool())
+107:         .await
+108:         .unwrap();
+109:     assert_eq!(remaining, survivor_manifest);
+110:     assert_eq!(count(&f, "agent_revisions").await, 1);
+111:     assert_eq!(count(&f, "model_usage_history").await, 1);
+112:     assert_eq!(count(&f, "run_dependency_manifests").await, 1);
+113:     sqlx::query("DELETE FROM companies WHERE id=$1")
+114:         .bind(f.binding.target.company.as_uuid())
+115:         .execute(f.persistence().pool())
+116:         .await
+117:         .unwrap();
+118:     assert_eq!(count(&f, "agent_dependency_manifests").await, 0);
+119:     assert_eq!(count(&f, "agent_revisions").await, 0);
+120: }
+
+Compiled sample test inventory (listing only, not execution):
+adapters::http::pages::dashboard::tests::infrastructure_panels_are_operator_only_and_missing_samples_render_safely: test
+adapters::http::routes::workflows::ui::authoring::tests::jev_tests::workflow_authoring_jev_catalogue_binding_and_sample: test
+adapters::http::routes::workflows::ui::authoring::tests::sample_tests::autonomous_agent_samples_keep_old_capture_and_hash_after_draft_changes: test
+adapters::http::routes::workflows::ui::authoring::tests::sample_tests::autonomous_agent_samples_release_rechecks_admin_after_competing_role_revocation: test
+adapters::http::routes::workflows::ui::authoring::tests::sample_tests::sample_direct_workflow_tool_child_and_message_have_zero_production_effects: test
+adapters::http::routes::workflows::ui::authoring::tests::sample_tests::sample_mcp_fixture_never_contacts_selected_endpoint_and_rejects_foreign_selection: test
+adapters::http::routes::workflows::ui::authoring::tests::sample_tests::samples_authorize_tenant_revision_and_preserve_invalid_hostile_text: test
+adapters::persistence::runtime_metrics::tests::pruning_takes_every_machines_old_samples_and_keeps_their_recent_ones: test
+adapters::persistence::runtime_metrics::tests::runtime_samples_round_trip_and_fill_dashboard_buckets: test
+adapters::persistence::workflow::tests::mcp_tests::agent_tests::autonomous_agent_samples_mcp_without_slots_never_opens_the_server: test
+application::services::runtime_metrics::tests::sampler_uses_ten_second_cadence_and_joins_on_shutdown: test
+application::workflow::sample::tests::bounded_root_budget_and_external_kinds_never_fall_back: test
+application::workflow::sample::tests::descendants_cannot_replenish_root_budgets_and_report_size_is_bounded: test
+application::workflow::sample::tests::jev_tests::jev_box_sample_rejects_tools_tokens_and_invalid_box: test
+application::workflow::sample::tests::jev_tests::jev_box_sample_uses_only_scripted_answers_and_inert_metadata: test
+application::workflow::sample::tests::jev_tests::workflow_sample_jev_mixed_thresholds_automatic_and_human_paths: test
+application::workflow::sample::tests::missing_invalid_unused_and_oversized_scripts_fail_explicitly: test
+application::workflow::sample::tests::pure_and_scripted_routing_share_compiled_validation: test
+application::workflow::sample::tests::repeated_human_revision_carries_edited_artifact_feedback_and_captures_reply: test
+application::workflow::sample::tests::tools_tests::direct_agent_tools_and_pinned_workflow_tools_stay_in_sample: test
+application::workflow::sample::tests::tools_tests::direct_mcp_tool_uses_the_production_result_envelope: test
+application::workflow::sample::tests::tools_tests::direct_tool_inputs_and_outputs_are_validated: test
+application::workflow::sample::tests::tools_tests::protected_step_workflow_tool_needs_approval_and_executes_child: test
+infra::runtime_metrics::tests::proc_stat_parser_and_delta_handle_first_sample_and_reset: test
+
+24 tests, 0 benchmarks

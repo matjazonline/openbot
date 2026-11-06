@@ -1,0 +1,14 @@
+[
+  {
+    "db": "open_bots",
+    "version": "20260817000000",
+    "source_sha384": "37ac0f9b192e04c5710d0e67fe236527f4184c418c33d457e8e8cf1dc6131e90036af424adf544f5d2d09a650a83aa91",
+    "matches_current": true
+  },
+  {
+    "db": "open_bots_test",
+    "version": "20260817000000",
+    "source_sha384": "37ac0f9b192e04c5710d0e67fe236527f4184c418c33d457e8e8cf1dc6131e90036af424adf544f5d2d09a650a83aa91",
+    "matches_current": true
+  }
+]

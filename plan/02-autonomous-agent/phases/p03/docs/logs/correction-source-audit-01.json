@@ -1,0 +1,22 @@
+{
+  "graft_calls": 7,
+  "graft_reported_saved": 11113,
+  "functions_over80": [
+    {
+      "file": "src/adapters/persistence/workflow/autonomous_agent_sample_closure_tests.rs",
+      "name": "autonomous_agent_samples_nested_aliases_and_model_only_leaf_keep_exact_sealed_configuration",
+      "start": 217,
+      "end": 331,
+      "lines": 115
+    }
+  ],
+  "file_lines": {
+    "src/adapters/persistence/workflow/checkpoint_authority_order_tests.rs": 142,
+    "src/application/workflow/sample/approval_tests.rs": 118,
+    "src/adapters/persistence/workflow/autonomous_agent_sample_closure_tests.rs": 331,
+    "src/adapters/persistence/workflow/autonomous_agent_sample_bounds_tests.rs": 228,
+    "src/adapters/persistence/workflow/sample_capture_bounds_tests.rs": 152,
+    "src/adapters/persistence/workflow/autonomous_agent_origin_fixture.rs": 201,
+    "src/adapters/persistence/workflow/autonomous_agent_origin_schema_tests.rs": 251
+  }
+}

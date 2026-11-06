@@ -11,6 +11,9 @@ use std::time::{Duration, Instant};
 
 mod capture;
 mod storage;
+#[cfg(test)]
+#[path = "capture_tests.rs"]
+mod tests;
 pub(super) use storage::{
     attach_child_on, execution_selection_on, persist_on, selected_on, workflow_bundle_on,
 };
@@ -28,6 +31,15 @@ fn refused() -> AppError {
     AppError::BadRequest(
         "Agent dependency graph is unavailable, cyclic or exceeds its limits".into(),
     )
+}
+
+fn check_selection_bound(count: usize) -> AppResult<()> {
+    if count > MAX_AGENT_DEPENDENCIES {
+        return Err(AppError::BadRequest(format!(
+            "A run may select at most {MAX_AGENT_DEPENDENCIES} agent and workflow definitions"
+        )));
+    }
+    Ok(())
 }
 
 /// The caller already owns the company serialization lock. No network work runs here.
@@ -81,17 +93,21 @@ pub(super) async fn capture_on(
 
 impl Closure {
     fn within_bound(&self) -> AppResult<()> {
-        if self.agents.len() + self.workflows.len() > MAX_AGENT_DEPENDENCIES {
-            return Err(AppError::BadRequest(format!(
-                "A run may select at most {MAX_AGENT_DEPENDENCIES} agent and workflow definitions"
-            )));
-        }
+        check_selection_bound(self.agents.len() + self.workflows.len())?;
         if Instant::now() >= self.deadline {
             return Err(AppError::Timeout(
                 "Agent dependency capture exceeded five seconds".into(),
             ));
         }
         Ok(())
+    }
+
+    fn check_node_capacity(&self, node: Node) -> AppResult<()> {
+        let selected = match node {
+            Node::Workflow(_, version) => self.workflows.contains_key(&version),
+            Node::Agent(agent, _) => self.agents.contains_key(&agent),
+        };
+        check_selection_bound(self.agents.len() + self.workflows.len() + usize::from(!selected))
     }
 
     async fn walk(&mut self, tx: &mut Transaction<'_, Postgres>, root: Node) -> AppResult<()> {
@@ -109,6 +125,9 @@ impl Closure {
         tx: &mut Transaction<'_, Postgres>,
         node: Node,
     ) -> AppResult<Vec<Node>> {
+        // Refuse a new selection before map insertion or an active-pointer lookup.
+        // Different use views of a selected agent do not consume another selection.
+        self.check_node_capacity(node)?;
         let children = match node {
             Node::Workflow(workflow, version) => self.workflow_edges(tx, workflow, version).await?,
             Node::Agent(agent, mode) => self.agent_edges(tx, agent, mode).await?,

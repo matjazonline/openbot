@@ -307,7 +307,10 @@ async fn live(tx: &mut PgConnection, fence: WorkflowFence, bound: &WriteBound) -
 
 /// Current agent/model authority for the immutable prepared selection, taken in the
 /// authority class before any local workflow lock. Missing preparation fails closed.
-async fn authorize_on(tx: &mut PgConnection, fence: WorkflowFence) -> AppResult<()> {
+async fn authorize_on(
+    tx: &mut PgConnection,
+    fence: WorkflowFence,
+) -> AppResult<Option<WorkflowActor>> {
     let prepared: Value = sqlx::query_scalar(
         "SELECT workflow_prepared FROM task_harness_runs WHERE company_id=$1
           AND workflow_run_id=$2 AND workflow_execution_id=$3 AND task_id=$4",
@@ -319,16 +322,18 @@ async fn authorize_on(tx: &mut PgConnection, fence: WorkflowFence) -> AppResult<
     .fetch_optional(&mut *tx)
     .await?
     .ok_or_else(missing)?;
-    super::agent_preparation::current_on(
-        tx,
-        crate::application::workflow::actions::ActionScope {
-            company: fence.scope.company,
-            run: fence.scope.run,
-            execution: fence.scope.execution,
-        },
-        &prepared,
-    )
-    .await
+    let scope = ActionScope {
+        company: fence.scope.company,
+        run: fence.scope.run,
+        execution: fence.scope.execution,
+    };
+    // The saved read holds no row lock. Publication owns account/company before
+    // agent rows; keep that order, then let callers take the local owner fence.
+    let Some(actor) = action_authority::prelock_on(tx, scope).await? else {
+        return Ok(None);
+    };
+    super::agent_preparation::current_on(tx, scope, &prepared).await?;
+    Ok(Some(actor))
 }
 
 async fn load_on(tx: &mut PgConnection, fence: WorkflowFence) -> AppResult<Option<Saved>> {

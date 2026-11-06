@@ -1,0 +1,60 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+
+running 28 tests
+test adapters::persistence::workflow::sample_capture::bounds::autonomous_agent_samples_workflow_payload_limit_covers_adapter_cache_and_sealed_input ... FAILED
+test adapters::http::routes::workflows::ui::authoring::tests::sample_tests::autonomous_agent_samples_release_rechecks_admin_after_competing_role_revocation ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::sample_tests::autonomous_agent_samples_keep_old_capture_and_hash_after_draft_changes ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::authority_order::autonomous_agent_authority_checkpoint_model_reservation_serializes_with_preview ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::authority_order::autonomous_agent_authority_checkpoint_saved_call_serializes_with_preview ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_admission::autonomous_agent_authority_checkpoint_requires_the_exact_selected_agent_identity ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_graph::samples::autonomous_agent_samples_nested_aliases_and_model_only_leaf_keep_exact_sealed_configuration ... FAILED
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_graph::samples::bounds::autonomous_agent_samples_aggregate_draft_bytes_are_bounded_without_publication ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_graph::samples::bounds::autonomous_agent_samples_draft_cycle_is_refused_without_activation_or_production_effects ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_graph::samples::bounds::autonomous_agent_samples_unique_draft_selections_accept_256_and_refuse_257 ... FAILED
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_graph::samples::bounds::autonomous_agent_samples_combined_capture_depth_accepts_32_and_refuses_34 ... ok
+test application::workflow::sample::tests::bounded_root_budget_and_external_kinds_never_fall_back ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::origin_schema::autonomous_agent_storage_action_origin_native_scope_selection_binding_and_content ... ok
+test application::workflow::sample::tests::jev_tests::jev_box_sample_rejects_tools_tokens_and_invalid_box ... ok
+test application::workflow::sample::tests::jev_tests::jev_box_sample_uses_only_scripted_answers_and_inert_metadata ... ok
+test application::workflow::sample::tests::jev_tests::workflow_sample_jev_mixed_thresholds_automatic_and_human_paths ... ok
+test application::workflow::sample::tests::missing_invalid_unused_and_oversized_scripts_fail_explicitly ... ok
+test application::workflow::sample::tests::pure_and_scripted_routing_share_compiled_validation ... ok
+test application::workflow::sample::tests::descendants_cannot_replenish_root_budgets_and_report_size_is_bounded ... ok
+test application::workflow::sample::tests::repeated_human_revision_carries_edited_artifact_feedback_and_captures_reply ... ok
+test application::workflow::sample::tests::tools_tests::approvals::autonomous_agent_samples_protected_http_binding_requires_explicit_simulated_approval ... ok
+test application::workflow::sample::tests::tools_tests::approvals::autonomous_agent_samples_protected_child_binding_requires_explicit_simulated_approval ... ok
+test application::workflow::sample::tests::tools_tests::direct_agent_tools_and_pinned_workflow_tools_stay_in_sample ... ok
+test application::workflow::sample::tests::tools_tests::direct_tool_inputs_and_outputs_are_validated ... ok
+test application::workflow::sample::tests::tools_tests::direct_mcp_tool_uses_the_production_result_envelope ... ok
+test application::workflow::sample::tests::tools_tests::protected_step_workflow_tool_needs_approval_and_executes_child ... ok
+test adapters::persistence::workflow::tests::mcp_tests::agent_tests::autonomous_agent_samples_mcp_without_slots_never_opens_the_server ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::origin_schema::autonomous_agent_storage_action_origin_populated_collector_and_company_cascade ... ok
+
+failures:
+
+---- adapters::persistence::workflow::sample_capture::bounds::autonomous_agent_samples_workflow_payload_limit_covers_adapter_cache_and_sealed_input stdout ----
+
+thread 'adapters::persistence::workflow::sample_capture::bounds::autonomous_agent_samples_workflow_payload_limit_covers_adapter_cache_and_sealed_input' (32751213) panicked at src/adapters/persistence/workflow/sample_capture_bounds_tests.rs:60:10:
+called `Result::unwrap()` on an `Err` value: Diagnostic { code: "publication.agent", message: "agent assistant: has missing or inconsistent source uses", field_path: "/steps/start/with/agent", span: SourceSpan { start: 250, end: 251, line: 1, column: 251 }, instance_path: None, schema_path: None }
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_graph::samples::autonomous_agent_samples_nested_aliases_and_model_only_leaf_keep_exact_sealed_configuration stdout ----
+
+thread 'adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_graph::samples::autonomous_agent_samples_nested_aliases_and_model_only_leaf_keep_exact_sealed_configuration' (32751258) panicked at src/adapters/persistence/workflow/autonomous_agent_sample_closure_tests.rs:217:5:
+assertion `left == right` failed: Some("Bad request: sample/start:1 (agent.run): Bad request: sample/start:1/tool-1:child/workflow-tool/start:1 (agent.run): Bad request: sample/start:1/tool-1:child/workflow-tool/start:1/tool-1:child/workflow-tool/start:1 (ai.classify): Bad request: Value does not match schema")
+  left: Stopped
+ right: Completed
+
+---- adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_graph::samples::bounds::autonomous_agent_samples_unique_draft_selections_accept_256_and_refuse_257 stdout ----
+
+thread 'adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_graph::samples::bounds::autonomous_agent_samples_unique_draft_selections_accept_256_and_refuse_257' (32751320) panicked at src/adapters/persistence/workflow/autonomous_agent_sample_bounds_tests.rs:142:10:
+called `Result::unwrap()` on an `Err` value: BadRequest("At most 256 workflow dependency selections are allowed")
+
+
+failures:
+    adapters::persistence::workflow::sample_capture::bounds::autonomous_agent_samples_workflow_payload_limit_covers_adapter_cache_and_sealed_input
+    adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_graph::samples::autonomous_agent_samples_nested_aliases_and_model_only_leaf_keep_exact_sealed_configuration
+    adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_graph::samples::bounds::autonomous_agent_samples_unique_draft_selections_accept_256_and_refuse_257
+
+test result: FAILED. 25 passed; 3 failed; 0 ignored; 0 measured; 2954 filtered out; finished in 4.69s
+

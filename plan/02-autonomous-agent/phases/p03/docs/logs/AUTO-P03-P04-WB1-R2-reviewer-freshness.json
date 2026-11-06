@@ -1,0 +1,34 @@
+{
+  "round": "AUTO-P03-P04-WB1-R2-N1",
+  "outcome": "PASS",
+  "scope": "Whole original03A+B/04A+B with necessary05C consumer integration; unaffected whole R1 coverage reused plus combined correction recheck",
+  "checked_at": "2026-11-06T12:21:40.453131+00:00",
+  "review_base": "dc35ee426d8f88abdaf40562027ae69ad66863eb",
+  "head": "499ef2879b29ac7530744aa6ab499f75724e6648",
+  "digest": "c2aee1f58aa2165ab3cf018541477627598a81c7f459e450b817075eb7f697d2",
+  "excludes": [
+    "plan/02-autonomous-agent/phases/p03/docs",
+    "plan/02-autonomous-agent/phases/p04/docs"
+  ],
+  "coordination_revision": 25,
+  "coordination_sha256": "a2b053edda2ad617558fe902acd18cb7f79205c539fce13e6c1a1f1b4155417b",
+  "authority_equals_pin": true,
+  "decision_addendum_sha256": "3ce2b6aef25509f59356a419951bd6cdb06aef0b1aa8d536c408828158c46768",
+  "fixed_findings": [
+    "AUTO-P03-P04-WB1-R1-F1",
+    "AUTO-P03-P04-WB1-R1-F2",
+    "AUTO-P03-P04-WB1-R1-F3",
+    "AUTO-P03-P04-WB1-R1-F4"
+  ],
+  "new_findings": [],
+  "independent_targeted_tests": {
+    "passed": 17,
+    "failed": 0,
+    "ignored": 0,
+    "seconds": 4.85
+  },
+  "independent_staged_diff_check": "PASS",
+  "source_authorship_by_reviewer": false,
+  "full_suite_run": false,
+  "later_phases_accepted": false
+}

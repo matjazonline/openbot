@@ -1,0 +1,22 @@
+base:   499ef2879b29ac7530744aa6ab499f75724e6648
+digest: c2aee1f58aa2165ab3cf018541477627598a81c7f459e450b817075eb7f697d2
+files:
+  src/adapters/persistence/workflow/agent_manifest/capture_tests.rs
+  src/adapters/persistence/workflow/agent_manifest/mod.rs
+  src/adapters/persistence/workflow/agent_runtime_tests.rs
+  src/adapters/persistence/workflow/autonomous_agent_graph_tests.rs
+  src/adapters/persistence/workflow/autonomous_agent_origin_fixture.rs
+  src/adapters/persistence/workflow/autonomous_agent_origin_schema_tests.rs
+  src/adapters/persistence/workflow/autonomous_agent_sample_bounds_tests.rs
+  src/adapters/persistence/workflow/autonomous_agent_sample_closure_tests.rs
+  src/adapters/persistence/workflow/checkpoint_authority_order_tests.rs
+  src/adapters/persistence/workflow/checkpoint_models.rs
+  src/adapters/persistence/workflow/checkpoint_updates.rs
+  src/adapters/persistence/workflow/checkpoints.rs
+  src/adapters/persistence/workflow/harness_model_store_tests.rs
+  src/adapters/persistence/workflow/sample_capture.rs
+  src/adapters/persistence/workflow/sample_capture_bounds_tests.rs
+  src/application/workflow/sample/approval_tests.rs
+  src/application/workflow/sample/dispatch.rs
+  src/application/workflow/sample/tools.rs
+  src/application/workflow/sample/tools_tests.rs
