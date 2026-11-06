@@ -21,7 +21,7 @@ impl<A: WorkflowAdmitter> WorkflowAdmitter for CrashAfterAdmission<A> {
 }
 
 /// An agent writes the report for the slot that came due.
-fn reporting_source() -> Value {
+pub(super) fn reporting_source() -> Value {
     json!({
         "format_version": 1,
         "workflow_id": Uuid::nil().to_string(),

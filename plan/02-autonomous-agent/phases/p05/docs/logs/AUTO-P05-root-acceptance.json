@@ -1,0 +1,14 @@
+{
+  "phase": "p05",
+  "accepted_in_phase": true,
+  "integrated": false,
+  "review_note": "AUTO-P05-WB1-R1-N1",
+  "digest": "414d408bd281c2be552264aa75534ad47639f3c461fb454031222e685f803a1a",
+  "review_base": "77a215858950ab3b18eebf65ab33efafb079e078",
+  "source_patch_sha256": "70743196a4b14efc2bee3c6947d091d50ce3c10a487aaf63ae7a2e6ffa43f20b",
+  "coordination_revision": 29,
+  "unresolved_findings": [],
+  "independent_current_tests": 12,
+  "scope": "original05A+B+C",
+  "full_suite": false
+}

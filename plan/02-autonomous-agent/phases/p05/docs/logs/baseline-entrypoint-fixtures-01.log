@@ -1,0 +1,26 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+
+running 2 tests
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::message_ingress_end_to_end_each_message_gets_its_own_run_and_reply ... FAILED
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::schedule_runtime_tests::schedule_end_to_end_a_due_slot_runs_its_workflow_once ... FAILED
+
+failures:
+
+---- adapters::persistence::workflow::tests::message_tests::ingress_tests::message_ingress_end_to_end_each_message_gets_its_own_run_and_reply stdout ----
+
+thread 'adapters::persistence::workflow::tests::message_tests::ingress_tests::message_ingress_end_to_end_each_message_gets_its_own_run_and_reply' (32827336) panicked at src/adapters/persistence/workflow/message_ingress_tests.rs:165:48:
+called `Result::unwrap()` on an `Err` value: Application(BadRequest("Agent assistant must be published in this company before a workflow can reference it"))
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- adapters::persistence::workflow::tests::message_tests::ingress_tests::schedule_runtime_tests::schedule_end_to_end_a_due_slot_runs_its_workflow_once stdout ----
+
+thread 'adapters::persistence::workflow::tests::message_tests::ingress_tests::schedule_runtime_tests::schedule_end_to_end_a_due_slot_runs_its_workflow_once' (32827337) panicked at src/adapters/persistence/workflow/message_ingress_tests.rs:165:48:
+called `Result::unwrap()` on an `Err` value: Application(BadRequest("Agent assistant must be published in this company before a workflow can reference it"))
+
+
+failures:
+    adapters::persistence::workflow::tests::message_tests::ingress_tests::message_ingress_end_to_end_each_message_gets_its_own_run_and_reply
+    adapters::persistence::workflow::tests::message_tests::ingress_tests::schedule_runtime_tests::schedule_end_to_end_a_due_slot_runs_its_workflow_once
+
+test result: FAILED. 0 passed; 2 failed; 0 ignored; 0 measured; 2982 filtered out; finished in 0.97s
+

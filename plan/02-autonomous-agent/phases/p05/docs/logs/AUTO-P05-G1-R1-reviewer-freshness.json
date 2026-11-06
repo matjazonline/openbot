@@ -1,0 +1,23 @@
+{
+  "round": "AUTO-P05-G1-R1-N1",
+  "outcome": "PASS",
+  "stage": "Architecture only",
+  "decision": "AUTO-P05-G1-D1 revision1",
+  "decision_sha256": "abe8c47129304ebee858ab427693559e126beb1f2cbe4bf953dd27c54f9a490f",
+  "checked_at": "2026-11-06T12:50:04.071428+00:00",
+  "phase_start": "77a215858950ab3b18eebf65ab33efafb079e078",
+  "review_base": "77a215858950ab3b18eebf65ab33efafb079e078",
+  "head": "77a215858950ab3b18eebf65ab33efafb079e078",
+  "branch": "autonomous/p05",
+  "digest": "4f0afbe9a8a78730361d2926fc9075f3260432494d4612b16b10b53365e3fa0f",
+  "excludes": [
+    "plan/02-autonomous-agent/phases/p05/docs"
+  ],
+  "coordination_revision": 28,
+  "coordination_sha256": "c11fcf727879a7e998ab46804fdf11cc35c91a2fe716fa5324c32debe89bd5a1",
+  "authority_equals_pin": true,
+  "findings": [],
+  "new_runtime_checks": false,
+  "source_authorship_by_reviewer": false,
+  "implementation_accepted": false
+}

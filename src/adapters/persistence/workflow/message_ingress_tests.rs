@@ -39,6 +39,9 @@ mod composition;
 #[path = "knowledge_e2e_tests.rs"]
 mod knowledge_e2e;
 
+#[path = "autonomous_agent_entrypoint_tests.rs"]
+mod autonomous_entrypoints;
+
 const CUSTOMER: &str = "customer@partner.test";
 
 /// The production engine and ingest over one company: a `support` channel the customer may
@@ -107,6 +110,7 @@ impl Deployment {
         )
         .await
         .unwrap();
+        fixture.publish_agent(agent.id).await;
         let llm = scripted_llm(turns).await;
         register_scripted_agent_base_url(agent.id, &llm.base_url);
         let config = Arc::new(AppConfig {

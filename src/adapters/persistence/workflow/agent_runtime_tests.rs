@@ -207,7 +207,8 @@ fn agent_runtime(
     WorkflowAgentRuntime::new(
         ProviderRegistry::standard().unwrap(),
         p.clone(),
-        AgentActionTools::new(Arc::new(http), Arc::new(mcp), Arc::new(message)),
+        AgentActionTools::new(Arc::new(http), Arc::new(mcp), Arc::new(message))
+            .with_workflow_tools(Arc::new(p.clone())),
         Some(notices(p)),
         lease(),
     )
@@ -878,6 +879,9 @@ async fn knowledge_run_level_model_continues_after_refused_http_tool_without_egr
 
 #[path = "autonomous_agent_admission_tests.rs"]
 mod autonomous_admission;
+
+#[path = "autonomous_agent_provisioning_tests.rs"]
+mod autonomous_provisioning;
 
 #[path = "autonomous_agent_graph_tests.rs"]
 mod autonomous_graph;

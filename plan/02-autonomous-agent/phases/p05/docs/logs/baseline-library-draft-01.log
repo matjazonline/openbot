@@ -1,0 +1,23 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+   Compiling open_bots v0.1.0 (/Users/mac02/dev/openbot-recovery/.worktrees/autonomous-p05)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1m 55s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-c19a0b960dacdcef)
+
+running 1 test
+test adapters::persistence::workflow::tests::autonomous_agent_provisioning_tests::autonomous_agent_provisioning_library_missing_local_tool_installs_an_unpublished_draft ... FAILED
+
+failures:
+
+---- adapters::persistence::workflow::tests::autonomous_agent_provisioning_tests::autonomous_agent_provisioning_library_missing_local_tool_installs_an_unpublished_draft stdout ----
+
+thread 'adapters::persistence::workflow::tests::autonomous_agent_provisioning_tests::autonomous_agent_provisioning_library_missing_local_tool_installs_an_unpublished_draft' (32824496) panicked at src/adapters/persistence/workflow/autonomous_agent_provisioning_tests.rs:68:10:
+portable library selection must allow local configuration before publication: BadRequest("Invalid skill assignment or missing required agent tool")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    adapters::persistence::workflow::tests::autonomous_agent_provisioning_tests::autonomous_agent_provisioning_library_missing_local_tool_installs_an_unpublished_draft
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 2983 filtered out; finished in 0.82s
+
+error: test failed, to rerun pass `--lib`

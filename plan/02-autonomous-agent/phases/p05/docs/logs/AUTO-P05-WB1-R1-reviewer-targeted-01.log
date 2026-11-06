@@ -1,0 +1,20 @@
+Command: ['scripts/test-network-isolation.sh', 'target/debug/deps/open_bots-c19a0b960dacdcef', 'autonomous_agent_provisioning_', 'autonomous_agent_entrypoints_', 'autonomous_agent_children_', 'library_builder_copy_', 'picking_a_library_agent_', 'message_ingress_end_to_end_', 'schedule_end_to_end_', '--test-threads=4']
+PG55605 owned p05; stock2MiB; missing DB bypass unset
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+
+running 12 tests
+test adapters::persistence::skill::tests::picking_a_library_agent_copies_its_skills_with_the_agent_and_channel ... ok
+test adapters::http::routes::agent::api_tests::library_builder_copy_keeps_its_grants_on_an_explicit_model ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::autonomous_provisioning::autonomous_agent_provisioning_failed_final_command_rolls_back_initial_revision_then_competing_retries_publish_once ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_provisioning::autonomous_agent_provisioning_library_install_failure_rolls_back_portable_skills_and_principal ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_provisioning::autonomous_agent_provisioning_library_missing_local_tool_installs_an_unpublished_draft ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_graph::descendants::tool_children::autonomous_agent_children_first_tool_child_keeps_root_selected_agent_and_workflow_after_publication_and_repin ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_provisioning::autonomous_agent_provisioning_library_requires_explicit_company_local_binding_before_publish ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::autonomous_entrypoints::autonomous_agent_entrypoints_messages_select_at_materialization_and_duplicate_processing_keeps_one_run ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::autonomous_entrypoints::autonomous_agent_entrypoints_manual_queues_exact_selection_and_replays_after_publication ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::autonomous_entrypoints::autonomous_agent_entrypoints_schedule_post_commit_crash_keeps_recorded_revision_and_next_occurrence_selects_new ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::schedule_runtime_tests::schedule_end_to_end_a_due_slot_runs_its_workflow_once ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::message_ingress_end_to_end_each_message_gets_its_own_run_and_reply ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 2979 filtered out; finished in 7.80s
+

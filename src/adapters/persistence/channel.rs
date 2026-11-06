@@ -525,17 +525,8 @@ impl LibraryAgentCopyPersistence for PostgresPersistence {
         prepare_library_agent_on(&mut tx, company_id, library_agent_id, &mut agent).await?;
         insert_agent_on(&mut tx, agent_id, Some(company_id), &agent).await?;
         create_agent_principal_on(&mut tx, company_id, agent_id, &agent.name).await?;
-        if agent.provider.is_some() && agent.model.is_some() {
-            super::agent_publication::publish_initial_on(
-                &mut tx,
-                crate::application::agent::AgentPublicationScope {
-                    company: crate::domain::workflow::CompanyId::new(company_id),
-                    actor,
-                    agent: crate::entities::agent_capability::AgentId::new(agent_id),
-                },
-            )
-            .await?;
-        }
+        // Library selection creates a draft so company-local tools can be configured
+        // before publication. Runnable assistant creation publishes on its own transaction.
         tx.commit().await.map_err(AppError::from)?;
         AgentPersistence::get_by_id(self, agent_id)
             .await?
@@ -544,7 +535,7 @@ impl LibraryAgentCopyPersistence for PostgresPersistence {
 }
 
 /// Copy a library definition into the company inside `tx`: its global skills become tenant-owned
-/// copies the agent is attached to, and its workflow tool grants come with it. A copy that grants
+/// copies the agent is attached to, and its portable builtin grants come with it. A copy that grants
 /// tools and would inherit its model gets the company default connection's first model, because a
 /// workflow runs an agent only on an explicit model (p08 D2.6).
 pub(crate) async fn prepare_library_agent_on(
@@ -585,7 +576,8 @@ pub(crate) async fn prepare_library_agent_on(
     }
     agent.skill_ids = copied_skill_ids;
 
-    // The definition's workflow tool grants come with it (p08 D2.6). A workflow runs an agent
+    // Library bindings are builtin-only; native scope constraints forbid tenant targets.
+    // A workflow runs an agent
     // only on an explicit model, so a copy that grants tools and would inherit gets the
     // company's default connection's first model, when it has a key.
     let mut bindings = super::agent_capability::bindings_on(tx, None, library_agent_id).await?;

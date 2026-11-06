@@ -1,0 +1,2 @@
+⬆ graft 0.28.0 → 0.28.1 available: run `graft upgrade` (restart your agent after).
+no hits for "prepare_admission" in 1233 indexed files. The pattern may be too specific — retry graft grep with a bare symbol name or short substring (drop the receiver, full signature, and regex anchors). All indexed code was searched; use raw grep -rn only for genuinely unindexed files (docs, configs, brand-new files)

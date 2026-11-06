@@ -1,0 +1,12 @@
+adapters::http::routes::workflows::ui::authoring::tests::sample_tests::autonomous_agent_samples_keep_old_capture_and_hash_after_draft_changes: test
+adapters::http::routes::workflows::ui::authoring::tests::sample_tests::autonomous_agent_samples_release_rechecks_admin_after_competing_role_revocation: test
+adapters::persistence::workflow::sample_capture::bounds::autonomous_agent_samples_workflow_payload_limit_covers_adapter_cache_and_sealed_input: test
+adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_graph::samples::autonomous_agent_samples_nested_aliases_and_model_only_leaf_keep_exact_sealed_configuration: test
+adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_graph::samples::bounds::autonomous_agent_samples_aggregate_draft_bytes_are_bounded_without_publication: test
+adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_graph::samples::bounds::autonomous_agent_samples_combined_capture_depth_accepts_32_and_refuses_34: test
+adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_graph::samples::bounds::autonomous_agent_samples_draft_cycle_is_refused_without_activation_or_production_effects: test
+adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_graph::samples::bounds::autonomous_agent_samples_message_steps_keep_metadata_and_generic_message_tools_stay_forbidden: test
+adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_graph::samples::bounds::autonomous_agent_samples_unique_draft_selections_accept_256_and_refuse_257: test
+adapters::persistence::workflow::tests::mcp_tests::agent_tests::autonomous_agent_samples_mcp_without_slots_never_opens_the_server: test
+application::workflow::sample::tests::tools_tests::approvals::autonomous_agent_samples_protected_child_binding_requires_explicit_simulated_approval: test
+application::workflow::sample::tests::tools_tests::approvals::autonomous_agent_samples_protected_http_binding_requires_explicit_simulated_approval: test

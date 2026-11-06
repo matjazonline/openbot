@@ -900,3 +900,6 @@ async fn provisioning_agent_reference_keeps_its_own_published_binding() {
 
 #[path = "knowledge_provisioning_tests.rs"]
 mod knowledge_provisioning_tests;
+
+#[path = "autonomous_agent_provisioning_atomic_tests.rs"]
+mod autonomous_provisioning;

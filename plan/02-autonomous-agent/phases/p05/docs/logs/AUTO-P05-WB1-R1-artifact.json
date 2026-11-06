@@ -1,0 +1,32 @@
+{
+  "phase": "p05",
+  "stage": "whole05A+B+C WB1 R1",
+  "start": "77a215858950ab3b18eebf65ab33efafb079e078",
+  "review_base": "77a215858950ab3b18eebf65ab33efafb079e078",
+  "digest": "414d408bd281c2be552264aa75534ad47639f3c461fb454031222e685f803a1a",
+  "exclusions": [
+    "plan/02-autonomous-agent/phases/p05/docs"
+  ],
+  "source_files": [
+    "src/adapters/persistence/channel.rs",
+    "src/adapters/persistence/workflow/agent_runtime_tests.rs",
+    "src/adapters/persistence/workflow/autonomous_agent_child_selection_tests.rs",
+    "src/adapters/persistence/workflow/message_ingress_tests.rs",
+    "src/adapters/persistence/workflow/provisioning_dispatch_tests.rs",
+    "src/adapters/persistence/workflow/schedule_runtime_tests.rs",
+    "src/adapters/persistence/workflow/autonomous_agent_children_tests.rs",
+    "src/adapters/persistence/workflow/autonomous_agent_entrypoint_tests.rs",
+    "src/adapters/persistence/workflow/autonomous_agent_provisioning_atomic_tests.rs",
+    "src/adapters/persistence/workflow/autonomous_agent_provisioning_tests.rs"
+  ],
+  "source_patch_sha256": "70743196a4b14efc2bee3c6947d091d50ce3c10a487aaf63ae7a2e6ffa43f20b",
+  "authority_revision": 29,
+  "coordination_pin_sha256": "51e842119a0b2a7641e65cd5231167cf06e418ee9fe4a83b11fb62b7c82088df",
+  "gate": "AUTO-P05-G1-R1-N1 PASS D1r1",
+  "tests": {
+    "required_families": 20,
+    "affected_regressions": 71,
+    "browser_protocols": 17
+  },
+  "source_frozen": true
+}

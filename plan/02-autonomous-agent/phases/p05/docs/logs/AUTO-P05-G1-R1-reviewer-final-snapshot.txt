@@ -1,0 +1,5 @@
+base:   77a215858950ab3b18eebf65ab33efafb079e078
+digest: 4f0afbe9a8a78730361d2926fc9075f3260432494d4612b16b10b53365e3fa0f
+files:
+  src/adapters/persistence/workflow/autonomous_agent_provisioning_tests.rs
+  src/adapters/persistence/workflow/tests.rs

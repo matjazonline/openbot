@@ -1,0 +1,13 @@
+{
+  "owner": "p05/root",
+  "port": 55605,
+  "pg_data": "/Users/mac02/dev/openbot-recovery/.worktrees/pg-autonomous-p05",
+  "socket": "/Users/mac02/dev/openbot-recovery/.worktrees/pg-autonomous-p05-socket",
+  "databases": [
+    "open_bots",
+    "open_bots_test"
+  ],
+  "target": "/Users/mac02/dev/openbot-recovery/.worktrees/autonomous-p05/target",
+  "env_mode": "0600",
+  "disposable": true
+}

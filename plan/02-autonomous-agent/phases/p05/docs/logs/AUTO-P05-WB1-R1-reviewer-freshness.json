@@ -1,0 +1,31 @@
+{
+  "round": "AUTO-P05-WB1-R1-N1",
+  "outcome": "PASS",
+  "scope": "Whole original05A+B+C implementation",
+  "checked_at": "2026-11-06T13:13:07.580764+00:00",
+  "phase_start": "77a215858950ab3b18eebf65ab33efafb079e078",
+  "review_base": "77a215858950ab3b18eebf65ab33efafb079e078",
+  "head": "77a215858950ab3b18eebf65ab33efafb079e078",
+  "branch": "autonomous/p05",
+  "digest": "414d408bd281c2be552264aa75534ad47639f3c461fb454031222e685f803a1a",
+  "excludes": [
+    "plan/02-autonomous-agent/phases/p05/docs"
+  ],
+  "source_patch_sha256": "70743196a4b14efc2bee3c6947d091d50ce3c10a487aaf63ae7a2e6ffa43f20b",
+  "decision": "AUTO-P05-G1-D1 revision1",
+  "decision_sha256": "abe8c47129304ebee858ab427693559e126beb1f2cbe4bf953dd27c54f9a490f",
+  "coordination_revision": 29,
+  "coordination_sha256": "51e842119a0b2a7641e65cd5231167cf06e418ee9fe4a83b11fb62b7c82088df",
+  "authority_equals_pin": true,
+  "findings": [],
+  "independent_targeted_tests": {
+    "passed": 12,
+    "failed": 0,
+    "ignored": 0,
+    "seconds": 7.8
+  },
+  "independent_staged_diff_check": "PASS",
+  "source_authorship_by_reviewer": false,
+  "full_suite_run": false,
+  "later06_07_accepted": false
+}

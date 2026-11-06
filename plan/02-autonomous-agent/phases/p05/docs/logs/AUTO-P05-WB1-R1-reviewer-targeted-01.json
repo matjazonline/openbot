@@ -1,0 +1,17 @@
+{
+  "command": [
+    "scripts/test-network-isolation.sh",
+    "target/debug/deps/open_bots-c19a0b960dacdcef",
+    "autonomous_agent_provisioning_",
+    "autonomous_agent_entrypoints_",
+    "autonomous_agent_children_",
+    "library_builder_copy_",
+    "picking_a_library_agent_",
+    "message_ingress_end_to_end_",
+    "schedule_end_to_end_",
+    "--test-threads=4"
+  ],
+  "start": "2026-11-06T13:10:17.667017+00:00",
+  "end": "2026-11-06T13:10:25.680315+00:00",
+  "exit": 0
+}

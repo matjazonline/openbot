@@ -1,0 +1,25 @@
+✔ library payload carries the agent's own fields and no retired runtime fields (1.298916ms)
+✔ accepted library writes show progress, prevent duplicate submits, and restore on failure (0.999458ms)
+✔ a late body read cannot remove preserved steps after a cancel or navigation (1663.238583ms)
+✔ an actual SSE disconnect reconciles and preserves an unfinished note and disclosure (932.5425ms)
+✔ a waiting parent refreshes a child badge on the child wakeup without reconnecting (636.696208ms)
+✔ board: two window reads completing out of order show the later choice (453.196458ms)
+✔ board: opening a run while a filter read is in flight keeps the chosen filters (1284.017625ms)
+✔ list: a wake-up during a filter read reads the new filter instead of undoing it (704.808333ms)
+✔ board: a filter change while a wake-up read is in flight wins (595.411083ms)
+✔ board: a burst of run events reads at most once per two seconds and shows the final state (7138.720125ms)
+✔ board: constant change still reads every two seconds and never starves (10807.791792ms)
+✔ phone: a stream-driven or polled pane reload leaves the reader on the list; opening a run still moves them (1324.747708ms)
+✔ board: reads slower than the interval never overlap and keep landing under constant change (12174.987416ms)
+✔ board: a run change during a filter read is read again after it, on the new leaf (4747.198542ms)
+✔ board: two quick filter changes do not leave the coalescer waiting for ever (2744.898375ms)
+✔ sample progress, failed request recovery and late navigation response use the requesting form (1249.655375ms)
+✔ actual sample textarea template preserves leading newlines for every raw JSON field (166.06675ms)
+ℹ tests 17
+ℹ suites 0
+ℹ pass 17
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 45945.022

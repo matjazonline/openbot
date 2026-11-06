@@ -1,0 +1,14 @@
+[
+  {
+    "database": "open_bots",
+    "expected_sha384": "37ac0f9b192e04c5710d0e67fe236527f4184c418c33d457e8e8cf1dc6131e90036af424adf544f5d2d09a650a83aa91",
+    "actual_sha384": "37ac0f9b192e04c5710d0e67fe236527f4184c418c33d457e8e8cf1dc6131e90036af424adf544f5d2d09a650a83aa91",
+    "match": true
+  },
+  {
+    "database": "open_bots_test",
+    "expected_sha384": "37ac0f9b192e04c5710d0e67fe236527f4184c418c33d457e8e8cf1dc6131e90036af424adf544f5d2d09a650a83aa91",
+    "actual_sha384": "37ac0f9b192e04c5710d0e67fe236527f4184c418c33d457e8e8cf1dc6131e90036af424adf544f5d2d09a650a83aa91",
+    "match": true
+  }
+]

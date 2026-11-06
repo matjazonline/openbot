@@ -1,6 +1,9 @@
 use super::*;
 use crate::application::workflow::{children::WorkflowChildren, completion::WorkflowCompletion};
 
+#[path = "autonomous_agent_children_tests.rs"]
+mod tool_children;
+
 #[tokio::test]
 async fn autonomous_agent_admission_descendant_keeps_the_parent_selection_after_new_publication() {
     let setup = Box::pin(agent_setup("http://127.0.0.1:1")).await;
