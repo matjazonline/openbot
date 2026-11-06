@@ -67,6 +67,15 @@ impl<'a, 'db> LockedAgentPublication<'a, 'db> {
         .ok_or_else(missing)?;
         Ok(Self { tx, scope })
     }
+    pub(in crate::adapters::persistence) async fn preview(self) -> AppResult<AgentPreview> {
+        let (draft_revision, definition) = capture::capture_on(self.tx, self.scope).await?;
+        let active_revision = storage::active_on(self.tx, self.scope).await?;
+        Ok(AgentPreview {
+            draft_revision,
+            active_revision,
+            definition,
+        })
+    }
     pub(in crate::adapters::persistence) async fn publish(
         self,
         request: &PublishAgent,

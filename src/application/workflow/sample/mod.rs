@@ -17,6 +17,10 @@ use std::sync::Arc;
 use uuid::Uuid;
 
 mod children;
+mod definitions;
+pub use definitions::{
+    PreparedSample, SampleAgentSelection, SampleConfigurationHash, SampleWorkflowSelection,
+};
 mod dispatch;
 mod tools;
 mod types;
@@ -32,6 +36,7 @@ struct Session {
         crate::entities::agent_capability::AgentId,
         crate::application::agent::ResolvedAgentDefinition,
     >,
+    workflows: BTreeMap<crate::domain::workflow::VersionId, Arc<PublishedBundle>>,
     scripts: BTreeMap<ScriptKey, VecDeque<ScriptedResponse>>,
     budget: RootBudgetLimits,
     report: SampleReport,
@@ -76,27 +81,20 @@ fn diagnostic(error: super::compiler::Diagnostic) -> AppError {
     refused(error.message)
 }
 
-pub fn execute(bundle: Arc<PublishedBundle>, request: SampleRequest) -> AppResult<SampleReport> {
-    let bytes = serde_json::to_vec(&request).map_err(|_| refused("Invalid sample request"))?;
-    if bytes.len() > MAX_SAMPLE_BYTES {
-        return Err(refused("Sample input and scripts exceed 256 KiB"));
-    }
-    if request.scripts.len() > MAX_SAMPLE_STEPS as usize {
-        return Err(refused("Sample exceeds 128 script keys"));
-    }
-    let mut agents = BTreeMap::new();
-    for agent in request.agents {
-        agent.validate()?;
-        if agent.company_id != bundle.company_id()
-            || agents.len() >= super::publication::MAX_DEPENDENCIES
-            || agents.insert(agent.agent_id, agent).is_some()
-        {
-            return Err(refused("Invalid sample agent definitions"));
-        }
-    }
+pub fn execute(sample: PreparedSample) -> AppResult<SampleReport> {
+    let PreparedSample {
+        root: bundle,
+        request,
+        agents,
+        workflows,
+        configuration_hash,
+        agent_selections,
+        workflow_selections,
+    } = sample;
     let scripts = script_queues(request.scripts)?;
     let mut session = Session {
         agents,
+        workflows,
         scripts,
         budget: bundle
             .compiled()
@@ -108,6 +106,9 @@ pub fn execute(bundle: Arc<PublishedBundle>, request: SampleRequest) -> AppResul
         report_bytes: 1024,
         report: SampleReport {
             content_hash: bundle.content_hash().clone(),
+            configuration_hash,
+            agent_selections,
+            workflow_selections,
             status: SampleStatus::Stopped,
             output: None,
             steps: vec![],
@@ -117,6 +118,12 @@ pub fn execute(bundle: Arc<PublishedBundle>, request: SampleRequest) -> AppResul
             diagnostic: None,
         },
     };
+    session.report_bytes = session.report_bytes.max(
+        serde_json::to_vec(&session.report)
+            .map_err(|_| refused("Invalid sample report"))?
+            .len()
+            .saturating_add(1024),
+    );
     let frame = Frame {
         input: request.input,
         params: request.params,
@@ -140,6 +147,13 @@ pub fn execute(bundle: Arc<PublishedBundle>, request: SampleRequest) -> AppResul
         Err(error) => session.report.diagnostic = Some(error.to_string()),
     }
     session.report.unused_responses = session.scripts.values().map(VecDeque::len).sum();
+    if serde_json::to_vec(&session.report)
+        .map_err(|_| refused("Invalid sample report"))?
+        .len()
+        > MAX_REPORT_BYTES
+    {
+        return Err(refused("Sample report exceeds 1 MiB"));
+    }
     Ok(session.report)
 }
 

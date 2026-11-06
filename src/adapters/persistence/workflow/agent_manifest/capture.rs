@@ -1,5 +1,4 @@
 use super::*;
-use crate::entities::agent_capability::AgentBindingSource;
 
 impl Closure {
     pub(super) async fn workflow_edges(
@@ -41,20 +40,9 @@ impl Closure {
             },
         )
         .await?;
-        let mut edges = BTreeSet::new();
-        for child in bundle.children().values() {
-            let definition = child.compiled().graph().definition();
-            edges.insert(Node::Workflow(
-                definition.workflow_id,
-                definition.version_id,
-            ));
-        }
-        for reference in &bundle.snapshots().agents {
-            for usage in &reference.uses {
-                edges.insert(Node::Agent(reference.agent_id, usage.mode));
-            }
-        }
-        Ok(edges.into_iter().collect())
+        Ok(crate::application::agent::dependency::workflow_edges(
+            &bundle,
+        ))
     }
 
     pub(super) async fn agent_edges(
@@ -87,21 +75,9 @@ impl Closure {
         .await?
         .ok_or_else(refused)?;
         super::super::agent_authority::check_definition_on(tx, &revision.definition, mode).await?;
-        if mode == AgentUseMode::ModelOnly {
-            return Ok(Vec::new());
-        }
-        Ok(revision
-            .definition
-            .tools
-            .iter()
-            .filter_map(|tool| match &tool.binding.source {
-                AgentBindingSource::Workflow {
-                    workflow, version, ..
-                } => Some(Node::Workflow(*workflow, *version)),
-                _ => None,
-            })
-            .collect::<BTreeSet<_>>()
-            .into_iter()
-            .collect())
+        Ok(crate::application::agent::dependency::agent_edges(
+            &revision.definition,
+            mode,
+        ))
     }
 }

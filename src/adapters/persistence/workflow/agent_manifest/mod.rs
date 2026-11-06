@@ -1,11 +1,12 @@
 //! Admission captures one closed identity graph; reconstruction never selects latest.
 use super::*;
+use crate::application::agent::dependency::{DependencyNode as Node, DependencyWalker};
 use crate::application::agent::{
     AgentPublicationScope, AgentRevisionSelection, DependencyManifest, MAX_AGENT_DEPENDENCIES,
-    MAX_AGENT_DEPENDENCY_DEPTH, WorkflowVersionSelection,
+    WorkflowVersionSelection,
 };
 use crate::entities::agent_capability::{AgentId, AgentRevisionId, DependencyManifestId};
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 use std::time::{Duration, Instant};
 
 mod capture;
@@ -14,19 +15,6 @@ pub(super) use storage::{
     attach_child_on, execution_selection_on, persist_on, selected_on, workflow_bundle_on,
 };
 
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-enum Node {
-    Workflow(WorkflowId, VersionId),
-    Agent(AgentId, AgentUseMode),
-}
-
-struct Frame {
-    node: Node,
-    children: Vec<Node>,
-    next: usize,
-    height: usize,
-}
-
 struct Closure {
     company: CompanyId,
     actor: WorkflowActor,
@@ -34,7 +22,6 @@ struct Closure {
     agents: BTreeMap<AgentId, AgentRevisionId>,
     workflows: BTreeMap<VersionId, WorkflowId>,
     deadline: Instant,
-    edges: usize,
 }
 
 fn refused() -> AppError {
@@ -56,7 +43,6 @@ pub(super) async fn capture_on(
         agents: BTreeMap::new(),
         workflows: BTreeMap::new(),
         deadline: Instant::now() + Duration::from_secs(5),
-        edges: 0,
     };
     sqlx::query("SELECT set_config('lock_timeout','1000ms',true),set_config('statement_timeout','5000ms',true)")
         .execute(&mut **tx).await?;
@@ -109,70 +95,25 @@ impl Closure {
     }
 
     async fn walk(&mut self, tx: &mut Transaction<'_, Postgres>, root: Node) -> AppResult<()> {
-        let mut done = BTreeMap::<Node, usize>::new();
-        let mut active = BTreeSet::new();
-        let mut stack = vec![self.frame(tx, root).await?];
-        active.insert(root);
-        while let Some(frame) = stack.last_mut() {
+        let mut walker = DependencyWalker::new(root);
+        while let Some(node) = walker.next()? {
             self.within_bound()?;
-            if frame.next == frame.children.len() {
-                let finished = stack.pop().ok_or_else(invalid)?;
-                active.remove(&finished.node);
-                done.insert(finished.node, finished.height);
-                if let Some(parent) = stack.last_mut() {
-                    parent.height = parent.height.max(finished.height + 1);
-                }
-                continue;
-            }
-            let child = frame.children[frame.next];
-            frame.next += 1;
-            if active.contains(&child) {
-                return Err(AppError::BadRequest(
-                    "Run dependencies contain an agent/workflow cycle".into(),
-                ));
-            }
-            if let Some(height) = done.get(&child) {
-                if stack.len() + height > MAX_AGENT_DEPENDENCY_DEPTH {
-                    return Err(AppError::BadRequest(format!(
-                        "Run dependency depth exceeds {MAX_AGENT_DEPENDENCY_DEPTH}"
-                    )));
-                }
-                let frame = stack.last_mut().ok_or_else(invalid)?;
-                frame.height = frame.height.max(height + 1);
-                continue;
-            }
-            if stack.len() >= MAX_AGENT_DEPENDENCY_DEPTH {
-                return Err(AppError::BadRequest(format!(
-                    "Run dependency depth exceeds {MAX_AGENT_DEPENDENCY_DEPTH}"
-                )));
-            }
-            if done.len() + active.len() >= MAX_AGENT_DEPENDENCIES * 2 {
-                return Err(refused());
-            }
-            active.insert(child);
-            stack.push(self.frame(tx, child).await?);
+            let children = self.edges_on(tx, node).await?;
+            walker.supply(node, children)?;
         }
-        Ok(())
+        self.within_bound()
     }
 
-    async fn frame(&mut self, tx: &mut Transaction<'_, Postgres>, node: Node) -> AppResult<Frame> {
+    async fn edges_on(
+        &mut self,
+        tx: &mut Transaction<'_, Postgres>,
+        node: Node,
+    ) -> AppResult<Vec<Node>> {
         let children = match node {
             Node::Workflow(workflow, version) => self.workflow_edges(tx, workflow, version).await?,
             Node::Agent(agent, mode) => self.agent_edges(tx, agent, mode).await?,
         };
-        self.edges = self.edges.saturating_add(children.len());
-        // Every workflow has <=256 children and <=256 references with two use modes;
-        // every agent has <=32 tools. Also bounds the work before deduplication.
-        const MAX_EDGES: usize = MAX_AGENT_DEPENDENCIES * (MAX_AGENT_DEPENDENCIES * 3 + 32);
-        if self.edges > MAX_EDGES {
-            return Err(refused());
-        }
         self.within_bound()?;
-        Ok(Frame {
-            node,
-            children,
-            next: 0,
-            height: 1,
-        })
+        Ok(children)
     }
 }

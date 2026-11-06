@@ -1,6 +1,5 @@
-//! 06-F019(h): an agent's approved MCP tool end to end. The agent names the tool; the
-//! workflow's bound MCP slot supplies the connection; ActionService dispatches it once and
-//! replay neither calls the model nor the MCP server again.
+//! Agent-owned concrete MCP bindings drive native execution and isolated samples.
+//! Native replay calls the effect once; samples never open the connection.
 use super::*;
 use crate::adapters::{
     harness::rig::{WorkflowAgentRuntime, providers::ProviderRegistry},
@@ -310,4 +309,81 @@ async fn refused_agent_calls(
             "injection {variant} must make no remote effect"
         );
     }
+}
+
+#[tokio::test]
+async fn autonomous_agent_samples_mcp_without_slots_never_opens_the_server() {
+    use crate::application::agent::AgentPublications;
+    use crate::application::workflow::sample::{SampleRequest, SampleStatus};
+    use crate::application::workflow::sample_capture::SampleDefinitionCapture;
+    let server = mcp_server(Call::Json).await;
+    let (fixture, agent) = published_mcp_agent(&server).await;
+    let p = fixture.persistence.clone();
+    let service = DefinitionService::new(
+        Preflight,
+        p.clone(),
+        WorkflowSourceDecoder,
+        AgentPublicationDirectory {
+            persistence: p.clone(),
+            inner: Preflight,
+        },
+    );
+    let mut source: Value =
+        serde_json::from_str(&registry::example("agent.run").unwrap().source).unwrap();
+    source["resources"] = json!([]);
+    let mut draft = fixture.save(None);
+    draft.content.source = source.to_string();
+    service.save(draft).await.unwrap();
+    let scope = crate::application::agent::AgentPublicationScope {
+        company: fixture.target.company,
+        actor: fixture.target.actor,
+        agent,
+    };
+    let active = p.active_agent_revision(scope).await.unwrap().unwrap();
+    let before: std::collections::BTreeMap<_, _> = ["POST", "GET", "DELETE"]
+        .into_iter()
+        .map(|method| (method, server.count(method)))
+        .collect();
+    let request=SampleRequest { agents:vec![],input:json!({}),params:json!({}),scripts:serde_json::from_value(json!([{
+        "workflow_id":fixture.target.workflow,"step":"start","responses":[{
+            "output":"Sample answer","tools":[{"name":TOOL,"input":{"customer_id":"c-42"},"output":{"content":[],"isError":false,"structuredContent":{"name":"Ada"}}}]
+        }]
+    }])).unwrap() };
+    let capture = crate::adapters::persistence::workflow::SampleCapture {
+        persistence: p.clone(),
+        http: vec![],
+        mcp: vec![],
+        refused_kinds: &[],
+    };
+    let target = crate::application::workflow::lifecycle::DefinitionTarget {
+        company: fixture.target.company,
+        actor: fixture.target.actor,
+        workflow: fixture.target.workflow,
+    };
+    let frozen = capture
+        .capture(target, DraftRevision::new(1).unwrap(), request)
+        .await
+        .unwrap();
+    let report = crate::application::workflow::sample::execute(frozen).unwrap();
+    capture.authorize_release(target).await.unwrap();
+    assert_eq!(
+        report.status,
+        SampleStatus::Completed,
+        "{:?}",
+        report.diagnostic
+    );
+    assert_eq!(report.usage.direct_tool_calls, 1);
+    assert_eq!(report.agent_selections.len(), 1);
+    assert_eq!(
+        p.active_agent_revision(scope).await.unwrap().unwrap().id,
+        active.id
+    );
+    for (method, count) in before {
+        assert_eq!(
+            server.count(method),
+            count,
+            "sampling never opens a transport"
+        );
+    }
+    assert_eq!(server.calls(), 0);
 }

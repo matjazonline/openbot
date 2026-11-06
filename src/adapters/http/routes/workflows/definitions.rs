@@ -493,3 +493,19 @@ pub async fn copy_template(
         ok(json!({"workflow_id": copied.workflow, "revision": copied.revision})),
     ))
 }
+
+pub(in crate::adapters::http::routes) async fn capture_sample(
+    engine: &WorkflowServices,
+    target: DefinitionTarget,
+    expected: u64,
+    http: &[HttpSelectionBody],
+    mcp: &[McpSelectionBody],
+    request: crate::application::workflow::sample::SampleRequest,
+) -> WorkflowResult<crate::application::workflow::sample::PreparedSample> {
+    use crate::application::workflow::sample_capture::SampleDefinitionCapture;
+    let (http, mcp) = selections(http, mcp)?;
+    Ok(engine
+        .sample_capture(http, mcp)
+        .capture(target, revision(expected, DraftRevision::new)?, request)
+        .await?)
+}

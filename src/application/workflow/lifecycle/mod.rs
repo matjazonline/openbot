@@ -70,3 +70,5 @@ impl<A, P, V, R> BindingService<A, P, V, R> {
 
 #[cfg(test)]
 mod tests;
+
+pub(crate) use definitions::check_draft;

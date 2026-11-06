@@ -21,81 +21,88 @@ impl<D: PublicationDirectory> PublicationDirectory for ChildPublicationDirectory
         actor: WorkflowActor,
         draft: &CompanyWorkflowDraft,
     ) -> AppResult<PublicationDependencies> {
-        let mut captured = self.inner.capture(actor, draft).await?;
-        // A draft that does not parse captures nothing here; compilation reports it with spans.
-        let Ok(decoded) = crate::adapters::workflow_source::decode(draft.source()) else {
-            return Ok(captured);
-        };
-        let Ok(parsed) = crate::application::workflow::compiler::parse_workflow(
-            &decoded,
-            VersionId::new(Uuid::nil()),
-        ) else {
-            return Ok(captured);
-        };
-        let tools = captured
-            .snapshots
-            .tools
-            .iter()
-            .filter_map(|tool| match tool.kind() {
-                ToolKind::Workflow(pin) => {
-                    Some((pin.workflow_id.as_uuid(), pin.version_id.as_uuid()))
-                }
-                _ => None,
-            });
-        let pinned: BTreeSet<(Uuid, Uuid)> = parsed
-            .controls
-            .values()
-            .map(|control| {
-                (
-                    control.child_workflow_id.as_uuid(),
-                    control.child_version_id.as_uuid(),
-                )
-            })
-            .chain(tools)
-            .collect();
-        if pinned.is_empty() {
-            return Ok(captured);
-        }
-        if pinned.len() > MAX_DEPENDENCIES {
-            return Err(AppError::BadRequest(
-                "At most 256 child bundles are allowed".into(),
-            ));
-        }
-        let (workflows, versions): (Vec<Uuid>, Vec<Uuid>) = pinned.into_iter().unzip();
+        let captured = self.inner.capture(actor, draft).await?;
         let mut tx = begin_http(&self.persistence).await?;
         authority::authorize_company(&mut tx, draft.company(), actor).await?;
-        let selectable: Vec<(Uuid, i32)> = sqlx::query_as(
-            "SELECT version.id, octet_length(version.bundle) \
+        let captured = capture_on(&mut tx, draft, captured).await?;
+        tx.commit().await?;
+        Ok(captured)
+    }
+}
+
+pub(super) async fn capture_on(
+    tx: &mut Transaction<'_, Postgres>,
+    draft: &CompanyWorkflowDraft,
+    mut captured: PublicationDependencies,
+) -> AppResult<PublicationDependencies> {
+    // A draft that does not parse captures nothing here; compilation reports it with spans.
+    let Ok(decoded) = crate::adapters::workflow_source::decode(draft.source()) else {
+        return Ok(captured);
+    };
+    let Ok(parsed) = crate::application::workflow::compiler::parse_workflow(
+        &decoded,
+        VersionId::new(Uuid::nil()),
+    ) else {
+        return Ok(captured);
+    };
+    let tools = captured
+        .snapshots
+        .tools
+        .iter()
+        .filter_map(|tool| match tool.kind() {
+            ToolKind::Workflow(pin) => Some((pin.workflow_id.as_uuid(), pin.version_id.as_uuid())),
+            _ => None,
+        });
+    let pinned: BTreeSet<(Uuid, Uuid)> = parsed
+        .controls
+        .values()
+        .map(|control| {
+            (
+                control.child_workflow_id.as_uuid(),
+                control.child_version_id.as_uuid(),
+            )
+        })
+        .chain(tools)
+        .collect();
+    if pinned.is_empty() {
+        return Ok(captured);
+    }
+    if pinned.len() > MAX_DEPENDENCIES {
+        return Err(AppError::BadRequest(
+            "At most 256 child bundles are allowed".into(),
+        ));
+    }
+    let (workflows, versions): (Vec<Uuid>, Vec<Uuid>) = pinned.into_iter().unzip();
+    let selectable: Vec<(Uuid, i32)> = sqlx::query_as(
+        "SELECT version.id, octet_length(version.bundle) \
              FROM unnest($2::uuid[], $3::uuid[]) AS pinned(workflow_id, id) \
              JOIN workflow_versions AS version ON version.company_id = $1 \
                AND version.workflow_id = pinned.workflow_id AND version.id = pinned.id \
              JOIN workflow_definitions AS definition ON definition.company_id = version.company_id \
                AND definition.id = version.workflow_id \
              WHERE NOT definition.archived",
-        )
-        .bind(draft.company().as_uuid())
-        .bind(&workflows)
-        .bind(&versions)
-        .fetch_all(&mut *tx)
-        .await?;
-        within_bundle_bound(selectable.iter().map(|(_, bytes)| *bytes))?;
-        let ids: Vec<Uuid> = selectable.into_iter().map(|(id, _)| id).collect();
-        let bundles: Vec<Vec<u8>> = sqlx::query_scalar(
-            "SELECT bundle FROM workflow_versions WHERE company_id = $1 AND id = ANY($2) ORDER BY id",
-        )
-        .bind(draft.company().as_uuid())
-        .bind(&ids)
-        .fetch_all(&mut *tx)
-        .await?;
-        tx.commit().await?;
-        for bytes in bundles {
-            captured.children.push(restore_bundle(
-                &bytes,
-                &crate::adapters::workflow_source::WorkflowSourceDecoder,
-            )?);
-        }
-        Ok(captured)
+    )
+    .bind(draft.company().as_uuid())
+    .bind(&workflows)
+    .bind(&versions)
+    .fetch_all(&mut **tx)
+    .await?;
+    within_bundle_bound(selectable.iter().map(|(_, bytes)| *bytes))?;
+    let ids: Vec<Uuid> = selectable.into_iter().map(|(id, _)| id).collect();
+    let bundles: Vec<Vec<u8>> = sqlx::query_scalar(
+        "SELECT bundle FROM workflow_versions WHERE company_id = $1 AND id = ANY($2) ORDER BY id",
+    )
+    .bind(draft.company().as_uuid())
+    .bind(&ids)
+    .fetch_all(&mut **tx)
+    .await?;
+    for bytes in bundles {
+        captured.children.push(restore_bundle(
+            &bytes,
+            &crate::adapters::workflow_source::WorkflowSourceDecoder,
+        )?);
     }
+    Ok(captured)
 }
 
 /// Refuse pinned children whose stored bundles together exceed what one bundle may hold, before

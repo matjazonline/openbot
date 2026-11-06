@@ -1,0 +1,101 @@
+    Checking open_bots v0.1.0 (/Users/mac02/dev/openbot-recovery/.worktrees/autonomous-p03)
+error[E0428]: the name `execute` is defined multiple times
+   --> src/application/workflow/sample/tests.rs:386:1
+    |
+ 55 | fn execute(bundle: Arc<PublishedBundle>, mut request: SampleRequest) -> AppResult<SampleReport> {
+    | ----------------------------------------------------------------------------------------------- previous definition of the value `execute` here
+...
+386 | fn execute(bundle: Arc<PublishedBundle>, request: SampleRequest) -> AppResult<SampleReport> {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `execute` redefined here
+    |
+    = note: `execute` must be defined only once in the value namespace of this module
+
+warning: unused import: `MAX_AGENT_DEPENDENCY_DEPTH`
+ --> src/adapters/persistence/workflow/agent_manifest/mod.rs:6:5
+  |
+6 |     MAX_AGENT_DEPENDENCY_DEPTH, WorkflowVersionSelection,
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `crate::entities::agent_capability::AgentBindingSource`
+ --> src/adapters/persistence/workflow/agent_manifest/capture.rs:2:5
+  |
+2 | use crate::entities::agent_capability::AgentBindingSource;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error[E0308]: mismatched types
+  --> src/adapters/persistence/workflow/sample_capture.rs:90:5
+   |
+90 |     authority::authorize_company(tx, target.company, target.actor).await
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `Result<(), AppError>`, found `Result<LevelActor, AppError>`
+   |
+   = note: expected enum `std::result::Result<(), _>`
+              found enum `std::result::Result<LevelActor, _>`
+
+error[E0433]: cannot find module or crate `http_publication` in this scope
+   --> src/adapters/persistence/workflow/sample_capture.rs:107:21
+    |
+107 |             .extend(http_publication::capture_on(tx, target.company, &s...
+    |                     ^^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `http_publication`
+    |
+help: to make use of source file src/adapters/persistence/workflow/http_publication.rs, use `mod http_publication` in this file to declare the module
+   --> src/lib.rs:5:1
+    |
+  5 + mod http_publication;
+    |
+
+error[E0433]: cannot find module or crate `mcp_publication` in this scope
+   --> src/adapters/persistence/workflow/sample_capture.rs:111:21
+    |
+111 |             .extend(mcp_publication::capture_on(tx, target.company, &se...
+    |                     ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `mcp_publication`
+    |
+help: to make use of source file src/adapters/persistence/workflow/mcp_publication.rs, use `mod mcp_publication` in this file to declare the module
+   --> src/lib.rs:5:1
+    |
+  5 + mod mcp_publication;
+    |
+
+error[E0308]: mismatched types
+  --> src/adapters/persistence/workflow/sample_capture.rs:90:5
+   |
+90 |     authority::authorize_company(tx, target.company, target.actor).await
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `Result<(), AppError>`, found `Result<LevelActor, AppError>`
+   |
+   = note: expected enum `std::result::Result<(), _>`
+              found enum `std::result::Result<access_level::LevelActor, _>`
+
+Some errors have detailed explanations: E0308, E0433.
+For more information about an error, try `rustc --explain E0308`.
+warning: `open_bots` (lib) generated 2 warnings
+error: could not compile `open_bots` (lib) due to 3 previous errors; 2 warnings emitted
+warning: build failed, waiting for other jobs to finish...
+error[E0061]: this function takes 1 argument but 2 arguments were supplied
+   --> src/application/workflow/sample/tests.rs:130:5
+    |
+130 |     super::execute(bundle, request)
+    |     ^^^^^^^^^^^^^^         ------- unexpected argument #2 of type `application::workflow::sample::types::SampleRequest`
+    |
+note: expected `PreparedSample`, found `Arc<PublishedBundle>`
+   --> src/application/workflow/sample/tests.rs:130:20
+    |
+130 |     super::execute(bundle, request)
+    |                    ^^^^^^
+    = note: expected struct `application::workflow::sample::definitions::PreparedSample`
+               found struct `std::sync::Arc<application::workflow::publication::PublishedBundle>`
+note: function defined here
+   --> src/application/workflow/sample/mod.rs:86:8
+    |
+ 86 | pub fn execute(sample: PreparedSample) -> AppResult<SampleReport> {
+    |        ^^^^^^^ ----------------------
+help: remove the extra argument
+    |
+130 -     super::execute(bundle, request)
+130 +     super::execute(/* application::workflow::sample::definitions::PreparedSample */)
+    |
+
+Some errors have detailed explanations: E0061, E0308, E0428, E0433.
+For more information about an error, try `rustc --explain E0061`.
+warning: `open_bots` (lib test) generated 2 warnings (2 duplicates)
+error: could not compile `open_bots` (lib test) due to 5 previous errors; 2 warnings emitted

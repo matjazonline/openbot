@@ -1,0 +1,21 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+
+running 15 tests
+test application::workflow::sample::tests::bounded_root_budget_and_external_kinds_never_fall_back ... ok
+test application::workflow::sample::tests::descendants_cannot_replenish_root_budgets_and_report_size_is_bounded ... ok
+test application::workflow::sample::tests::jev_tests::jev_box_sample_rejects_tools_tokens_and_invalid_box ... ok
+test application::workflow::sample::tests::jev_tests::jev_box_sample_uses_only_scripted_answers_and_inert_metadata ... ok
+test application::workflow::sample::tests::jev_tests::workflow_sample_jev_mixed_thresholds_automatic_and_human_paths ... ok
+test application::workflow::sample::tests::missing_invalid_unused_and_oversized_scripts_fail_explicitly ... ok
+test application::workflow::sample::tests::pure_and_scripted_routing_share_compiled_validation ... ok
+test application::workflow::sample::tests::repeated_human_revision_carries_edited_artifact_feedback_and_captures_reply ... ok
+test application::workflow::sample::tests::tools_tests::direct_agent_tools_and_pinned_workflow_tools_stay_in_sample ... ok
+test application::workflow::sample::tests::tools_tests::direct_mcp_tool_uses_the_production_result_envelope ... ok
+test application::workflow::sample::tests::tools_tests::direct_tool_inputs_and_outputs_are_validated ... ok
+test application::workflow::sample::tests::tools_tests::protected_step_workflow_tool_needs_approval_and_executes_child ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::sample_tests::autonomous_agent_samples_keep_old_capture_and_hash_after_draft_changes ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::sample_tests::sample_direct_workflow_tool_child_and_message_have_zero_production_effects ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::sample_tests::autonomous_agent_samples_release_rechecks_admin_after_competing_role_revocation ... ok
+
+test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 2953 filtered out; finished in 1.36s
+

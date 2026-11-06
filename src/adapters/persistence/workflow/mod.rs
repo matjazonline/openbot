@@ -139,3 +139,6 @@ mod jev_runtime;
 
 mod storage;
 mod storage_retention;
+
+mod sample_capture;
+pub use sample_capture::SampleCapture;

@@ -1,0 +1,25 @@
+    Checking open_bots v0.1.0 (/Users/mac02/dev/openbot-recovery/.worktrees/autonomous-p03)
+error[E0433]: cannot find `CompanyAccessRole` in `company`
+   --> src/adapters/http/routes/workflows/ui/authoring/sample_tests.rs:381:39
+    |
+381 |             crate::entities::company::CompanyAccessRole::Member,
+    |                                       ^^^^^^^^^^^^^^^^^ could not find `CompanyAccessRole` in `company`
+    |
+help: a struct with a similar name exists
+    |
+381 -             crate::entities::company::CompanyAccessRole::Member,
+381 +             crate::entities::company::CompanyAccess::Member,
+    |
+help: consider importing this enum
+    |
+  1 + use crate::entities::company_member::CompanyAccessRole;
+    |
+help: if you import `CompanyAccessRole`, refer to it directly
+    |
+381 -             crate::entities::company::CompanyAccessRole::Member,
+381 +             CompanyAccessRole::Member,
+    |
+
+For more information about this error, try `rustc --explain E0433`.
+error: could not compile `open_bots` (lib test) due to 1 previous error
+error: `cargo check` failed with status: exit status: 101

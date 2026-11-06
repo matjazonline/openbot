@@ -1,0 +1,28 @@
+{
+  "started_at": "2026-11-06T06:40:52.103852+00:00",
+  "command": [
+    "bash",
+    "scripts/test-network-isolation.sh",
+    "target/debug/deps/open_bots-c19a0b960dacdcef",
+    "application::workflow::sample::",
+    "sample_direct_workflow_tool_child_and_message_have_zero_production_effects",
+    "autonomous_agent_samples_",
+    "--test-threads=4"
+  ],
+  "quota": {
+    "checked_at": "2026-11-06T06:40:25.643913+00:00",
+    "fresh": true,
+    "interval_seconds": 900,
+    "next_check_at": "2026-11-06T06:55:25.643913+00:00",
+    "remaining_percent": 4.0,
+    "resets_at": 1794389522,
+    "sample_age_seconds": 14.379913,
+    "sample_timestamp": "2026-11-06T06:40:11.264Z",
+    "session": "01a1a6b2-c6b1-7103-9944-c1323c1d90a4",
+    "source": "/Users/mac02/.codex/sessions/2026/11/04/rollout-2026-11-04T14-14-56-01a1a6b2-c6b1-7103-9944-c1323c1d90a4.jsonl",
+    "stop_required": false,
+    "threshold_remaining_percent": 3.0,
+    "used_percent": 96.0,
+    "window_minutes": 10080
+  }
+}

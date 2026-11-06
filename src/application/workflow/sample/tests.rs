@@ -127,7 +127,7 @@ fn execute(bundle: Arc<PublishedBundle>, mut request: SampleRequest) -> AppResul
             pending.extend(next.children().values().cloned());
         }
     }
-    super::execute(bundle, request)
+    super::execute(PreparedSample::new(bundle, request, vec![])?)
 }
 
 fn response(output: Value) -> ScriptedResponse {

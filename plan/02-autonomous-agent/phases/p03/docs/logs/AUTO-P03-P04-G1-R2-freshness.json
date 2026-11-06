@@ -1,0 +1,34 @@
+{
+  "checked_at_utc": "2026-11-06T05:57:37.324189+00:00",
+  "phase_start_and_reviewbase": "dc35ee426d8f88abdaf40562027ae69ad66863eb",
+  "head": "04b0134eefa67cefc392e897ff2142ee2a0c3a3e",
+  "excludes": [
+    "plan/02-autonomous-agent/phases/p03/docs",
+    "plan/02-autonomous-agent/phases/p04/docs"
+  ],
+  "source_patch_sha256": "e17e6a009a5989f43646e1e94608db30be709e8922584a678c322074672154e0",
+  "reconstructed_precommit_source_digest": "12355398941034c0acd7a46e0c2a887cdeca6fda3441e96dc53655b55decd1bb",
+  "reconstruction_method": "SHA256(base <originalHEAD> newline + git diff --no-ext-diff --no-textconv --abbrev=7 <base> <HEAD> --binary -- <exact paths>); original source was entirely staged. Default Git hash abbreviation grew after checkpoint, so explicitly retain original 7 characters. Initial default-abbreviation reconstruction differed; full-index hash and explicit old-abbreviation reconstruction prove unchanged source.",
+  "coordination_revision": 22,
+  "coordination_sha256": "7e7bfb77d0a5ad46d76ee6bf85a3d71ca3ed26343bbd77df5571f0f1f2555975",
+  "coordination_pin_matches": true,
+  "decision_r2_sha256": "3ce2b6aef25509f59356a419951bd6cdb06aef0b1aa8d536c408828158c46768",
+  "current_snapshot": "base:   04b0134eefa67cefc392e897ff2142ee2a0c3a3e\ndigest: 78d94ca3c945e8b79ba94749e6d4b4e3912fc4fdff99afbdaf66f1799094a51a\nfiles:\n",
+  "quota": {
+    "checked_at": "2026-11-06T05:55:25.547435+00:00",
+    "fresh": true,
+    "interval_seconds": 900,
+    "next_check_at": "2026-11-06T06:10:25.547435+00:00",
+    "remaining_percent": 6.0,
+    "resets_at": 1794389522,
+    "sample_age_seconds": 10.519435,
+    "sample_timestamp": "2026-11-06T05:55:15.028Z",
+    "session": "01a1a6b2-c6b1-7103-9944-c1323c1d90a4",
+    "source": "/Users/mac02/.codex/sessions/2026/11/04/rollout-2026-11-04T14-14-56-01a1a6b2-c6b1-7103-9944-c1323c1d90a4.jsonl",
+    "stop_required": false,
+    "threshold_remaining_percent": 3.0,
+    "used_percent": 94.0,
+    "window_minutes": 10080
+  },
+  "watcher_process": "51719 /Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python -u /Users/mac02/dev/openbot-recovery/.worktrees/knowledge-tooling/autonomous-weekly-quota-watch.py --session 01a1a6b2-c6b1-7103-9944-c1323c1d90a4 --records /Users/mac02/dev/openbot-recovery/.worktrees/knowledge-tooling/autonomous-weekly-quota --interval 900 --stop-remaining 3"
+}

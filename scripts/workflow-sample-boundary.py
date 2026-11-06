@@ -20,11 +20,11 @@ PURE = {
     'decisions::hex_digest', 'decisions::prepare_submission', 'decisions::reviewer_deadline',
     'publication::PublishedBundle', 'publication::ContentHash', 'publication::AgentKey',
     'publication::ToolKind', 'publication::ToolSnapshot', 'publication::ActionEffect',
-    'publication::MAX_DEPENDENCIES', 'agent_contract::agent_action_snapshot',
+    'publication::MAX_DEPENDENCIES', 'publication::store_bundle', 'publication::AgentUseMode', 'agent_contract::agent_action_snapshot',
     'publication::ToolKind::Workflow', 'publication::ActionEffect::Read', 'publication::ActionEffect::Write',
     'registry::ModelStep', 'registry::mcp_tool_result', 'mcp::mcp_result_is_error',
 }
-EXTERNAL = {'serde', 'serde_json', 'uuid', 'chrono'}
+EXTERNAL = {'serde', 'serde_json', 'uuid', 'chrono', 'sha2'}
 SAMPLE = 'crate::application::workflow::sample'
 
 
@@ -66,6 +66,8 @@ def normalize(path, module):
 
 def permitted(path):
     if path==SAMPLE or path.startswith(SAMPLE+'::'):return True
+    if path.startswith('crate::application::agent::dependency::'):return True
+    if path in ('crate::application::agent::MAX_AGENT_DEPENDENCIES','crate::application::agent::MAX_AGENT_DEPENDENCY_DEPTH','crate::application::agent::MAX_AGENT_MANIFEST_BYTES','crate::entities::agent_capability::AgentBindingSource::Workflow','std::mem::take'):return True
     if path.startswith('crate::domain::workflow::'):return True
     if path in ('crate::application::agent::ResolvedAgentDefinition','crate::entities::agent_capability::AgentId',
                 'crate::application::agent::AgentKey','crate::application::agent::ActionEffect',
@@ -104,9 +106,11 @@ def qualified_paths(code):
 def violations(root):
     if not (root/'mod.rs').is_file():return [f'{root}: missing production sample module']
     failures=[]
-    for file in sorted(root.rglob('*.rs')):
+    shared=root.parents[1]/'agent/dependency.rs'
+    files=list(root.rglob('*.rs'))+([shared] if shared.is_file() else [])
+    for file in sorted(files):
         if file.name=='tests.rs' or file.stem.endswith('_tests'):continue
-        module=SAMPLE+'::'+'::'.join(file.relative_to(root).with_suffix('').parts)
+        module=('crate::application::agent::dependency' if file==shared else SAMPLE+'::'+'::'.join(file.relative_to(root).with_suffix('').parts))
         module=module.removesuffix('::mod')
         try:
             code=code_only(file.read_text())
@@ -119,7 +123,7 @@ def violations(root):
             paths+=qualified_paths(code)
             for path in paths:
                 # Local sibling modules may re-export inert sample types.
-                if path.startswith(('types::','children::','dispatch::','tools::')):
+                if path.startswith(('types::','children::','dispatch::','tools::','definitions::')):
                     path=SAMPLE+'::'+path
                 path=normalize(path,module)
                 if not permitted(path):failures.append(f'{file}: forbidden sample dependency {path}')

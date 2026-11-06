@@ -1,0 +1,52 @@
+ M plan/02-autonomous-agent/phases/p03/docs/HANDOFF.md
+ M plan/02-autonomous-agent/phases/p03/docs/REVIEW.md
+ M plan/02-autonomous-agent/phases/p03/docs/TASK.md
+ M plan/02-autonomous-agent/phases/p03/docs/agent-review-findings.md
+ M plan/02-autonomous-agent/phases/p03/docs/agent-review-notes.md
+ M plan/02-autonomous-agent/phases/p04/docs/HANDOFF.md
+ M plan/02-autonomous-agent/phases/p04/docs/TASK.md
+ M scripts/tests/workflow-sample-boundary.py
+ M scripts/workflow-sample-boundary.py
+ M src/adapters/http/pages/workflow_authoring/sample.rs
+ M src/adapters/http/routes/workflows/definitions.rs
+ M src/adapters/http/routes/workflows/ui/authoring/sample.rs
+ M src/adapters/http/routes/workflows/ui/authoring/sample_tests.rs
+ M src/adapters/persistence/agent_publication/commands.rs
+ M src/adapters/persistence/agent_publication/mod.rs
+ M src/adapters/persistence/workflow/agent_manifest/capture.rs
+ M src/adapters/persistence/workflow/agent_manifest/mod.rs
+ M src/adapters/persistence/workflow/agent_publication.rs
+ M src/adapters/persistence/workflow/child_publication.rs
+ M src/adapters/persistence/workflow/definitions.rs
+ M src/adapters/persistence/workflow/http.rs
+ M src/adapters/persistence/workflow/http_publication.rs
+ M src/adapters/persistence/workflow/mcp.rs
+ M src/adapters/persistence/workflow/mcp_agent_tests.rs
+ M src/adapters/persistence/workflow/mcp_publication.rs
+ M src/adapters/persistence/workflow/mod.rs
+ M src/application/agent/mod.rs
+ M src/application/workflow/lifecycle/definitions.rs
+ M src/application/workflow/lifecycle/mod.rs
+ M src/application/workflow/mod.rs
+ M src/application/workflow/sample/children.rs
+ M src/application/workflow/sample/mod.rs
+ M src/application/workflow/sample/tests.rs
+ M src/application/workflow/sample/tools.rs
+ M src/application/workflow/sample/types.rs
+ M src/infra/workflow/services.rs
+?? plan/02-autonomous-agent/phases/p03/docs/logs/AUTO-P03-P04-G1-R2-freshness.json
+?? plan/02-autonomous-agent/phases/p03/docs/logs/AUTO-P03-P04-G1-R2-snapshot.txt
+?? plan/02-autonomous-agent/phases/p03/docs/logs/AUTO-P03-P04-G1-r2-resume-snapshot.txt
+?? plan/02-autonomous-agent/phases/p03/docs/logs/G1-R2-root-acceptance-snapshot.txt
+?? plan/02-autonomous-agent/phases/p03/docs/logs/author-sample-build-07-36.json
+?? plan/02-autonomous-agent/phases/p03/docs/logs/author-sample-build-37-clippy06.json
+?? plan/02-autonomous-agent/phases/p03/docs/logs/coordination-r22.md
+?? plan/02-autonomous-agent/phases/p03/docs/logs/coordination-r23.md
+?? plan/02-autonomous-agent/phases/p03/docs/logs/quota3-working-status.txt
+?? plan/02-autonomous-agent/phases/p03/docs/logs/sample-runtime-selection-01.json
+?? plan/02-autonomous-agent/phases/p04/docs/logs/coordination-r22.md
+?? plan/02-autonomous-agent/phases/p04/docs/logs/coordination-r23.md
+?? src/adapters/persistence/workflow/sample_capture.rs
+?? src/application/agent/dependency.rs
+?? src/application/workflow/sample/definitions.rs
+?? src/application/workflow/sample_capture.rs

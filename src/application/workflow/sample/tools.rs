@@ -90,11 +90,12 @@ impl Session {
                         "Workflow tool output comes from its sample child, not a fixture",
                     ));
                 }
-                let child = bundle
-                    .children()
-                    .get(&pin.version_id)
-                    .ok_or_else(|| refused("Workflow tool child is not frozen"))?
-                    .clone();
+                let child = definitions::workflow_from(
+                    &self.workflows,
+                    bundle.company_id(),
+                    pin.workflow_id,
+                    pin.version_id,
+                )?;
                 let output = self.run(
                     child,
                     frame.child(

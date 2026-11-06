@@ -260,7 +260,7 @@ fn workflow_identity_span(decoded: &compiler::DecodedSource) -> compiler::Source
     decoded.root.span
 }
 
-fn check_draft(
+pub(crate) fn check_draft(
     state: &DraftState,
     target: DefinitionTarget,
     revision: DraftRevision,

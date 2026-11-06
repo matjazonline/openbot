@@ -99,3 +99,30 @@ pub(super) async fn verify_on(
     }
     Ok(())
 }
+
+/// Sample-only references never become a publication eligibility token.
+pub(super) async fn capture_sample_agents_on(
+    tx: &mut Transaction<'_, Postgres>,
+    draft: &CompanyWorkflowDraft,
+    captured: &mut PublicationDependencies,
+) -> AppResult<()> {
+    let Some(selection) = agent_selection(draft)? else {
+        return Ok(());
+    };
+    for (key, uses) in selection.references {
+        let id: Uuid =
+            sqlx::query_scalar("SELECT id FROM agents WHERE company_id=$1 AND slug=$2 FOR SHARE")
+                .bind(draft.company().as_uuid())
+                .bind(key.as_str())
+                .fetch_optional(&mut **tx)
+                .await?
+                .ok_or_else(missing)?;
+        captured.snapshots.agents.push(AgentReference {
+            company_id: draft.company(),
+            agent_id: AgentId::new(id),
+            key,
+            uses,
+        });
+    }
+    Ok(())
+}

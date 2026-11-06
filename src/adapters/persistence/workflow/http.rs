@@ -26,6 +26,7 @@ pub(in crate::adapters::persistence) async fn begin_http(
 mod publication_owner;
 pub use publication_owner::HttpPublicationDirectory;
 pub use publication_owner::HttpPublicationSelection;
+pub(super) use publication_owner::capture_on as capture_publication_on;
 #[path = "http_runtime.rs"]
 pub(super) mod runtime;
 

@@ -3,6 +3,7 @@ use crate::domain::workflow::{CompanyId, TypeName};
 use serde::{Deserialize, Serialize};
 
 mod definition;
+pub(crate) mod dependency;
 mod manifest;
 mod publication;
 mod resolution;

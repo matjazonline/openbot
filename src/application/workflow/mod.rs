@@ -42,6 +42,7 @@ pub mod reads;
 pub mod registry;
 pub mod run_views;
 pub mod sample;
+pub mod sample_capture;
 pub mod schedule_admission;
 mod service;
 pub mod storage;

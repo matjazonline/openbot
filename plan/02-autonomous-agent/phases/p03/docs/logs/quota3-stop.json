@@ -1,0 +1,59 @@
+{
+  "recorded_at": "2026-11-06T07:04:02.008113+00:00",
+  "status": "STOPPED_WEEKLY_QUOTA3",
+  "quota": {
+    "checked_at": "2026-11-06T06:55:25.703594+00:00",
+    "fresh": true,
+    "interval_seconds": 900,
+    "next_check_at": "2026-11-06T07:10:25.703594+00:00",
+    "remaining_percent": 3.0,
+    "resets_at": 1794389522,
+    "sample_age_seconds": 176.197594,
+    "sample_timestamp": "2026-11-06T06:52:29.506Z",
+    "session": "01a1a6b2-c6b1-7103-9944-c1323c1d90a4",
+    "source": "/Users/mac02/.codex/sessions/2026/11/04/rollout-2026-11-04T14-14-56-01a1a6b2-c6b1-7103-9944-c1323c1d90a4.jsonl",
+    "stop_required": true,
+    "threshold_remaining_percent": 3.0,
+    "used_percent": 97.0,
+    "window_minutes": 10080
+  },
+  "monitor_session": 65166,
+  "monitor_pid": 51719,
+  "monitor_exit_code": 20,
+  "accepted_review_base": "dc35ee426d8f88abdaf40562027ae69ad66863eb",
+  "pre_checkpoint_head": "04b0134eefa67cefc392e897ff2142ee2a0c3a3e",
+  "pre_checkpoint_context_digest": "ca2a1218947427c25f27289a6b8dd60d3604b5e9555997c0e1af0e606d0795f2",
+  "source_patch_full_index_sha256": "33d7c1c2adb9fea0b1b10fd2c794e942fd99423ea42ee603121b1403d87bb88b",
+  "snapshot_excludes": [
+    "plan/02-autonomous-agent/phases/p03/docs",
+    "plan/02-autonomous-agent/phases/p04/docs"
+  ],
+  "architecture": "AUTO-P03-P04-G1-R2-N1 PASS effectiveD1r2",
+  "implementation_accepted": false,
+  "runtime_sample_01": {
+    "passed": 15,
+    "failed": 0,
+    "ignored": 0,
+    "seconds": 1.36,
+    "source": "compiled36 before final3 edits"
+  },
+  "current_compile37": {
+    "exit_code": 0,
+    "duration": "1m44"
+  },
+  "current_clippy06": {
+    "exit_code": 0,
+    "duration": "1m10"
+  },
+  "sqlx07": {
+    "exit_code": 0,
+    "all_targets": true
+  },
+  "remaining": [
+    "Run new no-slot MCP sample and native shared walker graph/admission regressions",
+    "Rerun pure sample report-bound checks after final budget accounting changes",
+    "Audit native selection capacity before additional unique map insert/active-pointer lookup",
+    "Finish source audit/boundary/fmt/diff/Graft refresh and whole03\u201304 independent WB1 review",
+    "Original autonomous05\u201307 remain unaccepted"
+  ]
+}

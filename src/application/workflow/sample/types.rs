@@ -99,6 +99,9 @@ pub struct SampleUsage {
 #[derive(Debug, Serialize)]
 pub struct SampleReport {
     pub content_hash: super::super::publication::ContentHash,
+    pub configuration_hash: super::SampleConfigurationHash,
+    pub agent_selections: Vec<super::SampleAgentSelection>,
+    pub workflow_selections: Vec<super::SampleWorkflowSelection>,
     pub status: SampleStatus,
     pub output: Option<Value>,
     pub steps: Vec<SampleStep>,

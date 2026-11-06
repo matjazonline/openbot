@@ -87,8 +87,10 @@ fn sample_report(report: &SampleReport) -> String {
     format!(
         r#"<section id="sample-report" class="space-y-3" aria-label="Sample report"><h3 role="status" class="font-semibold">{status}</h3>
         <p class="text-xs opacity-70">Exact frozen content: <span class="font-mono">{hash}</span></p>
+        <p class="text-xs opacity-70">Frozen configuration: <span class="font-mono">{configuration}</span></p>
         {diagnostic}<p class="text-sm">{unused} unused scripted responses. Execution paths below are sample identities.</p>{body}</section>"#,
         hash = escape_html_text(report.content_hash.as_str()),
+        configuration = escape_html_text(report.configuration_hash.as_str()),
         diagnostic = form_error_banner(report.diagnostic.as_deref()),
         unused = report.unused_responses,
         body = json_block(&serde_json::to_value(report).expect("sample report is serializable"))

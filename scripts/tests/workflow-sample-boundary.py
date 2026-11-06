@@ -24,6 +24,7 @@ class BoundaryTests(unittest.TestCase):
             'use crate::adapters::persistence::PostgresPersistence;',
             'use crate::application::workflow::{actions::ActionIntents};',
             'use crate::infra::workflow::WorkflowEngine;',
+            'use crate::application::workflow::sample_capture::SampleDefinitionCapture;',
             'fn run(){reqwest::get("https://example.test");}',
             'fn run(){std::process::Command::new("curl");}',
             'fn run(){std::fs::read("credentials");}',
@@ -47,6 +48,19 @@ class BoundaryTests(unittest.TestCase):
             (root/'mod.rs').write_text('#[cfg(test)]\nmod tests;')
             self.assertEqual(boundary.violations(root),[])
             (root/'mod.rs').write_text('mod tests;')
+            self.assertTrue(boundary.violations(root))
+
+    def test_shared_dependency_walker_is_checked(self):
+        with TemporaryDirectory() as temporary:
+            app=Path(temporary)/'application'
+            root=app/'workflow/sample';root.mkdir(parents=True)
+            (root/'mod.rs').write_text('')
+            shared=app/'agent/dependency.rs';shared.parent.mkdir()
+            shared.write_text('use std::collections::BTreeMap;')
+            self.assertEqual(boundary.violations(root),[])
+            shared.write_text('fn walk(){std::fs::read("credentials");}')
+            self.assertTrue(boundary.violations(root))
+            shared.write_text('use crate::adapters::persistence::PostgresPersistence;')
             self.assertTrue(boundary.violations(root))
 
 if __name__=='__main__':unittest.main()

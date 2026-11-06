@@ -222,3 +222,193 @@ async fn sample_mcp_fixture_never_contacts_selected_endpoint_and_rejects_foreign
     assert!(html.contains("unavailable"));
     assert_eq!(before, counts(&f).await);
 }
+
+fn capture_target(
+    f: &Fixture,
+    user: Uuid,
+    workflow: Uuid,
+) -> crate::application::workflow::lifecycle::DefinitionTarget {
+    crate::application::workflow::lifecycle::DefinitionTarget {
+        company: crate::domain::workflow::CompanyId::new(f.company),
+        actor: crate::application::workflow::WorkflowActor::authenticated(user).unwrap(),
+        workflow: crate::domain::workflow::WorkflowId::new(workflow),
+    }
+}
+fn capture_request(workflow: Uuid) -> crate::application::workflow::sample::SampleRequest {
+    crate::application::workflow::sample::SampleRequest {
+        agents: vec![],
+        input: json!({}),
+        params: json!({}),
+        scripts: serde_json::from_value(
+            json!([{"workflow_id":workflow,"step":"start","responses":[{"output":"answer"}]}]),
+        )
+        .unwrap(),
+    }
+}
+#[tokio::test]
+async fn autonomous_agent_samples_keep_old_capture_and_hash_after_draft_changes() {
+    use crate::application::workflow::sample_capture::SampleDefinitionCapture;
+    let Some(f) = Fixture::new().await else {
+        return;
+    };
+    let agent = f.agent("Assistant", "assistant").await;
+    let workflow = Uuid::new_v4();
+    f.draft(workflow, "Sample hash", &source_of("agent.run", workflow))
+        .await;
+    let target = capture_target(&f, f.owner, workflow);
+    let capture = f.engine.sample_capture(vec![], vec![]);
+    let before = counts(&f).await;
+    let old = capture
+        .capture(
+            target,
+            crate::domain::workflow::DraftRevision::new(1).unwrap(),
+            capture_request(workflow),
+        )
+        .await
+        .unwrap();
+    AgentPersistence::update(
+        &f.persistence,
+        agent,
+        AgentWrite {
+            name: "Assistant".into(),
+            slug: "assistant".into(),
+            provider: Some("openai".into()),
+            model: Some("gpt-test".into()),
+            system_prompt: Some("Changed instructions".into()),
+            ..Default::default()
+        },
+    )
+    .await
+    .unwrap();
+    let new = capture
+        .capture(
+            target,
+            crate::domain::workflow::DraftRevision::new(1).unwrap(),
+            capture_request(workflow),
+        )
+        .await
+        .unwrap();
+    let old = f.engine.sample(old).unwrap();
+    let new = f.engine.sample(new).unwrap();
+    assert_eq!(old.content_hash, new.content_hash);
+    assert_ne!(old.configuration_hash, new.configuration_hash);
+    assert_ne!(
+        old.agent_selections[0].sample_hash,
+        new.agent_selections[0].sample_hash
+    );
+    assert!(matches!(
+        old.status,
+        crate::application::workflow::sample::SampleStatus::Completed
+    ));
+    assert!(matches!(
+        new.status,
+        crate::application::workflow::sample::SampleStatus::Completed
+    ));
+    assert_eq!(before, counts(&f).await);
+    let published: i64 =
+        sqlx::query_scalar("SELECT count(*) FROM agent_revisions WHERE company_id=$1")
+            .bind(f.company)
+            .fetch_one(f.persistence.pool())
+            .await
+            .unwrap();
+    assert_eq!(
+        published, 0,
+        "capturing drafts never activates production revisions"
+    );
+    assert!(
+        capture
+            .authorize_release(capture_target(&f, f.stranger, workflow))
+            .await
+            .is_err()
+    );
+    assert!(
+        capture
+            .capture(
+                capture_target(&f, f.stranger, workflow),
+                crate::domain::workflow::DraftRevision::new(1).unwrap(),
+                capture_request(workflow)
+            )
+            .await
+            .is_err()
+    );
+}
+
+async fn wait_for_member_lock(pool: &sqlx::PgPool, minimum: i64) {
+    tokio::time::timeout(std::time::Duration::from_secs(2),async {
+        loop {
+            let waiting:i64=sqlx::query_scalar("SELECT count(*) FROM pg_stat_activity WHERE datname=current_database() AND pid<>pg_backend_pid() AND wait_event_type='Lock' AND query LIKE '%company_members%'").fetch_one(pool).await.unwrap();
+            if waiting>=minimum {break;}
+            tokio::task::yield_now().await;
+        }
+    }).await.expect("real competing member locks");
+}
+#[tokio::test]
+async fn autonomous_agent_samples_release_rechecks_admin_after_competing_role_revocation() {
+    use crate::application::workflow::sample_capture::SampleDefinitionCapture;
+    use crate::use_cases::company_invite::CompanyInvitePersistence;
+    let Some(f) = Fixture::new().await else {
+        return;
+    };
+    f.agent("Assistant", "assistant").await;
+    let workflow = Uuid::new_v4();
+    f.draft(workflow, "Release race", &source_of("agent.run", workflow))
+        .await;
+    let capture = Arc::new(f.engine.sample_capture(vec![], vec![]));
+    let target = capture_target(&f, f.admin, workflow);
+    let snapshot = capture
+        .capture(
+            target,
+            crate::domain::workflow::DraftRevision::new(1).unwrap(),
+            capture_request(workflow),
+        )
+        .await
+        .unwrap();
+    capture.authorize_release(target).await.unwrap();
+    let mut locker = f.persistence.pool().begin().await.unwrap();
+    sqlx::query("SELECT id FROM company_members WHERE company_id=$1 AND user_id=$2 FOR UPDATE")
+        .bind(f.company)
+        .bind(f.admin)
+        .execute(&mut *locker)
+        .await
+        .unwrap();
+    let p = f.persistence.clone();
+    let company = f.company;
+    let admin = f.admin;
+    let demote = tokio::spawn(async move {
+        p.update_member_role(
+            company,
+            admin,
+            crate::entities::company_member::CompanyAccessRole::Member,
+        )
+        .await
+        .unwrap()
+        .unwrap()
+    });
+    wait_for_member_lock(f.persistence.pool(), 1).await;
+    let release = {
+        let capture = capture.clone();
+        tokio::spawn(async move { capture.authorize_release(target).await })
+    };
+    wait_for_member_lock(f.persistence.pool(), 2).await;
+    locker.commit().await.unwrap();
+    demote.await.unwrap();
+    assert!(
+        release.await.unwrap().is_err(),
+        "stale admin snapshot cannot release its result"
+    );
+    assert_eq!(
+        f.engine.sample(snapshot).unwrap().status,
+        crate::application::workflow::sample::SampleStatus::Completed
+    );
+    assert!(
+        f.ui(f.admin)
+            .sample_body(
+                f.company,
+                &f.ui(f.owner).detail(f.company, workflow).await.unwrap(),
+                SampleState::default()
+            )
+            .await
+            .is_err(),
+        "actual rendering guard refuses current member"
+    );
+}

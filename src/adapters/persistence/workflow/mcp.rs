@@ -17,6 +17,7 @@ use serde_json::Value;
 use std::collections::BTreeSet;
 #[path = "mcp_publication.rs"]
 mod publication_owner;
+pub(super) use publication_owner::capture_on as capture_publication_on;
 pub use publication_owner::{McpPublicationDirectory, McpPublicationSelection};
 #[path = "mcp_runtime.rs"]
 mod runtime;

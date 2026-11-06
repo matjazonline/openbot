@@ -15,15 +15,14 @@ fn write_error(error: sqlx::Error) -> AppError {
 #[async_trait]
 impl AgentPublications for PostgresPersistence {
     async fn preview_agent(&self, scope: AgentPublicationScope) -> AppResult<AgentPreview> {
-        let mut tx = begin_authorized(self, scope).await?;
-        let (draft_revision, definition) = capture::capture_on(&mut tx, scope).await?;
-        let active_revision = storage::active_on(&mut tx, scope).await?;
+        let mut tx = self.pool().begin().await?;
+        sqlx::query("SELECT set_config('lock_timeout','1000ms',true),set_config('statement_timeout','5000ms',true)").execute(&mut *tx).await?;
+        let preview = LockedAgentPublication::lock(&mut tx, scope)
+            .await?
+            .preview()
+            .await?;
         tx.commit().await.map_err(write_error)?;
-        Ok(AgentPreview {
-            draft_revision,
-            active_revision,
-            definition,
-        })
+        Ok(preview)
     }
 
     async fn publish_agent(&self, request: PublishAgent) -> AppResult<PublishedAgentRevision> {

@@ -17,11 +17,12 @@ impl Session {
             .compiled()
             .child_control(&activation.step)
             .ok_or_else(|| refused("Missing frozen child control"))?;
-        let child = bundle
-            .children()
-            .get(&control.child_version_id)
-            .ok_or_else(|| refused("Child is absent from the frozen closure"))?
-            .clone();
+        let child = definitions::workflow_from(
+            &self.workflows,
+            bundle.company_id(),
+            control.child_workflow_id,
+            control.child_version_id,
+        )?;
         let mut input = activation
             .inputs
             .get("input")

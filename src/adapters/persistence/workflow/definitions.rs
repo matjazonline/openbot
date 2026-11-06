@@ -1,6 +1,6 @@
 use super::{authority::*, rows::*, *};
 
-async fn read_draft(
+pub(super) async fn read_draft(
     db: &mut PgConnection,
     company: CompanyId,
     workflow: WorkflowId,

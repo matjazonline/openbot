@@ -1,0 +1,29 @@
+[
+  {
+    "log": "author-sqlx-prepare-07.log",
+    "command": [
+      "cargo",
+      "sqlx",
+      "prepare",
+      "--",
+      "--all-targets",
+      "--offline"
+    ],
+    "started_at": "2026-11-06T06:36:16.439926+00:00",
+    "exit_code": 0,
+    "finished_at": "2026-11-06T06:37:14.399385+00:00"
+  },
+  {
+    "log": "author-targeted-compile-36.log",
+    "command": [
+      "cargo",
+      "test",
+      "--offline",
+      "--lib",
+      "--no-run"
+    ],
+    "started_at": "2026-11-06T06:37:14.399725+00:00",
+    "exit_code": 0,
+    "finished_at": "2026-11-06T06:38:59.530610+00:00"
+  }
+]

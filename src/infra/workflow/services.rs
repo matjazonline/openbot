@@ -95,10 +95,21 @@ impl WorkflowServices {
     /// An isolated sample receives only inert validated content and scripted data.
     pub fn sample(
         &self,
-        bundle: Arc<crate::application::workflow::publication::PublishedBundle>,
-        request: crate::application::workflow::sample::SampleRequest,
+        sample: crate::application::workflow::sample::PreparedSample,
     ) -> crate::app_error::AppResult<crate::application::workflow::sample::SampleReport> {
-        crate::application::workflow::sample::execute(bundle, request)
+        crate::application::workflow::sample::execute(sample)
+    }
+    pub fn sample_capture(
+        &self,
+        http: Vec<HttpPublicationSelection>,
+        mcp: Vec<McpPublicationSelection>,
+    ) -> crate::adapters::persistence::workflow::SampleCapture {
+        crate::adapters::persistence::workflow::SampleCapture {
+            persistence: self.persistence.clone(),
+            http,
+            mcp,
+            refused_kinds: UNHANDLED_STEP_KINDS,
+        }
     }
 
     pub fn decisions(&self) -> &dyn crate::application::workflow::decisions::WorkflowDecisions {

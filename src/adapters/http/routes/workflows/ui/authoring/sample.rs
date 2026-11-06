@@ -1,5 +1,7 @@
 use super::*;
+use crate::application::workflow::lifecycle::DefinitionTarget;
 use crate::application::workflow::sample::{MAX_SAMPLE_BYTES, SampleReport, SampleRequest};
+use crate::application::workflow::sample_capture::SampleDefinitionCapture;
 
 #[derive(Default)]
 pub(super) struct SampleState {
@@ -31,6 +33,14 @@ impl Ui {
         });
         let selection_html =
             pages::workflow_selection_fieldset(needs.as_ref(), &options, &selections, too_many, "");
+        self.engine
+            .sample_capture(vec![], vec![])
+            .authorize_release(DefinitionTarget {
+                company: super::company(company),
+                actor: self.actor()?,
+                workflow: detail.summary.workflow,
+            })
+            .await?;
         Ok(pages::workflow_sample(&pages::SampleView {
             company,
             workflow: detail.summary.workflow.as_uuid(),
@@ -98,7 +108,7 @@ async fn run_sample(
         serde_json::from_str(raw)
             .map_err(|error| AppError::BadRequest(format!("Invalid sample JSON: {error}")))
     };
-    let mut request = SampleRequest {
+    let request = SampleRequest {
         agents: vec![],
         input: parse(&inputs.input)?,
         params: parse(&inputs.params)?,
@@ -106,32 +116,14 @@ async fn run_sample(
             .map_err(|error| AppError::BadRequest(format!("Invalid scripts: {error}")))?,
     };
     let (http, mcp) = selection_bodies(selections);
-    let bundle = validate_draft(
-        &ui.engine,
-        company,
-        ui.actor()?,
-        workflow,
-        revision,
-        &http,
-        &mcp,
+    let target = DefinitionTarget {
+        company: super::company(company),
+        actor: ui.actor()?,
+        workflow: crate::domain::workflow::WorkflowId::new(workflow),
+    };
+    let prepared = super::super::super::definitions::capture_sample(
+        &ui.engine, target, revision, &http, &mcp, request,
     )
     .await?;
-    let actor = ui.actor()?;
-    for agent in bundle.frozen_agent_ids() {
-        let scope = crate::application::agent::AgentPublicationScope {
-            company: super::company(company),
-            actor,
-            agent: crate::entities::agent_capability::AgentId::new(agent),
-        };
-        let revision = ui
-            .engine
-            .agent_publications()
-            .active_agent_revision(scope)
-            .await?
-            .ok_or_else(|| {
-                AppError::BadRequest("A sample agent has no active published revision".into())
-            })?;
-        request.agents.push(revision.definition);
-    }
-    Ok(ui.engine.sample(bundle, request)?)
+    Ok(ui.engine.sample(prepared)?)
 }
