@@ -51,7 +51,7 @@ pub(super) struct Setup {
     pub(super) kind: WorkflowStepKind,
 }
 #[derive(Clone, Copy)]
-pub(super) enum Entrance {
+pub(in crate::adapters::persistence::workflow::tests) enum Entrance {
     Http,
     Tool,
 }
@@ -117,7 +117,7 @@ pub(super) async fn setup_scoped(origin: &str, entrance: Entrance, scope: HttpTe
         ),
     }
 }
-pub(super) async fn configured(
+pub(in crate::adapters::persistence::workflow::tests) async fn configured(
     fixture: &Fixture,
     origin: &str,
     entrance: Entrance,

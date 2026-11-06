@@ -12,7 +12,7 @@ use std::{collections::BTreeMap, time::Duration};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 #[path = "http_test_support.rs"]
-mod support;
+pub(super) mod support;
 use support::*;
 
 #[path = "http_authority_tests.rs"]

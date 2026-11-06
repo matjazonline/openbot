@@ -1,0 +1,13 @@
+{
+  "native_export": "final-agent-browser-export-08.log",
+  "browser_argv": [
+    "node",
+    "--test",
+    "--test-concurrency=1",
+    "scripts/tests/agent-authoring-browser.mjs"
+  ],
+  "fixtures": "/Users/mac02/dev/openbot-recovery/.worktrees/autonomous-p07/plan/02-autonomous-agent/phases/p07/docs/logs/agent-authoring-browser-fixtures-final-08",
+  "chrome": "/Users/mac02/dev/openbot-recovery/.worktrees/autonomous-p03-browser-1193-jiexgad5/extracted/chrome-mac/headless_shell",
+  "source_compile": "author-final-compile-08.log",
+  "both_exit_zero": true
+}

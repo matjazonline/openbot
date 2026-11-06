@@ -1,0 +1,21 @@
+{
+  "segment": "13",
+  "reported_metrics": [
+    3245,
+    3485,
+    9436,
+    54583,
+    6220
+  ],
+  "final_source_audit_metrics": [
+    1242,
+    1236,
+    2122,
+    142,
+    1174,
+    607,
+    2963
+  ],
+  "total_reported_tokens_saved": 86455,
+  "basis": "Graft reported estimates only; no pricing available"
+}

@@ -1,0 +1,18 @@
+{
+  "segment": "10",
+  "reported_metrics": [
+    3743176,
+    2788,
+    23042,
+    5528,
+    25493,
+    3158,
+    833,
+    5162,
+    65530,
+    13738
+  ],
+  "total_reported_tokens_saved": 3888448,
+  "basis": "Reported Graft estimates; first value is full-repository orientation-map baseline, not a measured avoided read",
+  "pricing_available": false
+}

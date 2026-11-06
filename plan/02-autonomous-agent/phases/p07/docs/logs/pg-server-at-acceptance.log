@@ -1,0 +1,1313 @@
+2026-11-06 19:55:21.073 CET [77158] LOG:  starting PostgreSQL 18.6 (Homebrew) on aarch64-apple-darwin24.6.0, compiled by Apple clang version 17.0.0 (clang-1700.6.4.2), 64-bit
+2026-11-06 19:55:21.074 CET [77158] LOG:  listening on IPv4 address "127.0.0.1", port 55607
+2026-11-06 19:55:21.074 CET [77158] LOG:  listening on Unix socket "/Users/mac02/dev/openbot-recovery/.worktrees/pg-autonomous-p07-socket/.s.PGSQL.55607"
+2026-11-06 19:55:21.076 CET [77164] LOG:  database system was shut down at 2026-11-06 19:55:21 CET
+2026-11-06 19:55:21.077 CET [77158] LOG:  database system is ready to accept connections
+2026-11-06 20:00:21.081 CET [77162] LOG:  checkpoint starting: time
+2026-11-06 20:04:51.114 CET [77162] LOG:  checkpoint complete: wrote 3172 buffers (19.4%), wrote 3 SLRU buffers; 0 WAL file(s) added, 0 removed, 2 recycled; write=269.977 s, sync=0.055 s, total=270.034 s; sync files=2116, longest=0.001 s, average=0.001 s; distance=25612 kB, estimate=25612 kB; lsn=0/3090170, redo lsn=0/30900E0
+2026-11-06 20:05:01.101 CET [79654] FATAL:  terminating connection due to administrator command
+2026-11-06 20:05:01.101 CET [79659] FATAL:  terminating connection due to administrator command
+2026-11-06 20:05:01.101 CET [79656] FATAL:  terminating connection due to administrator command
+2026-11-06 20:05:01.101 CET [79657] FATAL:  terminating connection due to administrator command
+2026-11-06 20:05:01.101 CET [79658] FATAL:  terminating connection due to administrator command
+2026-11-06 20:05:01.205 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:05:01.206 CET [77162] LOG:  checkpoint complete: wrote 3 buffers (0.0%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=0.001 s, sync=0.001 s, total=0.002 s; sync files=4, longest=0.001 s, average=0.001 s; distance=12870 kB, estimate=24338 kB; lsn=0/3D21BC8, redo lsn=0/3D21B70
+2026-11-06 20:10:01.209 CET [77162] LOG:  checkpoint starting: time
+2026-11-06 20:10:01.312 CET [77162] LOG:  checkpoint complete: wrote 1 buffers (0.0%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=0.103 s, sync=0.001 s, total=0.104 s; sync files=2, longest=0.001 s, average=0.001 s; distance=1 kB, estimate=21904 kB; lsn=0/3D22188, redo lsn=0/3D22130
+2026-11-06 20:12:18.083 CET [81029] FATAL:  terminating connection due to administrator command
+2026-11-06 20:12:18.083 CET [81036] FATAL:  terminating connection due to administrator command
+2026-11-06 20:12:18.083 CET [81038] FATAL:  terminating connection due to administrator command
+2026-11-06 20:12:18.083 CET [81037] FATAL:  terminating connection due to administrator command
+2026-11-06 20:12:18.083 CET [81039] FATAL:  terminating connection due to administrator command
+2026-11-06 20:12:18.186 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:12:18.240 CET [77162] LOG:  checkpoint complete: wrote 1954 buffers (11.9%), wrote 3 SLRU buffers; 0 WAL file(s) added, 0 removed, 2 recycled; write=0.036 s, sync=0.018 s, total=0.054 s; sync files=1066, longest=0.001 s, average=0.001 s; distance=25390 kB, estimate=25390 kB; lsn=0/55FCE58, redo lsn=0/55EDBA0
+2026-11-06 20:12:18.747 CET [81028] FATAL:  terminating connection due to administrator command
+2026-11-06 20:12:18.747 CET [81033] FATAL:  terminating connection due to administrator command
+2026-11-06 20:12:18.747 CET [81031] FATAL:  terminating connection due to administrator command
+2026-11-06 20:12:18.747 CET [81032] FATAL:  terminating connection due to administrator command
+2026-11-06 20:12:18.747 CET [81034] FATAL:  terminating connection due to administrator command
+2026-11-06 20:12:18.850 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:12:18.851 CET [77162] LOG:  checkpoint complete: wrote 1 buffers (0.0%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=0.001 s, sync=0.001 s, total=0.002 s; sync files=2, longest=0.001 s, average=0.001 s; distance=566 kB, estimate=22908 kB; lsn=0/567B7C0, redo lsn=0/567B768
+2026-11-06 20:17:18.854 CET [77162] LOG:  checkpoint starting: time
+2026-11-06 20:17:18.958 CET [77162] LOG:  checkpoint complete: wrote 1 buffers (0.0%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=0.103 s, sync=0.001 s, total=0.105 s; sync files=2, longest=0.001 s, average=0.001 s; distance=1 kB, estimate=20617 kB; lsn=0/567BE80, redo lsn=0/567BE28
+2026-11-06 20:18:18.376 CET [82101] FATAL:  terminating connection due to administrator command
+2026-11-06 20:18:18.376 CET [82102] FATAL:  terminating connection due to administrator command
+2026-11-06 20:18:18.376 CET [82104] FATAL:  terminating connection due to administrator command
+2026-11-06 20:18:18.376 CET [82103] FATAL:  terminating connection due to administrator command
+2026-11-06 20:18:18.376 CET [82096] FATAL:  terminating connection due to administrator command
+2026-11-06 20:18:18.479 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:18:18.624 CET [77162] LOG:  checkpoint complete: wrote 5142 buffers (31.4%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 3 recycled; write=0.089 s, sync=0.056 s, total=0.146 s; sync files=3043, longest=0.001 s, average=0.001 s; distance=47004 kB, estimate=47004 kB; lsn=0/894B408, redo lsn=0/8463210
+2026-11-06 20:18:18.812 CET [82099] FATAL:  terminating connection due to administrator command
+2026-11-06 20:18:18.812 CET [82117] FATAL:  terminating connection due to administrator command
+2026-11-06 20:18:18.812 CET [82115] FATAL:  terminating connection due to administrator command
+2026-11-06 20:18:18.812 CET [82116] FATAL:  terminating connection due to administrator command
+2026-11-06 20:18:18.812 CET [82118] FATAL:  terminating connection due to administrator command
+2026-11-06 20:18:18.915 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:18:18.946 CET [82097] FATAL:  terminating connection due to administrator command
+2026-11-06 20:18:18.946 CET [82106] FATAL:  terminating connection due to administrator command
+2026-11-06 20:18:18.946 CET [82105] FATAL:  terminating connection due to administrator command
+2026-11-06 20:18:18.946 CET [82107] FATAL:  terminating connection due to administrator command
+2026-11-06 20:18:18.946 CET [82108] FATAL:  terminating connection due to administrator command
+2026-11-06 20:18:18.961 CET [77162] LOG:  checkpoint complete: wrote 1836 buffers (11.2%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 1 recycled; write=0.026 s, sync=0.020 s, total=0.046 s; sync files=1175, longest=0.001 s, average=0.001 s; distance=16855 kB, estimate=43990 kB; lsn=0/95FB2E8, redo lsn=0/94D9178
+2026-11-06 20:18:18.963 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:18:18.966 CET [77162] LOG:  checkpoint complete: wrote 132 buffers (0.8%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=0.002 s, sync=0.001 s, total=0.003 s; sync files=37, longest=0.001 s, average=0.001 s; distance=1180 kB, estimate=39709 kB; lsn=0/963BAA8, redo lsn=0/96004F0
+2026-11-06 20:18:19.415 CET [82098] FATAL:  terminating connection due to administrator command
+2026-11-06 20:18:19.415 CET [82110] FATAL:  terminating connection due to administrator command
+2026-11-06 20:18:19.415 CET [82109] FATAL:  terminating connection due to administrator command
+2026-11-06 20:18:19.415 CET [82111] FATAL:  terminating connection due to administrator command
+2026-11-06 20:18:19.415 CET [82112] FATAL:  terminating connection due to administrator command
+2026-11-06 20:18:19.518 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:18:19.579 CET [77162] LOG:  checkpoint complete: wrote 2618 buffers (16.0%), wrote 3 SLRU buffers; 0 WAL file(s) added, 0 removed, 1 recycled; write=0.033 s, sync=0.028 s, total=0.062 s; sync files=1386, longest=0.001 s, average=0.001 s; distance=17618 kB, estimate=37500 kB; lsn=0/A823A70, redo lsn=0/A734D58
+2026-11-06 20:18:19.730 CET [82120] FATAL:  terminating connection due to administrator command
+2026-11-06 20:18:19.730 CET [82124] FATAL:  terminating connection due to administrator command
+2026-11-06 20:18:19.730 CET [82125] FATAL:  terminating connection due to administrator command
+2026-11-06 20:18:19.730 CET [82127] FATAL:  terminating connection due to administrator command
+2026-11-06 20:18:19.730 CET [82126] FATAL:  terminating connection due to administrator command
+2026-11-06 20:18:19.833 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:18:19.841 CET [77162] LOG:  checkpoint complete: wrote 415 buffers (2.5%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=0.004 s, sync=0.005 s, total=0.009 s; sync files=174, longest=0.001 s, average=0.001 s; distance=1624 kB, estimate=33912 kB; lsn=0/A8F29F8, redo lsn=0/A8CAE50
+2026-11-06 20:18:20.699 CET [82128] FATAL:  terminating connection due to administrator command
+2026-11-06 20:18:20.699 CET [82130] FATAL:  terminating connection due to administrator command
+2026-11-06 20:18:20.699 CET [82132] FATAL:  terminating connection due to administrator command
+2026-11-06 20:18:20.699 CET [82131] FATAL:  terminating connection due to administrator command
+2026-11-06 20:18:20.699 CET [82133] FATAL:  terminating connection due to administrator command
+2026-11-06 20:18:20.802 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:18:20.803 CET [77162] LOG:  checkpoint complete: wrote 1 buffers (0.0%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=0.001 s, sync=0.001 s, total=0.002 s; sync files=2, longest=0.001 s, average=0.001 s; distance=828 kB, estimate=30604 kB; lsn=0/A99A090, redo lsn=0/A99A038
+2026-11-06 20:23:20.790 CET [77162] LOG:  checkpoint starting: time
+2026-11-06 20:23:20.897 CET [77162] LOG:  checkpoint complete: wrote 1 buffers (0.0%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=0.103 s, sync=0.001 s, total=0.107 s; sync files=2, longest=0.001 s, average=0.001 s; distance=2 kB, estimate=27543 kB; lsn=0/A99AA98, redo lsn=0/A99AA40
+2026-11-06 20:26:23.353 CET [83840] FATAL:  terminating connection due to administrator command
+2026-11-06 20:26:23.353 CET [83847] FATAL:  terminating connection due to administrator command
+2026-11-06 20:26:23.353 CET [83848] FATAL:  terminating connection due to administrator command
+2026-11-06 20:26:23.353 CET [83850] FATAL:  terminating connection due to administrator command
+2026-11-06 20:26:23.353 CET [83849] FATAL:  terminating connection due to administrator command
+2026-11-06 20:26:23.408 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:26:23.566 CET [83839] FATAL:  terminating connection due to administrator command
+2026-11-06 20:26:23.566 CET [83846] FATAL:  terminating connection due to administrator command
+2026-11-06 20:26:23.566 CET [83844] FATAL:  terminating connection due to administrator command
+2026-11-06 20:26:23.566 CET [83845] FATAL:  terminating connection due to administrator command
+2026-11-06 20:26:23.566 CET [83843] FATAL:  terminating connection due to administrator command
+2026-11-06 20:26:23.567 CET [77162] LOG:  checkpoint complete: wrote 5394 buffers (32.9%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 3 recycled; write=0.102 s, sync=0.056 s, total=0.159 s; sync files=3157, longest=0.001 s, average=0.001 s; distance=50219 kB, estimate=50219 kB; lsn=0/DCA7840, redo lsn=0/DAA5960
+2026-11-06 20:26:23.570 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:26:23.584 CET [77162] LOG:  checkpoint complete: wrote 503 buffers (3.1%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=0.005 s, sync=0.007 s, total=0.014 s; sync files=225, longest=0.001 s, average=0.001 s; distance=2208 kB, estimate=45418 kB; lsn=0/DD99F00, redo lsn=0/DCCDC30
+2026-11-06 20:26:23.714 CET [83841] FATAL:  terminating connection due to administrator command
+2026-11-06 20:26:23.714 CET [83861] FATAL:  terminating connection due to administrator command
+2026-11-06 20:26:23.714 CET [83862] FATAL:  terminating connection due to administrator command
+2026-11-06 20:26:23.714 CET [83860] FATAL:  terminating connection due to administrator command
+2026-11-06 20:26:23.714 CET [83859] FATAL:  terminating connection due to administrator command
+2026-11-06 20:26:23.817 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:26:23.921 CET [77162] LOG:  checkpoint complete: wrote 2439 buffers (14.9%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 1 recycled; write=0.081 s, sync=0.023 s, total=0.105 s; sync files=1354, longest=0.001 s, average=0.001 s; distance=15236 kB, estimate=42400 kB; lsn=0/EDBDB60, redo lsn=0/EBAEF20
+2026-11-06 20:26:24.196 CET [83838] FATAL:  terminating connection due to administrator command
+2026-11-06 20:26:24.196 CET [83853] FATAL:  terminating connection due to administrator command
+2026-11-06 20:26:24.196 CET [83855] FATAL:  terminating connection due to administrator command
+2026-11-06 20:26:24.196 CET [83854] FATAL:  terminating connection due to administrator command
+2026-11-06 20:26:24.196 CET [83852] FATAL:  terminating connection due to administrator command
+2026-11-06 20:26:24.299 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:26:24.496 CET [77162] LOG:  checkpoint complete: wrote 2649 buffers (16.2%), wrote 3 SLRU buffers; 0 WAL file(s) added, 0 removed, 1 recycled; write=0.160 s, sync=0.038 s, total=0.198 s; sync files=1964, longest=0.001 s, average=0.001 s; distance=19387 kB, estimate=40099 kB; lsn=0/1071CAB8, redo lsn=0/FE9DE28
+2026-11-06 20:26:24.729 CET [83873] FATAL:  terminating connection due to administrator command
+2026-11-06 20:26:24.729 CET [83874] FATAL:  terminating connection due to administrator command
+2026-11-06 20:26:24.729 CET [83875] FATAL:  terminating connection due to administrator command
+2026-11-06 20:26:24.729 CET [83867] FATAL:  terminating connection due to administrator command
+2026-11-06 20:26:24.729 CET [83876] FATAL:  terminating connection due to administrator command
+2026-11-06 20:26:24.832 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:26:24.901 CET [77162] LOG:  checkpoint complete: wrote 3006 buffers (18.3%), wrote 2 SLRU buffers; 0 WAL file(s) added, 0 removed, 2 recycled; write=0.039 s, sync=0.031 s, total=0.070 s; sync files=1602, longest=0.001 s, average=0.001 s; distance=22194 kB, estimate=38308 kB; lsn=0/1162A708, redo lsn=0/1144A9F0
+2026-11-06 20:26:25.212 CET [83886] FATAL:  terminating connection due to administrator command
+2026-11-06 20:26:25.212 CET [83893] FATAL:  terminating connection due to administrator command
+2026-11-06 20:26:25.212 CET [83896] FATAL:  terminating connection due to administrator command
+2026-11-06 20:26:25.212 CET [83895] FATAL:  terminating connection due to administrator command
+2026-11-06 20:26:25.212 CET [83894] FATAL:  terminating connection due to administrator command
+2026-11-06 20:26:25.213 CET [83877] FATAL:  terminating connection due to administrator command
+2026-11-06 20:26:25.213 CET [83889] FATAL:  terminating connection due to administrator command
+2026-11-06 20:26:25.213 CET [83887] FATAL:  terminating connection due to administrator command
+2026-11-06 20:26:25.213 CET [83890] FATAL:  terminating connection due to administrator command
+2026-11-06 20:26:25.213 CET [83888] FATAL:  terminating connection due to administrator command
+2026-11-06 20:26:25.315 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:26:25.320 CET [77162] LOG:  checkpoint complete: wrote 172 buffers (1.0%), wrote 3 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=0.003 s, sync=0.003 s, total=0.005 s; sync files=121, longest=0.001 s, average=0.001 s; distance=6741 kB, estimate=35152 kB; lsn=0/11AE0E30, redo lsn=0/11AE0080
+2026-11-06 20:26:25.320 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:26:25.321 CET [77162] LOG:  checkpoint complete: wrote 5 buffers (0.0%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=0.001 s, sync=0.001 s, total=0.001 s; sync files=6, longest=0.001 s, average=0.001 s; distance=4 kB, estimate=31637 kB; lsn=0/11AE30E8, redo lsn=0/11AE12C8
+2026-11-06 20:26:25.845 CET [83880] FATAL:  terminating connection due to administrator command
+2026-11-06 20:26:25.845 CET [83881] FATAL:  terminating connection due to administrator command
+2026-11-06 20:26:25.845 CET [83869] FATAL:  terminating connection due to administrator command
+2026-11-06 20:26:25.845 CET [83882] FATAL:  terminating connection due to administrator command
+2026-11-06 20:26:25.845 CET [83883] FATAL:  terminating connection due to administrator command
+2026-11-06 20:26:25.929 CET [83900] FATAL:  terminating connection due to administrator command
+2026-11-06 20:26:25.929 CET [83903] FATAL:  terminating connection due to administrator command
+2026-11-06 20:26:25.929 CET [83902] FATAL:  terminating connection due to administrator command
+2026-11-06 20:26:25.929 CET [83904] FATAL:  terminating connection due to administrator command
+2026-11-06 20:26:25.929 CET [83905] FATAL:  terminating connection due to administrator command
+2026-11-06 20:26:25.948 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:26:25.996 CET [77162] LOG:  checkpoint complete: wrote 1858 buffers (11.3%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 1 recycled; write=0.033 s, sync=0.016 s, total=0.049 s; sync files=1054, longest=0.001 s, average=0.001 s; distance=13079 kB, estimate=29781 kB; lsn=0/127A7308, redo lsn=0/127A72B0
+2026-11-06 20:26:25.998 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:26:25.999 CET [77162] LOG:  checkpoint complete: wrote 1 buffers (0.0%), wrote 0 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=0.001 s, sync=0.001 s, total=0.001 s; sync files=1, longest=0.001 s, average=0.001 s; distance=3 kB, estimate=26803 kB; lsn=0/127A81B0, redo lsn=0/127A8150
+2026-11-06 20:26:26.643 CET [83910] FATAL:  terminating connection due to administrator command
+2026-11-06 20:26:26.643 CET [83912] FATAL:  terminating connection due to administrator command
+2026-11-06 20:26:26.643 CET [83911] FATAL:  terminating connection due to administrator command
+2026-11-06 20:26:26.643 CET [83913] FATAL:  terminating connection due to administrator command
+2026-11-06 20:26:26.643 CET [83914] FATAL:  terminating connection due to administrator command
+2026-11-06 20:26:26.746 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:26:26.748 CET [77162] LOG:  checkpoint complete: wrote 3 buffers (0.0%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 1 recycled; write=0.001 s, sync=0.001 s, total=0.002 s; sync files=4, longest=0.001 s, average=0.001 s; distance=12530 kB, estimate=25376 kB; lsn=0/133E4A30, redo lsn=0/133E49D8
+2026-11-06 20:31:26.749 CET [77162] LOG:  checkpoint starting: time
+2026-11-06 20:31:26.855 CET [77162] LOG:  checkpoint complete: wrote 1 buffers (0.0%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=0.102 s, sync=0.001 s, total=0.107 s; sync files=2, longest=0.001 s, average=0.001 s; distance=3 kB, estimate=22839 kB; lsn=0/133E59B0, redo lsn=0/133E5958
+2026-11-06 20:33:55.164 CET [85229] LOG:  could not receive data from client: Connection reset by peer
+2026-11-06 20:33:55.324 CET [85218] LOG:  unexpected EOF on client connection with an open transaction
+2026-11-06 20:33:55.362 CET [85224] LOG:  unexpected EOF on client connection with an open transaction
+2026-11-06 20:33:56.214 CET [85253] FATAL:  terminating connection due to administrator command
+2026-11-06 20:33:56.214 CET [85262] FATAL:  terminating connection due to administrator command
+2026-11-06 20:33:56.214 CET [85261] FATAL:  terminating connection due to administrator command
+2026-11-06 20:33:56.214 CET [85259] FATAL:  terminating connection due to administrator command
+2026-11-06 20:33:56.214 CET [85260] FATAL:  terminating connection due to administrator command
+2026-11-06 20:33:56.317 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:33:56.462 CET [85252] FATAL:  terminating connection due to administrator command
+2026-11-06 20:33:56.462 CET [85264] FATAL:  terminating connection due to administrator command
+2026-11-06 20:33:56.462 CET [85265] FATAL:  terminating connection due to administrator command
+2026-11-06 20:33:56.462 CET [85267] FATAL:  terminating connection due to administrator command
+2026-11-06 20:33:56.462 CET [85266] FATAL:  terminating connection due to administrator command
+2026-11-06 20:33:56.544 CET [77162] LOG:  checkpoint complete: wrote 3750 buffers (22.9%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 2 recycled; write=0.153 s, sync=0.046 s, total=0.228 s; sync files=2631, longest=0.001 s, average=0.001 s; distance=33748 kB, estimate=33748 kB; lsn=0/15D94800, redo lsn=0/154DA9B8
+2026-11-06 20:33:56.550 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:33:56.568 CET [77162] LOG:  checkpoint complete: wrote 547 buffers (3.3%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=0.010 s, sync=0.008 s, total=0.018 s; sync files=421, longest=0.001 s, average=0.001 s; distance=9413 kB, estimate=31314 kB; lsn=0/15E5B1A0, redo lsn=0/15E0BE40
+2026-11-06 20:33:56.951 CET [85275] FATAL:  terminating connection due to administrator command
+2026-11-06 20:33:56.951 CET [85277] FATAL:  terminating connection due to administrator command
+2026-11-06 20:33:56.951 CET [85256] FATAL:  terminating connection due to administrator command
+2026-11-06 20:33:56.951 CET [85276] FATAL:  terminating connection due to administrator command
+2026-11-06 20:33:56.951 CET [85278] FATAL:  terminating connection due to administrator command
+2026-11-06 20:33:57.057 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:33:57.306 CET [85257] FATAL:  terminating connection due to administrator command
+2026-11-06 20:33:57.306 CET [85282] FATAL:  terminating connection due to administrator command
+2026-11-06 20:33:57.306 CET [85284] FATAL:  terminating connection due to administrator command
+2026-11-06 20:33:57.306 CET [85281] FATAL:  terminating connection due to administrator command
+2026-11-06 20:33:57.306 CET [85283] FATAL:  terminating connection due to administrator command
+2026-11-06 20:33:57.432 CET [77162] LOG:  checkpoint complete: wrote 2572 buffers (15.7%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 2 recycled; write=0.353 s, sync=0.022 s, total=0.375 s; sync files=1238, longest=0.001 s, average=0.001 s; distance=20500 kB, estimate=30233 kB; lsn=0/17DB2FA8, redo lsn=0/172110F0
+2026-11-06 20:33:57.434 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:33:57.442 CET [77162] LOG:  checkpoint complete: wrote 618 buffers (3.8%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=0.005 s, sync=0.003 s, total=0.008 s; sync files=68, longest=0.001 s, average=0.001 s; distance=11958 kB, estimate=28405 kB; lsn=0/17E2E568, redo lsn=0/17DBEBC8
+2026-11-06 20:33:57.915 CET [85274] FATAL:  terminating connection due to administrator command
+2026-11-06 20:33:57.915 CET [85296] FATAL:  terminating connection due to administrator command
+2026-11-06 20:33:57.915 CET [85295] FATAL:  terminating connection due to administrator command
+2026-11-06 20:33:57.915 CET [85298] FATAL:  terminating connection due to administrator command
+2026-11-06 20:33:57.915 CET [85297] FATAL:  terminating connection due to administrator command
+2026-11-06 20:33:58.017 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:33:58.052 CET [85272] FATAL:  terminating connection due to administrator command
+2026-11-06 20:33:58.052 CET [85290] FATAL:  terminating connection due to administrator command
+2026-11-06 20:33:58.052 CET [85291] FATAL:  terminating connection due to administrator command
+2026-11-06 20:33:58.052 CET [85289] FATAL:  terminating connection due to administrator command
+2026-11-06 20:33:58.052 CET [85288] FATAL:  terminating connection due to administrator command
+2026-11-06 20:33:58.111 CET [77162] LOG:  checkpoint complete: wrote 3059 buffers (18.7%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 2 recycled; write=0.062 s, sync=0.032 s, total=0.094 s; sync files=1507, longest=0.001 s, average=0.001 s; distance=27812 kB, estimate=28346 kB; lsn=0/19B67698, redo lsn=0/198E7C50
+2026-11-06 20:33:58.114 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:33:58.120 CET [77162] LOG:  checkpoint complete: wrote 269 buffers (1.6%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=0.003 s, sync=0.003 s, total=0.006 s; sync files=118, longest=0.001 s, average=0.001 s; distance=2654 kB, estimate=25777 kB; lsn=0/19BEF428, redo lsn=0/19B7F6F8
+2026-11-06 20:33:58.224 CET [85301] FATAL:  terminating connection due to administrator command
+2026-11-06 20:33:58.224 CET [85303] FATAL:  terminating connection due to administrator command
+2026-11-06 20:33:58.224 CET [85304] FATAL:  terminating connection due to administrator command
+2026-11-06 20:33:58.224 CET [85302] FATAL:  terminating connection due to administrator command
+2026-11-06 20:33:58.224 CET [85292] FATAL:  terminating connection due to administrator command
+2026-11-06 20:33:58.235 CET [85308] ERROR:  duplicate key value violates unique constraint "agents_company_slug_key"
+2026-11-06 20:33:58.235 CET [85308] DETAIL:  Key (company_id, slug)=(24561cf8-1b8c-4e55-8c84-b953acbbb34c, taken) already exists.
+2026-11-06 20:33:58.235 CET [85308] STATEMENT:  UPDATE agents AS agent
+	           SET name = $1, slug = $2, provider = $3, model = $4, system_prompt = $5,
+	               description = $6, avatar_url = $7, draft_revision = draft_revision + 1
+	           WHERE id = $8 AND company_id IS NOT DISTINCT FROM $9
+	           RETURNING agent.id, agent.company_id, agent.name, agent.slug::text AS slug, agent.provider, agent.model, agent.system_prompt, agent.description, agent.avatar_url, agent.created_by, agent.created_at, agent.draft_revision
+2026-11-06 20:33:58.327 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:33:58.347 CET [85321] LOG:  unexpected EOF on client connection with an open transaction
+2026-11-06 20:33:58.348 CET [77162] LOG:  checkpoint complete: wrote 716 buffers (4.4%), wrote 3 SLRU buffers; 0 WAL file(s) added, 0 removed, 1 recycled; write=0.006 s, sync=0.015 s, total=0.021 s; sync files=822, longest=0.001 s, average=0.001 s; distance=9025 kB, estimate=24102 kB; lsn=0/1A5442D8, redo lsn=0/1A44FBF8
+2026-11-06 20:33:58.489 CET [85330] ERROR:  canceling statement due to lock timeout
+2026-11-06 20:33:58.489 CET [85330] CONTEXT:  while locking tuple (0,1) in relation "company_mcp_connections"
+2026-11-06 20:33:58.489 CET [85330] STATEMENT:  UPDATE company_mcp_connections SET discovery_json=jsonb_set(discovery_json,'{0,description}','"Edited"'::jsonb) WHERE company_id=$1 AND id=$2
+2026-11-06 20:33:58.553 CET [85294] FATAL:  terminating connection due to administrator command
+2026-11-06 20:33:58.553 CET [85344] FATAL:  terminating connection due to administrator command
+2026-11-06 20:33:58.553 CET [85343] FATAL:  terminating connection due to administrator command
+2026-11-06 20:33:58.553 CET [85342] FATAL:  terminating connection due to administrator command
+2026-11-06 20:33:58.553 CET [85341] FATAL:  terminating connection due to administrator command
+2026-11-06 20:33:58.592 CET [85340] ERROR:  canceling statement due to lock timeout
+2026-11-06 20:33:58.592 CET [85340] CONTEXT:  while locking tuple (0,1) in relation "workflow_mcp_operations"
+2026-11-06 20:33:58.592 CET [85340] STATEMENT:  UPDATE workflow_mcp_operations SET revoked_at=clock_timestamp() WHERE company_id=$1 AND connection_id=$2
+2026-11-06 20:33:58.634 CET [85350] ERROR:  agent publication result is immutable
+2026-11-06 20:33:58.634 CET [85350] CONTEXT:  PL/pgSQL function guard_agent_publication_request() line 6 at RAISE
+2026-11-06 20:33:58.634 CET [85350] STATEMENT:  UPDATE agent_publication_requests SET expected_draft_revision=2 WHERE company_id=$1
+2026-11-06 20:33:58.634 CET [85351] ERROR:  agent publication result is immutable
+2026-11-06 20:33:58.634 CET [85351] CONTEXT:  PL/pgSQL function guard_agent_publication_request() line 6 at RAISE
+2026-11-06 20:33:58.634 CET [85351] STATEMENT:  DELETE FROM agent_publication_requests WHERE company_id=$1
+2026-11-06 20:33:58.656 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:33:58.660 CET [77162] LOG:  checkpoint complete: wrote 106 buffers (0.6%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=0.002 s, sync=0.002 s, total=0.004 s; sync files=80, longest=0.001 s, average=0.001 s; distance=5086 kB, estimate=22200 kB; lsn=0/1A949568, redo lsn=0/1A947540
+2026-11-06 20:33:58.695 CET [85330] ERROR:  canceling statement due to lock timeout
+2026-11-06 20:33:58.695 CET [85330] CONTEXT:  while locking tuple (0,1) in relation "company_mcp_tool_grants"
+2026-11-06 20:33:58.695 CET [85330] STATEMENT:  UPDATE company_mcp_tool_grants SET revoked_at=clock_timestamp() WHERE company_id=$1 AND connection_id=$2 AND revoked_at IS NULL
+2026-11-06 20:33:58.700 CET [85353] ERROR:  insert or update on table "agent_publication_requests" violates foreign key constraint "agent_publication_requests_company_id_agent_id_result_revi_fkey"
+2026-11-06 20:33:58.700 CET [85353] DETAIL:  Key (company_id, agent_id, result_revision)=(3c60b530-a413-4959-9054-1f0da2b8a3a6, 6d504514-68a5-4cfe-91e9-1f43ed4fb34a, eec73ef2-2c21-42a5-b275-cd38e747d3ef) is not present in table "agent_revisions".
+2026-11-06 20:33:58.700 CET [85353] STATEMENT:  INSERT INTO agent_publication_requests(company_id,agent_id,key,expected_draft_revision,result_revision) VALUES($1,$2,'foreign',1,$3)
+2026-11-06 20:33:58.825 CET [85376] ERROR:  update or delete on table "agents" violates foreign key constraint "agent_revisions_company_id_agent_id_fkey" on table "agent_revisions"
+2026-11-06 20:33:58.825 CET [85376] DETAIL:  Key (company_id, id)=(ee0daa58-6701-4495-984b-918acdf82bcf, 95f1efca-cdcd-47b9-ab8e-e2135e4f5da8) is still referenced from table "agent_revisions".
+2026-11-06 20:33:58.825 CET [85376] STATEMENT:  COMMIT
+2026-11-06 20:33:58.825 CET [85376] WARNING:  there is no transaction in progress
+2026-11-06 20:33:58.961 CET [85380] ERROR:  canceling statement due to lock timeout
+2026-11-06 20:33:58.961 CET [85380] CONTEXT:  while updating tuple (1,34) in relation "agents"
+2026-11-06 20:33:58.961 CET [85380] STATEMENT:  UPDATE agents SET system_prompt='Concurrent draft',draft_revision=draft_revision+1 WHERE id=$1
+2026-11-06 20:33:58.961 CET [85381] ERROR:  canceling statement due to lock timeout
+2026-11-06 20:33:58.961 CET [85381] CONTEXT:  while locking tuple (0,10) in relation "skills"
+2026-11-06 20:33:58.961 CET [85381] STATEMENT:  DELETE FROM skills WHERE company_id=$1 AND id=$2
+2026-11-06 20:33:59.067 CET [85385] ERROR:  canceling statement due to lock timeout
+2026-11-06 20:33:59.067 CET [85385] CONTEXT:  while updating tuple (0,9) in relation "skills"
+2026-11-06 20:33:59.067 CET [85385] STATEMENT:  UPDATE skills SET instructions='Concurrent shared text' WHERE id=$1
+2026-11-06 20:33:59.433 CET [85331] ERROR:  canceling statement due to lock timeout
+2026-11-06 20:33:59.433 CET [85331] CONTEXT:  while locking tuple (0,2) in relation "company_mcp_connections"
+2026-11-06 20:33:59.433 CET [85331] STATEMENT:  SELECT connection.company_id, connection.id, connection.access_level::smallint AS access_level, connection.slug,
+	    connection.endpoint_url, connection.enabled, connection.auth_type, connection.revision,
+	    connection.credential_revision, connection.discovery_json,
+	    EXISTS(SELECT 1 FROM company_mcp_credentials AS credential WHERE credential.company_id = connection.company_id AND credential.connection_id = connection.id) AS secret_set,
+	    ARRAY(SELECT grant_row.tool_name FROM company_mcp_tool_grants AS grant_row WHERE grant_row.company_id = connection.company_id AND grant_row.connection_id = connection.id AND grant_row.revoked_at IS NULL ORDER BY grant_row.tool_name) AS tool_grants
+	    FROM company_mcp_connections AS connection WHERE connection.company_id=$1 AND connection.id=$2 AND connection.deleted_at IS NULL FOR SHARE OF connection
+2026-11-06 20:33:59.821 CET [85379] ERROR:  canceling statement due to lock timeout
+2026-11-06 20:33:59.821 CET [85379] CONTEXT:  while locking tuple (0,8) in relation "skills"
+2026-11-06 20:33:59.821 CET [85379] STATEMENT:  SELECT skill.id, skill.company_id, skill.slug::text AS slug, skill.name, skill.description, skill.instructions, skill.created_by, skill.created_at, skill.updated_at,skill.required_tools FROM skills AS skill WHERE skill.company_id=$1 AND skill.id=ANY($2) ORDER BY skill.id FOR SHARE
+2026-11-06 20:33:59.992 CET [85386] ERROR:  canceling statement due to lock timeout
+2026-11-06 20:33:59.992 CET [85386] CONTEXT:  while locking tuple (2,1) in relation "agents"
+2026-11-06 20:33:59.992 CET [85386] STATEMENT:  SELECT id FROM agents WHERE company_id=$1 AND id=$2 FOR UPDATE
+2026-11-06 20:34:00.035 CET [85402] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:00.035 CET [85404] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:00.035 CET [85403] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:00.035 CET [85401] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:00.035 CET [85405] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:00.138 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:34:00.225 CET [77162] LOG:  checkpoint complete: wrote 2495 buffers (15.2%), wrote 3 SLRU buffers; 0 WAL file(s) added, 0 removed, 2 recycled; write=0.062 s, sync=0.026 s, total=0.088 s; sync files=1398, longest=0.001 s, average=0.001 s; distance=27809 kB, estimate=27809 kB; lsn=0/1C7B2160, redo lsn=0/1C46F9D0
+2026-11-06 20:34:00.746 CET [85413] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:00.746 CET [85425] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:00.746 CET [85426] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:00.746 CET [85428] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:00.746 CET [85427] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:00.850 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:34:01.072 CET [85433] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:01.072 CET [85434] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:01.072 CET [85432] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:01.072 CET [85431] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:01.072 CET [85420] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:01.341 CET [77162] LOG:  checkpoint complete: wrote 2285 buffers (13.9%), wrote 3 SLRU buffers; 0 WAL file(s) added, 0 removed, 2 recycled; write=0.467 s, sync=0.024 s, total=0.492 s; sync files=1282, longest=0.001 s, average=0.001 s; distance=30229 kB, estimate=30229 kB; lsn=0/1EC322A0, redo lsn=0/1E1F51A8
+2026-11-06 20:34:01.343 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:34:01.355 CET [77162] LOG:  checkpoint complete: wrote 865 buffers (5.3%), wrote 3 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=0.007 s, sync=0.006 s, total=0.013 s; sync files=199, longest=0.001 s, average=0.001 s; distance=10484 kB, estimate=28255 kB; lsn=0/1EC74128, redo lsn=0/1EC32318
+2026-11-06 20:34:01.422 CET [85439] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:01.422 CET [85436] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:01.422 CET [85424] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:01.422 CET [85437] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:01.422 CET [85438] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:01.526 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:34:01.900 CET [77162] LOG:  checkpoint complete: wrote 2217 buffers (13.5%), wrote 3 SLRU buffers; 0 WAL file(s) added, 0 removed, 1 recycled; write=0.338 s, sync=0.036 s, total=0.375 s; sync files=1778, longest=0.001 s, average=0.001 s; distance=12694 kB, estimate=26699 kB; lsn=0/2046E388, redo lsn=0/1F897DE8
+2026-11-06 20:34:01.967 CET [85448] ERROR:  injected final command commit failure
+2026-11-06 20:34:01.967 CET [85448] CONTEXT:  PL/pgSQL function autonomous_command_fault() line 1 at RAISE
+2026-11-06 20:34:01.967 CET [85448] STATEMENT:  INSERT INTO workflow_provisioning_commands (company_id, command_key, request_digest, actor_id, result) VALUES ($1, $2, $3, $4, $5)
+2026-11-06 20:34:02.125 CET [85445] ERROR:  agent capability identity is immutable
+2026-11-06 20:34:02.125 CET [85445] CONTEXT:  PL/pgSQL function guard_agent_owned_identity() line 10 at RAISE
+2026-11-06 20:34:02.125 CET [85445] STATEMENT:  UPDATE agent_capability_bindings SET alias='redirect' WHERE agent_id=$1
+2026-11-06 20:34:02.127 CET [85445] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:02.127 CET [85454] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:02.127 CET [85453] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:02.127 CET [85455] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:02.127 CET [85456] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:02.172 CET [85448] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:02.172 CET [85443] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:02.172 CET [85450] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:02.172 CET [85447] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:02.172 CET [85449] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:02.230 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:34:02.284 CET [77162] LOG:  checkpoint complete: wrote 2110 buffers (12.9%), wrote 4 SLRU buffers; 0 WAL file(s) added, 0 removed, 2 recycled; write=0.037 s, sync=0.017 s, total=0.054 s; sync files=1014, longest=0.001 s, average=0.001 s; distance=24729 kB, estimate=26502 kB; lsn=0/21231498, redo lsn=0/210BE418
+2026-11-06 20:34:02.286 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:34:02.289 CET [77162] LOG:  checkpoint complete: wrote 144 buffers (0.9%), wrote 0 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=0.002 s, sync=0.001 s, total=0.003 s; sync files=26, longest=0.001 s, average=0.001 s; distance=1532 kB, estimate=24005 kB; lsn=0/21267FD0, redo lsn=0/2123D508
+2026-11-06 20:34:02.392 CET [85416] WARNING:  there is no transaction in progress
+2026-11-06 20:34:02.451 CET [85416] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:02.451 CET [85417] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:02.451 CET [85409] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:02.451 CET [85415] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:02.451 CET [85414] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:02.463 CET [85468] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:02.463 CET [85452] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:02.463 CET [85467] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:02.463 CET [85466] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:02.463 CET [85469] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:02.555 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:34:02.801 CET [85476] ERROR:  agent capability scope mismatch
+2026-11-06 20:34:02.801 CET [85476] CONTEXT:  PL/pgSQL function guard_agent_library_scope() line 6 at RAISE
+2026-11-06 20:34:02.801 CET [85476] STATEMENT:  INSERT INTO agent_capability_bindings(company_id,agent_id,id,alias,kind,builtin) VALUES($1,$2,$3,'lookup','builtin','search_knowledge')
+2026-11-06 20:34:02.802 CET [85464] ERROR:  new row for relation "agent_capability_bindings" violates check constraint "agent_binding_reserved_alias"
+2026-11-06 20:34:02.802 CET [85464] DETAIL:  Failing row contains (e7420bb2-fab1-4722-9021-1284d85884c6, 31c08e79-d5bc-4c0f-aef9-5804fa0378a5, da5d4204-ff6b-4401-9b69-fcf59ca07d42, message.send, builtin, search_knowledge, null, null, null, null, null, null, null, null, null).
+2026-11-06 20:34:02.802 CET [85464] STATEMENT:  INSERT INTO agent_capability_bindings(company_id,agent_id,id,alias,kind,builtin) VALUES($1,$2,$3,'message.send','builtin','search_knowledge')
+2026-11-06 20:34:02.804 CET [85476] ERROR:  insert or update on table "agent_capability_bindings" violates foreign key constraint "agent_capability_bindings_company_id_http_connection_id_op_fkey"
+2026-11-06 20:34:02.804 CET [85476] DETAIL:  Key (company_id, http_connection_id, operation_name)=(e7420bb2-fab1-4722-9021-1284d85884c6, a6448091-ee17-453b-b8e3-0065f2efe4ef, lookup) is not present in table "workflow_http_operations".
+2026-11-06 20:34:02.805 CET [85464] ERROR:  insert or update on table "agent_capability_bindings" violates foreign key constraint "agent_capability_bindings_company_id_http_connection_id_op_fkey"
+2026-11-06 20:34:02.805 CET [85464] DETAIL:  Key (company_id, http_connection_id, operation_name)=(521c8529-1a33-4bef-97ec-e6935df084b4, a6448091-ee17-453b-b8e3-0065f2efe4ef, lookup) is not present in table "workflow_http_operations".
+2026-11-06 20:34:02.807 CET [85474] ERROR:  new row for relation "agent_capability_bindings" violates check constraint "agent_binding_target_shape"
+2026-11-06 20:34:02.807 CET [85474] DETAIL:  Failing row contains (e7420bb2-fab1-4722-9021-1284d85884c6, 31c08e79-d5bc-4c0f-aef9-5804fa0378a5, a0245f19-6529-4212-b799-8d4212e81406, lookup, builtin, null, a6448091-ee17-453b-b8e3-0065f2efe4ef, null, null, null, null, null, null, null, null).
+2026-11-06 20:34:02.807 CET [85474] STATEMENT:  INSERT INTO agent_capability_bindings(company_id,agent_id,id,alias,kind,http_connection_id) VALUES($1,$2,$3,'lookup','builtin',$4)
+2026-11-06 20:34:02.809 CET [85464] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:02.809 CET [85474] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:02.809 CET [85476] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:02.809 CET [85473] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:02.809 CET [85475] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:02.934 CET [77162] LOG:  checkpoint complete: wrote 2276 buffers (13.9%), wrote 3 SLRU buffers; 0 WAL file(s) added, 0 removed, 1 recycled; write=0.365 s, sync=0.014 s, total=0.380 s; sync files=942, longest=0.001 s, average=0.001 s; distance=18013 kB, estimate=23406 kB; lsn=0/22F7AB10, redo lsn=0/223D4968
+2026-11-06 20:34:02.937 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:34:02.944 CET [77162] LOG:  checkpoint complete: wrote 648 buffers (4.0%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=0.005 s, sync=0.003 s, total=0.008 s; sync files=87, longest=0.001 s, average=0.001 s; distance=11987 kB, estimate=22264 kB; lsn=0/22FCBA68, redo lsn=0/22F89758
+2026-11-06 20:34:03.214 CET [85482] ERROR:  canceling statement due to lock timeout
+2026-11-06 20:34:03.214 CET [85482] CONTEXT:  while locking tuple (0,2) in relation "company_mcp_tool_grants"
+2026-11-06 20:34:03.214 CET [85482] STATEMENT:  UPDATE company_mcp_tool_grants SET revoked_at=clock_timestamp() WHERE company_id=$1 AND connection_id=$2 AND tool_name=$3
+2026-11-06 20:34:03.226 CET [85482] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:03.226 CET [85483] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:03.226 CET [85484] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:03.226 CET [85485] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:03.226 CET [85470] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:03.330 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:34:03.473 CET [77162] LOG:  checkpoint complete: wrote 3407 buffers (20.8%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 2 recycled; write=0.107 s, sync=0.036 s, total=0.144 s; sync files=1801, longest=0.001 s, average=0.001 s; distance=24244 kB, estimate=24244 kB; lsn=0/24F74610, redo lsn=0/247368E0
+2026-11-06 20:34:03.863 CET [85500] ERROR:  canceling statement due to lock timeout
+2026-11-06 20:34:03.863 CET [85500] CONTEXT:  while locking tuple (0,2) in relation "company_mcp_tool_grants"
+2026-11-06 20:34:03.863 CET [85500] STATEMENT:  UPDATE company_mcp_tool_grants SET revoked_at=clock_timestamp() WHERE company_id=$1 AND connection_id=$2 AND tool_name=$3
+2026-11-06 20:34:03.870 CET [85487] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:03.870 CET [85500] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:03.870 CET [85501] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:03.870 CET [85499] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:03.870 CET [85498] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:03.972 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:34:04.038 CET [77162] LOG:  checkpoint complete: wrote 2288 buffers (14.0%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 2 recycled; write=0.041 s, sync=0.025 s, total=0.067 s; sync files=1331, longest=0.001 s, average=0.001 s; distance=25407 kB, estimate=25407 kB; lsn=0/263C5530, redo lsn=0/26006558
+2026-11-06 20:34:04.179 CET [85505] ERROR:  canceling statement due to lock timeout
+2026-11-06 20:34:04.179 CET [85505] CONTEXT:  while locking tuple (0,2) in relation "company_mcp_tool_grants"
+	SQL statement "SELECT 1 FROM public.company_mcp_tool_grants WHERE company_id=NEW.company_id
+	            AND connection_id=NEW.connection_id AND tool_name=NEW.name AND revoked_at IS NULL FOR SHARE"
+	PL/pgSQL function guard_mcp_operation_current_grant() line 5 at PERFORM
+2026-11-06 20:34:04.179 CET [85505] STATEMENT:  INSERT INTO workflow_mcp_operations(company_id,connection_id,name,snapshot,approval_required,version) VALUES($1,$2,$3,$4,false,$5)
+2026-11-06 20:34:04.181 CET [85504] ERROR:  active MCP operation requires a current company grant
+2026-11-06 20:34:04.181 CET [85504] CONTEXT:  PL/pgSQL function guard_mcp_operation_current_grant() line 8 at RAISE
+2026-11-06 20:34:04.181 CET [85504] STATEMENT:  INSERT INTO workflow_mcp_operations(company_id,connection_id,name,snapshot,approval_required,version) VALUES($1,$2,$3,$4,false,$5)
+2026-11-06 20:34:04.184 CET [85504] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:04.184 CET [85505] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:04.184 CET [85488] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:04.184 CET [85507] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:04.184 CET [85506] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:04.287 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:34:04.335 CET [77162] LOG:  checkpoint complete: wrote 1675 buffers (10.2%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=0.027 s, sync=0.020 s, total=0.048 s; sync files=1067, longest=0.001 s, average=0.001 s; distance=15436 kB, estimate=24410 kB; lsn=0/270F4C48, redo lsn=0/26F195D0
+2026-11-06 20:34:04.431 CET [85511] ERROR:  MCP operation reactivation requires a fresh review version
+2026-11-06 20:34:04.431 CET [85511] CONTEXT:  PL/pgSQL function guard_mcp_operation_current_grant() line 11 at RAISE
+2026-11-06 20:34:04.431 CET [85511] STATEMENT:  UPDATE workflow_mcp_operations SET revoked_at=NULL WHERE connection_id=$1
+2026-11-06 20:34:04.435 CET [85511] ERROR:  retained MCP grant keys must be revoked, not deleted
+2026-11-06 20:34:04.435 CET [85511] CONTEXT:  PL/pgSQL function guard_retained_mcp_grant() line 5 at RAISE
+2026-11-06 20:34:04.435 CET [85511] STATEMENT:  DELETE FROM company_mcp_tool_grants WHERE connection_id=$1
+2026-11-06 20:34:04.452 CET [85512] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:04.452 CET [85513] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:04.452 CET [85497] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:04.452 CET [85511] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:04.452 CET [85514] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:04.555 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:34:04.601 CET [77162] LOG:  checkpoint complete: wrote 1611 buffers (9.8%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 1 recycled; write=0.028 s, sync=0.019 s, total=0.047 s; sync files=1040, longest=0.002 s, average=0.001 s; distance=15142 kB, estimate=23483 kB; lsn=0/27F0BB68, redo lsn=0/27DE3090
+2026-11-06 20:34:04.900 CET [85509] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:04.900 CET [85520] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:04.900 CET [85522] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:04.900 CET [85523] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:04.900 CET [85521] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:05.003 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:34:05.060 CET [77162] LOG:  checkpoint complete: wrote 1784 buffers (10.9%), wrote 3 SLRU buffers; 0 WAL file(s) added, 0 removed, 2 recycled; write=0.036 s, sync=0.022 s, total=0.057 s; sync files=1172, longest=0.001 s, average=0.001 s; distance=18760 kB, estimate=23010 kB; lsn=0/2946F010, redo lsn=0/29035198
+2026-11-06 20:34:05.170 CET [85527] ERROR:  insert or update on table "agent_manifest_revisions" violates foreign key constraint "agent_manifest_revisions_company_id_agent_id_revision_id_fkey"
+2026-11-06 20:34:05.170 CET [85527] DETAIL:  Key (company_id, agent_id, revision_id)=(798cd2c0-6106-46f6-9010-b16783b0ec98, 85d39c5c-28ba-4cc9-88d4-919a739c0eda, 2e034a80-1302-4757-8e77-64ef274c6344) is not present in table "agent_revisions".
+2026-11-06 20:34:05.183 CET [85526] ERROR:  insert or update on table "run_dependency_manifests" violates foreign key constraint "run_dependency_manifests_company_id_run_id_root_run_id_fkey"
+2026-11-06 20:34:05.183 CET [85526] DETAIL:  Key (company_id, run_id, root_run_id)=(798cd2c0-6106-46f6-9010-b16783b0ec98, 80d60d30-cefc-40ba-b34e-5d837e31ce45, 9ce1b703-21d8-46df-a809-046448b44053) is not present in table "workflow_run_budgets".
+2026-11-06 20:34:05.188 CET [85528] ERROR:  agent revision selections must exactly match immutable manifest
+2026-11-06 20:34:05.188 CET [85528] CONTEXT:  PL/pgSQL function check_agent_manifest_members() line 14 at RAISE
+2026-11-06 20:34:05.188 CET [85528] STATEMENT:  COMMIT
+2026-11-06 20:34:05.188 CET [85528] WARNING:  there is no transaction in progress
+2026-11-06 20:34:05.194 CET [85526] ERROR:  workflow selections and root association must exactly match immutable manifest
+2026-11-06 20:34:05.194 CET [85526] CONTEXT:  PL/pgSQL function check_agent_manifest_members() line 22 at RAISE
+2026-11-06 20:34:05.194 CET [85526] STATEMENT:  COMMIT
+2026-11-06 20:34:05.195 CET [85526] WARNING:  there is no transaction in progress
+2026-11-06 20:34:05.196 CET [85529] ERROR:  run dependency capture is immutable
+2026-11-06 20:34:05.196 CET [85529] CONTEXT:  PL/pgSQL function guard_agent_manifest() line 15 at RAISE
+2026-11-06 20:34:05.196 CET [85529] STATEMENT:  DELETE FROM agent_dependency_manifests WHERE id=$1
+2026-11-06 20:34:05.197 CET [85516] ERROR:  run dependency capture is immutable
+2026-11-06 20:34:05.197 CET [85516] CONTEXT:  PL/pgSQL function guard_agent_manifest() line 15 at RAISE
+2026-11-06 20:34:05.197 CET [85516] STATEMENT:  UPDATE agent_dependency_manifests SET content=content WHERE id=$1
+2026-11-06 20:34:05.198 CET [85528] ERROR:  run dependency capture is immutable
+2026-11-06 20:34:05.198 CET [85528] CONTEXT:  PL/pgSQL function guard_agent_manifest() line 15 at RAISE
+2026-11-06 20:34:05.198 CET [85528] STATEMENT:  DELETE FROM run_dependency_manifests WHERE run_id=$1
+2026-11-06 20:34:05.200 CET [85529] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:05.200 CET [85527] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:05.200 CET [85516] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:05.200 CET [85528] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:05.200 CET [85526] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:05.303 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:34:05.449 CET [77162] LOG:  checkpoint complete: wrote 1653 buffers (10.1%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=0.121 s, sync=0.025 s, total=0.146 s; sync files=1277, longest=0.001 s, average=0.001 s; distance=14342 kB, estimate=22144 kB; lsn=0/2A6365A8, redo lsn=0/29E36A70
+2026-11-06 20:34:05.499 CET [85535] ERROR:  agent capability identity is immutable
+2026-11-06 20:34:05.499 CET [85535] CONTEXT:  PL/pgSQL function guard_agent_owned_identity() line 10 at RAISE
+2026-11-06 20:34:05.499 CET [85535] STATEMENT:  UPDATE agent_revisions SET content=content WHERE id=$1
+2026-11-06 20:34:05.500 CET [85519] ERROR:  agent capability identity is immutable
+2026-11-06 20:34:05.500 CET [85519] CONTEXT:  PL/pgSQL function guard_agent_owned_identity() line 10 at RAISE
+2026-11-06 20:34:05.500 CET [85519] STATEMENT:  DELETE FROM agent_revisions WHERE id=$1
+2026-11-06 20:34:05.502 CET [85533] ERROR:  agent revision bindings must exactly match immutable content
+2026-11-06 20:34:05.502 CET [85533] CONTEXT:  PL/pgSQL function check_agent_revision_members() line 19 at RAISE
+2026-11-06 20:34:05.502 CET [85533] STATEMENT:  COMMIT
+2026-11-06 20:34:05.502 CET [85533] WARNING:  there is no transaction in progress
+2026-11-06 20:34:05.505 CET [85536] ERROR:  insert or update on table "agent_active_revisions" violates foreign key constraint "agent_active_revisions_company_id_agent_id_revision_id_fkey"
+2026-11-06 20:34:05.505 CET [85536] DETAIL:  Key (company_id, agent_id, revision_id)=(c700b4c9-c503-47b1-8943-b56b413e3bb0, 108cb32f-fa13-4ba7-8727-9a2e140b5622, f110408a-468d-48e7-a9ab-ceb309e4a16a) is not present in table "agent_revisions".
+2026-11-06 20:34:05.508 CET [85519] ERROR:  agent revision bindings must exactly match immutable content
+2026-11-06 20:34:05.508 CET [85519] CONTEXT:  PL/pgSQL function check_agent_revision_members() line 19 at RAISE
+2026-11-06 20:34:05.508 CET [85519] STATEMENT:  COMMIT
+2026-11-06 20:34:05.510 CET [85519] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:05.510 CET [85533] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:05.510 CET [85535] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:05.510 CET [85536] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:05.510 CET [85534] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:05.542 CET [85492] WARNING:  there is no transaction in progress
+2026-11-06 20:34:05.595 CET [85491] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:05.595 CET [85492] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:05.595 CET [85493] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:05.595 CET [85479] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:05.595 CET [85490] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:05.613 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:34:05.705 CET [77162] LOG:  checkpoint complete: wrote 1700 buffers (10.4%), wrote 3 SLRU buffers; 0 WAL file(s) added, 0 removed, 1 recycled; write=0.074 s, sync=0.019 s, total=0.093 s; sync files=986, longest=0.001 s, average=0.001 s; distance=15709 kB, estimate=21500 kB; lsn=0/2B1B2948, redo lsn=0/2AD8E070
+2026-11-06 20:34:05.706 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:34:05.718 CET [77162] LOG:  checkpoint complete: wrote 505 buffers (3.1%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 1 recycled; write=0.006 s, sync=0.005 s, total=0.013 s; sync files=164, longest=0.001 s, average=0.001 s; distance=4623 kB, estimate=19812 kB; lsn=0/2B31A400, redo lsn=0/2B212058
+2026-11-06 20:34:05.761 CET [85545] ERROR:  agent revision skills must exactly match immutable content
+2026-11-06 20:34:05.761 CET [85545] CONTEXT:  PL/pgSQL function check_agent_revision_members() line 28 at RAISE
+2026-11-06 20:34:05.761 CET [85545] STATEMENT:  COMMIT
+2026-11-06 20:34:05.761 CET [85545] WARNING:  there is no transaction in progress
+2026-11-06 20:34:05.768 CET [85531] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:05.768 CET [85545] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:05.768 CET [85543] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:05.768 CET [85544] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:05.768 CET [85542] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:05.871 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:34:05.977 CET [77162] LOG:  checkpoint complete: wrote 2424 buffers (14.8%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 1 recycled; write=0.066 s, sync=0.041 s, total=0.107 s; sync files=1296, longest=0.006 s, average=0.001 s; distance=14988 kB, estimate=19330 kB; lsn=0/2C2B5B48, redo lsn=0/2C0B51C0
+2026-11-06 20:34:06.227 CET [85556] ERROR:  canceling statement due to lock timeout
+2026-11-06 20:34:06.227 CET [85556] CONTEXT:  while locking tuple (0,1) in relation "agent_skill_assignments"
+	SQL statement "UPDATE ONLY "public"."agent_skill_assignments" SET "live_skill_id" = NULL WHERE $1 OPERATOR(pg_catalog.=) "live_skill_id""
+2026-11-06 20:34:06.227 CET [85556] STATEMENT:  DELETE FROM skills WHERE company_id=$1 AND id=$2
+2026-11-06 20:34:06.235 CET [85556] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:06.235 CET [85554] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:06.235 CET [85553] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:06.235 CET [85540] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:06.235 CET [85555] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:06.338 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:34:06.400 CET [77162] LOG:  checkpoint complete: wrote 1721 buffers (10.5%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 1 recycled; write=0.040 s, sync=0.021 s, total=0.062 s; sync files=1161, longest=0.001 s, average=0.001 s; distance=17673 kB, estimate=19164 kB; lsn=0/2D643D30, redo lsn=0/2D1F7958
+2026-11-06 20:34:06.440 CET [85563] ERROR:  agent capability identity is immutable
+2026-11-06 20:34:06.440 CET [85563] CONTEXT:  PL/pgSQL function guard_agent_owned_identity() line 10 at RAISE
+2026-11-06 20:34:06.440 CET [85563] STATEMENT:  UPDATE agent_skill_assignments SET live_skill_id=skill_id WHERE id=$1
+2026-11-06 20:34:06.441 CET [85548] ERROR:  retired skill assignment cannot be attached
+2026-11-06 20:34:06.441 CET [85548] CONTEXT:  PL/pgSQL function capture_agent_skill_assignment() line 7 at RAISE
+2026-11-06 20:34:06.441 CET [85548] STATEMENT:  INSERT INTO agent_skills(company_id,agent_id,skill_id,assignment_id,position) VALUES($1,$2,$3,$4,0)
+2026-11-06 20:34:06.448 CET [85563] ERROR:  retired skill assignment cannot be attached
+2026-11-06 20:34:06.448 CET [85563] CONTEXT:  PL/pgSQL function capture_agent_skill_assignment() line 7 at RAISE
+2026-11-06 20:34:06.448 CET [85563] STATEMENT:  UPDATE agent_skills SET assignment_id=$2 WHERE agent_id=$1
+2026-11-06 20:34:06.450 CET [85562] ERROR:  new assignment requires its actual live skill
+2026-11-06 20:34:06.450 CET [85562] CONTEXT:  PL/pgSQL function guard_agent_library_scope() line 11 at RAISE
+2026-11-06 20:34:06.450 CET [85562] STATEMENT:  INSERT INTO agent_skill_assignments(company_id,agent_id,id,skill_id) VALUES($1,$2,$3,$4)
+2026-11-06 20:34:06.452 CET [85563] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:06.452 CET [85548] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:06.452 CET [85562] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:06.452 CET [85561] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:06.452 CET [85560] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:06.555 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:34:06.704 CET [77162] LOG:  checkpoint complete: wrote 1578 buffers (9.6%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=0.128 s, sync=0.021 s, total=0.149 s; sync files=1112, longest=0.001 s, average=0.001 s; distance=13665 kB, estimate=18614 kB; lsn=0/2E364720, redo lsn=0/2DF50090
+2026-11-06 20:34:06.751 CET [85567] FATAL:  database 259199 does not exist
+2026-11-06 20:34:07.187 CET [85577] ERROR:  canceling statement due to lock timeout
+2026-11-06 20:34:07.187 CET [85577] CONTEXT:  while locking tuple (0,1) in relation "agent_skill_assignments"
+2026-11-06 20:34:07.187 CET [85577] STATEMENT:  SELECT live_skill_id FROM agent_skill_assignments WHERE id=$1 FOR SHARE
+2026-11-06 20:34:07.193 CET [85577] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:07.193 CET [85552] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:07.193 CET [85578] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:07.193 CET [85579] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:07.193 CET [85576] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:07.296 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:34:07.362 CET [77162] LOG:  checkpoint complete: wrote 2474 buffers (15.1%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 2 recycled; write=0.037 s, sync=0.029 s, total=0.067 s; sync files=1383, longest=0.001 s, average=0.001 s; distance=27297 kB, estimate=27297 kB; lsn=0/2FE89FC0, redo lsn=0/2F9F87F0
+2026-11-06 20:34:07.392 CET [85583] ERROR:  agent grant incarnation cannot be restored or replaced
+2026-11-06 20:34:07.392 CET [85583] CONTEXT:  PL/pgSQL function guard_agent_live_grant() line 6 at RAISE
+2026-11-06 20:34:07.392 CET [85583] STATEMENT:  UPDATE agent_binding_grants SET revoked_at=NULL WHERE agent_id=$1
+2026-11-06 20:34:07.394 CET [85585] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:07.394 CET [85584] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:07.394 CET [85583] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:07.394 CET [85582] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:07.394 CET [85566] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:07.497 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:34:07.533 CET [77162] LOG:  checkpoint complete: wrote 1568 buffers (9.6%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 1 recycled; write=0.018 s, sync=0.018 s, total=0.036 s; sync files=1033, longest=0.001 s, average=0.001 s; distance=13424 kB, estimate=25910 kB; lsn=0/3082FFA8, redo lsn=0/307149F0
+2026-11-06 20:34:07.765 CET [85573] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:07.765 CET [85592] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:07.765 CET [85594] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:07.765 CET [85591] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:07.765 CET [85593] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:07.869 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:34:08.006 CET [77162] LOG:  checkpoint complete: wrote 1605 buffers (9.8%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 1 recycled; write=0.118 s, sync=0.020 s, total=0.138 s; sync files=1148, longest=0.001 s, average=0.001 s; distance=16088 kB, estimate=24928 kB; lsn=0/31BB0AC8, redo lsn=0/316CAB28
+2026-11-06 20:34:08.466 CET [85601] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:08.466 CET [85588] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:08.466 CET [85599] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:08.466 CET [85598] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:08.466 CET [85600] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:08.541 CET [85606] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:08.541 CET [85604] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:08.541 CET [85590] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:08.541 CET [85607] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:08.541 CET [85605] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:08.569 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:34:08.635 CET [77162] LOG:  checkpoint complete: wrote 2486 buffers (15.2%), wrote 4 SLRU buffers; 0 WAL file(s) added, 0 removed, 1 recycled; write=0.036 s, sync=0.029 s, total=0.067 s; sync files=1799, longest=0.001 s, average=0.001 s; distance=24327 kB, estimate=24868 kB; lsn=0/32FFE200, redo lsn=0/32E8C948
+2026-11-06 20:34:08.638 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:34:08.641 CET [77162] LOG:  checkpoint complete: wrote 145 buffers (0.9%), wrote 0 SLRU buffers; 0 WAL file(s) added, 0 removed, 1 recycled; write=0.001 s, sync=0.002 s, total=0.003 s; sync files=20, longest=0.001 s, average=0.001 s; distance=1518 kB, estimate=22533 kB; lsn=0/33024D08, redo lsn=0/33008250
+2026-11-06 20:34:08.862 CET [85570] ERROR:  injected commit abort
+2026-11-06 20:34:08.862 CET [85570] CONTEXT:  PL/pgSQL function lease_gate() line 1 at RAISE
+2026-11-06 20:34:08.862 CET [85570] STATEMENT:  COMMIT
+2026-11-06 20:34:08.862 CET [85570] WARNING:  there is no transaction in progress
+2026-11-06 20:34:08.862 CET [85570] LOG:  could not send data to client: Broken pipe
+2026-11-06 20:34:08.862 CET [85570] FATAL:  connection to client lost
+2026-11-06 20:34:08.918 CET [85569] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:08.918 CET [85550] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:08.918 CET [85568] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:08.918 CET [85571] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:09.019 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:34:09.020 CET [85603] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:09.020 CET [85614] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:09.020 CET [85615] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:09.020 CET [85613] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:09.020 CET [85612] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:09.368 CET [85624] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:09.368 CET [85625] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:09.368 CET [85626] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:09.368 CET [85617] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:09.368 CET [85627] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:09.514 CET [77162] LOG:  checkpoint complete: wrote 2265 buffers (13.8%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 1 recycled; write=0.479 s, sync=0.016 s, total=0.495 s; sync files=1001, longest=0.001 s, average=0.001 s; distance=17743 kB, estimate=22054 kB; lsn=0/34F8A1C8, redo lsn=0/3415C150
+2026-11-06 20:34:09.517 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:34:09.525 CET [77162] LOG:  checkpoint complete: wrote 743 buffers (4.5%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=0.005 s, sync=0.004 s, total=0.009 s; sync files=128, longest=0.001 s, average=0.001 s; distance=14609 kB, estimate=21309 kB; lsn=0/35054210, redo lsn=0/34FA08C8
+2026-11-06 20:34:09.759 CET [85620] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:09.759 CET [85629] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:09.759 CET [85632] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:09.759 CET [85631] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:09.759 CET [85630] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:09.863 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:34:10.526 CET [85638] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:10.526 CET [85647] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:10.526 CET [85650] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:10.526 CET [85649] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:10.526 CET [85648] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:10.550 CET [77162] LOG:  checkpoint complete: wrote 3313 buffers (20.2%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 2 recycled; write=0.632 s, sync=0.056 s, total=0.688 s; sync files=3038, longest=0.001 s, average=0.001 s; distance=21433 kB, estimate=21433 kB; lsn=0/378FDD18, redo lsn=0/3648EF30
+2026-11-06 20:34:10.553 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:34:10.572 CET [77162] LOG:  checkpoint complete: wrote 1225 buffers (7.5%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 1 recycled; write=0.011 s, sync=0.008 s, total=0.019 s; sync files=269, longest=0.001 s, average=0.001 s; distance=20963 kB, estimate=21386 kB; lsn=0/3798D898, redo lsn=0/37907C90
+2026-11-06 20:34:11.154 CET [85654] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:11.154 CET [85663] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:11.154 CET [85662] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:11.154 CET [85661] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:11.154 CET [85664] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:11.223 CET [85656] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:11.223 CET [85658] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:11.223 CET [85657] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:11.223 CET [85639] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:11.223 CET [85659] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:11.257 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:34:11.314 CET [77162] LOG:  checkpoint complete: wrote 2231 buffers (13.6%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 2 recycled; write=0.037 s, sync=0.020 s, total=0.057 s; sync files=1143, longest=0.001 s, average=0.001 s; distance=28010 kB, estimate=28010 kB; lsn=0/3973A8B0, redo lsn=0/39462498
+2026-11-06 20:34:11.316 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:34:11.322 CET [77162] LOG:  checkpoint complete: wrote 309 buffers (1.9%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=0.003 s, sync=0.003 s, total=0.007 s; sync files=85, longest=0.001 s, average=0.001 s; distance=3050 kB, estimate=25514 kB; lsn=0/3979DB18, redo lsn=0/3975D090
+2026-11-06 20:34:12.024 CET [85673] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:12.025 CET [85679] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:12.025 CET [85680] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:12.025 CET [85681] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:12.025 CET [85678] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:12.066 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:34:12.123 CET [77162] LOG:  checkpoint complete: wrote 2052 buffers (12.5%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 2 recycled; write=0.035 s, sync=0.023 s, total=0.058 s; sync files=1217, longest=0.001 s, average=0.001 s; distance=26989 kB, estimate=26989 kB; lsn=0/3B2F3B20, redo lsn=0/3B1B8520
+2026-11-06 20:34:12.143 CET [85644] ERROR:  injected commit abort
+2026-11-06 20:34:12.143 CET [85644] CONTEXT:  PL/pgSQL function lease_gate() line 1 at RAISE
+2026-11-06 20:34:12.143 CET [85644] STATEMENT:  COMMIT
+2026-11-06 20:34:12.143 CET [85644] WARNING:  there is no transaction in progress
+2026-11-06 20:34:12.143 CET [85644] LOG:  could not send data to client: Broken pipe
+2026-11-06 20:34:12.143 CET [85644] FATAL:  connection to client lost
+2026-11-06 20:34:12.199 CET [85643] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:12.199 CET [85642] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:12.199 CET [85641] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:12.199 CET [85635] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:12.302 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:34:12.375 CET [77162] LOG:  checkpoint complete: wrote 1915 buffers (11.7%), wrote 3 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=0.049 s, sync=0.025 s, total=0.073 s; sync files=998, longest=0.001 s, average=0.001 s; distance=11170 kB, estimate=25407 kB; lsn=0/3BE91F10, redo lsn=0/3BCA0FC0
+2026-11-06 20:34:12.528 CET [85668] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:12.528 CET [85670] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:12.528 CET [85671] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:12.527 CET [85669] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:12.528 CET [85660] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:12.587 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:34:12.745 CET [77162] LOG:  checkpoint complete: wrote 1503 buffers (9.2%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 1 recycled; write=0.129 s, sync=0.029 s, total=0.159 s; sync files=1060, longest=0.003 s, average=0.001 s; distance=10830 kB, estimate=23949 kB; lsn=0/3CE7F090, redo lsn=0/3C734808
+2026-11-06 20:34:13.143 CET [85698] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:13.143 CET [85691] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:13.143 CET [85696] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:13.143 CET [85697] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:13.143 CET [85695] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:13.246 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:34:13.383 CET [77162] LOG:  checkpoint complete: wrote 2584 buffers (15.8%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 1 recycled; write=0.107 s, sync=0.030 s, total=0.137 s; sync files=1638, longest=0.001 s, average=0.001 s; distance=22850 kB, estimate=23839 kB; lsn=0/3E202810, redo lsn=0/3DD85208
+2026-11-06 20:34:13.775 CET [85702] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:13.775 CET [85703] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:13.775 CET [85704] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:13.775 CET [85705] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:13.775 CET [85693] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:13.792 CET [85707] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:13.792 CET [85709] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:13.792 CET [85708] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:13.792 CET [85700] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:13.792 CET [85710] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:13.819 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:34:13.870 CET [77162] LOG:  checkpoint complete: wrote 1734 buffers (10.6%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 1 recycled; write=0.032 s, sync=0.020 s, total=0.052 s; sync files=1156, longest=0.001 s, average=0.001 s; distance=18693 kB, estimate=23325 kB; lsn=0/3F11D3A8, redo lsn=0/3EFC67B8
+2026-11-06 20:34:13.872 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:34:13.878 CET [77162] LOG:  checkpoint complete: wrote 275 buffers (1.7%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 1 recycled; write=0.003 s, sync=0.003 s, total=0.007 s; sync files=91, longest=0.001 s, average=0.001 s; distance=1371 kB, estimate=21129 kB; lsn=0/3F143500, redo lsn=0/3F11D4C8
+2026-11-06 20:34:14.028 CET [85675] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:14.028 CET [85686] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:14.028 CET [85723] FATAL:  terminating autovacuum process due to administrator command
+2026-11-06 20:34:14.028 CET [85723] CONTEXT:  while scanning block 94 of relation "pg_catalog.pg_attribute"
+2026-11-06 20:34:14.028 CET [85683] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:14.028 CET [85684] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:14.028 CET [85685] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:14.130 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:34:14.209 CET [85712] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:14.209 CET [85716] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:14.209 CET [85718] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:14.209 CET [85717] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:14.209 CET [85719] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:14.229 CET [77162] LOG:  checkpoint complete: wrote 2688 buffers (16.4%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 1 recycled; write=0.073 s, sync=0.026 s, total=0.099 s; sync files=1391, longest=0.001 s, average=0.001 s; distance=15603 kB, estimate=20577 kB; lsn=0/402675E0, redo lsn=0/4005A110
+2026-11-06 20:34:14.232 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:34:14.235 CET [77162] LOG:  checkpoint complete: wrote 197 buffers (1.2%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=0.002 s, sync=0.001 s, total=0.003 s; sync files=28, longest=0.001 s, average=0.001 s; distance=2158 kB, estimate=18735 kB; lsn=0/402A1258, redo lsn=0/40275988
+2026-11-06 20:34:14.625 CET [85730] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:14.625 CET [85731] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:14.625 CET [85728] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:14.625 CET [85721] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:14.625 CET [85729] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:14.627 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:34:14.737 CET [77162] LOG:  checkpoint complete: wrote 2752 buffers (16.8%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 1 recycled; write=0.077 s, sync=0.034 s, total=0.111 s; sync files=1632, longest=0.002 s, average=0.001 s; distance=22739 kB, estimate=22739 kB; lsn=0/41EBDA50, redo lsn=0/418AA5E0
+2026-11-06 20:34:15.177 CET [85746] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:15.177 CET [85743] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:15.177 CET [85732] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:15.177 CET [85744] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:15.177 CET [85745] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:15.280 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:34:15.356 CET [77162] LOG:  checkpoint complete: wrote 2300 buffers (14.0%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 2 recycled; write=0.037 s, sync=0.039 s, total=0.077 s; sync files=1340, longest=0.011 s, average=0.001 s; distance=24559 kB, estimate=24559 kB; lsn=0/4350E520, redo lsn=0/430A6340
+2026-11-06 20:34:15.483 CET [85750] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:15.483 CET [85751] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:15.483 CET [85734] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:15.483 CET [85752] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:15.483 CET [85753] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:15.585 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:34:15.640 CET [77162] LOG:  checkpoint complete: wrote 1737 buffers (10.6%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=0.033 s, sync=0.021 s, total=0.055 s; sync files=1128, longest=0.001 s, average=0.001 s; distance=15184 kB, estimate=23621 kB; lsn=0/441D5838, redo lsn=0/43F7A5C0
+2026-11-06 20:34:15.949 CET [85738] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:15.949 CET [85724] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:15.949 CET [85739] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:15.949 CET [85740] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:15.949 CET [85737] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:16.007 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:34:16.042 CET [85776] ERROR:  injected principal failure
+2026-11-06 20:34:16.042 CET [85776] CONTEXT:  PL/pgSQL function library_install_fault() line 1 at RAISE
+2026-11-06 20:34:16.042 CET [85776] STATEMENT:  INSERT INTO principals (id, company_id, kind, agent_id, display_label)
+	           VALUES ($1, $2, 'agent', $3, $4)
+	           ON CONFLICT (company_id, agent_id) WHERE agent_id IS NOT NULL
+	           DO UPDATE SET display_label = EXCLUDED.display_label,
+	                         updated_at = CURRENT_TIMESTAMP
+	           RETURNING id
+2026-11-06 20:34:16.051 CET [85776] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:16.051 CET [85755] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:16.051 CET [85774] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:16.051 CET [85775] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:16.051 CET [85773] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:16.078 CET [77162] LOG:  checkpoint complete: wrote 2569 buffers (15.7%), wrote 2 SLRU buffers; 0 WAL file(s) added, 0 removed, 2 recycled; write=0.043 s, sync=0.027 s, total=0.071 s; sync files=1440, longest=0.001 s, average=0.001 s; distance=19029 kB, estimate=23162 kB; lsn=0/4561DDB8, redo lsn=0/4520FB70
+2026-11-06 20:34:16.080 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:34:16.089 CET [77162] LOG:  checkpoint complete: wrote 331 buffers (2.0%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=0.004 s, sync=0.005 s, total=0.009 s; sync files=188, longest=0.001 s, average=0.001 s; distance=4260 kB, estimate=21272 kB; lsn=0/456C1538, redo lsn=0/45638C98
+2026-11-06 20:34:16.360 CET [85765] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:16.360 CET [85742] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:16.360 CET [85767] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:16.360 CET [85768] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:16.360 CET [85766] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:16.381 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:34:16.413 CET [85788] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:16.413 CET [85786] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:16.413 CET [85770] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:16.413 CET [85785] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:16.413 CET [85787] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:16.480 CET [77162] LOG:  checkpoint complete: wrote 2492 buffers (15.2%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 1 recycled; write=0.073 s, sync=0.025 s, total=0.099 s; sync files=1445, longest=0.001 s, average=0.001 s; distance=15745 kB, estimate=20719 kB; lsn=0/46ACBC78, redo lsn=0/46599128
+2026-11-06 20:34:16.482 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:34:16.489 CET [77162] LOG:  checkpoint complete: wrote 423 buffers (2.6%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=0.003 s, sync=0.005 s, total=0.008 s; sync files=185, longest=0.001 s, average=0.001 s; distance=5427 kB, estimate=19190 kB; lsn=0/46B50BB8, redo lsn=0/46AE6050
+2026-11-06 20:34:16.912 CET [85796] ERROR:  insert or update on table "agent_capability_bindings" violates foreign key constraint "agent_capability_bindings_company_id_http_connection_id_op_fkey"
+2026-11-06 20:34:16.912 CET [85796] DETAIL:  Key (company_id, http_connection_id, operation_name)=(c55c20c6-3a39-4595-9ea2-d8238387027d, 9932396a-d11d-4a4e-bd0c-2a42eb456228, registered.request) is not present in table "workflow_http_operations".
+2026-11-06 20:34:16.912 CET [85796] STATEMENT:  COMMIT
+2026-11-06 20:34:16.912 CET [85796] WARNING:  there is no transaction in progress
+2026-11-06 20:34:16.917 CET [85797] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:16.917 CET [85781] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:16.917 CET [85796] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:16.917 CET [85798] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:16.917 CET [85795] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:17.019 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:34:17.114 CET [77162] LOG:  checkpoint complete: wrote 2700 buffers (16.5%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 2 recycled; write=0.067 s, sync=0.027 s, total=0.095 s; sync files=1491, longest=0.001 s, average=0.001 s; distance=23364 kB, estimate=23364 kB; lsn=0/487E7288, redo lsn=0/481B71E0
+2026-11-06 20:34:17.484 CET [85803] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:17.484 CET [85783] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:17.484 CET [85804] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:17.484 CET [85801] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:17.484 CET [85802] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:17.587 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:34:17.626 CET [85811] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:17.626 CET [85810] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:17.626 CET [85812] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:17.626 CET [85792] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:17.626 CET [85809] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:17.661 CET [77162] LOG:  checkpoint complete: wrote 2730 buffers (16.7%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 1 recycled; write=0.039 s, sync=0.036 s, total=0.075 s; sync files=1849, longest=0.001 s, average=0.001 s; distance=24258 kB, estimate=24258 kB; lsn=0/49B2E618, redo lsn=0/49967AF8
+2026-11-06 20:34:17.664 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:34:17.668 CET [77162] LOG:  checkpoint complete: wrote 203 buffers (1.2%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=0.002 s, sync=0.002 s, total=0.004 s; sync files=58, longest=0.001 s, average=0.001 s; distance=1896 kB, estimate=22022 kB; lsn=0/49BAE078, redo lsn=0/49B41BA0
+2026-11-06 20:34:18.286 CET [85818] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:18.286 CET [85817] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:18.286 CET [85819] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:18.286 CET [85820] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:18.286 CET [85794] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:18.365 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:34:18.522 CET [77162] LOG:  checkpoint complete: wrote 3730 buffers (22.8%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 2 recycled; write=0.092 s, sync=0.065 s, total=0.158 s; sync files=2444, longest=0.008 s, average=0.001 s; distance=30817 kB, estimate=30817 kB; lsn=0/4C0C4B88, redo lsn=0/4B95A1C8
+2026-11-06 20:34:18.555 CET [85825] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:18.555 CET [85806] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:18.555 CET [85826] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:18.555 CET [85824] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:18.555 CET [85827] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:18.656 CET [85830] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:18.656 CET [85831] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:18.656 CET [85832] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:18.656 CET [85829] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:18.656 CET [85821] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:18.658 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:34:18.697 CET [77162] LOG:  checkpoint complete: wrote 2047 buffers (12.5%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 1 recycled; write=0.021 s, sync=0.018 s, total=0.040 s; sync files=947, longest=0.001 s, average=0.001 s; distance=13871 kB, estimate=29122 kB; lsn=0/4C801E58, redo lsn=0/4C6E5F20
+2026-11-06 20:34:18.699 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:34:18.702 CET [77162] LOG:  checkpoint complete: wrote 148 buffers (0.9%), wrote 0 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=0.002 s, sync=0.002 s, total=0.004 s; sync files=52, longest=0.001 s, average=0.001 s; distance=1234 kB, estimate=26334 kB; lsn=0/4C8760F8, redo lsn=0/4C81AA98
+2026-11-06 20:34:19.151 CET [85823] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:19.151 CET [85842] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:19.151 CET [85840] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:19.151 CET [85839] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:19.151 CET [85841] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:19.254 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:34:19.348 CET [85848] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:19.348 CET [85847] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:19.348 CET [85846] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:19.348 CET [85849] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:19.348 CET [85836] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:19.394 CET [77162] LOG:  checkpoint complete: wrote 3411 buffers (20.8%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 2 recycled; write=0.074 s, sync=0.065 s, total=0.140 s; sync files=2091, longest=0.013 s, average=0.001 s; distance=27348 kB, estimate=27348 kB; lsn=0/4E56C270, redo lsn=0/4E2CFE50
+2026-11-06 20:34:19.397 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:34:19.401 CET [77162] LOG:  checkpoint complete: wrote 254 buffers (1.6%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=0.002 s, sync=0.002 s, total=0.004 s; sync files=56, longest=0.001 s, average=0.001 s; distance=2778 kB, estimate=24891 kB; lsn=0/4E5BB0B0, redo lsn=0/4E586A20
+2026-11-06 20:34:19.782 CET [85856] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:19.782 CET [85857] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:19.782 CET [85855] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:19.782 CET [85843] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:19.782 CET [85858] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:19.792 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:34:20.332 CET [77162] LOG:  checkpoint complete: wrote 2752 buffers (16.8%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 1 recycled; write=0.480 s, sync=0.060 s, total=0.540 s; sync files=2627, longest=0.003 s, average=0.001 s; distance=22699 kB, estimate=24672 kB; lsn=0/50C80400, redo lsn=0/4FBB16F0
+2026-11-06 20:34:20.480 CET [85869] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:20.480 CET [85868] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:20.480 CET [85859] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:20.480 CET [85871] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:20.480 CET [85870] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:20.495 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:34:20.557 CET [77162] LOG:  checkpoint complete: wrote 2395 buffers (14.6%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 2 recycled; write=0.039 s, sync=0.024 s, total=0.063 s; sync files=1034, longest=0.001 s, average=0.001 s; distance=25061 kB, estimate=25061 kB; lsn=0/51865DB0, redo lsn=0/5142AB28
+2026-11-06 20:34:20.587 CET [85865] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:20.587 CET [85864] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:20.587 CET [85863] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:20.587 CET [85845] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:20.587 CET [85866] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:20.690 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:34:20.727 CET [85878] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:20.727 CET [85876] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:20.727 CET [85877] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:20.727 CET [85875] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:20.727 CET [85861] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:20.754 CET [77162] LOG:  checkpoint complete: wrote 2078 buffers (12.7%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 1 recycled; write=0.035 s, sync=0.029 s, total=0.064 s; sync files=1174, longest=0.002 s, average=0.001 s; distance=12680 kB, estimate=23822 kB; lsn=0/522292E0, redo lsn=0/5208CB68
+2026-11-06 20:34:20.756 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:34:20.758 CET [77162] LOG:  checkpoint complete: wrote 161 buffers (1.0%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=0.002 s, sync=0.001 s, total=0.003 s; sync files=28, longest=0.001 s, average=0.001 s; distance=1687 kB, estimate=21609 kB; lsn=0/5225ED58, redo lsn=0/522328A0
+2026-11-06 20:34:21.121 CET [85873] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:21.121 CET [85890] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:21.121 CET [85888] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:21.121 CET [85889] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:21.121 CET [85887] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:21.174 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:34:21.301 CET [77162] LOG:  checkpoint complete: wrote 2752 buffers (16.8%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 1 recycled; write=0.086 s, sync=0.041 s, total=0.127 s; sync files=1686, longest=0.003 s, average=0.001 s; distance=22995 kB, estimate=22995 kB; lsn=0/53F6F550, redo lsn=0/538A7510
+2026-11-06 20:34:21.784 CET [85885] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:21.784 CET [85905] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:21.784 CET [85904] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:21.784 CET [85906] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:21.784 CET [85903] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:21.863 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:34:21.983 CET [77162] LOG:  checkpoint complete: wrote 3419 buffers (20.9%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 2 recycled; write=0.081 s, sync=0.040 s, total=0.121 s; sync files=1884, longest=0.001 s, average=0.001 s; distance=29969 kB, estimate=29969 kB; lsn=0/55C274C0, redo lsn=0/555EB990
+2026-11-06 20:34:22.131 CET [85891] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:22.131 CET [85912] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:22.131 CET [85911] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:22.131 CET [85913] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:22.131 CET [85910] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:22.204 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:34:22.423 CET [77162] LOG:  checkpoint complete: wrote 1695 buffers (10.3%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 1 recycled; write=0.186 s, sync=0.033 s, total=0.219 s; sync files=1603, longest=0.001 s, average=0.001 s; distance=15793 kB, estimate=28551 kB; lsn=0/56DA7220, redo lsn=0/56557F38
+2026-11-06 20:34:22.822 CET [85930] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:22.822 CET [85933] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:22.822 CET [85932] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:22.822 CET [85907] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:22.822 CET [85931] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:22.851 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:34:22.981 CET [77162] LOG:  checkpoint complete: wrote 3281 buffers (20.0%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 2 recycled; write=0.091 s, sync=0.040 s, total=0.131 s; sync files=1929, longest=0.001 s, average=0.001 s; distance=29481 kB, estimate=29481 kB; lsn=0/589135B8, redo lsn=0/58222520
+2026-11-06 20:34:23.040 CET [85896] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:23.040 CET [85882] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:23.040 CET [85895] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:23.040 CET [85894] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:23.040 CET [85897] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:23.142 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:34:23.162 CET [77162] LOG:  checkpoint complete: wrote 1163 buffers (7.1%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=0.008 s, sync=0.012 s, total=0.020 s; sync files=643, longest=0.001 s, average=0.001 s; distance=9703 kB, estimate=27503 kB; lsn=0/58CEDEC8, redo lsn=0/58B9C160
+2026-11-06 20:34:23.380 CET [85948] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:23.380 CET [85946] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:23.380 CET [85947] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:23.380 CET [85926] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:23.380 CET [85945] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:23.483 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:34:23.505 CET [85939] ERROR:  insert or update on table "workflow_action_intents" violates foreign key constraint "workflow_action_origin_manifest_fk"
+2026-11-06 20:34:23.505 CET [85939] DETAIL:  Key (company_id, run_id, agent_manifest_id)=(0929dfd6-3dcc-447b-8be9-77f59ef2dd05, c9984fd7-9dc4-4a36-8709-757a8db3f392, 34e2fd97-4b3f-48ed-897b-be59a3a87e6b) is not present in table "run_dependency_manifests".
+2026-11-06 20:34:23.505 CET [85939] STATEMENT:  SET CONSTRAINTS ALL IMMEDIATE
+2026-11-06 20:34:23.506 CET [85943] ERROR:  insert or update on table "workflow_action_intents" violates foreign key constraint "workflow_action_origin_selection_fk"
+2026-11-06 20:34:23.506 CET [85943] DETAIL:  Key (company_id, agent_manifest_id, agent_id, agent_revision_id)=(0929dfd6-3dcc-447b-8be9-77f59ef2dd05, 653f0f6a-df97-414c-98fd-78281e5131fa, 01fc2786-53b4-4081-a9fd-dfcaa3aa1df3, dde17e2f-373a-4494-9479-ce47ff67fd75) is not present in table "agent_manifest_revisions".
+2026-11-06 20:34:23.506 CET [85943] STATEMENT:  SET CONSTRAINTS ALL IMMEDIATE
+2026-11-06 20:34:23.508 CET [85916] ERROR:  insert or update on table "workflow_action_intents" violates foreign key constraint "workflow_action_origin_binding_fk"
+2026-11-06 20:34:23.508 CET [85916] DETAIL:  Key (company_id, agent_revision_id, agent_binding_id)=(0929dfd6-3dcc-447b-8be9-77f59ef2dd05, 53e01431-5476-4429-a1b7-4d49e4732c32, 22f3a6af-ac9b-48e8-a195-289902d63ddc) is not present in table "agent_revision_bindings".
+2026-11-06 20:34:23.508 CET [85916] STATEMENT:  SET CONSTRAINTS ALL IMMEDIATE
+2026-11-06 20:34:23.509 CET [85940] ERROR:  insert or update on table "workflow_action_intents" violates foreign key constraint "workflow_action_origin_selection_fk"
+2026-11-06 20:34:23.509 CET [85940] DETAIL:  Key (company_id, agent_manifest_id, agent_id, agent_revision_id)=(0929dfd6-3dcc-447b-8be9-77f59ef2dd05, 653f0f6a-df97-414c-98fd-78281e5131fa, 00a35a86-8d9f-4acb-8434-db468752cff1, 53e01431-5476-4429-a1b7-4d49e4732c32) is not present in table "agent_manifest_revisions".
+2026-11-06 20:34:23.509 CET [85940] STATEMENT:  SET CONSTRAINTS ALL IMMEDIATE
+2026-11-06 20:34:23.510 CET [85938] ERROR:  new row for relation "workflow_action_intents" violates check constraint "workflow_action_origin_shape"
+2026-11-06 20:34:23.510 CET [85938] DETAIL:  Failing row contains (0, 0, 0929dfd6-3dcc-447b-8be9-77f59ef2dd05, c9984fd7-9dc4-4a36-8709-757a8db3f392, eeea1c90-2d9f-41f8-9e21-88385d69ce3f, 68c3040b-5514-4df9-bd39-37184db95b7d, registered.request, 68c3040b55144df9bd3937184db95b7d68c3040b55144df9bd3937184db95b7d, 545e956a1e908ac664d092c29af36f86a55466a25a459b5a0dc0f2706774b56a, workflow-action:v1:68c3040b55144df9bd3937184db95b7d68c3040b55144..., {"scope": {"run": "c9984fd7-9dc4-4a36-8709-757a8db3f392", "compa..., unevaluated, 2026-11-06 19:34:23.17147+00, workflow, 653f0f6a-df97-414c-98fd-78281e5131fa, 01fc2786-53b4-4081-a9fd-dfcaa3aa1df3, 53e01431-5476-4429-a1b7-4d49e4732c32, 43feada4-ebcc-485f-a2a1-2e531aacf2b5).
+2026-11-06 20:34:23.510 CET [85938] STATEMENT:  INSERT INTO workflow_action_intents SELECT (jsonb_populate_record(NULL::workflow_action_intents,$1)).*
+2026-11-06 20:34:23.510 CET [85939] ERROR:  new row for relation "workflow_action_intents" violates check constraint "workflow_action_origin_content"
+2026-11-06 20:34:23.510 CET [85939] DETAIL:  Failing row contains (0, 0, 0929dfd6-3dcc-447b-8be9-77f59ef2dd05, c9984fd7-9dc4-4a36-8709-757a8db3f392, eeea1c90-2d9f-41f8-9e21-88385d69ce3f, 26dae1d6-9f76-4b5f-8637-0decc2baa74e, registered.request, 26dae1d69f764b5f86370decc2baa74e26dae1d69f764b5f86370decc2baa74e, 545e956a1e908ac664d092c29af36f86a55466a25a459b5a0dc0f2706774b56a, workflow-action:v1:26dae1d69f764b5f86370decc2baa74e26dae1d69f764..., {"scope": {"run": "c9984fd7-9dc4-4a36-8709-757a8db3f392", "compa..., unevaluated, 2026-11-06 19:34:23.17147+00, agent, 653f0f6a-df97-414c-98fd-78281e5131fa, 01fc2786-53b4-4081-a9fd-dfcaa3aa1df3, 53e01431-5476-4429-a1b7-4d49e4732c32, 43feada4-ebcc-485f-a2a1-2e531aacf2b5).
+2026-11-06 20:34:23.510 CET [85939] STATEMENT:  INSERT INTO workflow_action_intents SELECT (jsonb_populate_record(NULL::workflow_action_intents,$1)).*
+2026-11-06 20:34:23.513 CET [85940] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:23.513 CET [85938] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:23.513 CET [85943] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:23.513 CET [85916] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:23.513 CET [85939] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:23.539 CET [77162] LOG:  checkpoint complete: wrote 1903 buffers (11.6%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 1 recycled; write=0.036 s, sync=0.020 s, total=0.056 s; sync files=1161, longest=0.001 s, average=0.001 s; distance=17325 kB, estimate=26485 kB; lsn=0/5A080188, redo lsn=0/59C87648
+2026-11-06 20:34:23.540 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:34:23.552 CET [77162] LOG:  checkpoint complete: wrote 501 buffers (3.1%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 1 recycled; write=0.006 s, sync=0.006 s, total=0.012 s; sync files=170, longest=0.001 s, average=0.001 s; distance=4244 kB, estimate=24261 kB; lsn=0/5A1B98F8, redo lsn=0/5A0AC9F8
+2026-11-06 20:34:23.597 CET [85922] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:23.597 CET [85921] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:23.597 CET [85900] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:23.597 CET [85919] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:23.597 CET [85918] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:23.700 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:34:23.744 CET [77162] LOG:  checkpoint complete: wrote 1957 buffers (11.9%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=0.021 s, sync=0.023 s, total=0.045 s; sync files=1142, longest=0.001 s, average=0.001 s; distance=11389 kB, estimate=22974 kB; lsn=0/5AD073C0, redo lsn=0/5ABCBFD0
+2026-11-06 20:34:24.223 CET [85957] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:24.223 CET [85958] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:24.223 CET [85929] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:24.223 CET [85956] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:24.223 CET [85955] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:24.246 CET [85967] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:24.246 CET [85966] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:24.246 CET [85950] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:24.246 CET [85968] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:24.246 CET [85969] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:24.327 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:34:24.422 CET [77162] LOG:  checkpoint complete: wrote 2426 buffers (14.8%), wrote 3 SLRU buffers; 0 WAL file(s) added, 0 removed, 2 recycled; write=0.063 s, sync=0.032 s, total=0.096 s; sync files=1712, longest=0.001 s, average=0.001 s; distance=25112 kB, estimate=25112 kB; lsn=0/5C71F8F0, redo lsn=0/5C452050
+2026-11-06 20:34:24.423 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:34:24.434 CET [77162] LOG:  checkpoint complete: wrote 433 buffers (2.6%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=0.005 s, sync=0.006 s, total=0.011 s; sync files=217, longest=0.001 s, average=0.001 s; distance=2895 kB, estimate=22890 kB; lsn=0/5C7863D0, redo lsn=0/5C726030
+2026-11-06 20:34:24.588 CET [85963] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:24.588 CET [85972] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:24.588 CET [85974] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:24.588 CET [85973] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:24.588 CET [85975] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:24.691 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:34:24.841 CET [77162] LOG:  checkpoint complete: wrote 2893 buffers (17.7%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 1 recycled; write=0.119 s, sync=0.031 s, total=0.151 s; sync files=1532, longest=0.001 s, average=0.001 s; distance=18330 kB, estimate=22434 kB; lsn=0/5DCA4C98, redo lsn=0/5D90C898
+2026-11-06 20:34:24.998 CET [85965] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:24.998 CET [85984] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:24.998 CET [85985] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:24.998 CET [85982] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:24.998 CET [85983] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:25.101 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:34:25.145 CET [85988] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:25.145 CET [85979] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:25.145 CET [85989] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:25.145 CET [85991] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:25.145 CET [85990] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:25.164 CET [77162] LOG:  checkpoint complete: wrote 2383 buffers (14.5%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 1 recycled; write=0.037 s, sync=0.027 s, total=0.064 s; sync files=1331, longest=0.001 s, average=0.001 s; distance=17710 kB, estimate=21962 kB; lsn=0/5EBE56E0, redo lsn=0/5EA58348
+2026-11-06 20:34:25.167 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:34:25.170 CET [77162] LOG:  checkpoint complete: wrote 143 buffers (0.9%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=0.002 s, sync=0.001 s, total=0.003 s; sync files=22, longest=0.001 s, average=0.001 s; distance=1647 kB, estimate=19930 kB; lsn=0/5EC2B050, redo lsn=0/5EBF40C8
+2026-11-06 20:34:25.532 CET [85981] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:25.532 CET [85998] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:25.532 CET [85999] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:25.532 CET [86001] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:25.532 CET [86000] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:25.574 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:34:25.859 CET [85992] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:25.859 CET [86008] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:25.859 CET [86006] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:25.859 CET [86009] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:25.859 CET [86007] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:26.148 CET [77162] LOG:  checkpoint complete: wrote 2735 buffers (16.7%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 2 recycled; write=0.376 s, sync=0.198 s, total=0.575 s; sync files=1446, longest=0.145 s, average=0.001 s; distance=22801 kB, estimate=22801 kB; lsn=0/6107DC68, redo lsn=0/60238520
+2026-11-06 20:34:26.151 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:34:26.171 CET [77162] LOG:  checkpoint complete: wrote 1242 buffers (7.6%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 1 recycled; write=0.010 s, sync=0.010 s, total=0.020 s; sync files=398, longest=0.001 s, average=0.001 s; distance=14763 kB, estimate=21997 kB; lsn=0/61191BD0, redo lsn=0/610A3380
+2026-11-06 20:34:26.360 CET [86015] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:26.360 CET [86014] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:26.360 CET [86016] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:26.360 CET [86002] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:26.360 CET [86013] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:26.418 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:34:26.515 CET [77162] LOG:  checkpoint complete: wrote 2432 buffers (14.8%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 1 recycled; write=0.070 s, sync=0.027 s, total=0.097 s; sync files=1324, longest=0.001 s, average=0.001 s; distance=16552 kB, estimate=21452 kB; lsn=0/626B6B90, redo lsn=0/620CD5E8
+2026-11-06 20:34:26.862 CET [86024] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:26.862 CET [86023] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:26.862 CET [86025] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:26.862 CET [86004] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:26.862 CET [86022] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:26.965 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:34:27.038 CET [77162] LOG:  checkpoint complete: wrote 2646 buffers (16.1%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 1 recycled; write=0.041 s, sync=0.033 s, total=0.074 s; sync files=1707, longest=0.001 s, average=0.001 s; distance=22750 kB, estimate=22750 kB; lsn=0/639E1940, redo lsn=0/63705038
+2026-11-06 20:34:27.313 CET [86033] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:27.313 CET [86018] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:27.313 CET [86032] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:27.313 CET [86030] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:27.313 CET [86031] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:27.334 CET [86038] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:27.334 CET [86020] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:27.334 CET [86035] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:27.334 CET [86037] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:27.334 CET [86036] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:27.407 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:34:27.579 CET [77162] LOG:  checkpoint complete: wrote 1790 buffers (10.9%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 1 recycled; write=0.139 s, sync=0.033 s, total=0.172 s; sync files=1572, longest=0.001 s, average=0.001 s; distance=20353 kB, estimate=22510 kB; lsn=0/65219118, redo lsn=0/64AE55F0
+2026-11-06 20:34:27.827 CET [86047] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:27.827 CET [86046] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:27.827 CET [86044] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:27.827 CET [86045] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:27.827 CET [86027] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:27.930 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:34:28.024 CET [77162] LOG:  checkpoint complete: wrote 3269 buffers (20.0%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 2 recycled; write=0.064 s, sync=0.031 s, total=0.095 s; sync files=1696, longest=0.001 s, average=0.001 s; distance=24647 kB, estimate=24647 kB; lsn=0/66513408, redo lsn=0/662F72D0
+2026-11-06 20:34:28.276 CET [86053] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:28.276 CET [86040] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:28.276 CET [86054] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:28.276 CET [86055] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:28.276 CET [86052] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:28.312 CET [86050] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:28.312 CET [86061] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:28.312 CET [86059] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:28.312 CET [86060] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:28.312 CET [86058] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:28.379 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:34:28.437 CET [77162] LOG:  checkpoint complete: wrote 2257 buffers (13.8%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 1 recycled; write=0.037 s, sync=0.021 s, total=0.058 s; sync files=1154, longest=0.001 s, average=0.001 s; distance=18602 kB, estimate=24042 kB; lsn=0/6793C5C0, redo lsn=0/67521CF0
+2026-11-06 20:34:28.439 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:34:28.451 CET [77162] LOG:  checkpoint complete: wrote 506 buffers (3.1%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=0.007 s, sync=0.006 s, total=0.013 s; sync files=187, longest=0.001 s, average=0.001 s; distance=4274 kB, estimate=22065 kB; lsn=0/67A95A80, redo lsn=0/6794E620
+2026-11-06 20:34:28.643 CET [86068] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:28.643 CET [86051] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:28.643 CET [86069] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:28.643 CET [86066] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:28.643 CET [86067] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:28.747 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:34:28.853 CET [77162] LOG:  checkpoint complete: wrote 2566 buffers (15.7%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 1 recycled; write=0.075 s, sync=0.032 s, total=0.107 s; sync files=1455, longest=0.001 s, average=0.001 s; distance=18012 kB, estimate=21660 kB; lsn=0/69185010, redo lsn=0/68AE5658
+2026-11-06 20:34:29.008 CET [86079] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:29.008 CET [86062] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:29.008 CET [86076] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:29.008 CET [86077] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:29.008 CET [86078] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:29.110 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:34:29.319 CET [77162] LOG:  checkpoint complete: wrote 1763 buffers (10.8%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 1 recycled; write=0.175 s, sync=0.034 s, total=0.210 s; sync files=1732, longest=0.001 s, average=0.001 s; distance=17587 kB, estimate=21253 kB; lsn=0/6A428170, redo lsn=0/69C12358
+2026-11-06 20:34:29.530 CET [86086] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:29.530 CET [86085] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:29.530 CET [86087] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:29.530 CET [86084] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:29.530 CET [86071] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:29.633 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:34:29.711 CET [77162] LOG:  checkpoint complete: wrote 2643 buffers (16.1%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 2 recycled; write=0.048 s, sync=0.030 s, total=0.079 s; sync files=1704, longest=0.001 s, average=0.001 s; distance=22055 kB, estimate=22055 kB; lsn=0/6B7A6BA0, redo lsn=0/6B19C1A0
+2026-11-06 20:34:30.063 CET [86099] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:30.063 CET [86100] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:30.063 CET [86101] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:30.063 CET [86102] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:30.063 CET [86081] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:30.087 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:34:30.217 CET [77162] LOG:  checkpoint complete: wrote 2752 buffers (16.8%), wrote 3 SLRU buffers; 0 WAL file(s) added, 0 removed, 1 recycled; write=0.098 s, sync=0.032 s, total=0.130 s; sync files=1556, longest=0.001 s, average=0.001 s; distance=23507 kB, estimate=23507 kB; lsn=0/6CE6F0F8, redo lsn=0/6C891150
+2026-11-06 20:34:30.708 CET [86116] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:30.708 CET [86115] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:30.708 CET [86097] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:30.708 CET [86113] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:30.708 CET [86114] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:30.771 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:34:30.852 CET [77162] LOG:  checkpoint complete: wrote 2415 buffers (14.7%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 2 recycled; write=0.051 s, sync=0.029 s, total=0.081 s; sync files=1438, longest=0.001 s, average=0.001 s; distance=25435 kB, estimate=25435 kB; lsn=0/6E648DA8, redo lsn=0/6E167F58
+2026-11-06 20:34:30.907 CET [86093] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:30.907 CET [86074] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:30.907 CET [86092] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:30.907 CET [86091] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:30.907 CET [86094] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:31.010 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:34:31.040 CET [77162] LOG:  checkpoint complete: wrote 1295 buffers (7.9%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=0.011 s, sync=0.019 s, total=0.031 s; sync files=934, longest=0.001 s, average=0.001 s; distance=9231 kB, estimate=23815 kB; lsn=0/6EB5F550, redo lsn=0/6EA6BB98
+2026-11-06 20:34:31.222 CET [86129] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:31.222 CET [86112] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:31.222 CET [86126] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:31.222 CET [86127] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:31.222 CET [86128] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:31.292 CET [86120] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:31.292 CET [86122] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:31.292 CET [86121] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:31.292 CET [86119] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:31.292 CET [86103] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:31.325 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:34:31.384 CET [86109] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:31.384 CET [86106] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:31.384 CET [86107] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:31.384 CET [86108] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:31.384 CET [86090] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:31.495 CET [77162] LOG:  checkpoint complete: wrote 1427 buffers (8.7%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 1 recycled; write=0.151 s, sync=0.019 s, total=0.170 s; sync files=1054, longest=0.001 s, average=0.001 s; distance=14606 kB, estimate=22894 kB; lsn=0/6FD4CA78, redo lsn=0/6F8AF4F0
+2026-11-06 20:34:31.496 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:34:31.503 CET [77162] LOG:  checkpoint complete: wrote 487 buffers (3.0%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=0.004 s, sync=0.003 s, total=0.008 s; sync files=96, longest=0.001 s, average=0.001 s; distance=4766 kB, estimate=21081 kB; lsn=0/6FD97FB8, redo lsn=0/6FD56E58
+2026-11-06 20:34:32.294 CET [86125] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:32.294 CET [86136] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:32.294 CET [86137] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:32.294 CET [86135] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:32.294 CET [86138] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:32.362 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:34:32.551 CET [77162] LOG:  checkpoint complete: wrote 4447 buffers (27.1%), wrote 2 SLRU buffers; 0 WAL file(s) added, 0 removed, 2 recycled; write=0.105 s, sync=0.079 s, total=0.189 s; sync files=2530, longest=0.001 s, average=0.001 s; distance=31689 kB, estimate=31689 kB; lsn=0/7231FB10, redo lsn=0/71C49448
+2026-11-06 20:34:33.076 CET [86148] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:33.076 CET [86167] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:33.076 CET [86166] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:33.076 CET [86168] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:33.076 CET [86169] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:33.100 CET [86161] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:33.100 CET [86159] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:33.100 CET [86158] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:33.100 CET [86160] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:33.100 CET [86147] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:33.104 CET [86142] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:33.104 CET [86152] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:33.104 CET [86153] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:33.104 CET [86151] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:33.104 CET [86150] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:33.140 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:34:33.195 CET [77162] LOG:  checkpoint complete: wrote 1561 buffers (9.5%), wrote 3 SLRU buffers; 0 WAL file(s) added, 0 removed, 2 recycled; write=0.037 s, sync=0.018 s, total=0.056 s; sync files=1056, longest=0.001 s, average=0.001 s; distance=25213 kB, estimate=31041 kB; lsn=0/73622FB0, redo lsn=0/734E88F8
+2026-11-06 20:34:33.999 CET [86187] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:33.999 CET [86185] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:33.999 CET [86184] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:33.999 CET [86186] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:33.999 CET [86181] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:34.102 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:34:34.234 CET [77162] LOG:  checkpoint complete: wrote 3843 buffers (23.5%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 2 recycled; write=0.085 s, sync=0.048 s, total=0.133 s; sync files=2233, longest=0.001 s, average=0.001 s; distance=36487 kB, estimate=36487 kB; lsn=0/75BC5DE0, redo lsn=0/7588A788
+2026-11-06 20:34:34.240 CET [86190] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:34.240 CET [86189] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:34.240 CET [86188] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:34.240 CET [86191] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:34.240 CET [86182] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:34.289 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:34:34.313 CET [77162] LOG:  checkpoint complete: wrote 600 buffers (3.7%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=0.009 s, sync=0.014 s, total=0.024 s; sync files=374, longest=0.001 s, average=0.001 s; distance=6030 kB, estimate=33441 kB; lsn=0/76323BF8, redo lsn=0/75E6E148
+2026-11-06 20:34:34.692 CET [86199] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:34.692 CET [86183] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:34.692 CET [86197] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:34.692 CET [86198] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:34.692 CET [86196] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:34.794 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:34:34.801 CET [86175] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:34.801 CET [86165] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:34.801 CET [86174] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:34.801 CET [86176] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:34.801 CET [86177] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:34.923 CET [77162] LOG:  checkpoint complete: wrote 3139 buffers (19.2%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 2 recycled; write=0.085 s, sync=0.044 s, total=0.130 s; sync files=2002, longest=0.003 s, average=0.001 s; distance=23448 kB, estimate=32442 kB; lsn=0/77836988, redo lsn=0/77554410
+2026-11-06 20:34:34.927 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:34:34.933 CET [77162] LOG:  checkpoint complete: wrote 379 buffers (2.3%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=0.004 s, sync=0.003 s, total=0.007 s; sync files=105, longest=0.001 s, average=0.001 s; distance=3003 kB, estimate=29498 kB; lsn=0/77889F20, redo lsn=0/77843400
+2026-11-06 20:34:35.270 CET [86202] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:35.270 CET [86211] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:35.270 CET [86213] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:35.270 CET [86212] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:35.270 CET [86215] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:35.278 CET [86200] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:35.278 CET [86206] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:35.278 CET [86203] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:35.278 CET [86204] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:35.278 CET [86205] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:35.355 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:34:35.465 CET [77162] LOG:  checkpoint complete: wrote 2523 buffers (15.4%), wrote 3 SLRU buffers; 0 WAL file(s) added, 0 removed, 1 recycled; write=0.080 s, sync=0.030 s, total=0.111 s; sync files=1522, longest=0.001 s, average=0.001 s; distance=22392 kB, estimate=28788 kB; lsn=0/79407F68, redo lsn=0/78E21440
+2026-11-06 20:34:36.083 CET [86225] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:36.083 CET [86224] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:36.083 CET [86216] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:36.083 CET [86223] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:36.083 CET [86222] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:36.186 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:34:36.312 CET [77162] LOG:  checkpoint complete: wrote 4108 buffers (25.1%), wrote 3 SLRU buffers; 0 WAL file(s) added, 0 removed, 2 recycled; write=0.079 s, sync=0.047 s, total=0.127 s; sync files=2651, longest=0.001 s, average=0.001 s; distance=32716 kB, estimate=32716 kB; lsn=0/7B10D6D8, redo lsn=0/7AE145B0
+2026-11-06 20:34:36.319 CET [86230] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:36.319 CET [86238] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:36.319 CET [86235] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:36.319 CET [86236] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:36.319 CET [86237] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:36.395 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:34:36.440 CET [77162] LOG:  checkpoint complete: wrote 1412 buffers (8.6%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 1 recycled; write=0.034 s, sync=0.011 s, total=0.045 s; sync files=551, longest=0.001 s, average=0.001 s; distance=10164 kB, estimate=30461 kB; lsn=0/7BB53D28, redo lsn=0/7B801778
+2026-11-06 20:34:36.448 CET [86218] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:36.448 CET [86232] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:36.448 CET [86234] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:36.448 CET [86233] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:36.448 CET [86231] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:36.550 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:34:36.590 CET [77162] LOG:  checkpoint complete: wrote 1788 buffers (10.9%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 1 recycled; write=0.018 s, sync=0.021 s, total=0.040 s; sync files=1014, longest=0.001 s, average=0.001 s; distance=11568 kB, estimate=28571 kB; lsn=0/7C493E40, redo lsn=0/7C34D998
+2026-11-06 20:34:36.724 CET [86244] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:36.724 CET [86246] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:36.724 CET [86249] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:36.724 CET [86247] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:36.724 CET [86229] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:36.733 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:34:36.773 CET [77162] LOG:  checkpoint complete: wrote 1376 buffers (8.4%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=0.028 s, sync=0.012 s, total=0.041 s; sync files=589, longest=0.001 s, average=0.001 s; distance=10436 kB, estimate=26758 kB; lsn=0/7D0A5CC0, redo lsn=0/7CD7EB90
+2026-11-06 20:34:37.251 CET [86256] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:37.251 CET [86245] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:37.251 CET [86259] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:37.251 CET [86258] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:37.251 CET [86257] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:37.333 CET [86264] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:37.333 CET [86263] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:37.333 CET [86252] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:37.333 CET [86265] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:37.333 CET [86262] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:37.354 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:34:37.408 CET [77162] LOG:  checkpoint complete: wrote 2179 buffers (13.3%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 2 recycled; write=0.035 s, sync=0.019 s, total=0.054 s; sync files=1158, longest=0.001 s, average=0.001 s; distance=24881 kB, estimate=26570 kB; lsn=0/7EA5B158, redo lsn=0/7E5CB210
+2026-11-06 20:34:37.409 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:34:37.422 CET [77162] LOG:  checkpoint complete: wrote 587 buffers (3.6%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=0.006 s, sync=0.006 s, total=0.013 s; sync files=254, longest=0.001 s, average=0.001 s; distance=4810 kB, estimate=24394 kB; lsn=0/7EB432C0, redo lsn=0/7EA7DD60
+2026-11-06 20:34:37.555 CET [86270] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:37.555 CET [86254] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:37.555 CET [86273] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:37.555 CET [86272] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:37.555 CET [86271] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:37.659 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:34:37.756 CET [77162] LOG:  checkpoint complete: wrote 2454 buffers (15.0%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 1 recycled; write=0.072 s, sync=0.025 s, total=0.097 s; sync files=1348, longest=0.001 s, average=0.001 s; distance=15430 kB, estimate=23498 kB; lsn=0/7FFBFDE0, redo lsn=0/7F98F780
+2026-11-06 20:34:38.031 CET [86279] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:38.031 CET [86261] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:38.031 CET [86281] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:38.031 CET [86282] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:38.031 CET [86280] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:38.134 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:34:38.210 CET [77162] LOG:  checkpoint complete: wrote 2426 buffers (14.8%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 2 recycled; write=0.045 s, sync=0.031 s, total=0.077 s; sync files=1759, longest=0.001 s, average=0.001 s; distance=22990 kB, estimate=23447 kB; lsn=0/811D97A0, redo lsn=0/810030E8
+2026-11-06 20:34:38.436 CET [86288] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:38.436 CET [86289] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:38.436 CET [86287] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:38.436 CET [86275] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:38.436 CET [86286] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:38.539 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:34:38.600 CET [77162] LOG:  checkpoint complete: wrote 2266 buffers (13.8%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 1 recycled; write=0.036 s, sync=0.026 s, total=0.062 s; sync files=1415, longest=0.001 s, average=0.001 s; distance=17998 kB, estimate=22902 kB; lsn=0/824007F8, redo lsn=0/82196910
+2026-11-06 20:34:38.649 CET [86295] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:38.649 CET [86293] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:38.649 CET [86278] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:38.649 CET [86296] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:38.649 CET [86294] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:38.688 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:34:38.715 CET [77162] LOG:  checkpoint complete: wrote 1320 buffers (8.1%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=0.016 s, sync=0.011 s, total=0.027 s; sync files=501, longest=0.001 s, average=0.001 s; distance=9394 kB, estimate=21551 kB; lsn=0/82D6A380, redo lsn=0/82AC3320
+2026-11-06 20:34:39.072 CET [86284] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:39.072 CET [86303] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:39.072 CET [86304] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:39.072 CET [86306] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:39.072 CET [86305] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:39.175 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:34:39.248 CET [77162] LOG:  checkpoint complete: wrote 2561 buffers (15.6%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 2 recycled; write=0.039 s, sync=0.034 s, total=0.074 s; sync files=1891, longest=0.001 s, average=0.001 s; distance=22149 kB, estimate=22149 kB; lsn=0/8430E7D8, redo lsn=0/84064940
+2026-11-06 20:34:39.304 CET [86292] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:39.304 CET [86311] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:39.304 CET [86314] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:39.304 CET [86313] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:39.304 CET [86312] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:39.337 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:34:39.365 CET [77162] LOG:  checkpoint complete: wrote 1333 buffers (8.1%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=0.016 s, sync=0.012 s, total=0.028 s; sync files=500, longest=0.001 s, average=0.001 s; distance=9619 kB, estimate=20896 kB; lsn=0/84C477A0, redo lsn=0/849C9558
+2026-11-06 20:34:39.684 CET [86302] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:39.684 CET [86321] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:39.684 CET [86319] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:39.684 CET [86320] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:39.684 CET [86322] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:39.705 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:34:39.759 CET [77162] LOG:  checkpoint complete: wrote 1792 buffers (10.9%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 1 recycled; write=0.032 s, sync=0.022 s, total=0.055 s; sync files=1188, longest=0.001 s, average=0.001 s; distance=15939 kB, estimate=20400 kB; lsn=0/85D510F8, redo lsn=0/8595A1F8
+2026-11-06 20:34:39.936 CET [86328] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:39.936 CET [86329] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:39.936 CET [86309] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:39.936 CET [86330] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:39.936 CET [86331] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:40.031 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:34:40.094 CET [77162] LOG:  checkpoint complete: wrote 1792 buffers (10.9%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 1 recycled; write=0.039 s, sync=0.024 s, total=0.064 s; sync files=1191, longest=0.001 s, average=0.001 s; distance=15390 kB, estimate=19899 kB; lsn=0/86CB6F20, redo lsn=0/86861DA0
+2026-11-06 20:34:40.438 CET [86318] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:40.438 CET [86335] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:40.438 CET [86338] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:40.438 CET [86337] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:40.438 CET [86336] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:40.541 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:34:40.578 CET [77162] LOG:  checkpoint complete: wrote 1581 buffers (9.6%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 1 recycled; write=0.010 s, sync=0.027 s, total=0.038 s; sync files=1572, longest=0.001 s, average=0.001 s; distance=17734 kB, estimate=19683 kB; lsn=0/87AE48A0, redo lsn=0/879B3648
+2026-11-06 20:34:40.769 CET [86340] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:40.769 CET [86341] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:40.769 CET [86343] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:40.769 CET [86342] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:40.769 CET [86325] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:40.871 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:34:40.885 CET [77162] LOG:  checkpoint complete: wrote 767 buffers (4.7%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 1 recycled; write=0.005 s, sync=0.009 s, total=0.015 s; sync files=272, longest=0.001 s, average=0.001 s; distance=6710 kB, estimate=18385 kB; lsn=0/8806FC78, redo lsn=0/880410D0
+2026-11-06 20:34:41.550 CET [86347] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:41.550 CET [86348] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:41.550 CET [86333] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:41.550 CET [86345] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:41.550 CET [86346] FATAL:  terminating connection due to administrator command
+2026-11-06 20:34:41.652 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:34:41.653 CET [77162] LOG:  checkpoint complete: wrote 1 buffers (0.0%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=0.001 s, sync=0.001 s, total=0.001 s; sync files=2, longest=0.001 s, average=0.001 s; distance=1419 kB, estimate=16689 kB; lsn=0/881A3D60, redo lsn=0/881A3D08
+2026-11-06 20:39:41.655 CET [77162] LOG:  checkpoint starting: time
+2026-11-06 20:40:11.023 CET [77162] LOG:  checkpoint complete: wrote 287 buffers (1.8%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=29.304 s, sync=0.029 s, total=29.368 s; sync files=767, longest=0.001 s, average=0.001 s; distance=1669 kB, estimate=15187 kB; lsn=0/883452D8, redo lsn=0/88345248
+2026-11-06 20:44:26.166 CET [88273] FATAL:  terminating connection due to administrator command
+2026-11-06 20:44:26.166 CET [88264] FATAL:  terminating connection due to administrator command
+2026-11-06 20:44:26.166 CET [88271] FATAL:  terminating connection due to administrator command
+2026-11-06 20:44:26.166 CET [88270] FATAL:  terminating connection due to administrator command
+2026-11-06 20:44:26.166 CET [88272] FATAL:  terminating connection due to administrator command
+2026-11-06 20:44:26.194 CET [88266] FATAL:  terminating connection due to administrator command
+2026-11-06 20:44:26.194 CET [88290] FATAL:  terminating connection due to administrator command
+2026-11-06 20:44:26.194 CET [88288] FATAL:  terminating connection due to administrator command
+2026-11-06 20:44:26.194 CET [88291] FATAL:  terminating connection due to administrator command
+2026-11-06 20:44:26.194 CET [88289] FATAL:  terminating connection due to administrator command
+2026-11-06 20:44:26.224 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:44:26.335 CET [77162] LOG:  checkpoint complete: wrote 3498 buffers (21.4%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 3 recycled; write=0.071 s, sync=0.040 s, total=0.112 s; sync files=2107, longest=0.001 s, average=0.001 s; distance=50359 kB, estimate=50359 kB; lsn=0/8B5ECCF8, redo lsn=0/8B473008
+2026-11-06 20:44:26.493 CET [88277] FATAL:  terminating connection due to administrator command
+2026-11-06 20:44:26.493 CET [88265] FATAL:  terminating connection due to administrator command
+2026-11-06 20:44:26.493 CET [88275] FATAL:  terminating connection due to administrator command
+2026-11-06 20:44:26.493 CET [88274] FATAL:  terminating connection due to administrator command
+2026-11-06 20:44:26.493 CET [88276] FATAL:  terminating connection due to administrator command
+2026-11-06 20:44:26.596 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:44:26.692 CET [77162] LOG:  checkpoint complete: wrote 3000 buffers (18.3%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 1 recycled; write=0.065 s, sync=0.031 s, total=0.097 s; sync files=1491, longest=0.001 s, average=0.001 s; distance=16383 kB, estimate=46961 kB; lsn=0/8C6ADB20, redo lsn=0/8C472D40
+2026-11-06 20:44:26.801 CET [88305] FATAL:  terminating connection due to administrator command
+2026-11-06 20:44:26.801 CET [88267] FATAL:  terminating connection due to administrator command
+2026-11-06 20:44:26.801 CET [88304] FATAL:  terminating connection due to administrator command
+2026-11-06 20:44:26.801 CET [88302] FATAL:  terminating connection due to administrator command
+2026-11-06 20:44:26.801 CET [88303] FATAL:  terminating connection due to administrator command
+2026-11-06 20:44:26.903 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:44:26.990 CET [77162] LOG:  checkpoint complete: wrote 2194 buffers (13.4%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 1 recycled; write=0.057 s, sync=0.030 s, total=0.087 s; sync files=1279, longest=0.001 s, average=0.001 s; distance=15358 kB, estimate=43801 kB; lsn=0/8D64EB18, redo lsn=0/8D3725B8
+2026-11-06 20:44:27.084 CET [88320] FATAL:  terminating connection due to administrator command
+2026-11-06 20:44:27.084 CET [88321] FATAL:  terminating connection due to administrator command
+2026-11-06 20:44:27.084 CET [88322] FATAL:  terminating connection due to administrator command
+2026-11-06 20:44:27.084 CET [88323] FATAL:  terminating connection due to administrator command
+2026-11-06 20:44:27.084 CET [88309] FATAL:  terminating connection due to administrator command
+2026-11-06 20:44:27.128 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:44:27.274 CET [77162] LOG:  checkpoint complete: wrote 1385 buffers (8.5%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=0.120 s, sync=0.026 s, total=0.147 s; sync files=995, longest=0.003 s, average=0.001 s; distance=10841 kB, estimate=40505 kB; lsn=0/8E51F5C0, redo lsn=0/8DE08B38
+2026-11-06 20:44:28.186 CET [88355] FATAL:  terminating connection due to administrator command
+2026-11-06 20:44:28.186 CET [88352] FATAL:  terminating connection due to administrator command
+2026-11-06 20:44:28.186 CET [88353] FATAL:  terminating connection due to administrator command
+2026-11-06 20:44:28.186 CET [88324] FATAL:  terminating connection due to administrator command
+2026-11-06 20:44:28.186 CET [88354] FATAL:  terminating connection due to administrator command
+2026-11-06 20:44:28.256 CET [88338] FATAL:  terminating connection due to administrator command
+2026-11-06 20:44:28.256 CET [88337] FATAL:  terminating connection due to administrator command
+2026-11-06 20:44:28.256 CET [88339] FATAL:  terminating connection due to administrator command
+2026-11-06 20:44:28.256 CET [88340] FATAL:  terminating connection due to administrator command
+2026-11-06 20:44:28.256 CET [88310] FATAL:  terminating connection due to administrator command
+2026-11-06 20:44:28.288 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:44:28.372 CET [77162] LOG:  checkpoint complete: wrote 3746 buffers (22.9%), wrote 3 SLRU buffers; 0 WAL file(s) added, 0 removed, 2 recycled; write=0.042 s, sync=0.042 s, total=0.084 s; sync files=2075, longest=0.001 s, average=0.001 s; distance=34178 kB, estimate=39872 kB; lsn=0/900220F8, redo lsn=0/8FF69708
+2026-11-06 20:44:28.376 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:44:28.381 CET [77162] LOG:  checkpoint complete: wrote 170 buffers (1.0%), wrote 2 SLRU buffers; 0 WAL file(s) added, 0 removed, 1 recycled; write=0.003 s, sync=0.003 s, total=0.006 s; sync files=94, longest=0.001 s, average=0.001 s; distance=739 kB, estimate=35959 kB; lsn=0/900243A8, redo lsn=0/90022560
+2026-11-06 20:44:28.397 CET [88372] FATAL:  terminating connection due to administrator command
+2026-11-06 20:44:28.397 CET [88370] FATAL:  terminating connection due to administrator command
+2026-11-06 20:44:28.397 CET [88369] FATAL:  terminating connection due to administrator command
+2026-11-06 20:44:28.397 CET [88371] FATAL:  terminating connection due to administrator command
+2026-11-06 20:44:28.397 CET [88344] FATAL:  terminating connection due to administrator command
+2026-11-06 20:44:28.500 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:44:28.587 CET [77162] LOG:  checkpoint complete: wrote 2099 buffers (12.8%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=0.069 s, sync=0.019 s, total=0.088 s; sync files=1026, longest=0.001 s, average=0.001 s; distance=10003 kB, estimate=33363 kB; lsn=0/90D74838, redo lsn=0/909E74D0
+2026-11-06 20:44:29.179 CET [88383] FATAL:  terminating connection due to administrator command
+2026-11-06 20:44:29.179 CET [88386] FATAL:  terminating connection due to administrator command
+2026-11-06 20:44:29.179 CET [88384] FATAL:  terminating connection due to administrator command
+2026-11-06 20:44:29.179 CET [88385] FATAL:  terminating connection due to administrator command
+2026-11-06 20:44:29.179 CET [88378] FATAL:  terminating connection due to administrator command
+2026-11-06 20:44:29.282 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:44:29.324 CET [88336] FATAL:  terminating connection due to administrator command
+2026-11-06 20:44:29.324 CET [88364] FATAL:  terminating connection due to administrator command
+2026-11-06 20:44:29.324 CET [88365] FATAL:  terminating connection due to administrator command
+2026-11-06 20:44:29.324 CET [88363] FATAL:  terminating connection due to administrator command
+2026-11-06 20:44:29.324 CET [88366] FATAL:  terminating connection due to administrator command
+2026-11-06 20:44:29.348 CET [77162] LOG:  checkpoint complete: wrote 2605 buffers (15.9%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 2 recycled; write=0.033 s, sync=0.033 s, total=0.066 s; sync files=1904, longest=0.001 s, average=0.001 s; distance=27062 kB, estimate=32733 kB; lsn=0/9265F670, redo lsn=0/92455038
+2026-11-06 20:44:29.350 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:44:29.355 CET [77162] LOG:  checkpoint complete: wrote 228 buffers (1.4%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=0.003 s, sync=0.002 s, total=0.005 s; sync files=73, longest=0.001 s, average=0.001 s; distance=2153 kB, estimate=29675 kB; lsn=0/926B41F8, redo lsn=0/9266F7D8
+2026-11-06 20:44:29.667 CET [88390] FATAL:  terminating connection due to administrator command
+2026-11-06 20:44:29.667 CET [88380] FATAL:  terminating connection due to administrator command
+2026-11-06 20:44:29.667 CET [88387] FATAL:  terminating connection due to administrator command
+2026-11-06 20:44:29.667 CET [88388] FATAL:  terminating connection due to administrator command
+2026-11-06 20:44:29.667 CET [88389] FATAL:  terminating connection due to administrator command
+2026-11-06 20:44:29.668 CET [88398] FATAL:  terminating autovacuum process due to administrator command
+2026-11-06 20:44:29.676 CET [88382] FATAL:  terminating connection due to administrator command
+2026-11-06 20:44:29.676 CET [88394] FATAL:  terminating connection due to administrator command
+2026-11-06 20:44:29.676 CET [88396] FATAL:  terminating connection due to administrator command
+2026-11-06 20:44:29.676 CET [88395] FATAL:  terminating connection due to administrator command
+2026-11-06 20:44:29.676 CET [88397] FATAL:  terminating connection due to administrator command
+2026-11-06 20:44:29.770 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:44:29.779 CET [77162] LOG:  checkpoint complete: wrote 763 buffers (4.7%), wrote 3 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=0.008 s, sync=0.001 s, total=0.009 s; sync files=11, longest=0.001 s, average=0.001 s; distance=5548 kB, estimate=27263 kB; lsn=0/92BDB3F8, redo lsn=0/92BDA928
+2026-11-06 20:44:29.781 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:44:29.782 CET [77162] LOG:  checkpoint complete: wrote 1 buffers (0.0%), wrote 0 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=0.001 s, sync=0.001 s, total=0.001 s; sync files=1, longest=0.001 s, average=0.001 s; distance=2 kB, estimate=24537 kB; lsn=0/92BDB4D0, redo lsn=0/92BDB470
+2026-11-06 20:44:30.412 CET [88402] FATAL:  terminating connection due to administrator command
+2026-11-06 20:44:30.412 CET [88404] FATAL:  terminating connection due to administrator command
+2026-11-06 20:44:30.412 CET [88405] FATAL:  terminating connection due to administrator command
+2026-11-06 20:44:30.412 CET [88406] FATAL:  terminating connection due to administrator command
+2026-11-06 20:44:30.412 CET [88407] FATAL:  terminating connection due to administrator command
+2026-11-06 20:44:30.515 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:44:30.517 CET [77162] LOG:  checkpoint complete: wrote 3 buffers (0.0%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 1 recycled; write=0.001 s, sync=0.001 s, total=0.002 s; sync files=4, longest=0.001 s, average=0.001 s; distance=12524 kB, estimate=23335 kB; lsn=0/93816668, redo lsn=0/93816610
+2026-11-06 20:44:31.122 CET [88411] FATAL:  terminating connection due to administrator command
+2026-11-06 20:44:31.122 CET [88414] FATAL:  terminating connection due to administrator command
+2026-11-06 20:44:31.122 CET [88415] FATAL:  terminating connection due to administrator command
+2026-11-06 20:44:31.122 CET [88416] FATAL:  terminating connection due to administrator command
+2026-11-06 20:44:31.122 CET [88413] FATAL:  terminating connection due to administrator command
+2026-11-06 20:44:31.226 CET [77162] LOG:  checkpoint starting: immediate force wait
+2026-11-06 20:44:31.227 CET [77162] LOG:  checkpoint complete: wrote 3 buffers (0.0%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 1 recycled; write=0.001 s, sync=0.001 s, total=0.002 s; sync files=4, longest=0.001 s, average=0.001 s; distance=12529 kB, estimate=22255 kB; lsn=0/94452D10, redo lsn=0/94452CB8
+2026-11-06 20:49:31.245 CET [77162] LOG:  checkpoint starting: time
+2026-11-06 20:49:31.350 CET [77162] LOG:  checkpoint complete: wrote 1 buffers (0.0%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=0.102 s, sync=0.001 s, total=0.106 s; sync files=2, longest=0.001 s, average=0.001 s; distance=3 kB, estimate=20029 kB; lsn=0/944539D0, redo lsn=0/94453978

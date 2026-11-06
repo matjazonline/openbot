@@ -1,0 +1,131 @@
+{
+  "id": "AUTO-P07-WB1-R1",
+  "combined_id": "AUTO-FINAL-R1",
+  "created_at": "2026-11-06T19:42:20.736966+00:00",
+  "worktree": "/Users/mac02/dev/openbot-recovery/.worktrees/autonomous-p07",
+  "branch": "autonomous/p07",
+  "phase_start": "93c6ac53e7fa053daf9b412e7d321c6bfecfebfa",
+  "review_base": "93c6ac53e7fa053daf9b412e7d321c6bfecfebfa",
+  "head": "93c6ac53e7fa053daf9b412e7d321c6bfecfebfa",
+  "combined_base": "ce93ff340a54db18770d8a5eec1c1d2008c5e5b1",
+  "preserved_remote_main": "f684d3683dc5be4560db7c7343a1dd5b0c54c509",
+  "digest": "3fa1c3654fd7b1b6195c63e75b553c6aa7a2f6acca375d013617cdfddcd0162b",
+  "exclusions": [
+    "plan/02-autonomous-agent/phases/p07/docs",
+    "plan/02-autonomous-agent/integration/final/docs"
+  ],
+  "authority": "/Users/mac02/dev/openbot-recovery/plan/02-autonomous-agent/COORDINATION.md",
+  "authority_revision": 41,
+  "authority_sha256": "c506d381971f564cd6e3cda25d4836955a3e9182eb87018527ddd090cef33986",
+  "authority_pin": "/Users/mac02/dev/openbot-recovery/.worktrees/autonomous-p07/plan/02-autonomous-agent/phases/p07/docs/logs/coordination-r41.md",
+  "skill_dir": "/Users/mac02/dev/openbot-recovery/.agents/skills/implement-astra-reviewed-2-2",
+  "snapshot_path_prefix": "/Users/mac02/dev/openbot-recovery/.worktrees/knowledge-tooling/autonomous-review-bin",
+  "source_files": {
+    "src/adapters/persistence/workflow/agent_driver_tests.rs": "e068bd30d9229fd58eeae46d56616611e73b8463b3d4c2992dd5ba6e48a2e420",
+    "src/adapters/persistence/workflow/autonomous_agent_e2e/approval.rs": "ec3aaf0ed6c7b0b5d3910e0dc1ba6c1e8e4984ba1ca60750800af6edd578dd52",
+    "src/adapters/persistence/workflow/autonomous_agent_e2e/live.rs": "6b0cc7e4272e503ea10d6b1746e3a783616f2d8ee82381ede263c9f4179d1f9e",
+    "src/adapters/persistence/workflow/autonomous_agent_e2e/mcp_effects.rs": "421be419e8531dc90edc658173ba82bb3d4d8fe65a227047a2e7dbcf3b37d904",
+    "src/adapters/persistence/workflow/autonomous_agent_e2e/mod.rs": "9324900fb5f14c902031001d79d2ae6d589633f6295193f75c807b1b5eaf56bb",
+    "src/adapters/persistence/workflow/autonomous_agent_e2e/races.rs": "d6351f2186a6195dfff970d9dba4e309c06e98a21250ec640616aeb75516aa88",
+    "src/adapters/persistence/workflow/autonomous_agent_e2e/revisions.rs": "f20fa46587215d65375d8fa03ea3d32c0c8643c36addbdac055c38a9e8fb9bcc",
+    "src/adapters/persistence/workflow/autonomous_agent_e2e/support.rs": "48046c49d1d68f410fc32d0faaeac23644601d587df13490ca704c97db2ef570",
+    "src/adapters/persistence/workflow/http_test_support.rs": "d946467d58cd52ee25fd1c293af22a7cce316f6624d405beedbc889e971d0f49",
+    "src/adapters/persistence/workflow/http_tests.rs": "2556ec093396ca7b8adb225e836998a6e1c1a764987587d9ae43c2ba02b2fe5d",
+    "src/adapters/persistence/workflow/mcp_agent_authority_tests.rs": "c55396eee3c827beca149855452a31267130a0419e6c6959a301ce5230af93c8",
+    "src/adapters/persistence/workflow/mcp_agent_tests.rs": "e350313ff4c9ff98e87c9b71ae41e5fc3c0c5a6d4df22bc403ac052769974dd0"
+  },
+  "checks": {
+    "author-final-compile-08.log": {
+      "sha256": "172358c98219143b3dac6bab91a399f7e562a52da151d16a74b1bb78ef0bbd78",
+      "bytes": 329
+    },
+    "final-targeted-native-08.log": {
+      "sha256": "1f9b12da36a6bdd7cf146ac2906157b565e2c25aabd6e43adbceaffec0fd602a",
+      "bytes": 31894
+    },
+    "final-targeted-command-08.json": {
+      "sha256": "8e5f968ac028d8d680375d302284ccfa7a2c9e4332a14a342b1fca2cb00f2849",
+      "bytes": 32250
+    },
+    "final-clippy-01.log": {
+      "sha256": "a89866924ecd885a2d0eda9dfb4a1ebb55c87c97d736b0b530cee7d90d90ea49",
+      "bytes": 165
+    },
+    "final-agent-browser-export-08.log": {
+      "sha256": "36d74df8eaa5e20b3576f84ab279269f8c261745614743cc21c6ded355f0867d",
+      "bytes": 318
+    },
+    "final-agent-authoring-browser-01.log": {
+      "sha256": "6d1c447186e00385cb863547a27267df18da03819845d012c61fa57d3b048bf2",
+      "bytes": 235
+    },
+    "final-decision-browser-01.log": {
+      "sha256": "b37cd7ff26c4813cec736ad8ae34c5a9d760aaabfc5be0e7ea5de0970801b588",
+      "bytes": 237
+    },
+    "final-sqlx-prepare-01.log": {
+      "sha256": "abd7671b308def981c1747aeb40f2d9796e36da5aac293bd7b1e4fd4e9cc6342",
+      "bytes": 258
+    },
+    "final-sqlx-check-01.log": {
+      "sha256": "c649568208c1da713b3400ad536ff63eafbbd33636b01abf8abfdb3e193330c5",
+      "bytes": 165
+    },
+    "final-offline-check-01.log": {
+      "sha256": "2bc683fb4e4f4f21ee9ee39e2b8ecce2efe20d3b1be57bda5316aa519ab3d30a",
+      "bytes": 72
+    },
+    "final-sqlx-offline-pipeline-01.json": {
+      "sha256": "72f94b407fb0b1ecf2c3bb569100a4dd220006e3787b1801715e91041ad5e0ed",
+      "bytes": 674
+    },
+    "owned-database-activation-01.json": {
+      "sha256": "3d8c19958a70535151df492136539d2eb70c50d0f45daab390ac7ed5b9a58761",
+      "bytes": 1046
+    },
+    "final-static-01.json": {
+      "sha256": "a1beb2c77dba251142cac64f9689d18396518de1ce0712704fbefb1562ef1634",
+      "bytes": 509
+    },
+    "final-source-audit-01.json": {
+      "sha256": "758ca158feaf00bb9f23c36f4298e6681db65bde249f64526783fbf0e3df7af7",
+      "bytes": 479
+    },
+    "unchanged-frontend-and-contract-evidence-bridge.json": {
+      "sha256": "91c112cfec83912d4157c1000efcee33df3cc0c5d28d4cc26b478e1a8a900f0f",
+      "bytes": 1353
+    },
+    "final-graft-build-01.log": {
+      "sha256": "faf44b88d1a0d1e8dfd845c37c28a72fad495189de412d87858c7b6fd47cd54e",
+      "bytes": 97203
+    },
+    "original07-coverage-map.md": {
+      "sha256": "df29ea165f81c2a51f3ac3f3c173774981ad5f7e3fbc9e1156041bd529bbf648",
+      "bytes": 6387
+    }
+  },
+  "accepted06_source": "1b9fbcda9c2824814c89a038d676de1a4a77185f",
+  "accepted06_metadata": "9178d3abbc9e93708d09a15460c23580f9e5a8b4",
+  "preserved_preexisting_changes": "none in assigned worktree",
+  "architecture_gate": "none for test-only07 integration; accepted01\u201306 decisions/contracts unchanged",
+  "required_native_families": {
+    "contract": 8,
+    "storage": 19,
+    "resolution": 12,
+    "skills": 6,
+    "publication": 17,
+    "workflow_reference": 10,
+    "admission": 9,
+    "dispatch": 3,
+    "authority": 6,
+    "recovery": 3,
+    "provisioning": 4,
+    "entrypoints": 3,
+    "children": 1,
+    "samples": 12,
+    "authoring": 24,
+    "views": 6,
+    "e2e": 8
+  },
+  "verification_limit": "targeted only per explicit user instruction; no full-suite claim; unchanged06 browser evidence with byte bridge"
+}

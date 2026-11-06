@@ -1,0 +1,20 @@
+{
+  "segment": "11",
+  "reported_metrics": [
+    10284,
+    2676,
+    904,
+    1981,
+    921,
+    3730,
+    2838,
+    1077,
+    26037,
+    2536,
+    1485,
+    5999,
+    2438
+  ],
+  "total_reported_tokens_saved": 62906,
+  "basis": "Reported Graft estimates only; no pricing available"
+}

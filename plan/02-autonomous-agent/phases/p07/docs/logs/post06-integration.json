@@ -1,0 +1,14 @@
+{
+  "created_at": "2026-11-06T18:53:33.474711+00:00",
+  "local_main": "93c6ac53e7fa053daf9b412e7d321c6bfecfebfa",
+  "accepted06_source": "1b9fbcda9c2824814c89a038d676de1a4a77185f",
+  "accepted06_metadata": "9178d3abbc9e93708d09a15460c23580f9e5a8b4",
+  "external_main": "f684d3683dc5be4560db7c7343a1dd5b0c54c509",
+  "protected_hashes_unchanged": {
+    "/Users/mac02/dev/openbot-recovery/plan/fix-app/COORDINATION.md": "573f77d2e362b036080b5c522a9c7515892c6e7dbf31c1c054156697020ea72f",
+    "/Users/mac02/dev/openbot-recovery/plan/01-knowledge-access-levels/COORDINATION.md": "adcb7e538bb0f63433e72244c8e447cf051699325435626d52d7e5eaadca9fcd",
+    "/Users/mac02/dev/openbot-recovery/plan/02-autonomous-agent/COORDINATION.md": "69e635d198aeae155b353b6b8467304fb2a17bd52f851f595cfa6d087e35415b"
+  },
+  "remote_main_not_pushed": true,
+  "phase07_complete": false
+}

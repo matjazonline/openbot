@@ -1,0 +1,83 @@
+{
+  "archive": "raw-browser-evidence.tar.gz",
+  "sha256": "843f5121005f039964c1810292120a5045eaf405ee7431d3e76a45105f239baf",
+  "purpose": "Retain exact generated browser evidence without rewriting whitespace; extract from phase07docs to recover original paths",
+  "files": [
+    {
+      "path": "logs/agent-authoring-browser-fixtures-final-08/app.js",
+      "sha256": "d16cde30526cc2c9711c020d625c231c375a253a9d8d92f3d3250ab9583f9dda"
+    },
+    {
+      "path": "logs/agent-authoring-browser-fixtures-final-08/builtin.html",
+      "sha256": "fa6fbf6b66970739d855e51e109852547c1fcc0b95ddd52347463406dc3fe65e"
+    },
+    {
+      "path": "logs/agent-authoring-browser-fixtures-final-08/fresh-pane.html",
+      "sha256": "b120f5d46f375ad99c8ec7e7bc665822c265283f4c405f1c1f85c85100aecf93"
+    },
+    {
+      "path": "logs/agent-authoring-browser-fixtures-final-08/http-selected.html",
+      "sha256": "e73fbde7e3151b1d764e08a9a3e0b9baf42ed5fe4d11437a682ab40b4ece0ca4"
+    },
+    {
+      "path": "logs/agent-authoring-browser-fixtures-final-08/http.html",
+      "sha256": "1f688181dfc73de69f70f3a4fa7f7e884181f20f7823abda2664be8e0211c288"
+    },
+    {
+      "path": "logs/agent-authoring-browser-fixtures-final-08/late-save.json",
+      "sha256": "f2a19d9a4369928af74cf0f519f8e66c4a10e175a43fc99e051896e5d2357905"
+    },
+    {
+      "path": "logs/agent-authoring-browser-fixtures-final-08/metadata.json",
+      "sha256": "3b1a792208c7c82a322c5995b89646e356f487d22f807d9cf86a80c2db30ba71"
+    },
+    {
+      "path": "logs/agent-authoring-browser-fixtures-final-08/other-pane.html",
+      "sha256": "61bb48ef3335a0cf05e5ccada3e187aa2b595cb841b2f9f6180a367bbb9502cb"
+    },
+    {
+      "path": "logs/agent-authoring-browser-fixtures-final-08/page.html",
+      "sha256": "debd2b2956aa45c99cf79e30c954eb3c795b1e4e92f53690db3a5a6e1fc235eb"
+    },
+    {
+      "path": "logs/agent-authoring-browser-fixtures-final-08/publication.html",
+      "sha256": "6b1e84b484fabd6e7278b9f7891e677caf5857dc5e2cd92465aa5e32e1e0e802"
+    },
+    {
+      "path": "logs/agent-authoring-browser-fixtures-final-08/stale-pane.html",
+      "sha256": "2721824017334d99213964e2bfb84ab34d2f74b02fcc6fae9bf66ed7fbfe1447"
+    },
+    {
+      "path": "logs/agent-authoring-browser-fixtures-final-08/theme-init.js",
+      "sha256": "b23ad4c72d7f288bfa1df3666ae18c4087fb8f6118f6b4187b3173bd4705c0c6"
+    },
+    {
+      "path": "logs/agent-authoring-browser-fixtures-final-08/workflow.html",
+      "sha256": "655bda77b2c65903f7bdf33e50cfdca3ec84480643614685d42ba4474a88f189"
+    },
+    {
+      "path": "logs/decision-browser-fixtures-final-08/closed.html",
+      "sha256": "19416a298c80a19a92a7d708a868f2d37810b006b234a3bc521e0b5e9f45e89e"
+    },
+    {
+      "path": "logs/decision-browser-fixtures-final-08/comment.html",
+      "sha256": "d146c29721648ea93453365fa13c5797cb310771fd09a772cfbc0b28e0507715"
+    },
+    {
+      "path": "logs/decision-browser-fixtures-final-08/source-note.html",
+      "sha256": "1db5fcc046771c1062d8260760dba8794a1b68a1c25508b0bec0e22aa5fa6454"
+    },
+    {
+      "path": "logs/decision-browser-fixtures-final-08/source-old.html",
+      "sha256": "df196f365de3baad43f07741767838715cc02a128f61dc12955c494c8f1f04f5"
+    },
+    {
+      "path": "logs/decision-browser-fixtures-final-08/source-retained.html",
+      "sha256": "8d767590dbc3351122028c308e29cb385608ff46fda741d5f64e130723c894d1"
+    },
+    {
+      "path": "logs/decision-browser-fixtures-final-08/waiting.html",
+      "sha256": "87ebd0d71cf3efb11b85d4df5136cdef7837febd9efb09921cca86028e4b1248"
+    }
+  ]
+}

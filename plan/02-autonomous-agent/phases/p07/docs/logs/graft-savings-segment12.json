@@ -1,0 +1,20 @@
+{
+  "segment": "12",
+  "reported_metrics": [
+    1890,
+    3568,
+    3878,
+    2074,
+    1117,
+    706,
+    425,
+    2732,
+    9378
+  ],
+  "saved_callers_file_metrics": [
+    62578,
+    40444
+  ],
+  "total_reported_tokens_saved": 128790,
+  "basis": "Graft reported estimates only; no pricing available"
+}

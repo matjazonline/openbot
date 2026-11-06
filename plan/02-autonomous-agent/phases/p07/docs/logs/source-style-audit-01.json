@@ -1,0 +1,35 @@
+{
+  "functions_over80": [
+    {
+      "file": "src/adapters/persistence/workflow/autonomous_agent_e2e/approval.rs",
+      "start": 76,
+      "end": 157,
+      "name": "autonomous_agent_e2e_approval_reconstruction_after_publication_keeps_saved_call_and_skill"
+    },
+    {
+      "file": "src/adapters/persistence/workflow/autonomous_agent_e2e/races.rs",
+      "start": 33,
+      "end": 125,
+      "name": "autonomous_agent_e2e_competing_publication_admission_and_lost_commit_replies"
+    }
+  ],
+  "file_lines": {
+    "src/adapters/persistence/workflow/autonomous_agent_e2e/revisions.rs": 69,
+    "src/adapters/persistence/workflow/autonomous_agent_e2e/support.rs": 397,
+    "src/adapters/persistence/workflow/autonomous_agent_e2e/races.rs": 125,
+    "src/adapters/persistence/workflow/autonomous_agent_e2e/mcp_effects.rs": 257,
+    "src/adapters/persistence/workflow/autonomous_agent_e2e/mod.rs": 21,
+    "src/adapters/persistence/workflow/autonomous_agent_e2e/live.rs": 166,
+    "src/adapters/persistence/workflow/autonomous_agent_e2e/approval.rs": 157
+  },
+  "graft_metrics": [
+    1249,
+    1236,
+    2122,
+    142,
+    1117,
+    607,
+    2963
+  ],
+  "graft_tokens_reported": 9436
+}

@@ -1,0 +1,15 @@
+{
+  "phase": "p07",
+  "owner": "/root",
+  "port": 55607,
+  "pg_data": "/Users/mac02/dev/openbot-recovery/.worktrees/pg-autonomous-p07",
+  "socket": "/Users/mac02/dev/openbot-recovery/.worktrees/pg-autonomous-p07-socket",
+  "databases": [
+    "open_bots",
+    "open_bots_test"
+  ],
+  "build_target": "/Users/mac02/dev/openbot-recovery/.worktrees/autonomous-p07/target",
+  "env_mode": "0600",
+  "disposable": true,
+  "pg_pid": 77158
+}

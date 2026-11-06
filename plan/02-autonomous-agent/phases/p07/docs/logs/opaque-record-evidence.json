@@ -1,0 +1,16 @@
+{
+  "archive": "opaque-record-evidence.tar.gz",
+  "sha256": "ccb70235a122b9dbc5e1a65906f70604dfdef11e3f12013d71110adf98588bca",
+  "files": {
+    "plan/02-autonomous-agent/phases/p07/docs/logs/AUTO-P07-WB1-R1-reviewer-native-01.log": "62de7bac4a0103d591a838ebf23372c7eb0d5d9373105e1f8f607ee285fde1e9",
+    "plan/02-autonomous-agent/phases/p07/docs/logs/author-e2e-runtime-02.log": "1d0d650a6857b0e9f56946ee42abd027874483ce151704015e746de8219c679f",
+    "plan/02-autonomous-agent/phases/p07/docs/logs/author-e2e-runtime-04.log": "0a3888a7a6f8ae9e712ea88eecab6c10f1b440eedd19ba2a3a55bc100fc6f588",
+    "plan/02-autonomous-agent/phases/p07/docs/logs/author-e2e-runtime-05.log": "b0f6afd05b891bdc347886b2ff2cd94d3baa75f0a1d0d4b7dfeb86e50aad088b",
+    "plan/02-autonomous-agent/phases/p07/docs/logs/author-e2e-runtime-07.log": "fb02b42818c768567ae5d43c735eca8ccb96f0c6712999ff379128291adfdcf3",
+    "plan/02-autonomous-agent/phases/p07/docs/logs/final-agent-browser-export-08.log": "36d74df8eaa5e20b3576f84ab279269f8c261745614743cc21c6ded355f0867d",
+    "plan/02-autonomous-agent/phases/p07/docs/logs/final-graft-build-01.log": "faf44b88d1a0d1e8dfd845c37c28a72fad495189de412d87858c7b6fd47cd54e",
+    "plan/02-autonomous-agent/phases/p07/docs/logs/final-targeted-native-08.log": "1f9b12da36a6bdd7cf146ac2906157b565e2c25aabd6e43adbceaffec0fd602a",
+    "plan/02-autonomous-agent/phases/p07/docs/logs/pg-init.log": "af200dd3b3ade83727c4b7e47ceb114154429c83540095694c1e2c8f6e34b691"
+  },
+  "restore": "extract from repository root; exact bytes retained, source untouched"
+}

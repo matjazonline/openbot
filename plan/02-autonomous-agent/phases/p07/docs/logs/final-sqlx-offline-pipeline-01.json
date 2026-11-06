@@ -1,0 +1,43 @@
+[
+  {
+    "check": "final-sqlx-prepare-01",
+    "argv": [
+      "cargo",
+      "sqlx",
+      "prepare",
+      "--",
+      "--locked",
+      "--offline",
+      "--all-targets"
+    ],
+    "exit": 0,
+    "sqlx_offline": "false"
+  },
+  {
+    "check": "final-sqlx-check-01",
+    "argv": [
+      "cargo",
+      "sqlx",
+      "prepare",
+      "--check",
+      "--",
+      "--locked",
+      "--offline",
+      "--all-targets"
+    ],
+    "exit": 0,
+    "sqlx_offline": "false"
+  },
+  {
+    "check": "final-offline-check-01",
+    "argv": [
+      "cargo",
+      "check",
+      "--locked",
+      "--offline",
+      "--all-targets"
+    ],
+    "exit": 0,
+    "sqlx_offline": "true"
+  }
+]

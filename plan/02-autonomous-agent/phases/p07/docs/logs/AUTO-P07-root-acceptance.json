@@ -1,0 +1,51 @@
+{
+  "accepted_at": "2026-11-06T19:54:11.716597+00:00",
+  "root": "/root",
+  "phase": "p07",
+  "combined_scope": "autonomous01\u201307",
+  "source_digest": "3fa1c3654fd7b1b6195c63e75b553c6aa7a2f6acca375d013617cdfddcd0162b",
+  "phase_start": "93c6ac53e7fa053daf9b412e7d321c6bfecfebfa",
+  "review_base": "93c6ac53e7fa053daf9b412e7d321c6bfecfebfa",
+  "head": "93c6ac53e7fa053daf9b412e7d321c6bfecfebfa",
+  "combined_base": "ce93ff340a54db18770d8a5eec1c1d2008c5e5b1",
+  "exclusions": [
+    "plan/02-autonomous-agent/phases/p07/docs",
+    "plan/02-autonomous-agent/integration/final/docs"
+  ],
+  "source_files": {
+    "src/adapters/persistence/workflow/agent_driver_tests.rs": "e068bd30d9229fd58eeae46d56616611e73b8463b3d4c2992dd5ba6e48a2e420",
+    "src/adapters/persistence/workflow/autonomous_agent_e2e/approval.rs": "ec3aaf0ed6c7b0b5d3910e0dc1ba6c1e8e4984ba1ca60750800af6edd578dd52",
+    "src/adapters/persistence/workflow/autonomous_agent_e2e/live.rs": "6b0cc7e4272e503ea10d6b1746e3a783616f2d8ee82381ede263c9f4179d1f9e",
+    "src/adapters/persistence/workflow/autonomous_agent_e2e/mcp_effects.rs": "421be419e8531dc90edc658173ba82bb3d4d8fe65a227047a2e7dbcf3b37d904",
+    "src/adapters/persistence/workflow/autonomous_agent_e2e/mod.rs": "9324900fb5f14c902031001d79d2ae6d589633f6295193f75c807b1b5eaf56bb",
+    "src/adapters/persistence/workflow/autonomous_agent_e2e/races.rs": "d6351f2186a6195dfff970d9dba4e309c06e98a21250ec640616aeb75516aa88",
+    "src/adapters/persistence/workflow/autonomous_agent_e2e/revisions.rs": "f20fa46587215d65375d8fa03ea3d32c0c8643c36addbdac055c38a9e8fb9bcc",
+    "src/adapters/persistence/workflow/autonomous_agent_e2e/support.rs": "48046c49d1d68f410fc32d0faaeac23644601d587df13490ca704c97db2ef570",
+    "src/adapters/persistence/workflow/http_test_support.rs": "d946467d58cd52ee25fd1c293af22a7cce316f6624d405beedbc889e971d0f49",
+    "src/adapters/persistence/workflow/http_tests.rs": "2556ec093396ca7b8adb225e836998a6e1c1a764987587d9ae43c2ba02b2fe5d",
+    "src/adapters/persistence/workflow/mcp_agent_authority_tests.rs": "c55396eee3c827beca149855452a31267130a0419e6c6959a301ce5230af93c8",
+    "src/adapters/persistence/workflow/mcp_agent_tests.rs": "e350313ff4c9ff98e87c9b71ae41e5fc3c0c5a6d4df22bc403ac052769974dd0"
+  },
+  "phase_pass": "AUTO-P07-WB1-R1-N1",
+  "combined_pass": "AUTO-FINAL-R1-N1",
+  "reviewer_log_sha256": "62de7bac4a0103d591a838ebf23372c7eb0d5d9373105e1f8f607ee285fde1e9",
+  "reviewer_checks": {
+    "passed": 12,
+    "failed": 0,
+    "ignored": 0
+  },
+  "author_native": {
+    "inventory": 187,
+    "passed": 186,
+    "failed": 0,
+    "ignored_export_separately_passed": 1
+  },
+  "fresh_browser_passed": 2,
+  "source_and_evidence_and_authority_root_rechecked": true,
+  "reviewed_authority_revision": 41,
+  "reviewed_authority_sha256": "c506d381971f564cd6e3cda25d4836955a3e9182eb87018527ddd090cef33986",
+  "unresolved_findings": [],
+  "full_suite_run": false,
+  "reason_for_focused_scope": "explicit user instruction I004/r1",
+  "publication": "accepted complete; commit/push authorized and next"
+}

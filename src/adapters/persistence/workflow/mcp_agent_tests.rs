@@ -398,3 +398,6 @@ async fn autonomous_agent_samples_mcp_without_slots_never_opens_the_server() {
 
 #[path = "autonomous_agent_authoring_mcp_tests.rs"]
 mod authoring_journey;
+
+#[path = "autonomous_agent_e2e/mod.rs"]
+mod e2e;

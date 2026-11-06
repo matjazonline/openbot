@@ -1,0 +1,21 @@
+{
+  "argv": [
+    "bash",
+    "scripts/test-network-isolation.sh",
+    "target/debug/deps/open_bots-c19a0b960dacdcef",
+    "autonomous_agent_e2e_",
+    "--test-threads=4"
+  ],
+  "tests": [
+    "adapters::persistence::workflow::tests::mcp_tests::agent_tests::e2e::races::autonomous_agent_e2e_competing_publication_admission_and_lost_commit_replies",
+    "adapters::persistence::workflow::tests::mcp_tests::agent_tests::e2e::revisions::autonomous_agent_e2e_mixed_tools_skills_two_workflows_and_queued_revisions"
+  ],
+  "environment": {
+    "DATABASE_URL": "postgres://mac02@127.0.0.1:55607/open_bots",
+    "TEST_DATABASE_URL": "postgres://mac02@127.0.0.1:55607/open_bots_test",
+    "SQLX_OFFLINE": "true",
+    "CARGO_INCREMENTAL": "0",
+    "RUST_MIN_STACK": "2097152"
+  },
+  "allow_missing_database_unset": true
+}

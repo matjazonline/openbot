@@ -1,0 +1,25 @@
+{
+  "argv": [
+    "bash",
+    "scripts/test-network-isolation.sh",
+    "target/debug/deps/open_bots-c19a0b960dacdcef",
+    "autonomous_agent_e2e_",
+    "--test-threads=4"
+  ],
+  "tests": [
+    "adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::driver::e2e::autonomous_agent_e2e_approval_reconstruction_after_publication_keeps_saved_call_and_skill",
+    "adapters::persistence::workflow::tests::mcp_tests::agent_tests::e2e::live::autonomous_agent_e2e_draft_skill_detach_keeps_selection_until_exact_revocation",
+    "adapters::persistence::workflow::tests::mcp_tests::agent_tests::e2e::live::autonomous_agent_e2e_invalid_required_alias_draft_cannot_replace_active_capabilities",
+    "adapters::persistence::workflow::tests::mcp_tests::agent_tests::e2e::live::autonomous_agent_e2e_model_removal_after_admission_refuses_before_all_peers",
+    "adapters::persistence::workflow::tests::mcp_tests::agent_tests::e2e::races::autonomous_agent_e2e_competing_publication_admission_and_lost_commit_replies",
+    "adapters::persistence::workflow::tests::mcp_tests::agent_tests::e2e::revisions::autonomous_agent_e2e_mixed_tools_skills_two_workflows_and_queued_revisions"
+  ],
+  "environment": {
+    "DATABASE_URL": "postgres://mac02@127.0.0.1:55607/open_bots",
+    "TEST_DATABASE_URL": "postgres://mac02@127.0.0.1:55607/open_bots_test",
+    "SQLX_OFFLINE": "true",
+    "CARGO_INCREMENTAL": "0",
+    "RUST_MIN_STACK": "2097152"
+  },
+  "allow_missing_database_unset": true
+}

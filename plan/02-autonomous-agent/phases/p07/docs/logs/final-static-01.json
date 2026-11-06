@@ -1,0 +1,30 @@
+{
+  "checked_at": "2026-11-06T19:30:01.934790+00:00",
+  "checks": [
+    {
+      "check": "css",
+      "argv": [
+        "npm",
+        "run",
+        "check:css"
+      ],
+      "exit": 0
+    },
+    {
+      "check": "sample-negative",
+      "argv": [
+        "python3",
+        "scripts/tests/workflow-sample-boundary.py"
+      ],
+      "exit": 0
+    },
+    {
+      "check": "sample-source",
+      "argv": [
+        "python3",
+        "scripts/workflow-sample-boundary.py"
+      ],
+      "exit": 0
+    }
+  ]
+}

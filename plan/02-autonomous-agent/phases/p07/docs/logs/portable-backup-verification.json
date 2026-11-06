@@ -1,0 +1,8 @@
+{
+  "backup": "/Users/mac02/dev/openbot-recovery-checkpoints/autonomous-p07-20261106T194220Z",
+  "checked_at": "2026-11-06T19:45:18.872311+00:00",
+  "hashes_match": true,
+  "patch_applies_to_temporary_index_at_base": "93c6ac53e7fa053daf9b412e7d321c6bfecfebfa",
+  "archive_paths_safe_without_external_links": true,
+  "source_or_actual_index_modified": false
+}

@@ -1,0 +1,22 @@
+{
+  "checked_at": "2026-11-06T19:47:46.303058+00:00",
+  "candidate_head": "93c6ac53e7fa053daf9b412e7d321c6bfecfebfa",
+  "all_accepted_inputs_and_external_main_are_ancestors": {
+    "fix": "73799dc6ac685008d5c97f154e861d11ae15bfa0",
+    "knowledge": "ce93ff340a54db18770d8a5eec1c1d2008c5e5b1",
+    "autonomous01": "e31ae98defcc6e6dea4c2778f5561ef15e4e716d",
+    "autonomous02": "dc35ee426d8f88abdaf40562027ae69ad66863eb",
+    "autonomous03_04": "b4a26c5af078c3eec89b7c5ad929aa484b996689",
+    "autonomous05": "a82d337ab651f6e345db24a8f4f128cd69a93a06",
+    "autonomous06": "1b9fbcda9c2824814c89a038d676de1a4a77185f",
+    "external_main": "f684d3683dc5be4560db7c7343a1dd5b0c54c509"
+  },
+  "source12_still_matches": true,
+  "primary_main": "93c6ac53e7fa053daf9b412e7d321c6bfecfebfa",
+  "protected_primary_hashes": {
+    "plan/fix-app/COORDINATION.md": "573f77d2e362b036080b5c522a9c7515892c6e7dbf31c1c054156697020ea72f",
+    "plan/01-knowledge-access-levels/COORDINATION.md": "adcb7e538bb0f63433e72244c8e447cf051699325435626d52d7e5eaadca9fcd",
+    "plan/02-autonomous-agent/COORDINATION.md": "c506d381971f564cd6e3cda25d4836955a3e9182eb87018527ddd090cef33986"
+  },
+  "status": "preflight only; final review/acceptance and commit/push pending"
+}

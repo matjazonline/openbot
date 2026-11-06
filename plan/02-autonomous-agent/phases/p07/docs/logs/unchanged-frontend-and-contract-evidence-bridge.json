@@ -1,0 +1,35 @@
+{
+  "accepted06_source": "1b9fbcda9c2824814c89a038d676de1a4a77185f",
+  "current_head": "93c6ac53e7fa053daf9b412e7d321c6bfecfebfa",
+  "compared_paths": [
+    "src/adapters/http",
+    "src/application/agent",
+    "src/application/workflow",
+    "src/domain",
+    "src/infra",
+    "src/adapters/persistence/agent_authoring",
+    "src/adapters/persistence/agent_publication",
+    "src/adapters/persistence/workflow/run_views.rs",
+    "src/adapters/persistence/workflow/run_provenance",
+    "assets",
+    "scripts/tests",
+    "Cargo.toml",
+    "Cargo.lock",
+    "package.json",
+    "package-lock.json",
+    "build.rs"
+  ],
+  "no_tracked_or_untracked_changes_in_checked_dependencies": true,
+  "reused_evidence": {
+    "author-agent-browser-interaction-32.log": "cf8dbe412126605d4b77d43e43a4718ae7bec3aedf0c557077b8ae1f60f9501b",
+    "author-affected-ui-protocols-02.log": "2b23e4ceae2af5b9a36de600435f05a0bc6f1fd7c7d5b1cc7496baa627d011b3",
+    "author-security-browser-01.log": "3d42211d752daa172502845b8cb6f5795bbdb58ebeca41fce13de180a76f1485",
+    "author-run-counts-final-02.log": "3bd9a80626b22faa37ab795c360c719f7c283472854b8391e5b9993f3368f0f1"
+  },
+  "fresh07_browser_proofs": [
+    "final-agent-browser-export-08.log",
+    "final-agent-authoring-browser-01.log",
+    "final-decision-browser-01.log"
+  ],
+  "not_claiming_unexecuted_full_suite": true
+}

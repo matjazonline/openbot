@@ -260,3 +260,6 @@ async fn workflow_agent_run_refuses_rebound_tool_target() {
     assert_eq!(dispatches, 0);
     assert_eq!(llm.finish().await.unwrap(), 1);
 }
+
+#[path = "autonomous_agent_e2e/approval.rs"]
+mod e2e;

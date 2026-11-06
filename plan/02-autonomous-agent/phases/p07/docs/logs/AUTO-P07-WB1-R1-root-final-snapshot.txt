@@ -1,0 +1,15 @@
+base:   93c6ac53e7fa053daf9b412e7d321c6bfecfebfa
+digest: 3fa1c3654fd7b1b6195c63e75b553c6aa7a2f6acca375d013617cdfddcd0162b
+files:
+  src/adapters/persistence/workflow/agent_driver_tests.rs
+  src/adapters/persistence/workflow/autonomous_agent_e2e/approval.rs
+  src/adapters/persistence/workflow/autonomous_agent_e2e/live.rs
+  src/adapters/persistence/workflow/autonomous_agent_e2e/mcp_effects.rs
+  src/adapters/persistence/workflow/autonomous_agent_e2e/mod.rs
+  src/adapters/persistence/workflow/autonomous_agent_e2e/races.rs
+  src/adapters/persistence/workflow/autonomous_agent_e2e/revisions.rs
+  src/adapters/persistence/workflow/autonomous_agent_e2e/support.rs
+  src/adapters/persistence/workflow/http_test_support.rs
+  src/adapters/persistence/workflow/http_tests.rs
+  src/adapters/persistence/workflow/mcp_agent_authority_tests.rs
+  src/adapters/persistence/workflow/mcp_agent_tests.rs

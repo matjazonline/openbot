@@ -208,3 +208,6 @@ impl AgentToolDispatch for PreparedOnly {
         Err(AppError::ServiceUnavailable("Saved MCP invocation".into()))
     }
 }
+
+#[path = "autonomous_agent_e2e/mcp_effects.rs"]
+mod e2e;
