@@ -1,0 +1,632 @@
+{
+  "rust_distinct_passed": 131,
+  "rust_tests": [
+    "adapters::http::pages::workflow_authoring::sample::tests::channel_reply_authoring_sample_preview_escapes_content_and_explains_human_waits",
+    "adapters::http::routes::ui_vault_bindings::tests::vault_binding_browser_consent_is_authenticated_csrf_protected_bounded_and_one_shot",
+    "adapters::persistence::agent_publication::tests::http::vault_binding_agent_publication_refuses_an_integration_http_source",
+    "adapters::persistence::agent_publication::tests::mcp::vault_binding_agent_publication_refuses_an_integration_mcp_source",
+    "adapters::persistence::integrations::connect_tests::bounds::vault_rotation_connect_attempt_competes_with_consumption_without_resurrecting_pkce",
+    "adapters::persistence::integrations::tests::cache_update_tests::vault_storage_cache_updates_preserve_each_providers_authorization_facts",
+    "adapters::persistence::integrations::tests::cache_update_tests::vault_storage_sql_required_json_fields_cannot_evaluate_to_null",
+    "adapters::persistence::integrations::tests::lifecycle_tests::vault_storage_durable_owner_teardown_restart_competitors_and_no_resurrection",
+    "adapters::persistence::integrations::tests::lifecycle_tests::vault_storage_host_company_membership_and_user_deletion_preserve_other_accounts",
+    "adapters::persistence::integrations::tests::lifecycle_tests::vault_storage_supervised_teardown_shutdown_cancels_actual_database_work",
+    "adapters::persistence::integrations::tests::lifecycle_tests::vault_storage_supervised_teardown_shutdown_cancels_pool_acquisition",
+    "adapters::persistence::integrations::tests::lifecycle_tests::vault_storage_teardown_poison_full_batch_backoff_restart_and_terminal_failure",
+    "adapters::persistence::integrations::tests::rotation_tests::vault_rotation_inventory_keysets_reconnect_rows_and_retirement",
+    "adapters::persistence::integrations::tests::rotation_tests::vault_rotation_real_managed_cache_write_defeats_waiting_stale_cas",
+    "adapters::persistence::integrations::tests::rotation_tests::vault_rotation_real_owner_replacement_defeats_waiting_stale_cas",
+    "adapters::persistence::integrations::tests::rotation_tests::vault_rotation_unavailable_key_blocks_convergence_without_plaintext_fallback",
+    "adapters::persistence::integrations::tests::storage_tests::vault_storage_cap_serializes_real_same_owner_creators",
+    "adapters::persistence::integrations::tests::storage_tests::vault_storage_constraints_substitution_and_malformed_encrypted_json_fail_closed",
+    "adapters::persistence::integrations::tests::storage_tests::vault_storage_envelope_identity_and_context_specific_bounds",
+    "adapters::persistence::integrations::tests::storage_tests::vault_storage_host_consumers_do_not_read_module_tables",
+    "adapters::persistence::integrations::tests::storage_tests::vault_storage_managed_identity_ignores_config_aliases_and_static_edits_deny",
+    "adapters::persistence::integrations::tests::storage_tests::vault_storage_owner_namespaces_keys_and_competing_replacements",
+    "adapters::persistence::integrations::tests::storage_tests::vault_storage_roundtrip_replace_disconnect_delete_and_redaction",
+    "adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::assistant_channel_command_replays_by_key_and_refuses_a_changed_request",
+    "adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::assistant_channel_commands_race_to_one_assistant",
+    "adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::autonomous_provisioning::autonomous_agent_provisioning_failed_final_command_rolls_back_initial_revision_then_competing_retries_publish_once",
+    "adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::channel_reply_native_tests::channel_reply_authoring_native_bootstrap_selects_once_and_replay_preserves_clear",
+    "adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::channel_reply_native_tests::channel_reply_authoring_native_competing_commands_share_one_selection",
+    "adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::channel_reply_native_tests::channel_reply_authoring_native_invalid_custom_end_rolls_back_every_resource",
+    "adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::knowledge_provisioning_tests::knowledge_run_level_provisioning_rechecks_pending_intent_before_any_local_effect",
+    "adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::provisioning_agent_reference_keeps_its_own_published_binding",
+    "adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::provisioning_competing_claimants_create_one_assistant",
+    "adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::provisioning_in_a_child_run_acts_for_the_roots_requester",
+    "adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::provisioning_lists_agents_and_models",
+    "adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::provisioning_lists_an_oversized_directory_within_its_bound",
+    "adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::provisioning_losing_an_address_race_is_a_conflict_refusal",
+    "adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::provisioning_refusals_commit_a_receipt_and_no_effect",
+    "adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::provisioning_stale_fences_write_nothing",
+    "adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::provisioning_transient_fault_leaves_no_marker_receipt_or_effect",
+    "adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_provisioning::autonomous_agent_provisioning_library_install_failure_rolls_back_portable_skills_and_principal",
+    "adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_provisioning::autonomous_agent_provisioning_library_missing_local_tool_installs_an_unpublished_draft",
+    "adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_provisioning::autonomous_agent_provisioning_library_requires_explicit_company_local_binding_before_publish",
+    "adapters::persistence::workflow::tests::http_tests::approval_tests::vault_approval_tests::vault_dispatch_authority_approval_is_required_and_cannot_authorize_a_rebound_account",
+    "adapters::persistence::workflow::tests::http_tests::vault_tests::authority::vault_dispatch_authority_host_cannot_skip_or_substitute_the_module_callback",
+    "adapters::persistence::workflow::tests::http_tests::vault_tests::authority::vault_dispatch_authority_real_persisted_fence_and_exact_invocation_are_required",
+    "adapters::persistence::workflow::tests::http_tests::vault_tests::authority::vault_dispatch_authority_replacement_and_rebind_cannot_reuse_frozen_action",
+    "adapters::persistence::workflow::tests::http_tests::vault_tests::authority::vault_dispatch_authority_replacement_competes_before_the_final_check_and_sends_nothing",
+    "adapters::persistence::workflow::tests::http_tests::vault_tests::authority::vault_dispatch_authority_revoke_competes_before_the_final_check_and_sends_nothing",
+    "adapters::persistence::workflow::tests::http_tests::vault_tests::bindings::vault_binding_cap_competing_creators_reconfirmation_and_pagination",
+    "adapters::persistence::workflow::tests::http_tests::vault_tests::bindings::vault_binding_company_teardown_preserves_other_real_company_grants_and_private_account",
+    "adapters::persistence::workflow::tests::http_tests::vault_tests::bindings::vault_binding_database_rejects_partial_sources_and_cross_owner_references",
+    "adapters::persistence::workflow::tests::http_tests::vault_tests::bindings::vault_binding_member_removal_readdition_repeated_teardown_and_owner_unbind",
+    "adapters::persistence::workflow::tests::http_tests::vault_tests::bindings::vault_binding_missing_consent_destination_and_shape_denials_are_non_mutating",
+    "adapters::persistence::workflow::tests::http_tests::vault_tests::bindings::vault_binding_owner_confirmation_and_admin_cannot_use_another_owners_account",
+    "adapters::persistence::workflow::tests::http_tests::vault_tests::bindings::vault_binding_proposal_cap_competing_creators_and_expiry_pruning",
+    "adapters::persistence::workflow::tests::http_tests::vault_tests::bindings::vault_binding_same_private_account_has_separate_http_and_mcp_grants",
+    "adapters::persistence::workflow::tests::http_tests::vault_tests::membership_race::vault_binding_membership_revocation_covers_consent_created_while_delete_waits",
+    "adapters::persistence::workflow::tests::http_tests::vault_tests::policies::vault_binding_old_proposal_cannot_confirm_changed_app_policy_or_destination",
+    "adapters::persistence::workflow::tests::http_tests::vault_tests::policies::vault_dispatch_authority_direct_http_tools_and_foreign_binding_cannot_mint_context",
+    "adapters::persistence::workflow::tests::http_tests::vault_tests::policies::vault_dispatch_authority_policy_changes_require_fresh_owner_consent",
+    "adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::google::google_refresh_race_http_and_mcp_apps_share_the_same_account_lock",
+    "adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::google::google_refresh_race_http_requests_with_distinct_dispatches_share_one_refresh",
+    "adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::isolation::google_refresh_race_an_independent_user_is_not_blocked_by_another_account",
+    "adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::isolation::google_refresh_race_same_owner_different_accounts_reach_provider_independently",
+    "adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::rotation::vault_rotation_competing_cas_cannot_overwrite_a_real_provider_refresh",
+    "adapters::persistence::workflow::tests::http_tests::vault_tests::temporal::vault_dispatch_authority_cancellation_during_module_wait_denies",
+    "adapters::persistence::workflow::tests::http_tests::vault_tests::temporal::vault_dispatch_authority_invocation_expiring_during_module_wait_denies",
+    "adapters::persistence::workflow::tests::http_tests::vault_tests::temporal::vault_dispatch_authority_lease_expiring_during_module_wait_denies",
+    "adapters::persistence::workflow::tests::http_tests::vault_tests::temporal::vault_dispatch_authority_run_expiring_during_module_wait_denies",
+    "adapters::persistence::workflow::tests::http_tests::vault_tests::temporal::vault_dispatch_authority_unexpired_contested_gate_still_succeeds",
+    "adapters::persistence::workflow::tests::mcp_tests::vault_authority_tests::vault_binding_mcp_definition_edits_preserve_the_confirmed_source_and_refuse_substitution",
+    "adapters::persistence::workflow::tests::mcp_tests::vault_authority_tests::vault_dispatch_authority_generic_mcp_tool_cannot_borrow_a_workflow_run",
+    "adapters::persistence::workflow::tests::mcp_tests::vault_authority_tests::vault_dispatch_authority_mcp_uses_the_real_step_and_fence_without_exposing_a_token",
+    "adapters::persistence::workflow::tests::message_tests::ingress_tests::channel_reply_e2e::channel_reply_e2e_automatic_replies_each_message_once_with_observers",
+    "adapters::persistence::workflow::tests::message_tests::ingress_tests::channel_reply_e2e::channel_reply_e2e_provider_retry_keeps_execution_and_wire_identity",
+    "adapters::persistence::workflow::tests::message_tests::ingress_tests::channel_reply_e2e::channel_reply_e2e_provider_unknown_survives_worker_reconstruction_without_resend",
+    "adapters::persistence::workflow::tests::message_tests::ingress_tests::channel_reply_e2e::channel_reply_e2e_quiet_ingress_has_no_owner_and_in_app_reply_has_no_transport",
+    "adapters::persistence::workflow::tests::message_tests::ingress_tests::channel_reply_e2e::channel_reply_e2e_selected_binding_manual_and_schedule_runs_never_inherit_destination",
+    "adapters::persistence::workflow::tests::message_tests::ingress_tests::channel_reply_e2e::channel_reply_e2e_silence_preserves_result_and_explicit_final_has_no_duplicate",
+    "adapters::persistence::workflow::tests::message_tests::ingress_tests::channel_reply_e2e::hitl::channel_reply_e2e_current_transport_revocation_blocks_final_after_human_wait",
+    "adapters::persistence::workflow::tests::message_tests::ingress_tests::channel_reply_e2e::hitl::channel_reply_e2e_grandchild_human_wait_returns_to_the_only_response_owner",
+    "adapters::persistence::workflow::tests::message_tests::ingress_tests::channel_reply_e2e::hitl::channel_reply_e2e_protected_final_requires_exact_current_approval",
+    "adapters::persistence::workflow::tests::message_tests::ingress_tests::channel_reply_e2e::hitl::channel_reply_e2e_question_rounds_resume_same_owner_with_frozen_contract",
+    "adapters::persistence::workflow::tests::message_tests::ingress_tests::channel_reply_e2e::hitl::channel_reply_e2e_two_waits_in_one_thread_route_answers_without_new_runs",
+    "adapters::persistence::workflow::tests::message_tests::ingress_tests::channel_reply_e2e::recovery::channel_reply_e2e_committed_intent_survives_reconstruction_without_its_wakeup",
+    "adapters::persistence::workflow::tests::message_tests::ingress_tests::channel_reply_e2e::recovery::channel_reply_e2e_remote_acceptance_before_receipt_keeps_unknown_after_shutdown",
+    "adapters::persistence::workflow::tests::message_tests::ingress_tests::provisioning_runtime_tests::builder_adds_custom_steps_to_the_new_agents_workflow",
+    "adapters::persistence::workflow::tests::message_tests::ingress_tests::provisioning_runtime_tests::builder_provisions_an_assistant_for_a_signed_in_admin",
+    "adapters::persistence::workflow::tests::message_tests::ingress_tests::provisioning_runtime_tests::builder_refuses_members_and_emailed_requests",
+    "adapters::persistence::workflow::tests::message_tests::ingress_tests::provisioning_runtime_tests::builder_sees_the_conversation_so_far",
+    "adapters::persistence::workflow::tests::message_tests::ingress_tests::provisioning_runtime_tests::builder_stops_a_listing_loop_once_its_result_repeats",
+    "adapters::persistence::workflow::tests::message_tests::ingress_tests::provisioning_runtime_tests::channel_reply_native_runtime_tests::channel_reply_authoring_native_real_review_closes_reject_and_publishes_only_edited_approval",
+    "adapters::persistence::workflow::tests::message_tests::ingress_tests::provisioning_runtime_tests::requester_locks::delegated_provisioning_locks_requester_before_company",
+    "adapters::persistence::workflow::tests::message_tests::ingress_tests::provisioning_runtime_tests::reviewed_assistants_park_their_answer_until_the_run_deadline",
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::channel_reply_completion_approval_resumes_exact_saved_output",
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::channel_reply_completion_automatic_and_suppressed_are_atomic",
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::channel_reply_completion_commit_failure_and_lost_ack_preserve_atomic_decision",
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::channel_reply_completion_competing_finalizers_create_one_obligation",
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::channel_reply_completion_contract_edits_cannot_replace_approved_content",
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::channel_reply_completion_invalid_projection_fails_or_uses_original_error_route",
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::channel_reply_completion_missing_notice_configuration_cannot_commit_success",
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::channel_reply_completion_policy_change_after_approval_fails_saved_step",
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::channel_reply_completion_rejection_uses_failure_without_publication",
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::owner_tests::channel_reply_completion_child_terminal_parks_only_the_owned_parent",
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::owner_tests::channel_reply_completion_exhausted_saved_child_result_never_reconciles_original_handler",
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::owner_tests::channel_reply_completion_fenced_approval_resumes_before_worker_handler",
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::owner_tests::channel_reply_completion_human_choice_parks_final_approval_before_success",
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::owner_tests::channel_reply_completion_timer_keeps_source_wait_and_final_approval_distinct",
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::policy_runtime_tests::channel_reply_completion_approved_job_cannot_claim_a_handler_with_sql",
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::policy_runtime_tests::channel_reply_completion_cancellation_and_finalization_share_one_terminal_owner",
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::policy_runtime_tests::channel_reply_completion_opposite_reviewers_have_one_formal_winner",
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::policy_runtime_tests::channel_reply_completion_private_result_cannot_cross_public_reply_clearance",
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::policy_runtime_tests::channel_reply_completion_privileged_reviewers_still_require_payload_clearance",
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::policy_runtime_tests::channel_reply_completion_release_revocation_and_finalization_do_not_deadlock",
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::policy_runtime_tests::channel_reply_completion_review_timeout_never_publishes_unapproved_output",
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::policy_runtime_tests::channel_reply_completion_revoked_send_role_still_permits_suppression",
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::slot_tests::channel_reply_completion_full_execution_rejects_final_without_another_slot",
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::slot_tests::channel_reply_completion_rejected_approval_keeps_its_slot_reservation",
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::slot_tests::channel_reply_completion_reserves_128th_slot_once_under_competing_finalizers",
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::policy_tests::channel_reply_completion_policy_rejects_unprivileged_reviewers_and_invalid_sql_shape",
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::policy_tests::channel_reply_completion_policy_settings_freeze_duration_for_ingress",
+    "application::use_cases::builtin_agent_library::tests::agent_builder_is_granted_the_provisioning_tools_and_told_their_rules",
+    "application::workflow::channel_reply::approval::tests::channel_reply_completion_policy_enforces_review_and_duration_bounds",
+    "application::workflow::channel_reply::approval::tests::channel_reply_completion_policy_materializes_relative_to_each_response_and_caps_run",
+    "application::workflow::channel_reply::approval::tests::channel_reply_completion_policy_roundtrips_only_static_user_reviewers",
+    "application::workflow::channel_reply::origin_tests::channel_reply_completion_origin_binds_immutable_proposal_to_effect_identity",
+    "application::workflow::channel_reply::origin_tests::channel_reply_completion_origin_cannot_enter_step_or_model_tool_preparation",
+    "application::workflow::channel_reply::origin_tests::channel_reply_completion_origin_is_restricted_to_the_trusted_company_reply_contract",
+    "application::workflow::channel_reply::origin_tests::channel_reply_completion_origin_roundtrip_and_integrity_are_strict",
+    "application::workflow::registry::message_tests::provisioning_names_are_not_step_tools",
+    "infra::workflow::tests::production_workers_stop_on_the_shutdown_token"
+  ],
+  "browser_passed": 1,
+  "receipts": [
+    {
+      "command": [
+        "env",
+        "SQLX_OFFLINE=false",
+        "cargo",
+        "sqlx",
+        "migrate",
+        "run"
+      ],
+      "cwd": "/Users/mac02/.codex/worktrees/1133/openbot",
+      "database": "vault_pull_main_1133_43797f74ae21",
+      "exit": 0,
+      "seconds": 0.36,
+      "log": "/Users/mac02/.codex/worktrees/1133/openbot/plan/vault-google/integration/channel-main/docs/logs/migrate-01.log",
+      "label": "migrate-01",
+      "log_sha256": "7e9d12c02f1d5b3bfd72d851b98ca3fb1dee374831bb18f92f704cc9a92ed54f",
+      "test_results": []
+    },
+    {
+      "command": [
+        "cargo",
+        "check",
+        "--locked",
+        "--offline",
+        "--all-targets"
+      ],
+      "cwd": "/Users/mac02/.codex/worktrees/1133/openbot",
+      "database": "vault_pull_main_1133_43797f74ae21",
+      "exit": 0,
+      "seconds": 76.8,
+      "log": "/Users/mac02/.codex/worktrees/1133/openbot/plan/vault-google/integration/channel-main/docs/logs/offline-early-01.log",
+      "label": "offline-early-01",
+      "log_sha256": "58fd75c5c214fb55b1cbb24d54cf226cefa0a2cbd75d52f6a519c5ccb0b25b55",
+      "test_results": []
+    },
+    {
+      "command": [
+        "env",
+        "RUST_MIN_STACK=2097152",
+        "RUST_TEST_THREADS=4",
+        "bash",
+        "scripts/test-network-isolation.sh",
+        "cargo",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "vault_dispatch_authority_"
+      ],
+      "cwd": "/Users/mac02/.codex/worktrees/1133/openbot",
+      "database": "vault_pull_main_1133_43797f74ae21",
+      "exit": 0,
+      "seconds": 8.1,
+      "log": "/Users/mac02/.codex/worktrees/1133/openbot/plan/vault-google/integration/channel-main/docs/logs/vault-authority-01.log",
+      "label": "vault-authority-01",
+      "log_sha256": "e9969ee14b73c9a32348bee198a19a40f107ad4f15ae684c3b980615c2565146",
+      "test_results": [
+        [
+          "15",
+          "0",
+          "0"
+        ]
+      ]
+    },
+    {
+      "command": [
+        "env",
+        "RUST_MIN_STACK=2097152",
+        "RUST_TEST_THREADS=4",
+        "bash",
+        "scripts/test-network-isolation.sh",
+        "cargo",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "vault_binding_"
+      ],
+      "cwd": "/Users/mac02/.codex/worktrees/1133/openbot",
+      "database": "vault_pull_main_1133_43797f74ae21",
+      "exit": 0,
+      "seconds": 5.31,
+      "log": "/Users/mac02/.codex/worktrees/1133/openbot/plan/vault-google/integration/channel-main/docs/logs/vault-bindings-01.log",
+      "label": "vault-bindings-01",
+      "log_sha256": "c30bdefeee06fa8679f236f9a2dcfd7511387666c0693ae8dd9a191eff3a11dc",
+      "test_results": [
+        [
+          "14",
+          "0",
+          "0"
+        ]
+      ]
+    },
+    {
+      "command": [
+        "env",
+        "RUST_MIN_STACK=2097152",
+        "RUST_TEST_THREADS=4",
+        "bash",
+        "scripts/test-network-isolation.sh",
+        "cargo",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "vault_storage_"
+      ],
+      "cwd": "/Users/mac02/.codex/worktrees/1133/openbot",
+      "database": "vault_pull_main_1133_43797f74ae21",
+      "exit": 0,
+      "seconds": 6.59,
+      "log": "/Users/mac02/.codex/worktrees/1133/openbot/plan/vault-google/integration/channel-main/docs/logs/vault-storage-01.log",
+      "label": "vault-storage-01",
+      "log_sha256": "76b26f7ca22d2a5d3ae63f3840c9e70d2b75eb0d03c67fa63e284534f71fff4f",
+      "test_results": [
+        [
+          "14",
+          "0",
+          "0"
+        ]
+      ]
+    },
+    {
+      "command": [
+        "env",
+        "RUST_MIN_STACK=2097152",
+        "RUST_TEST_THREADS=4",
+        "bash",
+        "scripts/test-network-isolation.sh",
+        "cargo",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "vault_rotation_"
+      ],
+      "cwd": "/Users/mac02/.codex/worktrees/1133/openbot",
+      "database": "vault_pull_main_1133_43797f74ae21",
+      "exit": 0,
+      "seconds": 2.96,
+      "log": "/Users/mac02/.codex/worktrees/1133/openbot/plan/vault-google/integration/channel-main/docs/logs/vault-rotation-01.log",
+      "label": "vault-rotation-01",
+      "log_sha256": "731a3427693f471ef3d82d6b113b15e8b2fa8e951911ea3ff4f34dfe5e6954bd",
+      "test_results": [
+        [
+          "6",
+          "0",
+          "0"
+        ]
+      ]
+    },
+    {
+      "command": [
+        "env",
+        "RUST_MIN_STACK=2097152",
+        "RUST_TEST_THREADS=4",
+        "bash",
+        "scripts/test-network-isolation.sh",
+        "cargo",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "google_refresh_race_"
+      ],
+      "cwd": "/Users/mac02/.codex/worktrees/1133/openbot",
+      "database": "vault_pull_main_1133_43797f74ae21",
+      "exit": 0,
+      "seconds": 2.5,
+      "log": "/Users/mac02/.codex/worktrees/1133/openbot/plan/vault-google/integration/channel-main/docs/logs/renewal-races-01.log",
+      "label": "renewal-races-01",
+      "log_sha256": "bd3ecc9459bd75e3879beb4a0056a7bf1b11bd7d43eb85c72361a52359985cd3",
+      "test_results": [
+        [
+          "4",
+          "0",
+          "0"
+        ]
+      ]
+    },
+    {
+      "command": [
+        "env",
+        "RUST_MIN_STACK=2097152",
+        "RUST_TEST_THREADS=4",
+        "bash",
+        "scripts/test-network-isolation.sh",
+        "cargo",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "channel_reply_completion_"
+      ],
+      "cwd": "/Users/mac02/.codex/worktrees/1133/openbot",
+      "database": "vault_pull_main_1133_43797f74ae21",
+      "exit": 0,
+      "seconds": 11.45,
+      "log": "/Users/mac02/.codex/worktrees/1133/openbot/plan/vault-google/integration/channel-main/docs/logs/channel-completion-01.log",
+      "label": "channel-completion-01",
+      "log_sha256": "e5ecc08d892650c995904b940ec02c1f97888ce9c427a759deaa26da7398f5f2",
+      "test_results": [
+        [
+          "34",
+          "0",
+          "0"
+        ]
+      ]
+    },
+    {
+      "command": [
+        "env",
+        "RUST_MIN_STACK=2097152",
+        "RUST_TEST_THREADS=4",
+        "bash",
+        "scripts/test-network-isolation.sh",
+        "cargo",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "channel_reply_e2e_"
+      ],
+      "cwd": "/Users/mac02/.codex/worktrees/1133/openbot",
+      "database": "vault_pull_main_1133_43797f74ae21",
+      "exit": 0,
+      "seconds": 20.41,
+      "log": "/Users/mac02/.codex/worktrees/1133/openbot/plan/vault-google/integration/channel-main/docs/logs/channel-e2e-01.log",
+      "label": "channel-e2e-01",
+      "log_sha256": "1ee6c73822c1e3dffc88285b99444c484cf9fdd775567b22f9945a2c3da31825",
+      "test_results": [
+        [
+          "13",
+          "0",
+          "0"
+        ]
+      ]
+    },
+    {
+      "command": [
+        "env",
+        "RUST_MIN_STACK=2097152",
+        "RUST_TEST_THREADS=4",
+        "bash",
+        "scripts/test-network-isolation.sh",
+        "cargo",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "provisioning_"
+      ],
+      "cwd": "/Users/mac02/.codex/worktrees/1133/openbot",
+      "database": "vault_pull_main_1133_43797f74ae21",
+      "exit": 0,
+      "seconds": 43.35,
+      "log": "/Users/mac02/.codex/worktrees/1133/openbot/plan/vault-google/integration/channel-main/docs/logs/provisioning-01.log",
+      "label": "provisioning-01",
+      "log_sha256": "721656821f933a400327199b7000619fcff6f61c92cef9fcfe15c72e7476a1f2",
+      "test_results": [
+        [
+          "29",
+          "0",
+          "0"
+        ]
+      ]
+    },
+    {
+      "command": [
+        "env",
+        "RUST_MIN_STACK=2097152",
+        "RUST_TEST_THREADS=4",
+        "bash",
+        "scripts/test-network-isolation.sh",
+        "cargo",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "production_workers_stop_on_the_shutdown_token"
+      ],
+      "cwd": "/Users/mac02/.codex/worktrees/1133/openbot",
+      "database": "vault_pull_main_1133_43797f74ae21",
+      "exit": 0,
+      "seconds": 1.32,
+      "log": "/Users/mac02/.codex/worktrees/1133/openbot/plan/vault-google/integration/channel-main/docs/logs/supervision-01.log",
+      "label": "supervision-01",
+      "log_sha256": "f550cbdbad2a510c7d4b7400b44790520be0cb8075be49c658d1447939df4ef1",
+      "test_results": [
+        [
+          "1",
+          "0",
+          "0"
+        ]
+      ]
+    },
+    {
+      "command": [
+        "env",
+        "RUST_MIN_STACK=2097152",
+        "bash",
+        "scripts/test-network-isolation.sh",
+        "target/debug/deps/open_bots-048b7abd3ed0c794",
+        "--exact",
+        "adapters::http::pages::workflow_authoring::sample::tests::channel_reply_authoring_sample_preview_escapes_content_and_explains_human_waits",
+        "--nocapture"
+      ],
+      "cwd": "/Users/mac02/.codex/worktrees/1133/openbot",
+      "database": "vault_pull_main_1133_43797f74ae21",
+      "exit": 0,
+      "seconds": 0.05,
+      "log": "/Users/mac02/.codex/worktrees/1133/openbot/plan/vault-google/integration/channel-main/docs/logs/sample-escaping-01.log",
+      "label": "sample-escaping-01",
+      "log_sha256": "0c5b730589f0bc76d1afee4de1143f1911ea6435c8b55120f7ad34cdc975cc76",
+      "test_results": [
+        [
+          "1",
+          "0",
+          "0"
+        ]
+      ]
+    },
+    {
+      "command": [
+        "env",
+        "SQLX_OFFLINE=false",
+        "cargo",
+        "sqlx",
+        "prepare",
+        "--",
+        "--all-targets"
+      ],
+      "cwd": "/Users/mac02/.codex/worktrees/1133/openbot",
+      "database": "vault_pull_main_1133_43797f74ae21",
+      "exit": 0,
+      "seconds": 14.15,
+      "log": "/Users/mac02/.codex/worktrees/1133/openbot/plan/vault-google/integration/channel-main/docs/logs/sqlx-prepare-01.log",
+      "label": "sqlx-prepare-01",
+      "log_sha256": "49e4b4bf6b9caefc4b3be4f3093a1c2da01e41564936357fcf0de5b179f1c831",
+      "test_results": []
+    },
+    {
+      "command": [
+        "env",
+        "SQLX_OFFLINE=false",
+        "cargo",
+        "sqlx",
+        "prepare",
+        "--check",
+        "--",
+        "--all-targets"
+      ],
+      "cwd": "/Users/mac02/.codex/worktrees/1133/openbot",
+      "database": "vault_pull_main_1133_43797f74ae21",
+      "exit": 0,
+      "seconds": 12.37,
+      "log": "/Users/mac02/.codex/worktrees/1133/openbot/plan/vault-google/integration/channel-main/docs/logs/sqlx-check-01.log",
+      "label": "sqlx-check-01",
+      "log_sha256": "86577b4abfba1a519aadea6caea1a281e581046b18bd6e507a3b3bb98498fbc6",
+      "test_results": []
+    },
+    {
+      "command": [
+        "cargo",
+        "clippy",
+        "--locked",
+        "--offline",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "cwd": "/Users/mac02/.codex/worktrees/1133/openbot",
+      "database": "vault_pull_main_1133_43797f74ae21",
+      "exit": 0,
+      "seconds": 88.8,
+      "log": "/Users/mac02/.codex/worktrees/1133/openbot/plan/vault-google/integration/channel-main/docs/logs/clippy-01.log",
+      "label": "clippy-01",
+      "log_sha256": "25dfd395b57f65e27c3fe7082c6595f3cb26a3192d12f1e197d522ca021d2b9a",
+      "test_results": []
+    },
+    {
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "cwd": "/Users/mac02/.codex/worktrees/1133/openbot",
+      "database": "vault_pull_main_1133_43797f74ae21",
+      "exit": 0,
+      "seconds": 2.35,
+      "log": "/Users/mac02/.codex/worktrees/1133/openbot/plan/vault-google/integration/channel-main/docs/logs/format-01.log",
+      "label": "format-01",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "test_results": []
+    },
+    {
+      "command": [
+        "git",
+        "diff",
+        "HEAD",
+        "--check"
+      ],
+      "cwd": "/Users/mac02/.codex/worktrees/1133/openbot",
+      "database": "vault_pull_main_1133_43797f74ae21",
+      "exit": 0,
+      "seconds": 0.06,
+      "log": "/Users/mac02/.codex/worktrees/1133/openbot/plan/vault-google/integration/channel-main/docs/logs/diff-01.log",
+      "label": "diff-01",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "test_results": []
+    },
+    {
+      "command": [
+        "python3",
+        "scripts/workflow-sample-boundary.py"
+      ],
+      "cwd": "/Users/mac02/.codex/worktrees/1133/openbot",
+      "database": "vault_pull_main_1133_43797f74ae21",
+      "exit": 0,
+      "seconds": 0.03,
+      "log": "/Users/mac02/.codex/worktrees/1133/openbot/plan/vault-google/integration/channel-main/docs/logs/sample-01.log",
+      "label": "sample-01",
+      "log_sha256": "228c0f0f23407594379b257a3e3684550f2f3eb1741d27acbc9be312e22e6d2d",
+      "test_results": []
+    },
+    {
+      "command": [
+        "env",
+        "CHROME_PATH=/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+        "node",
+        "--test",
+        "scripts/tests/channel-response-authoring.mjs"
+      ],
+      "cwd": "/Users/mac02/.codex/worktrees/1133/openbot",
+      "database": "vault_pull_main_1133_43797f74ae21",
+      "exit": 0,
+      "seconds": 2.11,
+      "log": "/Users/mac02/.codex/worktrees/1133/openbot/plan/vault-google/integration/channel-main/docs/logs/channel-authoring-02.log",
+      "label": "channel-authoring-02",
+      "log_sha256": "dd8bc5d1f6f2d777545269d560e7604789d25e27753903505b5f19511eb838e3",
+      "test_results": []
+    },
+    {
+      "command": [
+        "npm",
+        "run",
+        "check:css"
+      ],
+      "cwd": "/Users/mac02/.codex/worktrees/1133/openbot",
+      "database": "vault_pull_main_1133_43797f74ae21",
+      "exit": 0,
+      "seconds": 0.49,
+      "log": "/Users/mac02/.codex/worktrees/1133/openbot/plan/vault-google/integration/channel-main/docs/logs/css-01.log",
+      "label": "css-01",
+      "log_sha256": "831379e66e823495e1432621b2f310cc7830f7e6ddf4a03647b058e21ffb6024",
+      "test_results": []
+    },
+    {
+      "command": [
+        "graft",
+        "build"
+      ],
+      "cwd": "/Users/mac02/.codex/worktrees/1133/openbot",
+      "database": "vault_pull_main_1133_43797f74ae21",
+      "exit": 0,
+      "seconds": 2.16,
+      "log": "/Users/mac02/.codex/worktrees/1133/openbot/plan/vault-google/integration/channel-main/docs/logs/graft-01.log",
+      "label": "graft-01",
+      "log_sha256": "0032d88b699e9cb3e3b6f2eacc7ef464354a46c527ccf62a3cf0d554b3049714",
+      "test_results": []
+    }
+  ],
+  "selected_counts": {
+    "vault_dispatch_authority_": 15,
+    "vault_binding_": 14,
+    "vault_storage_": 14,
+    "vault_rotation_": 6,
+    "google_refresh_race_": 4,
+    "channel_reply_completion_": 34,
+    "channel_reply_e2e_": 13,
+    "provisioning_": 29,
+    "production_workers_stop_on_the_shutdown_token": 1,
+    "rendered_markup_carries_no_inline_javascript": 1
+  },
+  "inherited_failures": {
+    "markup-01": "Existing scanner flags committed main sample.rs:152 cfg(test) hostile fixture. Exact canonical-main-only reproduction in baseline-markup.json. Real sample escaping test passes.",
+    "transport-01": "Existing scanner flags committed test-only continuation support RFC input. Exact canonical-main-only script reproduction and output identity in baseline-transport.json."
+  },
+  "environment_failure_resolved": "channel-authoring01 missing Playwright managed shell; channel-authoring02 PASS on existing Chrome156 via supported CHROME_PATH, no source change.",
+  "zero_match_not_counted": "vault_lifecycle_0 matched; actual5lifecycle_tests all passed in vault-storage14, selection-gap-01.json proof.",
+  "scope": "Targeted affected tests/build/schema/interfaces only. No full/runtime/stack/lease suite; known unrelated overflow not run or changed. Two inherited static failures retained separately; no all-checks/full-suite-green claim."
+}

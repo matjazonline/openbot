@@ -1,0 +1,8 @@
+{
+  "decision": "D1/r2",
+  "sha256": "2c54c90221f2201b0b8e9bc740581e41092a176fecc62d059ff3047137a4efad",
+  "source_base": "ef36f90e6587c12bf9d38541d612a31945101a7d7fde5c782ef3c8df0a7175b9",
+  "head": "97e5d60dc538e26c7cb976a8d63772eed80baff2",
+  "coordination_revision": 6,
+  "supersedes": "D1/r1 draft, no review/source authored against r1"
+}

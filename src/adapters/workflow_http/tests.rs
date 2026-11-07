@@ -10,7 +10,7 @@ fn connection(origin: &str) -> HttpConnection {
         id: Uuid::new_v4(),
         origin: HttpOrigin::parse(origin).unwrap(),
         enabled: true,
-        bearer: false,
+        credential_source: crate::domain::integrations::authority::CredentialSource::None,
         secret_set: false,
         revision: 1,
     }

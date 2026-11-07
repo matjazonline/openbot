@@ -61,6 +61,7 @@ fn request(
 /// The run's actor and the frozen bundle's capability ceiling.
 pub(in crate::adapters::persistence::workflow) fn context(facts: &RunFacts) -> ActionPolicyContext {
     ActionPolicyContext {
+        integration: None,
         origin: crate::application::agent::ToolCallOrigin::Workflow,
         actor: facts.actor.user_id(),
         capability_ceiling: facts
@@ -165,7 +166,19 @@ impl HttpActionPreparation for PostgresPersistence {
             None => registered_on(&mut tx, scope.company, &tool).await?,
         };
         policy_on(&mut tx, scope.company, id, &tool).await?;
-        let result = request(scope, &facts, id, tool, arguments)?;
+        let mut result = request(scope, &facts, id, tool, arguments)?;
+        let connection = connection_on(&mut tx, scope.company, id)
+            .await?
+            .ok_or_else(missing)?;
+        let current =
+            super::super::integration_authority::http_snapshot(&mut tx, &connection).await?;
+        result.context.integration = super::super::integration_authority::frozen_snapshot_on(
+            &mut tx,
+            &result,
+            current.clone(),
+        )
+        .await?;
+        super::super::integration_authority::check_snapshot(&result, current)?;
         ready_on(&mut tx, &result).await?;
         tx.commit().await?;
         Ok(result)
@@ -198,6 +211,15 @@ impl HttpActionPreparation for PostgresPersistence {
             {
                 return Err(missing());
             }
+            if matches!(
+                connection_on(&mut tx, scope.company, call.connection)
+                    .await?
+                    .ok_or_else(missing)?
+                    .credential_source,
+                crate::domain::integrations::authority::CredentialSource::Integration(_)
+            ) {
+                return Err(missing());
+            }
             ready_on(&mut tx, &result).await?;
             tx.commit().await?;
             return Ok(result);
@@ -212,6 +234,15 @@ impl HttpActionPreparation for PostgresPersistence {
             .cloned()
             .ok_or_else(missing)?;
         if registered_on(&mut tx, scope.company, &tool).await? != call.connection {
+            return Err(missing());
+        }
+        if matches!(
+            connection_on(&mut tx, scope.company, call.connection)
+                .await?
+                .ok_or_else(missing)?
+                .credential_source,
+            crate::domain::integrations::authority::CredentialSource::Integration(_)
+        ) {
             return Err(missing());
         }
         let result = request(scope, &facts, call.connection, tool, call.arguments.clone())?;

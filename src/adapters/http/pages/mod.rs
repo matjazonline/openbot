@@ -203,3 +203,5 @@ pub mod company_typesafe;
 mod team_level_tests;
 
 pub(crate) mod connection_levels;
+
+pub mod vault;

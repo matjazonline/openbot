@@ -24,6 +24,7 @@ pub mod database_query_health;
 pub mod delivery;
 pub mod inbound_event;
 pub mod integration;
+pub(crate) mod integrations;
 pub mod knowledge;
 pub(crate) mod model_usage;
 pub mod notification;
@@ -489,3 +490,8 @@ mod auth_key_rotation_tests;
 
 #[cfg(test)]
 mod jsonb_test_support;
+mod user_lifecycle;
+
+pub(crate) mod integration_bindings;
+
+pub(crate) mod integration_connect_authority;

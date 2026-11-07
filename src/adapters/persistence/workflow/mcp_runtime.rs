@@ -70,7 +70,19 @@ impl McpActionPreparation for PostgresPersistence {
         let tool = field("tool")?
             .as_str()
             .ok_or_else(crate::application::workflow::mcp::invalid)?;
-        let result = request(scope, &facts, &slot, tool, field("arguments")?.clone())?;
+        let mut result = request(scope, &facts, &slot, tool, field("arguments")?.clone())?;
+        let connection = connection_on(&mut tx, scope.company, mcp_target(&result.target)?)
+            .await?
+            .ok_or_else(missing)?;
+        let current =
+            super::super::integration_authority::mcp_snapshot(&mut tx, &connection).await?;
+        result.context.integration = super::super::integration_authority::frozen_snapshot_on(
+            &mut tx,
+            &result,
+            current.clone(),
+        )
+        .await?;
+        super::super::integration_authority::check_snapshot(&result, current)?;
         current_on(&mut tx, &result).await?;
         tx.commit().await?;
         Ok(result)
@@ -110,6 +122,15 @@ impl McpActionPreparation for PostgresPersistence {
                 result
             }
         };
+        if matches!(
+            connection_on(&mut tx, scope.company, mcp_target(&result.target)?)
+                .await?
+                .ok_or_else(missing)?
+                .auth,
+            crate::entities::mcp::McpAuth::Integration(_)
+        ) {
+            return Err(missing());
+        }
         current_on(&mut tx, &result).await?;
         tx.commit().await?;
         Ok(result)

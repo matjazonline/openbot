@@ -366,7 +366,18 @@ impl WorkflowEngine {
     /// Start workflow slots, the intent worker, schedule materializer and metrics sampler
     /// under `shutdown`. The caller keeps the handles and joins them on shutdown.
     pub fn spawn(&self, shutdown: &CancellationToken) -> Vec<(&'static str, JoinHandle<()>)> {
-        let mut handles = Vec::with_capacity(self.slots + 5);
+        let mut handles = Vec::with_capacity(self.slots + 6);
+        let vault = crate::adapters::persistence::integrations::PostgresVault::new(
+            self.services.persistence.clone(),
+        );
+        let vault_stop = shutdown.clone();
+        handles.push((
+            "integration teardown",
+            tokio::spawn(async move {
+                crate::application::integrations::lifecycle::run(&vault, &vault_stop).await;
+            }),
+        ));
+
         let metric_persistence = self.services.persistence.clone();
         let monitoring = self.monitoring.clone();
         let metric_shutdown = shutdown.clone();
@@ -724,6 +735,11 @@ mod tests {
         let (_database, engine, _) = composed().await;
         let shutdown = CancellationToken::new();
         let handles = engine.spawn(&shutdown);
+        assert!(
+            handles
+                .iter()
+                .any(|(name, _)| *name == "integration teardown")
+        );
         let task_count = handles.len();
         engine.intent_wakeups.notify_waiters();
         engine.worker_wakeups.notify_waiters();
@@ -736,8 +752,8 @@ mod tests {
                 .unwrap();
         }
         assert_eq!(
-            task_count, 6,
-            "one slot, metrics, intent, final publication, schedule and storage workers"
+            task_count, 7,
+            "one slot, metrics, intent, final publication, schedule, storage and integration teardown workers"
         );
     }
 

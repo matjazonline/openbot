@@ -1,0 +1,17 @@
+{
+  "command": [
+    "cargo",
+    "clippy",
+    "--locked",
+    "--offline",
+    "--all-targets",
+    "--",
+    "-D",
+    "warnings"
+  ],
+  "cwd": "/Users/mac02/.codex/worktrees/1133/openbot",
+  "database": "vault_google_1133_41402e4b8104_test",
+  "exit": 0,
+  "seconds": 86.42,
+  "log": "/Users/mac02/.codex/worktrees/1133/openbot/plan/vault-google/phases/p05/docs/logs/clippy-02.log"
+}

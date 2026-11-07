@@ -511,3 +511,6 @@ mod agent_runtime_tests;
 
 #[path = "knowledge_http_tests.rs"]
 mod knowledge_http_tests;
+
+#[path = "vault_tests/mod.rs"]
+mod vault_tests;

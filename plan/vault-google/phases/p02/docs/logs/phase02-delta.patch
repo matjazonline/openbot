@@ -1,0 +1,3277 @@
+--- a/docs/deploy.md
++++ b/docs/deploy.md
+@@ -399,6 +399,49 @@
+ change to two functions in `src/adapters/persistence/credentials/envelope.rs` and does not change the
+ stored format; revisit it when the deployment holds credentials for workspaces it does not own.
+ 
++### Private vault and deletion recovery
++
++The profile's **Vault / Connected apps** page stores reusable static bearer tokens and API keys
++for the code-registered `X-API-Key` header. Values are encrypted on the server with the existing
++credential key ring; this is not end-to-end encryption. Forms offer replacement, never readback.
++Company attachment, external-app OAuth consent, and workflow use are unavailable until the later
++integration stages ship. Google sign-in remains a separate login flow.
++
++`integration_accounts.envelope` participates in the same `credentials status` and
++`credentials rotate` commands below, including keyset batches, unavailable-key reporting and
++convergence checks. Ready and reconnect-required rows with envelopes are inventoried; disconnected
++rows have none. The vault uses its own owner/account/provider/config/type-bound encryption context
++and a 16 KiB decrypted limit. Existing credential contexts keep their existing limits. Rewrapping
++uses ciphertext compare-and-swap and preserves account/authorization revisions and credential
++generation, so it cannot overwrite a concurrent logical credential write.
++
++Host user/company/membership deletion records idempotent teardown intent before removing host
++state. Owner retirement clears usable credentials immediately; cleanup retries do not restore them.
++Company and membership cleanup preserve private accounts. The current release cannot create use
++grants; grant-aware invalidation must ship before attachment is enabled. The local user-deletion
++adapter implements this lifecycle port; no new browser user-deletion route is exposed.
++
++The existing supervised worker group drains at most 16 intents per iteration. Cleanup errors roll
++back to a per-intent savepoint, persist retry eligibility and back off 64, 128, then 256 seconds; after
++8 failures the intent remains observable as `failed`. Cancellation rolls back in-progress cleanup;
++a restart resumes retained pending intents. Database outages use an additional 5-second worker
++backoff. Diagnose counts without selecting credentials:
++
++```sql
++SELECT kind, state, count(*), min(available_at), max(attempts)
++FROM integration_teardown_intents
++GROUP BY kind, state;
++```
++
++After resolving a failed cleanup's database/locking cause, an operator may retry that intent
++idempotently (bind `intent_id` through psql's `-v` option):
++
++```sql
++UPDATE integration_teardown_intents
++SET state = 'pending', attempts = 0, available_at = clock_timestamp()
++WHERE id = :'intent_id'::uuid AND state = 'failed';
++```
++
+ ### Multi-Machine credential-key rotation
+ 
+ Never replace bytes under an existing version number: authenticated decryption of data written with
+--- a/migrations/20260817000000_init_schema.sql
++++ b/migrations/20260817000000_init_schema.sql
+@@ -12489,3 +12489,96 @@
+     ADD CONSTRAINT workflow_action_origin_binding_fk FOREIGN KEY(company_id,agent_revision_id,agent_binding_id)
+         REFERENCES public.agent_revision_bindings(company_id,revision_id,binding_id)
+         DEFERRABLE INITIALLY DEFERRED;
++
++-- Private connected accounts. Owners are stable client references, never host-table FKs.
++CREATE TABLE public.integration_owner_states (
++    owner_namespace text NOT NULL CHECK (octet_length(owner_namespace) BETWEEN 1 AND 256),
++    owner_subject text NOT NULL CHECK (octet_length(owner_subject) BETWEEN 1 AND 256),
++    retired boolean NOT NULL DEFAULT false,
++    PRIMARY KEY (owner_namespace, owner_subject)
++);
++CREATE TABLE public.integration_accounts (
++    id uuid PRIMARY KEY,
++    owner_namespace text NOT NULL,
++    owner_subject text NOT NULL,
++    key text NOT NULL CHECK (octet_length(key) BETWEEN 1 AND 128 AND key = btrim(key)),
++    provider_id text NOT NULL CHECK (octet_length(provider_id) BETWEEN 1 AND 128),
++    auth_config_id text NOT NULL CHECK (octet_length(auth_config_id) BETWEEN 1 AND 128),
++    auth_method text NOT NULL,
++    credential_schema text NOT NULL,
++    external_identity text CHECK (octet_length(external_identity) <= 2048 AND jsonb_typeof(external_identity::jsonb) = 'object'),
++    authorization_key text CHECK (octet_length(authorization_key) BETWEEN 1 AND 256),
++    envelope text CHECK (octet_length(envelope) <= 23000 AND envelope LIKE 'enc:v2:%'),
++    revision bigint NOT NULL DEFAULT 1 CHECK (revision > 0),
++    authorization_revision bigint NOT NULL DEFAULT 1 CHECK (authorization_revision > 0),
++    credential_generation bigint NOT NULL DEFAULT 1 CHECK (credential_generation > 0),
++    status text NOT NULL CHECK (status IN ('ready', 'reconnect_required', 'disconnected')),
++    metadata text NOT NULL CHECK (octet_length(metadata) <= 4096 AND jsonb_typeof(metadata::jsonb) = 'object'
++        AND jsonb_typeof(metadata::jsonb->'label') = 'string'
++        AND octet_length(metadata::jsonb->>'label') BETWEEN 1 AND 256
++        AND btrim(metadata::jsonb->>'label') <> ''
++        AND metadata::jsonb - ARRAY['label','description'] = '{}'::jsonb
++        AND (NOT (metadata::jsonb ? 'description') OR jsonb_typeof(metadata::jsonb->'description') IN ('string','null'))),
++    created_at timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
++    updated_at timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
++    UNIQUE (owner_namespace, owner_subject, key),
++    UNIQUE (owner_namespace, owner_subject, provider_id, authorization_key),
++    FOREIGN KEY (owner_namespace, owner_subject) REFERENCES public.integration_owner_states(owner_namespace, owner_subject),
++    CHECK ((auth_method = 'static_secret' AND credential_schema = 'static-v1' AND external_identity IS NULL AND authorization_key IS NULL)
++        OR (auth_method = 'oauth_authorization_code' AND credential_schema IN ('google-v1', 'workspace-fixture-v1')
++            AND external_identity IS NOT NULL AND authorization_key IS NOT NULL)),
++    CHECK (external_identity IS NULL OR (external_identity::jsonb ?& ARRAY['kind','subject','authorization_key']
++        AND external_identity::jsonb - ARRAY['kind','subject','authorization_key'] = '{}'::jsonb
++        AND jsonb_typeof(external_identity::jsonb->'kind') = 'string'
++        AND jsonb_typeof(external_identity::jsonb->'subject') = 'string'
++        AND octet_length(external_identity::jsonb->>'kind') BETWEEN 1 AND 128
++        AND octet_length(external_identity::jsonb->>'subject') BETWEEN 1 AND 256
++        AND external_identity::jsonb->>'authorization_key' = authorization_key)),
++    CHECK ((status <> 'ready' OR envelope IS NOT NULL) AND (status <> 'disconnected' OR envelope IS NULL))
++);
++-- workspace-fixture-v1 is a contract-test schema, never enabled in the production registry.
++CREATE FUNCTION public.guard_integration_account() RETURNS trigger LANGUAGE plpgsql AS $$
++DECLARE owner_retired boolean;
++BEGIN
++    IF TG_OP = 'UPDATE' THEN
++        IF ROW(NEW.id, NEW.owner_namespace, NEW.owner_subject, NEW.key, NEW.provider_id,
++            NEW.auth_config_id, NEW.auth_method, NEW.credential_schema, NEW.external_identity, NEW.authorization_key)
++            IS DISTINCT FROM ROW(OLD.id, OLD.owner_namespace, OLD.owner_subject, OLD.key, OLD.provider_id,
++            OLD.auth_config_id, OLD.auth_method, OLD.credential_schema, OLD.external_identity, OLD.authorization_key) THEN
++            RAISE EXCEPTION USING ERRCODE = '23514', CONSTRAINT = 'integration_account_immutable_identity', MESSAGE = 'Immutable integration identity';
++        END IF;
++        RETURN NEW;
++    END IF;
++    INSERT INTO public.integration_owner_states(owner_namespace, owner_subject)
++        VALUES(NEW.owner_namespace, NEW.owner_subject) ON CONFLICT DO NOTHING;
++    SELECT retired INTO owner_retired FROM public.integration_owner_states
++        WHERE owner_namespace = NEW.owner_namespace AND owner_subject = NEW.owner_subject FOR UPDATE;
++    IF owner_retired THEN
++        RAISE EXCEPTION USING ERRCODE = '23514', CONSTRAINT = 'integration_owner_retired', MESSAGE = 'Integration owner retired';
++    END IF;
++    IF (SELECT count(*) FROM public.integration_accounts
++        WHERE owner_namespace = NEW.owner_namespace AND owner_subject = NEW.owner_subject) >= 128 THEN
++        RAISE EXCEPTION USING ERRCODE = '23514', CONSTRAINT = 'integration_account_owner_cap', MESSAGE = 'Integration account limit';
++    END IF;
++    RETURN NEW;
++END $$;
++CREATE TRIGGER integration_account_guard BEFORE INSERT OR UPDATE ON public.integration_accounts
++    FOR EACH ROW EXECUTE FUNCTION public.guard_integration_account();
++
++CREATE TABLE public.integration_teardown_intents (
++    id uuid PRIMARY KEY,
++    kind text NOT NULL CHECK (kind IN ('owner', 'company', 'membership')),
++    owner_namespace text NOT NULL CHECK (octet_length(owner_namespace) BETWEEN 1 AND 256),
++    owner_subject text NOT NULL CHECK (octet_length(owner_subject) <= 256),
++    host_binding text NOT NULL CHECK (octet_length(host_binding) <= 256),
++    state text NOT NULL DEFAULT 'pending' CHECK (state IN ('pending', 'completed', 'failed')),
++    attempts integer NOT NULL DEFAULT 0 CHECK (attempts BETWEEN 0 AND 8),
++    available_at timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
++    created_at timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
++    completed_at timestamptz,
++    UNIQUE (kind, owner_namespace, owner_subject, host_binding),
++    CHECK ((kind = 'owner' AND owner_subject <> '' AND host_binding = '')
++        OR (kind = 'company' AND owner_subject = '' AND host_binding <> '')
++        OR (kind = 'membership' AND owner_subject <> '' AND host_binding <> ''))
++);
++CREATE INDEX integration_teardown_due ON public.integration_teardown_intents(available_at, id) WHERE state = 'pending';
+--- a/plan/vault-google/README.md
++++ b/plan/vault-google/README.md
+@@ -6,8 +6,9 @@
+ 
+ ## Outcome and status
+ 
+-Status: proposed implementation, revised on 2026-11-06. None of the stages below is implemented by
+-this plan. The existing directory name is retained; the shared architecture covers multiple apps
++Status: stages 01–02 implemented; stages 03–07 remain planned. The current vault supports static
++bearer and registered `X-API-Key` credentials; company attachment and external-app OAuth are not
++available yet. The existing directory name is retained; the shared architecture covers multiple apps
+ and authentication methods, with Google/Gmail as the first production OAuth integration.
+ 
+ A user can save reusable private credentials, connect external accounts, and authorize selected
+--- a/src/adapters/http/app_state.rs
++++ b/src/adapters/http/app_state.rs
+@@ -34,6 +34,7 @@
+ 
+ #[derive(Clone)]
+ pub struct AppState {
++    pub integrations: Arc<dyn crate::application::integrations::IntegrationGateway>,
+     pub knowledge: Arc<crate::application::knowledge::KnowledgeLibrary>,
+     pub auth_admission: Arc<AuthAdmission>,
+     /// Workflow commands and read models, without worker handlers or spawn capability.
+@@ -243,3 +244,9 @@
+         state.onboarding_use_cases.clone()
+     }
+ }
++
++impl FromRef<AppState> for Arc<dyn crate::application::integrations::IntegrationGateway> {
++    fn from_ref(state: &AppState) -> Self {
++        state.integrations.clone()
++    }
++}
+--- a/src/adapters/http/pages/mod.rs
++++ b/src/adapters/http/pages/mod.rs
+@@ -203,3 +203,5 @@
+ mod team_level_tests;
+ 
+ pub(crate) mod connection_levels;
++
++pub mod vault;
+--- a/src/adapters/http/pages/profile.rs
++++ b/src/adapters/http/pages/profile.rs
+@@ -133,6 +133,7 @@
+             {identity}
+             {login_methods}
+             {notifications}
++            <section class="mb-6 rounded-box border border-base-300 p-5"><h2 class="text-lg font-semibold">Vault / Connected apps</h2><a class="link" href="/ui/profile/vault">Manage private credentials</a></section>
+             {password}
+         </div>
+         "##,
+--- a/src/adapters/http/pages/vault.rs
++++ b/src/adapters/http/pages/vault.rs
+@@ -0,0 +1,80 @@
++use super::{escape_html_attr, escape_html_text};
++use crate::domain::integrations::*;
++
++pub fn vault_content(page: &AccountPage, message: Option<&str>) -> String {
++    let banner = message
++        .map(|text| {
++            format!(
++                "<p role=\"status\" class=\"alert mb-4\">{}</p>",
++                escape_html_text(text)
++            )
++        })
++        .unwrap_or_default();
++    let accounts = page.accounts.iter().map(account_card).collect::<String>();
++    let next = page
++        .next
++        .map(|id| {
++            format!(
++                "<a class=\"link\" href=\"/ui/profile/vault?after={}\">Next page</a>",
++                id.as_uuid()
++            )
++        })
++        .unwrap_or_default();
++    format!(
++        r##"<div id="vault-content" class="mx-auto max-w-3xl p-6 lg:p-10">
++        <a class="link" href="/ui/profile">Back to profile</a><h1 class="mb-4 text-2xl font-bold">Vault / Connected apps</h1>
++        <p class="mb-4 text-sm">Private, server-encrypted storage. Saved secrets can be replaced and cannot be read back. Company attachment is not available yet.</p>
++        {banner}{create}<div class="space-y-4">{accounts}</div>{next}</div>"##,
++        create = create_form()
++    )
++}
++fn create_form() -> String {
++    r##"<section class="mb-6 rounded-box border border-base-300 p-5"><h2 class="text-lg font-semibold">Save a credential</h2>
++        <form hx-post="/ui/profile/vault" hx-target="#vault-content" hx-swap="outerHTML" hx-sync="this:drop" class="space-y-3">
++        <label class="block">Key<input class="input w-full" name="key" maxlength="128" required autocomplete="off"></label>
++        <label class="block">Label<input class="input w-full" name="label" maxlength="256" required></label>
++        <label class="block">Authentication<select class="select w-full" name="app"><option value="static-bearer">Bearer token</option><option value="static-api-key">API key (X-API-Key)</option></select></label>
++        <label class="block">Secret<textarea class="textarea w-full" name="value" maxlength="16384" required autocomplete="off" spellcheck="false"></textarea></label>
++        <p class="text-xs opacity-70">Enter a token or the adapter's typed JSON: token for bearer, api_key for API key.</p><button type="submit" class="btn btn-primary">Save credential</button></form></section>"##.to_string()
++}
++fn account_card(account: &ConnectedAccount) -> String {
++    let id = account.id.as_uuid();
++    let revision = account.revision.get();
++    let replace = if account.auth_method == AuthMethod::StaticSecret {
++        replacement_form(account)
++    } else {
++        String::new()
++    };
++    let configured = match account.status {
++        AccountStatus::Ready => "Configured",
++        AccountStatus::ReconnectRequired => "Reconnect required",
++        AccountStatus::Disconnected => "Not configured",
++    };
++    format!(
++        r##"<section class="rounded-box border border-base-300 p-5"><h2 class="text-lg font-semibold">{label}</h2><p class="font-mono text-xs">{key}</p><p>{configured}</p>
++        <p class="text-xs opacity-70">No company connections; attachment is not available yet.</p>{replace}
++        <form hx-post="/ui/profile/vault/{id}/disconnect" hx-target="#vault-content" hx-swap="outerHTML" hx-sync="this:drop">
++        <input type="hidden" name="expected_revision" value="{revision}"><button class="btn btn-sm" type="submit">Disconnect</button></form>
++        <form hx-delete="/ui/profile/vault/{id}" hx-target="#vault-content" hx-swap="outerHTML" hx-sync="this:drop">
++        <input type="hidden" name="expected_revision" value="{revision}"><button class="btn btn-sm" type="submit">Remove account</button></form></section>"##,
++        label = escape_html_text(account.metadata.label()),
++        key = escape_html_text(account.key.as_str())
++    )
++}
++fn replacement_form(account: &ConnectedAccount) -> String {
++    let app = match account.provider_id.as_str() {
++        "static-bearer" => "static-bearer",
++        "static-api-key" => "static-api-key",
++        _ => return String::new(),
++    };
++    format!(
++        r##"<form hx-put="/ui/profile/vault/{id}" hx-target="#vault-content" hx-swap="outerHTML" hx-sync="this:drop" class="my-4 space-y-3">
++        <input type="hidden" name="expected_revision" value="{revision}"><input type="hidden" name="key" value="{key}"><input type="hidden" name="app" value="{app}">
++        <label class="block">Label<input class="input w-full" name="label" value="{label}" maxlength="256" required></label>
++        <label class="block">Replacement secret<textarea class="textarea w-full" name="value" maxlength="16384" required autocomplete="off" spellcheck="false"></textarea></label><button type="submit" class="btn btn-primary">Replace credential</button></form>"##,
++        id = account.id.as_uuid(),
++        revision = account.revision.get(),
++        key = escape_html_attr(account.key.as_str()),
++        label = escape_html_attr(account.metadata.label())
++    )
++}
+--- a/src/adapters/http/routes/mod.rs
++++ b/src/adapters/http/routes/mod.rs
+@@ -37,6 +37,7 @@
+ pub mod ui_schedules;
+ pub mod ui_team;
+ pub mod ui_uploads;
++pub mod ui_vault;
+ pub mod user;
+ pub mod webhooks;
+ pub mod workflows;
+@@ -111,6 +112,7 @@
+         .merge(ui_invites::router())
+         .merge(ui_deliveries::router())
+         .merge(ui_profile::router())
++        .merge(ui_vault::router())
+         .merge(ui_run_counts::router())
+         .merge(ui_team::router())
+         .merge(ui_uploads::router())
+--- a/src/adapters/http/routes/ui_vault.rs
++++ b/src/adapters/http/routes/ui_vault.rs
+@@ -0,0 +1,175 @@
++use crate::{
++    adapters::{
++        http::{app_state::AppState, auth::AuthenticatedUser, pages},
++        integrations::owner::verified_owner,
++    },
++    app_error::AppResult,
++    application::integrations::*,
++    domain::integrations::*,
++    entities::value_objects::EmailAddress,
++    infra::config::AppConfig,
++    use_cases::user::UserUseCases,
++};
++use axum::{
++    Form, Router,
++    extract::{DefaultBodyLimit, Path, Query, State},
++    response::Html,
++    routing::{get, post},
++};
++use secrecy::SecretString;
++use serde::Deserialize;
++use std::sync::Arc;
++use uuid::Uuid;
++pub fn router() -> Router<AppState> {
++    mutation_router()
++        .route("/ui/profile/vault", get(page))
++        .route("/ui/profile/vault/{entry_id}", get(detail))
++}
++pub(super) fn mutation_router<S>() -> Router<S>
++where
++    S: Clone + Send + Sync + 'static,
++    Arc<dyn IntegrationGateway>: axum::extract::FromRef<S>,
++{
++    Router::new()
++        .route("/ui/profile/vault", post(create))
++        .route(
++            "/ui/profile/vault/{entry_id}",
++            axum::routing::put(replace).delete(remove),
++        )
++        .route("/ui/profile/vault/{entry_id}/disconnect", post(disconnect))
++        .layer(DefaultBodyLimit::max(64 * 1024))
++}
++#[derive(Deserialize)]
++#[serde(deny_unknown_fields)]
++pub(super) struct StaticForm {
++    key: String,
++    app: String,
++    label: String,
++    value: SecretString,
++    expected_revision: Option<i64>,
++}
++impl StaticForm {
++    fn input(self) -> IntegrationResult<StaticAccountInput> {
++        Ok(StaticAccountInput {
++            key: AccountKey::parse(self.key)?,
++            app: AppId::parse(self.app)?,
++            metadata: AccountMetadata::new(self.label, None)?,
++            value: self.value,
++        })
++    }
++}
++#[derive(Deserialize)]
++#[serde(deny_unknown_fields)]
++pub(super) struct RevisionForm {
++    expected_revision: i64,
++}
++#[derive(Deserialize)]
++struct ListQuery {
++    after: Option<Uuid>,
++}
++async fn fragment(
++    gateway: &dyn IntegrationGateway,
++    owner: &VerifiedOwner,
++    message: Option<&str>,
++) -> AppResult<Html<String>> {
++    let page = gateway
++        .list_accounts(owner, PageRequest::new(None, 50)?)
++        .await?;
++    Ok(Html(pages::vault::vault_content(&page, message)))
++}
++async fn page(
++    State(gateway): State<Arc<dyn IntegrationGateway>>,
++    State(users): State<Arc<UserUseCases>>,
++    State(config): State<Arc<AppConfig>>,
++    user: AuthenticatedUser,
++    Query(query): Query<ListQuery>,
++) -> AppResult<Html<String>> {
++    let owner = verified_owner(&user);
++    let entries = gateway
++        .list_accounts(
++            &owner,
++            PageRequest::new(query.after.map(AccountId::new), 50)?,
++        )
++        .await?;
++    let account = super::ui::load_account(&users, user.id).await?;
++    let email = EmailAddress::from(account.email.as_str());
++    let viewer = super::ui::workspace_user(&account, &email, &config);
++    let content = pages::vault::vault_content(&entries, None);
++    Ok(Html(pages::profile_page(&pages::ProfilePage {
++        user: &viewer,
++        company: None,
++        pane_html: &content,
++    })))
++}
++async fn detail(
++    State(gateway): State<Arc<dyn IntegrationGateway>>,
++    user: AuthenticatedUser,
++    Path(id): Path<Uuid>,
++) -> AppResult<Html<String>> {
++    let owner = verified_owner(&user);
++    let account = gateway.get_account(&owner, AccountId::new(id)).await?;
++    Ok(Html(pages::vault::vault_content(
++        &AccountPage {
++            accounts: vec![account],
++            next: None,
++        },
++        None,
++    )))
++}
++pub(super) async fn create(
++    State(gateway): State<Arc<dyn IntegrationGateway>>,
++    user: AuthenticatedUser,
++    Form(form): Form<StaticForm>,
++) -> AppResult<Html<String>> {
++    let owner = verified_owner(&user);
++    gateway.create_static_account(&owner, form.input()?).await?;
++    fragment(gateway.as_ref(), &owner, Some("Credential saved")).await
++}
++pub(super) async fn replace(
++    State(gateway): State<Arc<dyn IntegrationGateway>>,
++    user: AuthenticatedUser,
++    Path(id): Path<Uuid>,
++    Form(form): Form<StaticForm>,
++) -> AppResult<Html<String>> {
++    let owner = verified_owner(&user);
++    let revision = AccountRevision::new(form.expected_revision.ok_or(IntegrationError::Invalid)?)?;
++    gateway
++        .replace_static_account(&owner, AccountId::new(id), revision, form.input()?)
++        .await?;
++    fragment(gateway.as_ref(), &owner, Some("Credential replaced")).await
++}
++pub(super) async fn remove(
++    State(gateway): State<Arc<dyn IntegrationGateway>>,
++    user: AuthenticatedUser,
++    Path(id): Path<Uuid>,
++    Form(form): Form<RevisionForm>,
++) -> AppResult<Html<String>> {
++    let owner = verified_owner(&user);
++    gateway
++        .delete_account(
++            &owner,
++            AccountId::new(id),
++            AccountRevision::new(form.expected_revision)?,
++        )
++        .await?;
++    fragment(gateway.as_ref(), &owner, Some("Account removed")).await
++}
++async fn disconnect(
++    State(gateway): State<Arc<dyn IntegrationGateway>>,
++    user: AuthenticatedUser,
++    Path(id): Path<Uuid>,
++    Form(form): Form<RevisionForm>,
++) -> AppResult<Html<String>> {
++    let owner = verified_owner(&user);
++    gateway
++        .disconnect_account(
++            &owner,
++            AccountId::new(id),
++            AccountRevision::new(form.expected_revision)?,
++        )
++        .await?;
++    fragment(gateway.as_ref(), &owner, Some("Account disconnected")).await
++}
++#[cfg(test)]
++#[path = "vault_management_tests.rs"]
++mod tests;
+--- a/src/adapters/http/routes/vault_management_tests.rs
++++ b/src/adapters/http/routes/vault_management_tests.rs
+@@ -0,0 +1,325 @@
++use super::*;
++use crate::app_error::AppError;
++use crate::{
++    adapters::{
++        http::{auth, security, session::SessionAuthority},
++        integrations::owner::owner_for_user,
++        persistence::{
++            PostgresPersistence,
++            credentials::CredentialCipher,
++            integrations::PostgresVault,
++            test_support::{OwnDatabase, own_database},
++        },
++    },
++    application::integrations::private::CredentialStore,
++    use_cases::user::UserPersistence,
++};
++use axum::{
++    body::{Body, to_bytes},
++    http::{Request, StatusCode},
++    middleware,
++    response::IntoResponse,
++};
++use secrecy::ExposeSecret;
++use tower::ServiceExt;
++struct Fixture {
++    persistence: PostgresPersistence,
++    _database: OwnDatabase,
++    vault: PostgresVault,
++    gateway: Arc<dyn IntegrationGateway>,
++    user: Uuid,
++}
++impl Fixture {
++    async fn new() -> Self {
++        let database = own_database().await.expect("disposable database required");
++        let persistence = PostgresPersistence::with_credential_cipher(
++            database.pool.clone(),
++            CredentialCipher::for_test_with_keys(&[(1, [7; 32])], 1),
++        );
++        let vault = PostgresVault::new(persistence.clone());
++        let gateway = vault.gateway();
++        Self {
++            persistence,
++            _database: database,
++            vault,
++            gateway,
++            user: Uuid::new_v4(),
++        }
++    }
++    fn auth(&self) -> AuthenticatedUser {
++        AuthenticatedUser { id: self.user }
++    }
++    fn form(&self, value: &str, revision: Option<i64>) -> StaticForm {
++        StaticForm {
++            key: "private/key".into(),
++            app: "static-bearer".into(),
++            label: "Private label".into(),
++            value: SecretString::from(value.to_owned()),
++            expected_revision: revision,
++        }
++    }
++    async fn account(&self) -> ConnectedAccount {
++        self.gateway
++            .list_accounts(
++                &verified_owner(&self.auth()),
++                PageRequest::new(None, 50).unwrap(),
++            )
++            .await
++            .unwrap()
++            .accounts
++            .remove(0)
++    }
++}
++#[tokio::test]
++async fn vault_management_owner_crud_stale_revision_foreign_ids_and_no_readback() {
++    let f = Fixture::new().await;
++    let html = create(
++        State(f.gateway.clone()),
++        f.auth(),
++        Form(f.form("sentinel-vault-secret", None)),
++    )
++    .await
++    .unwrap()
++    .0;
++    assert!(!html.contains("sentinel-vault-secret") && !html.contains("enc:v2"));
++    assert!(html.contains("not available yet"));
++    assert!(!html.contains("data-submit=\"busy-once\""));
++    assert_eq!(
++        html.matches("<form ").count(),
++        html.matches("hx-sync=\"this:drop\"").count()
++    );
++
++    let account = f.account().await;
++    let owner = owner_for_user(f.user);
++    assert!(
++        f.vault
++            .read_usable(&owner, account.id)
++            .await
++            .unwrap()
++            .payload
++            .expose_secret()
++            == "sentinel-vault-secret"
++    );
++    deny_foreign(&f, account.id).await;
++    let html = replace(
++        State(f.gateway.clone()),
++        f.auth(),
++        Path(account.id.as_uuid()),
++        Form(f.form("replacement-vault-secret", Some(1))),
++    )
++    .await
++    .unwrap()
++    .0;
++    assert!(!html.contains("replacement-vault-secret"));
++    assert!(html.contains("Replacement secret"));
++    assert!(matches!(
++        replace(
++            State(f.gateway.clone()),
++            f.auth(),
++            Path(account.id.as_uuid()),
++            Form(f.form("stale-secret", Some(1)))
++        )
++        .await,
++        Err(AppError::Conflict(_))
++    ));
++    let inspection = f
++        .gateway
++        .inspect_grants(&verified_owner(&f.auth()), account.id)
++        .await
++        .unwrap();
++    assert!(!inspection.attachment_available && inspection.grants.is_empty());
++    let removed = remove(
++        State(f.gateway.clone()),
++        f.auth(),
++        Path(account.id.as_uuid()),
++        Form(RevisionForm {
++            expected_revision: 2,
++        }),
++    )
++    .await
++    .unwrap();
++    assert!(!removed.0.contains("replacement-vault-secret"));
++    assert!(
++        f.gateway
++            .get_account(&verified_owner(&f.auth()), account.id)
++            .await
++            .is_err()
++    );
++}
++#[tokio::test]
++async fn vault_management_errors_and_html_escape_labels_and_keep_secret_inputs_blank() {
++    let f = Fixture::new().await;
++    let mut form = f.form("saved-secret", None);
++    form.label = "\"/><script>alert(1)</script>".into();
++    let html = create(State(f.gateway.clone()), f.auth(), Form(form))
++        .await
++        .unwrap()
++        .0;
++    assert!(!html.contains("<script>alert(1)"));
++    assert!(!html.contains("saved-secret"));
++    assert!(html.contains("name=\"value\"") && !html.contains("name=\"value\" value="));
++    let invalid = f.form(r#" {"token":42,"private":"sentinel"}"#, None);
++    let error = create(State(f.gateway.clone()), f.auth(), Form(invalid))
++        .await
++        .unwrap_err();
++    let error = to_bytes(error.into_response().into_body(), 4096)
++        .await
++        .unwrap();
++    let error = String::from_utf8(error.to_vec()).unwrap();
++    assert!(!error.contains("sentinel") && !error.contains("private"));
++}
++#[tokio::test]
++async fn vault_management_real_session_origin_body_limit_and_owner_override_rejection() {
++    let f = Fixture::new().await;
++    let browser = authenticated_browser(&f).await;
++    let app = browser.app;
++    let body = "key=real%2Fkey&app=static-bearer&label=Real&value=submitted-secret";
++    let unauth = app
++        .clone()
++        .oneshot(request(body, Some("http://localhost:3000"), None))
++        .await
++        .unwrap();
++    assert_eq!(unauth.status(), StatusCode::SEE_OTHER);
++    for origin in [None, Some("https://foreign.invalid")] {
++        assert_eq!(
++            app.clone()
++                .oneshot(request(body, origin, Some(&browser.cookie)))
++                .await
++                .unwrap()
++                .status(),
++            StatusCode::FORBIDDEN
++        );
++    }
++    let override_body = format!("{body}&user_id={}", Uuid::new_v4());
++    assert!(
++        app.clone()
++            .oneshot(request(
++                &override_body,
++                Some("http://localhost:3000"),
++                Some(&browser.cookie)
++            ))
++            .await
++            .unwrap()
++            .status()
++            .is_client_error()
++    );
++    let too_big = format!(
++        "key=too-big&app=static-bearer&label=Large&value={}",
++        "x".repeat(65536)
++    );
++    assert_eq!(
++        app.clone()
++            .oneshot(request(
++                &too_big,
++                Some("http://localhost:3000"),
++                Some(&browser.cookie)
++            ))
++            .await
++            .unwrap()
++            .status(),
++        StatusCode::PAYLOAD_TOO_LARGE
++    );
++    let saved = app
++        .oneshot(request(
++            body,
++            Some("http://localhost:3000"),
++            Some(&browser.cookie),
++        ))
++        .await
++        .unwrap();
++    assert_eq!(saved.status(), StatusCode::OK);
++    let saved = String::from_utf8(
++        to_bytes(saved.into_body(), 128 * 1024)
++            .await
++            .unwrap()
++            .to_vec(),
++    )
++    .unwrap();
++    assert!(!saved.contains("submitted-secret"));
++    let owner = VerifiedOwner::from_verified_client(owner_for_user(browser.user));
++    assert_eq!(
++        f.gateway
++            .list_accounts(&owner, PageRequest::new(None, 50).unwrap())
++            .await
++            .unwrap()
++            .accounts
++            .len(),
++        1
++    );
++}
++
++async fn deny_foreign(f: &Fixture, id: AccountId) {
++    let foreign = AuthenticatedUser { id: Uuid::new_v4() };
++    assert!(matches!(
++        detail(
++            State(f.gateway.clone()),
++            foreign.clone(),
++            Path(id.as_uuid())
++        )
++        .await,
++        Err(AppError::NotFound(_))
++    ));
++    let denied = replace(
++        State(f.gateway.clone()),
++        foreign,
++        Path(id.as_uuid()),
++        Form(f.form("foreign-secret", Some(1))),
++    )
++    .await
++    .unwrap_err();
++    assert!(
++        !format!("{denied}").contains("Private label")
++            && !format!("{denied}").contains("foreign-secret")
++    );
++}
++
++struct Browser {
++    app: Router,
++    cookie: String,
++    user: Uuid,
++}
++async fn authenticated_browser(f: &Fixture) -> Browser {
++    let marker = Uuid::new_v4().simple().to_string();
++    let user = f
++        .persistence
++        .create_user(
++            &format!("vault-{marker}"),
++            &format!("vault-{marker}@example.test"),
++            "fixture-hash",
++        )
++        .await
++        .unwrap();
++    let config = Arc::new(AppConfig::for_test());
++    let sessions = Arc::new(SessionAuthority::new(
++        &config,
++        Arc::new(f.persistence.clone()),
++    ));
++    let cookie = sessions.cookie(&user).await.unwrap();
++    let cookie = format!("{}={}", cookie.name(), cookie.value());
++    let app = mutation_router()
++        .with_state(f.gateway.clone())
++        .layer(middleware::from_fn_with_state(sessions, auth::require_auth))
++        .layer(middleware::from_fn_with_state(
++            config,
++            security::browser_security,
++        ));
++    Browser {
++        app,
++        cookie,
++        user: user.id,
++    }
++}
++fn request(body: &str, origin: Option<&str>, session_cookie: Option<&str>) -> Request<Body> {
++    let mut builder = Request::builder()
++        .method("POST")
++        .uri("/ui/profile/vault")
++        .header("host", "localhost:3000")
++        .header("content-type", "application/x-www-form-urlencoded");
++    if let Some(cookie) = session_cookie {
++        builder = builder.header("cookie", cookie);
++    }
++    if let Some(origin) = origin {
++        builder = builder.header("origin", origin);
++    }
++    builder.body(Body::from(body.to_owned())).unwrap()
++}
+--- a/src/adapters/integrations/mod.rs
++++ b/src/adapters/integrations/mod.rs
+@@ -1,2 +1,7 @@
+ //! Provider-specific integration adapters, distinct from login OAuth.
++#[cfg_attr(
++    not(test),
++    allow(dead_code, reason = "External-app OAuth registration ships in phase04")
++)]
+ pub(crate) mod google_credentials;
++pub(crate) mod owner;
+--- a/src/adapters/integrations/owner.rs
++++ b/src/adapters/integrations/owner.rs
+@@ -0,0 +1,20 @@
++//! Trusted local host identity mapping; never takes an owner from browser input.
++use crate::{application::integrations::VerifiedOwner, domain::integrations::*};
++use uuid::Uuid;
++pub(crate) fn client_namespace() -> OwnerNamespace {
++    OwnerNamespace::parse("openbot").expect("code-configured client namespace")
++}
++pub(crate) fn owner_for_user(user: Uuid) -> AccountOwner {
++    AccountOwner {
++        namespace: client_namespace(),
++        subject: OwnerSubject::parse(user.to_string()).expect("UUID owner subject"),
++    }
++}
++pub(crate) fn verified_owner(
++    user: &crate::adapters::http::auth::AuthenticatedUser,
++) -> VerifiedOwner {
++    VerifiedOwner::from_verified_client(owner_for_user(user.id))
++}
++pub(crate) fn company_binding(company: Uuid) -> HostBinding {
++    HostBinding::parse(format!("company/{company}")).expect("UUID host binding")
++}
+--- a/src/adapters/persistence/company.rs
++++ b/src/adapters/persistence/company.rs
+@@ -125,6 +125,13 @@
+     if !company_exists {
+         return Ok(false);
+     }
++    super::integrations::lifecycle::revoke_company_on(
++        &mut transaction,
++        &crate::adapters::integrations::owner::client_namespace(),
++        &crate::adapters::integrations::owner::company_binding(id),
++    )
++    .await
++    .map_err(AppError::from)?;
+     sqlx::query("DELETE FROM companies WHERE id = $1")
+         .bind(id)
+         .execute(&mut *transaction)
+--- a/src/adapters/persistence/company_invite.rs
++++ b/src/adapters/persistence/company_invite.rs
+@@ -584,6 +584,13 @@
+             user_id,
+         )
+         .await?;
++        super::integrations::lifecycle::revoke_membership_on(
++            &mut transaction,
++            &crate::adapters::integrations::owner::owner_for_user(user_id),
++            &crate::adapters::integrations::owner::company_binding(company_id),
++        )
++        .await
++        .map_err(AppError::from)?;
+         sqlx::query!(
+             "DELETE FROM company_members
+              WHERE company_id = $1 AND user_id = $2 AND role <> 'owner'",
+--- a/src/adapters/persistence/credential_rotation.rs
++++ b/src/adapters/persistence/credential_rotation.rs
+@@ -68,6 +68,7 @@
+ /// whose rows never rotate, and nothing else in the system would notice.
+ #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+ enum CredentialTable {
++    IntegrationAccounts,
+     TypeSafeCredentials,
+     WorkflowHttpCredentials,
+     CompanyMcpCredentials,
+@@ -82,6 +83,7 @@
+ 
+ impl CredentialTable {
+     const ALL: &'static [Self] = &[
++        Self::IntegrationAccounts,
+         Self::TypeSafeCredentials,
+         Self::WorkflowHttpCredentials,
+         Self::CompanyMcpCredentials,
+@@ -97,6 +99,9 @@
+ /// key of a batch is exactly where the next batch starts.
+ #[derive(Debug, Clone, PartialEq, Eq)]
+ enum CredentialKey {
++    IntegrationAccount {
++        id: Uuid,
++    },
+     TypeSafeCredential {
+         company_id: Uuid,
+         connection_id: Uuid,
+@@ -438,6 +443,10 @@
+     rotated: &str,
+ ) -> AppResult<bool> {
+     let changed = match &row.key {
++        CredentialKey::IntegrationAccount { id } => {
++            super::integrations::inventory::rewrap(transaction,*id,&row.stored,rotated).await
++        }
++
+         CredentialKey::TypeSafeCredential { company_id, connection_id } => {
+             sqlx::query("UPDATE company_typesafe_connections SET envelope=$3 WHERE company_id=$1 AND id=$2 AND envelope=$4")
+                 .bind(company_id).bind(connection_id).bind(rotated).bind(&row.stored).execute(&mut **transaction).await
+@@ -581,6 +590,24 @@
+     cursor: Option<&CredentialKey>,
+ ) -> AppResult<Vec<InventoryRow>> {
+     match table {
++        CredentialTable::IntegrationAccounts => {
++            let after = match cursor {
++                Some(CredentialKey::IntegrationAccount { id }) => Some(*id),
++                None => None,
++                _ => return Err(AppError::Internal("Invalid vault rotation cursor".into())),
++            };
++            Ok(
++                super::integrations::inventory::page(connection, after, CREDENTIAL_BATCH_SIZE)
++                    .await?
++                    .into_iter()
++                    .map(|row| InventoryRow {
++                        key: CredentialKey::IntegrationAccount { id: row.id },
++                        format: CredentialFormat::Envelope(row.context),
++                        stored: row.envelope,
++                    })
++                    .collect(),
++            )
++        }
+         CredentialTable::TypeSafeCredentials => {
+             fetch_typesafe_credential_batch(connection, cursor).await
+         }
+--- a/src/adapters/persistence/credential_rotation_tests.rs
++++ b/src/adapters/persistence/credential_rotation_tests.rs
+@@ -21,6 +21,7 @@
+     // tables by design, so a real-table fixture would rotate rows belonging to a test running
+     // beside it.
+     for statement in [
++        crate::adapters::persistence::integrations::inventory::ISOLATED_TABLE_SQL,
+         r#"CREATE TEMPORARY TABLE company_typesafe_connections (
+                company_id UUID NOT NULL, id UUID NOT NULL, envelope TEXT NOT NULL,
+                PRIMARY KEY (company_id, id)
+--- a/src/adapters/persistence/credentials/envelope.rs
++++ b/src/adapters/persistence/credentials/envelope.rs
+@@ -128,8 +128,27 @@
+         }
+     }
+ 
++    pub(crate) fn integration_account(
++        account: &crate::domain::integrations::ConnectedAccount,
++    ) -> Self {
++        Self {
++            scope: "integration_account",
++            fields: vec![
++                account.owner.namespace.as_str().as_bytes().to_vec(),
++                account.owner.subject.as_str().as_bytes().to_vec(),
++                account.id.as_uuid().as_bytes().to_vec(),
++                account.provider_id.as_str().as_bytes().to_vec(),
++                account.auth_config_id.as_str().as_bytes().to_vec(),
++                account.auth_method.as_str().as_bytes().to_vec(),
++                account.credential_schema.as_str().as_bytes().to_vec(),
++            ],
++        }
++    }
++
+     fn max_secret_bytes(&self) -> usize {
+-        if self.scope == "company_mcp_credential" {
++        if self.scope == "integration_account" {
++            crate::domain::integrations::MAX_CREDENTIAL_BYTES
++        } else if self.scope == "company_mcp_credential" {
+             crate::entities::mcp::MAX_MCP_SECRET_BYTES
+         } else {
+             MAX_CREDENTIAL_BYTES
+--- a/src/adapters/persistence/integrations/accounts.rs
++++ b/src/adapters/persistence/integrations/accounts.rs
+@@ -0,0 +1,416 @@
++use super::super::credentials::envelope::CredentialContext;
++use super::{
++    PostgresVault,
++    rows::{AccountRow, COLUMNS},
++    storage_error,
++};
++use crate::{
++    application::integrations::{
++        management::{AccountRepository, AccountWrite},
++        private::{CredentialRecord, CredentialStore},
++    },
++    domain::integrations::*,
++};
++use async_trait::async_trait;
++use chrono::Utc;
++use secrecy::SecretString;
++use sqlx::{PgConnection, Postgres, Transaction};
++use uuid::Uuid;
++
++pub(super) async fn lock_owner(
++    tx: &mut Transaction<'_, Postgres>,
++    owner: &AccountOwner,
++) -> IntegrationResult<()> {
++    let retired=sqlx::query_scalar::<_,bool>("SELECT retired FROM integration_owner_states WHERE owner_namespace=$1 AND owner_subject=$2 FOR UPDATE")
++        .bind(owner.namespace.as_str()).bind(owner.subject.as_str()).fetch_optional(&mut **tx).await.map_err(storage_error)?;
++    if retired != Some(false) {
++        return Err(IntegrationError::Denied);
++    }
++    Ok(())
++}
++enum AccountRead {
++    Metadata,
++    Locked,
++}
++async fn load(
++    connection: &mut PgConnection,
++    owner: &AccountOwner,
++    id: AccountId,
++    mode: AccountRead,
++) -> IntegrationResult<AccountRow> {
++    let suffix = match mode {
++        AccountRead::Locked => " FOR UPDATE",
++        AccountRead::Metadata => "",
++    };
++    sqlx::query_as::<_,AccountRow>(&format!("SELECT {COLUMNS} FROM integration_accounts WHERE owner_namespace=$1 AND owner_subject=$2 AND id=$3{suffix}"))
++        .bind(owner.namespace.as_str()).bind(owner.subject.as_str()).bind(id.as_uuid()).fetch_optional(connection).await.map_err(storage_error)?.ok_or(IntegrationError::NotFound)
++}
++fn new_account(owner: &AccountOwner, w: &AccountWrite) -> ConnectedAccount {
++    ConnectedAccount {
++        id: AccountId::new(Uuid::new_v4()),
++        owner: owner.clone(),
++        key: w.key.clone(),
++        provider_id: w.provider.clone(),
++        auth_config_id: w.config.clone(),
++        auth_method: w.method,
++        credential_schema: w.schema.clone(),
++        external_identity: w.identity.clone(),
++        revision: AccountRevision::INITIAL,
++        authorization_revision: AuthorizationRevision::INITIAL,
++        status: AccountStatus::Ready,
++        metadata: w.metadata.clone(),
++        created_at: Utc::now(),
++        updated_at: Utc::now(),
++    }
++}
++impl PostgresVault {
++    fn validate_write(&self, w: &AccountWrite) -> IntegrationResult<()> {
++        let entry = self.registration(&w.provider, &w.config, w.method, &w.schema)?;
++        let identity = self
++            .registry
++            .validate(&entry.app.id, w.method, &w.schema, &w.payload)?;
++        if identity != w.identity {
++            return Err(IntegrationError::Invalid);
++        }
++        Ok(())
++    }
++    async fn locked_account(
++        &self,
++        tx: &mut Transaction<'_, Postgres>,
++        owner: &AccountOwner,
++        id: AccountId,
++        expected: AccountRevision,
++    ) -> IntegrationResult<(ConnectedAccount, CredentialVersions)> {
++        lock_owner(tx, owner).await?;
++        let row = load(tx, owner, id, AccountRead::Locked).await?;
++        let generation = CredentialGeneration::new(row.credential_generation)?;
++        let account = row.decode()?;
++        if account.revision != expected {
++            return Err(IntegrationError::Conflict);
++        }
++        let versions = CredentialVersions {
++            revision: account.revision,
++            authorization: account.authorization_revision,
++            generation,
++        };
++        Ok((account, versions))
++    }
++    /// Private adapter-only cache write; not a gateway operation and no provider call.
++    #[cfg_attr(
++        not(test),
++        expect(
++            dead_code,
++            reason = "The private provider renewal writer is used from phase05"
++        )
++    )]
++    pub(crate) async fn write_managed(
++        &self,
++        owner: &AccountOwner,
++        id: AccountId,
++        expected: AccountRevision,
++        payload: SecretString,
++    ) -> IntegrationResult<ConnectedAccount> {
++        let mut tx = self
++            .persistence
++            .pool()
++            .begin()
++            .await
++            .map_err(storage_error)?;
++        let (account, versions) = self.locked_account(&mut tx, owner, id, expected).await?;
++        if account.auth_method != AuthMethod::OAuthAuthorizationCode
++            || account.status != AccountStatus::Ready
++        {
++            return Err(IntegrationError::Denied);
++        }
++        let entry = self.registration(
++            &account.provider_id,
++            &account.auth_config_id,
++            account.auth_method,
++            &account.credential_schema,
++        )?;
++        let identity = self.registry.validate(
++            &entry.app.id,
++            account.auth_method,
++            &account.credential_schema,
++            &payload,
++        )?;
++        if identity != account.external_identity {
++            return Err(IntegrationError::Denied);
++        }
++        let next = versions.changed(CredentialChange::Refresh)?;
++        let envelope = self
++            .persistence
++            .credential_cipher()
++            .map_err(|_| IntegrationError::Credential)?
++            .seal_envelope(&CredentialContext::integration_account(&account), &payload)
++            .map_err(|_| IntegrationError::Credential)?;
++        save_payload(
++            &mut tx,
++            &account,
++            next,
++            Some(&envelope),
++            AccountStatus::Ready,
++            &account.metadata,
++        )
++        .await?;
++        let result = load(&mut tx, owner, id, AccountRead::Metadata)
++            .await?
++            .decode()?;
++        tx.commit().await.map_err(storage_error)?;
++        Ok(result)
++    }
++}
++async fn save_payload(
++    tx: &mut Transaction<'_, Postgres>,
++    account: &ConnectedAccount,
++    versions: CredentialVersions,
++    envelope: Option<&str>,
++    status: AccountStatus,
++    metadata: &AccountMetadata,
++) -> IntegrationResult<()> {
++    let metadata = serde_json::to_string(metadata).map_err(|_| IntegrationError::Invalid)?;
++    sqlx::query("UPDATE integration_accounts SET envelope=$4,status=$5,revision=$6,authorization_revision=$7,credential_generation=$8,metadata=$9,updated_at=clock_timestamp() WHERE owner_namespace=$1 AND owner_subject=$2 AND id=$3")
++        .bind(account.owner.namespace.as_str()).bind(account.owner.subject.as_str()).bind(account.id.as_uuid()).bind(envelope).bind(status.as_str())
++        .bind(versions.revision.get()).bind(versions.authorization.get()).bind(versions.generation.get()).bind(metadata).execute(&mut **tx).await.map_err(storage_error)?;
++    Ok(())
++}
++#[async_trait]
++impl AccountRepository for PostgresVault {
++    async fn list(
++        &self,
++        owner: &AccountOwner,
++        page: PageRequest,
++    ) -> IntegrationResult<AccountPage> {
++        let rows=sqlx::query_as::<_,AccountRow>(&format!("SELECT {COLUMNS} FROM integration_accounts WHERE owner_namespace=$1 AND owner_subject=$2 AND ($3::uuid IS NULL OR id>$3) ORDER BY id LIMIT $4"))
++            .bind(owner.namespace.as_str()).bind(owner.subject.as_str()).bind(page.after().map(AccountId::as_uuid)).bind((page.size()+1) as i64).fetch_all(self.persistence.pool()).await.map_err(storage_error)?;
++        let more = rows.len() > page.size();
++        let accounts = rows
++            .into_iter()
++            .take(page.size())
++            .map(AccountRow::decode)
++            .collect::<IntegrationResult<Vec<_>>>()?;
++        let next = if more {
++            accounts.last().map(|a| a.id)
++        } else {
++            None
++        };
++        Ok(AccountPage { accounts, next })
++    }
++    async fn get(
++        &self,
++        owner: &AccountOwner,
++        id: AccountId,
++    ) -> IntegrationResult<ConnectedAccount> {
++        let mut connection = self
++            .persistence
++            .pool()
++            .acquire()
++            .await
++            .map_err(storage_error)?;
++        load(&mut connection, owner, id, AccountRead::Metadata)
++            .await?
++            .decode()
++    }
++    async fn create(
++        &self,
++        owner: &AccountOwner,
++        w: AccountWrite,
++    ) -> IntegrationResult<ConnectedAccount> {
++        self.validate_write(&w)?;
++        let account = new_account(owner, &w);
++        let envelope = self
++            .persistence
++            .credential_cipher()
++            .map_err(|_| IntegrationError::Credential)?
++            .seal_envelope(
++                &CredentialContext::integration_account(&account),
++                &w.payload,
++            )
++            .map_err(|_| IntegrationError::Credential)?;
++        let metadata = serde_json::to_string(&w.metadata).map_err(|_| IntegrationError::Invalid)?;
++        let identity = w
++            .identity
++            .as_ref()
++            .map(serde_json::to_string)
++            .transpose()
++            .map_err(|_| IntegrationError::Invalid)?;
++        // The BEFORE INSERT guard serializes owner count/retirement with this insert.
++        let mut tx = self
++            .persistence
++            .pool()
++            .begin()
++            .await
++            .map_err(storage_error)?;
++        let row=sqlx::query_as::<_,AccountRow>(&format!("INSERT INTO integration_accounts(id,owner_namespace,owner_subject,key,provider_id,auth_config_id,auth_method,credential_schema,external_identity,authorization_key,envelope,status,metadata) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,'ready',$12) RETURNING {COLUMNS}"))
++            .bind(account.id.as_uuid()).bind(owner.namespace.as_str()).bind(owner.subject.as_str()).bind(w.key.as_str()).bind(w.provider.as_str()).bind(w.config.as_str())
++            .bind(w.method.as_str()).bind(w.schema.as_str()).bind(identity).bind(w.identity.as_ref().map(|i|i.authorization_key.as_str())).bind(envelope).bind(metadata)
++            .fetch_one(&mut *tx).await.map_err(storage_error)?;
++        let result = row.decode()?;
++        tx.commit().await.map_err(storage_error)?;
++        Ok(result)
++    }
++    async fn replace(
++        &self,
++        owner: &AccountOwner,
++        id: AccountId,
++        expected: AccountRevision,
++        w: AccountWrite,
++    ) -> IntegrationResult<ConnectedAccount> {
++        self.validate_write(&w)?;
++        if w.method != AuthMethod::StaticSecret {
++            return Err(IntegrationError::Denied);
++        }
++        let mut tx = self
++            .persistence
++            .pool()
++            .begin()
++            .await
++            .map_err(storage_error)?;
++        let (account, versions) = self.locked_account(&mut tx, owner, id, expected).await?;
++        if account.auth_method != w.method
++            || account.key != w.key
++            || account.provider_id != w.provider
++            || account.auth_config_id != w.config
++            || account.credential_schema != w.schema
++            || account.external_identity != w.identity
++        {
++            return Err(IntegrationError::Denied);
++        }
++        let envelope = self
++            .persistence
++            .credential_cipher()
++            .map_err(|_| IntegrationError::Credential)?
++            .seal_envelope(
++                &CredentialContext::integration_account(&account),
++                &w.payload,
++            )
++            .map_err(|_| IntegrationError::Credential)?;
++        save_payload(
++            &mut tx,
++            &account,
++            versions.changed(CredentialChange::Replace)?,
++            Some(&envelope),
++            AccountStatus::Ready,
++            &w.metadata,
++        )
++        .await?;
++        let result = load(&mut tx, owner, id, AccountRead::Metadata)
++            .await?
++            .decode()?;
++        tx.commit().await.map_err(storage_error)?;
++        Ok(result)
++    }
++    async fn disconnect(
++        &self,
++        owner: &AccountOwner,
++        id: AccountId,
++        expected: AccountRevision,
++    ) -> IntegrationResult<ConnectedAccount> {
++        let mut tx = self
++            .persistence
++            .pool()
++            .begin()
++            .await
++            .map_err(storage_error)?;
++        let (account, versions) = self.locked_account(&mut tx, owner, id, expected).await?;
++        save_payload(
++            &mut tx,
++            &account,
++            versions.changed(CredentialChange::Disconnect)?,
++            None,
++            AccountStatus::Disconnected,
++            &account.metadata,
++        )
++        .await?;
++        let result = load(&mut tx, owner, id, AccountRead::Metadata)
++            .await?
++            .decode()?;
++        tx.commit().await.map_err(storage_error)?;
++        Ok(result)
++    }
++    async fn delete(
++        &self,
++        owner: &AccountOwner,
++        id: AccountId,
++        expected: AccountRevision,
++    ) -> IntegrationResult<()> {
++        let mut tx = self
++            .persistence
++            .pool()
++            .begin()
++            .await
++            .map_err(storage_error)?;
++        let (account, versions) = self.locked_account(&mut tx, owner, id, expected).await?;
++        // No grants can be created in02.03 must invalidate grants in this same transaction.
++        save_payload(
++            &mut tx,
++            &account,
++            versions.changed(CredentialChange::Disconnect)?,
++            None,
++            AccountStatus::Disconnected,
++            &account.metadata,
++        )
++        .await?;
++        sqlx::query("DELETE FROM integration_accounts WHERE owner_namespace=$1 AND owner_subject=$2 AND id=$3").bind(owner.namespace.as_str()).bind(owner.subject.as_str()).bind(id.as_uuid()).execute(&mut *tx).await.map_err(storage_error)?;
++        tx.commit().await.map_err(storage_error)?;
++        Ok(())
++    }
++}
++#[async_trait]
++impl CredentialStore for PostgresVault {
++    async fn read_usable(
++        &self,
++        owner: &AccountOwner,
++        id: AccountId,
++    ) -> IntegrationResult<CredentialRecord> {
++        let mut tx = self
++            .persistence
++            .pool()
++            .begin()
++            .await
++            .map_err(storage_error)?;
++        let row = load(&mut tx, owner, id, AccountRead::Metadata).await?;
++        let generation = CredentialGeneration::new(row.credential_generation)?;
++        let account = row.decode()?;
++        if account.status != AccountStatus::Ready {
++            return Err(IntegrationError::Denied);
++        }
++        let envelope=sqlx::query_scalar::<_,Option<String>>("SELECT envelope FROM integration_accounts WHERE owner_namespace=$1 AND owner_subject=$2 AND id=$3 AND revision=$4 AND status='ready'")
++            .bind(owner.namespace.as_str()).bind(owner.subject.as_str()).bind(id.as_uuid()).bind(account.revision.get()).fetch_optional(&mut *tx).await.map_err(storage_error)?.flatten().ok_or(IntegrationError::Conflict)?;
++        if envelope.len() > 23000 {
++            return Err(IntegrationError::Credential);
++        }
++        let payload = self
++            .persistence
++            .credential_cipher()
++            .map_err(|_| IntegrationError::Credential)?
++            .open_envelope(&CredentialContext::integration_account(&account), &envelope)
++            .map_err(|_| IntegrationError::Credential)?;
++        let entry = self.registration(
++            &account.provider_id,
++            &account.auth_config_id,
++            account.auth_method,
++            &account.credential_schema,
++        )?;
++        let identity = self.registry.validate(
++            &entry.app.id,
++            account.auth_method,
++            &account.credential_schema,
++            &payload,
++        )?;
++        if identity != account.external_identity {
++            return Err(IntegrationError::Credential);
++        }
++        tx.commit().await.map_err(storage_error)?;
++        let versions = CredentialVersions {
++            revision: account.revision,
++            authorization: account.authorization_revision,
++            generation,
++        };
++        Ok(CredentialRecord {
++            account,
++            versions,
++            payload,
++        })
++    }
++}
+--- a/src/adapters/persistence/integrations/inventory.rs
++++ b/src/adapters/persistence/integrations/inventory.rs
+@@ -0,0 +1,63 @@
++use super::{
++    super::credentials::envelope::CredentialContext,
++    rows::{AccountRow, COLUMNS},
++};
++use crate::app_error::{AppError, AppResult};
++use sqlx::{PgConnection, Postgres, Transaction};
++use uuid::Uuid;
++pub(crate) struct VaultInventoryEntry {
++    pub id: Uuid,
++    pub context: CredentialContext,
++    pub envelope: String,
++}
++#[derive(sqlx::FromRow)]
++struct InventoryDb {
++    #[sqlx(flatten)]
++    account: AccountRow,
++    envelope: String,
++}
++pub(crate) async fn page(
++    connection: &mut PgConnection,
++    after: Option<Uuid>,
++    limit: i64,
++) -> AppResult<Vec<VaultInventoryEntry>> {
++    if !(1..=100).contains(&limit) {
++        return Err(AppError::Internal("Invalid vault inventory page".into()));
++    }
++    let rows=sqlx::query_as::<_,InventoryDb>(&format!("SELECT {COLUMNS},envelope FROM integration_accounts WHERE envelope IS NOT NULL AND ($1::uuid IS NULL OR id>$1) ORDER BY id LIMIT $2"))
++        .bind(after).bind(limit).fetch_all(connection).await.map_err(|_|AppError::Internal("Vault inventory unavailable".into()))?;
++    rows.into_iter()
++        .map(|row| {
++            let account = row
++                .account
++                .decode()
++                .map_err(|_| AppError::Internal("Invalid vault inventory metadata".into()))?;
++            if row.envelope.len() > 23000 {
++                return Err(AppError::Internal(
++                    "Invalid vault inventory envelope".into(),
++                ));
++            }
++            Ok(VaultInventoryEntry {
++                id: account.id.as_uuid(),
++                context: CredentialContext::integration_account(&account),
++                envelope: row.envelope,
++            })
++        })
++        .collect()
++}
++pub(crate) async fn rewrap(
++    tx: &mut Transaction<'_, Postgres>,
++    id: Uuid,
++    old: &str,
++    new: &str,
++) -> Result<sqlx::postgres::PgQueryResult, sqlx::Error> {
++    sqlx::query("UPDATE integration_accounts SET envelope=$2 WHERE id=$1 AND envelope=$3")
++        .bind(id)
++        .bind(new)
++        .bind(old)
++        .execute(&mut **tx)
++        .await
++}
++
++#[cfg(test)]
++pub(crate) const ISOLATED_TABLE_SQL: &str = "CREATE TEMPORARY TABLE integration_accounts (LIKE public.integration_accounts INCLUDING ALL) ON COMMIT PRESERVE ROWS";
+--- a/src/adapters/persistence/integrations/lifecycle.rs
++++ b/src/adapters/persistence/integrations/lifecycle.rs
+@@ -0,0 +1,166 @@
++use super::{PostgresVault, storage_error};
++use crate::{application::integrations::lifecycle::TeardownDrain, domain::integrations::*};
++use async_trait::async_trait;
++use sqlx::{Acquire, Postgres, Transaction};
++use tokio_util::sync::CancellationToken;
++use uuid::Uuid;
++
++/// Local implementation hooks: the host owns the surrounding deletion transaction.
++/// No host-table query or host foreign key exists inside the integrations module.
++pub(crate) async fn retire_owner_on(
++    tx: &mut Transaction<'_, Postgres>,
++    owner: &AccountOwner,
++) -> IntegrationResult<()> {
++    sqlx::query("INSERT INTO integration_owner_states(owner_namespace,owner_subject,retired) VALUES($1,$2,true) ON CONFLICT(owner_namespace,owner_subject) DO UPDATE SET retired=true")
++        .bind(owner.namespace.as_str()).bind(owner.subject.as_str()).execute(&mut **tx).await.map_err(storage_error)?;
++    sqlx::query("UPDATE integration_accounts SET status='disconnected',envelope=NULL,revision=revision+1,authorization_revision=authorization_revision+1,credential_generation=credential_generation+1,updated_at=clock_timestamp() WHERE owner_namespace=$1 AND owner_subject=$2 AND status<>'disconnected'")
++        .bind(owner.namespace.as_str()).bind(owner.subject.as_str()).execute(&mut **tx).await.map_err(storage_error)?;
++    enqueue(tx, "owner", &owner.namespace, owner.subject.as_str(), "").await
++}
++pub(crate) async fn revoke_company_on(
++    tx: &mut Transaction<'_, Postgres>,
++    client: &OwnerNamespace,
++    binding: &HostBinding,
++) -> IntegrationResult<()> {
++    enqueue(tx, "company", client, "", binding.as_str()).await
++}
++pub(crate) async fn revoke_membership_on(
++    tx: &mut Transaction<'_, Postgres>,
++    owner: &AccountOwner,
++    binding: &HostBinding,
++) -> IntegrationResult<()> {
++    enqueue(
++        tx,
++        "membership",
++        &owner.namespace,
++        owner.subject.as_str(),
++        binding.as_str(),
++    )
++    .await
++}
++async fn enqueue(
++    tx: &mut Transaction<'_, Postgres>,
++    kind: &str,
++    client: &OwnerNamespace,
++    subject: &str,
++    binding: &str,
++) -> IntegrationResult<()> {
++    sqlx::query("INSERT INTO integration_teardown_intents(id,kind,owner_namespace,owner_subject,host_binding) VALUES($1,$2,$3,$4,$5) ON CONFLICT(kind,owner_namespace,owner_subject,host_binding) DO NOTHING")
++        .bind(Uuid::new_v4()).bind(kind).bind(client.as_str()).bind(subject).bind(binding).execute(&mut **tx).await.map_err(storage_error)?;
++    Ok(())
++}
++#[derive(sqlx::FromRow)]
++struct Intent {
++    id: Uuid,
++    kind: String,
++    owner_namespace: String,
++    owner_subject: String,
++    attempts: i32,
++}
++async fn cleanup(tx: &mut Transaction<'_, Postgres>, intent: &Intent) -> IntegrationResult<()> {
++    match intent.kind.as_str() {
++        "owner" => {
++            sqlx::query(
++                "DELETE FROM integration_accounts WHERE owner_namespace=$1 AND owner_subject=$2",
++            )
++            .bind(&intent.owner_namespace)
++            .bind(&intent.owner_subject)
++            .execute(&mut **tx)
++            .await
++            .map_err(storage_error)?;
++        }
++        // There are no grants/bindings in02 and GrantGateway explicitly denies creation.
++        //03 must invalidate its grants here and in the corresponding deletion hooks.
++        // A host binding never owns private accounts, so neither case deletes accounts.
++        "company" | "membership" => {}
++        _ => return Err(IntegrationError::Invalid),
++    }
++    Ok(())
++}
++impl PostgresVault {
++    async fn drain_one(&self, stop: &CancellationToken) -> IntegrationResult<bool> {
++        let mut tx = tokio::select! {
++            biased;
++            _=stop.cancelled()=>return Ok(false),
++            transaction=self.persistence.pool().begin()=>transaction.map_err(storage_error)?,
++        };
++        sqlx::query("SET LOCAL lock_timeout='100ms'")
++            .execute(&mut *tx)
++            .await
++            .map_err(storage_error)?;
++        sqlx::query("SET LOCAL statement_timeout='2s'")
++            .execute(&mut *tx)
++            .await
++            .map_err(storage_error)?;
++        let claimed = tokio::select! {
++            biased;
++            _=stop.cancelled()=>None,
++            intent=sqlx::query_as::<_,Intent>("SELECT id,kind,owner_namespace,owner_subject,attempts FROM integration_teardown_intents WHERE state='pending' AND available_at<=clock_timestamp() ORDER BY available_at,id LIMIT 1 FOR UPDATE SKIP LOCKED").fetch_optional(&mut *tx)=>Some(intent.map_err(storage_error)?),
++        };
++        let Some(intent) = claimed else {
++            tx.rollback().await.map_err(storage_error)?;
++            return Ok(false);
++        };
++        let Some(intent) = intent else {
++            tx.rollback().await.map_err(storage_error)?;
++            return Ok(false);
++        };
++        let mut work = tx.begin().await.map_err(storage_error)?;
++        let result = tokio::select! {biased; _=stop.cancelled()=>None,result=cleanup(&mut work,&intent)=>Some(result)};
++        let success = matches!(result, Some(Ok(())));
++        if success {
++            work.commit().await.map_err(storage_error)?;
++        } else {
++            work.rollback().await.map_err(storage_error)?;
++        }
++        if result.is_none() || stop.is_cancelled() {
++            tx.rollback().await.map_err(storage_error)?;
++            return Ok(false);
++        }
++        let outcome = if success {
++            CleanupOutcome::Completed
++        } else {
++            CleanupOutcome::Deferred
++        };
++        settle(&mut tx, &intent, outcome).await?;
++        tx.commit().await.map_err(storage_error)?;
++        Ok(true)
++    }
++}
++enum CleanupOutcome {
++    Completed,
++    Deferred,
++}
++async fn settle(
++    tx: &mut Transaction<'_, Postgres>,
++    intent: &Intent,
++    outcome: CleanupOutcome,
++) -> IntegrationResult<()> {
++    if matches!(outcome, CleanupOutcome::Completed) {
++        sqlx::query("UPDATE integration_teardown_intents SET state='completed',completed_at=clock_timestamp() WHERE id=$1")
++            .bind(intent.id).execute(&mut **tx).await.map_err(storage_error)?;
++    } else {
++        let attempts = intent.attempts + 1;
++        let seconds = 2i32.pow((attempts + 5).min(8) as u32);
++        sqlx::query("UPDATE integration_teardown_intents SET attempts=$2,state=CASE WHEN $2>=8 THEN 'failed' ELSE 'pending' END,available_at=clock_timestamp()+$3*interval '1 second' WHERE id=$1")
++            .bind(intent.id).bind(attempts).bind(f64::from(seconds)).execute(&mut **tx).await.map_err(storage_error)?;
++        tracing::warn!(intent_id=%intent.id,attempt=attempts,terminal=attempts>=8,"Integration teardown deferred");
++    }
++    Ok(())
++}
++#[async_trait]
++impl TeardownDrain for PostgresVault {
++    async fn drain(&self, limit: u16, stop: &CancellationToken) -> IntegrationResult<usize> {
++        if limit == 0 || limit > 16 {
++            return Err(IntegrationError::Limit);
++        }
++        let mut count = 0;
++        for _ in 0..limit {
++            if stop.is_cancelled() || !self.drain_one(stop).await? {
++                break;
++            }
++            count += 1;
++        }
++        Ok(count)
++    }
++}
+--- a/src/adapters/persistence/integrations/lifecycle_tests.rs
++++ b/src/adapters/persistence/integrations/lifecycle_tests.rs
+@@ -0,0 +1,269 @@
++use super::super::lifecycle;
++use super::*;
++use crate::adapters::persistence::test_support::{
++    insert_company_with_owner, wait_until_a_backend_is_blocked,
++};
++async fn retire(f: &Fixture, owner: &AccountOwner) {
++    let mut tx = f.pool().begin().await.unwrap();
++    lifecycle::retire_owner_on(&mut tx, owner).await.unwrap();
++    tx.commit().await.unwrap();
++}
++#[tokio::test]
++async fn vault_storage_durable_owner_teardown_restart_competitors_and_no_resurrection() {
++    let f = Fixture::isolated().await;
++    let account = f.create("retire").await;
++    let other = AccountOwner {
++        namespace: OwnerNamespace::parse("other-client").unwrap(),
++        subject: f.owner.subject.clone(),
++    };
++    let survivor = f
++        .vault
++        .create(&other, static_write("survives", "other-secret"))
++        .await
++        .unwrap();
++    retire(&f, &f.owner).await;
++    retire(&f, &f.owner).await;
++    assert!(f.vault.read_usable(&f.owner, account.id).await.is_err());
++    assert_eq!(
++        f.vault.get(&f.owner, account.id).await.unwrap().status,
++        AccountStatus::Disconnected
++    );
++    assert!(matches!(
++        f.vault
++            .create(&f.owner, static_write("resurrection", "secret"))
++            .await,
++        Err(IntegrationError::Denied)
++    ));
++    let restarted = PostgresVault::new(f.vault.persistence.clone());
++    let barrier = tokio::sync::Barrier::new(2);
++    let stop = CancellationToken::new();
++    let left = async {
++        barrier.wait().await;
++        f.vault.drain(1, &stop).await.unwrap()
++    };
++    let right = async {
++        barrier.wait().await;
++        restarted.drain(1, &stop).await.unwrap()
++    };
++    let (left, right) = tokio::join!(left, right);
++    assert_eq!(left + right, 1);
++    assert!(matches!(
++        f.vault.get(&f.owner, account.id).await,
++        Err(IntegrationError::NotFound)
++    ));
++    assert!(f.vault.read_usable(&other, survivor.id).await.is_ok());
++    assert_eq!(restarted.drain(16, &stop).await.unwrap(), 0);
++    assert!(matches!(
++        restarted
++            .create(&f.owner, static_write("late", "secret"))
++            .await,
++        Err(IntegrationError::Denied)
++    ));
++}
++#[tokio::test]
++async fn vault_storage_teardown_poison_full_batch_backoff_restart_and_terminal_failure() {
++    let f = Fixture::isolated().await;
++    let mut ids = Vec::new();
++    for index in 0..16 {
++        let owner = AccountOwner {
++            namespace: f.owner.namespace.clone(),
++            subject: OwnerSubject::parse(format!("{}-{index}", f.owner.subject.as_str())).unwrap(),
++        };
++        let account = f
++            .vault
++            .create(&owner, static_write("poison", "secret"))
++            .await
++            .unwrap();
++        ids.push(account.id.as_uuid());
++        retire(&f, &owner).await;
++    }
++    let mut held = f.pool().begin().await.unwrap();
++    sqlx::query("SELECT id FROM integration_accounts WHERE id=ANY($1) FOR UPDATE")
++        .bind(&ids)
++        .fetch_all(&mut *held)
++        .await
++        .unwrap();
++    let stop = CancellationToken::new();
++    assert_eq!(f.vault.drain(16, &stop).await.unwrap(), 16);
++    let attempted:i64=sqlx::query_scalar("SELECT count(*) FROM integration_teardown_intents WHERE attempts=1 AND state='pending' AND available_at>clock_timestamp()").fetch_one(f.pool()).await.unwrap();
++    assert_eq!(attempted, 16);
++    assert_eq!(f.vault.drain(16, &stop).await.unwrap(), 0);
++    // Drive one real blocked retry to the terminal limit; the rest remain deferred.
++    sqlx::query("UPDATE integration_teardown_intents SET attempts=7,available_at=clock_timestamp()-interval '1 second' WHERE id=(SELECT id FROM integration_teardown_intents ORDER BY id LIMIT 1)").execute(f.pool()).await.unwrap();
++    assert_eq!(f.vault.drain(16, &stop).await.unwrap(), 1);
++    let terminal: i64 = sqlx::query_scalar(
++        "SELECT count(*) FROM integration_teardown_intents WHERE attempts=8 AND state='failed'",
++    )
++    .fetch_one(f.pool())
++    .await
++    .unwrap();
++    assert_eq!(terminal, 1);
++    assert_eq!(f.vault.drain(16, &stop).await.unwrap(), 0);
++    held.rollback().await.unwrap();
++    sqlx::query("UPDATE integration_teardown_intents SET available_at=clock_timestamp()-interval '1 second' WHERE state='pending'").execute(f.pool()).await.unwrap();
++    let restarted = PostgresVault::new(f.vault.persistence.clone());
++    assert_eq!(restarted.drain(16, &stop).await.unwrap(), 15);
++    let retained:i64=sqlx::query_scalar("SELECT count(*) FROM integration_accounts WHERE id=ANY($1) AND envelope IS NULL AND status='disconnected'").bind(&ids).fetch_one(f.pool()).await.unwrap();
++    assert_eq!(retained, 1);
++}
++#[tokio::test]
++async fn vault_storage_supervised_teardown_shutdown_cancels_actual_database_work() {
++    let f = Fixture::isolated().await;
++    let account = f.create("cancel").await;
++    retire(&f, &f.owner).await;
++    let mut held = f.pool().begin().await.unwrap();
++    sqlx::query("SELECT id FROM integration_accounts WHERE id=$1 FOR UPDATE")
++        .bind(account.id.as_uuid())
++        .fetch_one(&mut *held)
++        .await
++        .unwrap();
++    let stop = CancellationToken::new();
++    let worker_stop = stop.clone();
++    let vault = f.vault.clone();
++    let worker = tokio::spawn(async move {
++        crate::application::integrations::lifecycle::run(&vault, &worker_stop).await
++    });
++    wait_until_a_backend_is_blocked(f.pool()).await;
++    stop.cancel();
++    tokio::time::timeout(std::time::Duration::from_secs(3), worker)
++        .await
++        .unwrap()
++        .unwrap();
++    let state: (String, i32) =
++        sqlx::query_as("SELECT state,attempts FROM integration_teardown_intents")
++            .fetch_one(f.pool())
++            .await
++            .unwrap();
++    assert_eq!(state, ("pending".into(), 0));
++    held.rollback().await.unwrap();
++    assert_eq!(
++        f.vault.drain(16, &CancellationToken::new()).await.unwrap(),
++        1
++    );
++}
++async fn host_user(f: &Fixture) -> Uuid {
++    let id = Uuid::new_v4();
++    sqlx::query(
++        "INSERT INTO users(id,username,email,password_hash) VALUES($1,$2,$3,'fixture-hash')",
++    )
++    .bind(id)
++    .bind(format!("vault-{}", id.simple()))
++    .bind(format!("vault-{}@example.test", id.simple()))
++    .execute(f.pool())
++    .await
++    .unwrap();
++    id
++}
++#[tokio::test]
++async fn vault_storage_host_company_membership_and_user_deletion_preserve_other_accounts() {
++    use crate::{
++        application::ports::account_deletion::HostAccountDeletion,
++        use_cases::{company::CompanyPersistence, company_invite::CompanyInvitePersistence},
++    };
++    let mut f = Fixture::isolated().await;
++    let user = host_user(&f).await;
++    let other = host_user(&f).await;
++    f.owner = crate::adapters::integrations::owner::owner_for_user(user);
++    let other_owner = crate::adapters::integrations::owner::owner_for_user(other);
++    let account = f.create("host-owner").await;
++    let survivor = f
++        .vault
++        .create(&other_owner, static_write("survivor", "secret"))
++        .await
++        .unwrap();
++    let company = Uuid::new_v4();
++    insert_company_with_owner(
++        f.pool(),
++        company,
++        "Company",
++        &format!("vault-{}", company.simple()),
++        other,
++    )
++    .await;
++    sqlx::query("INSERT INTO company_members(id,company_id,user_id,role,access_level) VALUES($1,$2,$3,'member',0)").bind(Uuid::new_v4()).bind(company).bind(user).execute(f.pool()).await.unwrap();
++    f.vault
++        .persistence
++        .remove_member(company, user)
++        .await
++        .unwrap();
++    assert!(f.vault.read_usable(&f.owner, account.id).await.is_ok());
++    f.vault.persistence.delete(company).await.unwrap();
++    assert!(f.vault.read_usable(&other_owner, survivor.id).await.is_ok());
++    f.vault.drain(16, &CancellationToken::new()).await.unwrap();
++    assert!(f.vault.read_usable(&f.owner, account.id).await.is_ok());
++    let owned = Uuid::new_v4();
++    insert_company_with_owner(
++        f.pool(),
++        owned,
++        "Owned",
++        &format!("vault-{}", owned.simple()),
++        user,
++    )
++    .await;
++    f.vault.persistence.delete_user_account(user).await.unwrap();
++    f.vault.persistence.delete_user_account(user).await.unwrap();
++    let exists: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM users WHERE id=$1)")
++        .bind(user)
++        .fetch_one(f.pool())
++        .await
++        .unwrap();
++    assert!(!exists);
++    assert!(f.vault.read_usable(&f.owner, account.id).await.is_err());
++    let restarted = PostgresVault::new(f.vault.persistence.clone());
++    restarted
++        .drain(16, &CancellationToken::new())
++        .await
++        .unwrap();
++    assert!(matches!(
++        restarted.get(&f.owner, account.id).await,
++        Err(IntegrationError::NotFound)
++    ));
++    assert!(
++        restarted
++            .read_usable(&other_owner, survivor.id)
++            .await
++            .is_ok()
++    );
++}
++
++#[tokio::test]
++async fn vault_storage_supervised_teardown_shutdown_cancels_pool_acquisition() {
++    struct Observed {
++        vault: PostgresVault,
++        entered: Arc<tokio::sync::Notify>,
++    }
++    #[async_trait::async_trait]
++    impl TeardownDrain for Observed {
++        async fn drain(&self, limit: u16, stop: &CancellationToken) -> IntegrationResult<usize> {
++            self.entered.notify_one();
++            self.vault.drain(limit, stop).await
++        }
++    }
++    let f = Fixture::isolated().await;
++    let pool = sqlx::postgres::PgPoolOptions::new()
++        .max_connections(1)
++        .connect_with(f.pool().connect_options().as_ref().clone())
++        .await
++        .unwrap();
++    let held = pool.acquire().await.unwrap();
++    let entered = Arc::new(tokio::sync::Notify::new());
++    let observed = Observed {
++        vault: PostgresVault::new(PostgresPersistence::new(pool.clone())),
++        entered: entered.clone(),
++    };
++    let stop = CancellationToken::new();
++    let worker_stop = stop.clone();
++    let worker = tokio::spawn(async move {
++        crate::application::integrations::lifecycle::run(&observed, &worker_stop).await
++    });
++    // The current-thread runtime runs the observed drain through the pending acquire
++    // before delivering this notification, while the only connection stays held.
++    entered.notified().await;
++    stop.cancel();
++    tokio::time::timeout(std::time::Duration::from_secs(3), worker)
++        .await
++        .unwrap()
++        .unwrap();
++    drop(held);
++    pool.close().await;
++}
+--- a/src/adapters/persistence/integrations/mod.rs
++++ b/src/adapters/persistence/integrations/mod.rs
+@@ -0,0 +1,66 @@
++//! All connected-account and credential SQL belongs to this adapter.
++mod accounts;
++pub(crate) mod inventory;
++pub(crate) mod lifecycle;
++mod rows;
++#[cfg(test)]
++mod tests;
++use super::PostgresPersistence;
++use crate::{
++    application::integrations::{
++        registry::{CodeOwnedRegistry, static_registry},
++        *,
++    },
++    domain::integrations::*,
++};
++use std::sync::Arc;
++
++#[derive(Clone)]
++pub(crate) struct PostgresVault {
++    pub(super) persistence: PostgresPersistence,
++    pub(super) registry: Arc<CodeOwnedRegistry>,
++}
++impl PostgresVault {
++    pub fn new(persistence: PostgresPersistence) -> Self {
++        Self {
++            persistence,
++            registry: Arc::new(static_registry()),
++        }
++    }
++    pub fn gateway(&self) -> Arc<dyn IntegrationGateway> {
++        let management = Arc::new(management::VaultManagement::new(
++            Arc::new(self.clone()),
++            self.registry.clone(),
++        ));
++        let unavailable = Arc::new(unavailable::UnavailableIntegrations);
++        Arc::new(LocalIntegrationGateway::new(
++            management,
++            unavailable.clone(),
++            unavailable.clone(),
++            unavailable,
++        ))
++    }
++    fn registration(
++        &self,
++        provider: &ProviderId,
++        config: &AuthConfigId,
++        method: AuthMethod,
++        schema: &CredentialSchema,
++    ) -> IntegrationResult<&crate::application::integrations::registry::Registration> {
++        self.registry.for_account(provider, config, method, schema)
++    }
++}
++fn storage_error(error: sqlx::Error) -> IntegrationError {
++    if let Some(db) = error.as_database_error() {
++        return match db.constraint() {
++            Some("integration_account_owner_cap") => IntegrationError::Limit,
++            Some("integration_owner_retired") => IntegrationError::Denied,
++            _ => match db.code().as_deref() {
++                Some("23505") => IntegrationError::Conflict,
++                Some("23514" | "22P02") => IntegrationError::Invalid,
++                _ => IntegrationError::Storage,
++            },
++        };
++    }
++    IntegrationError::Storage
++}
+--- a/src/adapters/persistence/integrations/rotation_tests.rs
++++ b/src/adapters/persistence/integrations/rotation_tests.rs
+@@ -0,0 +1,186 @@
++use super::*;
++use crate::adapters::persistence::{
++    credentials::CredentialFormat,
++    test_support::{wait_until_a_backend_is_blocked, wait_until_backends_are_blocked},
++};
++#[tokio::test]
++async fn vault_rotation_inventory_keysets_reconnect_rows_and_retirement() {
++    let f = Fixture::isolated().await;
++    for index in 0..101 {
++        f.create(&format!("rotation-{index}")).await;
++    }
++    let account = f
++        .vault
++        .list(&f.owner, PageRequest::new(None, 1).unwrap())
++        .await
++        .unwrap()
++        .accounts
++        .remove(0);
++    sqlx::query("UPDATE integration_accounts SET status='reconnect_required',revision=2,authorization_revision=2,credential_generation=2 WHERE id=$1").bind(account.id.as_uuid()).execute(f.pool()).await.unwrap();
++    assert!(f.vault.read_usable(&f.owner, account.id).await.is_err());
++    let rotating = f.rotating();
++    let before = rotating.credential_status().await.unwrap();
++    assert_eq!(before.total_rows, 101);
++    assert_eq!(before.old_rows, 101);
++    let report = rotating.rotate_credentials().await.unwrap();
++    assert!(report.complete);
++    assert_eq!(report.rotated, 101);
++    assert!(report.batches >= 2);
++    let account_after = f.vault.get(&f.owner, account.id).await.unwrap();
++    assert_eq!(account_after.revision.get(), 2);
++    assert_eq!(account_after.authorization_revision.get(), 2);
++    let retired = PostgresPersistence::with_credential_cipher(
++        f.pool().clone(),
++        CredentialCipher::for_test_with_keys(&[(2, [8; 32])], 2),
++    );
++    assert!(
++        retired
++            .credential_status()
++            .await
++            .unwrap()
++            .satisfies_required_version(2)
++    );
++    assert_eq!(rotating.rotate_credentials().await.unwrap().rotated, 0);
++    let ready = f
++        .vault
++        .list(&f.owner, PageRequest::new(None, 50).unwrap())
++        .await
++        .unwrap()
++        .accounts
++        .into_iter()
++        .find(|a| a.status == AccountStatus::Ready)
++        .unwrap();
++    assert!(
++        PostgresVault::new(retired)
++            .read_usable(&f.owner, ready.id)
++            .await
++            .is_ok()
++    );
++}
++#[tokio::test]
++async fn vault_rotation_unavailable_key_blocks_convergence_without_plaintext_fallback() {
++    let f = Fixture::isolated().await;
++    let account = f.create("unavailable").await;
++    let unavailable = PostgresPersistence::with_credential_cipher(
++        f.pool().clone(),
++        CredentialCipher::for_test_with_keys(&[(2, [8; 32])], 2),
++    );
++    assert_eq!(
++        unavailable
++            .credential_status()
++            .await
++            .unwrap()
++            .unavailable_rows,
++        1
++    );
++    assert!(!unavailable.rotate_credentials().await.unwrap().complete);
++    assert!(
++        PostgresVault::new(unavailable)
++            .read_usable(&f.owner, account.id)
++            .await
++            .is_err()
++    );
++    assert!(f.rotating().rotate_credentials().await.unwrap().complete);
++}
++enum Writer {
++    Static,
++    Managed,
++}
++async fn racing_writer(writer: Writer) {
++    let mut f = Fixture::isolated().await;
++    let account = match writer {
++        Writer::Static => f.create("racing").await,
++        Writer::Managed => {
++            f.vault.registry = managed_registry();
++            f.vault
++                .create(
++                    &f.owner,
++                    managed_write(&f.vault.registry, "racing", "workspace-a"),
++                )
++                .await
++                .unwrap()
++        }
++    };
++    let mut scan = f.pool().acquire().await.unwrap();
++    let old = inventory::page(&mut scan, None, 100)
++        .await
++        .unwrap()
++        .remove(0);
++    drop(scan);
++    let rotating = f.rotating();
++    let rotated = rotating
++        .credential_cipher()
++        .unwrap()
++        .rotate_to_active(&CredentialFormat::Envelope(old.context), &old.envelope)
++        .unwrap();
++    // The fixture-only trigger pauses the real writer after its update, holding the row.
++    sqlx::raw_sql("CREATE FUNCTION pause_vault_writer() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.revision>OLD.revision THEN PERFORM pg_advisory_xact_lock(53943); END IF; RETURN NEW; END $$; CREATE TRIGGER pause_vault_writer AFTER UPDATE ON integration_accounts FOR EACH ROW EXECUTE FUNCTION pause_vault_writer();").execute(f.pool()).await.unwrap();
++    let mut barrier = f.pool().acquire().await.unwrap();
++    sqlx::query("SELECT pg_advisory_lock(53943)")
++        .execute(&mut *barrier)
++        .await
++        .unwrap();
++    let vault = f.vault.clone();
++    let owner = f.owner.clone();
++    let id = account.id;
++    let revision = account.revision;
++    let writing = tokio::spawn(async move {
++        match writer {
++            Writer::Static => {
++                vault
++                    .replace(&owner, id, revision, static_write("racing", "replacement"))
++                    .await
++            }
++            Writer::Managed => {
++                vault
++                    .write_managed(&owner, id, revision, managed_payload("same-client", 2))
++                    .await
++            }
++        }
++    });
++    wait_until_a_backend_is_blocked(f.pool()).await;
++    let pool = f.pool().clone();
++    let stored = old.envelope;
++    let rotation = tokio::spawn(async move {
++        let mut tx = pool.begin().await.unwrap();
++        let changed = inventory::rewrap(&mut tx, id.as_uuid(), &stored, &rotated)
++            .await
++            .unwrap()
++            .rows_affected();
++        tx.commit().await.unwrap();
++        changed
++    });
++    wait_until_backends_are_blocked(f.pool(), 2).await;
++    sqlx::query("SELECT pg_advisory_unlock(53943)")
++        .execute(&mut *barrier)
++        .await
++        .unwrap();
++    drop(barrier);
++    let written = writing.await.unwrap().unwrap();
++    assert_eq!(rotation.await.unwrap(), 0);
++    let before = f.vault.read_usable(&f.owner, id).await.unwrap();
++    assert_eq!(before.versions.generation.get(), 2);
++    assert_eq!(written.revision.get(), 2);
++    assert_eq!(
++        written.authorization_revision.get(),
++        if written.auth_method == AuthMethod::StaticSecret {
++            2
++        } else {
++            1
++        }
++    );
++    assert!(rotating.rotate_credentials().await.unwrap().complete);
++    let mut active = PostgresVault::new(rotating);
++    active.registry = f.vault.registry.clone();
++    let after = active.read_usable(&f.owner, id).await.unwrap();
++    assert!(after.payload.expose_secret() == before.payload.expose_secret());
++    assert_eq!(after.versions, before.versions);
++}
++#[tokio::test]
++async fn vault_rotation_real_owner_replacement_defeats_waiting_stale_cas() {
++    racing_writer(Writer::Static).await;
++}
++#[tokio::test]
++async fn vault_rotation_real_managed_cache_write_defeats_waiting_stale_cas() {
++    racing_writer(Writer::Managed).await;
++}
+--- a/src/adapters/persistence/integrations/rows.rs
++++ b/src/adapters/persistence/integrations/rows.rs
+@@ -0,0 +1,69 @@
++use crate::domain::integrations::*;
++use chrono::{DateTime, Utc};
++use uuid::Uuid;
++pub(super) const COLUMNS: &str = "id,owner_namespace,owner_subject,key,provider_id,auth_config_id,auth_method,credential_schema,external_identity,revision,authorization_revision,credential_generation,status,metadata,created_at,updated_at";
++#[derive(sqlx::FromRow)]
++pub(super) struct AccountRow {
++    pub id: Uuid,
++    pub owner_namespace: String,
++    pub owner_subject: String,
++    pub key: String,
++    pub provider_id: String,
++    pub auth_config_id: String,
++    pub auth_method: String,
++    pub credential_schema: String,
++    pub external_identity: Option<String>,
++    pub revision: i64,
++    pub authorization_revision: i64,
++    pub credential_generation: i64,
++    pub status: String,
++    pub metadata: String,
++    pub created_at: DateTime<Utc>,
++    pub updated_at: DateTime<Utc>,
++}
++impl AccountRow {
++    pub fn decode(self) -> IntegrationResult<ConnectedAccount> {
++        if self.metadata.len() > MAX_METADATA_BYTES
++            || self
++                .external_identity
++                .as_ref()
++                .is_some_and(|s| s.len() > 2048)
++        {
++            return Err(IntegrationError::Storage);
++        }
++        CredentialGeneration::new(self.credential_generation)?;
++        Ok(ConnectedAccount {
++            id: AccountId::new(self.id),
++            owner: AccountOwner {
++                namespace: OwnerNamespace::parse(self.owner_namespace)?,
++                subject: OwnerSubject::parse(self.owner_subject)?,
++            },
++            key: AccountKey::parse(self.key)?,
++            provider_id: ProviderId::parse(self.provider_id)?,
++            auth_config_id: AuthConfigId::parse(self.auth_config_id)?,
++            auth_method: match self.auth_method.as_str() {
++                "static_secret" => AuthMethod::StaticSecret,
++                "oauth_authorization_code" => AuthMethod::OAuthAuthorizationCode,
++                _ => return Err(IntegrationError::Storage),
++            },
++            credential_schema: CredentialSchema::parse(self.credential_schema)?,
++            external_identity: self
++                .external_identity
++                .map(|s| serde_json::from_str(&s))
++                .transpose()
++                .map_err(|_| IntegrationError::Storage)?,
++            revision: AccountRevision::new(self.revision)?,
++            authorization_revision: AuthorizationRevision::new(self.authorization_revision)?,
++            status: match self.status.as_str() {
++                "ready" => AccountStatus::Ready,
++                "reconnect_required" => AccountStatus::ReconnectRequired,
++                "disconnected" => AccountStatus::Disconnected,
++                _ => return Err(IntegrationError::Storage),
++            },
++            metadata: serde_json::from_str(&self.metadata)
++                .map_err(|_| IntegrationError::Storage)?,
++            created_at: self.created_at,
++            updated_at: self.updated_at,
++        })
++    }
++}
+--- a/src/adapters/persistence/integrations/storage_tests.rs
++++ b/src/adapters/persistence/integrations/storage_tests.rs
+@@ -0,0 +1,371 @@
++use super::*;
++#[tokio::test]
++async fn vault_storage_roundtrip_replace_disconnect_delete_and_redaction() {
++    let f = Fixture::shared().await;
++    let account = f.create("roundtrip").await;
++    let record = f.vault.read_usable(&f.owner, account.id).await.unwrap();
++    assert!(record.payload.expose_secret() == "fixture-secret");
++    let mut write = static_write("roundtrip", "replacement-secret");
++    write.metadata = AccountMetadata::new("Renamed".into(), Some("Description".into())).unwrap();
++    let replaced = f
++        .vault
++        .replace(&f.owner, account.id, account.revision, write)
++        .await
++        .unwrap();
++    assert_eq!(replaced.revision.get(), 2);
++    assert_eq!(replaced.authorization_revision.get(), 2);
++    let record = f.vault.read_usable(&f.owner, account.id).await.unwrap();
++    assert!(record.payload.expose_secret() == "replacement-secret");
++    assert_eq!(record.versions.generation.get(), 2);
++    assert_eq!(
++        f.vault
++            .get(&f.owner, account.id)
++            .await
++            .unwrap()
++            .metadata
++            .label(),
++        "Renamed"
++    );
++    let serialized = serde_json::to_string(
++        &f.vault
++            .list(&f.owner, PageRequest::new(None, 50).unwrap())
++            .await
++            .unwrap(),
++    )
++    .unwrap();
++    assert!(
++        !serialized.contains("replacement-secret")
++            && !serialized.contains("fixture-secret")
++            && !serialized.contains("enc:v2")
++            && !serialized.contains("envelope")
++    );
++    assert!(matches!(
++        f.vault
++            .replace(
++                &f.owner,
++                account.id,
++                account.revision,
++                static_write("roundtrip", "stale")
++            )
++            .await,
++        Err(IntegrationError::Conflict)
++    ));
++    let disconnected = f
++        .vault
++        .disconnect(&f.owner, account.id, replaced.revision)
++        .await
++        .unwrap();
++    assert_eq!(disconnected.status, AccountStatus::Disconnected);
++    assert!(f.vault.read_usable(&f.owner, account.id).await.is_err());
++    let empty: bool =
++        sqlx::query_scalar("SELECT envelope IS NULL FROM integration_accounts WHERE id=$1")
++            .bind(account.id.as_uuid())
++            .fetch_one(f.pool())
++            .await
++            .unwrap();
++    assert!(empty);
++    f.vault
++        .delete(&f.owner, account.id, disconnected.revision)
++        .await
++        .unwrap();
++    assert!(matches!(
++        f.vault.get(&f.owner, account.id).await,
++        Err(IntegrationError::NotFound)
++    ));
++}
++#[tokio::test]
++async fn vault_storage_owner_namespaces_keys_and_competing_replacements() {
++    let f = Fixture::shared().await;
++    let account = f.create("same-key").await;
++    let foreign = AccountOwner {
++        namespace: OwnerNamespace::parse("another-client").unwrap(),
++        subject: f.owner.subject.clone(),
++    };
++    assert!(matches!(
++        f.vault.get(&foreign, account.id).await,
++        Err(IntegrationError::NotFound)
++    ));
++    assert!(f.vault.read_usable(&foreign, account.id).await.is_err());
++    assert!(
++        f.vault
++            .create(&foreign, static_write("same-key", "different"))
++            .await
++            .is_ok()
++    );
++    assert!(matches!(
++        f.vault
++            .create(&f.owner, static_write("same-key", "duplicate"))
++            .await,
++        Err(IntegrationError::Conflict)
++    ));
++    let barrier = tokio::sync::Barrier::new(2);
++    let left = async {
++        barrier.wait().await;
++        f.vault
++            .replace(
++                &f.owner,
++                account.id,
++                account.revision,
++                static_write("same-key", "left"),
++            )
++            .await
++    };
++    let right = async {
++        barrier.wait().await;
++        f.vault
++            .replace(
++                &f.owner,
++                account.id,
++                account.revision,
++                static_write("same-key", "right"),
++            )
++            .await
++    };
++    let (left, right) = tokio::join!(left, right);
++    assert_eq!(usize::from(left.is_ok()) + usize::from(right.is_ok()), 1);
++    assert!(
++        matches!(left, Err(IntegrationError::Conflict))
++            || matches!(right, Err(IntegrationError::Conflict))
++    );
++}
++#[tokio::test]
++async fn vault_storage_cap_serializes_real_same_owner_creators() {
++    let f = Fixture::shared().await;
++    for index in 0..127 {
++        f.create(&format!("account-{index}")).await;
++    }
++    let other = PostgresVault::new(f.vault.persistence.clone());
++    let barrier = tokio::sync::Barrier::new(2);
++    let left = async {
++        barrier.wait().await;
++        f.vault
++            .create(&f.owner, static_write("last-left", "secret"))
++            .await
++    };
++    let right = async {
++        barrier.wait().await;
++        other
++            .create(&f.owner, static_write("last-right", "secret"))
++            .await
++    };
++    let (left, right) = tokio::join!(left, right);
++    assert_eq!(usize::from(left.is_ok()) + usize::from(right.is_ok()), 1);
++    assert!(
++        matches!(left, Err(IntegrationError::Limit))
++            || matches!(right, Err(IntegrationError::Limit))
++    );
++    let mut cursor = None;
++    let mut ids = std::collections::HashSet::new();
++    loop {
++        let page = f
++            .vault
++            .list(&f.owner, PageRequest::new(cursor, 50).unwrap())
++            .await
++            .unwrap();
++        assert!(page.accounts.len() <= 50);
++        for account in page.accounts {
++            assert!(ids.insert(account.id));
++        }
++        cursor = page.next;
++        if cursor.is_none() {
++            break;
++        }
++    }
++    assert_eq!(ids.len(), 128);
++}
++#[tokio::test]
++async fn vault_storage_managed_identity_ignores_config_aliases_and_static_edits_deny() {
++    let mut f = Fixture::shared().await;
++    f.vault.registry = managed_registry();
++    let account = f
++        .vault
++        .create(
++            &f.owner,
++            managed_write(&f.vault.registry, "managed", "workspace-a"),
++        )
++        .await
++        .unwrap();
++    let identity = serde_json::to_value(&account.external_identity).unwrap();
++    assert!(identity.get("email").is_none());
++    assert_eq!(identity["subject"], "workspace-without-email");
++    assert!(matches!(
++        f.vault
++            .create(
++                &f.owner,
++                managed_write(&f.vault.registry, "alias", "workspace-b")
++            )
++            .await,
++        Err(IntegrationError::Conflict)
++    ));
++    assert!(
++        f.vault
++            .create(
++                &f.owner,
++                managed_write(&f.vault.registry, "another-client", "workspace-other")
++            )
++            .await
++            .is_ok()
++    );
++    assert!(
++        f.vault
++            .replace(
++                &f.owner,
++                account.id,
++                account.revision,
++                static_write("managed", "generic")
++            )
++            .await
++            .is_err()
++    );
++    let updated = f
++        .vault
++        .write_managed(
++            &f.owner,
++            account.id,
++            account.revision,
++            managed_payload("same-client", 2),
++        )
++        .await
++        .unwrap();
++    assert_eq!(updated.revision.get(), 2);
++    assert_eq!(
++        updated.authorization_revision,
++        account.authorization_revision
++    );
++    assert_eq!(
++        f.vault
++            .read_usable(&f.owner, account.id)
++            .await
++            .unwrap()
++            .versions
++            .generation
++            .get(),
++        2
++    );
++    assert!(matches!(
++        f.vault
++            .write_managed(
++                &f.owner,
++                account.id,
++                account.revision,
++                managed_payload("same-client", 3)
++            )
++            .await,
++        Err(IntegrationError::Conflict)
++    ));
++}
++#[tokio::test]
++async fn vault_storage_constraints_substitution_and_malformed_encrypted_json_fail_closed() {
++    let f = Fixture::shared().await;
++    let account = f.create("constraints").await;
++    for statement in [
++        "UPDATE integration_accounts SET revision=0 WHERE id=$1",
++        "UPDATE integration_accounts SET credential_schema='unknown' WHERE id=$1",
++        "UPDATE integration_accounts SET metadata='{\"label\":42}' WHERE id=$1",
++        "UPDATE integration_accounts SET status='disconnected' WHERE id=$1",
++        "UPDATE integration_accounts SET key='substituted' WHERE id=$1",
++    ] {
++        assert!(
++            sqlx::query(statement)
++                .bind(account.id.as_uuid())
++                .execute(f.pool())
++                .await
++                .is_err()
++        );
++    }
++    let raw = SecretString::from(r#" {"token":42,"sentinel":"private"}"#);
++    let envelope = f
++        .vault
++        .persistence
++        .credential_cipher()
++        .unwrap()
++        .seal_envelope(&CredentialContext::integration_account(&account), &raw)
++        .unwrap();
++    sqlx::query("UPDATE integration_accounts SET envelope=$2 WHERE id=$1")
++        .bind(account.id.as_uuid())
++        .bind(envelope)
++        .execute(f.pool())
++        .await
++        .unwrap();
++    let error = f.vault.read_usable(&f.owner, account.id).await.unwrap_err();
++    assert!(!format!("{error:?} {error}").contains("private"));
++    assert!(f.vault.get(&f.owner, account.id).await.is_ok());
++    let mut w = static_write("constraints", "new");
++    w.config = AuthConfigId::parse("unregistered").unwrap();
++    assert!(
++        f.vault
++            .replace(&f.owner, account.id, account.revision, w)
++            .await
++            .is_err()
++    );
++}
++#[tokio::test]
++async fn vault_storage_envelope_identity_and_context_specific_bounds() {
++    let f = Fixture::shared().await;
++    let account = f.create("context").await;
++    let cipher = f.vault.persistence.credential_cipher().unwrap();
++    let secret = SecretString::from("x".repeat(MAX_CREDENTIAL_BYTES));
++    let context = CredentialContext::integration_account(&account);
++    let envelope = cipher.seal_envelope(&context, &secret).unwrap();
++    assert!(cipher.open_envelope(&context, &envelope).is_ok());
++    assert!(
++        cipher
++            .seal_envelope(
++                &context,
++                &SecretString::from("x".repeat(MAX_CREDENTIAL_BYTES + 1))
++            )
++            .is_err()
++    );
++    assert!(
++        cipher
++            .seal_envelope(
++                &CredentialContext::workflow_http_credential(Uuid::new_v4(), Uuid::new_v4()),
++                &SecretString::from("x".repeat(4097))
++            )
++            .is_err()
++    );
++    for field in 0..7 {
++        let mut moved = account.clone();
++        match field {
++            0 => moved.owner.namespace = OwnerNamespace::parse("other").unwrap(),
++            1 => moved.owner.subject = OwnerSubject::parse("other").unwrap(),
++            2 => moved.id = AccountId::new(Uuid::new_v4()),
++            3 => moved.provider_id = ProviderId::parse("other").unwrap(),
++            4 => moved.auth_config_id = AuthConfigId::parse("other").unwrap(),
++            5 => moved.auth_method = AuthMethod::OAuthAuthorizationCode,
++            _ => moved.credential_schema = CredentialSchema::parse("other").unwrap(),
++        };
++        assert!(
++            cipher
++                .open_envelope(&CredentialContext::integration_account(&moved), &envelope)
++                .is_err()
++        );
++    }
++}
++#[test]
++fn vault_storage_host_consumers_do_not_read_module_tables() {
++    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
++    for path in [
++        "src/adapters/http/routes",
++        "src/adapters/persistence/workflow",
++    ] {
++        fn scan(dir: &std::path::Path) {
++            for entry in std::fs::read_dir(dir).unwrap() {
++                let path = entry.unwrap().path();
++                if path.is_dir() {
++                    scan(&path);
++                } else if path.extension().is_some_and(|e| e == "rs") {
++                    let source = std::fs::read_to_string(&path).unwrap();
++                    assert!(
++                        !source.contains("FROM integration_accounts")
++                            && !source.contains("JOIN integration_accounts")
++                            && !source.contains("UPDATE integration_accounts"),
++                        "{} bypasses account port",
++                        path.display()
++                    );
++                }
++            }
++        }
++        scan(&root.join(path));
++    }
++}
+--- a/src/adapters/persistence/integrations/tests.rs
++++ b/src/adapters/persistence/integrations/tests.rs
+@@ -0,0 +1,184 @@
++use super::*;
++use crate::{
++    adapters::persistence::{
++        PostgresPersistence,
++        credentials::{CredentialCipher, envelope::CredentialContext},
++        test_support::{OwnDatabase, own_database, test_pool},
++    },
++    application::integrations::{
++        lifecycle::TeardownDrain,
++        management::{AccountRepository, AccountWrite},
++        private::*,
++        registry::*,
++    },
++    domain::integrations::*,
++};
++use secrecy::{ExposeSecret, SecretString};
++use serde::Deserialize;
++use serde_json::json;
++use sha2::{Digest, Sha256};
++use std::sync::Arc;
++use tokio_util::sync::CancellationToken;
++use uuid::Uuid;
++struct Fixture {
++    vault: PostgresVault,
++    owner: AccountOwner,
++    _database: Option<OwnDatabase>,
++}
++impl Fixture {
++    fn on(pool: sqlx::PgPool) -> Self {
++        let persistence = PostgresPersistence::with_credential_cipher(
++            pool,
++            CredentialCipher::for_test_with_keys(&[(1, [7; 32])], 1),
++        );
++        let owner = AccountOwner {
++            namespace: OwnerNamespace::parse("vault-test").unwrap(),
++            subject: OwnerSubject::parse(Uuid::new_v4().to_string()).unwrap(),
++        };
++        Self {
++            vault: PostgresVault::new(persistence),
++            owner,
++            _database: None,
++        }
++    }
++    async fn shared() -> Self {
++        Self::on(test_pool().await.expect("disposable database required"))
++    }
++    async fn isolated() -> Self {
++        let database = own_database().await.expect("disposable database required");
++        let mut f = Self::on(database.pool.clone());
++        f._database = Some(database);
++        f
++    }
++    fn pool(&self) -> &sqlx::PgPool {
++        self.vault.persistence.pool()
++    }
++    async fn create(&self, key: &str) -> ConnectedAccount {
++        self.vault
++            .create(&self.owner, static_write(key, "fixture-secret"))
++            .await
++            .unwrap()
++    }
++    fn rotating(&self) -> PostgresPersistence {
++        PostgresPersistence::with_credential_cipher(
++            self.pool().clone(),
++            CredentialCipher::for_test_with_keys(&[(1, [7; 32]), (2, [8; 32])], 2),
++        )
++    }
++}
++fn static_write(key: &str, value: &str) -> AccountWrite {
++    AccountWrite {
++        key: AccountKey::parse(key).unwrap(),
++        provider: ProviderId::parse("static-bearer").unwrap(),
++        config: AuthConfigId::parse("static-bearer").unwrap(),
++        method: AuthMethod::StaticSecret,
++        schema: CredentialSchema::parse("static-v1").unwrap(),
++        identity: None,
++        metadata: AccountMetadata::new(key.into(), None).unwrap(),
++        payload: SecretString::from(value.to_owned()),
++    }
++}
++struct WorkspaceAdapter {
++    client: String,
++}
++#[derive(Deserialize)]
++#[serde(deny_unknown_fields)]
++struct WorkspacePayload {
++    workspace: ExternalSubject,
++    client: ExternalSubject,
++    token: SecretString,
++    generation: CredentialGeneration,
++}
++impl CredentialAdapter for WorkspaceAdapter {
++    fn validate(&self, raw: &SecretString) -> IntegrationResult<Option<ExternalIdentity>> {
++        if raw.expose_secret().len() > MAX_CREDENTIAL_BYTES {
++            return Err(IntegrationError::Invalid);
++        }
++        let payload: WorkspacePayload =
++            serde_json::from_str(raw.expose_secret()).map_err(|_| IntegrationError::Credential)?;
++        if payload.client.as_str() != self.client || payload.token.expose_secret().is_empty() {
++            return Err(IntegrationError::Credential);
++        }
++        let _ = payload.generation;
++        let key = format!(
++            "{:x}",
++            Sha256::digest(
++                serde_json::to_vec(&(payload.workspace.as_str(), payload.client.as_str())).unwrap()
++            )
++        );
++        Ok(Some(ExternalIdentity {
++            kind: ExternalIdentityKind::parse("workspace")?,
++            subject: payload.workspace,
++            authorization_key: AuthorizationKey::parse(key)?,
++        }))
++    }
++    fn injection(&self, raw: &SecretString) -> IntegrationResult<TypedInjection> {
++        self.validate(raw)?;
++        let p: WorkspacePayload =
++            serde_json::from_str(raw.expose_secret()).map_err(|_| IntegrationError::Credential)?;
++        Ok(TypedInjection {
++            method: InjectionMethod::Bearer,
++            value: p.token,
++        })
++    }
++}
++fn managed_registry() -> Arc<CodeOwnedRegistry> {
++    let mut registry = static_registry();
++    for (name, client) in [
++        ("workspace-a", "same-client"),
++        ("workspace-b", "same-client"),
++        ("workspace-other", "other-client"),
++    ] {
++        let provider = ProviderId::parse("workspace-fixture").unwrap();
++        let config = AuthConfigId::parse(name).unwrap();
++        registry
++            .register(Registration {
++                provider: AuthProvider {
++                    id: provider.clone(),
++                    method: AuthMethod::OAuthAuthorizationCode,
++                    schema: CredentialSchema::parse("workspace-fixture-v1").unwrap(),
++                },
++                config: AuthConfig {
++                    id: config.clone(),
++                    provider: provider.clone(),
++                    client_identity: ExternalSubject::parse(client).unwrap(),
++                    client_secret_reference: None,
++                },
++                app: AppDefinition {
++                    id: AppId::parse(name).unwrap(),
++                    provider,
++                    config,
++                    destinations: vec![],
++                    capabilities: vec![],
++                },
++                adapter: Arc::new(WorkspaceAdapter {
++                    client: client.into(),
++                }),
++            })
++            .unwrap();
++    }
++    Arc::new(registry)
++}
++fn managed_payload(client: &str, generation: i64) -> SecretString {
++    SecretString::from(json!({"workspace":"workspace-without-email","client":client,"token":"fixture-managed-secret","generation":generation}).to_string())
++}
++fn managed_write(registry: &CodeOwnedRegistry, key: &str, app: &str) -> AccountWrite {
++    let registration = registry.get(&AppId::parse(app).unwrap()).unwrap();
++    let payload = managed_payload(registration.config.client_identity.as_str(), 1);
++    AccountWrite {
++        key: AccountKey::parse(key).unwrap(),
++        provider: registration.provider.id.clone(),
++        config: registration.config.id.clone(),
++        method: registration.provider.method,
++        schema: registration.provider.schema.clone(),
++        identity: registration.adapter.validate(&payload).unwrap(),
++        metadata: AccountMetadata::new(key.into(), None).unwrap(),
++        payload,
++    }
++}
++#[path = "lifecycle_tests.rs"]
++mod lifecycle_tests;
++#[path = "rotation_tests.rs"]
++mod rotation_tests;
++#[path = "storage_tests.rs"]
++mod storage_tests;
+--- a/src/adapters/persistence/mod.rs
++++ b/src/adapters/persistence/mod.rs
+@@ -24,6 +24,7 @@
+ pub mod delivery;
+ pub mod inbound_event;
+ pub mod integration;
++pub(crate) mod integrations;
+ pub mod knowledge;
+ pub(crate) mod model_usage;
+ pub mod notification;
+@@ -470,3 +471,4 @@
+ 
+ #[cfg(test)]
+ mod jsonb_test_support;
++mod user_lifecycle;
+--- a/src/adapters/persistence/user_lifecycle.rs
++++ b/src/adapters/persistence/user_lifecycle.rs
+@@ -0,0 +1,62 @@
++use super::{PostgresPersistence, integrations::lifecycle};
++use crate::{
++    adapters::integrations::owner::{client_namespace, company_binding, owner_for_user},
++    app_error::{AppError, AppResult},
++    application::ports::account_deletion::HostAccountDeletion,
++};
++use async_trait::async_trait;
++use uuid::Uuid;
++#[async_trait]
++impl HostAccountDeletion for PostgresPersistence {
++    async fn delete_user_account(&self, user: Uuid) -> AppResult<()> {
++        let mut tx = self.pool().begin().await.map_err(AppError::from)?;
++        // Serialize against membership/ownership writes before recording their teardown.
++        sqlx::query("SELECT id FROM users WHERE id=$1 FOR UPDATE")
++            .bind(user)
++            .fetch_optional(&mut *tx)
++            .await
++            .map_err(AppError::from)?;
++        let companies = sqlx::query_scalar::<_, Uuid>(
++            "SELECT id FROM companies WHERE user_id=$1 ORDER BY id FOR UPDATE",
++        )
++        .bind(user)
++        .fetch_all(&mut *tx)
++        .await
++        .map_err(AppError::from)?;
++        let memberships = sqlx::query_scalar::<_,Uuid>("SELECT company_id FROM company_members WHERE user_id=$1 AND role<>'owner' ORDER BY company_id FOR UPDATE")
++            .bind(user).fetch_all(&mut *tx).await.map_err(AppError::from)?;
++        for company in memberships {
++            lifecycle::revoke_membership_on(
++                &mut tx,
++                &owner_for_user(user),
++                &company_binding(company),
++            )
++            .await
++            .map_err(AppError::from)?;
++            super::delivery::cancellation::cancel_member_notices_on(&mut tx, company, user).await?;
++        }
++        sqlx::query("UPDATE principals SET kind='external',user_id=NULL,updated_at=clock_timestamp() WHERE user_id=$1")
++            .bind(user).execute(&mut *tx).await.map_err(AppError::from)?;
++        lifecycle::retire_owner_on(&mut tx, &owner_for_user(user))
++            .await
++            .map_err(AppError::from)?;
++        for company in companies {
++            lifecycle::revoke_company_on(&mut tx, &client_namespace(), &company_binding(company))
++                .await
++                .map_err(AppError::from)?;
++            sqlx::query("DELETE FROM companies WHERE id=$1 AND user_id=$2")
++                .bind(company)
++                .bind(user)
++                .execute(&mut *tx)
++                .await
++                .map_err(AppError::from)?;
++        }
++        sqlx::query("DELETE FROM users WHERE id=$1")
++            .bind(user)
++            .execute(&mut *tx)
++            .await
++            .map_err(AppError::from)?;
++        tx.commit().await.map_err(AppError::from)?;
++        Ok(())
++    }
++}
+--- a/src/application/integrations/gateway.rs
++++ b/src/application/integrations/gateway.rs
+@@ -205,6 +205,10 @@
+ /// This confirmation is obtained by a trusted host adapter, with current authority.
+ /// It is not a browser-deserializable grant command.
+ #[derive(Debug)]
++#[expect(
++    dead_code,
++    reason = "Owner-confirmed grants are implemented in phase03"
++)]
+ pub struct OwnerConfirmation {
+     pub(crate) owner: VerifiedOwner,
+     pub(crate) account: AccountId,
+--- a/src/application/integrations/lifecycle.rs
++++ b/src/application/integrations/lifecycle.rs
+@@ -0,0 +1,20 @@
++//! Bounded lifecycle recovery, owned by the host's supervised worker group.
++use crate::domain::integrations::IntegrationResult;
++use async_trait::async_trait;
++use std::time::Duration;
++use tokio_util::sync::CancellationToken;
++#[async_trait]
++pub(crate) trait TeardownDrain: Send + Sync {
++    async fn drain(&self, limit: u16, stop: &CancellationToken) -> IntegrationResult<usize>;
++}
++pub(crate) async fn run(drain: &dyn TeardownDrain, stop: &CancellationToken) {
++    let mut interval = tokio::time::interval(Duration::from_secs(2));
++    interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
++    loop {
++        tokio::select! {biased; _=stop.cancelled()=>return,_=interval.tick()=>{}}
++        if drain.drain(16, stop).await.is_err() {
++            tracing::warn!("Integration teardown retry pending");
++            tokio::select! {biased; _=stop.cancelled()=>return,_=tokio::time::sleep(Duration::from_secs(5))=>{}}
++        }
++    }
++}
+--- a/src/application/integrations/management.rs
++++ b/src/application/integrations/management.rs
+@@ -0,0 +1,156 @@
++use super::{registry::CodeOwnedRegistry, *};
++use crate::domain::integrations::*;
++use async_trait::async_trait;
++use secrecy::SecretString;
++use std::sync::Arc;
++
++/// Created only after registered adapter validation; never a browser/wire DTO.
++#[derive(Debug)]
++pub(crate) struct AccountWrite {
++    pub key: AccountKey,
++    pub provider: ProviderId,
++    pub config: AuthConfigId,
++    pub method: AuthMethod,
++    pub schema: CredentialSchema,
++    pub identity: Option<ExternalIdentity>,
++    pub metadata: AccountMetadata,
++    pub payload: SecretString,
++}
++#[async_trait]
++pub(crate) trait AccountRepository: Send + Sync {
++    async fn list(&self, owner: &AccountOwner, page: PageRequest)
++    -> IntegrationResult<AccountPage>;
++    async fn get(&self, owner: &AccountOwner, id: AccountId)
++    -> IntegrationResult<ConnectedAccount>;
++    async fn create(
++        &self,
++        owner: &AccountOwner,
++        write: AccountWrite,
++    ) -> IntegrationResult<ConnectedAccount>;
++    async fn replace(
++        &self,
++        owner: &AccountOwner,
++        id: AccountId,
++        expected: AccountRevision,
++        write: AccountWrite,
++    ) -> IntegrationResult<ConnectedAccount>;
++    async fn disconnect(
++        &self,
++        owner: &AccountOwner,
++        id: AccountId,
++        expected: AccountRevision,
++    ) -> IntegrationResult<ConnectedAccount>;
++    async fn delete(
++        &self,
++        owner: &AccountOwner,
++        id: AccountId,
++        expected: AccountRevision,
++    ) -> IntegrationResult<()>;
++}
++pub struct VaultManagement {
++    repository: Arc<dyn AccountRepository>,
++    registry: Arc<CodeOwnedRegistry>,
++}
++impl VaultManagement {
++    pub(crate) fn new(
++        repository: Arc<dyn AccountRepository>,
++        registry: Arc<CodeOwnedRegistry>,
++    ) -> Self {
++        Self {
++            repository,
++            registry,
++        }
++    }
++    fn static_write(&self, input: StaticAccountInput) -> IntegrationResult<AccountWrite> {
++        let entry = self.registry.get(&input.app)?;
++        if entry.provider.method != AuthMethod::StaticSecret {
++            return Err(IntegrationError::Denied);
++        }
++        let identity = self.registry.validate(
++            &input.app,
++            AuthMethod::StaticSecret,
++            &entry.provider.schema,
++            &input.value,
++        )?;
++        Ok(AccountWrite {
++            key: input.key,
++            provider: entry.provider.id.clone(),
++            config: entry.config.id.clone(),
++            method: AuthMethod::StaticSecret,
++            schema: entry.provider.schema.clone(),
++            identity,
++            metadata: input.metadata,
++            payload: input.value,
++        })
++    }
++}
++#[async_trait]
++impl ManagementGateway for VaultManagement {
++    async fn list_accounts(
++        &self,
++        owner: &VerifiedOwner,
++        page: PageRequest,
++    ) -> IntegrationResult<AccountPage> {
++        self.repository.list(owner.owner(), page).await
++    }
++    async fn get_account(
++        &self,
++        owner: &VerifiedOwner,
++        id: AccountId,
++    ) -> IntegrationResult<ConnectedAccount> {
++        self.repository.get(owner.owner(), id).await
++    }
++    async fn create_static_account(
++        &self,
++        owner: &VerifiedOwner,
++        input: StaticAccountInput,
++    ) -> IntegrationResult<ConnectedAccount> {
++        self.repository
++            .create(owner.owner(), self.static_write(input)?)
++            .await
++    }
++    async fn replace_static_account(
++        &self,
++        owner: &VerifiedOwner,
++        id: AccountId,
++        expected: AccountRevision,
++        input: StaticAccountInput,
++    ) -> IntegrationResult<ConnectedAccount> {
++        let current = self.repository.get(owner.owner(), id).await?;
++        if current.auth_method != AuthMethod::StaticSecret {
++            return Err(IntegrationError::Denied);
++        }
++        self.repository
++            .replace(owner.owner(), id, expected, self.static_write(input)?)
++            .await
++    }
++    async fn disconnect_account(
++        &self,
++        owner: &VerifiedOwner,
++        id: AccountId,
++        expected: AccountRevision,
++    ) -> IntegrationResult<ConnectedAccount> {
++        self.repository
++            .disconnect(owner.owner(), id, expected)
++            .await
++    }
++    async fn delete_account(
++        &self,
++        owner: &VerifiedOwner,
++        id: AccountId,
++        expected: AccountRevision,
++    ) -> IntegrationResult<()> {
++        self.repository.delete(owner.owner(), id, expected).await
++    }
++    async fn inspect_grants(
++        &self,
++        owner: &VerifiedOwner,
++        id: AccountId,
++    ) -> IntegrationResult<GrantInspection> {
++        self.repository.get(owner.owner(), id).await?;
++        Ok(GrantInspection {
++            grants: vec![],
++            attachment_available: false,
++        })
++    }
++}
+--- a/src/application/integrations/mod.rs
++++ b/src/application/integrations/mod.rs
+@@ -1,6 +1,10 @@
+ //! Application-owned gateway. Credential-bearing ports are crate-private.
+ pub mod execution;
+ pub mod gateway;
++#[expect(
++    dead_code,
++    reason = "Private provider lifecycle and injection contracts are wired in phases04–06"
++)]
+ pub(crate) mod private;
+ pub(crate) mod registry;
+ pub use execution::*;
+@@ -9,3 +13,24 @@
+ #[cfg(test)]
+ mod tests;
+ pub use registry::{AppDefinition, AuthConfig, AuthProvider};
++pub(crate) mod lifecycle;
++pub mod management;
++pub(crate) mod unavailable;
++
++impl From<crate::domain::integrations::IntegrationError> for crate::app_error::AppError {
++    fn from(error: crate::domain::integrations::IntegrationError) -> Self {
++        use crate::domain::integrations::IntegrationError as E;
++        match error {
++            E::NotFound => Self::NotFound("Vault account not found".into()),
++            E::Denied => Self::Forbidden("Vault access denied".into()),
++            E::Conflict => {
++                Self::Conflict("Vault account changed; reload before trying again".into())
++            }
++            E::Invalid => Self::BadRequest("Invalid vault input".into()),
++            E::Limit => Self::BadRequest("Vault limit reached".into()),
++            E::Unavailable => Self::ServiceUnavailable("Integration feature unavailable".into()),
++            E::Credential => Self::ServiceUnavailable("Vault credential unavailable".into()),
++            E::Storage => Self::ServiceUnavailable("Vault storage unavailable".into()),
++        }
++    }
++}
+--- a/src/application/integrations/registry.rs
++++ b/src/application/integrations/registry.rs
+@@ -14,6 +14,7 @@
+     pub id: AuthConfigId,
+     pub provider: ProviderId,
+     pub client_identity: ExternalSubject,
++    #[expect(dead_code, reason = "Provider client secrets are consumed in phase04")]
+     pub(crate) client_secret_reference: Option<ClientSecretReference>,
+ }
+ #[derive(Debug, Clone)]
+@@ -50,6 +51,23 @@
+     }
+     pub fn get(&self, app: &AppId) -> IntegrationResult<&Registration> {
+         self.entries.get(app).ok_or(IntegrationError::Unavailable)
++    }
++    pub(crate) fn for_account(
++        &self,
++        provider: &ProviderId,
++        config: &AuthConfigId,
++        method: AuthMethod,
++        schema: &CredentialSchema,
++    ) -> IntegrationResult<&Registration> {
++        self.entries
++            .values()
++            .find(|entry| {
++                &entry.provider.id == provider
++                    && &entry.config.id == config
++                    && entry.provider.method == method
++                    && &entry.provider.schema == schema
++            })
++            .ok_or(IntegrationError::Unavailable)
+     }
+     pub fn validate(
+         &self,
+--- a/src/application/integrations/unavailable.rs
++++ b/src/application/integrations/unavailable.rs
+@@ -0,0 +1,53 @@
++//! Explicit denial for features shipped by later phases. No successful defaults.
++use super::*;
++use crate::domain::integrations::{authority::UseGrant, *};
++use async_trait::async_trait;
++pub(crate) struct UnavailableIntegrations;
++#[async_trait]
++impl ConnectGateway for UnavailableIntegrations {
++    async fn begin_connect(
++        &self,
++        _: &VerifiedOwner,
++        _: BeginConnect,
++    ) -> IntegrationResult<ConnectStart> {
++        Err(IntegrationError::Unavailable)
++    }
++    async fn get_connect_attempt(
++        &self,
++        _: &VerifiedOwner,
++        _: ConnectAttemptId,
++    ) -> IntegrationResult<ConnectAttempt> {
++        Err(IntegrationError::Unavailable)
++    }
++}
++#[async_trait]
++impl GrantGateway for UnavailableIntegrations {
++    async fn create_use_grant(&self, _: OwnerConfirmation) -> IntegrationResult<UseGrant> {
++        Err(IntegrationError::Unavailable)
++    }
++    async fn revoke_use_grant(
++        &self,
++        _: &VerifiedOwner,
++        _: UseGrantId,
++        _: GrantRevision,
++    ) -> IntegrationResult<()> {
++        Err(IntegrationError::Unavailable)
++    }
++}
++#[async_trait]
++impl ExecutionGateway for UnavailableIntegrations {
++    async fn execute_http(
++        &self,
++        _: AuthorizedInvocation,
++        _: ExecutionContext,
++    ) -> IntegrationResult<ExecutionOutcome> {
++        Err(IntegrationError::Unavailable)
++    }
++    async fn call_mcp(
++        &self,
++        _: AuthorizedInvocation,
++        _: ExecutionContext,
++    ) -> IntegrationResult<ExecutionOutcome> {
++        Err(IntegrationError::Unavailable)
++    }
++}
+--- a/src/application/ports/account_deletion.rs
++++ b/src/application/ports/account_deletion.rs
+@@ -0,0 +1,10 @@
++//! Host user-deletion port. Integrations itself knows only opaque client owners.
++use crate::app_error::AppResult;
++use async_trait::async_trait;
++use uuid::Uuid;
++#[async_trait]
++pub trait HostAccountDeletion: Send + Sync {
++    /// Privileged host lifecycle operation; callers must establish user/operator authority.
++    /// Repeating deletion must retain or complete durable module cleanup.
++    async fn delete_user_account(&self, user: Uuid) -> AppResult<()>;
++}
+--- a/src/application/ports/mod.rs
++++ b/src/application/ports/mod.rs
+@@ -1,4 +1,5 @@
+ //! Ports shared across application subsystems. Contracts depend on domain and pure values.
++pub mod account_deletion;
+ pub mod channel;
+ pub mod integration;
+ pub mod participant;
+--- a/src/infra/setup.rs
++++ b/src/infra/setup.rs
+@@ -108,6 +108,8 @@
+ fn http_state(f: foundation::Foundation, c: HttpComponents) -> anyhow::Result<AppState> {
+     let p = f.persistence;
+     Ok(AppState {
++        integrations: crate::adapters::persistence::integrations::PostgresVault::new((*p).clone())
++            .gateway(),
+         knowledge: f.knowledge,
+         auth_admission: Arc::new(crate::adapters::http::auth_admission::AuthAdmission::from_env()?),
+         workflow: c.workflow,
+--- a/src/infra/workflow.rs
++++ b/src/infra/workflow.rs
+@@ -353,7 +353,18 @@
+     /// Start workflow slots, the intent worker, schedule materializer and metrics sampler
+     /// under `shutdown`. The caller keeps the handles and joins them on shutdown.
+     pub fn spawn(&self, shutdown: &CancellationToken) -> Vec<(&'static str, JoinHandle<()>)> {
+-        let mut handles = Vec::with_capacity(self.slots + 4);
++        let mut handles = Vec::with_capacity(self.slots + 5);
++        let vault = crate::adapters::persistence::integrations::PostgresVault::new(
++            self.services.persistence.clone(),
++        );
++        let vault_stop = shutdown.clone();
++        handles.push((
++            "integration teardown",
++            tokio::spawn(async move {
++                crate::application::integrations::lifecycle::run(&vault, &vault_stop).await;
++            }),
++        ));
++
+         let metric_persistence = self.services.persistence.clone();
+         let monitoring = self.monitoring.clone();
+         let metric_shutdown = shutdown.clone();
+@@ -705,6 +716,11 @@
+         let (_database, engine, _) = composed().await;
+         let shutdown = CancellationToken::new();
+         let handles = engine.spawn(&shutdown);
++        assert!(
++            handles
++                .iter()
++                .any(|(name, _)| *name == "integration teardown")
++        );
+         let task_count = handles.len();
+         engine.intent_wakeups.notify_waiters();
+         engine.worker_wakeups.notify_waiters();
+@@ -717,8 +733,8 @@
+                 .unwrap();
+         }
+         assert_eq!(
+-            task_count, 5,
+-            "one slot, metrics, intent, schedule and storage workers"
++            task_count, 6,
++            "one slot, metrics, intent, schedule, storage and integration teardown workers"
+         );
+     }
+ 

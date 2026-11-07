@@ -1,0 +1,7 @@
+{
+  "decision": "D1/r1",
+  "sha256": "1f784ee111f652668b0a70682500c5349a816eb8e599ea48ee78d5bd5dafa00c",
+  "source_base": "ef36f90e6587c12bf9d38541d612a31945101a7d7fde5c782ef3c8df0a7175b9",
+  "head": "97e5d60dc538e26c7cb976a8d63772eed80baff2",
+  "coordination_revision": 6
+}

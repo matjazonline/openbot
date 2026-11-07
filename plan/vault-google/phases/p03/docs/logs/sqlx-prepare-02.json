@@ -1,0 +1,16 @@
+{
+  "command": [
+    "env",
+    "SQLX_OFFLINE=false",
+    "cargo",
+    "sqlx",
+    "prepare",
+    "--",
+    "--all-targets"
+  ],
+  "cwd": "/Users/mac02/.codex/worktrees/1133/openbot",
+  "database": "vault_google_1133_41402e4b8104_test",
+  "exit": 0,
+  "seconds": 13.56,
+  "log": "/Users/mac02/.codex/worktrees/1133/openbot/plan/vault-google/phases/p03/docs/logs/sqlx-prepare-02.log"
+}

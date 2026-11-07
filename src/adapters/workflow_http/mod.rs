@@ -126,11 +126,13 @@ impl RemoteAction for HttpProvider {
     async fn invoke(&self, action: &FrozenAction, _: &ProviderInvocation) -> AppResult<Value> {
         let request = HttpRequest::parse(&action.request().arguments)?;
         tokio::time::timeout(Duration::from_secs(30), async {
-            let (connection, _) = self.persistence.http_for_action(action).await?;
+            let (connection, authentication) = self.persistence.http_for_action(action).await?;
+            authentication.into_owned()?;
             let client = client(&self.policy, &connection).await?;
             // DNS may have waited: reload revocation and rotated credentials after resolution,
             // immediately before polling the HTTP request. The origin itself is immutable.
-            let (connection, secret) = self.persistence.http_for_action(action).await?;
+            let (connection, authentication) = self.persistence.http_for_action(action).await?;
+            let secret = authentication.into_owned()?;
             send(client, &connection, secret.as_ref(), request).await
         })
         .await

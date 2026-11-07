@@ -1,0 +1,55 @@
+{
+  "command_receipt": "final-full-01.json",
+  "log_sha256": "b850bb6e1e2e14f8e8195ed52dd44d394b5c430220c16c39307c189dca214d75",
+  "library_runs": [
+    [
+      "3337",
+      "2",
+      "9",
+      "1063.35"
+    ],
+    [
+      "3337",
+      "2",
+      "9",
+      "946.34"
+    ]
+  ],
+  "successful_gates": [
+    "Generated CSS is current",
+    "SSE navigation lifecycle",
+    "Deployment script tests",
+    "Formatting",
+    "Patch whitespace",
+    "Transport abstraction boundary",
+    "Fetch locked Rust dependencies",
+    "Offline compilation",
+    "Clippy",
+    "Migrations",
+    "SQLx metadata matches migrated schema",
+    "Compile tests",
+    "Test database for this run"
+  ],
+  "failed_gates": [
+    "Database-backed test suite (isolated network)",
+    "Stack budget"
+  ],
+  "failures": [
+    "adapters::http::pages::tests::rendered_markup_carries_no_inline_javascript",
+    "adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::acceptance_tests::revision_tests::workflow_control_revision_overflow_refuses_without_partial_writes"
+  ],
+  "ignored": [
+    "test adapters::http::pages::knowledge::tests::dump_knowledge_browser_fixtures ... ignored, browser fixture: exact production library markup and JavaScript",
+    "test adapters::http::pages::tests::dump_application_javascript ... ignored, developer aid: dumps /assets/app.js so it can be syntax-checked with node",
+    "test adapters::http::pages::tests::dump_html_injection_browser_fixtures ... ignored, browser protocol fixture: write the server-rendered forms, alerts, and shipped JavaScript",
+    "test adapters::http::routes::ui_agents::authoring::browser_fixtures::dump_autonomous_agent_authoring_browser_fixtures ... ignored, exports native authoring responses for the browser gate",
+    "test adapters::http::routes::ui_profile::session_tests::dump_session_revocation_browser_fixtures ... ignored, writes actual profile responses for the browser protocol check",
+    "test adapters::http::routes::workflows::ui::authoring::tests::agent_picker_tests::dump_autonomous_workflow_agent_picker_browser_fixtures ... ignored, exports native workflow agent picker responses for the browser gate",
+    "test adapters::persistence::workflow::reads::tests::dump_run_list_query_shapes ... ignored, writes the query-plan script's input; run on demand",
+    "test adapters::smtp::server::tests::test_dkim_verification_with_gmail_raw_email ... ignored, optional live DNS smoke; required CI denies external egress",
+    "test adapters::smtp::server::tests::test_spf_verification_with_google_ip ... ignored, optional live DNS smoke; required CI denies external egress"
+  ],
+  "stack_overflow_seen": false,
+  "main_binary_tests": "not reached after library failure; explicit targeted binary run required",
+  "disposition": "VF1 fixture-location correction pending; VF2 clean-baseline reproduction in progress. No full-suite pass claim."
+}

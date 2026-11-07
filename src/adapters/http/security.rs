@@ -17,11 +17,32 @@ pub async fn browser_security(
     next: Next,
 ) -> Result<Response, StatusCode> {
     validate_same_origin(&request, config.secure_cookies)?;
+    let sensitive_callback =
+        request.uri().path().starts_with("/auth/") && request.uri().path().ends_with("/callback");
     let mut response = next.run(request).await;
     let headers = response.headers_mut();
     headers.insert(header::CONTENT_SECURITY_POLICY, CSP.parse().unwrap());
     headers.insert(header::X_CONTENT_TYPE_OPTIONS, "nosniff".parse().unwrap());
-    headers.insert(header::REFERRER_POLICY, "same-origin".parse().unwrap());
+    let referrer_policy = if sensitive_callback
+        || headers
+            .get(header::REFERRER_POLICY)
+            .is_some_and(|v| v == "no-referrer")
+    {
+        "no-referrer"
+    } else {
+        "same-origin"
+    };
+    // Preserve a stricter callback policy while retaining the global privacy floor.
+    headers.insert(
+        header::REFERRER_POLICY,
+        axum::http::HeaderValue::from_static(referrer_policy),
+    );
+    if sensitive_callback {
+        headers.insert(
+            header::CACHE_CONTROL,
+            axum::http::HeaderValue::from_static("no-store"),
+        );
+    }
     headers.insert(
         "permissions-policy",
         "camera=(), microphone=(), geolocation=()".parse().unwrap(),

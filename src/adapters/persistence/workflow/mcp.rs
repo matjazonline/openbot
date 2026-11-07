@@ -177,6 +177,8 @@ impl action_dispatch::SqlActionAuthority for McpActionAuthority {
         let connection = connection_on(tx, request.scope.company, mcp_target(&request.target)?)
             .await?
             .ok_or_else(missing)?;
+        let current = super::integration_authority::mcp_snapshot(tx, &connection).await?;
+        super::integration_authority::check_snapshot(request, current)?;
         Ok(action_dispatch::LockedActionAuthority {
             resource: status_on(tx, &connection).await?,
             policy: policy_on(tx, &connection, &request.contract).await?,
@@ -306,6 +308,21 @@ impl McpActionUse for PostgresPersistence {
         live_run_on(&mut tx, request).await?;
         super::agent_origin::current_on(&mut tx, request).await?;
         let (connection, decision) = current_on(&mut tx, request).await?;
+        let current = super::integration_authority::mcp_snapshot(&mut tx, &connection).await?;
+        super::integration_authority::check_snapshot(request, current.clone())?;
+        let approved = decisions::approvals::approved_request(&mut tx, request).await?;
+        if let Some(snapshot) = current {
+            tx.commit().await?;
+            return Ok(McpUse {
+                endpoint: connection.endpoint,
+                authentication:
+                    crate::application::workflow::http::PreparedAuthentication::Integration(
+                        Box::new(snapshot),
+                    ),
+                credential_revision: connection.credential_revision,
+                approval_required: decision == ActionAccessDecision::ApprovalRequired && !approved,
+            });
+        }
         let envelope: Option<String> = sqlx::query_scalar(
             "SELECT envelope FROM company_mcp_credentials WHERE company_id=$1 AND connection_id=$2",
         )
@@ -328,7 +345,8 @@ impl McpActionUse for PostgresPersistence {
         tx.commit().await?;
         Ok(McpUse {
             endpoint: connection.endpoint,
-            token,
+            authentication:
+                crate::application::workflow::http::PreparedAuthentication::ConnectionOwned(token),
             credential_revision: connection.credential_revision,
             approval_required: decision == ActionAccessDecision::ApprovalRequired && !approved,
         })

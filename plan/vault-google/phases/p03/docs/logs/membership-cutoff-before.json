@@ -1,0 +1,17 @@
+{
+  "command": [
+    "bash",
+    "scripts/test-network-isolation.sh",
+    "cargo",
+    "test",
+    "--locked",
+    "--offline",
+    "--lib",
+    "vault_binding_membership_revocation_covers_consent_created_while_delete_waits"
+  ],
+  "cwd": "/Users/mac02/.codex/worktrees/1133/openbot",
+  "database": "vault_google_1133_41402e4b8104_test",
+  "exit": 101,
+  "seconds": 13.9,
+  "log": "/Users/mac02/.codex/worktrees/1133/openbot/plan/vault-google/phases/p03/docs/logs/membership-cutoff-before.log"
+}

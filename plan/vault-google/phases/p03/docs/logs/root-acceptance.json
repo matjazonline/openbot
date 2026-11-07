@@ -1,0 +1,20 @@
+{
+  "phase": "p03",
+  "head": "97e5d60dc538e26c7cb976a8d63772eed80baff2",
+  "digest": "ef36f90e6587c12bf9d38541d612a31945101a7d7fde5c782ef3c8df0a7175b9",
+  "excludes": [
+    "plan/vault-google/COORDINATION.md",
+    "plan/vault-google/phases/p01/docs",
+    "plan/vault-google/phases/p02/docs",
+    "plan/vault-google/phases/p03/docs",
+    "plan/vault-google/phases/p04/docs",
+    "plan/vault-google/phases/p05/docs",
+    "plan/vault-google/integration/channel-p05/docs"
+  ],
+  "review": "VG-P03-B1-R2",
+  "finding": "VG-P03-B1-F1 fixed; no remaining actionable findings",
+  "verification": "checks-R2.json:215 distinct focused PASS, fresh migration04/current SQLx03/offline06/alltargetClippy04/fmt/boundaries; final full suite pending authorized03\u201305 completion",
+  "coordination_revision": 5,
+  "architecture": "D1/r2 a33eb50f... / VG-P03-AG1-R1 PASS",
+  "accepted_by": "/root"
+}

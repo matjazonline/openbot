@@ -1,0 +1,365 @@
+--- R1/src/adapters/http/auth_admission.rs
++++ R2/src/adapters/http/auth_admission.rs
+@@ -110,7 +110,9 @@
+             | "/auth/google/callback",
+         )
+         | (&Method::GET, "/auth/apple/register" | "/auth/apple/login" | "/auth/apple/connect")
+-        | (&Method::POST, "/auth/apple/callback") => Some(Kind::Oauth),
++        | (&Method::POST, "/auth/apple/callback")
++        | (&Method::POST, "/ui/profile/vault/apps/{app}/connect")
++        | (&Method::GET, "/auth/integrations/{provider}/callback") => Some(Kind::Oauth),
+         (&Method::PUT, "/ui/profile" | "/ui/profile/password" | "/ui/profile/password/setup")
+         | (&Method::POST | &Method::DELETE, "/ui/profile/changes/{kind}") => Some(Kind::Credential),
+         _ => None,
+@@ -597,6 +599,21 @@
+             (Method::GET, "/auth/apple/login", Kind::Oauth),
+             (Method::GET, "/auth/apple/connect", Kind::Oauth),
+             (Method::POST, "/auth/apple/callback", Kind::Oauth),
++            (
++                Method::POST,
++                "/ui/profile/vault/apps/{app}/connect",
++                Kind::Oauth,
++            ),
++            (
++                Method::GET,
++                "/auth/integrations/{provider}/callback",
++                Kind::Oauth,
++            ),
++            (
++                Method::HEAD,
++                "/auth/integrations/{provider}/callback",
++                Kind::Oauth,
++            ),
+         ] {
+             assert_eq!(kind(&method, path), Some(expected), "{method} {path}");
+         }
+--- R1/src/adapters/http/pages/vault.rs
++++ R2/src/adapters/http/pages/vault.rs
+@@ -55,7 +55,7 @@
+     let replace = if account.auth_method == AuthMethod::StaticSecret {
+         replacement_form(account)
+     } else {
+-        apps.iter().filter(|app|app.config==account.auth_config_id&&app.provider==account.provider_id).map(|app|format!("<form method=\"post\" action=\"/ui/profile/vault/apps/{}/connect\"><input type=\"hidden\" name=\"account\" value=\"{id}\"><input type=\"hidden\" name=\"authorization\" value=\"{}\"><button class=\"btn btn-sm\" type=\"submit\">Reconnect {}</button><p>Company grants require fresh confirmation after reconnecting.</p></form>",escape_html_attr(app.id.as_str()),account.authorization_revision.get(),escape_html_text(app.id.as_str()))).collect()
++        apps.iter().filter(|app|app.config==account.auth_config_id&&app.provider==account.provider_id).map(|app|format!("<form method=\"post\" action=\"/ui/profile/vault/apps/{}/connect\" hx-post=\"/ui/profile/vault/apps/{}/connect\" hx-sync=\"this:drop\" hx-disabled-elt=\"find button\"><input type=\"hidden\" name=\"account\" value=\"{id}\"><input type=\"hidden\" name=\"authorization\" value=\"{}\"><button class=\"btn btn-sm\" type=\"submit\">Reconnect {}</button><p>Company grants require fresh confirmation after reconnecting.</p></form>",escape_html_attr(app.id.as_str()),escape_html_attr(app.id.as_str()),account.authorization_revision.get(),escape_html_text(app.id.as_str()))).collect()
+     };
+     let configured = match account.status {
+         AccountStatus::Ready => "Configured",
+@@ -93,7 +93,7 @@
+ }
+ 
+ fn connect_apps(apps: &[crate::application::integrations::ConnectApp]) -> String {
+-    let forms=apps.iter().map(|app|format!("<form method=\"post\" action=\"/ui/profile/vault/apps/{}/connect\"><button class=\"btn btn-primary\" type=\"submit\">Connect {}</button></form>",escape_html_attr(app.id.as_str()),escape_html_text(app.id.as_str()))).collect::<String>();
++    let forms=apps.iter().map(|app|format!("<form method=\"post\" action=\"/ui/profile/vault/apps/{}/connect\" hx-post=\"/ui/profile/vault/apps/{}/connect\" hx-sync=\"this:drop\" hx-disabled-elt=\"find button\"><button class=\"btn btn-primary\" type=\"submit\">Connect {}</button></form>",escape_html_attr(app.id.as_str()),escape_html_attr(app.id.as_str()),escape_html_text(app.id.as_str()))).collect::<String>();
+     format!(
+         "<section class=\"mx-auto max-w-3xl p-6\"><h2>Connect an app</h2><p>App consent saves a private account. Company access requires a separate owner confirmation.</p>{forms}</section>"
+     )
+--- R1/src/adapters/http/routes/ui_vault_connect.rs
++++ R2/src/adapters/http/routes/ui_vault_connect.rs
+@@ -93,7 +93,30 @@
+             },
+         )
+         .await?;
+-    Ok(redirect(connected.authorization_url.as_str()))
++    // A form redirect to another origin is blocked by form-action 'self'. HTMX
++    // performs a top-level navigation; a normal form receives an ordinary link.
++    let url = connected.authorization_url.as_str();
++    let mut response = Html(pages::base_layout(
++        "Continue to app consent",
++        &format!(
++            "<main><h1>Continue to app consent</h1><p>Choose an account and review the app permissions.</p><a class=\"btn btn-primary\" href=\"{}\">Continue</a><p><a class=\"link\" href=\"/ui/profile/vault\">Return to Connected apps</a></p></main>",
++            pages::escape_html_attr(url)
++        ),
++    ))
++    .into_response();
++    response.headers_mut().insert(
++        "HX-Redirect",
++        url.parse().map_err(|_| IntegrationError::Invalid)?,
++    );
++    response.headers_mut().insert(
++        header::REFERRER_POLICY,
++        header::HeaderValue::from_static("no-referrer"),
++    );
++    response.headers_mut().insert(
++        header::CACHE_CONTROL,
++        header::HeaderValue::from_static("no-store"),
++    );
++    Ok(response)
+ }
+ #[derive(Deserialize)]
+ struct Callback {
+--- R1/src/adapters/http/routes/ui_vault_connect/tests.rs
++++ R2/src/adapters/http/routes/ui_vault_connect/tests.rs
+@@ -1,6 +1,6 @@
+ use super::*;
+ use crate::adapters::{
+-    http::{auth, security},
++    http::{auth, auth_admission, security},
+     persistence::integrations::connect_tests::Fixture,
+ };
+ use crate::infra::config::AppConfig;
+@@ -43,6 +43,10 @@
+             Arc::new(config),
+             security::browser_security,
+         ))
++        .layer(middleware::from_fn_with_state(
++            Arc::new(auth_admission::AuthAdmission::new(vec![])),
++            auth_admission::admit,
++        ))
+ }
+ fn request(
+     method: &str,
+@@ -79,8 +83,9 @@
+         ))
+         .await
+         .unwrap();
+-    assert_eq!(start.status(), StatusCode::SEE_OTHER);
+-    let url = url::Url::parse(start.headers()["location"].to_str().unwrap()).unwrap();
++    assert_eq!(start.status(), StatusCode::OK);
++    assert!(start.headers().get("location").is_none());
++    let url = url::Url::parse(start.headers()["hx-redirect"].to_str().unwrap()).unwrap();
+     assert_eq!(url.host_str(), Some("accounts.google.com"));
+     let state = url
+         .query_pairs()
+@@ -267,3 +272,6 @@
+     assert_eq!(response.headers()["cache-control"], "no-store");
+     assert_eq!(f.script.calls.load(std::sync::atomic::Ordering::SeqCst), 0);
+ }
++
++mod admission;
++mod navigation;
+--- R1/src/adapters/http/routes/ui_vault_connect/tests/admission.rs
++++ R2/src/adapters/http/routes/ui_vault_connect/tests/admission.rs
+@@ -0,0 +1,100 @@
++use super::*;
++use std::sync::atomic::Ordering;
++
++#[tokio::test]
++async fn integration_connect_admission_exhaustion_precedes_attempt_and_provider_work() {
++    let f = Box::pin(Fixture::new()).await;
++    let router = app(&f);
++    for n in 0..30 {
++        let method = if n % 2 == 0 { "HEAD" } else { "GET" };
++        let response = router
++            .clone()
++            .oneshot(request(
++                method,
++                "/auth/integrations/%67oogle/callback?state=invalid&code=sentinel",
++                Some(&f.cookie),
++                "",
++                None,
++            ))
++            .await
++            .unwrap();
++        assert_eq!(response.status(), StatusCode::SEE_OTHER);
++    }
++    for (method, path, origin) in [
++        (
++            "POST",
++            "/ui/profile/vault/apps/g%6dail/connect",
++            Some("http://localhost:3000"),
++        ),
++        ("GET", "/auth/integrations/%67oogle/callback", None),
++        ("HEAD", "/auth/integrations/google/callback", None),
++    ] {
++        let response = router
++            .clone()
++            .oneshot(request(method, path, Some(&f.cookie), "", origin))
++            .await
++            .unwrap();
++        assert_eq!(response.status(), StatusCode::TOO_MANY_REQUESTS);
++    }
++    assert_eq!(f.attempt_count().await, 0);
++    assert_eq!(f.script.calls.load(Ordering::SeqCst), 0);
++}
++
++fn callback_path(f: &Fixture, start: &ConnectStart) -> String {
++    let callback = f.callback(start);
++    let mut url = url::Url::parse("http://localhost/auth/integrations/%67oogle/callback").unwrap();
++    url.query_pairs_mut()
++        .append_pair("state", &callback.state)
++        .append_pair("code", "sentinel");
++    format!("{}?{}", url.path(), url.query().unwrap())
++}
++
++#[tokio::test]
++async fn integration_connect_admission_concurrent_callbacks_hold_the_real_active_budget() {
++    let f = Box::pin(Fixture::new()).await;
++    let router = app(&f);
++    let starts = [f.begin(None).await, f.begin(None).await];
++    let held = f.script.gate.clone().acquire_owned().await.unwrap();
++    let mut workers = Vec::new();
++    for start in &starts {
++        let request = request("GET", &callback_path(&f, start), Some(&f.cookie), "", None);
++        let router = router.clone();
++        workers.push(tokio::spawn(async move {
++            router.oneshot(request).await.unwrap()
++        }));
++    }
++    f.script.wait_calls(2).await;
++    for (method, path, origin) in [
++        (
++            "POST",
++            "/ui/profile/vault/apps/g%6dail/connect",
++            Some("http://localhost:3000"),
++        ),
++        ("HEAD", "/auth/integrations/%67oogle/callback", None),
++    ] {
++        let response = router
++            .clone()
++            .oneshot(request(method, path, Some(&f.cookie), "", origin))
++            .await
++            .unwrap();
++        assert_eq!(response.status(), StatusCode::TOO_MANY_REQUESTS);
++    }
++    assert_eq!(f.attempt_count().await, 2);
++    assert_eq!(f.script.calls.load(Ordering::SeqCst), 2);
++    drop(held);
++    for worker in workers {
++        assert_eq!(worker.await.unwrap().status(), StatusCode::SEE_OTHER);
++    }
++    let response = router
++        .oneshot(request(
++            "POST",
++            "/ui/profile/vault/apps/gmail/connect",
++            Some(&f.cookie),
++            "",
++            Some("http://localhost:3000"),
++        ))
++        .await
++        .unwrap();
++    assert_eq!(response.status(), StatusCode::OK);
++    assert_eq!(f.attempt_count().await, 3);
++}
+--- R1/src/adapters/http/routes/ui_vault_connect/tests/navigation.rs
++++ R2/src/adapters/http/routes/ui_vault_connect/tests/navigation.rs
+@@ -0,0 +1,107 @@
++use super::*;
++
++struct NavigationReply {
++    html: String,
++    csp: String,
++    target: String,
++}
++async fn begin_reply(router: &Router, f: &Fixture, body: &str) -> NavigationReply {
++    let response = router
++        .clone()
++        .oneshot(request(
++            "POST",
++            "/ui/profile/vault/apps/gmail/connect",
++            Some(&f.cookie),
++            body,
++            Some("http://localhost:3000"),
++        ))
++        .await
++        .unwrap();
++    assert_eq!(response.status(), StatusCode::OK);
++    assert!(response.headers().get("location").is_none());
++    assert_eq!(response.headers()["cache-control"], "no-store");
++    assert_eq!(response.headers()["referrer-policy"], "no-referrer");
++    let target = response.headers()["hx-redirect"]
++        .to_str()
++        .unwrap()
++        .to_owned();
++    assert_eq!(
++        url::Url::parse(&target).unwrap().host_str(),
++        Some("accounts.google.com")
++    );
++    let csp = response.headers()["content-security-policy"]
++        .to_str()
++        .unwrap()
++        .to_owned();
++    let html = String::from_utf8(
++        to_bytes(response.into_body(), 65536)
++            .await
++            .unwrap()
++            .to_vec(),
++    )
++    .unwrap();
++    assert!(
++        html.contains("Continue to app consent")
++            && html.contains("href=\"https://accounts.google.com/")
++    );
++    for secret in [
++        "access-sentinel",
++        "refresh-sentinel",
++        "client-secret-sentinel",
++        "enc:v2:",
++    ] {
++        assert!(!html.contains(secret));
++    }
++    NavigationReply { html, csp, target }
++}
++
++#[tokio::test]
++async fn integration_connect_navigation_uses_registered_navigation_and_shared_progress() {
++    let f = Box::pin(Fixture::new()).await;
++    let first = f.begin(None).await;
++    let connected = f.finish(&first).await;
++    let account = f
++        .gateway()
++        .get_account(&f.owner, connected.account.unwrap())
++        .await
++        .unwrap();
++    let router = app(&f);
++    let connect = begin_reply(&router, &f, "").await;
++    let reconnect = begin_reply(
++        &router,
++        &f,
++        &format!(
++            "account={}&authorization={}",
++            account.id.as_uuid(),
++            account.authorization_revision.get()
++        ),
++    )
++    .await;
++    let html = pages::base_layout(
++        "Connected apps",
++        &pages::vault::vault_content(
++            &AccountPage {
++                accounts: vec![account],
++                next: None,
++            },
++            None,
++            &f.gateway().connectable_apps().await.unwrap(),
++        ),
++    );
++    assert_eq!(
++        html.matches("hx-post=\"/ui/profile/vault/apps/gmail/connect\"")
++            .count(),
++        2
++    );
++    assert_eq!(html.matches("hx-disabled-elt=\"find button\"").count(), 2);
++    if let Some(dir) = std::env::var_os("OPENBOT_BROWSER_FIXTURE_DIR") {
++        let dir = std::path::PathBuf::from(dir);
++        std::fs::create_dir_all(&dir).unwrap();
++        std::fs::write(dir.join("page.html"), html).unwrap();
++        std::fs::write(dir.join("app.js"), pages::application_javascript()).unwrap();
++        std::fs::write(dir.join("connect.html"), &connect.html).unwrap();
++        std::fs::write(dir.join("reconnect.html"), &reconnect.html).unwrap();
++        let metadata = serde_json::json!({"csp":connect.csp,"connect":connect.target,"reconnect":reconnect.target});
++        std::fs::write(dir.join("navigation.json"), metadata.to_string()).unwrap();
++    }
++}
+--- R1/src/adapters/persistence/integrations/connect_tests/mod.rs
++++ R2/src/adapters/persistence/integrations/connect_tests/mod.rs
+@@ -61,7 +61,7 @@
+     pub observed: Mutex<Option<FormObservation>>,
+ }
+ impl Script {
+-    async fn wait_calls(&self, expected: usize) {
++    pub(crate) async fn wait_calls(&self, expected: usize) {
+         tokio::time::timeout(std::time::Duration::from_secs(3), async {
+             loop {
+                 let event = self.entered.notified();
+@@ -318,6 +318,11 @@
+     pub fn pool(&self) -> &sqlx::PgPool {
+         self.vault.persistence.pool()
+     }
++    pub(crate) async fn attempt_count(&self) -> i64 {
++        sqlx::query_scalar("SELECT count(*) FROM integration_connect_attempts WHERE owner_namespace=$1 AND owner_subject=$2")
++            .bind(self.owner.owner().namespace.as_str()).bind(self.owner.owner().subject.as_str())
++            .fetch_one(self.pool()).await.unwrap()
++    }
+ }
+ pub(crate) fn verified(session: VerifiedSession) -> VerifiedOwner {
+     let reference = session.session_id.0.to_string();

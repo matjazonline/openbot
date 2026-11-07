@@ -150,3 +150,70 @@ pub(super) fn write() -> AgentWrite {
         ..Default::default()
     }
 }
+
+pub(super) async fn attach_vault(
+    f: &Fixture,
+    connection: Uuid,
+    revision: i64,
+    kind: crate::application::use_cases::integration_binding::BindingKind,
+) {
+    use crate::{
+        adapters::{
+            integrations::owner::owner_for_user,
+            persistence::{
+                integration_bindings::PostgresIntegrationBindings, integrations::PostgresVault,
+            },
+        },
+        application::{
+            integrations::{
+                VerifiedOwner,
+                management::{AccountRepository, AccountWrite},
+            },
+            use_cases::integration_binding::*,
+        },
+        domain::integrations::*,
+    };
+    let owner = owner_for_user(f.scope.actor.user_id());
+    let vault = PostgresVault::new(f.p.clone());
+    let account = vault
+        .create(
+            &owner,
+            AccountWrite {
+                key: AccountKey::parse("agent-private").unwrap(),
+                provider: ProviderId::parse("static-bearer").unwrap(),
+                config: AuthConfigId::parse("static-bearer").unwrap(),
+                method: AuthMethod::StaticSecret,
+                schema: CredentialSchema::parse("static-v1").unwrap(),
+                identity: None,
+                metadata: AccountMetadata::new("Agent private".into(), None).unwrap(),
+                payload: secrecy::SecretString::from("private-agent-token"),
+            },
+        )
+        .await
+        .unwrap();
+    let host = PostgresIntegrationBindings {
+        persistence: f.p.clone(),
+        vault,
+    };
+    let proposal = host
+        .propose(
+            f.scope.actor.user_id(),
+            ProposeBinding {
+                company: f.scope.company.as_uuid(),
+                connection,
+                kind,
+                app: AppId::parse("static-bearer").unwrap(),
+                expected_revision: revision,
+            },
+        )
+        .await
+        .unwrap();
+    host.confirm(
+        VerifiedOwner::from_verified_client(owner),
+        proposal.id,
+        account.id,
+        account.authorization_revision,
+    )
+    .await
+    .unwrap();
+}

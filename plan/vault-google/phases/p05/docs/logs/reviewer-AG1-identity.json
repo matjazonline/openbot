@@ -1,0 +1,25 @@
+{
+  "review": "VG-P05-AG1-R1",
+  "stage": "architecture",
+  "verdict": "PASS",
+  "decision": "D1/r1",
+  "decision_sha256": "a0df7f11553ef95ea538942ee44a3277eb7e97a8934c9cd44b1fd09ae2dc1259",
+  "head": "97e5d60dc538e26c7cb976a8d63772eed80baff2",
+  "source_digest": "b1dde903b71fda9e8f03eb2338114d72c03418f39b8bceaa54ea308e0d484960",
+  "excludes": [
+    "plan/vault-google/COORDINATION.md",
+    "plan/vault-google/phases/p01/docs",
+    "plan/vault-google/phases/p02/docs",
+    "plan/vault-google/phases/p03/docs",
+    "plan/vault-google/phases/p04/docs",
+    "plan/vault-google/phases/p05/docs",
+    "plan/vault-google/integration/channel-p05/docs"
+  ],
+  "coordination_revision": 8,
+  "coordination_sha256": "3cbeabffeb1f413e550ca30a2c0542d8f07c00961516f96cba49c8ae73cb36bd",
+  "notice_disposition": "VG-C004/r1 proposed contract reviewed and approved for activation; implementation producer not yet accepted",
+  "entry_exit_match": true,
+  "coordination_pin_match": true,
+  "tests": "none: no phase05 implementation exists",
+  "at_utc": "2026-11-07T12:09:57.699084+00:00"
+}

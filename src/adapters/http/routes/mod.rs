@@ -37,6 +37,7 @@ mod ui_run_counts;
 pub mod ui_schedules;
 pub mod ui_team;
 pub mod ui_uploads;
+pub mod ui_vault;
 pub mod user;
 pub mod webhooks;
 pub mod workflows;
@@ -111,6 +112,7 @@ pub fn router(sessions: Arc<SessionAuthority>) -> Router<AppState> {
         .merge(ui_invites::router())
         .merge(ui_deliveries::router())
         .merge(ui_profile::router())
+        .merge(ui_vault::router())
         .merge(ui_run_counts::router())
         .merge(ui_team::router())
         .merge(ui_uploads::router())
@@ -271,3 +273,7 @@ mod tests {
         assert_eq!(body_of(page).await, "the dashboard");
     }
 }
+
+mod ui_vault_bindings;
+
+mod ui_vault_connect;

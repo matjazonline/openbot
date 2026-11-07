@@ -1,0 +1,12 @@
+{
+  "before_digest": "2b114131e1b9a47fa1db8557baf6b913c392f88163500245b719801b1c60d982",
+  "current_digest": "9d561a9cd7b6e4662d859bca78e70b0739b985b1dad6d8e75e5f30b68311088b",
+  "changed_paths": [
+    "src/adapters/http/routes/ui_vault.rs",
+    "src/adapters/http/routes/ui_vault/tests.rs",
+    "src/adapters/http/routes/vault_management_tests.rs"
+  ],
+  "source_semantics": "test module relocation with identical contents; only path attribute removed; production code unchanged",
+  "baseline_failure": "VF2 reproduced at clean HEAD97e5d60d; leave unrelated test unchanged",
+  "checks": "root correction-checks.py still running; freeze holds source stable"
+}

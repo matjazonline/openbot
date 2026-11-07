@@ -301,7 +301,9 @@ async fn workflow_decision_production_removal_preserves_open_and_settled_history
 async fn await_blocked_removal(pool: &sqlx::PgPool) {
     tokio::time::timeout(std::time::Duration::from_millis(800), async {
         loop {
-            let blocked: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM pg_stat_activity WHERE datname=current_database() AND query LIKE 'UPDATE principals%' AND cardinality(pg_blocking_pids(pid))>0)")
+            // Removal now locks the company before its principal. Observe either
+            // real removal statement, depending on which held decision lock it meets.
+            let blocked: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM pg_stat_activity WHERE datname=current_database() AND (query LIKE 'UPDATE principals%' OR query='SELECT id FROM companies WHERE id=$1 FOR NO KEY UPDATE') AND cardinality(pg_blocking_pids(pid))>0)")
                 .fetch_one(pool).await.unwrap();
             if blocked { break; }
             tokio::time::sleep(std::time::Duration::from_millis(5)).await;

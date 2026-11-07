@@ -1,0 +1,12 @@
+{
+  "command": [
+    "node",
+    "plan/vault-google/phases/p04/docs/logs/browser-navigation-R2.cjs",
+    "plan/vault-google/phases/p04/docs/logs/browser-R2"
+  ],
+  "cwd": "/Users/mac02/.codex/worktrees/1133/openbot",
+  "database": "vault_google_1133_41402e4b8104_test",
+  "exit": 1,
+  "seconds": 7.37,
+  "log": "/Users/mac02/.codex/worktrees/1133/openbot/plan/vault-google/phases/p04/docs/logs/real-browser-R2-01.log"
+}

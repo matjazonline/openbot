@@ -1,0 +1,14 @@
+{
+  "baseline": "3ec6bd6cc3aec69cb198832777f0aefa969b0563cf754514ceb5f7a5a96e5e05",
+  "current": "b1dde903b71fda9e8f03eb2338114d72c03418f39b8bceaa54ea308e0d484960",
+  "changed": [
+    "src/adapters/http/auth_admission.rs",
+    "src/adapters/http/pages/vault.rs",
+    "src/adapters/http/routes/ui_vault_connect.rs",
+    "src/adapters/http/routes/ui_vault_connect/tests.rs",
+    "src/adapters/http/routes/ui_vault_connect/tests/admission.rs",
+    "src/adapters/http/routes/ui_vault_connect/tests/navigation.rs",
+    "src/adapters/persistence/integrations/connect_tests/mod.rs"
+  ],
+  "all_current_hashes_match": true
+}

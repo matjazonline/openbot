@@ -1,0 +1,13 @@
+{
+  "authorized_by": "user push to main",
+  "reviewed_artifact": "f2bd7d430aa1f4eff0289a6006fa64deeb9fa189def2e9ae74fa427f232b7926",
+  "parent": "4ab45555f8316ec7a8b1b64e8c05b77ff7d9a29d",
+  "source_paths": 146,
+  "review": "VG-INT-MAIN-R1 PASS with inherited F1/F2",
+  "targeted_verification": "131Rust +1browser PASS, independent34channelcompletionPASS, freshmigration/SQLx/offline/Clippy/fmt etc PASS; inherited scanner failures remain",
+  "full_suite_run_for_publication": false,
+  "known_overflow_test": "unchanged/not rerun",
+  "local_binary_count_retained_outside_git": 5,
+  "outside_post_push_receipt": "/private/tmp/vault-main-pull-rtehstpa/main-push-receipt.json",
+  "coordination_authorization_revision": 14
+}

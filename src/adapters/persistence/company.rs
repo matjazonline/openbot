@@ -125,6 +125,13 @@ async fn delete_company_with_cleanup(
     if !company_exists {
         return Ok(false);
     }
+    super::integrations::lifecycle::revoke_company_on(
+        &mut transaction,
+        &crate::adapters::integrations::owner::client_namespace(),
+        &crate::adapters::integrations::owner::company_binding(id),
+    )
+    .await
+    .map_err(AppError::from)?;
     sqlx::query("DELETE FROM companies WHERE id = $1")
         .bind(id)
         .execute(&mut *transaction)

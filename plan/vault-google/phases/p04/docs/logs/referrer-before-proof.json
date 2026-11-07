@@ -1,0 +1,6 @@
+{
+  "security_sha256": "b2e302eb887e2557c84ae3453820d3fcaae44a6aec454b019898dee4f2b6964c",
+  "test": "integration_connect_browser_start_callback_status_and_replay_are_sanitized",
+  "failed_receipt": "connect-browser-01.json",
+  "observed": "same-origin overwrote required no-referrer on callback redirect; main security source unchanged from HEAD at failing run"
+}

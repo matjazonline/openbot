@@ -54,6 +54,10 @@ fn write(
     let auth = match draft.auth_type.as_str() {
         "none" => McpAuth::None,
         "bearer" => McpAuth::Bearer,
+        "integration" => current
+            .filter(|c| matches!(c.auth, McpAuth::Integration(_)))
+            .map(|c| c.auth.clone())
+            .ok_or_else(|| AppError::BadRequest("Confirm a Vault binding with its owner".into()))?,
         _ => {
             return Err(AppError::BadRequest(
                 "Unsupported MCP authentication".into(),
