@@ -94,7 +94,7 @@ pub(in crate::adapters::persistence::workflow) async fn park(
     Ok(Some(WaitId::new(wait)))
 }
 
-pub(super) async fn approvers(
+pub(in crate::adapters::persistence::workflow) async fn approvers(
     db: &mut PgConnection,
     scope: ActivationRequest,
     users: &[Uuid],
@@ -114,12 +114,18 @@ pub(super) async fn approvers(
     Ok(Some(reviewers))
 }
 
-fn proposal(invocation: Uuid, action: &FrozenAction) -> Value {
+pub(in crate::adapters::persistence::workflow) fn proposal(
+    invocation: Uuid,
+    action: &FrozenAction,
+) -> Value {
     json!({"invocation":invocation,"operation":action.operation_key(),"target":action.request().target,
         "arguments":action.request().arguments,"argument_digest":action.argument_digest().as_str(),"operation_digest":action.operation_digest().as_str()})
 }
 
-pub(super) async fn close_attempt(db: &mut PgConnection, fence: WorkflowFence) -> AppResult<()> {
+pub(in crate::adapters::persistence::workflow) async fn close_attempt(
+    db: &mut PgConnection,
+    fence: WorkflowFence,
+) -> AppResult<()> {
     let scope = fence.scope;
     let closed = sqlx::query("UPDATE task_attempts SET status='completed',stop_reason='approval_parked',finished_at=clock_timestamp() WHERE task_id=$1 AND attempt_number=$2 AND worker_id=$3 AND execution_generation=$4 AND status='processing'")
         .bind(scope.job.0).bind(fence.attempt.0).bind(fence.worker.0).bind(fence.generation.0).execute(&mut *db).await?;
@@ -220,7 +226,7 @@ pub(in crate::adapters::persistence::workflow) async fn confirm(
         .bind(fence.scope.company.as_uuid()).bind(fence.scope.run.as_uuid()).bind(fence.scope.execution.as_uuid()).bind(fence.scope.job.0).bind(fence.attempt.0).bind(fence.worker.0).bind(fence.generation.0).bind(wait.as_uuid()).fetch_one(persistence.pool()).await?)
 }
 
-pub(super) async fn audit(
+pub(in crate::adapters::persistence::workflow) async fn audit(
     db: &mut PgConnection,
     scope: ActivationRequest,
     decision: DecisionId,

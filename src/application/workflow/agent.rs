@@ -68,7 +68,9 @@ pub struct PreparedTool {
 impl PreparedTool {
     pub fn message_kind(&self) -> Option<MessageKind> {
         match &self.target {
-            AgentToolTarget::Message { name } => MessageKind::parse(name.as_str()),
+            AgentToolTarget::Message { name } => {
+                MessageKind::parse(name.as_str()).filter(|kind| *kind != MessageKind::Ask)
+            }
             _ => None,
         }
     }
@@ -280,7 +282,10 @@ fn prepared_tool(
     let snapshot = agent_action_snapshot(selection.company_id(), tool)?;
     let consistent = match (&target, &tool.binding.source) {
         (AgentToolTarget::Message { name }, AgentBindingSource::Builtin { tool }) => {
-            MessageKind::parse(tool.name()).is_some() && name == &snapshot.contract.name
+            matches!(
+                MessageKind::parse(tool.name()),
+                Some(MessageKind::Send | MessageKind::Reply)
+            ) && name == &snapshot.contract.name
         }
         (AgentToolTarget::Provisioning { name }, AgentBindingSource::Builtin { tool }) => {
             super::provisioning::ProvisioningKind::parse(tool.name()).is_some()

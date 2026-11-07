@@ -1,0 +1,11 @@
+{
+  "checks": [
+    "final-sqlx-check-01.json",
+    "final-clippy-01.json",
+    "final-feature-tests-01.json",
+    "final-fmt-01.json",
+    "final-diff-01.json",
+    "final-graft-01.json"
+  ],
+  "full_suite": false
+}

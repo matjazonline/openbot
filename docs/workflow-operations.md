@@ -73,8 +73,8 @@ control commands use the revision just read and a stable `command_key`. Re-read 
 | Expired wait | Allow deadline maintenance to settle it. Human, timer/event, child, message receipt and reconciliation waits have durable deadline/recovery paths. Inspect persistent overdue gauges and worker logs; do not extend deadlines by hand. Budget waits retain the run deadline. |
 
 Worker capacity is `WORKFLOW_WORKER_SLOTS` (1–16, default 2) per process. Startup requires
-`DATABASE_MAX_CONNECTIONS >= 9 + 2 × WORKFLOW_WORKER_SLOTS` (default pool 20): nine connections
-cover shared workers/listener/headroom including the metrics sampler, two per workflow slot cover
+`DATABASE_MAX_CONNECTIONS >= 12 + 2 × WORKFLOW_WORKER_SLOTS` (default pool 20): twelve connections
+cover shared workers/listener/headroom including the final-reply publisher and metrics sampler; two per workflow slot cover
 work and renewal. Tenant admission limits and fair polling are additional controls; increasing
 slots does not remove them. Mixed-load tests exercise full tenants, unsupported work, poison,
 waiting and hung work, quiet tenants and sustained refill. Inspect queue age before increasing

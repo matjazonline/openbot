@@ -1,0 +1,67 @@
+{
+  "digest": "eec077d537f975767e3d1d0deed360b88a76b40730a910c85caad126bc6fc4a7",
+  "coordination_revision": 2,
+  "checks": {
+    "author-contract-tests-01": {
+      "exit_code": 0,
+      "seconds": 0.717,
+      "receipt": "author-contract-tests-01.json",
+      "log": "author-contract-tests-01.log"
+    },
+    "author-binding-tests-01": {
+      "exit_code": 0,
+      "seconds": 8.678,
+      "receipt": "author-binding-tests-01.json",
+      "log": "author-binding-tests-01.log"
+    },
+    "author-fresh-migrate-04": {
+      "exit_code": 0,
+      "seconds": 0.867,
+      "receipt": "author-fresh-migrate-04.json",
+      "log": "author-fresh-migrate-04.log"
+    },
+    "author-fresh-test-migrate-04": {
+      "exit_code": 0,
+      "seconds": 0.869,
+      "receipt": "author-fresh-test-migrate-04.json",
+      "log": "author-fresh-test-migrate-04.log"
+    },
+    "author-sqlx-prepare-01": {
+      "exit_code": 0,
+      "seconds": 74.981,
+      "receipt": "author-sqlx-prepare-01.json",
+      "log": "author-sqlx-prepare-01.log"
+    },
+    "author-sqlx-check-01": {
+      "exit_code": 0,
+      "seconds": 70.457,
+      "receipt": "author-sqlx-check-01.json",
+      "log": "author-sqlx-check-01.log"
+    },
+    "author-clippy-offline-01": {
+      "exit_code": 0,
+      "seconds": 80.391,
+      "receipt": "author-clippy-offline-01.json",
+      "log": "author-clippy-offline-01.log"
+    },
+    "author-fmt-final-01": {
+      "exit_code": 0,
+      "seconds": 2.338,
+      "receipt": "author-fmt-final-01.json",
+      "log": "author-fmt-final-01.log"
+    },
+    "author-diff-final-01": {
+      "exit_code": 0,
+      "seconds": 0.027,
+      "receipt": "author-diff-final-01.json",
+      "log": "author-diff-final-01.log"
+    }
+  },
+  "primary_selected": 82,
+  "primary_pass": 80,
+  "primary_confirmed_inherited_failures": 2,
+  "baseline_both_reproduced": true,
+  "full_suite_run": false,
+  "offline_compile": "covered by current all-target Clippy with SQLX_OFFLINE=true and --locked --offline",
+  "source_changes_during_review": false
+}

@@ -10,6 +10,8 @@ use std::sync::{Arc, Mutex};
 use chrono::Utc;
 
 use super::*;
+#[path = "delivery_worker_lifecycle_tests.rs"]
+mod lifecycle;
 use crate::{
     entities::{
         correlation::CorrelationId,

@@ -11,6 +11,7 @@ struct CompletionRun {
 }
 #[derive(sqlx::FromRow)]
 struct CompletionExecution {
+    response_disposition: String,
     completed_at: Option<chrono::DateTime<chrono::Utc>>,
     committed_output: Option<Value>,
     committed_route: Option<String>,
@@ -31,7 +32,8 @@ impl WorkflowCompletion for PostgresPersistence {
                 let mut conn = bound.acquire(&self.pool).await?;
                 let mut tx = bound.begin(&mut conn).await?;
                 // Box at the activation/restore boundary to preserve stock-stack tests.
-                let saved = Box::pin(complete_on(&mut tx, result)).await;
+                let saved =
+                    Box::pin(complete_on(&mut tx, result, self.channel_reply_notices())).await;
                 bound.end(tx, saved.map(End::Commit)).await
             }))
             .await;
@@ -53,9 +55,14 @@ impl WorkflowCompletion for PostgresPersistence {
                         };
                         let evidence = async {
                             Ok(match completed(&mut tx, fence).await? {
-                                Settled::Completed => {
-                                    Evidence::Applied(Box::pin(complete_on(&mut tx, retry)).await?)
-                                }
+                                Settled::Completed => Evidence::Applied(
+                                    Box::pin(complete_on(
+                                        &mut tx,
+                                        retry,
+                                        self.channel_reply_notices(),
+                                    ))
+                                    .await?,
+                                ),
                                 Settled::Retired => Evidence::Applied(None),
                                 Settled::Owned => Evidence::NotApplied,
                             })
@@ -72,9 +79,11 @@ impl WorkflowCompletion for PostgresPersistence {
 pub(super) async fn complete_on(
     db: &mut PgConnection,
     result: FencedWorkflowResult,
+    notices: Option<&crate::application::workflow::decisions::DecisionNotices>,
 ) -> AppResult<Option<CommittedWorkflowStep>> {
     // The caller's transaction already carries the server lock/statement bound.
     let scope = result.fence.scope;
+    channel_reply_completion::prelock_on(db, scope).await?;
     let run = sqlx::query_as::<_, CompletionRun>(
         "SELECT binding_id,max_steps FROM workflow_runs WHERE company_id=$1 AND id=$2 FOR UPDATE",
     )
@@ -85,7 +94,7 @@ pub(super) async fn complete_on(
     let Some(run) = run else {
         return Ok(None);
     };
-    let row = sqlx::query_as::<_, CompletionExecution>("SELECT completed_at,committed_output,committed_route,route_target,successor_execution_id FROM workflow_executions WHERE company_id=$1 AND run_id=$2 AND id=$3 FOR UPDATE")
+    let row = sqlx::query_as::<_, CompletionExecution>("SELECT response_disposition,completed_at,committed_output,committed_route,route_target,successor_execution_id FROM workflow_executions WHERE company_id=$1 AND run_id=$2 AND id=$3 FOR UPDATE")
         .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(scope.execution.as_uuid()).fetch_optional(&mut *db).await?;
     let Some(row) = row else {
         return Ok(None);
@@ -135,15 +144,27 @@ pub(super) async fn complete_on(
         &completion,
         run.max_steps,
         completion_job::CompletionOwner::Fenced(result.fence),
+        notices,
     )
     .await?;
-    Ok(Some(CommittedWorkflowStep {
+    let batch_commit::CompletionProgress::Advanced(successor) = successor else {
+        return Ok(None);
+    };
+    Ok(Some(committed(completion, successor)))
+}
+
+fn committed(
+    completion: crate::application::workflow::batch::PureCompletion,
+    successor: Option<ActivationRequest>,
+) -> CommittedWorkflowStep {
+    CommittedWorkflowStep {
         disposition: CommitDisposition::Committed,
+        response_disposition: completion.response_disposition,
         output: completion.output,
         route: completion.route,
         target: completion.target,
         successor,
-    }))
+    }
 }
 
 async fn progression_allowed(db: &mut PgConnection, fence: WorkflowFence) -> AppResult<bool> {
@@ -278,6 +299,7 @@ async fn replay(
     };
     Ok(Some(CommittedWorkflowStep {
         disposition: CommitDisposition::Replayed,
+        response_disposition: row.response_disposition.parse().map_err(|_| invalid())?,
         output: result.output,
         route,
         target,

@@ -80,6 +80,9 @@ fn notes(name: &str) -> &'static str {
         "data.map" => {
             "Pure typed construction, no scripts; output is value itself and follows output_schema."
         }
+        "channel.no_reply" => {
+            "Finish this run successfully without an automatic channel reply. Return the explicit value unchanged, validated against output_schema and the workflow output schema. Success must route to $end. Earlier explicit messages remain published; children cannot suppress their parent's reply."
+        }
         "http.request" => {
             "Declared http slot, relative path (2048 characters), at most 64 headers. HTTP verbs never establish replay safety. Shared action receipts/reconciliation required."
         }
@@ -88,6 +91,9 @@ fn notes(name: &str) -> &'static str {
         }
         "message.send" | "message.reply" => {
             "Canonical content up to 16384 characters, at most 20 scoped destinations. Accepted means provider acceptance/local commit, never read receipt. Replies require an explicit source message."
+        }
+        "message.ask" => {
+            "Publish a question and register its human wait atomically. source_message selects the authorized thread and its author as the sole respondent. Declare the standard message payload_schema and an absolute deadline, capped by the run deadline. The output is the human reply; transport acceptance alone never completes the step. Workflow step only; formal approvals use decision.human."
         }
         "workflow.call" => {
             "Runs the pinned child version with explicit with.input and static with.params (literals or /params). The child gets only those, the parent's same-named resources, its deadline and root budget; never its history. Output is the child's output; child failure or cancellation takes the error route."

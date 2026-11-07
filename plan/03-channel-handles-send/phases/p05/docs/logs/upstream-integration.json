@@ -1,0 +1,18 @@
+{
+  "previous_head": "769a23aa6ef423e964f8221a8ee6b0743325c6ba",
+  "head": "f6e133058c69e28c173850657b134b83ac7c6224",
+  "method": "fast-forward origin/main; stash only local knowledge_e2e_support.rs then apply cleanly",
+  "commits": [
+    "f6e133058c69e28c173850657b134b83ac7c6224 Fix verification fixtures for published agent revisions",
+    "12277c5a12220c27b515728cd51f8ec224d09ea6 Plan workflow evaluations and version comparisons"
+  ],
+  "temporary_stash": "9dba897b70749c9450574a98bb233c1c8c625353",
+  "external_deletion_preserved": "plan/local_machine_tunnel_plan.md",
+  "affected_checks": [
+    "actual all-target offline compilation/SQLx/clippy",
+    "workflow_action_",
+    "workflow_agent_message_tool_",
+    "knowledge_e2e_"
+  ],
+  "reason": "User authorizes main push after p05 acceptance; integrate incoming before new R2 digest/review."
+}

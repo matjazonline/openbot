@@ -1,0 +1,10 @@
+{
+  "distinct_selected": 526,
+  "distinct_passed": 525,
+  "ignored": [
+    "adapters::http::routes::ui_agents::authoring::browser_fixtures::dump_autonomous_agent_authoring_browser_fixtures"
+  ],
+  "failed": [],
+  "scope_receipts": "affected-summary-01.json",
+  "full_suite": false
+}

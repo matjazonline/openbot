@@ -184,6 +184,21 @@ BEGIN
                                     AND action.execution_id = wait.execution_id AND action.wait_id = wait.id
                                 WHERE wait.company_id = execution.company_id AND wait.execution_id = execution.id
                                     AND wait.reason = 'effect' AND wait.state = 'waiting'))
+                        OR (attempt.stop_reason='question_parked' AND execution.completed_at IS NULL
+                            AND execution.committed_route IS NULL AND run.state='waiting' AND run.waiting_reason='event'
+                            AND OLD.continuation_count < workflow_job_continuation_limit()
+                            AND EXISTS (SELECT 1 FROM workflow_channel_questions AS question
+                                JOIN workflow_waits AS wait ON wait.company_id=question.company_id AND wait.id=question.wait_id
+                                JOIN workflow_message_actions AS action ON action.company_id=question.company_id
+                                    AND action.invocation_id=question.invocation_id AND action.wait_id=question.wait_id
+                                JOIN workflow_action_dispatches AS marker ON marker.company_id=action.company_id
+                                    AND marker.invocation_id=action.invocation_id AND marker.id=action.dispatch_id
+                                WHERE question.company_id=execution.company_id AND question.run_id=execution.run_id
+                                    AND question.execution_id=execution.id AND action.origin='step'
+                                    AND marker.job_id=NEW.id AND marker.attempt_number=OLD.attempt_ordinal
+                                    AND marker.worker_id=OLD.worker_id AND marker.execution_generation=OLD.execution_generation
+                                    AND wait.reason='event' AND wait.event_name='channel.question.reply'
+                                    AND wait.state='waiting' AND wait.deadline>clock_timestamp()))
                         OR (attempt.stop_reason='approval_parked' AND execution.completed_at IS NULL
                             AND execution.committed_route IS NULL AND run.state='waiting' AND run.waiting_reason='decision'
                             AND OLD.continuation_count < workflow_job_continuation_limit()
@@ -191,7 +206,12 @@ BEGIN
                                 JOIN workflow_waits AS wait ON wait.company_id=decision.company_id AND wait.id=decision.wait_id
                                 WHERE decision.company_id=execution.company_id AND decision.execution_id=execution.id
                                     AND decision.subject_kind IN ('action_approval','token_allowance') AND decision.submitted_at IS NULL
-                                    AND decision.job_id=OLD.id AND decision.parked_attempt_number=OLD.attempt_ordinal
+                                    AND decision.job_id=OLD.id AND (decision.parked_attempt_number=OLD.attempt_ordinal
+                                        OR EXISTS(SELECT 1 FROM public.channel_reply_proposals AS proposal
+                                            WHERE proposal.company_id=decision.company_id AND proposal.id=decision.reply_proposal_id
+                                                AND proposal.approval_decision_id=decision.id AND proposal.owner_kind='fenced'
+                                                AND proposal.owner_attempt=OLD.attempt_ordinal AND proposal.owner_worker=OLD.worker_id
+                                                AND proposal.owner_generation=OLD.execution_generation AND proposal.owner_expiry=OLD.lock_expires_at))
                                     AND wait.reason='decision' AND wait.state='waiting'))
                         -- A workflow tool call parks its agent job on the call's child (07-D2 §D2.5).
                         OR (attempt.stop_reason='child_parked' AND execution.completed_at IS NULL
@@ -247,6 +267,19 @@ BEGIN
                     AND decision.job_id=OLD.id AND decision.parked_attempt_number=OLD.attempt_ordinal
                     AND decision.submitted_xact=pg_current_xact_id()
                     AND wait.reason='decision' AND wait.state='completed'
+            ) OR EXISTS (
+                -- Final approval reopens the saved completion under its real staging witness.
+                SELECT 1 FROM public.channel_reply_proposals AS proposal
+                JOIN public.workflow_decisions AS decision ON decision.company_id=proposal.company_id
+                    AND decision.id=proposal.approval_decision_id AND decision.reply_proposal_id=proposal.id
+                JOIN public.workflow_waits AS wait ON wait.company_id=decision.company_id AND wait.id=decision.wait_id
+                JOIN public.workflow_runs AS run ON run.company_id=proposal.company_id AND run.id=proposal.run_id
+                JOIN public.workflow_executions AS execution ON execution.company_id=proposal.company_id AND execution.id=proposal.execution_id
+                WHERE proposal.company_id=OLD.company_id AND proposal.job_id=OLD.id
+                    AND proposal.execution_id=OLD.workflow_execution_id AND proposal.continuation_count=OLD.continuation_count
+                    AND execution.completed_at IS NULL AND run.state='running' AND run.deadline>clock_timestamp()
+                    AND decision.choice='approve' AND decision.submitted_xact=pg_current_xact_id()
+                    AND wait.state='completed' AND wait.reason='decision'
             ) OR EXISTS (
                 -- A workflow tool call continues its parked agent job once the call's child is
                 -- terminal and its wait completed (07-D2 §D2.4).
@@ -1234,8 +1267,8 @@ BEGIN
             USING ERRCODE = '23514', CONSTRAINT = 'workflow_guard:workflow_activation_immutable';
     END IF;
     IF OLD.completed_at IS NOT NULL AND
-       (NEW.completed_at, NEW.committed_output) IS DISTINCT FROM
-       (OLD.completed_at, OLD.committed_output) THEN
+       (NEW.completed_at, NEW.committed_output, NEW.response_disposition) IS DISTINCT FROM
+       (OLD.completed_at, OLD.committed_output, OLD.response_disposition) THEN
         RAISE EXCEPTION 'workflow committed output is immutable'
             USING ERRCODE = '23514', CONSTRAINT = 'workflow_guard:workflow_output_immutable';
     END IF;
@@ -2255,6 +2288,28 @@ BEGIN
         has_delivery:=EXISTS(SELECT 1 FROM workflow_message_destinations AS target
             WHERE target.company_id=NEW.company_id AND target.invocation_id=NEW.invocation_id
                 AND target.delivery_id IS NOT NULL);
+        IF EXISTS(SELECT 1 FROM workflow_action_intents AS intent
+            WHERE intent.company_id=NEW.company_id AND intent.id=NEW.invocation_id AND intent.operation_key='message.ask') THEN
+            IF action.fence_expires_at<=clock_timestamp() OR action.origin<>'step'
+                OR NOT EXISTS (
+                    SELECT 1 FROM workflow_channel_questions AS question
+                    JOIN workflow_runs AS run ON run.company_id=question.company_id AND run.id=question.run_id
+                    JOIN workflow_waits AS wait ON wait.company_id=question.company_id AND wait.id=question.wait_id
+                    JOIN background_tasks AS job ON job.company_id=run.company_id AND job.id=NEW.job_id
+                    JOIN task_attempts AS attempt ON attempt.task_id=job.id AND attempt.attempt_number=NEW.attempt_number
+                    WHERE question.company_id=NEW.company_id AND question.run_id=NEW.run_id
+                        AND question.execution_id=NEW.execution_id AND question.invocation_id=NEW.invocation_id
+                        AND question.wait_id=action.wait_id AND run.state='waiting' AND run.waiting_reason='event'
+                        AND run.deadline>clock_timestamp() AND wait.reason='event' AND wait.state='waiting'
+                        AND wait.event_name='channel.question.reply' AND wait.deadline>clock_timestamp()
+                        AND job.status='completed' AND attempt.status='completed' AND attempt.stop_reason='question_parked'
+                        AND attempt.worker_id=NEW.worker_id AND attempt.execution_generation=NEW.execution_generation)
+            THEN RAISE EXCEPTION 'workflow question park lost its fence' USING ERRCODE='23514', CONSTRAINT='workflow_guard:workflow_question_commit_guard'; END IF;
+            IF NOT has_delivery AND NOT EXISTS(SELECT 1 FROM workflow_action_receipts AS receipt
+                WHERE receipt.company_id=NEW.company_id AND receipt.invocation_id=NEW.invocation_id AND receipt.dispatch_id=NEW.id)
+            THEN RAISE EXCEPTION 'in-app question requires atomic transport receipt' USING ERRCODE='23514', CONSTRAINT='workflow_guard:workflow_question_commit_guard'; END IF;
+            RETURN NEW;
+        END IF;
         IF action.wait_id IS NOT NULL THEN
             IF NOT has_delivery OR action.fence_expires_at<=clock_timestamp()
                 OR NOT EXISTS (
@@ -3085,6 +3140,11 @@ CREATE FUNCTION public.workflow_message_destination_in_app_guard() RETURNS trigg
     LANGUAGE plpgsql
     AS $$
 BEGIN
+    PERFORM id FROM public.messages WHERE company_id=NEW.company_id AND id=NEW.message_id FOR UPDATE;
+    PERFORM id FROM public.message_deliveries WHERE company_id=NEW.company_id AND id=NEW.delivery_id FOR UPDATE;
+    IF EXISTS(SELECT 1 FROM public.channel_reply_decisions WHERE company_id=NEW.company_id AND state='published'
+        AND (message_id=NEW.message_id OR delivery_id=NEW.delivery_id))
+    THEN RAISE EXCEPTION 'message publication origins must be disjoint' USING ERRCODE='23514'; END IF;
     -- A member destination is emailed unless its run publishes in-app only (p08 D1.7).
     IF NEW.kind='user' AND NEW.delivery_id IS NULL AND NOT EXISTS(
         SELECT 1 FROM workflow_runs AS run
@@ -3152,14 +3212,16 @@ END $$;
 CREATE FUNCTION public.workflow_message_delivery_transition_guard() RETURNS trigger
     LANGUAGE plpgsql
     AS $$
-DECLARE evidence workflow_action_evidence%ROWTYPE; reopen workflow_message_delivery_reopens%ROWTYPE;
+DECLARE evidence workflow_action_evidence%ROWTYPE; reopen workflow_message_delivery_reopens%ROWTYPE; origin text;
 BEGIN
-    IF NOT EXISTS(SELECT 1 FROM workflow_message_destinations AS target
-        WHERE target.company_id=NEW.company_id AND target.delivery_id=NEW.id) THEN RETURN NEW; END IF;
+    origin:=public.workflow_delivery_origin(NEW.company_id,NEW.id);
+    IF origin IS NULL THEN RETURN NEW; END IF;
+    IF origin='conflict' THEN RAISE EXCEPTION 'delivery has conflicting publication origins' USING ERRCODE='23514'; END IF;
     IF OLD.status IN ('delivered', 'dead_letter') THEN
         RAISE EXCEPTION 'workflow message delivery outcome is final' USING ERRCODE='23514', CONSTRAINT='workflow_guard:workflow_message_delivery_transition_guard';
     END IF;
     IF OLD.status<>'outcome_unknown' THEN RETURN NEW; END IF;
+    IF origin='channel_final' THEN RAISE EXCEPTION 'final delivery unknown requires a final proof owner' USING ERRCODE='23514'; END IF;
     IF NEW.status IN ('delivered', 'dead_letter') THEN
         SELECT * INTO evidence FROM workflow_action_evidence
             WHERE company_id=NEW.company_id AND id=NEW.settled_evidence_id AND delivery_id=NEW.id;
@@ -3256,15 +3318,17 @@ END $$;
 CREATE FUNCTION public.workflow_message_part_transition_guard() RETURNS trigger
     LANGUAGE plpgsql
     AS $$
-DECLARE parent message_deliveries%ROWTYPE; reopen workflow_message_delivery_reopens%ROWTYPE;
+DECLARE parent message_deliveries%ROWTYPE; reopen workflow_message_delivery_reopens%ROWTYPE; origin text;
 BEGIN
-    IF NOT EXISTS(SELECT 1 FROM workflow_message_destinations AS target
-        WHERE target.company_id=NEW.company_id AND target.delivery_id=NEW.delivery_id) THEN RETURN NEW; END IF;
+    origin:=public.workflow_delivery_origin(NEW.company_id,NEW.delivery_id);
+    IF origin IS NULL THEN RETURN NEW; END IF;
+    IF origin='conflict' THEN RAISE EXCEPTION 'delivery has conflicting publication origins' USING ERRCODE='23514'; END IF;
     SELECT * INTO parent FROM message_deliveries WHERE id=NEW.delivery_id;
     IF OLD.status IN ('delivered', 'dead') THEN
         RAISE EXCEPTION 'workflow message part outcome is final' USING ERRCODE='23514', CONSTRAINT='workflow_guard:workflow_message_part_transition_guard';
     END IF;
     IF OLD.status='outcome_unknown' THEN
+        IF origin='channel_final' THEN RAISE EXCEPTION 'final part unknown requires a final proof owner' USING ERRCODE='23514'; END IF;
         IF (NEW.status='delivered' AND parent.settled_evidence_id IS NOT NULL AND parent.status='delivered')
             OR (NEW.status='dead' AND parent.settled_evidence_id IS NOT NULL AND parent.status='dead_letter')
             OR (NEW.status='retryable' AND parent.reopen_id IS NOT NULL AND parent.status='retryable')
@@ -3310,6 +3374,8 @@ CREATE FUNCTION public.workflow_message_reopen_guard() RETURNS trigger
     AS $$
 DECLARE evidence workflow_action_evidence%ROWTYPE;
 BEGIN
+    IF public.workflow_delivery_origin(NEW.company_id,NEW.delivery_id) IS DISTINCT FROM 'explicit'
+    THEN RAISE EXCEPTION 'delivery reopen requires its explicit action owner' USING ERRCODE='23514'; END IF;
     PERFORM id FROM workflow_runs WHERE company_id=NEW.company_id AND id=NEW.run_id FOR UPDATE;
     SELECT * INTO evidence FROM workflow_action_evidence WHERE company_id=NEW.company_id AND id=NEW.evidence_id;
     IF NOT FOUND OR evidence.disposition<>'final_not_applied' OR NOT evidence.grant_eligible
@@ -3844,7 +3910,7 @@ CREATE TABLE public.message_deliveries (
     reopen_id uuid,
     CONSTRAINT message_deliveries_attempt_check CHECK (((attempt_count >= 0) AND (max_attempts > 0) AND (attempt_count <= max_attempts))),
     CONSTRAINT message_deliveries_attribution_check CHECK ((((channel_id IS NOT NULL) AND (message_id IS NOT NULL) AND (source_binding_id IS NOT NULL) AND (destination_binding_id IS NOT NULL)) OR ((channel_id IS NULL) AND (message_id IS NULL) AND (source_binding_id IS NULL) AND (destination_binding_id IS NULL) AND (depends_on_delivery_id IS NULL) AND (external_destination IS NOT NULL) AND (purpose = 'notification'::text)))),
-    CONSTRAINT message_deliveries_cancellation_check CHECK ((((cancellation_requested_at IS NULL) = (cancellation_reason IS NULL)) AND ((cancellation_reason IS NULL) OR (cancellation_reason = ANY (ARRAY['workflow_cancelled'::text, 'workflow_expired'::text, 'workflow_revoked'::text, 'recipient_revoked'::text, 'evidence_conflict'::text]))) AND ((cancellation_requested_at IS NULL) OR (status <> ALL (ARRAY['pending'::text, 'retryable'::text]))))),
+    CONSTRAINT message_deliveries_cancellation_check CHECK ((((cancellation_requested_at IS NULL) = (cancellation_reason IS NULL)) AND ((cancellation_reason IS NULL) OR (cancellation_reason = ANY (ARRAY['workflow_cancelled'::text, 'workflow_expired'::text, 'workflow_revoked'::text, 'recipient_revoked'::text, 'evidence_conflict'::text, 'question_closed'::text]))) AND ((cancellation_requested_at IS NULL) OR (status <> ALL (ARRAY['pending'::text, 'retryable'::text]))))),
     CONSTRAINT message_deliveries_delivered_at_check CHECK (((status = 'delivered'::text) = (delivered_at IS NOT NULL))),
     CONSTRAINT message_deliveries_error_check CHECK (
         (last_error_class IS NULL OR public.valid_delivery_failure_class(last_error_class))
@@ -4213,7 +4279,7 @@ CREATE TABLE public.task_attempts (
     CONSTRAINT task_attempts_finished_check CHECK ((status = 'processing') = (finished_at IS NULL)),
     CONSTRAINT task_attempts_stop_reason_check CHECK (CASE status
         WHEN 'processing' THEN stop_reason IS NULL
-        WHEN 'completed' THEN stop_reason IS NOT NULL AND stop_reason IN ('completed','effect_parked','approval_parked','child_parked')
+        WHEN 'completed' THEN stop_reason IS NOT NULL AND stop_reason IN ('completed','effect_parked','question_parked','approval_parked','child_parked')
         WHEN 'failed' THEN stop_reason IS NULL OR stop_reason IN ('timed_out','lease_lost')
         ELSE false END),
     CONSTRAINT workflow_attempt_failure_shape CHECK ((((workflow_failure_class IS NULL) AND (workflow_failure_code IS NULL) AND (workflow_retry_safety IS NULL) AND (workflow_retirement IS NULL)) OR ((status = 'failed'::text) AND (finished_at IS NOT NULL) AND (workflow_failure_class IS NOT NULL) AND (workflow_failure_class = ANY (ARRAY['retryable'::text, 'terminal'::text])) AND (workflow_failure_code IS NOT NULL) AND ((octet_length(workflow_failure_code) >= 1) AND (octet_length(workflow_failure_code) <= 128)) AND (workflow_retry_safety IS NOT NULL) AND (workflow_retry_safety = ANY (ARRAY['safe'::text, 'unknown'::text])) AND (workflow_retirement IS NOT NULL) AND (workflow_retirement = ANY (ARRAY['live'::text, 'expired'::text, 'deadline'::text, 'cancel'::text, 'guard'::text])))))
@@ -5149,10 +5215,13 @@ CREATE TABLE public.workflow_executions (
     frozen_inputs jsonb,
     completed_at timestamp with time zone,
     committed_output jsonb,
+    response_disposition text DEFAULT 'automatic'::text NOT NULL,
     frozen_choice text,
     committed_route text,
     route_target text,
     successor_execution_id uuid,
+    CONSTRAINT workflow_response_disposition CHECK (response_disposition IN ('automatic', 'suppressed')),
+    CONSTRAINT workflow_suppressed_terminal CHECK (response_disposition <> 'suppressed' OR (completed_at IS NOT NULL AND committed_route IS NOT NULL AND committed_route = 'success' AND route_target IS NOT NULL AND route_target = '$end')),
     CONSTRAINT workflow_choice_shape CHECK (((frozen_choice IS NULL) OR ((activated_at IS NOT NULL) AND ((octet_length(frozen_choice) >= 1) AND (octet_length(frozen_choice) <= 128))))),
     CONSTRAINT workflow_execution_activation_shape CHECK ((((activated_at IS NULL) AND (frozen_inputs IS NULL)) OR ((activated_at IS NOT NULL) AND (frozen_inputs IS NOT NULL) AND (jsonb_typeof(frozen_inputs) = 'object'::text) AND (octet_length((frozen_inputs)::text) <= 1048576)))),
     CONSTRAINT workflow_execution_output_shape CHECK ((((completed_at IS NULL) AND (committed_output IS NULL)) OR ((completed_at IS NOT NULL) AND (committed_output IS NOT NULL) AND (activated_at IS NOT NULL) AND (completed_at >= activated_at) AND (octet_length((committed_output)::text) <= 1048576)))),
@@ -8807,7 +8876,7 @@ CREATE TRIGGER workflow_execution_revision AFTER INSERT OR UPDATE ON public.work
 -- Name: workflow_executions workflow_executions_preserve_facts; Type: TRIGGER; Schema: public; Owner: -
 --
 
-CREATE TRIGGER workflow_executions_preserve_facts BEFORE UPDATE OF activated_at, frozen_inputs, completed_at, committed_output ON public.workflow_executions FOR EACH ROW EXECUTE FUNCTION public.preserve_workflow_execution_facts();
+CREATE TRIGGER workflow_executions_preserve_facts BEFORE UPDATE OF activated_at, frozen_inputs, completed_at, committed_output, response_disposition ON public.workflow_executions FOR EACH ROW EXECUTE FUNCTION public.preserve_workflow_execution_facts();
 
 
 --
@@ -12489,3 +12558,963 @@ ALTER TABLE public.workflow_action_intents
     ADD CONSTRAINT workflow_action_origin_binding_fk FOREIGN KEY(company_id,agent_revision_id,agent_binding_id)
         REFERENCES public.agent_revision_bindings(company_id,revision_id,binding_id)
         DEFERRABLE INITIALLY DEFERRED;
+
+-- Channel response ownership (CHS-P01-D1/r2). Settings affect future ingress;
+-- passive ingress snapshots confer no authority until their designated run is admitted.
+CREATE FUNCTION public.valid_channel_reply_approval(policy jsonb) RETURNS boolean
+LANGUAGE plpgsql IMMUTABLE AS $$
+DECLARE reviewer jsonb; identifier uuid; seen uuid[] := '{}';
+BEGIN
+    IF policy IS NULL THEN RETURN true; END IF;
+    IF jsonb_typeof(policy)<>'object' OR octet_length(policy::text)>4096
+    THEN RETURN false; END IF;
+    IF (SELECT count(*) FROM jsonb_object_keys(policy))<>2
+        OR jsonb_typeof(policy->'reviewers') IS DISTINCT FROM 'array'
+        OR jsonb_typeof(policy->'review_timeout_seconds') IS DISTINCT FROM 'number'
+        OR (policy->>'review_timeout_seconds') !~ '^[0-9]{1,5}$'
+    THEN RETURN false; END IF;
+    IF (policy->>'review_timeout_seconds')::integer NOT BETWEEN 1 AND 86400
+        OR jsonb_array_length(policy->'reviewers') NOT BETWEEN 1 AND 16
+    THEN RETURN false; END IF;
+    FOR reviewer IN SELECT value FROM jsonb_array_elements(policy->'reviewers') LOOP
+        IF jsonb_typeof(reviewer)<>'object' THEN RETURN false; END IF;
+        IF (SELECT count(*) FROM jsonb_object_keys(reviewer))<>2
+            OR reviewer->>'kind' IS DISTINCT FROM 'user'
+            OR jsonb_typeof(reviewer->'id') IS DISTINCT FROM 'string'
+            OR (reviewer->>'id') !~ '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
+        THEN RETURN false; END IF;
+        identifier := (reviewer->>'id')::uuid;
+        IF identifier='00000000-0000-0000-0000-000000000000'::uuid OR identifier=ANY(seen)
+        THEN RETURN false; END IF;
+        seen := array_append(seen,identifier);
+    END LOOP;
+    RETURN true;
+END $$;
+
+CREATE TABLE public.channel_reply_settings (
+    company_id uuid NOT NULL REFERENCES public.companies(id) ON DELETE CASCADE,
+    channel_id uuid NOT NULL,
+    revision bigint NOT NULL CHECK (revision > 0),
+    binding_id uuid,
+    binding_revision bigint,
+    contract jsonb,
+    approval_policy jsonb CHECK (public.valid_channel_reply_approval(approval_policy)),
+    PRIMARY KEY (company_id, channel_id),
+    FOREIGN KEY (company_id, channel_id) REFERENCES public.channels(company_id,id) ON DELETE CASCADE,
+    FOREIGN KEY (company_id, channel_id, binding_id)
+        REFERENCES public.workflow_bindings(company_id,channel_id,id) DEFERRABLE INITIALLY DEFERRED,
+    FOREIGN KEY (company_id,binding_id,binding_revision)
+        REFERENCES public.workflow_binding_revisions(company_id,binding_id,revision) DEFERRABLE INITIALLY DEFERRED,
+    CHECK (num_nonnulls(binding_id,binding_revision,contract) IN (0,3)),
+    CHECK (contract IS NULL OR (jsonb_typeof(contract)='object' AND octet_length(contract::text)<=16384
+        AND (contract->'format_version'='1'::jsonb) IS TRUE))
+);
+
+CREATE TABLE public.channel_reply_contexts (
+    company_id uuid NOT NULL REFERENCES public.companies(id) ON DELETE CASCADE,
+    intent_id uuid NOT NULL,
+    message_id uuid NOT NULL,
+    channel_id uuid NOT NULL,
+    thread_id uuid NOT NULL,
+    responder_principal_id uuid,
+    actor_id uuid NOT NULL REFERENCES public.users(id),
+    delivery_policy text NOT NULL CHECK (delivery_policy IN ('deliver','in_app_only')),
+    binding_id uuid NOT NULL,
+    binding_revision bigint NOT NULL,
+    settings_revision bigint NOT NULL CHECK (settings_revision>0),
+    approval_policy jsonb CHECK (public.valid_channel_reply_approval(approval_policy)),
+    contract jsonb NOT NULL CHECK (jsonb_typeof(contract)='object' AND octet_length(contract::text)<=16384
+        AND (contract->'format_version'='1'::jsonb) IS TRUE),
+    source jsonb NOT NULL CHECK (jsonb_typeof(source)='object' AND octet_length(source::text)<=16384),
+    PRIMARY KEY (company_id,intent_id),
+    UNIQUE (company_id,intent_id,binding_id,binding_revision),
+    FOREIGN KEY (company_id,intent_id) REFERENCES public.workflow_message_intents(company_id,id)
+        ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED,
+    FOREIGN KEY (company_id,channel_id,thread_id,message_id)
+        REFERENCES public.thread_messages(company_id,channel_id,thread_id,message_id) DEFERRABLE INITIALLY DEFERRED,
+    FOREIGN KEY (company_id,responder_principal_id) REFERENCES public.principals(company_id,id)
+        DEFERRABLE INITIALLY DEFERRED,
+    FOREIGN KEY (company_id,binding_id,binding_revision)
+        REFERENCES public.workflow_binding_revisions(company_id,binding_id,revision) DEFERRABLE INITIALLY DEFERRED
+);
+
+CREATE TABLE public.channel_reply_runs (
+    company_id uuid NOT NULL REFERENCES public.companies(id) ON DELETE CASCADE,
+    intent_id uuid NOT NULL,
+    run_id uuid NOT NULL,
+    binding_id uuid NOT NULL,
+    binding_revision bigint NOT NULL,
+    PRIMARY KEY (company_id,intent_id),
+    UNIQUE (company_id,run_id),
+    FOREIGN KEY (company_id,intent_id,binding_id,binding_revision)
+        REFERENCES public.channel_reply_contexts(company_id,intent_id,binding_id,binding_revision)
+        DEFERRABLE INITIALLY DEFERRED,
+    FOREIGN KEY (company_id,run_id,binding_id) REFERENCES public.workflow_runs(company_id,id,binding_id)
+        ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED,
+    FOREIGN KEY (company_id,intent_id,binding_id)
+        REFERENCES public.workflow_message_intent_bindings(company_id,intent_id,binding_id)
+        DEFERRABLE INITIALLY DEFERRED
+);
+
+CREATE FUNCTION public.guard_channel_reply_settings() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF TG_OP='DELETE' THEN
+        IF EXISTS (SELECT 1 FROM public.channels WHERE company_id=OLD.company_id AND id=OLD.channel_id)
+            AND EXISTS (SELECT 1 FROM public.companies WHERE id=OLD.company_id)
+        THEN
+            RAISE EXCEPTION 'clear the responder without deleting its revision' USING ERRCODE='23514';
+        END IF;
+        RETURN OLD;
+    END IF;
+    IF TG_OP='UPDATE' AND ((NEW.company_id,NEW.channel_id) IS DISTINCT FROM (OLD.company_id,OLD.channel_id)
+        OR NEW.revision<>OLD.revision+1) THEN
+        RAISE EXCEPTION 'invalid channel response settings revision' USING ERRCODE='23514';
+    END IF;
+    IF NEW.binding_id IS NOT NULL AND NOT EXISTS (
+        SELECT 1 FROM public.workflow_bindings AS binding
+        JOIN public.workflow_binding_revisions AS configuration ON configuration.company_id=binding.company_id
+            AND configuration.binding_id=binding.id AND configuration.revision=NEW.binding_revision
+        WHERE binding.company_id=NEW.company_id AND binding.id=NEW.binding_id
+            AND binding.channel_id=NEW.channel_id AND binding.thread_id IS NULL AND binding.active
+            AND binding.configuration_revision=NEW.binding_revision AND configuration.message_trigger IS NOT NULL
+    ) THEN
+        RAISE EXCEPTION 'invalid channel responder selection' USING ERRCODE='23514';
+    END IF;
+    RETURN NEW;
+END $$;
+CREATE TRIGGER channel_reply_settings_revision BEFORE INSERT OR UPDATE OR DELETE ON public.channel_reply_settings
+    FOR EACH ROW EXECUTE FUNCTION public.guard_channel_reply_settings();
+
+CREATE FUNCTION public.channel_reply_source(intent public.workflow_message_intents) RETURNS jsonb
+LANGUAGE sql IMMUTABLE STRICT AS $$
+    SELECT to_jsonb(intent) - ARRAY['state','attempts','available_at','worker_id','claim_generation',
+        'lease_expires_at','outcome','matched_run_id','updated_at','reply_settled']
+$$;
+
+CREATE FUNCTION public.capture_channel_reply_context() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    -- Lock the channel even when no selection exists. Settings use the same row
+    -- after company authorization, so an absent selection cannot race insertion.
+    PERFORM 1 FROM public.channels AS channel
+        WHERE channel.company_id=NEW.company_id AND channel.id=NEW.channel_id FOR SHARE;
+    IF NEW.admissible THEN
+        INSERT INTO public.channel_reply_contexts
+            (company_id,intent_id,message_id,channel_id,thread_id,responder_principal_id,
+             actor_id,delivery_policy,binding_id,binding_revision,settings_revision,contract,approval_policy,source)
+        SELECT NEW.company_id,NEW.id,NEW.message_id,NEW.channel_id,NEW.thread_id,NEW.responder_principal_id,
+            configuration.run_as_user_id,NEW.delivery_policy,settings.binding_id,settings.binding_revision,
+            settings.revision,settings.contract,settings.approval_policy,public.channel_reply_source(NEW)
+        FROM public.channel_reply_settings AS settings
+        JOIN public.workflow_bindings AS binding ON binding.company_id=settings.company_id
+            AND binding.id=settings.binding_id AND binding.channel_id=settings.channel_id
+        JOIN public.workflow_binding_revisions AS configuration ON configuration.company_id=settings.company_id
+            AND configuration.binding_id=settings.binding_id AND configuration.revision=settings.binding_revision
+        WHERE settings.company_id=NEW.company_id AND settings.channel_id=NEW.channel_id
+            AND binding.thread_id IS NULL AND configuration.message_trigger IS NOT NULL;
+    END IF;
+    RETURN NEW;
+END $$;
+CREATE TRIGGER channel_reply_ingress_snapshot AFTER INSERT ON public.workflow_message_intents
+    FOR EACH ROW EXECUTE FUNCTION public.capture_channel_reply_context();
+
+CREATE FUNCTION public.guard_channel_reply_context() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF TG_OP='DELETE' THEN
+        IF EXISTS (SELECT 1 FROM public.workflow_message_intents
+            WHERE company_id=OLD.company_id AND id=OLD.intent_id)
+            AND EXISTS (SELECT 1 FROM public.companies WHERE id=OLD.company_id)
+        THEN
+            RAISE EXCEPTION 'retain the response snapshot with its source' USING ERRCODE='23514';
+        END IF;
+        RETURN OLD;
+    END IF;
+    IF TG_OP='UPDATE' THEN
+        IF NEW IS DISTINCT FROM OLD THEN
+            RAISE EXCEPTION 'channel response snapshot is immutable' USING ERRCODE='23514';
+        END IF;
+        RETURN NEW;
+    END IF;
+    IF NOT EXISTS (
+        SELECT 1 FROM public.workflow_message_intents AS intent
+        JOIN public.channel_reply_settings AS settings ON settings.company_id=intent.company_id
+            AND settings.channel_id=intent.channel_id
+        JOIN public.workflow_binding_revisions AS configuration ON configuration.company_id=settings.company_id
+            AND configuration.binding_id=settings.binding_id AND configuration.revision=settings.binding_revision
+        WHERE intent.company_id=NEW.company_id AND intent.id=NEW.intent_id AND intent.admissible
+            AND (intent.message_id,intent.channel_id,intent.thread_id,intent.delivery_policy)
+                =(NEW.message_id,NEW.channel_id,NEW.thread_id,NEW.delivery_policy)
+            AND intent.responder_principal_id IS NOT DISTINCT FROM NEW.responder_principal_id
+            AND configuration.run_as_user_id=NEW.actor_id
+            AND (settings.binding_id,settings.binding_revision,settings.revision,settings.contract)
+                =(NEW.binding_id,NEW.binding_revision,NEW.settings_revision,NEW.contract)
+            AND settings.approval_policy IS NOT DISTINCT FROM NEW.approval_policy
+            AND public.channel_reply_source(intent)=NEW.source
+    ) THEN
+        RAISE EXCEPTION 'invalid channel response snapshot' USING ERRCODE='23514';
+    END IF;
+    RETURN NEW;
+END $$;
+CREATE TRIGGER channel_reply_context_immutable BEFORE INSERT OR UPDATE OR DELETE ON public.channel_reply_contexts
+    FOR EACH ROW EXECUTE FUNCTION public.guard_channel_reply_context();
+
+CREATE FUNCTION public.guard_channel_reply_intent() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF public.channel_reply_source(NEW) IS DISTINCT FROM public.channel_reply_source(OLD)
+        AND EXISTS (SELECT 1 FROM public.channel_reply_contexts AS context
+            WHERE context.company_id=OLD.company_id AND context.intent_id=OLD.id)
+        AND EXISTS (SELECT 1 FROM public.companies WHERE id=OLD.company_id)
+    THEN
+        RAISE EXCEPTION 'channel response ingress facts are immutable' USING ERRCODE='23514';
+    END IF;
+    RETURN NEW;
+END $$;
+CREATE TRIGGER channel_reply_intent_immutable BEFORE UPDATE ON public.workflow_message_intents
+    FOR EACH ROW EXECUTE FUNCTION public.guard_channel_reply_intent();
+
+CREATE FUNCTION public.guard_channel_reply_run() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF TG_OP='DELETE' THEN
+        IF EXISTS (SELECT 1 FROM public.workflow_runs WHERE company_id=OLD.company_id AND id=OLD.run_id)
+            AND EXISTS (SELECT 1 FROM public.companies WHERE id=OLD.company_id)
+        THEN
+            RAISE EXCEPTION 'retain response ownership with its run' USING ERRCODE='23514';
+        END IF;
+        RETURN OLD;
+    END IF;
+    IF TG_OP='UPDATE' THEN
+        IF NEW IS DISTINCT FROM OLD THEN
+            RAISE EXCEPTION 'channel response run ownership is immutable' USING ERRCODE='23514';
+        END IF;
+        RETURN NEW;
+    END IF;
+    IF NOT EXISTS (
+        SELECT 1 FROM public.channel_reply_contexts AS context
+        JOIN public.workflow_runs AS run ON run.company_id=context.company_id AND run.id=NEW.run_id
+        JOIN public.workflow_message_intent_bindings AS outcome ON outcome.company_id=context.company_id
+            AND outcome.intent_id=context.intent_id AND outcome.binding_id=context.binding_id
+        JOIN public.workflow_message_intents AS intent ON intent.company_id=context.company_id AND intent.id=context.intent_id
+        JOIN public.workflow_admissions AS admission ON admission.company_id=run.company_id
+            AND admission.run_id=run.id AND admission.binding_id=run.binding_id
+        WHERE context.company_id=NEW.company_id AND context.intent_id=NEW.intent_id
+            AND (context.binding_id,context.binding_revision)=(NEW.binding_id,NEW.binding_revision)
+            AND (run.binding_id,run.binding_revision,run.channel_id,run.thread_id,run.trigger_id,run.actor_id,run.delivery_policy)
+                =(context.binding_id,context.binding_revision,context.channel_id,context.thread_id,
+                  context.intent_id,context.actor_id,context.delivery_policy)
+            AND run.parent_run_id IS NULL AND run.rerun_of_run_id IS NULL
+            AND intent.outcome IS DISTINCT FROM 'matched' AND intent.admissible
+            AND outcome.outcome='admitted' AND outcome.run_id=run.id
+            AND substring(admission.source_key FROM 4)::jsonb=jsonb_build_array('message',context.message_id)
+    ) THEN
+        RAISE EXCEPTION 'invalid channel response run ownership' USING ERRCODE='23514';
+    END IF;
+    RETURN NEW;
+END $$;
+CREATE TRIGGER channel_reply_run_immutable BEFORE INSERT OR UPDATE OR DELETE ON public.channel_reply_runs
+    FOR EACH ROW EXECUTE FUNCTION public.guard_channel_reply_run();
+
+-- A proposal reserves one message invocation before approval. It does not declare success.
+CREATE TABLE public.channel_reply_proposals (
+    company_id uuid NOT NULL REFERENCES public.companies(id) ON DELETE CASCADE,
+    run_id uuid NOT NULL,
+    execution_id uuid NOT NULL,
+    id uuid NOT NULL,
+    intent_id uuid NOT NULL,
+    invocation_id uuid NOT NULL,
+    argument_digest text NOT NULL,
+    operation_digest text NOT NULL,
+    integrity text NOT NULL CHECK (integrity ~ '^[0-9a-f]{64}$'),
+    integrity_document jsonb NOT NULL CHECK (jsonb_typeof(integrity_document)='object' AND octet_length(integrity_document::text)<=1200000),
+    business_output jsonb NOT NULL CHECK (octet_length(business_output::text)<=1048576),
+    completion_route text NOT NULL CHECK (completion_route='success' OR completion_route LIKE 'choice:%'),
+    content jsonb NOT NULL CHECK (jsonb_typeof(content)='object' AND octet_length(content::text)<=65536),
+    route_snapshot jsonb NOT NULL CHECK (jsonb_typeof(route_snapshot)='object' AND octet_length(route_snapshot::text)<=16384
+        AND jsonb_typeof(route_snapshot->'targets')='array' AND jsonb_array_length(route_snapshot->'targets')=1
+        AND (route_snapshot->'targets'->0->>'kind') IN ('reply_email','reply_internal')),
+    recipients jsonb NOT NULL CHECK (jsonb_typeof(recipients)='array' AND jsonb_array_length(recipients) BETWEEN 1 AND 20
+        AND octet_length(recipients::text)<=16384),
+    approval_policy jsonb CHECK (public.valid_channel_reply_approval(approval_policy)),
+    approval_deadline timestamptz,
+    approval_decision_id uuid,
+    job_id uuid NOT NULL,
+    owner_kind text NOT NULL CHECK (owner_kind IN ('pure','fenced','wait')),
+    owner_attempt integer,
+    owner_worker uuid,
+    owner_generation uuid,
+    owner_expiry timestamptz,
+    source_wait_id uuid,
+    continuation_count integer NOT NULL CHECK (continuation_count>=0),
+    created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
+    PRIMARY KEY (company_id,id),
+    UNIQUE (company_id,run_id,execution_id),
+    UNIQUE (company_id,run_id,execution_id,id,integrity),
+    UNIQUE (company_id,run_id,execution_id,id,invocation_id,argument_digest,operation_digest),
+    UNIQUE (company_id,invocation_id),
+    CHECK ((owner_kind='pure' AND num_nonnulls(owner_attempt,owner_worker,owner_generation,owner_expiry,source_wait_id)=0)
+        OR (owner_kind='fenced' AND num_nonnulls(owner_attempt,owner_worker,owner_generation,owner_expiry)=4
+            AND owner_attempt>0 AND source_wait_id IS NULL)
+        OR (owner_kind='wait' AND source_wait_id IS NOT NULL
+            AND num_nonnulls(owner_attempt,owner_worker,owner_generation,owner_expiry)=0)),
+    CHECK ((approval_policy IS NULL AND num_nonnulls(approval_deadline,approval_decision_id)=0)
+        OR (approval_policy IS NOT NULL AND num_nonnulls(approval_deadline,approval_decision_id)=2
+            AND approval_deadline>created_at
+            AND approval_deadline<=created_at+make_interval(secs=>(approval_policy->>'review_timeout_seconds')::integer))),
+    CHECK (integrity=encode(sha256(convert_to(integrity_document::text,'UTF8')),'hex')),
+    CHECK ((integrity_document->'output'=business_output
+        AND integrity_document->'content'=content AND integrity_document->'recipients'=recipients
+        AND integrity_document->'route_snapshot'=route_snapshot
+        AND integrity_document->'approval_policy'=COALESCE(approval_policy,'null'::jsonb)
+        AND integrity_document->>'run'=run_id::text AND integrity_document->>'execution'=execution_id::text
+        AND integrity_document->>'proposal'=id::text AND integrity_document->>'intent'=intent_id::text) IS TRUE),
+    CHECK ((integrity_document->>'approval_deadline')::timestamptz IS NOT DISTINCT FROM approval_deadline),
+    FOREIGN KEY (company_id,run_id) REFERENCES public.channel_reply_runs(company_id,run_id) ON DELETE CASCADE,
+    FOREIGN KEY (company_id,intent_id) REFERENCES public.channel_reply_contexts(company_id,intent_id),
+    FOREIGN KEY (company_id,run_id,execution_id) REFERENCES public.workflow_executions(company_id,run_id,id) ON DELETE CASCADE,
+    FOREIGN KEY (company_id,execution_id,job_id) REFERENCES public.background_tasks(company_id,workflow_execution_id,id) DEFERRABLE INITIALLY DEFERRED,
+    FOREIGN KEY (job_id,owner_attempt) REFERENCES public.task_attempts(task_id,attempt_number) DEFERRABLE INITIALLY DEFERRED,
+    FOREIGN KEY (company_id,run_id,execution_id,source_wait_id) REFERENCES public.workflow_waits(company_id,run_id,execution_id,id) DEFERRABLE INITIALLY DEFERRED,
+    FOREIGN KEY (company_id,run_id,execution_id,invocation_id,argument_digest,operation_digest)
+        REFERENCES public.workflow_action_intents(company_id,run_id,execution_id,id,argument_digest,operation_digest)
+        DEFERRABLE INITIALLY DEFERRED,
+    FOREIGN KEY (company_id,run_id,execution_id,approval_decision_id)
+        REFERENCES public.workflow_decisions(company_id,run_id,execution_id,id) DEFERRABLE INITIALLY DEFERRED
+);
+
+ALTER TABLE public.workflow_action_intents
+    ADD COLUMN reply_proposal_id uuid,
+    ADD COLUMN reply_integrity text,
+    DROP CONSTRAINT workflow_action_origin_shape,
+    DROP CONSTRAINT workflow_action_origin_content,
+    ADD CONSTRAINT workflow_action_origin_shape CHECK (
+        (origin_kind='workflow' AND num_nonnulls(agent_manifest_id,agent_id,agent_revision_id,agent_binding_id,reply_proposal_id,reply_integrity)=0)
+        OR (origin_kind='agent' AND num_nonnulls(agent_manifest_id,agent_id,agent_revision_id,agent_binding_id)=4
+            AND num_nonnulls(reply_proposal_id,reply_integrity)=0)
+        OR (origin_kind='channel_final' AND num_nonnulls(agent_manifest_id,agent_id,agent_revision_id,agent_binding_id)=0
+            AND num_nonnulls(reply_proposal_id,reply_integrity)=2 AND reply_integrity ~ '^[0-9a-f]{64}$'
+            AND operation_key='message.reply')),
+    ADD CONSTRAINT workflow_action_origin_content CHECK ((operation->'context'->'origin'=CASE origin_kind
+        WHEN 'workflow' THEN jsonb_build_object('kind','workflow')
+        WHEN 'agent' THEN jsonb_build_object('kind','agent','manifest',agent_manifest_id,
+            'agent',agent_id,'revision',agent_revision_id,'binding',agent_binding_id)
+        WHEN 'channel_final' THEN jsonb_build_object('kind','channel_final','proposal',reply_proposal_id,'integrity',reply_integrity)
+        END) IS TRUE),
+    ADD CONSTRAINT workflow_action_final_proposal_fk FOREIGN KEY (company_id,run_id,execution_id,reply_proposal_id,reply_integrity)
+        REFERENCES public.channel_reply_proposals(company_id,run_id,execution_id,id,integrity) DEFERRABLE INITIALLY DEFERRED;
+
+ALTER TABLE public.workflow_decisions
+    ADD COLUMN reply_proposal_id uuid,
+    DROP CONSTRAINT workflow_decisions_subject_kind_check,
+    ADD CONSTRAINT workflow_decisions_subject_kind_check CHECK (
+        (subject_kind IN ('business','action_approval')
+            AND num_nonnulls(checkpoint_id,checkpoint_revision,token_request_id,token_stage,token_proposal)=0
+            AND ((subject_kind='business' AND num_nonnulls(job_id,parked_attempt_number,action_invocation_id,argument_digest,operation_digest,reply_proposal_id)=0)
+                OR (subject_kind='action_approval' AND num_nonnulls(job_id,action_invocation_id,argument_digest,operation_digest)=4
+                    AND ((reply_proposal_id IS NULL AND parked_attempt_number IS NOT NULL AND parked_attempt_number>0)
+                        OR (reply_proposal_id IS NOT NULL AND parked_attempt_number IS NULL)))))
+        OR (subject_kind='token_allowance' AND reply_proposal_id IS NULL
+            AND num_nonnulls(checkpoint_id,checkpoint_revision,token_request_id,token_stage,token_proposal,job_id,parked_attempt_number)=7
+            AND num_nonnulls(action_invocation_id,argument_digest,operation_digest)=0
+            AND checkpoint_revision>=0 AND parked_attempt_number>0 AND token_stage IN ('reservation','settlement')
+            AND jsonb_typeof(token_proposal)='object' AND octet_length(token_proposal::text)<=8192)),
+    ADD CONSTRAINT workflow_decision_final_proposal_fk
+        FOREIGN KEY (company_id,run_id,execution_id,reply_proposal_id,action_invocation_id,argument_digest,operation_digest)
+        REFERENCES public.channel_reply_proposals(company_id,run_id,execution_id,id,invocation_id,argument_digest,operation_digest)
+        DEFERRABLE INITIALLY DEFERRED;
+
+-- Business success owns a separate canonical-publication queue, never transport state.
+CREATE TABLE public.channel_reply_decisions (
+    company_id uuid NOT NULL REFERENCES public.companies(id) ON DELETE CASCADE,
+    run_id uuid NOT NULL,
+    execution_id uuid NOT NULL,
+    intent_id uuid NOT NULL,
+    disposition text NOT NULL CHECK (disposition IN ('automatic','suppressed')),
+    proposal_id uuid,
+    integrity text,
+    state text NOT NULL CHECK (state IN ('suppressed','pending','claimed','published','failed')),
+    attempts integer NOT NULL DEFAULT 0 CHECK (attempts BETWEEN 0 AND 8),
+    available_at timestamptz NOT NULL DEFAULT clock_timestamp(),
+    last_claimed_at timestamptz,
+    generation uuid,
+    worker_id uuid,
+    lease_expires_at timestamptz,
+    message_id uuid,
+    delivery_id uuid,
+    diagnostic_code text CHECK (diagnostic_code IN ('attempts_exhausted','authority_revoked','policy_changed',
+        'source_unavailable','release_denied','invalid_proposal','publication_failed')),
+    created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
+    updated_at timestamptz NOT NULL DEFAULT clock_timestamp(),
+    PRIMARY KEY (company_id,run_id),
+    UNIQUE (company_id,intent_id),
+    UNIQUE (company_id,message_id),
+    UNIQUE (company_id,delivery_id),
+    CHECK ((disposition='suppressed' AND state='suppressed' AND num_nonnulls(proposal_id,integrity,message_id,delivery_id,diagnostic_code)=0 AND attempts=0)
+        OR (disposition='automatic' AND state<>'suppressed' AND num_nonnulls(proposal_id,integrity)=2)),
+    CHECK ((state='claimed' AND num_nonnulls(generation,worker_id,lease_expires_at)=3 AND attempts>0)
+        OR (state<>'claimed' AND num_nonnulls(generation,worker_id,lease_expires_at)=0)),
+    CHECK ((state='published')=(message_id IS NOT NULL)),
+    CHECK ((state='failed')=(diagnostic_code IS NOT NULL)),
+    CHECK (delivery_id IS NULL OR state='published'),
+    FOREIGN KEY (company_id,run_id) REFERENCES public.channel_reply_runs(company_id,run_id) ON DELETE CASCADE,
+    FOREIGN KEY (company_id,intent_id) REFERENCES public.channel_reply_contexts(company_id,intent_id),
+    FOREIGN KEY (company_id,run_id,execution_id) REFERENCES public.workflow_executions(company_id,run_id,id) ON DELETE CASCADE,
+    FOREIGN KEY (company_id,run_id,execution_id,proposal_id,integrity)
+        REFERENCES public.channel_reply_proposals(company_id,run_id,execution_id,id,integrity),
+    FOREIGN KEY (company_id,message_id) REFERENCES public.messages(company_id,id) DEFERRABLE INITIALLY DEFERRED,
+    FOREIGN KEY (company_id,delivery_id) REFERENCES public.message_deliveries(company_id,id) DEFERRABLE INITIALLY DEFERRED
+);
+CREATE INDEX channel_reply_publication_due ON public.channel_reply_decisions(available_at,company_id,run_id)
+    WHERE state IN ('pending','claimed');
+CREATE INDEX channel_reply_company_turn ON public.channel_reply_decisions(company_id,last_claimed_at DESC)
+    WHERE last_claimed_at IS NOT NULL;
+
+CREATE FUNCTION public.workflow_message_slots(tenant uuid, execution uuid) RETURNS bigint
+LANGUAGE sql STABLE AS $$
+    SELECT count(*) FROM (
+        SELECT invocation_id FROM public.workflow_action_dispatches WHERE company_id=tenant AND execution_id=execution
+        UNION
+        SELECT invocation_id FROM public.channel_reply_proposals WHERE company_id=tenant AND execution_id=execution
+        LIMIT 129
+    ) AS bounded
+$$;
+
+CREATE OR REPLACE FUNCTION public.workflow_message_admission_guard() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    -- Preserve fenced-attempt serialization for ordinary message actions.
+    PERFORM 1 FROM public.task_attempts WHERE task_id=NEW.job_id AND attempt_number=NEW.attempt_number
+        AND execution_generation=NEW.execution_generation AND worker_id=NEW.worker_id FOR UPDATE;
+    IF public.workflow_message_slots(NEW.company_id,NEW.execution_id)>=128
+        AND NOT EXISTS(SELECT 1 FROM public.channel_reply_proposals WHERE company_id=NEW.company_id
+            AND execution_id=NEW.execution_id AND invocation_id=NEW.invocation_id)
+    THEN RAISE EXCEPTION 'workflow message action limit' USING ERRCODE='54000', CONSTRAINT='workflow_guard:workflow_message_admission_guard'; END IF;
+    RETURN NEW;
+END $$;
+
+CREATE FUNCTION public.guard_channel_reply_proposal() RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE job public.background_tasks%ROWTYPE; run public.workflow_runs%ROWTYPE;
+BEGIN
+    IF TG_OP='UPDATE' THEN RAISE EXCEPTION 'channel response proposal is immutable' USING ERRCODE='23514'; END IF;
+    IF TG_OP='DELETE' THEN
+        IF EXISTS(SELECT 1 FROM public.companies WHERE id=OLD.company_id)
+            AND (EXISTS(SELECT 1 FROM public.channel_reply_decisions WHERE company_id=OLD.company_id AND run_id=OLD.run_id AND state IN ('pending','claimed'))
+                OR EXISTS(SELECT 1 FROM public.workflow_decisions AS decision JOIN public.workflow_waits AS wait
+                    ON wait.company_id=decision.company_id AND wait.id=decision.wait_id
+                    WHERE decision.company_id=OLD.company_id AND decision.id=OLD.approval_decision_id AND wait.state='waiting'))
+        THEN RAISE EXCEPTION 'live channel response proposal cannot be removed' USING ERRCODE='23514'; END IF;
+        RETURN OLD;
+    END IF;
+    SELECT * INTO STRICT run FROM public.workflow_runs WHERE company_id=NEW.company_id AND id=NEW.run_id FOR UPDATE;
+    SELECT * INTO STRICT job FROM public.background_tasks WHERE company_id=NEW.company_id AND id=NEW.job_id FOR UPDATE;
+    IF run.state NOT IN ('queued','running') OR run.deadline<=clock_timestamp()
+        OR job.workflow_execution_id<>NEW.execution_id OR job.continuation_count<>NEW.continuation_count
+        OR NOT EXISTS(SELECT 1 FROM public.channel_reply_runs WHERE company_id=NEW.company_id AND run_id=NEW.run_id AND intent_id=NEW.intent_id)
+        OR EXISTS(SELECT 1 FROM public.workflow_executions WHERE company_id=NEW.company_id AND id=NEW.execution_id AND completed_at IS NOT NULL)
+        OR (NEW.approval_deadline IS NOT NULL AND NEW.approval_deadline>run.deadline)
+    THEN RAISE EXCEPTION 'channel response proposal lacks active root ownership' USING ERRCODE='23514'; END IF;
+    IF NEW.owner_kind='pure' AND NOT (job.status='pending' AND job.worker_id IS NULL AND job.execution_generation IS NULL
+        AND job.lock_expires_at IS NULL AND job.run_at<=clock_timestamp() AND job.retry_count<job.max_retries)
+        OR NEW.owner_kind='fenced' AND NOT (job.status='processing' AND job.attempt_ordinal=NEW.owner_attempt
+            AND job.worker_id=NEW.owner_worker AND job.execution_generation=NEW.owner_generation
+            AND job.lock_expires_at=NEW.owner_expiry AND NEW.owner_expiry>clock_timestamp()
+            AND EXISTS(SELECT 1 FROM public.task_attempts WHERE task_id=NEW.job_id AND attempt_number=NEW.owner_attempt
+                AND worker_id=NEW.owner_worker AND execution_generation=NEW.owner_generation AND status='processing'))
+        OR NEW.owner_kind='wait' AND NOT (job.status='completed' AND job.worker_id IS NULL
+            AND EXISTS(SELECT 1 FROM public.workflow_waits WHERE company_id=NEW.company_id AND run_id=NEW.run_id
+                AND execution_id=NEW.execution_id AND id=NEW.source_wait_id AND state='completed'))
+    THEN RAISE EXCEPTION 'channel response proposal lacks its completion owner' USING ERRCODE='23514'; END IF;
+    IF public.workflow_message_slots(NEW.company_id,NEW.execution_id)>=128 THEN
+        RAISE EXCEPTION 'workflow message action limit' USING ERRCODE='54000'; END IF;
+    RETURN NEW;
+END $$;
+CREATE TRIGGER channel_reply_proposal_guard BEFORE INSERT OR UPDATE OR DELETE ON public.channel_reply_proposals
+    FOR EACH ROW EXECUTE FUNCTION public.guard_channel_reply_proposal();
+
+CREATE FUNCTION public.guard_channel_reply_decision() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF TG_OP='DELETE' THEN
+        IF EXISTS(SELECT 1 FROM public.companies WHERE id=OLD.company_id)
+            AND EXISTS(SELECT 1 FROM public.workflow_runs WHERE company_id=OLD.company_id AND id=OLD.run_id) THEN
+            RAISE EXCEPTION 'channel response decision belongs to its retained run' USING ERRCODE='23514'; END IF;
+        RETURN OLD;
+    END IF;
+    IF TG_OP='INSERT' THEN
+        IF NEW.state NOT IN ('pending','suppressed') OR NEW.attempts<>0 OR NEW.last_claimed_at IS NOT NULL THEN
+            RAISE EXCEPTION 'invalid initial channel response decision' USING ERRCODE='23514'; END IF;
+        RETURN NEW;
+    END IF;
+    IF ROW(NEW.company_id,NEW.run_id,NEW.execution_id,NEW.intent_id,NEW.disposition,NEW.proposal_id,NEW.integrity,NEW.created_at)
+        IS DISTINCT FROM ROW(OLD.company_id,OLD.run_id,OLD.execution_id,OLD.intent_id,OLD.disposition,OLD.proposal_id,OLD.integrity,OLD.created_at)
+        OR OLD.state IN ('suppressed','published','failed')
+    THEN RAISE EXCEPTION 'channel response decision is immutable' USING ERRCODE='23514'; END IF;
+    IF NEW.state='claimed' THEN
+        IF (OLD.state='claimed' AND OLD.lease_expires_at>clock_timestamp())
+            OR (OLD.state='pending' AND OLD.available_at>clock_timestamp()) OR NEW.attempts<>OLD.attempts+1
+            OR NEW.lease_expires_at<=clock_timestamp() OR NEW.lease_expires_at>clock_timestamp()+interval '30 seconds'
+            OR NEW.generation IS NOT DISTINCT FROM OLD.generation
+            OR NEW.last_claimed_at IS NULL OR NEW.last_claimed_at<=COALESCE(OLD.last_claimed_at,'-infinity'::timestamptz)
+            OR NEW.last_claimed_at>clock_timestamp()
+        THEN RAISE EXCEPTION 'invalid channel response claim' USING ERRCODE='23514'; END IF;
+    ELSIF NEW.state IN ('pending','published','failed') THEN
+        IF NEW.attempts<>OLD.attempts OR NEW.last_claimed_at IS DISTINCT FROM OLD.last_claimed_at
+            OR (OLD.state<>'claimed' AND NOT (NEW.state='failed' AND OLD.attempts=8))
+            OR (NEW.state<>'failed' AND OLD.lease_expires_at<=clock_timestamp())
+        THEN RAISE EXCEPTION 'invalid channel response settlement' USING ERRCODE='23514'; END IF;
+        IF NEW.state='published' THEN
+            PERFORM id FROM public.messages WHERE company_id=NEW.company_id AND id=NEW.message_id FOR UPDATE;
+            PERFORM id FROM public.message_deliveries WHERE company_id=NEW.company_id AND id=NEW.delivery_id FOR UPDATE;
+            IF NOT public.channel_reply_publication_matches(NEW.company_id,NEW.run_id,NEW.message_id,NEW.delivery_id)
+            THEN RAISE EXCEPTION 'channel publication requires its canonical linkage' USING ERRCODE='23514'; END IF;
+        END IF;
+    ELSE RAISE EXCEPTION 'invalid channel response transition' USING ERRCODE='23514'; END IF;
+    RETURN NEW;
+END $$;
+CREATE TRIGGER channel_reply_decision_guard BEFORE INSERT OR UPDATE OR DELETE ON public.channel_reply_decisions
+    FOR EACH ROW EXECUTE FUNCTION public.guard_channel_reply_decision();
+
+CREATE FUNCTION public.require_channel_reply_decision() RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE tenant uuid; root uuid; run public.workflow_runs%ROWTYPE; decision public.channel_reply_decisions%ROWTYPE;
+BEGIN
+    tenant=NEW.company_id;
+    IF TG_TABLE_NAME='workflow_runs' THEN root=NEW.id; ELSE root=NEW.run_id; END IF;
+    SELECT * INTO run FROM public.workflow_runs WHERE company_id=tenant AND id=root;
+    IF TG_TABLE_NAME='channel_reply_decisions' AND (run.id IS NULL OR run.state<>'succeeded')
+        AND EXISTS(SELECT 1 FROM public.channel_reply_decisions WHERE company_id=tenant AND run_id=root) THEN
+        RAISE EXCEPTION 'channel response publication requires completed success' USING ERRCODE='23514'; END IF;
+    IF run.id IS NULL OR run.state<>'succeeded'
+        OR NOT EXISTS(SELECT 1 FROM public.channel_reply_runs WHERE company_id=tenant AND run_id=root) THEN RETURN NEW; END IF;
+    SELECT * INTO decision FROM public.channel_reply_decisions WHERE company_id=tenant AND run_id=root;
+    IF NOT FOUND OR decision.execution_id IS DISTINCT FROM run.terminal_execution_id
+        OR NOT EXISTS(SELECT 1 FROM public.workflow_executions WHERE company_id=tenant AND run_id=root AND id=decision.execution_id
+            AND completed_at IS NOT NULL AND committed_route<>'final_error' AND route_target='$end' AND response_disposition=decision.disposition)
+        OR NOT EXISTS(SELECT 1 FROM public.channel_reply_runs WHERE company_id=tenant AND run_id=root AND intent_id=decision.intent_id)
+        OR (decision.disposition='automatic' AND NOT EXISTS(
+            SELECT 1 FROM public.channel_reply_proposals AS proposal
+            JOIN public.workflow_executions AS execution ON execution.company_id=proposal.company_id AND execution.id=proposal.execution_id
+            LEFT JOIN public.workflow_decisions AS approval ON approval.company_id=proposal.company_id AND approval.id=proposal.approval_decision_id
+            JOIN public.workflow_action_intents AS action ON action.company_id=proposal.company_id AND action.id=proposal.invocation_id
+            WHERE proposal.company_id=tenant AND proposal.id=decision.proposal_id
+                AND proposal.business_output=execution.committed_output AND action.origin_kind='channel_final'
+                AND action.reply_proposal_id=proposal.id AND action.reply_integrity=proposal.integrity
+                AND (proposal.approval_policy IS NULL OR approval.choice='approve')))
+    THEN RAISE EXCEPTION 'successful channel root requires its exact final response decision' USING ERRCODE='23514'; END IF;
+    RETURN NEW;
+END $$;
+CREATE CONSTRAINT TRIGGER channel_reply_success_decision AFTER INSERT OR UPDATE ON public.workflow_runs
+    DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION public.require_channel_reply_decision();
+CREATE CONSTRAINT TRIGGER channel_reply_success_owner AFTER INSERT ON public.channel_reply_runs
+    DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION public.require_channel_reply_decision();
+CREATE CONSTRAINT TRIGGER channel_reply_success_proof AFTER INSERT ON public.channel_reply_decisions
+    DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION public.require_channel_reply_decision();
+
+CREATE FUNCTION public.require_channel_reply_proposal_links() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM public.channel_reply_proposals WHERE company_id=NEW.company_id AND id=NEW.id) THEN RETURN NEW; END IF;
+    IF NOT EXISTS (
+        SELECT 1 FROM public.workflow_action_intents AS action
+        JOIN public.channel_reply_contexts AS context ON context.company_id=NEW.company_id AND context.intent_id=NEW.intent_id
+        JOIN public.workflow_runs AS run ON run.company_id=NEW.company_id AND run.id=NEW.run_id
+        JOIN public.companies AS company ON company.id=run.company_id
+        LEFT JOIN public.workflow_decisions AS approval ON approval.company_id=NEW.company_id AND approval.id=NEW.approval_decision_id
+        LEFT JOIN public.workflow_waits AS wait ON wait.company_id=approval.company_id AND wait.id=approval.wait_id
+        WHERE action.company_id=NEW.company_id AND action.run_id=NEW.run_id AND action.execution_id=NEW.execution_id
+            AND action.id=NEW.invocation_id AND action.argument_digest=NEW.argument_digest AND action.operation_digest=NEW.operation_digest
+            AND action.origin_kind='channel_final' AND action.reply_proposal_id=NEW.id AND action.reply_integrity=NEW.integrity
+            AND action.operation->'arguments'=jsonb_build_object('source_message',context.message_id,'content',NEW.content)
+            AND action.operation->'context'->>'actor'=context.actor_id::text
+            AND NEW.integrity_document->>'company'=NEW.company_id::text
+            AND NEW.integrity_document->'source'=context.source
+            AND NEW.integrity_document->>'source_message'=context.message_id::text
+            AND NEW.integrity_document->>'actor'=context.actor_id::text
+            AND NEW.integrity_document->>'channel'=context.channel_id::text
+            AND NEW.integrity_document->>'thread'=context.thread_id::text
+            AND NEW.route_snapshot->'targets'->0->>'source'=context.message_id::text
+            AND NEW.route_snapshot->'targets'->0->>'thread'=context.thread_id::text
+            AND NEW.route_snapshot->>'delivery_policy'=context.delivery_policy
+            AND NEW.route_snapshot->>'correlation_id'=run.correlation_id::text
+            AND NEW.route_snapshot->>'company_slug'=company.slug::text
+            AND ((NEW.route_snapshot->'targets'->0->>'kind'='reply_internal'
+                    AND NEW.route_snapshot->'targets'->0->>'channel'=context.channel_id::text)
+                OR (NEW.route_snapshot->'targets'->0->>'kind'='reply_email'
+                    AND NEW.route_snapshot->'targets'->0->'sender'->>'id'=context.channel_id::text
+                    AND EXISTS(SELECT 1 FROM public.channel_slugs AS alias WHERE alias.channel_id=context.channel_id AND alias.is_primary
+                        AND alias.slug::text=NEW.route_snapshot->'targets'->0->'sender'->>'slug')))
+            AND NEW.approval_policy IS NOT DISTINCT FROM context.approval_policy
+            AND ((NEW.approval_policy IS NULL AND action.policy_decision='unevaluated' AND run.state='succeeded'
+                    AND EXISTS(SELECT 1 FROM public.channel_reply_decisions WHERE company_id=NEW.company_id AND run_id=NEW.run_id AND proposal_id=NEW.id))
+                OR (NEW.approval_policy IS NOT NULL AND action.policy_decision='approval_required'
+                    AND approval.subject_kind='action_approval' AND approval.reply_proposal_id=NEW.id
+                    AND approval.job_id=NEW.job_id AND approval.action_invocation_id=NEW.invocation_id
+                    AND wait.execution_id=NEW.execution_id AND wait.deadline=NEW.approval_deadline
+                    AND run.state='waiting' AND run.waiting_reason='decision' AND wait.state='waiting'
+                    AND EXISTS(SELECT 1 FROM public.background_tasks WHERE company_id=NEW.company_id AND id=NEW.job_id AND status='completed')))
+    ) THEN RAISE EXCEPTION 'channel response proposal requires its exact action and approval' USING ERRCODE='23514'; END IF;
+    RETURN NEW;
+END $$;
+CREATE CONSTRAINT TRIGGER channel_reply_proposal_links AFTER INSERT ON public.channel_reply_proposals
+    DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION public.require_channel_reply_proposal_links();
+
+CREATE FUNCTION public.guard_channel_reply_run_retention() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF EXISTS(SELECT 1 FROM public.companies WHERE id=OLD.company_id) AND (
+        EXISTS(SELECT 1 FROM public.channel_reply_decisions AS final
+            LEFT JOIN public.message_deliveries AS delivery ON delivery.company_id=final.company_id AND delivery.id=final.delivery_id
+            WHERE final.company_id=OLD.company_id AND final.run_id=OLD.id AND (final.state IN ('pending','claimed')
+                OR (final.state='published' AND final.delivery_id IS NOT NULL
+                    AND (delivery.id IS NULL OR delivery.status NOT IN ('delivered','dead_letter')))))
+        OR (OLD.state IN ('queued','running','waiting') AND EXISTS(SELECT 1 FROM public.channel_reply_proposals AS proposal
+            JOIN public.workflow_executions AS execution ON execution.company_id=proposal.company_id AND execution.id=proposal.execution_id
+            WHERE proposal.company_id=OLD.company_id AND proposal.run_id=OLD.id AND execution.completed_at IS NULL)))
+    THEN RAISE EXCEPTION 'live final response obligation prevents run retention' USING ERRCODE='23514'; END IF;
+    RETURN OLD;
+END $$;
+CREATE TRIGGER channel_reply_run_retention BEFORE DELETE ON public.workflow_runs
+    FOR EACH ROW EXECUTE FUNCTION public.guard_channel_reply_run_retention();
+
+CREATE FUNCTION public.guard_channel_reply_job_claim() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF EXISTS(SELECT 1 FROM public.channel_reply_proposals WHERE company_id=NEW.company_id AND execution_id=NEW.workflow_execution_id) THEN
+        RAISE EXCEPTION 'saved final completion cannot claim its original handler'
+            USING ERRCODE='23514',CONSTRAINT='workflow_guard:guard_channel_reply_job_claim';
+    END IF;
+    RETURN NEW;
+END $$;
+CREATE TRIGGER channel_reply_job_claim BEFORE UPDATE ON public.background_tasks
+    FOR EACH ROW WHEN (OLD.status='pending' AND NEW.status='processing') EXECUTE FUNCTION public.guard_channel_reply_job_claim();
+
+
+-- Completed final publication has a real owner independent of an active workflow action.
+CREATE FUNCTION public.workflow_delivery_origin(tenant uuid, target uuid) RETURNS text LANGUAGE sql STABLE AS $$
+    SELECT CASE
+        WHEN EXISTS(SELECT 1 FROM public.workflow_message_destinations WHERE company_id=tenant AND delivery_id=target)
+            AND EXISTS(SELECT 1 FROM public.channel_reply_decisions WHERE company_id=tenant AND delivery_id=target AND state='published') THEN 'conflict'
+        WHEN EXISTS(SELECT 1 FROM public.channel_reply_decisions WHERE company_id=tenant AND delivery_id=target AND state='published') THEN 'channel_final'
+        WHEN EXISTS(SELECT 1 FROM public.workflow_message_destinations WHERE company_id=tenant AND delivery_id=target) THEN 'explicit'
+        ELSE NULL END
+$$;
+
+CREATE FUNCTION public.channel_reply_publication_matches(tenant uuid, root uuid, published_message uuid, published_delivery uuid)
+RETURNS boolean LANGUAGE sql STABLE AS $$
+    SELECT EXISTS(
+        SELECT 1 FROM public.channel_reply_decisions AS final
+        JOIN public.channel_reply_proposals AS proposal ON proposal.company_id=final.company_id AND proposal.id=final.proposal_id
+        JOIN public.channel_reply_contexts AS context ON context.company_id=final.company_id AND context.intent_id=final.intent_id
+        JOIN public.workflow_runs AS run ON run.company_id=final.company_id AND run.id=final.run_id
+        JOIN public.messages AS message ON message.company_id=final.company_id AND message.id=published_message
+        JOIN public.thread_messages AS filed ON filed.company_id=message.company_id AND filed.message_id=message.id
+        LEFT JOIN public.message_deliveries AS delivery ON delivery.company_id=final.company_id AND delivery.id=published_delivery
+        WHERE final.company_id=tenant AND final.run_id=root AND final.disposition='automatic'
+            AND run.state='succeeded' AND run.terminal_execution_id=final.execution_id
+            AND message.subject=proposal.content->>'subject' AND message.clean_text_body=proposal.content->>'body'
+            AND message.role='system' AND message.direction='outbound' AND message.correlation_id=run.correlation_id
+            AND message.access_level=run.content_level
+            AND filed.channel_id=context.channel_id AND filed.thread_id=context.thread_id
+            AND filed.entry_kind=CASE WHEN proposal.route_snapshot->'targets'->0->>'kind'='reply_internal' THEN 'note' ELSE 'conversation' END
+            AND NOT EXISTS(SELECT 1 FROM public.workflow_message_destinations AS explicit
+                WHERE explicit.company_id=tenant AND (explicit.message_id=published_message OR explicit.delivery_id=published_delivery))
+            AND NOT EXISTS(SELECT 1 FROM public.message_deliveries AS other_delivery
+                WHERE other_delivery.company_id=tenant AND other_delivery.message_id=published_message
+                    AND other_delivery.id IS DISTINCT FROM published_delivery)
+            AND ((published_delivery IS NULL AND message.audience='internal_only'
+                    AND (proposal.route_snapshot->'targets'->0->>'kind'='reply_internal'
+                        OR (proposal.route_snapshot->'targets'->0->>'kind'='reply_email' AND context.delivery_policy='in_app_only')))
+                OR (published_delivery IS NOT NULL AND proposal.route_snapshot->'targets'->0->>'kind'='reply_email'
+                    AND context.delivery_policy='deliver' AND message.audience='external_conversation'
+                    AND delivery.message_id=message.id AND delivery.channel_id=context.channel_id
+                    AND delivery.correlation_id=run.correlation_id AND delivery.transport='email' AND delivery.purpose='workflow_reply'
+                    AND delivery.external_destination=proposal.route_snapshot->'targets'->0->>'recipient'
+                    AND delivery.status='pending' AND delivery.attempt_count=0
+                    AND EXISTS(SELECT 1 FROM public.message_delivery_parts WHERE company_id=tenant AND delivery_id=published_delivery)
+                    AND NOT EXISTS(SELECT 1 FROM public.message_delivery_parts WHERE company_id=tenant AND delivery_id=published_delivery
+                        AND (status<>'prepared' OR attempt_count<>0 OR request_started_at IS NOT NULL OR provider_message_key IS NOT NULL
+                            OR payload->>'transport'<>'email'))))
+    )
+$$;
+
+CREATE FUNCTION public.require_channel_reply_publication() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM public.companies WHERE id=NEW.company_id) THEN RETURN NEW; END IF;
+    IF OLD.state<>'claimed' OR OLD.lease_expires_at<=clock_timestamp()
+        OR NOT public.channel_reply_publication_matches(NEW.company_id,NEW.run_id,NEW.message_id,NEW.delivery_id)
+    THEN RAISE EXCEPTION 'final publication lost its claim or canonical linkage at commit' USING ERRCODE='23514'; END IF;
+    RETURN NEW;
+END $$;
+CREATE CONSTRAINT TRIGGER channel_reply_publication_commit AFTER UPDATE ON public.channel_reply_decisions
+    DEFERRABLE INITIALLY DEFERRED FOR EACH ROW WHEN (NEW.state='published')
+    EXECUTE FUNCTION public.require_channel_reply_publication();
+
+CREATE FUNCTION public.channel_reply_message_owner(tenant uuid, canonical uuid)
+RETURNS TABLE(run_id uuid, delivery_id uuid) LANGUAGE sql STABLE STRICT AS $$
+    SELECT final.run_id,final.delivery_id FROM public.channel_reply_decisions AS final
+    JOIN public.workflow_runs AS run ON run.company_id=final.company_id AND run.id=final.run_id
+    JOIN public.companies AS company ON company.id=final.company_id
+    WHERE final.company_id=tenant AND final.message_id=canonical AND final.state='published'
+$$;
+
+-- Membership writers serialize with the final publication's FOR UPDATE lock before inspecting ownership.
+-- An uncommitted foreign parent is not a valid membership target; do not wait on its FK after the check.
+CREATE FUNCTION public.lock_message_publication_boundary(original_company uuid, original_message uuid,
+    replacement_company uuid, replacement_message uuid) RETURNS void LANGUAGE plpgsql AS $$
+BEGIN
+    PERFORM message.id FROM public.messages AS message
+        WHERE (message.company_id,message.id) IN
+            ((original_company,original_message),(replacement_company,replacement_message))
+        ORDER BY message.company_id,message.id FOR KEY SHARE;
+    IF replacement_company IS NOT NULL AND replacement_message IS NOT NULL AND NOT EXISTS(SELECT 1 FROM public.messages
+        WHERE company_id=replacement_company AND id=replacement_message)
+    THEN RAISE EXCEPTION 'message membership target is not committed or owned by this transaction' USING ERRCODE='23503'; END IF;
+END $$;
+
+CREATE FUNCTION public.lock_delivery_publication_boundary(original_company uuid, original_delivery uuid,
+    replacement_company uuid, replacement_delivery uuid) RETURNS void LANGUAGE plpgsql AS $$
+BEGIN
+    PERFORM delivery.id FROM public.message_deliveries AS delivery
+        WHERE (delivery.company_id,delivery.id) IN
+            ((original_company,original_delivery),(replacement_company,replacement_delivery))
+        ORDER BY delivery.company_id,delivery.id FOR KEY SHARE;
+    IF replacement_company IS NOT NULL AND replacement_delivery IS NOT NULL AND NOT EXISTS(SELECT 1 FROM public.message_deliveries
+        WHERE company_id=replacement_company AND id=replacement_delivery)
+    THEN RAISE EXCEPTION 'delivery membership target is not committed or owned by this transaction'
+        USING ERRCODE='23503',CONSTRAINT='message_delivery_parts_delivery_fk',TABLE='message_delivery_parts',SCHEMA='public'; END IF;
+END $$;
+
+CREATE FUNCTION public.guard_owned_delivery_intent() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF TG_OP='DELETE' THEN
+        IF public.workflow_delivery_origin(OLD.company_id,OLD.id) IS NOT NULL
+            AND EXISTS(SELECT 1 FROM public.companies WHERE id=OLD.company_id)
+        THEN RAISE EXCEPTION 'owned delivery is retained with its publication owner' USING ERRCODE='23514'; END IF;
+        RETURN OLD;
+    END IF;
+    IF TG_OP='INSERT' THEN
+        PERFORM public.lock_message_publication_boundary(NULL,NULL,NEW.company_id,NEW.message_id);
+    ELSE
+        PERFORM public.lock_message_publication_boundary(OLD.company_id,OLD.message_id,NEW.company_id,NEW.message_id);
+    END IF;
+    IF EXISTS(SELECT 1 FROM public.workflow_channel_message_owner(NEW.company_id,NEW.message_id) AS owner
+        WHERE owner.delivery_id IS DISTINCT FROM NEW.id)
+    THEN RAISE EXCEPTION 'channel canonical message requires its exact delivery receipt' USING ERRCODE='23514'; END IF;
+    IF TG_OP='INSERT' THEN RETURN NEW; END IF;
+    IF public.workflow_delivery_origin(OLD.company_id,OLD.id) IS NOT NULL THEN
+        IF (to_jsonb(NEW)-ARRAY['status','attempt_count','max_attempts','available_at','last_error_class','last_error_detail','execution_id',
+            'owner_worker_id','locked_at','lock_expires_at','delivered_at','updated_at','cancellation_requested_at','cancellation_reason',
+            'settled_evidence_id','reopen_id']) IS DISTINCT FROM
+            (to_jsonb(OLD)-ARRAY['status','attempt_count','max_attempts','available_at','last_error_class','last_error_detail','execution_id',
+            'owner_worker_id','locked_at','lock_expires_at','delivered_at','updated_at','cancellation_requested_at','cancellation_reason',
+            'settled_evidence_id','reopen_id']) OR NEW.attempt_count<OLD.attempt_count OR NEW.max_attempts>OLD.max_attempts
+            OR (OLD.status IN ('delivered','dead_letter') AND (to_jsonb(NEW)-'updated_at') IS DISTINCT FROM (to_jsonb(OLD)-'updated_at'))
+        THEN RAISE EXCEPTION 'owned delivery intent and terminal truth are immutable' USING ERRCODE='23514'; END IF;
+    END IF;
+    RETURN NEW;
+END $$;
+CREATE TRIGGER workflow_owned_delivery_intent BEFORE INSERT OR UPDATE OR DELETE ON public.message_deliveries
+    FOR EACH ROW EXECUTE FUNCTION public.guard_owned_delivery_intent();
+
+CREATE FUNCTION public.guard_owned_delivery_part() RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE owned boolean;
+BEGIN
+    IF TG_OP='INSERT' THEN
+        PERFORM public.lock_delivery_publication_boundary(NULL,NULL,NEW.company_id,NEW.delivery_id);
+        IF public.workflow_delivery_origin(NEW.company_id,NEW.delivery_id) IS NOT NULL THEN
+            RAISE EXCEPTION 'owned delivery parts are frozen before publication' USING ERRCODE='23514'; END IF;
+        RETURN NEW;
+    END IF;
+    IF TG_OP='DELETE' THEN
+        PERFORM public.lock_delivery_publication_boundary(OLD.company_id,OLD.delivery_id,NULL,NULL);
+    ELSE
+        PERFORM public.lock_delivery_publication_boundary(OLD.company_id,OLD.delivery_id,NEW.company_id,NEW.delivery_id);
+    END IF;
+    owned:=public.workflow_delivery_origin(OLD.company_id,OLD.delivery_id) IS NOT NULL;
+    IF TG_OP='DELETE' THEN
+        IF owned AND EXISTS(SELECT 1 FROM public.companies WHERE id=OLD.company_id)
+            AND EXISTS(SELECT 1 FROM public.message_deliveries WHERE company_id=OLD.company_id AND id=OLD.delivery_id)
+        THEN RAISE EXCEPTION 'owned delivery part is retained with its parent' USING ERRCODE='23514'; END IF;
+        RETURN OLD;
+    END IF;
+    owned:=owned OR public.workflow_delivery_origin(NEW.company_id,NEW.delivery_id) IS NOT NULL;
+    IF owned AND ((to_jsonb(NEW)-ARRAY['status','provider_message_key','attempt_count','last_error_class','last_error_detail',
+            'request_started_at','delivered_at','updated_at']) IS DISTINCT FROM
+        (to_jsonb(OLD)-ARRAY['status','provider_message_key','attempt_count','last_error_class','last_error_detail',
+            'request_started_at','delivered_at','updated_at']) OR NEW.attempt_count<OLD.attempt_count
+        OR (OLD.status IN ('delivered','dead') AND (to_jsonb(NEW)-'updated_at') IS DISTINCT FROM (to_jsonb(OLD)-'updated_at')))
+    THEN RAISE EXCEPTION 'owned delivery part payload and terminal truth are immutable' USING ERRCODE='23514'; END IF;
+    RETURN NEW;
+END $$;
+CREATE TRIGGER workflow_owned_delivery_part BEFORE INSERT OR UPDATE OR DELETE ON public.message_delivery_parts
+    FOR EACH ROW EXECUTE FUNCTION public.guard_owned_delivery_part();
+
+CREATE FUNCTION public.guard_channel_reply_message() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF NEW IS DISTINCT FROM OLD AND EXISTS(SELECT 1 FROM public.workflow_channel_message_owner(OLD.company_id,OLD.id))
+    THEN RAISE EXCEPTION 'published channel message content is immutable' USING ERRCODE='23514'; END IF;
+    RETURN NEW;
+END $$;
+CREATE TRIGGER channel_reply_message_immutable BEFORE UPDATE ON public.messages
+    FOR EACH ROW EXECUTE FUNCTION public.guard_channel_reply_message();
+
+CREATE FUNCTION public.guard_channel_reply_message_component() RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE original_company uuid; original_message uuid; replacement_company uuid; replacement_message uuid;
+BEGIN
+    IF TG_OP<>'INSERT' THEN original_company:=OLD.company_id; original_message:=OLD.message_id; END IF;
+    IF TG_OP<>'DELETE' THEN replacement_company:=NEW.company_id; replacement_message:=NEW.message_id; END IF;
+    PERFORM public.lock_message_publication_boundary(original_company,original_message,replacement_company,replacement_message);
+    IF EXISTS(SELECT 1 FROM public.workflow_channel_message_owner(original_company,original_message))
+        OR EXISTS(SELECT 1 FROM public.workflow_channel_message_owner(replacement_company,replacement_message))
+    THEN RAISE EXCEPTION 'published channel message association and metadata are immutable' USING ERRCODE='23514'; END IF;
+    IF TG_OP='DELETE' THEN RETURN OLD; END IF;
+    RETURN NEW;
+END $$;
+CREATE TRIGGER channel_reply_association_immutable BEFORE INSERT OR UPDATE OR DELETE ON public.thread_messages
+    FOR EACH ROW EXECUTE FUNCTION public.guard_channel_reply_message_component();
+CREATE TRIGGER channel_reply_email_metadata_immutable BEFORE INSERT OR UPDATE OR DELETE ON public.email_message_metadata
+    FOR EACH ROW EXECUTE FUNCTION public.guard_channel_reply_message_component();
+CREATE TRIGGER channel_reply_participants_immutable BEFORE INSERT OR UPDATE OR DELETE ON public.message_participants
+    FOR EACH ROW EXECUTE FUNCTION public.guard_channel_reply_message_component();
+
+
+-- A conversational question is an actual explicit message action, not a final publication.
+-- Its normal delivery row is the durable prompt intent; only this real event wait resumes it.
+CREATE TABLE public.workflow_channel_questions (
+    company_id uuid NOT NULL,
+    run_id uuid NOT NULL,
+    execution_id uuid NOT NULL,
+    invocation_id uuid NOT NULL,
+    wait_id uuid NOT NULL,
+    message_id uuid NOT NULL,
+    source_message_id uuid NOT NULL,
+    respondent_id uuid NOT NULL,
+    deadline timestamptz NOT NULL,
+    PRIMARY KEY (company_id, wait_id),
+    UNIQUE (company_id, invocation_id, respondent_id),
+    UNIQUE (company_id, message_id),
+    UNIQUE (company_id, execution_id),
+    FOREIGN KEY (company_id, run_id, execution_id, invocation_id)
+        REFERENCES public.workflow_message_actions(company_id,run_id,execution_id,invocation_id) ON DELETE CASCADE,
+    FOREIGN KEY (company_id, run_id, execution_id, wait_id)
+        REFERENCES public.workflow_waits(company_id,run_id,execution_id,id) ON DELETE CASCADE,
+    FOREIGN KEY (company_id, message_id) REFERENCES public.messages(company_id,id) DEFERRABLE INITIALLY DEFERRED,
+    FOREIGN KEY (company_id, source_message_id) REFERENCES public.messages(company_id,id) DEFERRABLE INITIALLY DEFERRED,
+    FOREIGN KEY (company_id, respondent_id) REFERENCES public.principals(company_id,id) DEFERRABLE INITIALLY DEFERRED
+);
+
+-- Canonical membership protection is shared; final provider admission still uses its
+-- narrower channel_reply_message_owner and cannot mistake a question for a final grant.
+CREATE FUNCTION public.workflow_channel_message_owner(tenant uuid, canonical uuid)
+RETURNS TABLE(run_id uuid, delivery_id uuid) LANGUAGE sql STABLE STRICT AS $$
+    SELECT owner.run_id, owner.delivery_id FROM public.channel_reply_message_owner(tenant,canonical) AS owner
+    UNION ALL
+    SELECT question.run_id, destination.delivery_id FROM public.workflow_channel_questions AS question
+    JOIN public.workflow_runs AS run ON run.company_id=question.company_id AND run.id=question.run_id
+    JOIN public.companies AS company ON company.id=question.company_id
+    JOIN public.workflow_message_destinations AS destination ON destination.company_id=question.company_id
+        AND destination.invocation_id=question.invocation_id AND destination.message_id=question.message_id
+    WHERE question.company_id=tenant AND question.message_id=canonical
+$$;
+
+CREATE FUNCTION public.workflow_question_guard() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF TG_OP='DELETE' THEN
+        IF pg_trigger_depth()>1 AND NOT EXISTS(SELECT 1 FROM public.workflow_runs
+            WHERE company_id=OLD.company_id AND id=OLD.run_id) THEN RETURN OLD; END IF;
+        RAISE EXCEPTION 'question ownership is retained with its run' USING ERRCODE='23514', CONSTRAINT='workflow_guard:workflow_question_guard';
+    END IF;
+    IF TG_OP='UPDATE' THEN
+        RAISE EXCEPTION 'question ownership is immutable' USING ERRCODE='23514', CONSTRAINT='workflow_guard:workflow_question_guard';
+    END IF;
+    IF NOT EXISTS (
+        SELECT 1 FROM public.workflow_message_actions AS action
+        JOIN public.workflow_action_intents AS intent ON intent.company_id=action.company_id AND intent.id=action.invocation_id
+        JOIN public.workflow_executions AS execution ON execution.company_id=action.company_id AND execution.run_id=action.run_id AND execution.id=action.execution_id
+        JOIN public.workflow_runs AS run ON run.company_id=action.company_id AND run.id=action.run_id
+        JOIN public.workflow_message_destinations AS destination ON destination.company_id=action.company_id AND destination.invocation_id=action.invocation_id
+        JOIN public.workflow_waits AS wait ON wait.company_id=action.company_id AND wait.id=action.wait_id
+        JOIN public.messages AS source ON source.company_id=action.company_id AND source.id=NEW.source_message_id
+        JOIN public.messages AS prompt ON prompt.company_id=action.company_id AND prompt.id=NEW.message_id
+        WHERE action.company_id=NEW.company_id AND action.run_id=NEW.run_id AND action.execution_id=NEW.execution_id
+            AND action.invocation_id=NEW.invocation_id AND action.wait_id=NEW.wait_id AND action.origin='step' AND action.destination_count=1
+            AND intent.origin_kind='workflow' AND intent.operation_key='message.ask'
+            AND intent.operation#>>'{contract,contract,name}'='message.ask'
+            AND execution.frozen_inputs-'approval'=intent.operation->'arguments'
+            AND (intent.operation#>>'{arguments,source_message}')::uuid=NEW.source_message_id
+            AND prompt.clean_text_body=intent.operation#>>'{arguments,content,body}'
+            AND destination.kind='reply' AND destination.replied_message_id=NEW.source_message_id AND destination.message_id=NEW.message_id
+            AND source.author_principal_id=NEW.respondent_id
+            AND (SELECT count(*) FROM public.message_deliveries AS delivery
+                WHERE delivery.company_id=NEW.company_id AND delivery.message_id=NEW.message_id)
+                = CASE WHEN destination.delivery_id IS NULL THEN 0 ELSE 1 END
+            AND wait.run_id=NEW.run_id AND wait.execution_id=NEW.execution_id AND wait.reason='event'
+            AND wait.event_name='channel.question.reply' AND wait.correlation=NEW.message_id::text
+            AND wait.deadline=NEW.deadline AND NEW.deadline=LEAST(run.deadline,(intent.operation#>>'{arguments,deadline}')::timestamptz)
+            AND wait.notification_intent=jsonb_build_object('version',1,'wait_id',NEW.wait_id,'message_id',NEW.message_id)
+    ) THEN RAISE EXCEPTION 'question requires its exact declared action, prompt and human wait' USING ERRCODE='23514', CONSTRAINT='workflow_guard:workflow_question_guard'; END IF;
+    RETURN NEW;
+END $$;
+
+CREATE TRIGGER workflow_question_guard BEFORE INSERT OR UPDATE OR DELETE ON public.workflow_channel_questions
+    FOR EACH ROW EXECUTE FUNCTION public.workflow_question_guard();
+
+CREATE FUNCTION public.workflow_question_wait_guard() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM public.workflow_channel_questions AS question
+        WHERE question.company_id=NEW.company_id AND question.run_id=NEW.run_id AND question.execution_id=NEW.execution_id
+            AND question.wait_id=NEW.id AND NEW.reason='event' AND NEW.correlation=question.message_id::text
+            AND NEW.deadline=question.deadline)
+    THEN RAISE EXCEPTION 'private question wait requires its prompt owner' USING ERRCODE='23514', CONSTRAINT='workflow_guard:workflow_question_wait_guard'; END IF;
+    RETURN NULL;
+END $$;
+
+CREATE CONSTRAINT TRIGGER workflow_question_wait_guard AFTER INSERT ON public.workflow_waits
+    DEFERRABLE INITIALLY DEFERRED FOR EACH ROW WHEN (NEW.event_name='channel.question.reply')
+    EXECUTE FUNCTION public.workflow_question_wait_guard();
+
+-- Real producer identity, exact frozen respondent and original deadline; no thread-only match.
+CREATE FUNCTION public.workflow_question_event_guard() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM public.workflow_channel_questions AS question
+        JOIN public.workflow_waits AS wait ON wait.company_id=question.company_id AND wait.id=question.wait_id
+        JOIN public.workflow_runs AS run ON run.company_id=question.company_id AND run.id=question.run_id
+        JOIN public.workflow_message_destinations AS destination ON destination.company_id=question.company_id
+            AND destination.invocation_id=question.invocation_id AND destination.message_id=question.message_id
+        JOIN public.thread_messages AS incoming ON incoming.company_id=question.company_id AND incoming.thread_id=destination.thread_id
+            AND incoming.message_id=(NEW.payload->>'source_message')::uuid
+        JOIN public.messages AS author ON author.company_id=incoming.company_id AND author.id=incoming.message_id
+        WHERE question.company_id=NEW.company_id AND question.run_id=NEW.run_id
+            AND question.message_id::text=NEW.correlation AND author.author_principal_id=question.respondent_id
+            AND wait.state='waiting' AND wait.reason='event' AND wait.event_name=NEW.event_name
+            AND NEW.created_at>=wait.created_at AND NEW.created_at<=wait.deadline
+            AND run.state IN ('queued','running','waiting') AND run.deadline>clock_timestamp()
+    ) THEN RAISE EXCEPTION 'question event requires its authorized live prompt' USING ERRCODE='23514', CONSTRAINT='workflow_guard:workflow_question_event_guard'; END IF;
+    RETURN NEW;
+END $$;
+
+CREATE TRIGGER workflow_question_event_guard BEFORE INSERT ON public.workflow_wait_events
+    FOR EACH ROW WHEN (NEW.event_name='channel.question.reply') EXECUTE FUNCTION public.workflow_question_event_guard();
+CREATE UNIQUE INDEX workflow_question_first_response ON public.workflow_wait_events(company_id,run_id,correlation)
+    WHERE event_name='channel.question.reply';
+
+-- A question's deadline is checked again after the real parent/part locks, at the commit
+-- that admits provider entry. A clock check before those locks alone is insufficient.
+CREATE FUNCTION public.workflow_question_provider_entry_guard() RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE question public.workflow_channel_questions%ROWTYPE;
+BEGIN
+    SELECT owned.* INTO question FROM public.workflow_channel_questions AS owned
+    JOIN public.workflow_message_destinations AS destination ON destination.company_id=owned.company_id
+        AND destination.invocation_id=owned.invocation_id AND destination.message_id=owned.message_id
+    WHERE destination.company_id=NEW.company_id AND destination.delivery_id=NEW.delivery_id;
+    IF NOT FOUND THEN RETURN NULL; END IF;
+    PERFORM run.id FROM public.workflow_runs AS run
+        WHERE run.company_id=question.company_id AND run.id=question.run_id FOR SHARE;
+    PERFORM wait.id FROM public.workflow_waits AS wait
+        WHERE wait.company_id=question.company_id AND wait.id=question.wait_id FOR SHARE;
+    IF NOT EXISTS(SELECT 1 FROM public.workflow_waits AS wait
+        JOIN public.workflow_runs AS run ON run.company_id=wait.company_id AND run.id=wait.run_id
+        WHERE wait.company_id=question.company_id AND wait.id=question.wait_id
+            AND wait.execution_id=question.execution_id AND wait.state='waiting'
+            AND wait.reason='event' AND wait.event_name='channel.question.reply'
+            AND wait.deadline=question.deadline AND wait.deadline>clock_timestamp()
+            AND run.state IN ('queued','running','waiting') AND run.deadline>clock_timestamp())
+    THEN RAISE EXCEPTION 'question provider entry outlived its human wait' USING ERRCODE='23514', CONSTRAINT='workflow_guard:workflow_question_provider_entry_guard'; END IF;
+    RETURN NULL;
+END $$;
+CREATE CONSTRAINT TRIGGER workflow_question_provider_entry_guard AFTER UPDATE ON public.message_delivery_parts
+    DEFERRABLE INITIALLY DEFERRED FOR EACH ROW
+    WHEN (NEW.status='sending' AND OLD.status IN ('prepared','retryable'))
+    EXECUTE FUNCTION public.workflow_question_provider_entry_guard();

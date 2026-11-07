@@ -1,0 +1,109 @@
+[
+  {
+    "name": "sqlx-check-01",
+    "exit_code": 0,
+    "seconds": 11.369,
+    "receipt": "/Users/mac02/dev/openbot/plan/03-channel-handles-send/phases/p04/docs/logs/sqlx-check-01.json"
+  },
+  {
+    "name": "feature-final-tests-01",
+    "exit_code": 0,
+    "seconds": 101.548,
+    "receipt": "/Users/mac02/dev/openbot/plan/03-channel-handles-send/phases/p04/docs/logs/feature-final-tests-01.json",
+    "selected": 124
+  },
+  {
+    "name": "messaging-final-tests-01",
+    "exit_code": 0,
+    "seconds": 28.835,
+    "receipt": "/Users/mac02/dev/openbot/plan/03-channel-handles-send/phases/p04/docs/logs/messaging-final-tests-01.json",
+    "selected": 64
+  },
+  {
+    "name": "delivery-final-tests-01",
+    "exit_code": 0,
+    "seconds": 10.251,
+    "receipt": "/Users/mac02/dev/openbot/plan/03-channel-handles-send/phases/p04/docs/logs/delivery-final-tests-01.json",
+    "selected": 39
+  },
+  {
+    "name": "delivery-worker-final-tests-01",
+    "exit_code": 0,
+    "seconds": 3.294,
+    "receipt": "/Users/mac02/dev/openbot/plan/03-channel-handles-send/phases/p04/docs/logs/delivery-worker-final-tests-01.json",
+    "selected": 16
+  },
+  {
+    "name": "retention-final-tests-01",
+    "exit_code": 0,
+    "seconds": 136.291,
+    "receipt": "/Users/mac02/dev/openbot/plan/03-channel-handles-send/phases/p04/docs/logs/retention-final-tests-01.json",
+    "selected": 21
+  },
+  {
+    "name": "sample-final-tests-01",
+    "exit_code": 0,
+    "seconds": 0.658,
+    "receipt": "/Users/mac02/dev/openbot/plan/03-channel-handles-send/phases/p04/docs/logs/sample-final-tests-01.json",
+    "selected": 15
+  },
+  {
+    "name": "knowledge-final-tests-01",
+    "exit_code": 0,
+    "seconds": 22.664,
+    "receipt": "/Users/mac02/dev/openbot/plan/03-channel-handles-send/phases/p04/docs/logs/knowledge-final-tests-01.json",
+    "selected": 49
+  },
+  {
+    "name": "runtime-final-tests-01",
+    "exit_code": 0,
+    "seconds": 1.529,
+    "receipt": "/Users/mac02/dev/openbot/plan/03-channel-handles-send/phases/p04/docs/logs/runtime-final-tests-01.json",
+    "selected": 5
+  },
+  {
+    "name": "intent-final-tests-01",
+    "exit_code": 0,
+    "seconds": 5.224,
+    "receipt": "/Users/mac02/dev/openbot/plan/03-channel-handles-send/phases/p04/docs/logs/intent-final-tests-01.json",
+    "selected": 14
+  },
+  {
+    "name": "transport-final-tests-01",
+    "exit_code": 0,
+    "seconds": 0.416,
+    "receipt": "/Users/mac02/dev/openbot/plan/03-channel-handles-send/phases/p04/docs/logs/transport-final-tests-01.json",
+    "selected": 26
+  },
+  {
+    "name": "approvals-final-tests-01",
+    "exit_code": 0,
+    "seconds": 18.621,
+    "receipt": "/Users/mac02/dev/openbot/plan/03-channel-handles-send/phases/p04/docs/logs/approvals-final-tests-01.json",
+    "selected": 32
+  },
+  {
+    "name": "clippy-final-01",
+    "exit_code": 101,
+    "seconds": 78.276,
+    "receipt": "/Users/mac02/dev/openbot/plan/03-channel-handles-send/phases/p04/docs/logs/clippy-final-01.json"
+  },
+  {
+    "name": "fmt-final-01",
+    "exit_code": 0,
+    "seconds": 2.162,
+    "receipt": "/Users/mac02/dev/openbot/plan/03-channel-handles-send/phases/p04/docs/logs/fmt-final-01.json"
+  },
+  {
+    "name": "diff-final-01",
+    "exit_code": 0,
+    "seconds": 0.062,
+    "receipt": "/Users/mac02/dev/openbot/plan/03-channel-handles-send/phases/p04/docs/logs/diff-final-01.json"
+  },
+  {
+    "name": "graft-final-01",
+    "exit_code": 0,
+    "seconds": 2.097,
+    "receipt": "/Users/mac02/dev/openbot/plan/03-channel-handles-send/phases/p04/docs/logs/graft-final-01.json"
+  }
+]

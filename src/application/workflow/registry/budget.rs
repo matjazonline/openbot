@@ -68,7 +68,10 @@ fn declarations(
         };
         budget.schema(schema)?;
         budget.schema(schema)?;
-        if step.step_type.as_str() == "data.map" || step.step_type.as_str().starts_with("decision.")
+        if matches!(
+            step.step_type.as_str(),
+            "data.map" | "channel.no_reply" | "message.ask"
+        ) || step.step_type.as_str().starts_with("decision.")
         {
             budget.schema(schema)?;
         }

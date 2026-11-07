@@ -1,0 +1,25 @@
+diff --git a/plan/cloudroom-local/README.md b/plan/cloudroom-local/README.md
+index 6ffc73f5..1f43f0ac 100644
+--- a/plan/cloudroom-local/README.md
++++ b/plan/cloudroom-local/README.md
+@@ -105,7 +105,7 @@ Add a small application-owned local-agent module and adapters at those seams. Ke
+ WebSocket, and SQL types outside domain/application contracts. A local agent profile is separate
+ from Openbot's existing published `Agent` entity; this does not replace native `agent.run`.
+ 
+-This plan supersedes [the reverse OpenCode tunnel sketch](../local_machine_tunnel_plan.md) for
++This plan supersedes the retired reverse OpenCode tunnel sketch for
+ company-owned local execution. It is separate from [tenant-owned custom tool execution](../tenant-owned-execution-backends.md),
+ which sends individual scripts to a cloud provider, and from [app credential integrations](../vault-google/README.md).
+ Neither unrelated implementation is a prerequisite, and their credentials are not copied locally.
+diff --git a/src/main.rs b/src/main.rs
+index bd4c2588..a3a1bf5a 100644
+--- a/src/main.rs
++++ b/src/main.rs
+@@ -262,7 +262,6 @@ const NO_BACKWARD_COMPATIBILITY_NOTES: &[&str] = &[
+     "plan/hindsight_remaining_work.md",
+     "plan/hydradb/01-preserve-memory-scope-isolation.md",
+     "plan/hydradb/06-make-memory-ingestion-durable.md",
+-    "plan/local_machine_tunnel_plan.md",
+     "plan/memory_management/general_plan_instructions.md",
+     "plan/opencode_microvm_sandbox_plan.md",
+     "plan/outreach_allowlist_plan.md",

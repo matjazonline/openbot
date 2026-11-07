@@ -1,0 +1,13 @@
+{
+  "branch": "main",
+  "HEAD": "f6e133058c69e28c173850657b134b83ac7c6224",
+  "digest_matches": true,
+  "bad": [],
+  "coordination_matches": true,
+  "source_paths": 154,
+  "archive_members": 153,
+  "archive_hash_matches": true,
+  "archive_mismatches": [],
+  "decision_hash_matches": true,
+  "pin_hash_matches": true
+}

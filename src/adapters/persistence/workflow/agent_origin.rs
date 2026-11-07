@@ -25,6 +25,7 @@ pub(super) async fn authority_on(
             validate_agent_action(request, &selection)?;
             Ok(ActionOriginAuthority::Agent(Box::new(selection)))
         }
+        ToolCallOrigin::ChannelFinal(_) => Err(missing()),
     }
 }
 
@@ -286,5 +287,6 @@ pub(super) async fn workflow_tool_on(
             .await?;
             Ok(ActionOriginAuthority::Agent(Box::new(selection)))
         }
+        ToolCallOrigin::ChannelFinal(_) => Err(missing()),
     }
 }

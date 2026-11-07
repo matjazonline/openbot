@@ -1,0 +1,1262 @@
+diff --git a/plan/evals/01-contracts-and-dataset-model.md b/plan/evals/01-contracts-and-dataset-model.md
+new file mode 100644
+index 00000000..6db075ae
+--- /dev/null
++++ b/plan/evals/01-contracts-and-dataset-model.md
+@@ -0,0 +1,75 @@
++# 01 — Contracts and dataset model
++
++> **No backward compatibility.** We don't need backward compatibility and will reset the database
++> when needed. Do not add data backfills, dual reads/writes, legacy decoders, compatibility shims,
++> or staged rollouts for existing data.
++
++## Outcome and dependency
++
++Define the shared model before adding storage or live inference. Trace the existing sample,
++publication, access-level, provider-budget and job contracts. Preserve their owners; domain types
++remain independent of transport, SQLx, browser and provider SDK types.
++
++## Batch 01A — Cases, revisions, and frozen subjects
++
++Use typed identities for a company-owned suite, immutable suite revision, case, run and attempt.
++A suite targets one workflow identity and has an editable draft plus immutable reviewed revisions.
++Changing cases, expected answers, fixtures, rubric, split, hard gates or thresholds creates a new
++revision. Runs retain the exact content digest and selected case IDs, never a moving draft alias.
++
++Separate execution input from grading-only data. Execution input contains workflow input/params,
++explicit conversation/history/retrieval snapshots, tool fixtures and human decisions. Grading data
++contains reference facts/labels, required and forbidden behavior, assertions, rubrics and human
++labels. The preparation path cannot put grading data into agent context or fixture responses.
++
++Freeze each subject's published bundle/content hash, child workflow versions, agent/skill/tool
++revisions, model/provider settings and relevant resource policies once at run admission. Agent
++revisions publish independently: never resolve the currently active agent anew for each case or
++repeat. Reuse `SampleDefinitionCapture`, `PreparedSample`, configuration hashes and native manifest
++ownership; extend that owner for published/eval captures where necessary. A draft may be evaluated
++only through its authorized, revision-checked capture path without activating it. Persist the
++validated capture/manifest identities needed for resume; do not reconstruct them from moving aliases.
++Secrets are opaque company-scoped references resolved at execution; never snapshot credential bytes.
++Record connection identity/revision and provenance without claiming third-party models are immutable.
++
++Fixtures are bounded data selected deterministically by operation, validated arguments and logical
++call occurrence/path. Unexpected calls, exhausted fixtures and ambiguous matches fail visibly.
++Do not return the next fixture regardless of the actual tool arguments. Expected behavioral
++constraints must allow legitimate alternative traces rather than asserting every internal step.
++
++**Focused checks:** `eval_contract_`, `eval_fixture_`, and `eval_subject_` unit tests for schema
++validation, stable hashing, immutable identity, missing/foreign dependencies, correct fixture
++matching, and structural separation of expected answers from subject inputs.
++
++## Batch 01B — Modes, statuses, and enforced limits
++
++Represent scripted and live-model requests as explicit variants with distinct requirements.
++Keep disposable integrations as operator/CI environment evidence; do not add a production-write
++flag to the eval request. Distinguish execution status, grader status and verdict: completed,
++failed, cancelled, expired or unavailable execution; passed/failed/error/ungraded checks; and
++pass/fail/incomplete aggregate verdicts. A stopped run or missing judge never becomes a pass.
++
++Record case/repeat/subject identity, observable steps and attempted effects, actual usage or
++explicitly synthetic usage, wall duration, diagnostics and per-criterion evidence. Never label
++sample token counts as provider billing. Price estimates require a recorded price basis; unknown
++usage/pricing stays unknown. Do not collect hidden model reasoning as an eval requirement.
++
++Initial code-owned caps: 100 cases/revision, five repeats, two compared subjects, and 1,000 total
++case attempts/run including retries; 256 KiB per case, 8 MiB per suite payload and 1 MiB per case
++report. Preserve any stricter sample/model/tool limits. Bound total stored run payload, import
++size, queue depth, case/run wall time and judge calls before implementation acceptance; set and
++test concrete defaults in the owning layer. A user-supplied lower inference budget is enforced
++before dispatch and shared across subject, retries and grading.
++
++Reports are paginated; comparisons do not concatenate an entire suite into one model prompt.
++Limit/refusal/truncation must be explicit and must not silently omit required grading evidence.
++Any raised bound needs an early-failure CI signal and a recorded reason.
++
++**Focused checks:** `eval_bounds_` and `eval_verdict_` tests at/beyond each boundary, including
++overflowing case×repeat×subject counts, report allocation, synthetic/unknown usage and incomplete
++grading. Select tests with `-- --list` first and reject a zero match.
++
++## Exit criteria
++
++The contracts specify data ownership, immutable comparison identity, input/answer separation,
++execution modes, limits and honest verdicts without introducing another workflow language.
+diff --git a/plan/evals/02-storage-and-suite-management.md b/plan/evals/02-storage-and-suite-management.md
+new file mode 100644
+index 00000000..d3a02ef9
+--- /dev/null
++++ b/plan/evals/02-storage-and-suite-management.md
+@@ -0,0 +1,62 @@
++# 02 — Storage and suite management
++
++> **No backward compatibility.** We don't need backward compatibility and will reset the database
++> when needed. Do not add data backfills, dual reads/writes, legacy decoders, compatibility shims,
++> or staged rollouts for existing data.
++
++## Outcome and dependency
++
++Depends on 01. Add durable, company-qualified suite/revision/run ownership through application
++ports and PostgreSQL adapters. Keep the first authoring surface a bounded structured form/JSON
++editor and import/export beside the workflow; no separate dataset service or labeling application.
++
++## Batch 02A — Tenant-qualified persistence and authorization
++
++Persist suite drafts/revisions, cases, run manifests, attempts and grading evidence under explicit
++company identities. Use purpose-specific transactions and composite tenant foreign keys to bind
++suite, workflow, subject, case, run and result. Derive the company/actor from trusted session or job
++authority; imported payloads cannot select foreign ownership or credentials.
++
++Apply existing membership and access-level authorization in application use cases for creation,
++editing, versioning, execution, cancellation, reads, export and deletion. Suite/run visibility must
++be at least as restrictive as all selected source content, fixture data and outcomes. A less
++privileged case cannot lower the enclosing report's restriction. Authorization/storage failures
++propagate; they do not mean missing data, an empty permitted suite, or successful deletion.
++
++Use revision checks for draft writes, idempotent run admission keys scoped to actor/company and
++logical request, and immutable revision contents. Same admission key/different payload conflicts.
++Retain run identity/digests needed for comparison even when bulky evidence expires; an expired
++artifact is unavailable evidence rather than a passing empty result.
++
++Change the init schema, migrate a fresh disposable database and regenerate `.sqlx` for SQL changes.
++Do not add compatibility readers/backfills for old suite or report formats.
++
++**Focused checks:** `eval_storage_`, `eval_authorization_`, and `eval_admission_` database-backed
++tests for cross-company relations/CRUD/exports, restricted source data, stale draft writes, and
++duplicate admissions. Race two real writers/admitters and assert one accepted logical result.
++
++## Batch 02B — Dataset authoring and safe case capture
++
++Offer case creation/editing, review/version creation, split selection, and validated bounded
++import/export using current form, CSRF, escaping and revision patterns. Import is inert data:
++reject executable grader code, arbitrary file paths, remote fixture URLs and secret-bearing
++connection objects. Export requires the same content authority as reading all included cases.
++
++Mark cases as development/regression or held-out; preserve that split in immutable revisions.
++Run failures can be manually promoted into a draft case by an authorized reviewer who selects and
++redacts required inputs and supplies the correct expectations. Do not automatically ingest raw
++production messages, credential-bearing HTTP/MCP traces or another company's knowledge/history.
++Judge-generated expectations require human review before becoming reference labels.
++
++Use synthetic/sanitized repository examples for CI. Actual company datasets stay in authorized
++storage, not git. Keep case lineage/source access provenance and explain that running a held-out
++case repeatedly during tuning weakens its value as held-out evidence.
++
++**Focused checks:** `eval_dataset_` tests for malformed/oversized imports, duplicate case IDs,
++unknown fields, unsafe fixture references, split/version immutability and restricted capture/export.
++Browser form fixtures verify escaping, CSRF, stale-write recovery, and accessible errors.
++
++## Exit criteria
++
++Authorized users can create/review a reproducible suite revision. Foreign or insufficiently
++privileged users cannot retrieve cases, expected answers, runs or exports by knowing their IDs.
+diff --git a/plan/evals/03-scripted-evaluation.md b/plan/evals/03-scripted-evaluation.md
+new file mode 100644
+index 00000000..d192c63b
+--- /dev/null
++++ b/plan/evals/03-scripted-evaluation.md
+@@ -0,0 +1,67 @@
++# 03 — Scripted evaluation
++
++> **No backward compatibility.** We don't need backward compatibility and will reset the database
++> when needed. Do not add data backfills, dual reads/writes, legacy decoders, compatibility shims,
++> or staged rollouts for existing data.
++
++## Outcome and dependency
++
++Depends on 02. Deliver a useful offline suite runner by composing frozen subjects, existing sample
++execution and deterministic checkers. Share orchestration/reporting with later live evals without
++adding I/O or a provider-selection flag to the current sample interpreter.
++
++## Batch 03A — Execute cases through existing samples
++
++Prepare each case's execution-only projection into the current `SampleRequest`, with no client-
++supplied agent definitions. Reuse authorized definition capture and the validated `PreparedSample`
++owner, retain the subject closure pinned at admission, then call `sample::execute(prepared)`.
++Do not recapture different active agent revisions between cases, repeats or a resumed attempt.
++Keep current validation, child execution, simulated approvals, effect interception and budgets.
++Normalize `SampleReport` into eval evidence without pretending
++sample paths are production run IDs or simulated effects are delivered effects.
++
++Evaluate supported output/path/schema, expected branch/status, operation arguments and call-count
++assertions over structured evidence. Nonempty unexpected/unused fixtures, stopped execution or
++insufficient evidence are explicit failures/incomplete results according to the frozen policy.
++Do not compare entire natural-language outputs byte-for-byte when the workflow allows alternatives.
++Keep assertions and reference answers out of the sample request and all resulting subject context.
++Preserve the existing `authorize_release` recheck before returning evidence and apply the same
++current authority requirement to stored report reads/exports after a long-running eval completes.
++
++Exercise published child workflows and agent tools through their existing sample boundaries.
++Scripted success establishes workflow behavior under supplied responses; it is not a measurement
++of a live model's judgment or proof of actual external authorization.
++
++**Focused checks:** `eval_scripted_` with existing sample fixtures, including JEV automatic/human
++paths, child tools, intercepted writes, unknown tools, stopped samples and unused fixtures.
++Run affected `workflow_sample_`/sample-tool tests and both workflow-sample boundary scripts.
++
++## Batch 03B — Durable bounded orchestration
++
++Reuse the existing bounded job/lease infrastructure and lifecycle patterns; do not create a new
++scheduler. Add only the eval-owned job payload/state and purpose-specific persistence operations
++needed to claim, execute and settle a case/repeat/subject attempt. Keep new ownership fields and
++claims in the responsible eval/job layer rather than writing eval business rules in a worker loop.
++
++Persist immutable admission manifests and logical attempt identities. Claim with fencing/revision
++checks, bounded retries/backoff and current company authority; settle evidence and verdict state
++atomically. A lost lease cancels and awaits the real work. Late results cannot overwrite a newer
++attempt or complete a cancelled/expired run. Resume only missing eligible attempts and expose
++repeated attempts; do not hide failing cases behind selective retries.
++
++Apply global and company capacity limits, queue admission bounds, run/case deadlines, bounded
++shutdown, and terminal states for exhausted/poison jobs. Report partial progress with counts for
++expected, completed, failed, cancelled and unavailable attempts. A full failed claim batch must
++not hot-spin or starve other companies. Small suites use this same path rather than a second
++untracked background execution path hidden behind an HTTP handler.
++
++**Focused checks:** `eval_jobs_`, `eval_cancellation_`, and `eval_fairness_` with isolated real
++PostgreSQL: two competing workers, crash/restart, lease loss, cancellation racing settlement,
++duplicate notifications, poison batches, retry exhaustion and another company's continued progress.
++Assert case/evidence counts and stale-owner rejection, not only worker return values.
++
++## Exit criteria
++
++A versioned suite runs offline and produces durable per-case evidence through existing samples.
++Concurrent workers, restarts and cancellation cannot manufacture a passing or duplicate result;
++ordinary workflow samples retain their current offline behavior.
+diff --git a/plan/evals/04-live-models-and-integrations.md b/plan/evals/04-live-models-and-integrations.md
+new file mode 100644
+index 00000000..ce53c499
+--- /dev/null
++++ b/plan/evals/04-live-models-and-integrations.md
+@@ -0,0 +1,85 @@
++# 04 — Live models and integrations
++
++> **No backward compatibility.** We don't need backward compatibility and will reset the database
++> when needed. Do not add data backfills, dual reads/writes, legacy decoders, compatibility shims,
++> or staged rollouts for existing data.
++
++## Outcome and dependency
++
++Depends on 03. Measure real model behavior using existing provider/harness execution while keeping
++business operations simulated. Real external effects belong only to a separately provisioned
++disposable integration environment. The original sample interpreter remains offline.
++
++## Batch 04A — Explicit live inference with isolated tools/state
++
++Add an application-owned live-eval execution operation that uses the frozen workflow/agent/model
++contracts and existing provider adapter. Reuse the responsible execution/input-preparation owners;
++extract a small common policy/traversal helper where necessary rather than cloning the workflow
++engine or pretending a scripted response is a real provider response.
++
++Every HTTP/MCP/message/knowledge/memory/child-agent surface must pass through the evaluation
++dispatcher. Permit model inference only to the selected authorized provider destination; intercept
++external reads and writes using validated case fixtures, isolate history/memory stores, and keep
++child workflows in the same mode. Unknown/unsupported operations fail closed with no production
++fallback. A workflow/tool result cannot change mode, select another company's connection, call
++an arbitrary URL, or escape through an imported child workflow.
++
++Reuse operation-schema, tool-grant and workflow-policy checks where applicable. Record proposed
++actions, rejected actions and simulated approvals distinctly from actual effects/real human
++approval. A supplied approval fixture never creates a production approval record or capability.
++Freeze retrieval/history context; do not silently query changing production knowledge during a
++supposedly matched comparison. Do not save eval exchanges as customer conversation history.
++
++**Focused checks:** `eval_live_boundary_` and `eval_live_tools_` through scripted local model
++servers and counted fake services. Prove nested workflows, direct agent tools, HTTP/MCP, reply,
++memory/history and unexpected operations cannot hit production paths. Inspect prepared provider
++requests for absence of references/labels/expected answers, credentials and foreign context.
++
++## Batch 04B — Budgeted execution and honest recovery
++
++Require existing company model access, execution permission, and an explicit run budget before
++paid dispatch. Grading shares that budget. Reserve bounded worst-case input/output capacity before
++each provider call using existing budget authority, including concurrent attempts and retries;
++observed token counters after the call are not a pre-call budget. Enforce case/run deadlines,
++provider timeouts, tool rounds, prompt/output bounds and company/global concurrency.
++
++Store actual model/parameters, provider request identity when available, usage, timing and attempt
++outcome. Unknown billing or an interrupted remote response remains unknown/uncertain. Never
++silently reissue a potentially charged inference as though request IDs guarantee idempotency.
++Use existing recovery contracts; any allowed retry consumes attempt/spend budget and remains
++visible. Lease loss or cancellation reaches the provider work and prevents stale settlement.
++
++**Focused checks:** `eval_live_budget_` and `eval_live_recovery_` database-backed races for one
++remaining budget reservation, duplicate worker dispatch, revoked model access, dropped responses,
++provider errors, cancellation and lease loss. Assert counted calls, budget accounting and explicit
++unknown outcomes. A scripted provider proves orchestration, not real-inference compatibility.
++
++## Batch 04C — Disposable integration acceptance
++
++Run the normal application against isolated databases, companies, mail sinks and test HTTP/MCP
++accounts/services. The environment owns explicit test-only credentials and destination allowlists;
++ordinary eval requests cannot switch to production credentials or authorize real customer writes.
++Integration tests inspect actual remote/database state and effect counts rather than trusting
++the agent's final text. Cover approvals, tenant isolation, idempotency/concurrent claimants and
++recovery with the actual production dispatch protocol.
++
++Record source/image revisions, fixture identity/digest, actor/resource scope, assertions and
++results as integration evidence, with provenance distinguishing CI/operator evidence from a
++user-imported claim. Do not add a public API that accepts arbitrary signed-off success blobs as
++authoritative release evidence. Attach only bounded redacted observations through trusted tooling.
++
++For [Doop](../doop-canvas/README.md), use disposable workspaces/accounts and complete the
++[private-file fix](../fix-file-access/README.md) before real confidential document acceptance.
++Other workflows use their own controlled service fixtures; there is no dependency on Doop for
++the general eval runner.
++
++**Focused checks:** `eval_integration_` with real application workers and disposable counted
++HTTP/MCP/mail services, including negative cross-company access and competing claims. Separately
++record any real service/model probes and unavailable credentials; no silent skipping or claim
++that fixture acceptance establishes a real external service's behavior.
++
++## Exit criteria
++
++Live inference measures actual model decisions without a route to production business effects.
++Budgets and recovery hold across workers; actual integration guarantees have separate, attributable
++disposable-environment evidence.
+diff --git a/plan/evals/05-graders-and-hard-gates.md b/plan/evals/05-graders-and-hard-gates.md
+new file mode 100644
+index 00000000..baac607a
+--- /dev/null
++++ b/plan/evals/05-graders-and-hard-gates.md
+@@ -0,0 +1,75 @@
++# 05 — Graders and hard gates
++
++> **No backward compatibility.** We don't need backward compatibility and will reset the database
++> when needed. Do not add data backfills, dual reads/writes, legacy decoders, compatibility shims,
++> or staged rollouts for existing data.
++
++## Outcome and dependency
++
++Depends on 03; paid judges use 04. Score task success with appropriate evidence and separate
++non-negotiable hard failures from subjective quality. Keep grader definitions versioned and
++reusable through a small code-owned set of check types, not executable code uploaded by users.
++
++## Batch 05A — Deterministic checks and workflow rubrics
++
++Implement bounded schema/JSON-path value assertions, expected decisions, allowed/forbidden tool
++names/arguments, required approvals, call/effect counts and terminal status checks. Paths select
++structured data; they do not evaluate expressions or execute Python/shell/JavaScript. Validate
++assertions against actual report contracts and return an explicit missing-evidence result when
++required steps/state cannot be observed. Avoid assumptions about an exact valid reasoning path.
++
++| Workflow family | Primary checks | Quality judgment, where useful |
++| --- | --- | --- |
++| Classification/routing | Expected label/branch, fallback, per-class confusion counts | Ambiguity and correct escalation |
++| Extraction | Output schema, field values, absent/null handling | Faithfulness to source text |
++| Support/research | Required supported facts/citations, forbidden claims, abstention | Correctness, completeness, clarity |
++| External action | Authorized intent/destination, validated arguments, approval, counted effects | Whether the action meets the request |
++| Document creation | Required content, factual assertions, intended workspace/link/export | Readability, layout and visual completeness |
++| Human review | Escalation, reviewer context, decision/continuation and refusal behavior | Adequacy of the review handoff |
++
++Routing/extraction scores use labeled cases; citation presence alone does not prove source support.
++For integration tests, real state determines actual effects. For simulated runs label those counts
++as attempted/intercepted, not delivered. Document visuals require the relevant rendered artifact
++or human review; a text-only judge cannot certify clipping, private font loading or PDF usability.
++
++Freeze which checks are hard gates. Any observed permission violation, unauthorized disclosure,
++missing required approval or forbidden/duplicate effect fails the evaluated run regardless of
++quality averages. Missing/error/ungraded mandatory checks make the verdict incomplete or failed,
++never passed. A judge saying an action is safe cannot authorize that action at runtime.
++
++**Focused checks:** `eval_assertion_`, `eval_hard_gate_`, and `eval_metrics_` tests for every
++checker, missing evidence, invalid schemas/paths, rare-class failures, synthetic/real effect
++distinction and quality averages that attempt to hide hard violations.
++
++## Batch 05B — Model judges and human calibration
++
++Use the existing provider port for an explicitly authorized company judge model, with no tools,
++strict structured output, bounded evidence and frozen rubric/references. Separate judge input from
++subject preparation. Treat answers, tool traces and reference documents as untrusted data rather
++than instructions. Never give the judge credentials or use its free-text explanation as executable
++policy. The subject cannot select its judge, alter thresholds or write its own human labels.
++
++Prefer specific pass/fail criteria and blinded pairwise comparison with randomized or balanced
++answer order. Record criterion scores, short evidence references, judge revision/model/settings
++and ordering; do not require or retain hidden reasoning. Validate outputs and finite score ranges.
++Invalid output, provider failure, missing visual evidence or insufficient context is ungraded/error.
++
++Calibrate with reviewed human examples, including deliberately bad answers and tricky borderline
++cases. Measure disagreement and retain human adjudication. A stronger judge or agreement on a
++small set is not proof of accuracy. Keep held-out labels separate from prompt tuning; changes to
++judge, rubric or threshold create new grading identity and invalidate incompatible comparisons.
++
++Each judge call must pass company model access, content/provider egress policy and the shared run
++budget before dispatch. A company approving provider A for execution does not implicitly approve
++provider B to receive traces for grading. Redact unnecessary sensitive fields, preserve access
++restrictions, and count grading usage/latency separately from subject usage/latency.
++
++**Focused checks:** `eval_judge_`, `eval_grader_security_`, and `eval_calibration_` with local
++judge fixtures for valid/invalid output, injected instructions, position bias fixtures, missing
++context, budget exhaustion, forbidden provider egress and repeatable aggregation. Separately run
++authorized real-judge calibration and record agreement/disagreements and unavailable checks.
++
++## Exit criteria
++
++Every score is attributable to a specific criterion and evidence. Hard violations cannot be
++averaged away; model-based scores have explicit limits, reviewed calibration and separate authority.
+diff --git a/plan/evals/06-comparisons-and-authoring.md b/plan/evals/06-comparisons-and-authoring.md
+new file mode 100644
+index 00000000..1a33ef5a
+--- /dev/null
++++ b/plan/evals/06-comparisons-and-authoring.md
+@@ -0,0 +1,67 @@
++# 06 — Comparisons and authoring
++
++> **No backward compatibility.** We don't need backward compatibility and will reset the database
++> when needed. Do not add data backfills, dual reads/writes, legacy decoders, compatibility shims,
++> or staged rollouts for existing data.
++
++## Outcome and dependency
++
++Depends on 04–05. Let workflow authors compare the same reviewed suite against frozen baseline
++and candidate subjects, inspect failures, and carry honest evidence into their existing publish
++and binding-selection decisions. An eval is not an alternative workflow activation path.
++
++## Batch 06A — Matched comparisons and release evidence
++
++Pair results by immutable case ID/revision, repeat index and subject. Include the captured
++configuration hash and explicit agent/workflow selections in the comparison identity; equal root
++workflow content hashes do not imply the same independently published agent revisions. Require
++compatible dataset,
++fixtures, execution mode and grading identity; record deliberate differences such as model, prompt
++or agent revision. Changed reference data or fixture environment requires new evidence rather than
++an unlabeled improvement claim. Freeze state/time/random inputs where controllable and record
++remaining provider nondeterminism.
++
++Report expected/completed/failed/cancelled/unavailable counts, case-level changes, hard violations,
++quality by criterion/workflow category, per-class routing errors, run-to-run variation, actual
++subject/judge usage, and latency distributions with their sample counts. Expose candidate losses
++and critical slices; a global mean cannot conceal a failed class or missing attempt. Show price
++estimates only with their basis; synthetic/unknown cost remains labeled. Use uncertainty intervals
++where sample sizes and methods support them, not spurious precision on a tiny suite.
++
++Thresholds are reviewed suite policy, not invented universal quality numbers. A passing report
++requires all mandatory checks/attempts plus the declared quality criteria; incomplete runs cannot
++be the only release evidence. CI can block code release on the selected suite's failed hard gates.
++Workflow/agent publication and binding activation retain their current explicit authorization and
++revision checks. Initial integration shows current evidence; it does not silently activate on
++pass or introduce an automatic binding-selection policy.
++
++**Focused checks:** `eval_comparison_` and `eval_release_evidence_` for matched identity, changed
++dataset/grader/mode, partial attempts, repeated runs, hard-gate regressions, rare-class loss and
++misleading missing-cost/latency values. Prove report completion cannot publish or move a binding.
++
++## Batch 06B — Workflow authoring surface
++
++Extend the workflow authoring area with suites, immutable revisions, execution mode, selected
++subject(s), repeats and an explicit paid budget for live inference/grading. Display the distinction
++between scripted correctness, live-model quality and disposable integration evidence. Ordinary
++sample forms continue to run offline with no hidden provider fallback or new paid behavior.
++
++Provide run admission, progress/cancellation, paginated case results, per-check evidence and a
++baseline/candidate comparison. Show actionable failure location, hard-gate status, expected vs
++observed facts, diagnostic class and incomplete/unavailable evidence. Keep raw sensitive content
++behind the same case/run access checks; do not place it in public URLs, logs or notifications.
++
++Use current forms, CSRF, revision handling, escaping, accessibility, SSE navigation/lifecycle and
++pagination patterns. Do not allow repeated submit/navigation to admit duplicate paid runs. A stale
++result or case edited during execution must remain labeled with the evaluated immutable revision.
++Failure-to-case capture goes through 02's explicit reviewed draft flow, not automatic data export.
++
++**Focused checks:** `eval_authoring_` HTTP authorization/form tests and a new browser protocol
++fixture covering duplicate submissions, stale revisions, navigation/cancellation, report paging,
++escaping, keyboard/error states, restricted readers and deliberate paid-run intent. Run affected
++existing workflow authoring, sample and SSE tests.
++
++## Exit criteria
++
++Authors can identify exactly what was compared, where a candidate regressed and what remains
++unverified. Existing publication/activation remains an explicit separately authorized operation.
+diff --git a/plan/evals/07-verification-and-operations.md b/plan/evals/07-verification-and-operations.md
+new file mode 100644
+index 00000000..7aa792cf
+--- /dev/null
++++ b/plan/evals/07-verification-and-operations.md
+@@ -0,0 +1,116 @@
++# 07 — Verification and operations
++
++> **No backward compatibility.** We don't need backward compatibility and will reset the database
++> when needed. Do not add data backfills, dual reads/writes, legacy decoders, compatibility shims,
++> or staged rollouts for existing data.
++
++## Outcome and dependency
++
++Depends on all preceding groups. Verify a shared, tenant-safe eval system across different
++workflow families. The commands and new test prefixes below are implementation requirements;
++publishing this plan is not evidence that the eval system or live providers have been tested.
++
++## Batch 07A — Focused checks and integrated acceptance
++
++For each batch record exact command, revision, environment, nonzero selected/executed test counts,
++results and unavailable checks. List filters before execution, for example:
++
++```sh
++cargo test --locked --offline --lib eval_scripted_ -- --list
++cargo test --locked --offline --lib eval_scripted_
++```
++
++| Group | New focused test families | Additional proof |
++| --- | --- | --- |
++| 01 | `eval_contract_`, `eval_fixture_`, `eval_subject_`, `eval_bounds_`, `eval_verdict_` | Hashing, answer separation, all boundaries |
++| 02 | `eval_storage_`, `eval_authorization_`, `eval_admission_`, `eval_dataset_` | Tenant constraints, competing writers, authoring forms |
++| 03 | `eval_scripted_`, `eval_jobs_`, `eval_cancellation_`, `eval_fairness_` | Sample boundary, real worker races/poison batches |
++| 04 | `eval_live_boundary_`, `eval_live_tools_`, `eval_live_budget_`, `eval_live_recovery_`, `eval_integration_` | Counted providers/effects, budget contention |
++| 05 | `eval_assertion_`, `eval_hard_gate_`, `eval_metrics_`, `eval_judge_`, `eval_grader_security_`, `eval_calibration_` | Human labels and actual judge calibration |
++| 06 | `eval_comparison_`, `eval_release_evidence_`, `eval_authoring_` | Matched results, browser workflow, no activation side effects |
++| 07 | `eval_e2e_`, `eval_retention_` | Two-company acceptance, cleanup/restore, full CI gate |
++
++Use `own_database` for global/unscoped worker claims, cleanup and whole-table assertions. Apply the
++init schema to a fresh disposable PostgreSQL database; regenerate/check `.sqlx` for changed SQL.
++No database/browser/provider absence may become a silently skipped passing acceptance check.
++Broaden checks early at shared runtime/auth/budget boundaries; preserve one final full-suite gate.
++
++Integrated acceptance uses routing, extraction, support/research, action, document and human-review
++fixtures. Exercise two companies with restricted data, matching slugs and foreign identifiers.
++Prove answer/reference isolation, offline samples, intercepted live tools, isolated child state,
++explicit provider egress, hard gates, truthful partial reports and exact comparison identities.
++Crash at admission/claim/provider/settlement boundaries; race claimants, cancellation, revocation
++and budget reservations. Assert actual call counts and durable evidence, not just a final score.
++
++## Batch 07B — Final full-suite gate
++
++Run once the entire implementation is integrated. Reconcile against current
++[CI](../../.github/workflows/ci.yml), install locked dependencies/SQLx CLI/Chromium and provision
++isolated PostgreSQL 18.6 with CI's query-statistics configuration and parameter logging disabled.
++Prepare dependencies before offline/network-isolated execution; do not alter shared databases.
++
++```sh
++cargo fmt --all -- --check
++git diff --check
++cargo check --locked --offline --all-targets
++cargo clippy --locked --offline --all-targets -- -D warnings
++SQLX_OFFLINE=false cargo sqlx migrate run
++SQLX_OFFLINE=false cargo sqlx prepare --check -- --all-targets
++cargo test --locked --offline --all-targets --no-run
++scripts/test-network-isolation.sh cargo test --locked --offline --all-targets
++scripts/test-network-isolation.sh scripts/stack-budget.sh --offline
++scripts/test-network-isolation.sh scripts/lease-budget.sh --offline
++npm run check:css
++npm run test:run-counts
++node --test scripts/tests/sse-navigation.mjs scripts/tests/agent-runtime.mjs scripts/tests/workflow-runs.mjs scripts/tests/workflow-conversations.mjs scripts/tests/workflow-samples.mjs
++scripts/tests/deploy.sh
++scripts/tests/credential-key-rotation.sh
++scripts/tests/transport-boundary.sh
++scripts/transport-boundary-check.sh
++python3 scripts/tests/workflow-sample-boundary.py
++python3 scripts/workflow-sample-boundary.py
++python3 scripts/tests/knowledge-model-prepare.py
++```
++
++Also execute CI's production image/knowledge memory, query-statistics activation, HTML/team-
++autocomplete, knowledge-library, agent-authoring, workflow-agent-picker, session-revocation and
++decision browser gates with their exact fixture/environment setup. Add eval authoring/browser and
++security/limit cases to CI. A missing
++fixture is unavailable coverage, not a passing browser run. Pin any new git dependencies; preserve
++non-root production operation, stack/lease budget checks and offline compilation.
++
++Real-provider acceptance is separate from network-isolated CI. With an explicitly authorized
++test budget and disposable data, run one live subject and calibrated judge, compare repeated cases,
++and verify recorded actual usage/error behavior. Run actual integration/browser checks against
++the disposable external services relevant to the workflow. Record missing credentials/services,
++unsupported visuals or provider limitations; local fixtures do not establish live compatibility.
++
++## Batch 07C — Retention, operating guidance, and release
++
++Use the existing cleanup/job owner for bounded deletion of expired bulky run/trace/grading data;
++define finite payload/summary retention defaults and CI boundary tests before release. Keep suite
++revisions needed for supported comparisons until explicitly deleted under authorized lifecycle
++policy. Report expired evidence honestly and prevent cancellation/cleanup races from reviving it.
++Backup/restore must preserve company/access lineage and never automatically replay paid calls.
++
++Document dataset review/capture/redaction, development vs held-out splits, rubric calibration,
++provider consent/budgets, live-call uncertainty, cancellation and incomplete results. Configuration
++examples name only keys actually read. Do not promise startup checks, exact model reproducibility,
++statistical certainty or runtime security from an eval score that the implementation cannot supply.
++
++Emit identifiers, progress/counts, typed failures and aggregate usage without putting input bodies,
++expected answers, judge prompts, tool payloads or secrets into operational logs. Keep protected
++evidence in authorized storage, with explicit export/deletion and provider disclosure controls.
++Retain release evidence for the exact subject/dataset/grader combination and observed limitations.
++
++Release requires no unresolved company leaks, production side-effect escape, answer leakage,
++budget over-dispatch, stale-owner settlement or false passing verdict. Rerun affected checks after
++fixes and repeat the full gate when warranted. Incompatible schema/payload changes reset data;
++there are no old report decoders, dual formats or staged compatibility modes. Refresh graft after
++substantial implementation and register every plan file in the startup reset-note list.
++
++## Exit criteria
++
++The implemented eval system has reproducible, tenant-safe evidence across workflow families and
++accurate operating limits. Every required unavailable check is reported; full verification is
++claimed only when the complete applicable gate actually ran and passed.
+diff --git a/plan/evals/README.md b/plan/evals/README.md
+new file mode 100644
+index 00000000..80d60013
+--- /dev/null
++++ b/plan/evals/README.md
+@@ -0,0 +1,102 @@
++# Workflow evaluations
++
++> **No backward compatibility.** We don't need backward compatibility and will reset the database
++> when needed. Do not add data backfills, dual reads/writes, legacy decoders, compatibility shims,
++> or staged rollouts for existing data.
++
++## Outcome and status
++
++Status: proposed implementation, 2026-11-06. This plan does not implement evals or claim that any
++workflow, provider, or integration has passed the checks described here.
++
++Use one shared evaluation runner with a versioned suite for each workflow. An authorized company
++member can define cases and success criteria, evaluate an exact frozen workflow/agent version,
++and compare a candidate with a baseline. Reports show individual failures, hard-gate violations,
++quality by criterion, usage, and latency. Different workflows share execution/reporting machinery
++while retaining their own definition of success.
++
++Build on existing workflow samples, immutable publication, agent execution, company authorization,
++model connections, and bounded job execution. Keep the current sample runner offline. Introduce
++paid model evaluation through a separate application operation with explicit authority and budgets.
++Do not build another workflow engine, provider SDK stack, generic grader plugin system, or hosted
++eval-service dependency.
++
++## Implementation order
++
++| Group | Deliverable | Depends on |
++| --- | --- | --- |
++| [01 — Contracts and dataset model](01-contracts-and-dataset-model.md) | Cases, versions, execution modes, limits, and hard/quality verdicts | Current sample/publication contracts |
++| [02 — Storage and suite management](02-storage-and-suite-management.md) | Company-scoped immutable suite revisions, import/export, authorization | 01 |
++| [03 — Scripted evaluation](03-scripted-evaluation.md) | Shared runner over existing offline samples, deterministic assertions, durable results | 02 |
++| [04 — Live models and integrations](04-live-models-and-integrations.md) | Budgeted live inference with intercepted tools; disposable integration acceptance | 03 |
++| [05 — Graders and hard gates](05-graders-and-hard-gates.md) | Workflow-specific deterministic/model rubrics and human calibration | 03; 04 for paid grading |
++| [06 — Comparisons and authoring](06-comparisons-and-authoring.md) | Matched baseline/candidate reports, workflow UI, release evidence | 04–05 |
++| [07 — Verification and operations](07-verification-and-operations.md) | End-to-end proof, final full CI gate, retention and operating guidance | All preceding groups |
++
++Each numbered file is one logical implementation group with focused checks and exit criteria.
++Implement the scripted path first; it is useful independently of model credentials. No completed
++group authorizes real customer data, paid inference, or external writes during implementation.
++
++## Execution modes and boundaries
++
++| Mode | Executes | Establishes |
++| --- | --- | --- |
++| Scripted | Existing sample interpreter with scripted model/tool/human responses | Branching, data flow, assertions, and simulated effect behavior |
++| Live model | Real model calls; fixture-controlled external reads/writes, isolated state, scripted human decisions | Actual model choices and output quality under the supplied environment |
++| Disposable integration | The normal application against explicitly provisioned test companies/accounts/services | Real transport, authorization, concurrency, and external state behavior |
++
++The first two modes never dispatch business effects to production services. Disposable integration
++is an operator/CI test environment, not a switch that lets ordinary eval requests use production
++connections. Its evidence names the tested revisions, fixtures, identities, and external state.
++Simulation does not prove production authorization or actual remote effect counts.
++
++## Decisions carried from the discussion
++
++- Start with about 20–30 reviewed cases per workflow, then grow from observed failures. Include
++  ordinary inputs, ambiguity, missing context, failures, human review, and adversarial content.
++  Small suites establish regressions, not statistical proof of universal correctness.
++- A case contains inputs/context, fixture setup, expected outcome, allowed/forbidden actions,
++  and a grading rubric. Expected answers and grading-only data are never model/tool input.
++- Keep development/regression and held-out cases explicitly separated. Freeze dataset, grader,
++  workflow/agent/tool revisions and model settings for every run. Compare the same case/repeat
++  pairs; repeat stochastic cases and expose missing/failed attempts in the denominator.
++- Permission violations, unauthorized disclosure, missing required approval, and forbidden or
++  duplicate effects are hard failures. A high quality average cannot override them. Zero observed
++  violations is scoped to the executed suite; graders are not runtime authorization controls.
++- Prefer deterministic checks for structure, facts, state, and effects. Use explicit model rubrics
++  for subjective quality, calibrated against human labels. Model judges have no tool access.
++- Datasets, traces, grading prompts, exports, and reports remain company-scoped and at least as
++  restricted as all source content. Using a judge is another provider disclosure and paid call.
++- Eval execution cannot publish a workflow, activate an agent, move a binding, send a reply, or
++  mutate production memory. A separate authorized user action remains responsible for deployment.
++
++## Existing owners and reference guidance
++
++- [Sample contracts](../../src/application/workflow/sample/types.rs):13–48, 63–112 define scripted
++  inputs, steps, intercepted effects, synthetic usage, and reports with configuration hashes and
++  selected agent/workflow revisions.
++- [SampleDefinitionCapture](../../src/application/workflow/sample_capture.rs) and its
++  [PostgreSQL adapter](../../src/adapters/persistence/workflow/sample_capture.rs):41–81 already
++  capture the authorized definition closure and recheck release authority. Client-supplied agent
++  definitions are rejected; internal capture selects them. This is definition capture, distinct
++  from the proposed reviewed capture of a failed run as a dataset case.
++- [PreparedSample](../../src/application/workflow/sample/definitions.rs):43–78 and
++  [sample execution](../../src/application/workflow/sample/mod.rs):84–158 own validated frozen
++  execution/report assembly; [step dispatch](../../src/application/workflow/sample/dispatch.rs)
++  and [tool dispatch](../../src/application/workflow/sample/tools.rs) own its offline behavior.
++- [Sample authoring route](../../src/adapters/http/routes/workflows/ui/authoring/sample.rs)
++  and [sample report UI](../../src/adapters/http/pages/workflow_authoring/sample.rs) are
++  existing workflow entry points. Extend their surrounding authoring area instead of a new app.
++- [Publication contracts](../../src/application/workflow/publication/mod.rs) and native agent
++  manifests own pinned dependencies. Agent revisions publish independently; a workflow version
++  alone does not identify which active agent revision an eval selects.
++- [Sample boundary check](../../scripts/workflow-sample-boundary.py) must continue to protect
++  ordinary sample execution when live-model evals are introduced.
++- [Official OpenAI evaluation guidance](https://developers.openai.com/api/docs/guides/evaluation-best-practices)
++  supports task-specific cases, explicit metrics, human calibration, and repeatable comparisons.
++  This plan uses those methods without depending on a hosted eval platform or a particular vendor.
++
++Read applicable AGENTS.md files and graft context before implementation; trace every shared symbol
++before changing it. Record focused commands, selected/executed counts, results and unavailable
++checks per batch. Run the final complete verification gate once after integration. Every Markdown
++file here must appear in `NO_BACKWARD_COMPATIBILITY_NOTES` in `src/main.rs`.
+diff --git a/src/adapters/http/pages/agent_settings.rs b/src/adapters/http/pages/agent_settings.rs
+index b1e284f9..c091aa06 100644
+--- a/src/adapters/http/pages/agent_settings.rs
++++ b/src/adapters/http/pages/agent_settings.rs
+@@ -809,7 +809,7 @@ pub(super) fn agent_avatar_field(id_prefix: &str, draft: &AgentDraft<'_>) -> Str
+         Ok(stored) => stored,
+         Err(message) => {
+             return format!(
+-                r#"<label class="form-control">Agent Picture<input type="text" class="input input-bordered" name="avatar_url" value="{value}" aria-invalid="true"><span class="text-error">{message}</span></label>"#,
++                r#"<label class="form-control">Agent Picture<input type="text" class="input" name="avatar_url" value="{value}" aria-invalid="true"><span class="text-error">{message}</span></label>"#,
+                 value = escape_html_attr(draft.avatar_url),
+                 message = escape_html_text(&message)
+             );
+diff --git a/src/adapters/http/routes/workflows/run_filter_tests.rs b/src/adapters/http/routes/workflows/run_filter_tests.rs
+index bff4a2fb..3b586bba 100644
+--- a/src/adapters/http/routes/workflows/run_filter_tests.rs
++++ b/src/adapters/http/routes/workflows/run_filter_tests.rs
+@@ -3,9 +3,15 @@
+ //! through a pinned child — combined with the other filters and the cursor, and only ever for an
+ //! agent of the company being listed.
+ use super::*;
++use crate::application::agent::{
++    AgentPublicationKey, AgentPublicationScope, AgentPublications, PublishAgent,
++};
++use crate::application::workflow::WorkflowActor;
++use crate::domain::workflow::CompanyId;
++use crate::entities::agent_capability::AgentId;
+ 
+ impl Fixture {
+-    /// An agent of `company` on an enabled model connection, as publication requires.
++    /// A published agent of `company` on an enabled model connection.
+     pub(super) async fn model_agent(&self, company: Uuid, slug: &str) -> Uuid {
+         sqlx::query(
+             "INSERT INTO company_model_connections(company_id, provider, api_key, models) \
+@@ -15,7 +21,7 @@ impl Fixture {
+         .execute(self.persistence.pool())
+         .await
+         .unwrap();
+-        AgentPersistence::create(
++        let agent = AgentPersistence::create(
+             &self.persistence,
+             company,
+             AgentWrite {
+@@ -27,8 +33,27 @@ impl Fixture {
+             },
+         )
+         .await
+-        .unwrap()
+-        .id
++        .unwrap();
++        let user = if company == self.company {
++            self.owner
++        } else {
++            assert_eq!(company, self.other);
++            self.stranger
++        };
++        self.persistence
++            .publish_agent(PublishAgent {
++                scope: AgentPublicationScope {
++                    company: CompanyId::new(company),
++                    actor: WorkflowActor::authenticated(user).unwrap(),
++                    agent: AgentId::new(agent.id),
++                },
++                expected_draft_revision: agent.draft_revision,
++                expected_active_revision: None,
++                key: AgentPublicationKey::parse(Uuid::new_v4().to_string()).unwrap(),
++            })
++            .await
++            .unwrap();
++        agent.id
+     }
+ 
+     /// `source` saved over draft `revision` of `workflow` and published: the new version.
+@@ -329,7 +354,19 @@ async fn run_agent_filter_finds_only_an_agent_of_the_company() {
+     let (status, page) = f.runs_page(f.stranger, f.other, by_agent(mine)).await;
+     assert_eq!(status, StatusCode::NOT_FOUND, "{page}");
+ 
+-    let idle = f.model_agent(company, "idle").await;
++    // Draft-only agents can be deleted; published revisions must retain their identity.
++    let idle = AgentPersistence::create(
++        &f.persistence,
++        company,
++        AgentWrite {
++            name: "Idle".into(),
++            slug: "idle".into(),
++            ..Default::default()
++        },
++    )
++    .await
++    .unwrap()
++    .id;
+     assert!(f.listed(owner, company, by_agent(idle)).await.is_empty());
+     AgentPersistence::delete(&f.persistence, idle)
+         .await
+diff --git a/src/adapters/http/routes/workflows/ui/authoring/publish_tests.rs b/src/adapters/http/routes/workflows/ui/authoring/publish_tests.rs
+index 4abf26fc..12db76d6 100644
+--- a/src/adapters/http/routes/workflows/ui/authoring/publish_tests.rs
++++ b/src/adapters/http/routes/workflows/ui/authoring/publish_tests.rs
+@@ -1,4 +1,4 @@
+-//! Publication from the editor: the preview of frozen agents and selected connections, a publish
++//! Publication from the editor: the preview of agent references and selected connections, a publish
+ //! that moves no binding, compare, stale and conflicting publishes, and MCP selections.
+ use super::*;
+ 
+@@ -153,31 +153,12 @@ async fn a_publish_of_a_revision_that_is_no_longer_the_draft_is_refused_in_the_e
+ }
+ 
+ #[tokio::test]
+-async fn an_agent_step_previews_the_agents_frozen_tools_and_skills() {
++async fn an_agent_step_previews_the_published_agent_reference_and_use() {
+     let Some(f) = Fixture::new().await else {
+         return;
+     };
+-    sqlx::query(
+-        "INSERT INTO company_model_connections(company_id, provider, api_key, models) \
+-         VALUES ($1, 'openai', 'fixture-key', '{gpt-test}')",
+-    )
+-    .bind(f.company)
+-    .execute(f.persistence.pool())
+-    .await
+-    .unwrap();
+-    AgentPersistence::create(
+-        &f.persistence,
+-        f.company,
+-        AgentWrite {
+-            name: "Assistant".into(),
+-            slug: "assistant".into(),
+-            provider: Some("openai".into()),
+-            model: Some("gpt-test".into()),
+-            ..Default::default()
+-        },
+-    )
+-    .await
+-    .unwrap();
++    let agent = f.agent("Assistant", "assistant").await;
++    f.publish_agent(agent).await;
+     let workflow = Uuid::new_v4();
+     let source = source_of("agent.run", workflow);
+     f.draft(workflow, "Agent", &source).await;
+@@ -194,10 +175,10 @@ async fn an_agent_step_previews_the_agents_frozen_tools_and_skills() {
+         .await
+         .unwrap();
+     assert!(html.contains("Revision 2 is valid"), "{html}");
+-    assert!(html.contains("Uses the agent's tools and skills"));
+-    assert!(html.contains("source: the agent, frozen at publication"));
+-    assert!(html.contains("tools: no tools") && html.contains("skills: no skills"));
+-    assert!(html.contains("openai / gpt-test"));
++    assert!(html.contains("Assistant"));
++    assert!(html.contains(r#"agent <span class="font-mono">@assistant</span>"#));
++    assert!(html.contains("start (agent tools and skills)"));
++    assert!(html.contains("The published agent revision is selected when a run starts."));
+ }
+ 
+ #[tokio::test]
+@@ -312,32 +293,13 @@ async fn an_mcp_step_validates_publishes_through_the_selected_slot_and_locates_b
+ }
+ 
+ #[tokio::test]
+-async fn a_parameter_selected_agent_step_previews_every_frozen_candidate() {
++async fn a_parameter_selected_agent_step_previews_every_published_candidate() {
+     let Some(f) = Fixture::new().await else {
+         return;
+     };
+-    sqlx::query(
+-        "INSERT INTO company_model_connections(company_id, provider, api_key, models) \
+-         VALUES ($1, 'openai', 'fixture-key', '{gpt-test}')",
+-    )
+-    .bind(f.company)
+-    .execute(f.persistence.pool())
+-    .await
+-    .unwrap();
+     for slug in ["assistant", "helper"] {
+-        AgentPersistence::create(
+-            &f.persistence,
+-            f.company,
+-            AgentWrite {
+-                name: format!("Agent {slug}"),
+-                slug: slug.into(),
+-                provider: Some("openai".into()),
+-                model: Some("gpt-test".into()),
+-                ..Default::default()
+-            },
+-        )
+-        .await
+-        .unwrap();
++        let agent = f.agent(&format!("Agent {slug}"), slug).await;
++        f.publish_agent(agent).await;
+     }
+     let workflow = Uuid::new_v4();
+     let mut source = example("agent.run", workflow);
+@@ -362,9 +324,10 @@ async fn a_parameter_selected_agent_step_previews_every_frozen_candidate() {
+     assert!(html.contains("Revision 2 is valid"), "{html}");
+     assert!(html.contains("Agent assistant") && html.contains("Agent helper"));
+     assert_eq!(
+-        html.matches("tools: no tools").count(),
++        html.matches("The published agent revision is selected when a run starts.")
++            .count(),
+         2,
+-        "each candidate's tools"
++        "each candidate's published reference"
+     );
+     assert!(html.contains(r#"the agent named by <span class="font-mono">/params/agent</span> at run time, one of @assistant, @helper"#));
+ }
+@@ -416,28 +379,9 @@ async fn a_parameter_selected_step_lists_its_own_parameters_agents() {
+     let Some(f) = Fixture::new().await else {
+         return;
+     };
+-    sqlx::query(
+-        "INSERT INTO company_model_connections(company_id, provider, api_key, models) \
+-         VALUES ($1, 'openai', 'fixture-key', '{gpt-test}')",
+-    )
+-    .bind(f.company)
+-    .execute(f.persistence.pool())
+-    .await
+-    .unwrap();
+     for slug in ["assistant", "helper"] {
+-        AgentPersistence::create(
+-            &f.persistence,
+-            f.company,
+-            AgentWrite {
+-                name: format!("Agent {slug}"),
+-                slug: slug.into(),
+-                provider: Some("openai".into()),
+-                model: Some("gpt-test".into()),
+-                ..Default::default()
+-            },
+-        )
+-        .await
+-        .unwrap();
++        let agent = f.agent(&format!("Agent {slug}"), slug).await;
++        f.publish_agent(agent).await;
+     }
+     // `start` names @assistant literally; `second` picks from an enum holding only @helper.
+     let workflow = Uuid::new_v4();
+diff --git a/src/adapters/http/routes/workflows/ui/authoring/tests.rs b/src/adapters/http/routes/workflows/ui/authoring/tests.rs
+index 5b04dd70..5f4a67fc 100644
+--- a/src/adapters/http/routes/workflows/ui/authoring/tests.rs
++++ b/src/adapters/http/routes/workflows/ui/authoring/tests.rs
+@@ -212,6 +212,26 @@ impl Fixture {
+         .unwrap()
+         .id
+     }
++
++    async fn publish_agent(&self, agent: Uuid) {
++        use crate::application::agent::{AgentPublicationKey, AgentPublicationScope, PublishAgent};
++        let scope = AgentPublicationScope {
++            company: CompanyId::new(self.company),
++            actor: WorkflowActor::authenticated(self.owner).unwrap(),
++            agent: crate::entities::agent_capability::AgentId::new(agent),
++        };
++        let publications = self.engine.agent_publications();
++        let preview = publications.preview_agent(scope).await.unwrap();
++        publications
++            .publish_agent(PublishAgent {
++                scope,
++                expected_draft_revision: preview.draft_revision,
++                expected_active_revision: preview.active_revision,
++                key: AgentPublicationKey::parse(Uuid::new_v4().to_string()).unwrap(),
++            })
++            .await
++            .unwrap();
++    }
+ }
+ 
+ fn form(fields: &[(&str, &str)]) -> Bytes {
+diff --git a/src/adapters/http/routes/workflows/ui/authoring/tools_tests.rs b/src/adapters/http/routes/workflows/ui/authoring/tools_tests.rs
+index 6a99587b..9f89ac64 100644
+--- a/src/adapters/http/routes/workflows/ui/authoring/tools_tests.rs
++++ b/src/adapters/http/routes/workflows/ui/authoring/tools_tests.rs
+@@ -295,7 +295,7 @@ async fn used_by_lists_a_binding_that_reaches_the_agent_only_through_a_child_dia
+         return;
+     };
+     let agent = f.agent("Assistant", "assistant").await;
+-    f.publish_usage_agent(agent).await;
++    f.publish_agent(agent).await;
+     // The grandchild runs the agent; two children each call it; the parent calls both.
+     let grandchild = Uuid::new_v4();
+     let mut source = example("agent.run", grandchild);
+@@ -397,25 +397,3 @@ async fn used_by_lists_a_binding_that_reaches_the_agent_only_through_a_child_dia
+         "{gone}"
+     );
+ }
+-
+-impl Fixture {
+-    async fn publish_usage_agent(&self, agent: Uuid) {
+-        use crate::application::agent::{AgentPublicationKey, AgentPublicationScope, PublishAgent};
+-        let scope = AgentPublicationScope {
+-            company: CompanyId::new(self.company),
+-            actor: WorkflowActor::authenticated(self.owner).unwrap(),
+-            agent: crate::entities::agent_capability::AgentId::new(agent),
+-        };
+-        let publications = self.engine.agent_publications();
+-        let preview = publications.preview_agent(scope).await.unwrap();
+-        publications
+-            .publish_agent(PublishAgent {
+-                scope,
+-                expected_draft_revision: preview.draft_revision,
+-                expected_active_revision: preview.active_revision,
+-                key: AgentPublicationKey::parse(Uuid::new_v4().to_string()).unwrap(),
+-            })
+-            .await
+-            .unwrap();
+-    }
+-}
+diff --git a/src/adapters/persistence/onboarding/tests.rs b/src/adapters/persistence/onboarding/tests.rs
+index 36f72261..e895489c 100644
+--- a/src/adapters/persistence/onboarding/tests.rs
++++ b/src/adapters/persistence/onboarding/tests.rs
+@@ -169,6 +169,21 @@ impl Fixture {
+                 .await?,
+         )
+     }
++    async fn rename_agent(&self, agent: Uuid) {
++        AgentPersistence::update(
++            self.persistence.as_ref(),
++            agent,
++            AgentWrite {
++                name: "Archived desk".into(),
++                slug: "archived".into(),
++                provider: Some("openai".into()),
++                model: Some("gpt-4o-mini".into()),
++                ..Default::default()
++            },
++        )
++        .await
++        .unwrap();
++    }
+     async fn totals(&self) -> (i64, i64, i64) {
+         sqlx::query_as(
+             "SELECT (SELECT count(*) FROM agents WHERE company_id IS NOT NULL), \
+@@ -310,7 +325,8 @@ async fn onboarding_address_refusal_keeps_the_agent_and_other_channels() {
+ }
+ 
+ #[tokio::test]
+-async fn onboarding_same_key_reuses_results_and_new_key_after_deletion_is_fresh() {
++async fn onboarding_same_key_replays_and_new_key_after_channel_deletion_and_agent_rename_is_fresh()
++{
+     let f = Fixture::new(false).await;
+     let library = f.library("desk", "Desk").await;
+     let key = Uuid::new_v4();
+@@ -325,7 +341,7 @@ async fn onboarding_same_key_reuses_results_and_new_key_after_deletion_is_fresh(
+     )
+     .unwrap();
+     // A channel with workflow configuration is intentionally retained. This private fixture has
+-    // no runs; remove its unused binding before exercising the supported channel/agent deletion.
++    // no runs; remove its unused binding before exercising channel deletion.
+     let removed =
+         sqlx::query("DELETE FROM workflow_bindings WHERE company_id = $1 AND channel_id = $2")
+             .bind(f.company)
+@@ -338,12 +354,15 @@ async fn onboarding_same_key_reuses_results_and_new_key_after_deletion_is_fresh(
+     ChannelPersistence::delete(f.persistence.as_ref(), channel)
+         .await
+         .unwrap();
+-    AgentPersistence::delete(f.persistence.as_ref(), first[0].agent.id)
+-        .await
+-        .unwrap();
++    assert!(matches!(
++        AgentPersistence::delete(f.persistence.as_ref(), first[0].agent.id).await,
++        Err(AppError::Conflict(_))
++    ));
++    f.rename_agent(first[0].agent.id).await;
+     let fresh = f.onboard(Uuid::new_v4(), &[library], false).await.unwrap();
+     assert_ne!(ids(&first), ids(&fresh));
+-    assert_eq!(f.totals().await, (1, 1, 2));
++    assert_ne!(first[0].agent.id, fresh[0].agent.id);
++    assert_eq!(f.totals().await, (2, 1, 2));
+ }
+ 
+ #[tokio::test]
+@@ -351,19 +370,7 @@ async fn onboarding_new_key_after_rename_does_not_replay_an_old_channel() {
+     let f = Fixture::new(false).await;
+     let library = f.library("desk", "Desk").await;
+     let first = f.onboard(Uuid::new_v4(), &[library], false).await.unwrap();
+-    AgentPersistence::update(
+-        f.persistence.as_ref(),
+-        first[0].agent.id,
+-        AgentWrite {
+-            name: "Archived desk".into(),
+-            slug: "archived".into(),
+-            provider: Some("openai".into()),
+-            model: Some("gpt-4o-mini".into()),
+-            ..Default::default()
+-        },
+-    )
+-    .await
+-    .unwrap();
++    f.rename_agent(first[0].agent.id).await;
+     let fresh = f.onboard(Uuid::new_v4(), &[library], false).await.unwrap();
+     assert_ne!(fresh[0].agent.id, first[0].agent.id);
+     assert!(matches!(
+@@ -754,19 +761,7 @@ async fn onboarding_new_owner_with_new_key_does_not_replay_the_previous_owners_c
+     let f = Fixture::new(false).await;
+     let library = f.library("desk", "Desk").await;
+     let first = f.onboard(Uuid::new_v4(), &[library], false).await.unwrap();
+-    AgentPersistence::update(
+-        f.persistence.as_ref(),
+-        first[0].agent.id,
+-        AgentWrite {
+-            name: "Archive".into(),
+-            slug: "archive".into(),
+-            provider: Some("openai".into()),
+-            model: Some("gpt-4o-mini".into()),
+-            ..Default::default()
+-        },
+-    )
+-    .await
+-    .unwrap();
++    f.rename_agent(first[0].agent.id).await;
+     let owner = f
+         .persistence
+         .create_user("new-owner", "new-owner@example.test", "hash")
+@@ -774,6 +769,17 @@ async fn onboarding_new_owner_with_new_key_does_not_replay_the_previous_owners_c
+         .unwrap()
+         .id;
+     transfer_company_ownership(&f.db.pool, f.company, owner, CompanyAccessRole::Admin).await;
++    let mut membership = f.db.pool.begin().await.unwrap();
++    crate::adapters::persistence::participant::create_person_principal_on(
++        &mut membership,
++        f.company,
++        owner,
++        "new-owner",
++        "new-owner@example.test",
++    )
++    .await
++    .unwrap();
++    membership.commit().await.unwrap();
+     let fresh = completed(
+         f.service
+             .onboard(
+diff --git a/src/adapters/persistence/workflow/action_tests.rs b/src/adapters/persistence/workflow/action_tests.rs
+index 68353836..a7a2979b 100644
+--- a/src/adapters/persistence/workflow/action_tests.rs
++++ b/src/adapters/persistence/workflow/action_tests.rs
+@@ -5,11 +5,12 @@ use crate::application::workflow::actions::*;
+ async fn setup() -> (AdmissionFixture, ActionRequest) {
+     let (fixture, execution) = fixture().await;
+     fixture.persistence().activate(execution).await.unwrap();
+-    let request = action_request(ActionScope {
++    let mut request = action_request(ActionScope {
+         company: execution.company,
+         run: execution.run,
+         execution: execution.execution,
+     });
++    request.context.actor = fixture.binding.target.actor.user_id();
+     (fixture, request)
+ }
+ 
+@@ -156,8 +157,7 @@ async fn workflow_action_numeric_jsonb_roundtrip_preserves_digest_and_replay() {
+ 
+ #[tokio::test]
+ async fn workflow_action_authority_sql_scope_actor_and_current_membership() {
+-    let (f, mut request) = setup().await;
+-    request.context.actor = f.binding.target.actor.user_id();
++    let (f, request) = setup().await;
+     let service = ActionService::new(f.persistence().clone());
+     let intent = service
+         .prepare_tool(
+@@ -211,8 +211,7 @@ async fn workflow_action_authority_sql_scope_actor_and_current_membership() {
+ 
+ #[tokio::test]
+ async fn workflow_action_authority_revocation_contender_blocks_then_rechecks() {
+-    let (f, mut request) = setup().await;
+-    request.context.actor = f.binding.target.actor.user_id();
++    let (f, request) = setup().await;
+     let intent = ActionService::new(f.persistence().clone())
+         .prepare_step(request.clone())
+         .await
+@@ -244,8 +243,7 @@ async fn workflow_action_authority_revocation_contender_blocks_then_rechecks() {
+ 
+ #[tokio::test]
+ async fn workflow_action_authority_run_lock_wait_cannot_cross_deadline() {
+-    let (f, mut request) = setup().await;
+-    request.context.actor = f.binding.target.actor.user_id();
++    let (f, request) = setup().await;
+     let intent = ActionService::new(f.persistence().clone())
+         .prepare_step(request.clone())
+         .await
+diff --git a/src/adapters/persistence/workflow/knowledge_e2e_mcp_tests.rs b/src/adapters/persistence/workflow/knowledge_e2e_mcp_tests.rs
+index 87d6eb1b..cdb45f80 100644
+--- a/src/adapters/persistence/workflow/knowledge_e2e_mcp_tests.rs
++++ b/src/adapters/persistence/workflow/knowledge_e2e_mcp_tests.rs
+@@ -83,6 +83,7 @@ async fn configure_connection(
+     )
+     .await
+     .unwrap();
++    j.d.fixture.publish_agent(agent).await;
+     j.d.mcp_selections = vec![McpPublicationSelection {
+         connection: connection.id,
+         slot: ResourceName::parse("service").unwrap(),
+diff --git a/src/adapters/persistence/workflow/knowledge_e2e_support.rs b/src/adapters/persistence/workflow/knowledge_e2e_support.rs
+index 5501e8a0..e90220d6 100644
+--- a/src/adapters/persistence/workflow/knowledge_e2e_support.rs
++++ b/src/adapters/persistence/workflow/knowledge_e2e_support.rs
+@@ -135,6 +135,7 @@ async fn configure(d: &Deployment, audience: Audience) {
+     )
+     .await
+     .unwrap();
++    d.fixture.publish_agent(agent).await;
+     ChannelPersistence::update(
+         d.p(),
+         ChannelUpdate {
+diff --git a/src/adapters/persistence/workflow/message_agent_tests.rs b/src/adapters/persistence/workflow/message_agent_tests.rs
+index ee2277d3..8da17d0f 100644
+--- a/src/adapters/persistence/workflow/message_agent_tests.rs
++++ b/src/adapters/persistence/workflow/message_agent_tests.rs
+@@ -29,11 +29,7 @@ use crate::services::test_support::{
+     LlmTurn, SCRIPTED_MODEL, SCRIPTED_PROVIDER, register_scripted_agent_base_url, scripted_llm,
+ };
+ 
+-#[tokio::test]
+-async fn workflow_agent_message_tool_parks_on_delivery_and_continues_with_its_receipt() {
+-    let fixture = Fixture::new().await;
+-    let channel = new_channel(&fixture, "runs").await;
+-    let user = member(&fixture, "member").await;
++async fn published_message_agent(fixture: &Fixture) -> Uuid {
+     let p = fixture.persistence.clone();
+     let company = fixture.target.company;
+     let agent = AgentPersistence::create(
+@@ -68,6 +64,18 @@ async fn workflow_agent_message_tool_parks_on_delivery_and_continues_with_its_re
+     )
+     .await
+     .unwrap();
++    fixture.publish_agent(agent.id).await;
++    agent.id
++}
++
++#[tokio::test]
++async fn workflow_agent_message_tool_parks_on_delivery_and_continues_with_its_receipt() {
++    let fixture = Fixture::new().await;
++    let channel = new_channel(&fixture, "runs").await;
++    let user = member(&fixture, "member").await;
++    // Keep publication setup off the stock test thread's stack.
++    let agent = Box::pin(published_message_agent(&fixture)).await;
++    let p = fixture.persistence.clone();
+     let definitions = DefinitionService::new(
+         Preflight,
+         p.clone(),
+@@ -96,7 +104,7 @@ async fn workflow_agent_message_tool_parks_on_delivery_and_continues_with_its_re
+         LlmTurn::text("\"sent\""),
+     ])
+     .await;
+-    register_scripted_agent_base_url(agent.id, &llm.base_url);
++    register_scripted_agent_base_url(agent, &llm.base_url);
+     let runtime = WorkflowAgentRuntime::new(
+         ProviderRegistry::standard().unwrap(),
+         p.clone(),
+diff --git a/src/main.rs b/src/main.rs
+index ad62769d..bd4c2588 100644
+--- a/src/main.rs
++++ b/src/main.rs
+@@ -237,6 +237,14 @@ const NO_BACKWARD_COMPATIBILITY_NOTES: &[&str] = &[
+     "plan/doop-canvas/04-results-and-human-access.md",
+     "plan/doop-canvas/05-operations-and-lifecycle.md",
+     "plan/doop-canvas/06-integration-and-verification.md",
++    "plan/evals/README.md",
++    "plan/evals/01-contracts-and-dataset-model.md",
++    "plan/evals/02-storage-and-suite-management.md",
++    "plan/evals/03-scripted-evaluation.md",
++    "plan/evals/04-live-models-and-integrations.md",
++    "plan/evals/05-graders-and-hard-gates.md",
++    "plan/evals/06-comparisons-and-authoring.md",
++    "plan/evals/07-verification-and-operations.md",
+     "plan/fix-app/README.md",
+     "plan/fix-app/01-identity-and-ownership.md",
+     "plan/fix-app/02-silent-stalls.md",

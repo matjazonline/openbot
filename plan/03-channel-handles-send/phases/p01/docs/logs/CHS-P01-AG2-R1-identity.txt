@@ -1,0 +1,7 @@
+2026-11-06 CHS-P01-AG2-R1 final identity
+base:   769a23aa6ef423e964f8221a8ee6b0743325c6ba
+digest: eec077d537f975767e3d1d0deed360b88a76b40730a910c85caad126bc6fc4a7
+HEAD: 769a23aa6ef423e964f8221a8ee6b0743325c6ba
+branch: main
+Coordination r2 unchanged, active I001-I003/r1,I004/r2,I005-I006/r1.
+PASS exact D1/r3-proposed decision; B1 implementation findings remain open.

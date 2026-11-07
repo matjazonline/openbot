@@ -26,7 +26,13 @@ use crate::domain::workflow::{FailureClass, FailureCode, RetrySafety, StepFailur
 pub fn marker_owned_effect_kind(kind: &str) -> bool {
     matches!(
         kind,
-        "http.request" | "tool.call" | "mcp.call" | "message.send" | "message.reply" | "agent.run"
+        "http.request"
+            | "tool.call"
+            | "mcp.call"
+            | "message.send"
+            | "message.reply"
+            | "message.ask"
+            | "agent.run"
     )
 }
 
@@ -37,6 +43,7 @@ pub fn effect_free_kind(kind: &str) -> bool {
     matches!(
         kind,
         "data.map"
+            | "channel.no_reply"
             | "decision.rule"
             | "decision.human"
             | "decision.agent"
@@ -290,6 +297,7 @@ mod tests {
             "mcp.call",
             "message.send",
             "message.reply",
+            "message.ask",
             "agent.run",
         ] {
             assert!(marker_owned_effect_kind(kind));

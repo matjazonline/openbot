@@ -1,0 +1,62 @@
+{
+  "digest": "0995151ed93e67f2e5feee8092cdc08687580b79f1d988d40d5d072d5e39decf",
+  "checks": {
+    "correction-binding-tests-02": {
+      "receipt": "correction-binding-tests-02.json",
+      "exit_code": 0,
+      "seconds": 7.062
+    },
+    "correction-intents-tests-02": {
+      "receipt": "correction-intents-tests-02.json",
+      "exit_code": 0,
+      "seconds": 5.461
+    },
+    "correction-actor-tests-02": {
+      "receipt": "correction-actor-tests-02.json",
+      "exit_code": 0,
+      "seconds": 0.882
+    },
+    "correction-fresh-migrate-01": {
+      "receipt": "correction-fresh-migrate-01.json",
+      "exit_code": 0,
+      "seconds": 0.874
+    },
+    "correction-fresh-test-migrate-01": {
+      "receipt": "correction-fresh-test-migrate-01.json",
+      "exit_code": 0,
+      "seconds": 0.876
+    },
+    "correction-sqlx-prepare-02": {
+      "receipt": "correction-sqlx-prepare-02.json",
+      "exit_code": 0,
+      "seconds": 62.434
+    },
+    "correction-sqlx-check-02": {
+      "receipt": "correction-sqlx-check-02.json",
+      "exit_code": 0,
+      "seconds": 64.276
+    },
+    "correction-clippy-offline-02": {
+      "receipt": "correction-clippy-offline-02.json",
+      "exit_code": 0,
+      "seconds": 75.892
+    },
+    "correction-fmt-02": {
+      "receipt": "correction-fmt-02.json",
+      "exit_code": 0,
+      "seconds": 2.164
+    },
+    "correction-diff-02": {
+      "receipt": "correction-diff-02.json",
+      "exit_code": 0,
+      "seconds": 0.025
+    }
+  },
+  "focused_correction_selected": 34,
+  "focused_correction_pass": 34,
+  "total_unique_primary_selected": 84,
+  "total_unique_primary_pass": 82,
+  "baseline_confirmed_inherited_failures": 2,
+  "full_suite": false,
+  "reused_evidence": "R1 author checks and unchanged source hashes; no unrelated source modifications"
+}

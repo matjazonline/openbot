@@ -1,0 +1,30 @@
+[
+  {
+    "filter": "channel_reply_terminal_",
+    "selected": 21,
+    "exit_code": 0,
+    "inventory": "correction-terminal-list-01",
+    "execution": "correction-terminal-tests-01"
+  },
+  {
+    "filter": "application::workflow::actions::failure::tests::",
+    "selected": 4,
+    "exit_code": 0,
+    "inventory": "correction-failure-list-01",
+    "execution": "correction-failure-tests-01"
+  },
+  {
+    "filter": "application::workflow::registry::",
+    "selected": 57,
+    "exit_code": 0,
+    "inventory": "correction-registry-list-01",
+    "execution": "correction-registry-tests-01"
+  },
+  {
+    "filter": "workflow_poison_",
+    "selected": 12,
+    "exit_code": 0,
+    "inventory": "correction-recovery-list-01",
+    "execution": "correction-recovery-tests-01"
+  }
+]

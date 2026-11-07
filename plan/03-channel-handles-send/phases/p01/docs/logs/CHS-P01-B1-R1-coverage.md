@@ -1,0 +1,9 @@
+# B1 R1 in-progress reviewer coverage — 2026-11-06
+
+Source identity verified on entry: eec077d537f975767e3d1d0deed360b88a76b40730a910c85caad126bc6fc4a7, base/HEAD769a23aa6ef423e964f8221a8ee6b0743325c6ba; manifest exact nine exclusions; coordination r2 matches pinned copy.
+
+Inspected all 16 changed/new files: migration's three tables/five trigger functions, application contract/newtypes/port and eight unit tests, persistence selection/read/write and frozen admission/link helpers, binding row reader/current verifier/candidate query deltas, all17 new database tests and module registration. Reused gate requirement records, original phase01 and dependent original plan contracts. Traced frozen_revision/read_binding_at/link_run callers with graft; shared binding callers include schedules and provisioning/onboarding. Inspected existing company/association authorization, binding run-as checks, Message claim guard and source authorization. Inspected exact primary/baseline logs for both onboarding failures: same errors at unchanged343/787, proving inherited status.
+
+No acceptance yet. Further review: current-run-as visibility at settings selection; inactive selected binding at ingress; proof of trigger eligibility/authentic claim at the new persistent link boundary; selection-vs-ingress concurrency coverage. Author runtime evidence8 contract+17 binding PASS inspected via receipts pending final audit.
+
+Reviewer runtime attempts: reviewer-channel-reply-list-01 and03 fail before test invocation with nested sandbox-exec sandbox_apply Operation not permitted (exit71). An escalation retry02 was interrupted after waiting for approval; no02 receipt generated. Parent notified immediately after checkpoint; do not mistake blocked inventory for zero selected tests or test failure. Continue inspection and reuse author executed evidence; no guard bypass, no source/cache edits.

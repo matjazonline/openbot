@@ -1,0 +1,23 @@
+{
+  "phase": "p02",
+  "status": "accepted in phase; plan integration pending",
+  "digest": "aa7cd3e8ddd572c6dd7a551cc69a8119769b09b8ace32b567744f4d1fc11ed5e",
+  "head": "769a23aa6ef423e964f8221a8ee6b0743325c6ba",
+  "review": "CHS-P02-B1-R2",
+  "architecture": "CHS-P02-D1/r2",
+  "coordination_revision": 3,
+  "source_hashes": "all50 match",
+  "checks": {
+    "correction-clippy-01": 0,
+    "correction-fmt-01": 0,
+    "correction-diff-01": 0,
+    "correction-graft-01": 0,
+    "correction-sqlx-prepare-01": 0,
+    "correction-sqlx-check-01": 0
+  },
+  "focused_unique_tests": 226,
+  "full_suite": false,
+  "unrelated_failures": "two p01 onboarding failures reproduced at original HEAD; untouched",
+  "root": "/root, user-confirmed Sol6.1/xhigh",
+  "reviewer": "/root/channel_reply_reviewer, requested Astra/high independent context"
+}

@@ -90,13 +90,17 @@ impl CandidateRow {
 }
 
 /// The eligibility read; `$4` narrows it to one binding for a `Stale` re-read.
-const CANDIDATES: &str = "SELECT binding.id, binding.configuration_revision, \
+const CANDIDATES: &str = "SELECT binding.id, configuration.revision AS configuration_revision, \
        configuration.run_as_user_id, configuration.message_trigger \
      FROM workflow_bindings AS binding \
-     JOIN workflow_binding_revisions AS configuration ON configuration.company_id = binding.company_id \
-       AND configuration.binding_id = binding.id AND configuration.revision = binding.configuration_revision \
      JOIN workflow_message_intents AS intent ON intent.company_id = binding.company_id AND intent.id = $2 \
-     WHERE binding.company_id = $1 AND binding.active AND binding.activated_at <= intent.created_at \
+     LEFT JOIN channel_reply_contexts AS response ON response.company_id=intent.company_id \
+       AND response.intent_id=intent.id AND response.binding_id=binding.id \
+     JOIN workflow_binding_revisions AS configuration ON configuration.company_id = binding.company_id \
+       AND configuration.binding_id = binding.id \
+       AND configuration.revision = COALESCE(response.binding_revision,binding.configuration_revision) \
+     WHERE binding.company_id = $1 \
+       AND (response.intent_id IS NOT NULL OR (binding.active AND binding.activated_at <= intent.created_at)) \
        AND configuration.message_trigger IS NOT NULL \
        AND binding.channel_id = intent.channel_id \
        AND (binding.thread_id IS NULL OR binding.thread_id = intent.thread_id) \

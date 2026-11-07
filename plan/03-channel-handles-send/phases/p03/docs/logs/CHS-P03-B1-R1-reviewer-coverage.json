@@ -1,0 +1,196 @@
+{
+  "round": "CHS-P03-B1-R1",
+  "digest": "19960fb95b5d0a4fcb1547e317cb46fe91161392f76967d2802364eb1843f808",
+  "all_authored_changed_files_reviewed": [
+    "migrations/20260817000000_init_schema.sql",
+    "src/adapters/persistence/delivery/enqueue.rs",
+    "src/adapters/persistence/mod.rs",
+    "src/adapters/persistence/workflow/action_authority.rs",
+    "src/adapters/persistence/workflow/actions.rs",
+    "src/adapters/persistence/workflow/agent_origin.rs",
+    "src/adapters/persistence/workflow/association.rs",
+    "src/adapters/persistence/workflow/batch.rs",
+    "src/adapters/persistence/workflow/batch_commit.rs",
+    "src/adapters/persistence/workflow/batch_recovery_tests.rs",
+    "src/adapters/persistence/workflow/batch_tests.rs",
+    "src/adapters/persistence/workflow/budget.rs",
+    "src/adapters/persistence/workflow/channel_reply.rs",
+    "src/adapters/persistence/workflow/channel_reply_approvals.rs",
+    "src/adapters/persistence/workflow/channel_reply_binding_integrity_tests.rs",
+    "src/adapters/persistence/workflow/channel_reply_binding_tests.rs",
+    "src/adapters/persistence/workflow/channel_reply_completion.rs",
+    "src/adapters/persistence/workflow/channel_reply_completion_owner_tests.rs",
+    "src/adapters/persistence/workflow/channel_reply_completion_policy_runtime_tests.rs",
+    "src/adapters/persistence/workflow/channel_reply_completion_slot_tests.rs",
+    "src/adapters/persistence/workflow/channel_reply_completion_tests.rs",
+    "src/adapters/persistence/workflow/channel_reply_intent_schema_tests.rs",
+    "src/adapters/persistence/workflow/channel_reply_policy_tests.rs",
+    "src/adapters/persistence/workflow/channel_reply_proposals.rs",
+    "src/adapters/persistence/workflow/channel_reply_publication.rs",
+    "src/adapters/persistence/workflow/channel_reply_refusal.rs",
+    "src/adapters/persistence/workflow/channel_reply_resume.rs",
+    "src/adapters/persistence/workflow/child_waits.rs",
+    "src/adapters/persistence/workflow/completion.rs",
+    "src/adapters/persistence/workflow/completion_job.rs",
+    "src/adapters/persistence/workflow/completion_race_tests.rs",
+    "src/adapters/persistence/workflow/controls.rs",
+    "src/adapters/persistence/workflow/decision_approvals.rs",
+    "src/adapters/persistence/workflow/decisions.rs",
+    "src/adapters/persistence/workflow/guard_failure.rs",
+    "src/adapters/persistence/workflow/http_runtime.rs",
+    "src/adapters/persistence/workflow/jev_authorization.rs",
+    "src/adapters/persistence/workflow/knowledge_release.rs",
+    "src/adapters/persistence/workflow/lease.rs",
+    "src/adapters/persistence/workflow/lease_claim.rs",
+    "src/adapters/persistence/workflow/maintenance.rs",
+    "src/adapters/persistence/workflow/message.rs",
+    "src/adapters/persistence/workflow/message_publish.rs",
+    "src/adapters/persistence/workflow/message_sql_tests.rs",
+    "src/adapters/persistence/workflow/mod.rs",
+    "src/adapters/persistence/workflow/pending_recovery.rs",
+    "src/adapters/persistence/workflow/pending_recovery_tests.rs",
+    "src/adapters/persistence/workflow/provisioning.rs",
+    "src/adapters/persistence/workflow/recovery.rs",
+    "src/adapters/persistence/workflow/wait_commit.rs",
+    "src/adapters/persistence/workflow/waits.rs",
+    "src/application/agent/tool_origin.rs",
+    "src/application/workflow/actions/service.rs",
+    "src/application/workflow/channel_reply/approval.rs",
+    "src/application/workflow/channel_reply/approval_tests.rs",
+    "src/application/workflow/channel_reply/finalization.rs",
+    "src/application/workflow/channel_reply/mod.rs",
+    "src/application/workflow/channel_reply/origin_tests.rs",
+    "src/application/workflow/channel_reply/publication.rs",
+    "src/application/workflow/contracts.rs",
+    "src/application/workflow/message.rs",
+    "src/application/workflow/worker.rs",
+    "src/domain/workflow/ids.rs",
+    "src/domain/workflow/mod.rs",
+    "src/domain/workflow/reply_integrity.rs",
+    "src/infra/workflow.rs"
+  ],
+  "source_delta_base": "aa7cd3e8ddd572c6dd7a551cc69a8119769b09b8ace32b567744f4d1fc11ed5e",
+  "exclusions": [
+    "plan/03-channel-handles-send/COORDINATION.md",
+    "plan/03-channel-handles-send/phases/p01/docs",
+    "plan/03-channel-handles-send/phases/p02/docs",
+    "plan/03-channel-handles-send/phases/p03/docs",
+    "plan/03-channel-handles-send/phases/p04/docs",
+    "plan/03-channel-handles-send/phases/p05/docs",
+    "plan/03-channel-handles-send/phases/p06/docs",
+    "plan/03-channel-handles-send/phases/p07/docs",
+    "plan/03-channel-handles-send/integration/final/docs"
+  ],
+  "checks_inspected": [
+    {
+      "scope": "feature",
+      "selected": 92,
+      "receipt": "affected-feature-tests-01.json",
+      "exit": 0,
+      "summary": "test result: ok. 92 passed; 0 failed; 0 ignored; 0 measured; 3027 filtered out; finished in 27.89s"
+    },
+    {
+      "scope": "batch",
+      "selected": 15,
+      "receipt": "affected-batch-tests-01.json",
+      "exit": 0,
+      "summary": "test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 3104 filtered out; finished in 6.95s"
+    },
+    {
+      "scope": "completion",
+      "selected": 14,
+      "receipt": "affected-completion-tests-01.json",
+      "exit": 0,
+      "summary": "test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 3105 filtered out; finished in 11.45s"
+    },
+    {
+      "scope": "wait",
+      "selected": 20,
+      "receipt": "affected-wait-tests-01.json",
+      "exit": 0,
+      "summary": "test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 3099 filtered out; finished in 14.70s"
+    },
+    {
+      "scope": "child-call",
+      "selected": 9,
+      "receipt": "affected-child-call-tests-01.json",
+      "exit": 0,
+      "summary": "test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 3110 filtered out; finished in 3.99s"
+    },
+    {
+      "scope": "repeat",
+      "selected": 4,
+      "receipt": "affected-repeat-tests-01.json",
+      "exit": 0,
+      "summary": "test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 3115 filtered out; finished in 2.55s"
+    },
+    {
+      "scope": "decision",
+      "selected": 38,
+      "receipt": "affected-decision-tests-01.json",
+      "exit": 0,
+      "summary": "test result: ok. 38 passed; 0 failed; 0 ignored; 0 measured; 3081 filtered out; finished in 15.11s"
+    },
+    {
+      "scope": "pending-recovery",
+      "selected": 12,
+      "receipt": "affected-pending-recovery-tests-01.json",
+      "exit": 0,
+      "summary": "test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 3107 filtered out; finished in 4.74s"
+    },
+    {
+      "scope": "protected-action",
+      "selected": 32,
+      "receipt": "affected-protected-action-tests-01.json",
+      "exit": 0,
+      "summary": "test result: ok. 32 passed; 0 failed; 0 ignored; 0 measured; 3087 filtered out; finished in 18.72s"
+    },
+    {
+      "scope": "messaging",
+      "selected": 64,
+      "receipt": "affected-messaging-tests-01.json",
+      "exit": 0,
+      "summary": "test result: ok. 64 passed; 0 failed; 0 ignored; 0 measured; 3055 filtered out; finished in 29.35s"
+    },
+    {
+      "scope": "message-admission",
+      "selected": 14,
+      "receipt": "affected-message-admission-tests-01.json",
+      "exit": 0,
+      "summary": "test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 3105 filtered out; finished in 5.05s"
+    },
+    {
+      "scope": "release",
+      "selected": 49,
+      "receipt": "affected-release-tests-01.json",
+      "exit": 0,
+      "summary": "test result: ok. 49 passed; 0 failed; 0 ignored; 0 measured; 3070 filtered out; finished in 22.75s"
+    },
+    {
+      "scope": "sample",
+      "selected": 15,
+      "receipt": "affected-sample-tests-01.json",
+      "exit": 0,
+      "summary": "test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 3104 filtered out; finished in 0.37s"
+    },
+    {
+      "scope": "autonomous-agent",
+      "selected": 151,
+      "receipt": "affected-autonomous-agent-tests-01.json",
+      "exit": 0,
+      "summary": "test result: ok. 150 passed; 0 failed; 1 ignored; 0 measured; 2968 filtered out; finished in 27.53s"
+    }
+  ],
+  "author_distinct_selected": 526,
+  "author_passed": 525,
+  "author_ignored": 1,
+  "diagnostic_executed_by": "root mechanically in isolated copy; inspected by reviewer",
+  "diagnostic_receipt": "review-delete-tests-01.json",
+  "diagnostic_result": "0 passed / 2 failed / 0 ignored; both expected rejections instead commit deletion",
+  "reviewer_runtime_execution": false,
+  "full_suite": false,
+  "findings": [
+    "CHS-P03-B1-F1"
+  ],
+  "outcome": "CHANGES REQUIRED"
+}

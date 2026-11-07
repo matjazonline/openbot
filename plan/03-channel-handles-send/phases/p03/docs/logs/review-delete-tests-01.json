@@ -1,0 +1,33 @@
+{
+  "worktree": "/var/folders/qc/f8s9x42x5sz6vbh79sb0cfth0000gn/T/openbot-chs-p03-review-delete-bkvmtj75/worktree",
+  "container": "/var/folders/qc/f8s9x42x5sz6vbh79sb0cfth0000gn/T/openbot-chs-p03-review-delete-bkvmtj75",
+  "preserve_until_review_complete": true,
+  "source_digest": "19960fb95b5d0a4fcb1547e317cb46fe91161392f76967d2802364eb1843f808",
+  "diagnostic_patch": "review-delete-diagnostic.diff",
+  "database_pair": "openbot_chs/openbot_chs_test",
+  "target": "/Users/mac02/dev/openbot/target",
+  "command": [
+    "scripts/test-network-isolation.sh",
+    "cargo",
+    "test",
+    "--locked",
+    "--offline",
+    "--lib",
+    "channel_reply_review_diagnostic_",
+    "--",
+    "--nocapture"
+  ],
+  "environment": {
+    "DATABASE_URL": "postgres://mac02@127.0.0.1:65037/openbot_chs",
+    "TEST_DATABASE_URL": "postgres://mac02@127.0.0.1:65037/openbot_chs_test",
+    "SQLX_OFFLINE": "true",
+    "CARGO_INCREMENTAL": "1",
+    "CARGO_BUILD_JOBS": "4",
+    "RUST_MIN_STACK": "2097152",
+    "CARGO_TARGET_DIR": "/Users/mac02/dev/openbot/target"
+  },
+  "started": "2026-11-07T01:50:11.296170+00:00",
+  "seconds": 149.446,
+  "exit_code": 101,
+  "log": "review-delete-tests-01.log"
+}

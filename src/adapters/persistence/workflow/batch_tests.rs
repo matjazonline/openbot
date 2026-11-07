@@ -1,4 +1,6 @@
 use super::*;
+#[path = "channel_reply_terminal_tests.rs"]
+mod channel_reply_terminal_tests;
 #[path = "child_configuration_tests.rs"]
 mod child_configuration_tests;
 #[path = "child_decision_round_tests.rs"]
@@ -264,9 +266,14 @@ async fn workflow_batch_invalid_scope_lease_due_state_and_bounds_fail_closed() {
         let mut tx = f.persistence().pool().begin().await.unwrap();
         sqlx::raw_sql(statement).execute(&mut *tx).await.unwrap();
         assert!(
-            crate::adapters::persistence::workflow::batch::advance_on(&mut tx, request, budget(64))
-                .await
-                .is_err()
+            crate::adapters::persistence::workflow::batch::advance_on(
+                &mut tx,
+                request,
+                budget(64),
+                None
+            )
+            .await
+            .is_err()
         );
         tx.rollback().await.unwrap();
         assert_eq!(snapshot(&f).await, before);

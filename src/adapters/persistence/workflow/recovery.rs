@@ -254,6 +254,7 @@ async fn route_failure(
             || activation.ordinal < u64::try_from(run.max_steps).map_err(|_| invalid())?
         {
             let completion = PureCompletion {
+                response_disposition: ResponseDisposition::Automatic,
                 output: serde_json::Value::Null,
                 route: RouteSelection::FinalError,
                 state: if target == TransitionTarget::End {
@@ -270,6 +271,7 @@ async fn route_failure(
                 &completion,
                 run.max_steps,
                 completion_job::CompletionOwner::Recovered,
+                None,
             )
             .await?;
             true

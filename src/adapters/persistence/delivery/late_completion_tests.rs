@@ -429,9 +429,9 @@ async fn delivery_late_completion_worker_renews_so_a_slow_batch_completes() {
         .unwrap();
     let worker = DeliveryWorker::new(Arc::new(persistence.clone()), Arc::new(transports))
         .with_lease(Duration::from_secs(2));
-    let (_shutdown, receiver) = tokio::sync::broadcast::channel(1);
+    let (_shutdown, mut receiver) = tokio::sync::broadcast::channel(1);
 
-    let claimed = worker.drain_once(&receiver).await.unwrap();
+    let claimed = worker.drain_once(&mut receiver).await.unwrap();
 
     assert_eq!(claimed, 3);
     for delivery in deliveries {

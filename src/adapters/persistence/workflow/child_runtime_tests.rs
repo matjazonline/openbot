@@ -1,6 +1,8 @@
 //! Runtime `workflow.call` (07-D1 §D1.2, §D1.4, §D1.5, §D1.9): park, consume, cancel, expire.
 use super::child_repeat_tests::{repeat_parent, round_child};
 use super::*;
+#[path = "channel_reply_terminal_child_tests.rs"]
+mod channel_reply_terminal_child_tests;
 use crate::adapters::persistence::workflow::tests::admission_tests::admission_history_tests::Conversation;
 use crate::application::workflow::children::WorkflowChildren;
 use crate::application::workflow::completion::CommitDisposition;

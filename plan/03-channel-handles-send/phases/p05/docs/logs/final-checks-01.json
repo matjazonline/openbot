@@ -1,0 +1,18 @@
+[
+  {
+    "check": "hitl-list-08",
+    "exit": 0
+  },
+  {
+    "check": "hitl-tests-08",
+    "exit": 0
+  },
+  {
+    "check": "message-entry-tests-08",
+    "exit": 0
+  },
+  {
+    "check": "clippy-01",
+    "exit": 101
+  }
+]

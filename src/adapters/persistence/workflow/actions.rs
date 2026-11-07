@@ -19,6 +19,14 @@ impl ActionIntents for PostgresPersistence {
         action: &FrozenAction,
         model_call: Option<&ModelToolCallId>,
     ) -> AppResult<ActionIntent> {
+        if matches!(
+            action.request().context.origin,
+            crate::application::agent::ToolCallOrigin::ChannelFinal(_)
+        ) {
+            return Err(AppError::BadRequest(
+                "Final responses require their terminal owner".into(),
+            ));
+        }
         let mut tx = self.pool().begin().await?;
         sqlx::query("SELECT set_config('lock_timeout','5s',true), set_config('statement_timeout','5s',true)")
             .execute(&mut *tx).await?;
@@ -31,9 +39,9 @@ impl ActionIntents for PostgresPersistence {
                 .ok_or_else(missing)?;
         }
         let active: bool = sqlx::query_scalar(
-            "SELECT state IN ('queued','running') AND deadline > clock_timestamp() FROM workflow_runs \
+            "SELECT state IN ('queued','running') AND deadline > clock_timestamp() AND NOT EXISTS(SELECT 1 FROM channel_reply_proposals WHERE company_id=$1 AND run_id=$2 AND execution_id=$3) FROM workflow_runs \
              WHERE company_id=$1 AND id=$2 FOR UPDATE",
-        ).bind(scope.company.as_uuid()).bind(scope.run.as_uuid())
+        ).bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(scope.execution.as_uuid())
             .fetch_optional(&mut *tx).await?.ok_or_else(missing)?;
         let existing = read(&mut tx, action).await?;
         let replayed = existing.is_some();
@@ -73,7 +81,7 @@ async fn insert(db: &mut PgConnection, action: &FrozenAction) -> AppResult<Inten
         super::knowledge_release::MessageRecipients::Current,
     )
     .await?;
-    let origin = OriginColumns::from(action.request().context.origin);
+    let origin = OriginColumns::try_from(action.request().context.origin)?;
     let decision = match action.decision() {
         ActionPolicyDecision::Unevaluated => "unevaluated",
         ActionPolicyDecision::ApprovalRequired => "approval_required",
@@ -155,10 +163,11 @@ struct OriginColumns {
     revision: Option<Uuid>,
     binding: Option<Uuid>,
 }
-impl From<crate::application::agent::ToolCallOrigin> for OriginColumns {
-    fn from(origin: crate::application::agent::ToolCallOrigin) -> Self {
+impl TryFrom<crate::application::agent::ToolCallOrigin> for OriginColumns {
+    type Error = AppError;
+    fn try_from(origin: crate::application::agent::ToolCallOrigin) -> AppResult<Self> {
         use crate::application::agent::ToolCallOrigin;
-        match origin {
+        Ok(match origin {
             ToolCallOrigin::Workflow => Self {
                 kind: "workflow",
                 manifest: None,
@@ -173,6 +182,7 @@ impl From<crate::application::agent::ToolCallOrigin> for OriginColumns {
                 revision: Some(origin.revision.as_uuid()),
                 binding: Some(origin.binding.as_uuid()),
             },
-        }
+            ToolCallOrigin::ChannelFinal(_) => return Err(missing()),
+        })
     }
 }

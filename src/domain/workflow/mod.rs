@@ -12,6 +12,8 @@ mod graph;
 mod ids;
 mod outcome;
 mod recovery;
+mod reply_integrity;
+mod response;
 mod rule;
 mod state;
 mod transition;
@@ -42,6 +44,7 @@ pub use ids::{
     RuntimeResourceId, ScheduleId, ScheduleOccurrenceId, StepId, TemplateId, TemplateRevision,
     ToolCallId, TriggerId, TypeName, VersionId, WaitId, WorkflowBindingId, WorkflowId,
 };
+pub use ids::{ChannelReplyId, ReplyProposalId};
 pub use outcome::{
     CompletedStep, CompletionRoute, DurableWaitRequest, EngineDisposition, FailureClass,
     KNOWLEDGE_AUDIENCE_BELOW_CONTENT, KnowledgeRefusal, OutcomeError, RetryEligibility,
@@ -51,6 +54,8 @@ pub use recovery::{
     AttemptBudget, RecoveryDecision, RecoveryLimit, RecoveryPolicy, RecoveryPolicyError,
     RecoverySnapshot, RetrySafety,
 };
+pub use reply_integrity::ReplyIntegrity;
+pub use response::{InvalidResponseDisposition, ResponseDisposition};
 pub use rule::{OrderedRule, RuleCase, RuleError};
 pub use state::{RunState, RunStateError, WaitingReason};
 pub use transition::{RouteError, RouteSelection, TransitionTarget, select_route};

@@ -1,0 +1,17 @@
+{
+  "phase": "p05",
+  "status": "accepted in phase; combined integration pending",
+  "source_digest": "6153d305283d257f724e4a1e659fa04ef66c4688403dcce5165b5e6257ccde8c",
+  "head": "f6e133058c69e28c173850657b134b83ac7c6224",
+  "review": "CHS-P05-B1-R3 PASS, reusing CHS-P05-B1-R2 whole-phase pass",
+  "finding": "CHS-P05-B1-F1 FIXED",
+  "source_files_verified": 156,
+  "distinct_targeted_passed": 500,
+  "ignored": 0,
+  "full_suite": false,
+  "coordination_review_pin": 16,
+  "notices": "I001-I003/r1,I004/r2,I005-I006/r1,I007/r2,C001/r1,C002/r1,C003/r2,C004/r2,C005/r1",
+  "user_authorized_deletion": "plan/local_machine_tunnel_plan.md",
+  "next": "commit/push checkpoint main, then p06/p07/history",
+  "archive_sha256": "ddbc626e11dda8abd768533fd0b54ea89fb76770fabb4ef2412cb5f75370fcd3"
+}

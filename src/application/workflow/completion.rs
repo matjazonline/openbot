@@ -1,7 +1,7 @@
 //! Validated successful progression. Failure recovery and parking have separate owners.
 use super::{activation::*, batch::*, lease::FencedWorkflowResult, publication::PublishedBundle};
 use crate::application::app_error::{AppError, AppResult};
-use crate::domain::workflow::{ChoiceName, RouteSelection, TransitionTarget};
+use crate::domain::workflow::{ChoiceName, ResponseDisposition, RouteSelection, TransitionTarget};
 use async_trait::async_trait;
 use serde_json::Value;
 
@@ -14,6 +14,7 @@ pub enum CommitDisposition {
 #[derive(Debug, Clone, PartialEq)]
 pub struct CommittedWorkflowStep {
     pub disposition: CommitDisposition,
+    pub response_disposition: ResponseDisposition,
     pub output: Value,
     pub route: RouteSelection,
     pub target: TransitionTarget,
@@ -48,6 +49,7 @@ pub fn is_io_kind(kind: &str) -> bool {
             | "mcp.call"
             | "message.send"
             | "message.reply"
+            | "message.ask"
     )
 }
 

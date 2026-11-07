@@ -1,0 +1,9 @@
+{
+  "worktree": "/var/folders/qc/f8s9x42x5sz6vbh79sb0cfth0000gn/T/openbot-chs-p04-review-part-bmo8d4ae/worktree",
+  "container": "/var/folders/qc/f8s9x42x5sz6vbh79sb0cfth0000gn/T/openbot-chs-p04-review-part-bmo8d4ae",
+  "preserve_until_review_complete": true,
+  "source_digest": "d5f72e8fb63aba4fe2bac0afe7823f6d71e893a88bb0ef65d6c6de58ed95cb78",
+  "diagnostic_patch": "review-part-diagnostic.diff",
+  "database_pair": "openbot_chs/openbot_chs_test",
+  "target": "/Users/mac02/dev/openbot/target"
+}

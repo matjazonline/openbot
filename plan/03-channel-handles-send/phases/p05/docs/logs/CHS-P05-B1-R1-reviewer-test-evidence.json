@@ -1,0 +1,21 @@
+{
+  "distinct": 425,
+  "missing_PASS": [],
+  "log_sha256": {
+    "hitl-tests-08.log": "996891f2f0d040ba970d739282d9993fc7749593318e80ebafbab5c93c66eb6b",
+    "channel-reply-tests-06.log": "de9a70e5ec50f8aa4182900092536c1c4c3c76fc9d7c64f2e5aae180daac5757",
+    "samples-tests-06.log": "367efc99d9a44759d7af0a1942ebea1d662fceec1575c3888fa08037f1528d9c",
+    "messaging-tests-06.log": "6641b68932942abeee071ff17f4a8722de216f56cba51c55eee58b05c008e977",
+    "message-entry-tests-08.log": "81d725037f1c76a3ab34c83c81cdc2754389266e67807296934a6d190910b6c3",
+    "reply-ingress-tests-06.log": "989b7c99b92a5a4840731a169b54a51b583ffcbc3f293d357a8cdcf8e2faea50",
+    "action-approval-tests-06.log": "9512c6f9c592523599663e7384bf1710f7e7ae932a04f82ad954d61d3f773c11",
+    "decisions-tests-06.log": "cab44ab3444bea42e103888a2f4f311609f4e72a1891ec825d5d2b7c20cdb6d6",
+    "waits-tests-06.log": "bc022945e0cedffb2a7bed7c9d321fd1669d3e6602dcfe962d88ffd5ebba7aaa",
+    "children-tests-06.log": "bcadbbce15d4b8d2713086636af5038b144961b62210fe81ce378c1e726e5bc1",
+    "delivery-tests-06.log": "97b662b3231b9e3320be35ec7eab7ef88b27eab5a29c5bfbf870c4fd8b0a0cd3",
+    "cancellation-tests-06.log": "dcba6d389c24e9f3487a78a5c825fce5a0d44c06902a2c811a16005e9d13d99c",
+    "registry-tests-07.log": "38a50313ea98cb058b8ada8f9c7393a0fbf58c8a6f6b412ea9e97968da223740",
+    "storage-semantics-tests-07.log": "fa8493e4b0fb4660db45b4f51bb80e66934a0eae61aa113d2f04aa646d87c896",
+    "attempt-schema-tests-07.log": "4f422a9c71433092bb19926c2a80734b58768eb0d615674f152b214168dbb118"
+  }
+}

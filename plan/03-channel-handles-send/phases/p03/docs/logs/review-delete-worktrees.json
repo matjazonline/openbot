@@ -1,0 +1,9 @@
+{
+  "owner": "/root",
+  "purpose": "B requested isolated deletion diagnostic",
+  "worktrees": [
+    "/private/var/folders/qc/f8s9x42x5sz6vbh79sb0cfth0000gn/T/openbot-chs-p03-review-delete-bkvmtj75/worktree",
+    "/private/var/folders/qc/f8s9x42x5sz6vbh79sb0cfth0000gn/T/openbot-chs-p03-review-delete-bz5d6g9l/worktree"
+  ],
+  "cleanup": "only after diagnostic/review evidence retained; never remove baseline or primary worktree"
+}

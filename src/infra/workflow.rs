@@ -29,12 +29,14 @@ use crate::adapters::workflow_source::WorkflowSourceDecoder;
 use crate::application::services::mcp_client::McpClient;
 use crate::application::services::runtime_metrics::ActiveWorkflowJobs;
 use crate::application::transport::DeliveryComposer;
+use crate::application::workflow::channel_reply::ChannelReplyPublisher;
 use crate::application::workflow::decisions::DecisionNotices;
 use crate::application::workflow::history::WorkflowHistoryRuntime;
 use crate::application::workflow::lease::{
     ClaimedWorkflow, LeasePolicy, WorkflowHandlerOutcome, WorkflowWorkerId,
 };
 use crate::application::workflow::lifecycle::{BindingService, DefinitionService};
+use crate::application::workflow::message::MessagePlanner;
 use crate::application::workflow::message_admission::{
     MessageAdmissionWorker, MessageAdmissions, MessageIntentWorkerId,
 };
@@ -57,11 +59,12 @@ pub const UNHANDLED_STEP_KINDS: &[&str] = &["memory.load", "memory.save"];
 
 /// The default and bounds of `WORKFLOW_WORKER_SLOTS`, and the database connections everything
 /// else `serve` runs needs (listener, HTTP headroom, task, delivery, notification and inbound
-/// workers, the intent worker, the schedule materializer, metrics sampler and storage maintenance). Each slot needs
+/// workers, the intent worker, the schedule materializer, metrics sampler, storage maintenance,
+/// and two concurrent final publishers). Each slot needs
 /// two: its claim or handler transaction and its lease renewal.
 pub const DEFAULT_WORKFLOW_WORKER_SLOTS: usize = 2;
 pub const MAX_WORKFLOW_WORKER_SLOTS: usize = 16;
-pub const RESERVED_DATABASE_CONNECTIONS: u32 = 10;
+pub const RESERVED_DATABASE_CONNECTIONS: u32 = 12;
 
 const LEASE: Duration = Duration::from_secs(30);
 const POLL: Duration = Duration::from_secs(1);
@@ -176,6 +179,7 @@ impl WorkflowHandler for ProductionHandler {
 pub struct WorkflowEngine {
     services: Arc<WorkflowServices>,
     handler: Arc<ProductionHandler>,
+    reply_publisher: Arc<ChannelReplyPublisher<PostgresPersistence>>,
     slots: usize,
     /// The jobs the worker slots are executing, for the runtime panel's sampler.
     active_jobs: ActiveWorkflowJobs,
@@ -294,6 +298,7 @@ impl WorkflowEngine {
             &setup.config.public_base_url(),
             &setup.config.app_domain_name,
         );
+        let persistence = persistence.with_channel_reply_notices(notices.clone());
         let catalogue = TemplateCatalogue::shipped(&WorkflowSourceDecoder)
             .map_err(|error| anyhow::anyhow!("shipped workflow templates: {error:?}"))?;
         let templates = ProvisioningDeployment::new(
@@ -302,6 +307,13 @@ impl WorkflowEngine {
             &setup.config.app_domain_name,
         );
         let handler = compose_handler(&persistence, &setup, &notices, &templates, lease)?;
+        let reply_publisher = Arc::new(
+            ChannelReplyPublisher::new(
+                persistence.clone(),
+                MessagePlanner::new(setup.composer.clone(), setup.config.app_domain_name.clone()),
+            )
+            .with_monitoring(setup.monitoring.clone()),
+        );
         let worker_wakeups = Arc::new(Notify::new());
         let services = Arc::new(WorkflowServices {
             persistence,
@@ -313,6 +325,7 @@ impl WorkflowEngine {
         Ok(Self {
             services,
             handler,
+            reply_publisher,
             slots: setup.slots,
             active_jobs: ActiveWorkflowJobs::default(),
             monitoring: setup.monitoring,
@@ -353,7 +366,7 @@ impl WorkflowEngine {
     /// Start workflow slots, the intent worker, schedule materializer and metrics sampler
     /// under `shutdown`. The caller keeps the handles and joins them on shutdown.
     pub fn spawn(&self, shutdown: &CancellationToken) -> Vec<(&'static str, JoinHandle<()>)> {
-        let mut handles = Vec::with_capacity(self.slots + 4);
+        let mut handles = Vec::with_capacity(self.slots + 5);
         let metric_persistence = self.services.persistence.clone();
         let monitoring = self.monitoring.clone();
         let metric_shutdown = shutdown.clone();
@@ -412,6 +425,12 @@ impl WorkflowEngine {
                 };
                 worker.run(&intent_wakeup, &intent_shutdown).await;
             }),
+        ));
+        let publisher = self.reply_publisher.clone();
+        let publisher_shutdown = shutdown.clone();
+        handles.push((
+            "workflow final reply publisher",
+            tokio::spawn(async move { publisher.run(&publisher_shutdown).await }),
         ));
         handles.push(self.spawn_storage(shutdown));
         let materializer = self.services.schedule_materializer();
@@ -717,8 +736,8 @@ mod tests {
                 .unwrap();
         }
         assert_eq!(
-            task_count, 5,
-            "one slot, metrics, intent, schedule and storage workers"
+            task_count, 6,
+            "one slot, metrics, intent, final publication, schedule and storage workers"
         );
     }
 
@@ -733,8 +752,8 @@ mod tests {
             worker_slots(None, crate::infra::db::DEFAULT_DATABASE_MAX_CONNECTIONS).unwrap(),
             2
         );
-        assert_eq!(worker_slots(Some("4"), 18).unwrap(), 4);
-        assert!(worker_slots(Some("4"), 17).is_err());
+        assert_eq!(worker_slots(Some("4"), 20).unwrap(), 4);
+        assert!(worker_slots(Some("4"), 19).is_err());
         assert!(worker_slots(Some("5"), 18).is_err());
         assert!(worker_slots(Some("0"), 64).is_err());
         assert!(worker_slots(Some("17"), 64).is_err());

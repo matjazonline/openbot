@@ -1,0 +1,1721 @@
+{
+  "phase": "p04",
+  "full_suite": false,
+  "scope": "Only changed reply publication/delivery and affected shared interfaces",
+  "counts": {
+    "distinct_selected": 400,
+    "passed": 400,
+    "ignored": 0,
+    "failed": 0
+  },
+  "cohorts": [
+    {
+      "name": "feature-final-tests-01",
+      "selected": 124,
+      "receipt": "/Users/mac02/dev/openbot/plan/03-channel-handles-send/phases/p04/docs/logs/feature-final-tests-01.json",
+      "log_sha256": "b4d3a292aa89cd20a0cc93d2aca94e1587cb102c98de1099b37e2f2cab2e5f47"
+    },
+    {
+      "name": "messaging-final-tests-01",
+      "selected": 64,
+      "receipt": "/Users/mac02/dev/openbot/plan/03-channel-handles-send/phases/p04/docs/logs/messaging-final-tests-01.json",
+      "log_sha256": "bc15ae9fda5bf501b81dfc6e640fcd61c4f1c75ebcf5c31c66de47566115523f"
+    },
+    {
+      "name": "delivery-final-tests-01",
+      "selected": 39,
+      "receipt": "/Users/mac02/dev/openbot/plan/03-channel-handles-send/phases/p04/docs/logs/delivery-final-tests-01.json",
+      "log_sha256": "65892b582192407964201702b555d0edb40c6837e4fcd217334eeffee5d39b99"
+    },
+    {
+      "name": "delivery-worker-final-tests-01",
+      "selected": 16,
+      "receipt": "/Users/mac02/dev/openbot/plan/03-channel-handles-send/phases/p04/docs/logs/delivery-worker-final-tests-01.json",
+      "log_sha256": "2573b8a0647719dc6ec548115e668dab5276dfb04c8cb26276e29bf080f67649"
+    },
+    {
+      "name": "retention-final-tests-01",
+      "selected": 21,
+      "receipt": "/Users/mac02/dev/openbot/plan/03-channel-handles-send/phases/p04/docs/logs/retention-final-tests-01.json",
+      "log_sha256": "8ab3702afd0fe9bfaeef261486efd9df70e8570478ba59b4a1868c271d909f8a"
+    },
+    {
+      "name": "sample-final-tests-01",
+      "selected": 15,
+      "receipt": "/Users/mac02/dev/openbot/plan/03-channel-handles-send/phases/p04/docs/logs/sample-final-tests-01.json",
+      "log_sha256": "5521346f3a94ca086c7865475b477ea8a67811c0f0d85b94bded637b2194ea51"
+    },
+    {
+      "name": "knowledge-final-tests-01",
+      "selected": 49,
+      "receipt": "/Users/mac02/dev/openbot/plan/03-channel-handles-send/phases/p04/docs/logs/knowledge-final-tests-01.json",
+      "log_sha256": "87f8780bdfb84890fbf9cbc95fb21e33cfc03ba939b0d4851b265b972876e651"
+    },
+    {
+      "name": "runtime-final-tests-01",
+      "selected": 5,
+      "receipt": "/Users/mac02/dev/openbot/plan/03-channel-handles-send/phases/p04/docs/logs/runtime-final-tests-01.json",
+      "log_sha256": "af590c0f2f11b9c9b6cc1e4e39d85b9645eb5fa0d44d459a7ad948e7b9324015"
+    },
+    {
+      "name": "intent-final-tests-01",
+      "selected": 14,
+      "receipt": "/Users/mac02/dev/openbot/plan/03-channel-handles-send/phases/p04/docs/logs/intent-final-tests-01.json",
+      "log_sha256": "624c438463b414fb555ea9ce5832d0f38af3de86f640ef5a023e1f1d5f4a2940"
+    },
+    {
+      "name": "transport-final-tests-01",
+      "selected": 26,
+      "receipt": "/Users/mac02/dev/openbot/plan/03-channel-handles-send/phases/p04/docs/logs/transport-final-tests-01.json",
+      "log_sha256": "29c59f0c1ef27f1dc3a7f66e52a465c18d8d192619c2d59e31f226d9d167b065"
+    },
+    {
+      "name": "approvals-final-tests-01",
+      "selected": 32,
+      "receipt": "/Users/mac02/dev/openbot/plan/03-channel-handles-send/phases/p04/docs/logs/approvals-final-tests-01.json",
+      "log_sha256": "1cc48b34178275f82f78fe5824e0b70731b99039ebb88ae6ab1d9f0300c2c7c3"
+    },
+    {
+      "name": "feature-final-tests-02",
+      "selected": 125,
+      "receipt": "/Users/mac02/dev/openbot/plan/03-channel-handles-send/phases/p04/docs/logs/feature-final-tests-02.json",
+      "log_sha256": "660fb16ff69d22d9827cfa0eaca3866e6b9aab89b0b2e83bb07d6e3b2c85697b"
+    },
+    {
+      "name": "messaging-final-tests-02",
+      "selected": 64,
+      "receipt": "/Users/mac02/dev/openbot/plan/03-channel-handles-send/phases/p04/docs/logs/messaging-final-tests-02.json",
+      "log_sha256": "eb0f4614a34c8924fc863a0ac8569101a3778bcd69b4fe343dc80579cfdd5d83"
+    },
+    {
+      "name": "delivery-final-tests-02",
+      "selected": 39,
+      "receipt": "/Users/mac02/dev/openbot/plan/03-channel-handles-send/phases/p04/docs/logs/delivery-final-tests-02.json",
+      "log_sha256": "20adfa37d934e82c7cff2e69cf1ad421ca56d814036377d1dc2afe8a3994f0ee"
+    },
+    {
+      "name": "message-retention-final-tests-02",
+      "selected": 1,
+      "receipt": "/Users/mac02/dev/openbot/plan/03-channel-handles-send/phases/p04/docs/logs/message-retention-final-tests-02.json",
+      "log_sha256": "4615df2a6a4cc35dcc46b1b3c66df2d40f2c053f164b891bb390de606f1426db"
+    },
+    {
+      "name": "publication-final-tests-03",
+      "selected": 28,
+      "receipt": "/Users/mac02/dev/openbot/plan/03-channel-handles-send/phases/p04/docs/logs/publication-final-tests-03.json",
+      "log_sha256": "b64e04fcca33e571cfb04892917dc526a71c8e2f83035958c3406c3bd8d191c7"
+    }
+  ],
+  "cases": {
+    "adapters::persistence::workflow::tests::admission_tests::batch_tests::channel_reply_terminal_tests::channel_reply_terminal_final_error_cannot_become_suppressed_success": {
+      "status": "ok",
+      "latest_passing_cohort": "feature-final-tests-02"
+    },
+    "adapters::persistence::workflow::tests::admission_tests::batch_tests::child_runtime_tests::channel_reply_terminal_child_tests::channel_reply_terminal_repeat_child_cannot_suppress_parent": {
+      "status": "ok",
+      "latest_passing_cohort": "feature-final-tests-02"
+    },
+    "adapters::persistence::workflow::tests::admission_tests::batch_tests::channel_reply_terminal_tests::channel_reply_terminal_competing_completions_commit_one_disposition": {
+      "status": "ok",
+      "latest_passing_cohort": "feature-final-tests-02"
+    },
+    "adapters::persistence::workflow::tests::admission_tests::batch_tests::child_runtime_tests::channel_reply_terminal_child_tests::channel_reply_terminal_worker_dispatches_without_io": {
+      "status": "ok",
+      "latest_passing_cohort": "feature-final-tests-02"
+    },
+    "adapters::persistence::workflow::tests::admission_tests::batch_tests::channel_reply_terminal_tests::channel_reply_terminal_exhausted_pending_is_effect_free_failure": {
+      "status": "ok",
+      "latest_passing_cohort": "feature-final-tests-02"
+    },
+    "adapters::persistence::workflow::tests::admission_tests::batch_tests::channel_reply_terminal_tests::channel_reply_terminal_ordinary_output_flags_cannot_suppress": {
+      "status": "ok",
+      "latest_passing_cohort": "feature-final-tests-02"
+    },
+    "adapters::persistence::workflow::tests::admission_tests::batch_tests::channel_reply_terminal_tests::channel_reply_terminal_metadata_is_atomic_and_immutable": {
+      "status": "ok",
+      "latest_passing_cohort": "feature-final-tests-02"
+    },
+    "adapters::persistence::workflow::tests::admission_tests::batch_tests::child_runtime_tests::channel_reply_terminal_child_tests::channel_reply_terminal_parent_selects_its_own_suppression": {
+      "status": "ok",
+      "latest_passing_cohort": "feature-final-tests-02"
+    },
+    "adapters::persistence::workflow::tests::admission_tests::batch_tests::child_runtime_tests::channel_reply_terminal_child_tests::channel_reply_terminal_child_cannot_suppress_parent": {
+      "status": "ok",
+      "latest_passing_cohort": "feature-final-tests-02"
+    },
+    "adapters::persistence::workflow::tests::admission_tests::decision_tests::channel_reply_terminal_human_tests::channel_reply_terminal_human_continuation_preserves_notices": {
+      "status": "ok",
+      "latest_passing_cohort": "feature-final-tests-02"
+    },
+    "adapters::persistence::workflow::tests::message_tests::channel_reply_terminal_message_tests::channel_reply_terminal_preserves_an_explicit_published_message": {
+      "status": "ok",
+      "latest_passing_cohort": "feature-final-tests-02"
+    },
+    "adapters::persistence::workflow::tests::admission_tests::lease_tests::completion_tests::channel_reply_terminal_io_tests::channel_reply_terminal_io_predecessor_keeps_receipt_and_local_disposition": {
+      "status": "ok",
+      "latest_passing_cohort": "feature-final-tests-02"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::channel_reply_binding_company_teardown_removes_scoped_selection_and_snapshots": {
+      "status": "ok",
+      "latest_passing_cohort": "feature-final-tests-02"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::channel_reply_binding_competing_assignments_choose_one_current_responder": {
+      "status": "ok",
+      "latest_passing_cohort": "feature-final-tests-02"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::channel_reply_binding_freezes_head_contract_and_responder_at_ingress": {
+      "status": "ok",
+      "latest_passing_cohort": "feature-final-tests-02"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::channel_reply_binding_live_run_blocks_snapshot_and_principal_deletion": {
+      "status": "ok",
+      "latest_passing_cohort": "feature-final-tests-02"
+    },
+    "adapters::persistence::workflow::tests::admission_tests::batch_tests::channel_reply_terminal_tests::channel_reply_terminal_invalid_output_fails_or_takes_ordinary_error_route": {
+      "status": "ok",
+      "latest_passing_cohort": "feature-final-tests-02"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::channel_reply_binding_passive_snapshot_follows_source_retention": {
+      "status": "ok",
+      "latest_passing_cohort": "feature-final-tests-02"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::channel_reply_binding_quiet_and_unselected_ingress_get_no_snapshot": {
+      "status": "ok",
+      "latest_passing_cohort": "feature-final-tests-02"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::channel_reply_binding_rejects_foreign_inactive_thread_and_stale_selection": {
+      "status": "ok",
+      "latest_passing_cohort": "feature-final-tests-02"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::channel_reply_binding_roundtrip_update_clear_and_stale_revision": {
+      "status": "ok",
+      "latest_passing_cohort": "feature-final-tests-02"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::channel_reply_binding_snapshot_and_referenced_source_facts_are_immutable": {
+      "status": "ok",
+      "latest_passing_cohort": "feature-final-tests-02"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::channel_reply_binding_trigger_mismatch_and_revocation_create_no_obligation": {
+      "status": "ok",
+      "latest_passing_cohort": "feature-final-tests-02"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::channel_reply_completion_approval_resumes_exact_saved_output": {
+      "status": "ok",
+      "latest_passing_cohort": "feature-final-tests-02"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::channel_reply_completion_commit_failure_and_lost_ack_preserve_atomic_decision": {
+      "status": "ok",
+      "latest_passing_cohort": "feature-final-tests-02"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::channel_reply_completion_competing_finalizers_create_one_obligation": {
+      "status": "ok",
+      "latest_passing_cohort": "feature-final-tests-02"
+    },
+    "adapters::persistence::workflow::tests::admission_tests::batch_tests::child_runtime_tests::channel_reply_terminal_child_tests::channel_reply_terminal_cancellation_competes_without_silent_failure": {
+      "status": "ok",
+      "latest_passing_cohort": "feature-final-tests-02"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::channel_reply_completion_contract_edits_cannot_replace_approved_content": {
+      "status": "ok",
+      "latest_passing_cohort": "feature-final-tests-02"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::channel_reply_completion_missing_notice_configuration_cannot_commit_success": {
+      "status": "ok",
+      "latest_passing_cohort": "feature-final-tests-02"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::channel_reply_completion_policy_change_after_approval_fails_saved_step": {
+      "status": "ok",
+      "latest_passing_cohort": "feature-final-tests-02"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::channel_reply_completion_rejection_uses_failure_without_publication": {
+      "status": "ok",
+      "latest_passing_cohort": "feature-final-tests-02"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::intent_schema_tests::channel_reply_intent_schema_competing_claims_and_fenced_release": {
+      "status": "ok",
+      "latest_passing_cohort": "feature-final-tests-02"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::channel_reply_completion_automatic_and_suppressed_are_atomic": {
+      "status": "ok",
+      "latest_passing_cohort": "feature-final-tests-02"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::intent_schema_tests::channel_reply_intent_schema_cross_tenant_links_and_duplicate_decisions_are_rejected": {
+      "status": "ok",
+      "latest_passing_cohort": "feature-final-tests-02"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::intent_schema_tests::channel_reply_intent_schema_eighth_expired_claim_is_terminal": {
+      "status": "ok",
+      "latest_passing_cohort": "feature-final-tests-02"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::intent_schema_tests::channel_reply_intent_schema_expired_lease_has_one_new_owner": {
+      "status": "ok",
+      "latest_passing_cohort": "feature-final-tests-02"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::intent_schema_tests::channel_reply_intent_schema_live_obligation_and_proposal_are_protected": {
+      "status": "ok",
+      "latest_passing_cohort": "feature-final-tests-02"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::channel_reply_completion_invalid_projection_fails_or_uses_original_error_route": {
+      "status": "ok",
+      "latest_passing_cohort": "feature-final-tests-02"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::intent_schema_tests::channel_reply_intent_schema_queued_root_cannot_forge_a_suppressed_decision": {
+      "status": "ok",
+      "latest_passing_cohort": "feature-final-tests-02"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::intent_schema_tests::channel_reply_intent_schema_success_without_decision_rolls_back": {
+      "status": "ok",
+      "latest_passing_cohort": "feature-final-tests-02"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::intent_schema_tests::channel_reply_intent_schema_suppressed_is_never_claimable": {
+      "status": "ok",
+      "latest_passing_cohort": "feature-final-tests-02"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::intent_schema_tests::channel_reply_intent_schema_terminal_failure_keeps_success_and_allows_retention": {
+      "status": "ok",
+      "latest_passing_cohort": "feature-final-tests-02"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::intent_schema_tests::channel_reply_intent_schema_claim_page_serves_another_tenant_before_a_burst": {
+      "status": "ok",
+      "latest_passing_cohort": "feature-final-tests-02"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::owner_tests::channel_reply_completion_child_terminal_parks_only_the_owned_parent": {
+      "status": "ok",
+      "latest_passing_cohort": "feature-final-tests-02"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::owner_tests::channel_reply_completion_exhausted_saved_child_result_never_reconciles_original_handler": {
+      "status": "ok",
+      "latest_passing_cohort": "feature-final-tests-02"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::owner_tests::channel_reply_completion_fenced_approval_resumes_before_worker_handler": {
+      "status": "ok",
+      "latest_passing_cohort": "feature-final-tests-02"
+    },
+    "adapters::persistence::workflow::tests::admission_tests::batch_tests::channel_reply_terminal_tests::channel_reply_terminal_preserves_business_value_and_replays_after_restart": {
+      "status": "ok",
+      "latest_passing_cohort": "feature-final-tests-02"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::owner_tests::channel_reply_completion_human_choice_parks_final_approval_before_success": {
+      "status": "ok",
+      "latest_passing_cohort": "feature-final-tests-02"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::owner_tests::channel_reply_completion_timer_keeps_source_wait_and_final_approval_distinct": {
+      "status": "ok",
+      "latest_passing_cohort": "feature-final-tests-02"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::policy_runtime_tests::channel_reply_completion_approved_job_cannot_claim_a_handler_with_sql": {
+      "status": "ok",
+      "latest_passing_cohort": "feature-final-tests-02"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::policy_runtime_tests::channel_reply_completion_cancellation_and_finalization_share_one_terminal_owner": {
+      "status": "ok",
+      "latest_passing_cohort": "feature-final-tests-02"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::policy_runtime_tests::channel_reply_completion_opposite_reviewers_have_one_formal_winner": {
+      "status": "ok",
+      "latest_passing_cohort": "feature-final-tests-02"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::policy_runtime_tests::channel_reply_completion_private_result_cannot_cross_public_reply_clearance": {
+      "status": "ok",
+      "latest_passing_cohort": "feature-final-tests-02"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::policy_runtime_tests::channel_reply_completion_release_revocation_and_finalization_do_not_deadlock": {
+      "status": "ok",
+      "latest_passing_cohort": "feature-final-tests-02"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::authority::channel_reply_publication_changed_plan_has_no_partial_effects": {
+      "status": "ok",
+      "latest_passing_cohort": "publication-final-tests-03"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::policy_runtime_tests::channel_reply_completion_review_timeout_never_publishes_unapproved_output": {
+      "status": "ok",
+      "latest_passing_cohort": "feature-final-tests-02"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::authority::channel_reply_publication_forged_claims_cannot_load_or_commit": {
+      "status": "ok",
+      "latest_passing_cohort": "publication-final-tests-03"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::authority::channel_reply_publication_policy_change_refuses_without_redirecting": {
+      "status": "ok",
+      "latest_passing_cohort": "publication-final-tests-03"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::authority::channel_reply_publication_rechecks_current_send_authority": {
+      "status": "ok",
+      "latest_passing_cohort": "publication-final-tests-03"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::authority::channel_reply_publication_write_failure_rolls_back_then_replays_original_plan": {
+      "status": "ok",
+      "latest_passing_cohort": "publication-final-tests-03"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::channel_reply_publication_competing_transactions_keep_one_canonical_receipt": {
+      "status": "ok",
+      "latest_passing_cohort": "publication-final-tests-03"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::authority::channel_reply_publication_approved_content_survives_elapsed_review_deadline_and_contract_edit": {
+      "status": "ok",
+      "latest_passing_cohort": "publication-final-tests-03"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::policy_runtime_tests::channel_reply_completion_privileged_reviewers_still_require_payload_clearance": {
+      "status": "ok",
+      "latest_passing_cohort": "feature-final-tests-02"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::channel_reply_publication_internal_source_never_falls_back_to_email": {
+      "status": "ok",
+      "latest_passing_cohort": "publication-final-tests-03"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::policy_runtime_tests::channel_reply_completion_revoked_send_role_still_permits_suppression": {
+      "status": "ok",
+      "latest_passing_cohort": "feature-final-tests-02"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::delivery::channel_reply_delivery_revocation_before_provider_entry_cancels_unsent_work": {
+      "status": "ok",
+      "latest_passing_cohort": "publication-final-tests-03"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::delivery::channel_reply_delivery_safe_retry_keeps_same_message_and_prepared_part": {
+      "status": "ok",
+      "latest_passing_cohort": "publication-final-tests-03"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::delivery::channel_reply_delivery_unknown_is_quarantined_and_cannot_be_rewritten_or_deleted": {
+      "status": "ok",
+      "latest_passing_cohort": "publication-final-tests-03"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::delivery::channel_reply_delivery_expired_started_request_recovers_unknown_without_resend": {
+      "status": "ok",
+      "latest_passing_cohort": "publication-final-tests-03"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::integrity::channel_reply_delivery_multipart_cancellation_preserves_accepted_piece": {
+      "status": "ok",
+      "latest_passing_cohort": "publication-final-tests-03"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::integrity::channel_reply_delivery_resolved_owner_can_be_retained_without_losing_message": {
+      "status": "ok",
+      "latest_passing_cohort": "publication-final-tests-03"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::integrity::channel_reply_publication_approved_reviewer_must_retain_payload_clearance": {
+      "status": "ok",
+      "latest_passing_cohort": "publication-final-tests-03"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::channel_reply_publication_email_and_in_app_commit_exact_content_and_replay": {
+      "status": "ok",
+      "latest_passing_cohort": "publication-final-tests-03"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::integrity::channel_reply_publication_frozen_association_metadata_and_parts_cannot_change": {
+      "status": "ok",
+      "latest_passing_cohort": "publication-final-tests-03"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::lifecycle::channel_reply_recovery_shutdown_cancels_actual_composition_and_releases_claim": {
+      "status": "ok",
+      "latest_passing_cohort": "publication-final-tests-03"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::lifecycle::channel_reply_recovery_shutdown_cancels_actual_publication_transaction": {
+      "status": "ok",
+      "latest_passing_cohort": "publication-final-tests-03"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::lifecycle::channel_reply_recovery_shutdown_during_unacknowledged_claim_retains_real_lease": {
+      "status": "ok",
+      "latest_passing_cohort": "publication-final-tests-03"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::recovery::channel_reply_recovery_reconstructed_worker_polls_without_a_wakeup": {
+      "status": "ok",
+      "latest_passing_cohort": "publication-final-tests-03"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::recovery::channel_reply_publication_and_delivery_survive_original_execution_deadline": {
+      "status": "ok",
+      "latest_passing_cohort": "publication-final-tests-03"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::recovery::channel_reply_recovery_transient_composition_backs_off_and_spares_quiet_tenant": {
+      "status": "ok",
+      "latest_passing_cohort": "publication-final-tests-03"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::recovery::channel_reply_recovery_deferred_commit_expiry_rolls_back_all_effects": {
+      "status": "ok",
+      "latest_passing_cohort": "publication-final-tests-03"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::integrity::channel_reply_publication_current_binding_is_required_at_commit_and_provider_entry": {
+      "status": "ok",
+      "latest_passing_cohort": "publication-final-tests-03"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::slot_tests::channel_reply_completion_full_execution_rejects_final_without_another_slot": {
+      "status": "ok",
+      "latest_passing_cohort": "feature-final-tests-02"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::slot_tests::channel_reply_completion_rejected_approval_keeps_its_slot_reservation": {
+      "status": "ok",
+      "latest_passing_cohort": "feature-final-tests-02"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::integrity::channel_reply_publication_release_rechecked_after_success_and_before_provider": {
+      "status": "ok",
+      "latest_passing_cohort": "publication-final-tests-03"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::slot_tests::channel_reply_completion_reserves_128th_slot_once_under_competing_finalizers": {
+      "status": "ok",
+      "latest_passing_cohort": "feature-final-tests-02"
+    },
+    "application::services::delivery_worker::tests::lifecycle::channel_reply_delivery_owner_observes_shutdown_before_claiming": {
+      "status": "ok",
+      "latest_passing_cohort": "feature-final-tests-02"
+    },
+    "application::services::delivery_worker::tests::lifecycle::channel_reply_delivery_provider_deadline_cancels_actual_call": {
+      "status": "ok",
+      "latest_passing_cohort": "feature-final-tests-02"
+    },
+    "application::services::delivery_worker::tests::lifecycle::channel_reply_delivery_ready_result_wins_simultaneous_shutdown": {
+      "status": "ok",
+      "latest_passing_cohort": "feature-final-tests-02"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::integrity::channel_reply_binding_competing_ingress_claimants_create_one_owned_run": {
+      "status": "ok",
+      "latest_passing_cohort": "feature-final-tests-02"
+    },
+    "application::services::delivery_worker::tests::lifecycle::channel_reply_delivery_shutdown_drops_actual_provider_and_records_unknown": {
+      "status": "ok",
+      "latest_passing_cohort": "feature-final-tests-02"
+    },
+    "application::services::delivery_worker::tests::lifecycle::channel_reply_delivery_shutdown_preserves_known_result_during_settlement": {
+      "status": "ok",
+      "latest_passing_cohort": "feature-final-tests-02"
+    },
+    "application::workflow::channel_reply::approval::tests::channel_reply_completion_policy_enforces_review_and_duration_bounds": {
+      "status": "ok",
+      "latest_passing_cohort": "feature-final-tests-02"
+    },
+    "application::workflow::channel_reply::approval::tests::channel_reply_completion_policy_materializes_relative_to_each_response_and_caps_run": {
+      "status": "ok",
+      "latest_passing_cohort": "feature-final-tests-02"
+    },
+    "application::workflow::channel_reply::approval::tests::channel_reply_completion_policy_roundtrips_only_static_user_reviewers": {
+      "status": "ok",
+      "latest_passing_cohort": "feature-final-tests-02"
+    },
+    "application::workflow::channel_reply::contract::tests::channel_reply_contract_bounds_stored_literals_before_evaluation": {
+      "status": "ok",
+      "latest_passing_cohort": "feature-final-tests-02"
+    },
+    "application::workflow::channel_reply::contract::tests::channel_reply_contract_literal_output_still_checks_business_schema": {
+      "status": "ok",
+      "latest_passing_cohort": "feature-final-tests-02"
+    },
+    "application::workflow::channel_reply::contract::tests::channel_reply_contract_projects_only_declared_content_and_preserves_result": {
+      "status": "ok",
+      "latest_passing_cohort": "feature-final-tests-02"
+    },
+    "application::workflow::channel_reply::contract::tests::channel_reply_contract_refuses_optional_ambiguous_and_non_string_schema_paths": {
+      "status": "ok",
+      "latest_passing_cohort": "feature-final-tests-02"
+    },
+    "application::workflow::channel_reply::contract::tests::channel_reply_contract_rejects_missing_wrong_blank_and_oversized_results": {
+      "status": "ok",
+      "latest_passing_cohort": "feature-final-tests-02"
+    },
+    "application::workflow::channel_reply::contract::tests::channel_reply_contract_requires_supported_explicit_format_version": {
+      "status": "ok",
+      "latest_passing_cohort": "feature-final-tests-02"
+    },
+    "application::workflow::channel_reply::contract::tests::channel_reply_contract_roundtrip_refuses_unknown_fields_and_arbitrary_operators": {
+      "status": "ok",
+      "latest_passing_cohort": "feature-final-tests-02"
+    },
+    "application::workflow::channel_reply::contract::tests::channel_reply_contract_uses_existing_reference_pointer_rules": {
+      "status": "ok",
+      "latest_passing_cohort": "feature-final-tests-02"
+    },
+    "application::workflow::channel_reply::origin_tests::channel_reply_completion_origin_binds_immutable_proposal_to_effect_identity": {
+      "status": "ok",
+      "latest_passing_cohort": "feature-final-tests-02"
+    },
+    "application::workflow::channel_reply::origin_tests::channel_reply_completion_origin_cannot_enter_step_or_model_tool_preparation": {
+      "status": "ok",
+      "latest_passing_cohort": "feature-final-tests-02"
+    },
+    "application::workflow::channel_reply::origin_tests::channel_reply_completion_origin_is_restricted_to_the_trusted_company_reply_contract": {
+      "status": "ok",
+      "latest_passing_cohort": "feature-final-tests-02"
+    },
+    "application::workflow::channel_reply::origin_tests::channel_reply_completion_origin_roundtrip_and_integrity_are_strict": {
+      "status": "ok",
+      "latest_passing_cohort": "feature-final-tests-02"
+    },
+    "application::workflow::registry::channel_reply_terminal_contract_tests::channel_reply_terminal_contract_accepts_schema_valid_empty_business_values": {
+      "status": "ok",
+      "latest_passing_cohort": "feature-final-tests-02"
+    },
+    "application::workflow::registry::channel_reply_terminal_contract_tests::channel_reply_terminal_contract_preflight_charges_all_schema_copies": {
+      "status": "ok",
+      "latest_passing_cohort": "feature-final-tests-02"
+    },
+    "application::workflow::registry::channel_reply_terminal_contract_tests::channel_reply_terminal_contract_rejects_nonterminal_and_choice_routes": {
+      "status": "ok",
+      "latest_passing_cohort": "feature-final-tests-02"
+    },
+    "application::workflow::registry::channel_reply_terminal_contract_tests::channel_reply_terminal_contract_retains_error_routing_and_typed_value": {
+      "status": "ok",
+      "latest_passing_cohort": "feature-final-tests-02"
+    },
+    "application::workflow::registry::channel_reply_terminal_contract_tests::channel_reply_terminal_contract_roundtrip_and_identity": {
+      "status": "ok",
+      "latest_passing_cohort": "feature-final-tests-02"
+    },
+    "application::workflow::sample::tests::channel_reply_terminal_tests::channel_reply_terminal_sample_returns_business_value_without_a_script": {
+      "status": "ok",
+      "latest_passing_cohort": "feature-final-tests-02"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::integrity::channel_reply_binding_context_insert_and_source_acceptance_roll_back_together": {
+      "status": "ok",
+      "latest_passing_cohort": "feature-final-tests-02"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::integrity::channel_reply_binding_inactive_before_ingress_has_visible_refusal_until_selection_cleared": {
+      "status": "ok",
+      "latest_passing_cohort": "feature-final-tests-02"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::integrity::channel_reply_binding_manual_root_has_no_automatic_response_authority": {
+      "status": "ok",
+      "latest_passing_cohort": "feature-final-tests-02"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::integrity::channel_reply_binding_observer_run_cannot_replace_response_owner": {
+      "status": "ok",
+      "latest_passing_cohort": "feature-final-tests-02"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::integrity::channel_reply_binding_rechecks_current_run_as_private_channel_visibility": {
+      "status": "ok",
+      "latest_passing_cohort": "feature-final-tests-02"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::integrity::channel_reply_binding_thread_scoped_binding_cannot_own_channel_responses": {
+      "status": "ok",
+      "latest_passing_cohort": "feature-final-tests-02"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::policy_tests::channel_reply_completion_policy_rejects_unprivileged_reviewers_and_invalid_sql_shape": {
+      "status": "ok",
+      "latest_passing_cohort": "feature-final-tests-02"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::policy_tests::channel_reply_completion_policy_settings_freeze_duration_for_ingress": {
+      "status": "ok",
+      "latest_passing_cohort": "feature-final-tests-02"
+    },
+    "application::services::delivery_worker::tests::lifecycle::channel_reply_delivery_shutdown_bounds_stuck_known_settlement": {
+      "status": "ok",
+      "latest_passing_cohort": "feature-final-tests-02"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::channel_reply_tests::channel_reply_binding_deferred_human_reply_has_no_response_authority": {
+      "status": "ok",
+      "latest_passing_cohort": "feature-final-tests-02"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::channel_reply_tests::channel_reply_binding_matched_human_reply_retains_only_passive_snapshot": {
+      "status": "ok",
+      "latest_passing_cohort": "feature-final-tests-02"
+    },
+    "adapters::persistence::workflow::tests::message_tests::delivery_tests::workflow_message_delivery_reaper_locks_parents_and_marks_started_requests_unknown": {
+      "status": "ok",
+      "latest_passing_cohort": "messaging-final-tests-02"
+    },
+    "adapters::persistence::workflow::tests::message_tests::delivery_tests::workflow_message_delivery_begin_part_refuses_a_revoked_actor": {
+      "status": "ok",
+      "latest_passing_cohort": "messaging-final-tests-02"
+    },
+    "adapters::persistence::workflow::tests::message_tests::delivery_tests::workflow_message_race_paused_producer_then_consumer_sees_both_events": {
+      "status": "ok",
+      "latest_passing_cohort": "messaging-final-tests-02"
+    },
+    "adapters::persistence::workflow::tests::message_tests::reconcile_tests::race_tests::workflow_message_race_competing_settlements_reopen_once": {
+      "status": "ok",
+      "latest_passing_cohort": "messaging-final-tests-02"
+    },
+    "adapters::persistence::workflow::tests::message_tests::authority_tests::workflow_message_publish_revocation_after_a_marker_stays_retryable": {
+      "status": "ok",
+      "latest_passing_cohort": "messaging-final-tests-02"
+    },
+    "adapters::persistence::workflow::tests::message_tests::delivery_tests::workflow_message_delivery_duplicate_callback_adds_no_event": {
+      "status": "ok",
+      "latest_passing_cohort": "messaging-final-tests-02"
+    },
+    "adapters::persistence::workflow::tests::message_tests::delivery_tests::workflow_message_delivery_begin_part_refuses_a_run_past_its_deadline": {
+      "status": "ok",
+      "latest_passing_cohort": "messaging-final-tests-02"
+    },
+    "adapters::persistence::workflow::tests::message_tests::reconcile_tests::race_tests::workflow_message_race_settle_and_consumer_compete_for_one_action": {
+      "status": "ok",
+      "latest_passing_cohort": "messaging-final-tests-02"
+    },
+    "adapters::persistence::workflow::tests::message_tests::delivery_tests::workflow_message_delivery_begin_part_refuses_a_recipient_no_longer_a_member": {
+      "status": "ok",
+      "latest_passing_cohort": "messaging-final-tests-02"
+    },
+    "adapters::persistence::workflow::tests::message_tests::reconcile_tests::race_tests::workflow_message_race_settle_consumer_and_begin_part_compete": {
+      "status": "ok",
+      "latest_passing_cohort": "messaging-final-tests-02"
+    },
+    "adapters::persistence::workflow::tests::message_tests::reconcile_tests::race_tests::workflow_message_race_settle_racing_workflow_cancellation_supersedes": {
+      "status": "ok",
+      "latest_passing_cohort": "messaging-final-tests-02"
+    },
+    "adapters::persistence::workflow::tests::message_tests::reconcile_tests::veto_tests::workflow_message_reconcile_model_tool_delivery_reopen_never_reopens_the_job": {
+      "status": "ok",
+      "latest_passing_cohort": "messaging-final-tests-02"
+    },
+    "adapters::persistence::workflow::tests::message_tests::reconcile_tests::veto_tests::workflow_message_reconcile_wrong_association_actor_is_refused": {
+      "status": "ok",
+      "latest_passing_cohort": "messaging-final-tests-02"
+    },
+    "adapters::persistence::workflow::tests::message_tests::reconcile_tests::workflow_message_reconcile_applied_on_a_live_run_resumes_after_every_destination": {
+      "status": "ok",
+      "latest_passing_cohort": "messaging-final-tests-02"
+    },
+    "adapters::persistence::workflow::tests::message_tests::reconcile_tests::workflow_message_reconcile_applied_on_a_terminal_run_records_truth_only": {
+      "status": "ok",
+      "latest_passing_cohort": "messaging-final-tests-02"
+    },
+    "adapters::persistence::workflow::tests::message_tests::reconcile_tests::workflow_message_reconcile_conflicted_execution_reopens_nothing": {
+      "status": "ok",
+      "latest_passing_cohort": "messaging-final-tests-02"
+    },
+    "adapters::persistence::workflow::tests::message_tests::reconcile_tests::veto_tests::workflow_message_reconcile_finality_breach_then_every_destination_final_vetoes_the_receipt": {
+      "status": "ok",
+      "latest_passing_cohort": "messaging-final-tests-02"
+    },
+    "adapters::persistence::workflow::tests::message_tests::reconcile_tests::veto_tests::workflow_message_reconcile_sql_reopen_refuses_expired_non_final_and_foreign_evidence": {
+      "status": "ok",
+      "latest_passing_cohort": "messaging-final-tests-02"
+    },
+    "adapters::persistence::workflow::tests::message_tests::reconcile_tests::workflow_message_reconcile_expired_proof_before_begin_part_returns_to_unknown": {
+      "status": "ok",
+      "latest_passing_cohort": "messaging-final-tests-02"
+    },
+    "adapters::persistence::workflow::tests::message_tests::reconcile_tests::workflow_message_reconcile_expired_proof_is_refused_without_a_grant": {
+      "status": "ok",
+      "latest_passing_cohort": "messaging-final-tests-02"
+    },
+    "adapters::persistence::workflow::tests::message_tests::race_tests::workflow_message_race_delayed_commit_past_fence_expiry_or_deadline_rolls_back": {
+      "status": "ok",
+      "latest_passing_cohort": "messaging-final-tests-02"
+    },
+    "adapters::persistence::workflow::tests::message_tests::reconcile_tests::workflow_message_reconcile_finality_breach_vetoes_resume_and_reopen": {
+      "status": "ok",
+      "latest_passing_cohort": "messaging-final-tests-02"
+    },
+    "adapters::persistence::workflow::tests::message_tests::reconcile_tests::workflow_message_reconcile_not_applied_reopens_only_the_subject": {
+      "status": "ok",
+      "latest_passing_cohort": "messaging-final-tests-02"
+    },
+    "adapters::persistence::workflow::tests::message_tests::reconcile_tests::workflow_message_reconcile_stale_snapshot_is_refused_without_a_grant": {
+      "status": "ok",
+      "latest_passing_cohort": "messaging-final-tests-02"
+    },
+    "adapters::persistence::workflow::tests::message_tests::reconcile_tests::workflow_message_reconcile_unknown_and_refusals_change_nothing": {
+      "status": "ok",
+      "latest_passing_cohort": "messaging-final-tests-02"
+    },
+    "adapters::persistence::workflow::tests::message_tests::reconcile_tests::workflow_message_sql_evidence_attribution_shape_rejects_forgeries": {
+      "status": "ok",
+      "latest_passing_cohort": "messaging-final-tests-02"
+    },
+    "adapters::persistence::workflow::tests::message_tests::reconcile_tests::workflow_message_unknown_note_through_the_production_composition": {
+      "status": "ok",
+      "latest_passing_cohort": "messaging-final-tests-02"
+    },
+    "adapters::persistence::workflow::tests::message_tests::recovery_tests::workflow_message_model_tool_failed_delivery_continues_the_agent_job": {
+      "status": "ok",
+      "latest_passing_cohort": "messaging-final-tests-02"
+    },
+    "adapters::persistence::workflow::tests::message_tests::recovery_tests::workflow_message_publish_competing_dispatchers_publish_once": {
+      "status": "ok",
+      "latest_passing_cohort": "messaging-final-tests-02"
+    },
+    "adapters::persistence::workflow::tests::message_tests::recovery_tests::workflow_message_recovery_control_retry_replays_the_failed_receipt": {
+      "status": "ok",
+      "latest_passing_cohort": "messaging-final-tests-02"
+    },
+    "adapters::persistence::workflow::tests::message_tests::authority_tests::workflow_message_publish_revoked_authority_is_terminal_rejected_before_any_marker": {
+      "status": "ok",
+      "latest_passing_cohort": "messaging-final-tests-02"
+    },
+    "adapters::persistence::workflow::tests::message_tests::sql_tests::workflow_message_publish_admission_admits_128_and_refuses_129": {
+      "status": "ok",
+      "latest_passing_cohort": "messaging-final-tests-02"
+    },
+    "adapters::persistence::workflow::tests::message_tests::race_tests::workflow_message_race_ambiguous_publication_commit_resolves_three_ways": {
+      "status": "ok",
+      "latest_passing_cohort": "messaging-final-tests-02"
+    },
+    "adapters::persistence::workflow::tests::message_tests::sql_tests::workflow_message_publish_step_at_the_limit_is_a_terminal_action_limit": {
+      "status": "ok",
+      "latest_passing_cohort": "messaging-final-tests-02"
+    },
+    "adapters::persistence::workflow::tests::message_tests::sql_tests::workflow_message_sql_admission_backstop_serializes_competing_writers": {
+      "status": "ok",
+      "latest_passing_cohort": "messaging-final-tests-02"
+    },
+    "adapters::persistence::workflow::tests::message_tests::sql_tests::workflow_message_sql_destination_links_reject_foreign_rows": {
+      "status": "ok",
+      "latest_passing_cohort": "messaging-final-tests-02"
+    },
+    "adapters::persistence::workflow::tests::message_tests::sql_tests::workflow_message_sql_effect_wait_must_match_its_run_and_action": {
+      "status": "ok",
+      "latest_passing_cohort": "messaging-final-tests-02"
+    },
+    "adapters::persistence::workflow::tests::message_tests::sql_tests::workflow_message_sql_fence_capture_and_close_identity_reject_forgeries": {
+      "status": "ok",
+      "latest_passing_cohort": "messaging-final-tests-02"
+    },
+    "adapters::persistence::workflow::tests::message_tests::sql_tests::workflow_message_sql_park_requires_the_effect_parked_close_cause": {
+      "status": "ok",
+      "latest_passing_cohort": "messaging-final-tests-02"
+    },
+    "adapters::persistence::workflow::tests::message_tests::reconcile_tests::workflow_message_reconcile_not_applied_exhausted_or_ended_never_resends": {
+      "status": "ok",
+      "latest_passing_cohort": "messaging-final-tests-02"
+    },
+    "adapters::persistence::workflow::tests::message_tests::sql_tests::workflow_message_sql_step_execution_keeps_one_effect_wait": {
+      "status": "ok",
+      "latest_passing_cohort": "messaging-final-tests-02"
+    },
+    "adapters::persistence::workflow::tests::message_tests::sql_tests::workflow_message_sql_delivery_provenance_rejects_unproven_exits": {
+      "status": "ok",
+      "latest_passing_cohort": "messaging-final-tests-02"
+    },
+    "adapters::persistence::workflow::tests::message_tests::thread_tests::correlation_tests::workflow_message_stores_anchored_rendered_headers_without_rederiving_them": {
+      "status": "ok",
+      "latest_passing_cohort": "messaging-final-tests-02"
+    },
+    "adapters::persistence::workflow::tests::message_tests::thread_tests::workflow_message_thread_external_reply_answers_its_own_source": {
+      "status": "ok",
+      "latest_passing_cohort": "messaging-final-tests-02"
+    },
+    "adapters::persistence::workflow::tests::message_tests::thread_tests::workflow_message_thread_in_app_reply_stays_in_the_source_thread": {
+      "status": "ok",
+      "latest_passing_cohort": "messaging-final-tests-02"
+    },
+    "adapters::persistence::workflow::tests::message_tests::recovery_tests::workflow_message_recovery_existing_marker_is_never_republished": {
+      "status": "ok",
+      "latest_passing_cohort": "messaging-final-tests-02"
+    },
+    "adapters::persistence::workflow::tests::message_tests::thread_tests::workflow_message_thread_inbound_reply_resolves_each_recipients_copy": {
+      "status": "ok",
+      "latest_passing_cohort": "messaging-final-tests-02"
+    },
+    "adapters::persistence::workflow::tests::message_tests::thread_tests::workflow_message_thread_internal_reply_note_leaves_guards_unchanged": {
+      "status": "ok",
+      "latest_passing_cohort": "messaging-final-tests-02"
+    },
+    "adapters::persistence::workflow::tests::message_tests::sql_tests::workflow_message_sql_receipt_and_state_guards_reject_forgeries": {
+      "status": "ok",
+      "latest_passing_cohort": "messaging-final-tests-02"
+    },
+    "adapters::persistence::workflow::tests::message_tests::thread_tests::workflow_message_thread_send_never_joins_the_customer_thread": {
+      "status": "ok",
+      "latest_passing_cohort": "messaging-final-tests-02"
+    },
+    "adapters::persistence::workflow::tests::message_tests::thread_tests::workflow_message_thread_external_reply_continues_the_source_relay_trace": {
+      "status": "ok",
+      "latest_passing_cohort": "messaging-final-tests-02"
+    },
+    "adapters::persistence::workflow::tests::message_tests::workflow_message_publish_in_app_channel_commits_receipt_atomically": {
+      "status": "ok",
+      "latest_passing_cohort": "messaging-final-tests-02"
+    },
+    "application::workflow::supervise::tests::workflow_message_wait_supervisor_confirms_suspension_and_never_releases": {
+      "status": "ok",
+      "latest_passing_cohort": "messaging-final-tests-02"
+    },
+    "adapters::persistence::workflow::tests::message_tests::workflow_message_receipt_failed_delivery_takes_final_error_and_never_resends": {
+      "status": "ok",
+      "latest_passing_cohort": "messaging-final-tests-02"
+    },
+    "adapters::persistence::workflow::tests::message_tests::workflow_message_model_tool_deliveries_park_and_continue_sequentially": {
+      "status": "ok",
+      "latest_passing_cohort": "messaging-final-tests-02"
+    },
+    "adapters::persistence::workflow::tests::message_tests::workflow_message_receipt_poison_backs_off_and_stalls_at_five": {
+      "status": "ok",
+      "latest_passing_cohort": "messaging-final-tests-02"
+    },
+    "adapters::persistence::workflow::tests::message_tests::workflow_message_receipt_unknown_is_uncertain_until_the_deadline": {
+      "status": "ok",
+      "latest_passing_cohort": "messaging-final-tests-02"
+    },
+    "adapters::persistence::workflow::tests::message_tests::recovery_tests::workflow_message_recovery_rolled_back_publication_retries_and_publishes_once": {
+      "status": "ok",
+      "latest_passing_cohort": "messaging-final-tests-02"
+    },
+    "adapters::persistence::workflow::tests::message_tests::workflow_message_wait_cancel_supersedes_unsent_and_records_late_truth": {
+      "status": "ok",
+      "latest_passing_cohort": "messaging-final-tests-02"
+    },
+    "adapters::persistence::workflow::tests::message_tests::workflow_message_wait_deadline_supersedes_unsent_deliveries": {
+      "status": "ok",
+      "latest_passing_cohort": "messaging-final-tests-02"
+    },
+    "adapters::persistence::workflow::tests::message_tests::thread_tests::workflow_message_thread_user_send_opens_a_thread_the_member_takes_part_in": {
+      "status": "ok",
+      "latest_passing_cohort": "messaging-final-tests-02"
+    },
+    "adapters::persistence::workflow::tests::message_tests::workflow_message_wait_user_email_parks_then_resumes_on_accepted_receipt": {
+      "status": "ok",
+      "latest_passing_cohort": "messaging-final-tests-02"
+    },
+    "adapters::persistence::workflow::tests::message_tests::thread_tests::correlation_tests::workflow_message_invalid_frozen_correlation_creates_no_message_or_delivery": {
+      "status": "ok",
+      "latest_passing_cohort": "messaging-final-tests-02"
+    },
+    "adapters::persistence::workflow::tests::message_tests::thread_tests::workflow_message_thread_reply_refuses_sources_it_cannot_answer": {
+      "status": "ok",
+      "latest_passing_cohort": "messaging-final-tests-02"
+    },
+    "adapters::persistence::delivery::cancellation::tests::every_reason_has_a_detail_the_sql_case_can_carry": {
+      "status": "ok",
+      "latest_passing_cohort": "delivery-final-tests-02"
+    },
+    "adapters::persistence::delivery::tests::a_stored_destination_is_read_through_its_own_transport": {
+      "status": "ok",
+      "latest_passing_cohort": "delivery-final-tests-02"
+    },
+    "adapters::persistence::delivery::tests::a_stored_part_payload_is_decoded_fallibly": {
+      "status": "ok",
+      "latest_passing_cohort": "delivery-final-tests-02"
+    },
+    "adapters::persistence::delivery::tests::cancellation::the_cancellation_reasons_match_their_database_constraint": {
+      "status": "ok",
+      "latest_passing_cohort": "delivery-final-tests-02"
+    },
+    "adapters::persistence::delivery::tests::a_reaped_lease_retries_only_what_never_reached_the_provider": {
+      "status": "ok",
+      "latest_passing_cohort": "delivery-final-tests-02"
+    },
+    "adapters::persistence::delivery::tests::cancellation::a_held_delivery_starts_no_further_part_once_cancelled": {
+      "status": "ok",
+      "latest_passing_cohort": "delivery-final-tests-02"
+    },
+    "adapters::persistence::delivery::tests::cancellation::a_queued_delivery_is_superseded_and_keeps_its_partial_send": {
+      "status": "ok",
+      "latest_passing_cohort": "delivery-final-tests-02"
+    },
+    "adapters::persistence::delivery::tests::a_stale_execution_cannot_write_over_the_one_that_replaced_it": {
+      "status": "ok",
+      "latest_passing_cohort": "delivery-final-tests-02"
+    },
+    "adapters::persistence::delivery::tests::a_retryable_failure_backs_off_and_the_last_attempt_dead_letters": {
+      "status": "ok",
+      "latest_passing_cohort": "delivery-final-tests-02"
+    },
+    "adapters::persistence::delivery::tests::a_poison_delivery_goes_terminal_without_spinning": {
+      "status": "ok",
+      "latest_passing_cohort": "delivery-final-tests-02"
+    },
+    "adapters::persistence::delivery::tests::cancellation::a_begin_part_that_loses_the_parent_lock_starts_no_request": {
+      "status": "ok",
+      "latest_passing_cohort": "delivery-final-tests-02"
+    },
+    "adapters::persistence::delivery::tests::a_dependent_delivery_waits_and_is_orphaned_when_its_root_dies": {
+      "status": "ok",
+      "latest_passing_cohort": "delivery-final-tests-02"
+    },
+    "adapters::persistence::delivery::tests::one_key_per_destination_absorbs_a_repeat_and_keeps_two_recipients_apart": {
+      "status": "ok",
+      "latest_passing_cohort": "delivery-final-tests-02"
+    },
+    "adapters::persistence::delivery::tests::cancellation::release_failure_and_the_lease_sweep_settle_rather_than_requeue": {
+      "status": "ok",
+      "latest_passing_cohort": "delivery-final-tests-02"
+    },
+    "adapters::persistence::delivery::tests::cancellation::a_request_already_made_keeps_its_real_outcome": {
+      "status": "ok",
+      "latest_passing_cohort": "delivery-final-tests-02"
+    },
+    "adapters::persistence::delivery::tests::a_multi_part_delivery_aggregates_from_its_parts": {
+      "status": "ok",
+      "latest_passing_cohort": "delivery-final-tests-02"
+    },
+    "adapters::persistence::delivery::tests::tenant_tests::channel_path_fk_delivery_cannot_cross_channels": {
+      "status": "ok",
+      "latest_passing_cohort": "delivery-final-tests-02"
+    },
+    "adapters::persistence::delivery::tests::competing_standalone_notification_enqueues_create_one_claimable_delivery": {
+      "status": "ok",
+      "latest_passing_cohort": "delivery-final-tests-02"
+    },
+    "adapters::persistence::delivery::tests::tenant_tests::notification_delivery_tenant_member_removal_cancels_pending_notices": {
+      "status": "ok",
+      "latest_passing_cohort": "delivery-final-tests-02"
+    },
+    "adapters::persistence::delivery::tests::tenant_tests::notification_delivery_tenant_part_company_must_match_its_delivery": {
+      "status": "ok",
+      "latest_passing_cohort": "delivery-final-tests-02"
+    },
+    "adapters::persistence::delivery::tests::jsonb_row_context_delivery_reports_id_before_creating_queue_rows": {
+      "status": "ok",
+      "latest_passing_cohort": "delivery-final-tests-02"
+    },
+    "adapters::persistence::delivery::tests::late_completion::delivery_late_completion_after_the_lease_expired_records_the_outcome": {
+      "status": "ok",
+      "latest_passing_cohort": "delivery-final-tests-02"
+    },
+    "adapters::persistence::delivery::tests::tenant_tests::tenant_fk_small_company_deletion_leaves_no_demand_or_poll_rows": {
+      "status": "ok",
+      "latest_passing_cohort": "delivery-final-tests-02"
+    },
+    "adapters::persistence::delivery::tests::tenant_tests::tenant_fk_small_notification_event_and_recipient_are_tenant_proven": {
+      "status": "ok",
+      "latest_passing_cohort": "delivery-final-tests-02"
+    },
+    "adapters::persistence::delivery::tests::the_claimable_statuses_match_the_index_the_claim_relies_on": {
+      "status": "ok",
+      "latest_passing_cohort": "delivery-final-tests-02"
+    },
+    "adapters::persistence::delivery::tests::the_delivery_vocabularies_match_their_database_constraints": {
+      "status": "ok",
+      "latest_passing_cohort": "delivery-final-tests-02"
+    },
+    "adapters::persistence::delivery::tests::late_completion::delivery_late_completion_after_the_reaper_took_the_row_is_lease_lost": {
+      "status": "ok",
+      "latest_passing_cohort": "delivery-final-tests-02"
+    },
+    "adapters::persistence::delivery::tests::late_completion::delivery_late_completion_races_the_reaper_and_exactly_one_wins": {
+      "status": "ok",
+      "latest_passing_cohort": "delivery-final-tests-02"
+    },
+    "adapters::persistence::delivery::tests::late_completion::delivery_late_completion_renewal_locks_in_id_order": {
+      "status": "ok",
+      "latest_passing_cohort": "delivery-final-tests-02"
+    },
+    "adapters::persistence::delivery::tests::late_completion::delivery_late_completion_renewal_races_the_reaper_and_exactly_one_wins": {
+      "status": "ok",
+      "latest_passing_cohort": "delivery-final-tests-02"
+    },
+    "adapters::persistence::delivery::tests::releasing_a_claim_costs_no_attempt_and_makes_it_immediately_claimable": {
+      "status": "ok",
+      "latest_passing_cohort": "delivery-final-tests-02"
+    },
+    "adapters::persistence::delivery::tests::schema_constraint_delivery_failure_requires_class_and_bounded_detail": {
+      "status": "ok",
+      "latest_passing_cohort": "delivery-final-tests-02"
+    },
+    "adapters::persistence::delivery::tests::schema_constraint_retired_delivery_purposes_and_identity_status_are_refused": {
+      "status": "ok",
+      "latest_passing_cohort": "delivery-final-tests-02"
+    },
+    "adapters::persistence::delivery::tests::tenant_tests::notification_delivery_tenant_company_deletion_removes_notices_and_parts": {
+      "status": "ok",
+      "latest_passing_cohort": "delivery-final-tests-02"
+    },
+    "adapters::persistence::delivery::tests::tenant_tests::notification_delivery_tenant_removal_first_producer_finds_no_member": {
+      "status": "ok",
+      "latest_passing_cohort": "delivery-final-tests-02"
+    },
+    "adapters::persistence::delivery::tests::tenant_tests::notification_delivery_tenant_removal_waits_for_a_producer_and_cancels_its_notice": {
+      "status": "ok",
+      "latest_passing_cohort": "delivery-final-tests-02"
+    },
+    "adapters::persistence::delivery::tests::the_stuck_delivery_census_counts_each_stall_and_not_a_due_delivery": {
+      "status": "ok",
+      "latest_passing_cohort": "delivery-final-tests-02"
+    },
+    "adapters::persistence::delivery::tests::two_claimants_never_own_the_same_delivery": {
+      "status": "ok",
+      "latest_passing_cohort": "delivery-final-tests-02"
+    },
+    "adapters::persistence::delivery::tests::late_completion::delivery_late_completion_worker_renews_so_a_slow_batch_completes": {
+      "status": "ok",
+      "latest_passing_cohort": "delivery-final-tests-02"
+    },
+    "application::services::delivery_worker::tests::a_creation_says_whether_it_queued_anything": {
+      "status": "ok",
+      "latest_passing_cohort": "delivery-worker-final-tests-01"
+    },
+    "application::services::delivery_worker::tests::a_resumed_delivery_starts_at_its_first_unfinished_part": {
+      "status": "ok",
+      "latest_passing_cohort": "delivery-worker-final-tests-01"
+    },
+    "application::services::delivery_worker::tests::a_delivery_for_an_unregistered_transport_is_dead_lettered": {
+      "status": "ok",
+      "latest_passing_cohort": "delivery-worker-final-tests-01"
+    },
+    "application::services::delivery_worker::tests::delivery_late_completion_a_lost_renewal_stops_the_send": {
+      "status": "ok",
+      "latest_passing_cohort": "delivery-worker-final-tests-01"
+    },
+    "application::services::delivery_worker::tests::delivery_late_completion_a_renewal_error_still_sends": {
+      "status": "ok",
+      "latest_passing_cohort": "delivery-worker-final-tests-01"
+    },
+    "application::services::delivery_worker::tests::a_single_tenant_batch_keeps_the_claim_s_order": {
+      "status": "ok",
+      "latest_passing_cohort": "delivery-worker-final-tests-01"
+    },
+    "application::services::delivery_worker::tests::a_batch_is_interleaved_so_one_tenant_cannot_monopolise_it": {
+      "status": "ok",
+      "latest_passing_cohort": "delivery-worker-final-tests-01"
+    },
+    "application::services::delivery_worker::tests::losing_the_lease_stops_the_worker_mid_send": {
+      "status": "ok",
+      "latest_passing_cohort": "delivery-worker-final-tests-01"
+    },
+    "application::services::delivery_worker::tests::shutdown_before_a_send_releases_the_claim_rather_than_stranding_it": {
+      "status": "ok",
+      "latest_passing_cohort": "delivery-worker-final-tests-01"
+    },
+    "application::services::delivery_worker::tests::a_sweep_publishes_every_stuck_delivery_gauge": {
+      "status": "ok",
+      "latest_passing_cohort": "delivery-worker-final-tests-01"
+    },
+    "adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::eligibility_tests::claim_sql_tests::storage_reconciliation_tests::run_retention_consumed_old_proof_cannot_close_a_later_remote_entry": {
+      "status": "ok",
+      "latest_passing_cohort": "retention-final-tests-01"
+    },
+    "adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::eligibility_tests::claim_sql_tests::storage_reconciliation_tests::run_retention_evidence_conflict_keeps_terminal_tree_even_with_exact_receipt": {
+      "status": "ok",
+      "latest_passing_cohort": "retention-final-tests-01"
+    },
+    "adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::storage_checkpoint_tests::run_retention_native_checkpoint_model_usage_and_tree_rollback_then_retry": {
+      "status": "ok",
+      "latest_passing_cohort": "retention-final-tests-01"
+    },
+    "adapters::persistence::workflow::tests::admission_tests::storage_tests::protection_tests::run_retention_external_rerun_blocks_referent_until_independent_root_is_removed": {
+      "status": "ok",
+      "latest_passing_cohort": "retention-final-tests-01"
+    },
+    "adapters::persistence::workflow::tests::admission_tests::storage_tests::protection_tests::run_retention_deferred_job_provenance_still_rejects_native_commit": {
+      "status": "ok",
+      "latest_passing_cohort": "retention-final-tests-01"
+    },
+    "adapters::persistence::workflow::tests::admission_tests::storage_tests::report_tests::run_retention_report_global_scan_cap_applies_before_filters_across_sources": {
+      "status": "ok",
+      "latest_passing_cohort": "retention-final-tests-01"
+    },
+    "adapters::persistence::workflow::tests::admission_tests::storage_tests::protection_tests::run_retention_protects_open_decision_until_its_wait_closes": {
+      "status": "ok",
+      "latest_passing_cohort": "retention-final-tests-01"
+    },
+    "adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::storage_checkpoint_tests::run_retention_native_checkpoint_and_model_usage_delete_with_only_owned_jobs": {
+      "status": "ok",
+      "latest_passing_cohort": "retention-final-tests-01"
+    },
+    "adapters::persistence::workflow::tests::admission_tests::storage_tests::protection_tests::run_retention_shutdown_rolls_back_the_actual_inflight_archive_and_delete": {
+      "status": "ok",
+      "latest_passing_cohort": "retention-final-tests-01"
+    },
+    "adapters::persistence::workflow::tests::admission_tests::storage_tests::report_tests::run_retention_reports_preserve_categories_filters_time_prices_and_live_union": {
+      "status": "ok",
+      "latest_passing_cohort": "retention-final-tests-01"
+    },
+    "adapters::persistence::workflow::tests::admission_tests::storage_tests::retry_tests::run_retention_first_fences_waiting_production_retry_without_partial_archive": {
+      "status": "ok",
+      "latest_passing_cohort": "retention-final-tests-01"
+    },
+    "adapters::persistence::workflow::tests::admission_tests::storage_tests::retry_tests::run_retention_retry_first_revival_owns_and_preserves_live_work": {
+      "status": "ok",
+      "latest_passing_cohort": "retention-final-tests-01"
+    },
+    "adapters::persistence::workflow::tests::admission_tests::storage_tests::run_retention_archive_guards_refuse_forgery_duplicates_and_mutation": {
+      "status": "ok",
+      "latest_passing_cohort": "retention-final-tests-01"
+    },
+    "adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::eligibility_tests::claim_sql_tests::storage_reconciliation_tests::run_retention_historical_not_applied_closure_survives_retry_grant_expiry": {
+      "status": "ok",
+      "latest_passing_cohort": "retention-final-tests-01"
+    },
+    "adapters::persistence::workflow::tests::admission_tests::storage_tests::run_retention_competing_collectors_delete_exactly_once": {
+      "status": "ok",
+      "latest_passing_cohort": "retention-final-tests-01"
+    },
+    "adapters::persistence::workflow::tests::admission_tests::storage_tests::run_retention_complete_tree_jobs_usage_and_idempotent_retry": {
+      "status": "ok",
+      "latest_passing_cohort": "retention-final-tests-01"
+    },
+    "adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::eligibility_tests::claim_sql_tests::storage_reconciliation_tests::run_retention_unknown_effect_is_protected_while_complete_not_applied_proof_closes_it": {
+      "status": "ok",
+      "latest_passing_cohort": "retention-final-tests-01"
+    },
+    "adapters::persistence::workflow::tests::admission_tests::storage_tests::run_retention_global_cursor_skips_protected_prefix_and_keeps_young_live": {
+      "status": "ok",
+      "latest_passing_cohort": "retention-final-tests-01"
+    },
+    "adapters::persistence::workflow::tests::admission_tests::storage_tests::run_retention_rollback_after_runs_before_jobs_preserves_every_owner": {
+      "status": "ok",
+      "latest_passing_cohort": "retention-final-tests-01"
+    },
+    "adapters::persistence::workflow::tests::message_tests::storage_message_tests::run_retention_pending_message_consumption_keeps_terminal_tree": {
+      "status": "ok",
+      "latest_passing_cohort": "message-retention-final-tests-02"
+    },
+    "adapters::persistence::workflow::tests::admission_tests::storage_tests::boundary_tests::run_retention_native_schema_100001_members_reaches_delete_without_activation_cutoff": {
+      "status": "ok",
+      "latest_passing_cohort": "retention-final-tests-01"
+    },
+    "application::workflow::sample::tests::jev_tests::jev_box_sample_uses_only_scripted_answers_and_inert_metadata": {
+      "status": "ok",
+      "latest_passing_cohort": "sample-final-tests-01"
+    },
+    "application::workflow::sample::tests::jev_tests::jev_box_sample_rejects_tools_tokens_and_invalid_box": {
+      "status": "ok",
+      "latest_passing_cohort": "sample-final-tests-01"
+    },
+    "application::workflow::sample::tests::tools_tests::approvals::autonomous_agent_samples_protected_http_binding_requires_explicit_simulated_approval": {
+      "status": "ok",
+      "latest_passing_cohort": "sample-final-tests-01"
+    },
+    "application::workflow::sample::tests::tools_tests::approvals::autonomous_agent_samples_protected_child_binding_requires_explicit_simulated_approval": {
+      "status": "ok",
+      "latest_passing_cohort": "sample-final-tests-01"
+    },
+    "application::workflow::sample::tests::tools_tests::direct_agent_tools_and_pinned_workflow_tools_stay_in_sample": {
+      "status": "ok",
+      "latest_passing_cohort": "sample-final-tests-01"
+    },
+    "application::workflow::sample::tests::tools_tests::direct_tool_inputs_and_outputs_are_validated": {
+      "status": "ok",
+      "latest_passing_cohort": "sample-final-tests-01"
+    },
+    "application::workflow::sample::tests::pure_and_scripted_routing_share_compiled_validation": {
+      "status": "ok",
+      "latest_passing_cohort": "sample-final-tests-01"
+    },
+    "application::workflow::sample::tests::tools_tests::protected_step_workflow_tool_needs_approval_and_executes_child": {
+      "status": "ok",
+      "latest_passing_cohort": "sample-final-tests-01"
+    },
+    "application::workflow::sample::tests::jev_tests::workflow_sample_jev_mixed_thresholds_automatic_and_human_paths": {
+      "status": "ok",
+      "latest_passing_cohort": "sample-final-tests-01"
+    },
+    "application::workflow::sample::tests::bounded_root_budget_and_external_kinds_never_fall_back": {
+      "status": "ok",
+      "latest_passing_cohort": "sample-final-tests-01"
+    },
+    "application::workflow::sample::tests::missing_invalid_unused_and_oversized_scripts_fail_explicitly": {
+      "status": "ok",
+      "latest_passing_cohort": "sample-final-tests-01"
+    },
+    "application::workflow::sample::tests::repeated_human_revision_carries_edited_artifact_feedback_and_captures_reply": {
+      "status": "ok",
+      "latest_passing_cohort": "sample-final-tests-01"
+    },
+    "application::workflow::sample::tests::tools_tests::direct_mcp_tool_uses_the_production_result_envelope": {
+      "status": "ok",
+      "latest_passing_cohort": "sample-final-tests-01"
+    },
+    "application::workflow::sample::tests::descendants_cannot_replenish_root_budgets_and_report_size_is_bounded": {
+      "status": "ok",
+      "latest_passing_cohort": "sample-final-tests-01"
+    },
+    "adapters::persistence::workflow::knowledge::tests::knowledge_run_level_reader_facts_exclude_nonreaders_and_reject_malformed_authority": {
+      "status": "ok",
+      "latest_passing_cohort": "knowledge-final-tests-01"
+    },
+    "adapters::http::routes::connection_levels::tests::knowledge_run_level_connection_payloads_are_strict_bounded_and_forms_keep_progress": {
+      "status": "ok",
+      "latest_passing_cohort": "knowledge-final-tests-01"
+    },
+    "adapters::http::routes::connection_levels::tests::knowledge_run_level_connection_form_parses_integer_strings_and_rejects_injected_fields": {
+      "status": "ok",
+      "latest_passing_cohort": "knowledge-final-tests-01"
+    },
+    "adapters::http::routes::connection_levels::tests::knowledge_run_level_race_live_admin_demotion_precedes_connection_level_write": {
+      "status": "ok",
+      "latest_passing_cohort": "knowledge-final-tests-01"
+    },
+    "adapters::http::routes::connection_levels::tests::knowledge_run_level_connection_commands_enforce_caps_and_preserve_other_settings": {
+      "status": "ok",
+      "latest_passing_cohort": "knowledge-final-tests-01"
+    },
+    "adapters::persistence::workflow::tests::admission_tests::admission_source_tests::knowledge_run_level_schedule_uses_configured_run_as_ceiling": {
+      "status": "ok",
+      "latest_passing_cohort": "knowledge-final-tests-01"
+    },
+    "adapters::persistence::workflow::tests::admission_tests::history_reader_tests::knowledge_history_tests::knowledge_run_level_history_filters_before_count_and_raises_returned_content": {
+      "status": "ok",
+      "latest_passing_cohort": "knowledge-final-tests-01"
+    },
+    "adapters::http::routes::connection_levels::tests::knowledge_run_level_race_connection_revision_writers_have_one_winner": {
+      "status": "ok",
+      "latest_passing_cohort": "knowledge-final-tests-01"
+    },
+    "adapters::http::routes::connection_levels::tests::knowledge_run_level_http_new_read_routes_hide_valid_foreign_company_and_resource_ids": {
+      "status": "ok",
+      "latest_passing_cohort": "knowledge-final-tests-01"
+    },
+    "adapters::http::routes::connection_levels::tests::knowledge_run_level_all_four_connection_level_write_routes_scope_valid_foreign_resources": {
+      "status": "ok",
+      "latest_passing_cohort": "knowledge-final-tests-01"
+    },
+    "adapters::persistence::workflow::tests::admission_tests::history_reader_tests::knowledge_history_lease_tests::knowledge_run_level_history_real_replacement_claim_fences_old_reader_and_replays_once": {
+      "status": "ok",
+      "latest_passing_cohort": "knowledge-final-tests-01"
+    },
+    "adapters::persistence::workflow::tests::admission_tests::history_reader_tests::knowledge_history_tests::knowledge_run_level_raise_rolls_back_with_its_read_transaction": {
+      "status": "ok",
+      "latest_passing_cohort": "knowledge-final-tests-01"
+    },
+    "adapters::persistence::workflow::tests::admission_tests::knowledge_admission_tests::knowledge_run_level_child_inherits_and_competing_result_consumers_raise_parent_once": {
+      "status": "ok",
+      "latest_passing_cohort": "knowledge-final-tests-01"
+    },
+    "adapters::persistence::workflow::tests::admission_tests::knowledge_admission_tests::knowledge_run_level_manual_and_replay_keep_admitted_ceiling": {
+      "status": "ok",
+      "latest_passing_cohort": "knowledge-final-tests-01"
+    },
+    "adapters::persistence::workflow::tests::admission_tests::history_reader_tests::knowledge_history_lease_tests::knowledge_run_level_history_consumption_rejects_foreign_scope_and_rewritten_proof": {
+      "status": "ok",
+      "latest_passing_cohort": "knowledge-final-tests-01"
+    },
+    "adapters::persistence::workflow::tests::admission_tests::knowledge_admission_tests::knowledge_run_level_manual_uses_actual_admin_starter_and_keeps_member_refused": {
+      "status": "ok",
+      "latest_passing_cohort": "knowledge-final-tests-01"
+    },
+    "adapters::persistence::workflow::tests::admission_tests::history_reader_tests::knowledge_history_lease_tests::knowledge_run_level_history_expired_database_lease_or_deadline_returns_no_output_or_rise": {
+      "status": "ok",
+      "latest_passing_cohort": "knowledge-final-tests-01"
+    },
+    "adapters::persistence::workflow::tests::admission_tests::knowledge_admission_tests::knowledge_run_level_message_empty_owner_and_mixed_cc_audiences": {
+      "status": "ok",
+      "latest_passing_cohort": "knowledge-final-tests-01"
+    },
+    "adapters::persistence::workflow::tests::admission_tests::knowledge_admission_tests::knowledge_run_level_schema_rejects_ceiling_changes_lowering_and_out_of_range": {
+      "status": "ok",
+      "latest_passing_cohort": "knowledge-final-tests-01"
+    },
+    "adapters::persistence::workflow::tests::admission_tests::knowledge_admission_tests::knowledge_run_level_stamped_trigger_taints_or_refuses_without_partial_admission": {
+      "status": "ok",
+      "latest_passing_cohort": "knowledge-final-tests-01"
+    },
+    "adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::knowledge_provisioning_tests::knowledge_run_level_provisioning_rechecks_pending_intent_before_any_local_effect": {
+      "status": "ok",
+      "latest_passing_cohort": "knowledge-final-tests-01"
+    },
+    "adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_run_level_model_continues_after_refused_http_tool_without_egress": {
+      "status": "ok",
+      "latest_passing_cohort": "knowledge-final-tests-01"
+    },
+    "adapters::persistence::workflow::tests::http_tests::knowledge_http_tests::knowledge_run_level_completed_remote_receipt_replays_after_taint_without_reentry": {
+      "status": "ok",
+      "latest_passing_cohort": "knowledge-final-tests-01"
+    },
+    "adapters::persistence::workflow::tests::http_tests::knowledge_http_tests::knowledge_run_level_http_current_connection_level_allows_classified_dispatch": {
+      "status": "ok",
+      "latest_passing_cohort": "knowledge-final-tests-01"
+    },
+    "adapters::persistence::workflow::tests::http_tests::knowledge_http_tests::knowledge_run_level_remote_possible_marker_stays_uncertain_after_taint": {
+      "status": "ok",
+      "latest_passing_cohort": "knowledge-final-tests-01"
+    },
+    "adapters::persistence::workflow::tests::mcp_tests::knowledge_mcp_tests::knowledge_run_level_mcp_level_change_preserves_operation_and_credentials": {
+      "status": "ok",
+      "latest_passing_cohort": "knowledge-final-tests-01"
+    },
+    "adapters::persistence::workflow::tests::mcp_tests::knowledge_mcp_tests::knowledge_run_level_mcp_step_and_tool_refuse_without_provider_entry": {
+      "status": "ok",
+      "latest_passing_cohort": "knowledge-final-tests-01"
+    },
+    "adapters::persistence::workflow::tests::message_tests::knowledge_message_tests::knowledge_run_level_internal_message_stamps_current_content_and_completed_replay_retains_stamp": {
+      "status": "ok",
+      "latest_passing_cohort": "knowledge-final-tests-01"
+    },
+    "adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::tokens::scheduling::knowledge_run_level_refusal_survives_real_token_allowance_and_refusal_retirement": {
+      "status": "ok",
+      "latest_passing_cohort": "knowledge-final-tests-01"
+    },
+    "adapters::persistence::workflow::tests::message_tests::knowledge_message_tests::knowledge_run_level_pending_public_intent_cannot_send_after_content_rises": {
+      "status": "ok",
+      "latest_passing_cohort": "knowledge-final-tests-01"
+    },
+    "adapters::persistence::workflow::tests::message_tests::knowledge_message_tests::knowledge_run_level_race_verified_address_change_cannot_authorize_a_frozen_retired_recipient": {
+      "status": "ok",
+      "latest_passing_cohort": "knowledge-final-tests-01"
+    },
+    "adapters::persistence::workflow::tests::message_tests::knowledge_message_tests::knowledge_run_level_refused_message_cannot_recover_into_success": {
+      "status": "ok",
+      "latest_passing_cohort": "knowledge-final-tests-01"
+    },
+    "application::workflow::message_admission::knowledge_tests::knowledge_run_level_stamped_trigger_refusal_settles_instead_of_retrying": {
+      "status": "ok",
+      "latest_passing_cohort": "knowledge-final-tests-01"
+    },
+    "domain::entities::access_level::knowledge_tests::knowledge_run_level_audience_is_the_lowest_reader_or_public": {
+      "status": "ok",
+      "latest_passing_cohort": "knowledge-final-tests-01"
+    },
+    "domain::entities::access_level::knowledge_tests::knowledge_run_level_domain_keeps_content_within_the_admission_ceiling": {
+      "status": "ok",
+      "latest_passing_cohort": "knowledge-final-tests-01"
+    },
+    "domain::entities::access_level::knowledge_tests::knowledge_run_level_release_matrix_never_declassifies": {
+      "status": "ok",
+      "latest_passing_cohort": "knowledge-final-tests-01"
+    },
+    "domain::workflow::outcome::tests::knowledge_run_level_refusal_has_no_retry_or_error_route": {
+      "status": "ok",
+      "latest_passing_cohort": "knowledge-final-tests-01"
+    },
+    "domain::workflow::recovery::tests::knowledge_run_level_refusal_is_final_but_unknown_effect_still_reconciles": {
+      "status": "ok",
+      "latest_passing_cohort": "knowledge-final-tests-01"
+    },
+    "adapters::persistence::workflow::tests::message_tests::knowledge_message_tests::knowledge_run_level_sql_freeze_constraint_matches_pure_release_matrix": {
+      "status": "ok",
+      "latest_passing_cohort": "knowledge-final-tests-01"
+    },
+    "adapters::persistence::workflow::tests::http_tests::knowledge_http_tests::knowledge_run_level_http_step_and_direct_tool_refuse_before_network": {
+      "status": "ok",
+      "latest_passing_cohort": "knowledge-final-tests-01"
+    },
+    "adapters::persistence::workflow::tests::message_tests::knowledge_message_tests::knowledge_run_level_tool_refusal_is_typed_and_contains_no_content": {
+      "status": "ok",
+      "latest_passing_cohort": "knowledge-final-tests-01"
+    },
+    "adapters::persistence::workflow::tests::message_tests::knowledge_message_tests::knowledge_run_level_verified_member_email_uses_current_member_level": {
+      "status": "ok",
+      "latest_passing_cohort": "knowledge-final-tests-01"
+    },
+    "adapters::persistence::workflow::tests::message_tests::thread_tests::knowledge_reply_tests::knowledge_run_level_race_cc_commit_after_destination_snapshot_is_ordered_after_that_freeze": {
+      "status": "ok",
+      "latest_passing_cohort": "knowledge-final-tests-01"
+    },
+    "adapters::persistence::workflow::tests::message_tests::thread_tests::knowledge_reply_tests::knowledge_run_level_reply_cc_added_after_intent_refuses_publication_without_partial_effect": {
+      "status": "ok",
+      "latest_passing_cohort": "knowledge-final-tests-01"
+    },
+    "adapters::persistence::workflow::tests::admission_tests::history_reader_tests::knowledge_history_lease_tests::knowledge_run_level_history_expiry_during_statement_and_commit_rolls_back_taint_and_proof": {
+      "status": "ok",
+      "latest_passing_cohort": "knowledge-final-tests-01"
+    },
+    "adapters::persistence::workflow::tests::message_tests::thread_tests::knowledge_reply_tests::knowledge_run_level_reply_unverified_historical_address_stays_public": {
+      "status": "ok",
+      "latest_passing_cohort": "knowledge-final-tests-01"
+    },
+    "adapters::persistence::workflow::tests::message_tests::knowledge_message_tests::knowledge_run_level_step_email_and_fanout_refuse_before_any_effect": {
+      "status": "ok",
+      "latest_passing_cohort": "knowledge-final-tests-01"
+    },
+    "adapters::persistence::workflow::tests::message_tests::workflow_tool_tests::knowledge_run_level_workflow_tool_child_and_saved_result_replay_taint_parent_atomically": {
+      "status": "ok",
+      "latest_passing_cohort": "knowledge-final-tests-01"
+    },
+    "adapters::persistence::workflow::tests::admission_tests::history_reader_tests::knowledge_history_race_tests::knowledge_run_level_race_history_read_and_email_freeze_record_consistent_consumption": {
+      "status": "ok",
+      "latest_passing_cohort": "knowledge-final-tests-01"
+    },
+    "infra::workflow::tests::worker_slots_respect_the_pool": {
+      "status": "ok",
+      "latest_passing_cohort": "runtime-final-tests-01"
+    },
+    "infra::workflow::tests::production_handler_covers_every_io_kind_or_refuses_it": {
+      "status": "ok",
+      "latest_passing_cohort": "runtime-final-tests-01"
+    },
+    "infra::workflow::tests::production_admission_refuses_a_child_trigger": {
+      "status": "ok",
+      "latest_passing_cohort": "runtime-final-tests-01"
+    },
+    "infra::workflow::tests::production_workers_stop_on_the_shutdown_token": {
+      "status": "ok",
+      "latest_passing_cohort": "runtime-final-tests-01"
+    },
+    "infra::workflow::tests::production_publication_refuses_memory_steps_and_captures_children": {
+      "status": "ok",
+      "latest_passing_cohort": "runtime-final-tests-01"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::message_intent_crash_after_admission_replays_its_run": {
+      "status": "ok",
+      "latest_passing_cohort": "intent-final-tests-01"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::message_intent_refused_run_as_is_visible_and_spares_its_sibling": {
+      "status": "ok",
+      "latest_passing_cohort": "intent-final-tests-01"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::message_intent_competing_claimants_admit_one_run_and_fence_the_stale_worker": {
+      "status": "ok",
+      "latest_passing_cohort": "intent-final-tests-01"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::message_intent_lease_lapsing_on_the_last_attempt_fails_it_observably": {
+      "status": "ok",
+      "latest_passing_cohort": "intent-final-tests-01"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::message_intent_rules_admit_each_eligible_binding_independently": {
+      "status": "ok",
+      "latest_passing_cohort": "intent-final-tests-01"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::message_intent_poison_batch_is_not_reclaimed": {
+      "status": "ok",
+      "latest_passing_cohort": "intent-final-tests-01"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::message_intent_reconfigured_binding_is_re_read_before_admission": {
+      "status": "ok",
+      "latest_passing_cohort": "intent-final-tests-01"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::message_intent_ignores_bindings_activated_later_or_deactivated": {
+      "status": "ok",
+      "latest_passing_cohort": "intent-final-tests-01"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::message_intent_rows_cannot_name_another_companys_records": {
+      "status": "ok",
+      "latest_passing_cohort": "intent-final-tests-01"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::message_intent_admission_replay_with_another_delivery_policy_conflicts": {
+      "status": "ok",
+      "latest_passing_cohort": "intent-final-tests-01"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::message_intent_in_app_policy_reaches_the_admitted_run": {
+      "status": "ok",
+      "latest_passing_cohort": "intent-final-tests-01"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::message_intent_claims_are_fair_across_tenants": {
+      "status": "ok",
+      "latest_passing_cohort": "intent-final-tests-01"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::message_intent_transient_failure_retries_only_the_failed_binding": {
+      "status": "ok",
+      "latest_passing_cohort": "intent-final-tests-01"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::message_intent_worker_stops_between_and_during_processing": {
+      "status": "ok",
+      "latest_passing_cohort": "intent-final-tests-01"
+    },
+    "application::transport::bounded::tests::bounded_text_measures_bytes_rather_than_characters": {
+      "status": "ok",
+      "latest_passing_cohort": "transport-final-tests-01"
+    },
+    "application::transport::bounded::tests::a_list_at_its_limit_is_accepted_and_one_past_it_is_not": {
+      "status": "ok",
+      "latest_passing_cohort": "transport-final-tests-01"
+    },
+    "application::transport::dependency_tests::runtime_boundary_scanner_covers_direct_sdk_paths_without_internal_false_positives": {
+      "status": "ok",
+      "latest_passing_cohort": "transport-final-tests-01"
+    },
+    "application::transport::dependency_tests::scanner_tests::the_inline_test_module_is_not_scanned": {
+      "status": "ok",
+      "latest_passing_cohort": "transport-final-tests-01"
+    },
+    "application::transport::dependency_tests::scanner_tests::a_cfg_test_attribute_on_an_item_does_not_truncate_the_file": {
+      "status": "ok",
+      "latest_passing_cohort": "transport-final-tests-01"
+    },
+    "application::transport::inbox::tests::payload_debug_never_contains_its_bytes": {
+      "status": "ok",
+      "latest_passing_cohort": "transport-final-tests-01"
+    },
+    "application::transport::bounded::tests::an_over_limit_list_is_refused_on_the_way_back_in_without_panicking": {
+      "status": "ok",
+      "latest_passing_cohort": "transport-final-tests-01"
+    },
+    "application::transport::ingress::tests::canonical_content_strips_invisible_and_prompt_injection_characters": {
+      "status": "ok",
+      "latest_passing_cohort": "transport-final-tests-01"
+    },
+    "application::transport::inbox::tests::payload_and_safe_facts_are_bounded": {
+      "status": "ok",
+      "latest_passing_cohort": "transport-final-tests-01"
+    },
+    "application::transport::ingress::tests::only_email_carries_authentication_verdicts": {
+      "status": "ok",
+      "latest_passing_cohort": "transport-final-tests-01"
+    },
+    "application::transport::lease::tests::two_claims_on_the_same_row_are_distinguished_by_their_execution": {
+      "status": "ok",
+      "latest_passing_cohort": "transport-final-tests-01"
+    },
+    "application::transport::lease::tests::a_lapsed_claim_reports_itself_as_lapsed": {
+      "status": "ok",
+      "latest_passing_cohort": "transport-final-tests-01"
+    },
+    "application::transport::queue::tests::a_delivery_that_renders_nothing_is_refused_rather_than_queued": {
+      "status": "ok",
+      "latest_passing_cohort": "transport-final-tests-01"
+    },
+    "application::transport::queue::tests::backoff_doubles_then_stops_at_its_ceiling": {
+      "status": "ok",
+      "latest_passing_cohort": "transport-final-tests-01"
+    },
+    "application::transport::ingress::tests::a_protocol_extension_decodes_only_from_a_shape_it_knows": {
+      "status": "ok",
+      "latest_passing_cohort": "transport-final-tests-01"
+    },
+    "application::transport::tests::a_payload_is_read_back_only_by_the_transport_and_version_that_wrote_it": {
+      "status": "ok",
+      "latest_passing_cohort": "transport-final-tests-01"
+    },
+    "application::transport::queue::tests::a_claimed_delivery_resumes_at_its_first_unfinished_part": {
+      "status": "ok",
+      "latest_passing_cohort": "transport-final-tests-01"
+    },
+    "application::transport::tests::a_registry_refuses_a_mismatched_or_repeated_transport": {
+      "status": "ok",
+      "latest_passing_cohort": "transport-final-tests-01"
+    },
+    "application::transport::tests::the_same_logical_delivery_replans_to_the_same_key": {
+      "status": "ok",
+      "latest_passing_cohort": "transport-final-tests-01"
+    },
+    "application::transport::tests::fan_out_includes_exactly_what_policy_allows": {
+      "status": "ok",
+      "latest_passing_cohort": "transport-final-tests-01"
+    },
+    "application::transport::tests::a_sender_reports_rate_limits_and_ambiguity_as_distinct_outcomes": {
+      "status": "ok",
+      "latest_passing_cohort": "transport-final-tests-01"
+    },
+    "application::transport::tests::an_over_limit_rendered_payload_is_refused_rather_than_stored": {
+      "status": "ok",
+      "latest_passing_cohort": "transport-final-tests-01"
+    },
+    "application::transport::ingress::tests::content_is_refused_rather_than_truncated_when_it_exceeds_its_bound": {
+      "status": "ok",
+      "latest_passing_cohort": "transport-final-tests-01"
+    },
+    "application::transport::dependency_tests::workflow_and_transport_depend_on_shared_ports_without_reverse_usecase_imports": {
+      "status": "ok",
+      "latest_passing_cohort": "transport-final-tests-01"
+    },
+    "application::transport::dependency_tests::the_application_layer_names_no_agent_runtime": {
+      "status": "ok",
+      "latest_passing_cohort": "transport-final-tests-01"
+    },
+    "application::transport::dependency_tests::the_application_layer_imports_no_adapter_framework_or_provider_type": {
+      "status": "ok",
+      "latest_passing_cohort": "transport-final-tests-01"
+    },
+    "adapters::persistence::workflow::tests::http_tests::approval_tests::continuation_tests::workflow_action_approval_continuation_counter_and_history_cannot_be_forged": {
+      "status": "ok",
+      "latest_passing_cohort": "approvals-final-tests-01"
+    },
+    "adapters::persistence::workflow::tests::http_tests::approval_tests::continuation_tests::workflow_action_approval_later_submission_competes_with_cancellation": {
+      "status": "ok",
+      "latest_passing_cohort": "approvals-final-tests-01"
+    },
+    "adapters::persistence::workflow::tests::http_tests::approval_tests::continuation_tests::workflow_action_approval_old_comment_cannot_attach_to_later_wait": {
+      "status": "ok",
+      "latest_passing_cohort": "approvals-final-tests-01"
+    },
+    "adapters::persistence::workflow::tests::http_tests::approval_tests::review_tests::workflow_action_approval_operator_retry_preserves_nonzero_continuation_witness": {
+      "status": "ok",
+      "latest_passing_cohort": "approvals-final-tests-01"
+    },
+    "adapters::persistence::workflow::tests::http_tests::approval_tests::review_tests::workflow_action_approval_audit_kind_binding_preserves_ordinary_uniqueness": {
+      "status": "ok",
+      "latest_passing_cohort": "approvals-final-tests-01"
+    },
+    "adapters::persistence::workflow::tests::http_tests::approval_tests::continuation_tests::workflow_action_approval_multiple_effects_resume_without_failure_debit_or_old_approval_reuse": {
+      "status": "ok",
+      "latest_passing_cohort": "approvals-final-tests-01"
+    },
+    "adapters::persistence::workflow::tests::http_tests::approval_tests::review_tests::workflow_action_approval_identical_operation_new_call_id_reuses_one_receipt": {
+      "status": "ok",
+      "latest_passing_cohort": "approvals-final-tests-01"
+    },
+    "adapters::persistence::workflow::tests::http_tests::approval_tests::continuation_tests::workflow_action_approval_failure_retry_after_continuation_uses_failure_allowance": {
+      "status": "ok",
+      "latest_passing_cohort": "approvals-final-tests-01"
+    },
+    "adapters::persistence::workflow::tests::http_tests::approval_tests::continuation_tests::workflow_action_approval_orphan_wait_and_foreign_audit_are_rejected": {
+      "status": "ok",
+      "latest_passing_cohort": "approvals-final-tests-01"
+    },
+    "adapters::persistence::workflow::tests::http_tests::approval_tests::review_tests::workflow_action_approval_replay_preserves_result_after_later_successor": {
+      "status": "ok",
+      "latest_passing_cohort": "approvals-final-tests-01"
+    },
+    "adapters::persistence::workflow::tests::http_tests::approval_tests::continuation_tests::workflow_action_approval_later_expiry_and_rejection_preserve_first_decision": {
+      "status": "ok",
+      "latest_passing_cohort": "approvals-final-tests-01"
+    },
+    "adapters::persistence::workflow::tests::http_tests::approval_tests::sql_tests::workflow_action_approval_digest_cannot_authorize_changed_arguments": {
+      "status": "ok",
+      "latest_passing_cohort": "approvals-final-tests-01"
+    },
+    "adapters::persistence::workflow::tests::http_tests::approval_tests::sql_tests::workflow_action_approval_digest_fk_rejects_each_mismatch": {
+      "status": "ok",
+      "latest_passing_cohort": "approvals-final-tests-01"
+    },
+    "adapters::persistence::workflow::tests::http_tests::approval_tests::sql_tests::workflow_action_approval_invalid_choice_data_and_digest_leave_open": {
+      "status": "ok",
+      "latest_passing_cohort": "approvals-final-tests-01"
+    },
+    "adapters::persistence::workflow::tests::http_tests::approval_tests::sql_tests::workflow_action_approval_unprovable_notice_key_fails_without_park": {
+      "status": "ok",
+      "latest_passing_cohort": "approvals-final-tests-01"
+    },
+    "adapters::persistence::workflow::tests::http_tests::approval_tests::continuation_tests::workflow_action_approval_continuation_ceiling_refuses_without_resetting_failures": {
+      "status": "ok",
+      "latest_passing_cohort": "approvals-final-tests-01"
+    },
+    "adapters::persistence::workflow::tests::http_tests::approval_tests::workflow_action_approval_competing_reviewers_settle_once": {
+      "status": "ok",
+      "latest_passing_cohort": "approvals-final-tests-01"
+    },
+    "adapters::persistence::workflow::tests::http_tests::approval_tests::workflow_action_approval_expiry_fails_without_dispatch": {
+      "status": "ok",
+      "latest_passing_cohort": "approvals-final-tests-01"
+    },
+    "adapters::persistence::workflow::tests::http_tests::approval_tests::review_tests::workflow_action_approval_same_arguments_different_target_or_operation_need_new_approval": {
+      "status": "ok",
+      "latest_passing_cohort": "approvals-final-tests-01"
+    },
+    "adapters::persistence::workflow::tests::http_tests::approval_tests::workflow_action_approval_last_failure_attempt_can_park_and_resume": {
+      "status": "ok",
+      "latest_passing_cohort": "approvals-final-tests-01"
+    },
+    "adapters::persistence::workflow::tests::http_tests::approval_tests::workflow_action_approval_park_with_sixteen_approvers_commits_within_bound": {
+      "status": "ok",
+      "latest_passing_cohort": "approvals-final-tests-01"
+    },
+    "adapters::persistence::workflow::tests::http_tests::approval_tests::workflow_action_approval_reject_registered_operation_has_http_failure": {
+      "status": "ok",
+      "latest_passing_cohort": "approvals-final-tests-01"
+    },
+    "adapters::persistence::workflow::tests::http_tests::approval_tests::workflow_action_approval_reopen_without_submission_is_rejected": {
+      "status": "ok",
+      "latest_passing_cohort": "approvals-final-tests-01"
+    },
+    "adapters::persistence::workflow::tests::http_tests::approval_tests::workflow_action_approval_admin_demotion_refuses_park_and_submission": {
+      "status": "ok",
+      "latest_passing_cohort": "approvals-final-tests-01"
+    },
+    "adapters::persistence::workflow::tests::http_tests::approval_tests::workflow_action_approval_submit_competes_with_expiry": {
+      "status": "ok",
+      "latest_passing_cohort": "approvals-final-tests-01"
+    },
+    "adapters::persistence::workflow::tests::http_tests::approval_tests::workflow_action_approval_dispatch_claims_next_attempt_and_dispatches_once": {
+      "status": "ok",
+      "latest_passing_cohort": "approvals-final-tests-01"
+    },
+    "adapters::persistence::workflow::tests::mcp_tests::approval_tests::workflow_action_approval_mcp_never_opens_before_approval_then_calls_once": {
+      "status": "ok",
+      "latest_passing_cohort": "approvals-final-tests-01"
+    },
+    "adapters::persistence::workflow::tests::mcp_tests::approval_tests::workflow_action_approval_not_applied_proof_never_grants_second_entry": {
+      "status": "ok",
+      "latest_passing_cohort": "approvals-final-tests-01"
+    },
+    "adapters::persistence::workflow::tests::message_tests::approval_tests::workflow_action_approval_message_then_effect_wait_preserves_both_histories": {
+      "status": "ok",
+      "latest_passing_cohort": "approvals-final-tests-01"
+    },
+    "adapters::persistence::workflow::tests::http_tests::approval_tests::sql_tests::workflow_action_approval_reopen_checks_transaction_choice_and_accounting": {
+      "status": "ok",
+      "latest_passing_cohort": "approvals-final-tests-01"
+    },
+    "adapters::persistence::workflow::tests::message_tests::approval_tests::workflow_action_approval_race_message_lost_ack_resolves_park": {
+      "status": "ok",
+      "latest_passing_cohort": "approvals-final-tests-01"
+    },
+    "adapters::persistence::workflow::tests::http_tests::approval_tests::resolution_tests::workflow_action_approval_race_lost_commit_ack_resolves_exact_park": {
+      "status": "ok",
+      "latest_passing_cohort": "approvals-final-tests-01"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::delivery::channel_reply_delivery_unknown_parent_and_run_cannot_be_removed_together": {
+      "status": "ok",
+      "latest_passing_cohort": "publication-final-tests-03"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::delivery::channel_reply_delivery_authority_lock_deadline_leaves_request_unstarted": {
+      "status": "ok",
+      "latest_passing_cohort": "publication-final-tests-03"
+    }
+  },
+  "current_gates": "focused-batch-03-results.json; fresh main/test migrations04; actual sqlx-prepare03 and check03",
+  "reuse_disposition": [
+    "Batch02 reruns the final-link retention correction against125reply,64messaging,39delivery and1message-retention tests; prior failed diagnostic is replaced by its passing permanent regression.",
+    "Batch03 reruns all28publication/delivery/recovery tests after final-only server lock bounds, including real blocked binding-lock/no-entry/release proof. Explicit/nonworkflow branches return before the setter.",
+    "Earlier worker shutdown, sample, knowledge, engine/pool, ingress, transport and protected-approval scopes are unaffected by these later parent-delete/NULL-retention and final-only server-bound corrections.",
+    "Existing native retention21 cases (including100001member boundary) have no final-link deletion path; previous PASS retained. New actual final pending/unknown/resolved retention and whole-company teardown controls rerun in the publication cohort."
+  ],
+  "retained_failures": "All receipts kept: author test fixture/type mistakes, corrected exact retry classification,3Clippy auto-deref issues fixed, and real author-detected unknown-delivery/owner deletion bypass demonstrated then fixed.",
+  "unavailable_checks": [],
+  "environment": "Owned PostgreSQL18.6 loopback65037; mandatory runtime networkguard; locked offline Cargo runtime; stock2MiB; serialized jobs4 incremental target"
+}

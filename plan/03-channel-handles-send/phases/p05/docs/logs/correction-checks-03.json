@@ -1,0 +1,50 @@
+[
+  {
+    "check": "upstream-action-tests-02",
+    "exit": 0
+  },
+  {
+    "check": "release-knowledge-tests-02",
+    "exit": 0
+  },
+  {
+    "check": "upstream-message-agent-tests-01",
+    "exit": 0
+  },
+  {
+    "check": "upstream-knowledge-tests-01",
+    "exit": 0
+  },
+  {
+    "check": "release-final-entry-tests-01",
+    "exit": 0
+  },
+  {
+    "check": "release-native-delivery-tests-01",
+    "exit": 0
+  },
+  {
+    "check": "clippy-03",
+    "exit": 0
+  },
+  {
+    "check": "sqlx-prepare-04",
+    "exit": 0
+  },
+  {
+    "check": "sqlx-check-04",
+    "exit": 0
+  },
+  {
+    "check": "fmt-check-03",
+    "exit": 0
+  },
+  {
+    "check": "diff-check-03",
+    "exit": 0
+  },
+  {
+    "check": "graft-build-03",
+    "exit": 0
+  }
+]

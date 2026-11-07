@@ -1,0 +1,69 @@
+{
+  "phase": "p01",
+  "stage": "whole-phase batch review",
+  "start": "769a23aa6ef423e964f8221a8ee6b0743325c6ba",
+  "review_base": "769a23aa6ef423e964f8221a8ee6b0743325c6ba",
+  "head": "769a23aa6ef423e964f8221a8ee6b0743325c6ba",
+  "digest": "eec077d537f975767e3d1d0deed360b88a76b40730a910c85caad126bc6fc4a7",
+  "exclusions": [
+    "plan/03-channel-handles-send/COORDINATION.md",
+    "plan/03-channel-handles-send/phases/p01/docs",
+    "plan/03-channel-handles-send/phases/p02/docs",
+    "plan/03-channel-handles-send/phases/p03/docs",
+    "plan/03-channel-handles-send/phases/p04/docs",
+    "plan/03-channel-handles-send/phases/p05/docs",
+    "plan/03-channel-handles-send/phases/p06/docs",
+    "plan/03-channel-handles-send/phases/p07/docs",
+    "plan/03-channel-handles-send/integration/final/docs"
+  ],
+  "source_files": {
+    "migrations/20260817000000_init_schema.sql": "55ef1abcb5708e492f7bf74e6d04088248691854c778284f008b652180988921",
+    "src/adapters/persistence/workflow/admission.rs": "8098a87f5d8cb779459398f65ffa06cbd0d517da80d2fd777736c1af42f38422",
+    "src/adapters/persistence/workflow/admission_binding.rs": "1e183fde2f79d1a54be27772de3da944b07985afa706f4721bd048e0f7291cc2",
+    "src/adapters/persistence/workflow/binding_rows.rs": "11a98b02b610020360ed5179e54b4b5273884f0c3ba870aa53899a7b7f08df36",
+    "src/adapters/persistence/workflow/channel_reply.rs": "8ad597555a248eab2a644bfabe5fe3964c3ed2b1b07b30e32fee20e2f1b92bc6",
+    "src/adapters/persistence/workflow/channel_reply_binding_integrity_tests.rs": "8b31a66d049a4159b376cdb6f09cf56db896c70dab89a5c4c95f7e9a9d772f23",
+    "src/adapters/persistence/workflow/channel_reply_binding_tests.rs": "028b380c8203eac076c0262f294fcd815e403e1796bf0d1f69205e9cca28b5b6",
+    "src/adapters/persistence/workflow/channel_reply_correlation_tests.rs": "9fc5423b11d4e18fa73293687a344325be34fef3f9a94c6754ac363327ff448a",
+    "src/adapters/persistence/workflow/message_intent_tests.rs": "01fd53072fb1887b694f5c7d4fc65919925441912c1e516b42bf5dcb49aed428",
+    "src/adapters/persistence/workflow/message_intents.rs": "4b7a044049bac74548d3d7adc88b202528276c14723610dcba3924d81eeba5c3",
+    "src/adapters/persistence/workflow/message_reply_tests.rs": "f18802a19903ae6016f47650d284768e0674ae869a0bfca244d3d0e233b76570",
+    "src/adapters/persistence/workflow/mod.rs": "1ed66380734a396b9a589949b8976b2c85e003d0c6a26929752141ed63770248",
+    "src/application/workflow/channel_reply/contract.rs": "a69fe51cc80d9cf22e4649863101240ec420d2579983c3e9a3dfdab604acb931",
+    "src/application/workflow/channel_reply/contract_tests.rs": "7271891370c0a23cfd08efa7061bc67afe0e6f6fe706e5a76398569b8503e1f7",
+    "src/application/workflow/channel_reply/mod.rs": "110083dc28adb046c64c12a07695c42c6106604b212a9c370cf03cc8411a3992",
+    "src/application/workflow/mod.rs": "41d77e237bf6b226a820e91db9cfc75f90420c9c8cde4662e942d4638f15a88c"
+  },
+  "coordination_revision": 2,
+  "instructions": [
+    "CHS-I001/r1",
+    "CHS-I002/r1",
+    "CHS-I003/r1",
+    "CHS-I004/r2",
+    "CHS-I005/r1",
+    "CHS-I006/r1"
+  ],
+  "gated_decision": "CHS-P01-D1/r2",
+  "architecture_pass": "CHS-P01-AG1-R2",
+  "coordination_sha256": "bd316d9bfc3fec18753a1b109d3459aaebc8cf3227d81e8aaa939e9f61fb6206",
+  "primary_tests": {
+    "contract": 8,
+    "binding": 17,
+    "existing_selected": 57,
+    "existing_pass": 55,
+    "existing_inherited_failures": 2
+  },
+  "inherited_failure_proof": [
+    "baseline-onboarding-01.json",
+    "baseline-onboarding-01.log",
+    "baseline-onboarding-02.json",
+    "baseline-onboarding-02.log"
+  ],
+  "pending_checks": [
+    "SQLx check",
+    "offline alltarget compile",
+    "Clippy-Dwarnings",
+    "final fmt/diff"
+  ],
+  "preserved_preexisting_changes": "none"
+}

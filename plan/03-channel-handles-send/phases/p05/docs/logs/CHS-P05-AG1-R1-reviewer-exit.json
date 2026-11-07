@@ -1,0 +1,27 @@
+{
+  "at": "2026-11-07T05:31:33.396615+00:00",
+  "branch": "main",
+  "HEAD": "769a23aa6ef423e964f8221a8ee6b0743325c6ba",
+  "snapshot_exit": 0,
+  "source_digest": "f26c909acb26d1cd0c9dd4332bc7cc3519f639d27de78b30dcd24212cb5709b8",
+  "source_digest_matches": true,
+  "decision_sha": "f453fef4cecb190eff4b8f494adeddfc02d69f41a624f7b669b8770b9737b823",
+  "decision_sha_matches": true,
+  "coordination_sha_matches": true,
+  "coordination_pin_matches": true,
+  "source_paths_verified": 133,
+  "source_mismatches": [],
+  "exclusions": [
+    "plan/03-channel-handles-send/COORDINATION.md",
+    "plan/03-channel-handles-send/phases/p01/docs",
+    "plan/03-channel-handles-send/phases/p02/docs",
+    "plan/03-channel-handles-send/phases/p03/docs",
+    "plan/03-channel-handles-send/phases/p04/docs",
+    "plan/03-channel-handles-send/phases/p05/docs",
+    "plan/03-channel-handles-send/phases/p06/docs",
+    "plan/03-channel-handles-send/phases/p07/docs",
+    "plan/03-channel-handles-send/integration/final/docs"
+  ],
+  "unrelated_tunnel_plan_absence_preserved": true,
+  "runtime_checks_executed": false
+}

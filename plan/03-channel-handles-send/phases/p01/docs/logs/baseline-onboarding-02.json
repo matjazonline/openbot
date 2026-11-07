@@ -1,0 +1,27 @@
+{
+  "command": [
+    "scripts/test-network-isolation.sh",
+    "cargo",
+    "test",
+    "--locked",
+    "--offline",
+    "--lib",
+    "adapters::persistence::onboarding::tests::onboarding_new_owner_with_new_key_does_not_replay_the_previous_owners_command",
+    "--",
+    "--exact"
+  ],
+  "cwd": "/private/tmp/openbot-chs-baseline-6ra2cluo/worktree",
+  "base": "769a23aa6ef423e964f8221a8ee6b0743325c6ba",
+  "environment": {
+    "DATABASE_URL": "postgres://mac02@127.0.0.1:65037/openbot_chs_baseline",
+    "TEST_DATABASE_URL": "postgres://mac02@127.0.0.1:65037/openbot_chs_baseline_test",
+    "CARGO_TARGET_DIR": "/private/tmp/openbot-chs-baseline-6ra2cluo/target",
+    "SQLX_OFFLINE": "true",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_BUILD_JOBS": "4",
+    "RUST_MIN_STACK": "2097152"
+  },
+  "exit_code": 101,
+  "seconds": 1.73,
+  "finished": "2026-11-06T21:35:57.790285+00:00"
+}

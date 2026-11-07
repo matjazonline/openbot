@@ -1,0 +1,24 @@
+2026-11-06 CHS-P01-B1-R1 final identity check
+base:   769a23aa6ef423e964f8221a8ee6b0743325c6ba
+digest: eec077d537f975767e3d1d0deed360b88a76b40730a910c85caad126bc6fc4a7
+files:
+  migrations/20260817000000_init_schema.sql
+  src/adapters/persistence/workflow/admission.rs
+  src/adapters/persistence/workflow/admission_binding.rs
+  src/adapters/persistence/workflow/binding_rows.rs
+  src/adapters/persistence/workflow/channel_reply.rs
+  src/adapters/persistence/workflow/channel_reply_binding_integrity_tests.rs
+  src/adapters/persistence/workflow/channel_reply_binding_tests.rs
+  src/adapters/persistence/workflow/channel_reply_correlation_tests.rs
+  src/adapters/persistence/workflow/message_intent_tests.rs
+  src/adapters/persistence/workflow/message_intents.rs
+  src/adapters/persistence/workflow/message_reply_tests.rs
+  src/adapters/persistence/workflow/mod.rs
+  src/application/workflow/channel_reply/contract.rs
+  src/application/workflow/channel_reply/contract_tests.rs
+  src/application/workflow/channel_reply/mod.rs
+  src/application/workflow/mod.rs
+HEAD: 769a23aa6ef423e964f8221a8ee6b0743325c6ba
+branch: main
+Coordination: byte-identical to CHS-P01-B1-coordination-r2.md; active I001-I003/r1,I004/r2,I005-I006/r1.
+Result: changes required, B1-F1/F2 P2. Narrow D1/r3 architecture recheck required for B1-F2 lifecycle clarification.

@@ -1,0 +1,107 @@
+--- a/src/adapters/persistence/workflow/channel_reply_terminal_tests.rs
++++ b/src/adapters/persistence/workflow/channel_reply_terminal_tests.rs
+@@ -1,4 +1,30 @@
+ use super::*;
++use crate::application::workflow::lease::{LeasePolicy, WorkflowLeaseRecovery};
++
++#[tokio::test]
++async fn channel_reply_terminal_exhausted_pending_is_effect_free_failure() {
++    let (f, scope) = fixture(terminal("channel.no_reply", json!("done"))).await;
++    sqlx::query("UPDATE background_tasks SET retry_count=max_retries WHERE id=$1")
++        .bind(scope.job.0)
++        .execute(f.persistence().pool())
++        .await
++        .unwrap();
++    let barrier = Barrier::new(2);
++    let retire = || async {
++        barrier.wait().await;
++        f.persistence()
++            .retire_exhausted_work(scope, LeasePolicy::new(Duration::from_secs(3)).unwrap())
++            .await
++            .unwrap()
++    };
++    let (a, b) = tokio::join!(retire(), retire());
++    assert_ne!(a, b);
++    let saved = snapshot(&f).await;
++    assert_eq!(saved["runs"][0]["state"], "failed");
++    assert_eq!(saved["jobs"][0]["status"], "failed");
++    assert_eq!(saved["executions"][0]["completed_at"], Value::Null);
++    assert_eq!(saved["executions"][0]["response_disposition"], "automatic");
++}
+ 
+ #[derive(Debug, PartialEq, Eq, sqlx::FromRow)]
+ struct Effects {
+--- a/src/application/workflow/actions/failure.rs
++++ b/src/application/workflow/actions/failure.rs
+@@ -37,6 +37,7 @@
+     matches!(
+         kind,
+         "data.map"
++            | "channel.no_reply"
+             | "decision.rule"
+             | "decision.human"
+             | "decision.agent"
+--- a/src/application/workflow/registry/budget.rs
++++ b/src/application/workflow/registry/budget.rs
+@@ -68,7 +68,8 @@
+         };
+         budget.schema(schema)?;
+         budget.schema(schema)?;
+-        if step.step_type.as_str() == "data.map" || step.step_type.as_str().starts_with("decision.")
++        if matches!(step.step_type.as_str(), "data.map" | "channel.no_reply")
++            || step.step_type.as_str().starts_with("decision.")
+         {
+             budget.schema(schema)?;
+         }
+--- a/src/application/workflow/registry/channel_reply_terminal_contract_tests.rs
++++ b/src/application/workflow/registry/channel_reply_terminal_contract_tests.rs
+@@ -73,3 +73,49 @@
+         compiled.validate_output(&value).unwrap();
+     }
+ }
++
++fn preflight_sample(kind: &str, padding: usize) -> AuthoringExample {
++    let mut sample = example(kind).unwrap();
++    let tool = example("tool.call").unwrap();
++    let tool_source: Value = serde_json::from_str(&tool.source).unwrap();
++    sample.facts = tool.facts;
++    let schema = json!({"type":"object","$comment":"x".repeat(padding)});
++    sample.facts.tools[0].input_schema = schema.clone();
++    sample.facts.tools[0].output_schema = schema;
++    changed(&mut sample, |source| {
++        let mut terminal = source["steps"]["start"].clone();
++        terminal["with"]["output_schema"] = json!({"literal":{
++            "type":"string","$comment":"x".repeat(8_128)}});
++        source["steps"] = json!({"finish":terminal});
++        source["entry"] = json!("t00");
++        for index in 0..16 {
++            let mut node = tool_source["steps"]["start"].clone();
++            node["routes"]["success"] = json!(if index == 15 {
++                "finish".to_owned()
++            } else {
++                format!("t{:02}", index + 1)
++            });
++            source["steps"][format!("t{index:02}")] = node;
++        }
++    });
++    sample
++}
++
++#[test]
++fn channel_reply_terminal_contract_preflight_charges_all_schema_copies() {
++    // Shared external facts fill the budget without exceeding the wire-source cap.
++    // At 16_025 bytes of padding, two terminal copies fit but three do not.
++    let check = |kind, padding| {
++        let sample = preflight_sample(kind, padding);
++        let decoded = crate::adapters::workflow_source::decode(&sample.source).unwrap();
++        let parsed = compiler::parse_workflow(&decoded, VersionId::new(Uuid::nil())).unwrap();
++        budget::preflight(&parsed, &sample.facts)
++    };
++    for kind in ["data.map", "channel.no_reply"] {
++        assert_eq!(
++            check(kind, 16_025).expect_err(kind).code,
++            "dependency.limit"
++        );
++    }
++    check("channel.no_reply", 15_500).unwrap();
++}

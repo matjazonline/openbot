@@ -11,7 +11,7 @@ const PAUSE_KEY: i64 = 470_203;
 const RUN_RECEIPT: &str = "SELECT id FROM workflow_runs WHERE company_id=$1 AND id=$2 FOR UPDATE";
 const RUN_COMPLETION: &str = "SELECT binding_id,max_steps FROM workflow_runs";
 const OBSERVATION: &str = "INSERT INTO workflow_action_actual_receipt_observations";
-const EXECUTION: &str = "SELECT completed_at,committed_output,committed_route";
+const EXECUTION: &str = "SELECT response_disposition,completed_at,committed_output,committed_route";
 
 #[derive(Clone, Copy)]
 pub(super) struct Owners {

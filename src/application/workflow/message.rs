@@ -23,6 +23,10 @@ use serde_json::{Value, json};
 use std::collections::BTreeSet;
 use uuid::Uuid;
 
+#[path = "message_planner.rs"]
+mod planner;
+pub use planner::{MessagePlanner, MessagePublicationIdentity};
+
 #[path = "message_runtime.rs"]
 mod runtime;
 pub use runtime::*;
@@ -41,12 +45,15 @@ pub fn is_builtin_message_tool(name: &str) -> bool {
 pub enum MessageKind {
     Send,
     Reply,
+    /// A workflow-only reply whose result is an authorized human response.
+    Ask,
 }
 impl MessageKind {
     pub fn parse(name: &str) -> Option<Self> {
         match name {
             "message.send" => Some(Self::Send),
             "message.reply" => Some(Self::Reply),
+            "message.ask" => Some(Self::Ask),
             _ => None,
         }
     }
@@ -54,6 +61,7 @@ impl MessageKind {
         match self {
             Self::Send => "message.send",
             Self::Reply => "message.reply",
+            Self::Ask => "message.ask",
         }
     }
 }
@@ -99,7 +107,10 @@ pub fn is_trusted_message_snapshot(snapshot: &ToolSnapshot) -> AppResult<bool> {
     )
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, serde::Serialize, serde::Deserialize,
+)]
+#[serde(rename_all = "snake_case")]
 pub enum DestinationKind {
     Channel,
     User,
@@ -141,7 +152,7 @@ impl MessageArguments {
                 content,
                 destinations: parse_destinations(arguments.get("destinations"))?,
             }),
-            MessageKind::Reply => {
+            MessageKind::Reply | MessageKind::Ask => {
                 let source = arguments
                     .get("source_message")
                     .and_then(Value::as_str)
@@ -227,7 +238,8 @@ pub(crate) fn invalid_message() -> AppError {
 }
 
 /// A channel this message may be sent through or published into, as persistence read it.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct ChannelRoute {
     pub id: Uuid,
     pub slug: ChannelSlug,
@@ -236,7 +248,8 @@ pub struct ChannelRoute {
 
 /// Facts persistence resolved for one invocation. Not a grant: publication re-reads and
 /// locks every one of them before writing.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct MessageRoutes {
     pub company_slug: CompanySlug,
     pub correlation_id: CorrelationId,
@@ -245,7 +258,8 @@ pub struct MessageRoutes {
     pub delivery_policy: crate::application::workflow::DeliveryPolicy,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum RouteTarget {
     Channel {
         channel: Uuid,
@@ -276,7 +290,8 @@ pub enum RouteTarget {
 /// The inter-channel relay trace recorded when the source arrived (its inbound task). An email
 /// reply continues it, as an agent answer does (04.11-D2 §1.3); a source with none recorded
 /// starts a chain, as an answer to direct mail does.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct SourceRelay {
     pub hop_count: u32,
     pub trace_channels: Vec<Uuid>,

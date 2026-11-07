@@ -12,6 +12,7 @@ struct BatchRun {
 #[derive(sqlx::FromRow)]
 struct BatchExecution {
     step_id: String,
+    response_disposition: String,
     completed_at: Option<chrono::DateTime<chrono::Utc>>,
     committed_route: Option<String>,
     route_target: Option<String>,
@@ -34,7 +35,7 @@ impl WorkflowBatch for PostgresPersistence {
         // continue progressing in detached work. SQLx rolls back dropped txs.
         tokio::time::timeout(budget.transaction_timeout(), async {
             let mut tx = self.pool.begin().await?;
-            let result = advance_on(&mut tx, request, budget).await?;
+            let result = advance_on(&mut tx, request, budget, self.channel_reply_notices()).await?;
             tx.commit().await?;
             Ok(result)
         })
@@ -47,6 +48,7 @@ pub(super) async fn advance_on(
     db: &mut PgConnection,
     request: ActivationRequest,
     budget: BatchBudget,
+    notices: Option<&crate::application::workflow::decisions::DecisionNotices>,
 ) -> AppResult<BatchResult> {
     let started = Instant::now();
     let timeout = format!("{}ms", budget.transaction_timeout().as_millis());
@@ -56,6 +58,11 @@ pub(super) async fn advance_on(
     .bind(timeout)
     .execute(&mut *db)
     .await?;
+    let progress = Box::pin(channel_reply_resume::resume_on(db, request, notices)).await?;
+    if let Some(saved) = finalization_result(request, progress) {
+        return Ok(saved);
+    }
+    channel_reply_completion::prelock_on(db, request).await?;
     let run = sqlx::query_as::<_, BatchRun>(
         "SELECT binding_id, state, max_steps, deadline <= clock_timestamp() AS expired \
          FROM workflow_runs WHERE company_id = $1 AND id = $2 FOR UPDATE",
@@ -87,6 +94,7 @@ pub(super) async fn advance_on(
             budget,
             started,
             max_steps: run.max_steps,
+            notices,
         },
         binding.bundle(),
         first,
@@ -94,7 +102,42 @@ pub(super) async fn advance_on(
     .await
 }
 
-struct BatchContext {
+fn finalization_result(
+    request: ActivationRequest,
+    progress: crate::application::workflow::channel_reply::FinalizationProgress,
+) -> Option<BatchResult> {
+    match progress {
+        crate::application::workflow::channel_reply::FinalizationProgress::Unstaged => None,
+        crate::application::workflow::channel_reply::FinalizationProgress::Completed(step) => {
+            Some(BatchResult {
+                disposition: if step.disposition
+                    == crate::application::workflow::completion::CommitDisposition::Replayed
+                {
+                    BatchDisposition::Replay
+                } else {
+                    BatchDisposition::Completed
+                },
+                response_disposition: Some(step.response_disposition),
+                completed: u8::from(
+                    step.disposition
+                        == crate::application::workflow::completion::CommitDisposition::Committed,
+                ),
+                last: request,
+                continuation: None,
+            })
+        }
+        _ => Some(BatchResult {
+            disposition: BatchDisposition::Deferred,
+            response_disposition: None,
+            completed: 0,
+            last: request,
+            continuation: None,
+        }),
+    }
+}
+
+struct BatchContext<'a> {
+    notices: Option<&'a crate::application::workflow::decisions::DecisionNotices>,
     request: ActivationRequest,
     budget: BatchBudget,
     started: Instant,
@@ -103,7 +146,7 @@ struct BatchContext {
 
 async fn run_steps(
     db: &mut PgConnection,
-    context: BatchContext,
+    context: BatchContext<'_>,
     bundle: &PublishedBundle,
     first: BatchExecution,
 ) -> AppResult<BatchResult> {
@@ -112,6 +155,7 @@ async fn run_steps(
         budget,
         started,
         max_steps,
+        notices,
     } = context;
     let mut current = request;
     let mut row = first;
@@ -122,6 +166,7 @@ async fn run_steps(
             batch_commit::check_deadline(db, request).await?;
             return Ok(BatchResult {
                 disposition: BatchDisposition::Boundary,
+                response_disposition: None,
                 completed,
                 last: current,
                 continuation: Some(current),
@@ -132,12 +177,7 @@ async fn run_steps(
                 pending_recovery::Pending::Ready(prepared) => prepared,
                 pending_recovery::Pending::Settled => return Ok(failed(current, completed)),
                 pending_recovery::Pending::Deferred => {
-                    return Ok(BatchResult {
-                        disposition: BatchDisposition::Deferred,
-                        completed,
-                        last: current,
-                        continuation: None,
-                    });
+                    return Ok(deferred(current, completed));
                 }
             };
         let next = batch_commit::complete(
@@ -147,13 +187,21 @@ async fn run_steps(
             &completion,
             max_steps,
             completion_job::CompletionOwner::Pure,
+            notices,
         )
         .await?;
+        if matches!(next, batch_commit::CompletionProgress::Refused) {
+            return Ok(failed(current, completed));
+        }
+        let batch_commit::CompletionProgress::Advanced(next) = next else {
+            return Ok(deferred(current, completed));
+        };
         completed += 1;
         let Some(next) = next else {
             batch_commit::check_deadline(db, request).await?;
             return Ok(BatchResult {
                 disposition: BatchDisposition::Completed,
+                response_disposition: Some(completion.response_disposition),
                 completed,
                 last: current,
                 continuation: None,
@@ -163,6 +211,7 @@ async fn run_steps(
             batch_commit::check_deadline(db, request).await?;
             return Ok(BatchResult {
                 disposition: BatchDisposition::Yielded,
+                response_disposition: None,
                 completed,
                 last: current,
                 continuation: Some(next),
@@ -178,7 +227,7 @@ async fn lock_execution(
     request: ActivationRequest,
 ) -> AppResult<BatchExecution> {
     let row = sqlx::query_as::<_, BatchExecution>(
-        "SELECT step_id, completed_at, committed_route, route_target, successor_execution_id \
+        "SELECT step_id, response_disposition, completed_at, committed_route, route_target, successor_execution_id \
          FROM workflow_executions WHERE company_id = $1 AND run_id = $2 AND id = $3 FOR UPDATE",
     )
     .bind(request.company.as_uuid())
@@ -232,6 +281,13 @@ async fn replay(
     };
     Ok(BatchResult {
         disposition: BatchDisposition::Replay,
+        response_disposition: if row.route_target.as_deref() == Some("$end")
+            && row.committed_route.as_deref() != Some("final_error")
+        {
+            Some(row.response_disposition.parse().map_err(|_| invalid())?)
+        } else {
+            None
+        },
         completed: 0,
         last: request,
         continuation,
@@ -244,6 +300,17 @@ fn ineligible() -> AppError {
 fn failed(last: ActivationRequest, completed: u8) -> BatchResult {
     BatchResult {
         disposition: BatchDisposition::Failed,
+        response_disposition: None,
+        completed,
+        last,
+        continuation: None,
+    }
+}
+
+fn deferred(last: ActivationRequest, completed: u8) -> BatchResult {
+    BatchResult {
+        disposition: BatchDisposition::Deferred,
+        response_disposition: None,
         completed,
         last,
         continuation: None,

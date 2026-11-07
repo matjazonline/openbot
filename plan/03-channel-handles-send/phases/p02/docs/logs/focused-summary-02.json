@@ -1,0 +1,16 @@
+[
+  {
+    "filter": "channel_reply_terminal_",
+    "selected": 19,
+    "exit_code": 0,
+    "inventory": "focused-terminal-list-02",
+    "execution": "focused-terminal-tests-02"
+  },
+  {
+    "filter": "application::workflow::registry::",
+    "selected": 56,
+    "exit_code": 101,
+    "inventory": "focused-registry-list-02",
+    "execution": "focused-registry-tests-02"
+  }
+]

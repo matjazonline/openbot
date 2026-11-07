@@ -12,6 +12,8 @@ pub const MESSAGE_INPUT_BODY_BYTES: usize = 16 * 1024;
 pub const MESSAGE_INPUT_SENDER_BYTES: usize = 320;
 /// The reserved event a reply to a workflow-published message is delivered as (p08 D1.5).
 pub const MESSAGE_REPLY_EVENT: &str = "message.reply";
+/// Only trusted ingress may produce a response to an atomic declared question.
+pub const CHANNEL_QUESTION_REPLY_EVENT: &str = "channel.question.reply";
 
 /// What an accepted message gives the run it admits, and the payload of a correlated reply.
 #[derive(Debug, Clone, PartialEq, Eq)]

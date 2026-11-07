@@ -27,7 +27,7 @@ impl Registration<'_> {
                     &["saved_ids"],
                 ),
             )),
-            "ai.classify" | "agent.run" | "data.map" => self.schema_output(),
+            "ai.classify" | "agent.run" | "data.map" | "channel.no_reply" => self.schema_output(),
             "decision.rule" | "decision.human" | "decision.agent" => self.decision(),
             "wait.event" | "wait.timer" => self.wait(),
             _ => unreachable!("basic registration family"),
@@ -37,7 +37,7 @@ impl Registration<'_> {
         let schema = self.declared_schema("output_schema")?;
         let declaration = json!({"const":schema});
         let mut result = match self.name() {
-            "data.map" => contract(
+            "data.map" | "channel.no_reply" => contract(
                 json!({"value":embedded(schema.clone(),"mapped"),"output_schema":declaration}),
                 &["value", "output_schema"],
                 schema,

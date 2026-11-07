@@ -27,6 +27,7 @@ pub(super) async fn resume_on(
     scope: ActivationRequest,
     run: waits::WaitRun,
     wait: Uuid,
+    notices: Option<&crate::application::workflow::decisions::DecisionNotices>,
 ) -> AppResult<WaitProgress> {
     let fact = sqlx::query_as::<_, ChildFact>(
         "SELECT wait.child_run_id, child.content_level::smallint AS content_level, wait.child_ordinal, wait.child_tool_call_id, event.terminal_state, event.terminal_execution_id \
@@ -57,7 +58,7 @@ pub(super) async fn resume_on(
         .and_then(ChildOrdinal::new)
         .ok_or_else(invalid)?;
     match state {
-        "succeeded" => Box::pin(succeeded(db, scope, &run, wait, &fact, round)).await,
+        "succeeded" => Box::pin(succeeded(db, scope, &run, wait, &fact, round, notices)).await,
         "failed" => child_failed(db, scope, wait, CHILD_FAILED, &fact).await,
         "cancelled" => child_failed(db, scope, wait, CHILD_CANCELLED, &fact).await,
         _ => Err(invalid()),
@@ -71,6 +72,7 @@ async fn succeeded(
     wait: Uuid,
     fact: &ChildFact,
     round: ChildOrdinal,
+    notices: Option<&crate::application::workflow::decisions::DecisionNotices>,
 ) -> AppResult<WaitProgress> {
     let output: Value = sqlx::query_scalar(
         "SELECT committed_output FROM workflow_executions WHERE company_id=$1 AND run_id=$2 AND id=$3 AND completed_at IS NOT NULL",
@@ -111,7 +113,10 @@ async fn succeeded(
             db,
             scope,
             run,
-            &binding,
+            ChildCompletion {
+                binding: &binding,
+                notices,
+            },
             &activation,
             output,
             RouteSelection::Success,
@@ -133,7 +138,10 @@ async fn succeeded(
                 db,
                 scope,
                 run,
-                &binding,
+                ChildCompletion {
+                    binding: &binding,
+                    notices,
+                },
                 &activation,
                 provisional,
                 choice("done")?,
@@ -146,7 +154,10 @@ async fn succeeded(
                 db,
                 scope,
                 run,
-                &binding,
+                ChildCompletion {
+                    binding: &binding,
+                    notices,
+                },
                 &activation,
                 provisional,
                 exhausted,
@@ -182,23 +193,37 @@ fn choice(name: &str) -> AppResult<RouteSelection> {
     ))
 }
 
+struct ChildCompletion<'a> {
+    binding: &'a crate::application::workflow::binding::ConfiguredBinding,
+    notices: Option<&'a crate::application::workflow::decisions::DecisionNotices>,
+}
+
 async fn finish(
     db: &mut PgConnection,
     scope: ActivationRequest,
     run: &waits::WaitRun,
-    binding: &crate::application::workflow::binding::ConfiguredBinding,
+    services: ChildCompletion<'_>,
     activation: &ActivatedExecution,
     output: Value,
     route: RouteSelection,
 ) -> AppResult<WaitProgress> {
-    let completion = match child_completion(binding.bundle(), activation, output, route) {
+    let completion = match child_completion(services.binding.bundle(), activation, output, route) {
         Ok(completion) => completion,
         Err(AppError::BadRequest(_)) => {
             return wait_commit::fail(db, scope, WaitFailureReason::InvalidOutput).await;
         }
         Err(error) => return Err(error),
     };
-    wait_commit::commit_wake(db, scope, run, activation, completion, None).await
+    wait_commit::commit_wake(
+        db,
+        scope,
+        run,
+        activation,
+        completion,
+        None,
+        services.notices,
+    )
+    .await
 }
 
 struct NextRound<'a> {

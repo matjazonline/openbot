@@ -1,0 +1,732 @@
+--- /dev/null
++++ b/plan/cloudroom-local/README.md
+@@ -0,0 +1,132 @@
++# Cloudroom local agents connected to Openbot
++
++> **No backward compatibility.** We don't need backward compatibility and will reset the database
++> when needed. Do not add data backfills, dual reads/writes, legacy decoders, compatibility shims,
++> or staged rollouts for existing data.
++
++Status: proposed implementation, 2026-11-06. Saving this plan does not implement its plugin,
++pairing screens, routes, protocol, workflow step, or deployment commands. Proposed names below
++are contracts to implement, not configuration keys or commands the current application accepts.
++
++## Product decision
++
++One Cloudroom installation serves one company. Its local server and host daemon run native
++Claude Code, Codex, and OpenCode sessions on macOS or a headless Linux server. Agents share the
++company's local OS account, files, tools, and configured provider credentials. Per-agent
++containers, VM provisioning, and isolation between agents are outside this feature. Git worktrees
++remain an optional Cloudroom facility for concurrent edits, not a security boundary.
++
++An Openbot plugin runs as a Cloudroom background service. It initiates an authenticated outbound
++WebSocket connection to Openbot, creates and manages threads through Cloudroom's public SDK, and
++returns bounded status and output. The same threads appear in Cloudroom's existing UI because
++they are created through its local server from the beginning. Openbot supplies company workflows,
++scheduling, management, and publication; Cloudroom owns agent execution and conversation history.
++
++```mermaid
++flowchart LR
++    O[Openbot server] <-->|Outbound WSS opened by plugin| P[Openbot plugin]
++    P <-->|Public plugin SDK| S[Cloudroom local server]
++    U[Cloudroom UI] <--> S
++    S --> H[Local host daemon]
++    H --> A[Claude Code / Codex / OpenCode]
++```
++
++The Cloudroom HTTP API stays on loopback. No public listener on the company machine, SSH access,
++Cloudroom hosted account, external relay, or separate connector daemon is required. The Rust
++Cloudroom Core and VPS container runner are not dependencies of this implementation.
++
++## User setup
++
++1. Install the supported Cloudroom release and desired native agent CLIs; authenticate the CLIs
++   locally under the account running the host daemon.
++2. Add project directories in Cloudroom and install the Openbot plugin.
++3. In Openbot's proposed company machine settings, create a short-lived pairing code. Enter it
++   and the Openbot HTTPS URL in the plugin. Select the local projects to advertise.
++4. Openbot shows machine connectivity and discovered provider/model availability. Create a local
++   agent profile, select it for a run, and follow the resulting Cloudroom thread from either UI.
++5. Keep Cloudroom's server and host daemon running. Linux uses a non-root systemd service;
++   macOS can use the desktop application or a supported headless login service on the same profile.
++
++Installation and packaging are acceptance work in phase 06. Do not publish fictional install
++commands or treat upstream BB's npm package as a verified Cloudroom release.
++
++## Ordered implementation groups
++
++| Group | Deliverable | Depends on |
++| --- | --- | --- |
++| [01 — Contracts and Cloudroom compatibility](01-contracts-and-cloudroom-compatibility.md) | Ownership, typed contracts, pinned SDK proof, bounds | Existing application/workflow contracts |
++| [02 — Company machines and pairing](02-company-machines-and-pairing.md) | Company authorization, storage, enrollment, revocation | 01 |
++| [03 — Outbound connection and durable protocol](03-outbound-connection-and-durable-protocol.md) | WSS, durable command/event inboxes, replica fencing | 01–02 |
++| [04 — Cloudroom plugin and session recovery](04-cloudroom-plugin-and-session-recovery.md) | Plugin package, SDK execution, local journal, reconciliation | 01–03 |
++| [05 — Openbot management and workflows](05-openbot-management-and-workflows.md) | Agent profiles, thread controls, durable workflow integration | 02–04 |
++| [06 — Local setup and operations](06-local-setup-and-operations.md) | Linux/macOS packaging, operator docs, lifecycle and retention | 02–05 |
++| [07 — Integration and verification](07-integration-and-verification.md) | Failure/race coverage, final full-suite gate, platform acceptance | All preceding groups |
++
++Each file contains cohesive implementation batches and focused checks. Finish the compatibility
++proof before committing to any upstream idempotency, event, or cancellation guarantee. A failed
++proof narrows the documented behavior or requires a small reviewed upstream extension; it must
++not silently become a second private agent runtime.
++
++## Invariants
++
++- One local installation is paired to one company at a time. Openbot still enforces company and
++  conversation/workflow authority on every control and read; shared local files do not grant
++  cross-company access to Openbot data.
++- Cloudroom owns native agent processes, session identity, workspace setup, permission prompts,
++  and the canonical local transcript. Openbot does not launch CLIs or edit Cloudroom's database.
++- Provider logins remain local. The plugin holds only a revocable credential scoped to its
++  company's machine connection. Native agents sharing that OS account are trusted to the same
++  degree; this design does not isolate that credential from them.
++- Openbot commands and accepted observations are durable. Transport redelivery reuses identities;
++  an ambiguous SDK mutation is reconciled or reported uncertain, never blindly executed again.
++- A disconnect is not proof that an agent stopped. Offline cancellation/revocation does not
++  promise an immediate physical stop on a disconnected machine.
++- The Cloudroom UI and Openbot share thread identity and observe the local server's queue. An
++  idle notification alone is not proof that a particular Openbot prompt completed.
++- Local output is untrusted data, not authorization or proof of an Openbot-side action. Existing
++  workflow and message publication rules remain authoritative.
++- No network wait holds a database transaction or a workflow execution lease for an agent turn.
++  Results wake parked workflow work through durable identities and current fences.
++
++## Repository integration and related plans
++
++Use the current repository seams, not the historical `AgentRunner`/`AgentExecutionDriver` sketches:
++
++- `src/application/use_cases/company.rs`: `managed_company`, `readable_company`, and company access.
++- `src/application/workflow/worker.rs`: `WorkflowHandler` and worker dispatch.
++- `src/application/workflow/registry/`: registered step types, schemas, descriptors, and examples.
++- `src/application/workflow/agent.rs`: frozen native-agent preparation and tool-dispatch contracts.
++- `src/adapters/harness/rig/workflow.rs`: the existing native model/agent handler.
++- `src/infra/workflow.rs`: handler construction and routing.
++- `src/adapters/persistence/workflow/`: durable claims, waits, cancellation, and completion.
++- `.github/workflows/ci.yml` and `scripts/check.sh`: verification entry points.
++
++Add a small application-owned local-agent module and adapters at those seams. Keep Cloudroom SDK,
++WebSocket, and SQL types outside domain/application contracts. A local agent profile is separate
++from Openbot's existing published `Agent` entity; this does not replace native `agent.run`.
++
++This plan supersedes the retired reverse OpenCode tunnel sketch for
++company-owned local execution. It is separate from [tenant-owned custom tool execution](../tenant-owned-execution-backends.md),
++which sends individual scripts to a cloud provider, and from [app credential integrations](../vault-google/README.md).
++Neither unrelated implementation is a prerequisite, and their credentials are not copied locally.
++
++## Source baseline and verification status
++
++Cloudroom was inspected at commit
++[`d8b3cc3a16bb4b06fc99d8e543d40f1087d1e815`](https://github.com/davidondrej/cloudroom/tree/d8b3cc3a16bb4b06fc99d8e543d40f1087d1e815).
++Phase 01 lists the relevant source evidence and outstanding runtime proofs. This is a source
++inspection baseline, not an assertion that a released package was installed or real agents ran.
++
++Plan publication checks cover Markdown links, reset-note registration, whitespace, and Rust
++formatting for the startup note list. The implementation's Rust/database/plugin/browser suites
++and real-provider platform acceptance remain future requirements in phase 07. Record actual
++commands/results and unavailable checks; zero selected tests or skipped databases do not pass.
++
++Plan publication verification on 2026-11-06: `git diff --check` and
++`cargo fmt --all -- --check` passed. A Python integrity check passed for all 8 plan files,
++their reset notes/startup registrations, 21 local links, balanced fences and trailing whitespace.
++Implementation suites and real-provider checks were not run: this change publishes the plan and
++startup warning metadata only.
++
++Every Markdown file in this directory must carry the reset note and be registered in
++`NO_BACKWARD_COMPATIBILITY_NOTES` in `src/main.rs`.
+--- /dev/null
++++ b/src/main.rs
+@@ -0,0 +1,594 @@
++use dotenvy::dotenv;
++use std::future::{Future, IntoFuture};
++use std::sync::Arc;
++use tokio::time::{Duration, sleep, timeout};
++use tracing::{info, warn};
++
++/// How long to let in-flight requests finish after a stop signal before exiting regardless.
++///
++/// Comfortably longer than the 15s a mailbox send can hold its request, and comfortably shorter
++/// than the platform's own kill timeout, so the process gets to exit on its own terms.
++const DRAIN_GRACE: Duration = Duration::from_secs(20);
++
++#[derive(Debug, PartialEq, Eq)]
++enum DrainOutcome {
++    Forced,
++    DeadlineReached,
++}
++
++use open_bots::{
++    adapters::persistence::PostgresPersistence,
++    infra::{
++        app::create_app,
++        config::runtime_thread_stack_bytes_from_env,
++        events::run_mailbox_event_listener,
++        postgres_persistence,
++        runtime_metrics::LinuxRuntimeMetricSource,
++        setup::{init_app_state, init_tracing},
++    },
++    services::{
++        inbound_event_worker::InboundEventWorker, notification_worker::NotificationWorker,
++        runtime_metrics::RuntimeMetricSampler,
++    },
++};
++
++#[derive(Debug, PartialEq, Eq)]
++enum ProcessCommand {
++    Serve,
++    CredentialStatus { required_version: Option<u32> },
++    CredentialRotate,
++    KnowledgeModelCheck,
++    Help,
++}
++
++/// Build the runtime by hand rather than through `#[tokio::main]`, which offers no way to widen
++/// the worker stacks -- see `DEFAULT_RUNTIME_THREAD_STACK_BYTES` for why 2 MiB is not enough here.
++fn main() -> anyhow::Result<()> {
++    dotenv().ok();
++    init_tracing();
++    match parse_process_command(std::env::args().skip(1))? {
++        ProcessCommand::Serve => serve_runtime(),
++        ProcessCommand::KnowledgeModelCheck => {
++            let directory = open_bots::adapters::embedding::model_directory_from_env();
++            println!(
++                "{}",
++                serde_json::to_string(&open_bots::adapters::embedding::model_check(&directory)?)?
++            );
++            Ok(())
++        }
++        ProcessCommand::CredentialStatus { required_version } => {
++            operational_runtime()?.block_on(run_credential_status(required_version))
++        }
++        ProcessCommand::CredentialRotate => {
++            operational_runtime()?.block_on(run_credential_rotation())
++        }
++        ProcessCommand::Help => {
++            println!("{}", command_usage());
++            Ok(())
++        }
++    }
++}
++
++fn serve_runtime() -> anyhow::Result<()> {
++    let runtime = tokio::runtime::Builder::new_multi_thread()
++        .enable_all()
++        .thread_stack_size(runtime_thread_stack_bytes_from_env())
++        .build()?;
++    let result = runtime.block_on(serve());
++    // A native call can outlive cooperative cancellation; Runtime::drop must not wait forever.
++    runtime.shutdown_timeout(Duration::from_secs(1));
++    result
++}
++
++fn operational_runtime() -> anyhow::Result<tokio::runtime::Runtime> {
++    Ok(tokio::runtime::Builder::new_current_thread()
++        .enable_all()
++        .build()?)
++}
++
++fn parse_process_command(args: impl IntoIterator<Item = String>) -> anyhow::Result<ProcessCommand> {
++    let args = args.into_iter().collect::<Vec<_>>();
++    match args.as_slice() {
++        [] => Ok(ProcessCommand::Serve),
++        [help] if help == "--help" || help == "-h" => Ok(ProcessCommand::Help),
++        [credentials, status] if credentials == "credentials" && status == "status" => {
++            Ok(ProcessCommand::CredentialStatus {
++                required_version: None,
++            })
++        }
++        [credentials, status, require, version]
++            if credentials == "credentials"
++                && status == "status"
++                && require == "--require-version" =>
++        {
++            let required_version = parse_required_version(version)?;
++            Ok(ProcessCommand::CredentialStatus {
++                required_version: Some(required_version),
++            })
++        }
++        [knowledge, check] if knowledge == "knowledge" && check == "model-check" => {
++            Ok(ProcessCommand::KnowledgeModelCheck)
++        }
++        [credentials, rotate] if credentials == "credentials" && rotate == "rotate" => {
++            Ok(ProcessCommand::CredentialRotate)
++        }
++        _ => anyhow::bail!("Invalid command.\n\n{}", command_usage()),
++    }
++}
++
++fn parse_required_version(value: &str) -> anyhow::Result<u32> {
++    let version = value
++        .parse::<u32>()
++        .map_err(|_| anyhow::anyhow!("--require-version must be a positive integer"))?;
++    if version == 0 {
++        anyhow::bail!("--require-version must be a positive integer");
++    }
++    Ok(version)
++}
++
++fn command_usage() -> &'static str {
++    "Usage:\n  open_bots\n  open_bots credentials status [--require-version <N>]\n  open_bots credentials rotate\n  open_bots knowledge model-check"
++}
++
++async fn run_credential_status(required_version: Option<u32>) -> anyhow::Result<()> {
++    let persistence = postgres_persistence().await?;
++    let status = persistence.credential_status().await?;
++    println!("{}", serde_json::to_string(&status)?);
++    ensure_credential_status(&status, required_version)
++}
++
++fn ensure_credential_status(
++    status: &open_bots::adapters::persistence::credential_rotation::CredentialStatus,
++    required_version: Option<u32>,
++) -> anyhow::Result<()> {
++    if !status.is_valid() {
++        anyhow::bail!("Credential status found malformed or unavailable rows");
++    }
++    if let Some(required_version) = required_version
++        && !status.satisfies_required_version(required_version)
++    {
++        anyhow::bail!("Credential rows have not converged on required version {required_version}");
++    }
++    Ok(())
++}
++
++async fn run_credential_rotation() -> anyhow::Result<()> {
++    let persistence: PostgresPersistence = postgres_persistence().await?;
++    let report = persistence.rotate_credentials().await?;
++    println!("{}", serde_json::to_string(&report)?);
++    if !report.complete {
++        anyhow::bail!("Credential rotation did not converge");
++    }
++    Ok(())
++}
++
++/// Every file carrying the "No backward compatibility" note, logged at startup.
++const NO_BACKWARD_COMPATIBILITY_NOTES: &[&str] = &[
++    "AGENTS.md",
++    "src/adapters/persistence/AGENTS.md",
++    "plan/.archived/fix-01-run-agent-query/01-agent-run-filter.md",
++    "plan/.archived/fix-01-run-agent-query/02-query-plan-evidence-and-index.md",
++    "plan/.archived/fix-01-run-agent-query/03-slow-read-tripwire-and-release.md",
++    "plan/.archived/fix-02-run-child-duplicates/01-top-level-filter.md",
++    "plan/.archived/fix-02-run-child-duplicates/02-child-rollup-on-parent.md",
++    "plan/.archived/fix-02-run-child-duplicates/03-verification-and-release.md",
++    "plan/.archived/fix-03-run-board-finished-columns/01-run-finished-at.md",
++    "plan/.archived/fix-03-run-board-finished-columns/02-bounded-board-read.md",
++    "plan/.archived/fix-03-run-board-finished-columns/03-truncation-signal-and-release.md",
++    "plan/.archived/new-board-view/README.md",
++    "plan/.archived/new-board-view/01-board-view-and-layout.md",
++    "plan/.archived/new-board-view/02-filters-and-entry-points.md",
++    "plan/.archived/new-board-view/03-live-updates.md",
++    "plan/.archived/new-board-view/04-runs-in-navigation.md",
++    "plan/.archived/new-board-view/05-verification-and-release.md",
++    "plan/01-knowledge-access-levels/README.md",
++    "plan/01-knowledge-access-levels/01-access-levels-and-member-levels.md",
++    "plan/01-knowledge-access-levels/02-knowledge-library-and-indexing.md",
++    "plan/01-knowledge-access-levels/03-run-levels-history-and-egress.md",
++    "plan/01-knowledge-access-levels/04-knowledge-search-tool.md",
++    "plan/01-knowledge-access-levels/05-read-paths-ui-and-notifications.md",
++    "plan/01-knowledge-access-levels/06-integration-and-verification.md",
++    "plan/02-autonomous-agent/01-capability-contracts-and-storage.md",
++    "plan/02-autonomous-agent/02-agent-publication-and-skills.md",
++    "plan/02-autonomous-agent/03-workflow-references-and-run-snapshots.md",
++    "plan/02-autonomous-agent/04-tool-dispatch-and-live-authority.md",
++    "plan/02-autonomous-agent/05-provisioning-children-and-samples.md",
++    "plan/02-autonomous-agent/06-authoring-and-operations.md",
++    "plan/02-autonomous-agent/07-integration-and-verification.md",
++    "plan/03-channel-handles-send/01-contracts-and-response-ownership.md",
++    "plan/03-channel-handles-send/02-terminal-outcomes-and-no-reply.md",
++    "plan/03-channel-handles-send/03-durable-response-intents.md",
++    "plan/03-channel-handles-send/04-channel-publication-and-delivery.md",
++    "plan/03-channel-handles-send/05-human-input-and-continuations.md",
++    "plan/03-channel-handles-send/06-authoring-observability-and-operations.md",
++    "plan/03-channel-handles-send/07-integration-and-verification.md",
++    "plan/04-autonomous-agent-history/01-contracts-and-conversation-identity.md",
++    "plan/04-autonomous-agent-history/02-durable-exchanges-and-completion.md",
++    "plan/04-autonomous-agent-history/03-turn-ordering-and-recovery.md",
++    "plan/04-autonomous-agent-history/04-automatic-context-and-frozen-preparation.md",
++    "plan/04-autonomous-agent-history/05-callers-continuations-and-channel-integration.md",
++    "plan/04-autonomous-agent-history/06-history-views-retention-and-operations.md",
++    "plan/04-autonomous-agent-history/07-integration-and-verification.md",
++    "plan/attribution-service/01-application-boundaries-and-contracts.md",
++    "plan/attribution-service/02-independent-application-foundation.md",
++    "plan/attribution-service/03-single-sign-on-and-company-access.md",
++    "plan/attribution-service/04-merchant-setup-and-api-credentials.md",
++    "plan/attribution-service/05-links-and-durable-clicks.md",
++    "plan/attribution-service/06-website-tracking-and-checkout-handoff.md",
++    "plan/attribution-service/07-orders-refunds-and-attribution.md",
++    "plan/attribution-service/08-analytics-and-attribution-dashboard.md",
++    "plan/attribution-service/09-operations-retention-and-separate-deployment.md",
++    "plan/attribution-service/10-integration-verification-and-pilot.md",
++    "plan/cloudroom-local/README.md",
++    "plan/cloudroom-local/01-contracts-and-cloudroom-compatibility.md",
++    "plan/cloudroom-local/02-company-machines-and-pairing.md",
++    "plan/cloudroom-local/03-outbound-connection-and-durable-protocol.md",
++    "plan/cloudroom-local/04-cloudroom-plugin-and-session-recovery.md",
++    "plan/cloudroom-local/05-openbot-management-and-workflows.md",
++    "plan/cloudroom-local/06-local-setup-and-operations.md",
++    "plan/cloudroom-local/07-integration-and-verification.md",
++    "plan/db_improve/05-deferred-until-traffic.md",
++    "plan/db_improve/improve-key-credentials.md",
++    "plan/db_improve/run-agent-link-table.md",
++    "plan/doop-canvas/README.md",
++    "plan/doop-canvas/01-contracts-and-company-setup.md",
++    "plan/doop-canvas/02-company-mcp-connections.md",
++    "plan/doop-canvas/03-workflow-and-agent-authoring.md",
++    "plan/doop-canvas/04-results-and-human-access.md",
++    "plan/doop-canvas/05-operations-and-lifecycle.md",
++    "plan/doop-canvas/06-integration-and-verification.md",
++    "plan/evals/README.md",
++    "plan/evals/01-contracts-and-dataset-model.md",
++    "plan/evals/02-storage-and-suite-management.md",
++    "plan/evals/03-scripted-evaluation.md",
++    "plan/evals/04-live-models-and-integrations.md",
++    "plan/evals/05-graders-and-hard-gates.md",
++    "plan/evals/06-comparisons-and-authoring.md",
++    "plan/evals/07-verification-and-operations.md",
++    "plan/fix-app/README.md",
++    "plan/fix-app/01-identity-and-ownership.md",
++    "plan/fix-app/02-silent-stalls.md",
++    "plan/fix-app/03-workflow-database-guards.md",
++    "plan/fix-app/04-authorization-in-application.md",
++    "plan/fix-app/05-tenant-integrity.md",
++    "plan/fix-app/06-workflow-storage-growth.md",
++    "plan/fix-app/07-application-layering.md",
++    "plan/fix-app/08-schema-cleanup.md",
++    "plan/fix-file-access/README.md",
++    "plan/fix-file-access/01-resource-ownership-and-policy.md",
++    "plan/fix-file-access/02-media-authorization-and-caching.md",
++    "plan/fix-file-access/03-rendering-and-export.md",
++    "plan/fix-file-access/04-verification-and-deployment.md",
++    "plan/hindsight_remaining_work.md",
++    "plan/hydradb/01-preserve-memory-scope-isolation.md",
++    "plan/hydradb/06-make-memory-ingestion-durable.md",
++    "plan/memory_management/general_plan_instructions.md",
++    "plan/opencode_microvm_sandbox_plan.md",
++    "plan/outreach_allowlist_plan.md",
++    "plan/shodh_memory_provider.md",
++    "plan/slack-integration/README.md",
++    "plan/standard-operating-procedures/README.md",
++    "plan/standard-operating-procedures/01-shared-contracts-and-workflow-integration.md",
++    "plan/standard-operating-procedures/02-guidance-and-authoring.md",
++    "plan/standard-operating-procedures/03-verification-and-evidence.md",
++    "plan/standard-operating-procedures/04-coordination-and-handoffs.md",
++    "plan/standard-operating-procedures/05-flow-measures-and-capacity.md",
++    "plan/standard-operating-procedures/06-debriefs-and-improvement-backlog.md",
++    "plan/standard-operating-procedures/07-controlled-improvement-experiments.md",
++    "plan/standard-operating-procedures/08-integration-verification-and-release.md",
++    "plan/tenant-owned-execution-backends.md",
++    "plan/vault-google/README.md",
++    "plan/vault-google/01-contracts-and-ownership.md",
++    "plan/vault-google/02-vault-storage-and-management.md",
++    "plan/vault-google/03-connection-bindings-and-authority.md",
++    "plan/vault-google/04-google-authorization.md",
++    "plan/vault-google/05-token-resolution-and-refresh.md",
++    "plan/vault-google/06-workflow-integration-and-authoring.md",
++    "plan/vault-google/07-integration-verification-and-operations.md",
++];
++
++async fn serve() -> anyhow::Result<()> {
++    // Logged before migrations run, so it is visible when one fails against existing data.
++    warn!(
++        notes = ?NO_BACKWARD_COMPATIBILITY_NOTES,
++        "No backward compatibility: schema and persisted data are not migrated across releases. \
++         The schema is a single init migration edited in place, so an existing database whose \
++         recorded migrations or checksum no longer match must be reset. When compatibility is required, \
++         freeze the init schema, reinstate follow-up migrations, and remove this warning and the \
++         listed notes."
++    );
++    let open_bots::infra::setup::Application {
++        http: app_state,
++        workers,
++    } = init_app_state().await?;
++    let mcp_use_cases = app_state.mcp_use_cases.clone();
++    let inbound_event_worker: Arc<InboundEventWorker> = workers.inbound_events;
++    let notification_worker: Arc<NotificationWorker> = workers.notifications;
++    let workflow = workers.workflow;
++    let delivery_worker = workers.deliveries;
++    let smtp_server = workers.smtp;
++
++    // Create broadcast channel for background worker graceful shutdown
++    let (shutdown_tx, shutdown_rx) = tokio::sync::broadcast::channel(1);
++    // The workflow loops take a cancellation token; one bridge turns the broadcast into it.
++    let workflow_shutdown = tokio_util::sync::CancellationToken::new();
++    let mut workflow_bridge_handle = {
++        let token = workflow_shutdown.clone();
++        let mut stop = shutdown_tx.subscribe();
++        tokio::spawn(async move {
++            let _ = stop.recv().await;
++            token.cancel();
++        })
++    };
++    let mut knowledge_shutdown_handle =
++        supervise_knowledge_shutdown(app_state.knowledge.clone(), shutdown_tx.subscribe());
++    let mut workflow_handles = workflow.spawn(&workflow_shutdown);
++
++    // The runtime panel samples the workflow worker slots and the jobs they hold (p08 D4.8).
++    let runtime_source = LinuxRuntimeMetricSource::new(
++        app_state.runtime_identity.clone(),
++        workflow.active_jobs(),
++        workflow.slots(),
++    );
++    let runtime_sampler =
++        RuntimeMetricSampler::new(app_state.runtime_metrics.clone(), runtime_source);
++    let mut runtime_sampler_handle = tokio::spawn(runtime_sampler.run(shutdown_rx.resubscribe()));
++    let mut session_cleanup_handle = tokio::spawn(
++        app_state
++            .sessions
++            .clone()
++            .run_cleanup(shutdown_rx.resubscribe()),
++    );
++
++    let mut inbound_event_worker_handle =
++        tokio::spawn(inbound_event_worker.run(shutdown_rx.resubscribe()));
++    let mut notification_worker_handle =
++        tokio::spawn(notification_worker.run(shutdown_rx.resubscribe()));
++
++    // The delivery queue is drained by its own worker: a delivery outlives the run that produced
++    // it, plenty of deliveries have no run behind them at all, and a long agent run must not hold
++    // up a queued reply.
++    let mut delivery_worker_handle = tokio::spawn(delivery_worker.run(shutdown_rx.resubscribe()));
++
++    let smtp_handle = tokio::spawn(smtp_server.start_server_loop(shutdown_rx.resubscribe()));
++
++    // Republish committed messages to open mailboxes. It listens on the database rather than
++    // in-process because the writer is usually a workflow worker or the SMTP loop above.
++    let mailbox_listener_handle = tokio::spawn(run_mailbox_event_listener(
++        app_state.db.clone(),
++        app_state.events.clone(),
++        app_state.inbound_event_wakeups.clone(),
++        shutdown_rx.resubscribe(),
++    ));
++
++    let app = create_app(app_state);
++    let listener = tokio::net::TcpListener::bind("0.0.0.0:3001").await.unwrap();
++
++    info!("Backend listening at {}", &listener.local_addr().unwrap());
++
++    // Serve axum app with graceful shutdown listener
++    let mut draining = shutdown_tx.subscribe();
++    let server = axum::serve(
++        listener,
++        app.into_make_service_with_connect_info::<std::net::SocketAddr>(),
++    )
++    .with_graceful_shutdown(shutdown_signal(shutdown_tx.clone()))
++    .into_future();
++    tokio::pin!(server);
++
++    tokio::select! {
++        result = &mut server => result.unwrap(),
++        // The mailbox holds SSE streams open for as long as a tab is, and a graceful shutdown waits
++        // for every connection to close — so without a deadline one open tab pins the process until
++        // the platform loses patience and kills it mid-request. Cutting a stream is harmless: the
++        // client reconnects and resumes from its last event id.
++        outcome = wait_for_drain_end(&mut draining, second_interrupt(), DRAIN_GRACE) => {
++            match outcome {
++                DrainOutcome::Forced => {
++                    warn!("Second interrupt received; exiting without remaining connections.");
++                }
++                DrainOutcome::DeadlineReached => {
++                    warn!(
++                        "Connections still open {}s into the drain; exiting without them.",
++                        DRAIN_GRACE.as_secs()
++                    );
++                }
++            }
++        }
++    }
++
++    // Also covers an HTTP server that ended without a signal: every background owner receives the
++    // same stop notification, and the sampler is explicitly joined rather than detached.
++    let _ = shutdown_tx.send(());
++    if let Err(error) = mcp_use_cases.shutdown().await {
++        warn!(error = %error, "MCP shutdown failed");
++    }
++    let mut smtp_handle = smtp_handle;
++    let mut mailbox_listener_handle = mailbox_listener_handle;
++    tokio::join!(
++        join_background("knowledge indexing", &mut knowledge_shutdown_handle),
++        join_background("runtime metric sampler", &mut runtime_sampler_handle),
++        join_background("session cleanup", &mut session_cleanup_handle),
++        join_background("inbound event worker", &mut inbound_event_worker_handle),
++        join_background("notification projector", &mut notification_worker_handle),
++        join_background("delivery worker", &mut delivery_worker_handle),
++        join_background("SMTP listener", &mut smtp_handle),
++        join_background("mailbox listener", &mut mailbox_listener_handle),
++        join_background("workflow shutdown bridge", &mut workflow_bridge_handle),
++        futures::future::join_all(
++            workflow_handles
++                .iter_mut()
++                .map(|(name, handle)| join_background(name, handle)),
++        ),
++    );
++
++    Ok(())
++}
++
++fn supervise_knowledge_shutdown(
++    knowledge: Arc<open_bots::application::knowledge::KnowledgeLibrary>,
++    mut stop: tokio::sync::broadcast::Receiver<()>,
++) -> tokio::task::JoinHandle<()> {
++    tokio::spawn(async move {
++        let _ = stop.recv().await;
++        if let Err(error) = knowledge.shutdown().await {
++            warn!(error=%error,"Knowledge indexing shutdown failed");
++        }
++    })
++}
++
++async fn join_background(name: &str, handle: &mut tokio::task::JoinHandle<()>) {
++    match timeout(DRAIN_GRACE, &mut *handle).await {
++        Ok(Ok(())) => {}
++        Ok(Err(error)) => warn!(%error, component = name, "Background task ended unexpectedly"),
++        Err(_) => {
++            warn!(
++                component = name,
++                "Background task did not stop within drain grace; aborting it"
++            );
++            handle.abort();
++            let _ = handle.await;
++        }
++    }
++}
++
++/// Waits until graceful shutdown has begun, then bounds how long connections may keep draining.
++async fn wait_for_drain_end<F>(
++    draining: &mut tokio::sync::broadcast::Receiver<()>,
++    force_shutdown: F,
++    grace: Duration,
++) -> DrainOutcome
++where
++    F: Future<Output = ()>,
++{
++    let _ = draining.recv().await;
++
++    tokio::select! {
++        _ = force_shutdown => DrainOutcome::Forced,
++        _ = sleep(grace) => DrainOutcome::DeadlineReached,
++    }
++}
++
++async fn second_interrupt() {
++    tokio::signal::ctrl_c()
++        .await
++        .expect("failed to listen for a second ctrl+c event");
++}
++
++/// Resolves on whichever stop signal arrives first, then tells the background loops to wind down.
++///
++/// SIGTERM matters as much as ^C here: it is what `docker stop`, Kubernetes, and a bare `kill`
++/// send, and without a handler the process dies where it stands — cutting off whatever agent run
++/// an HTTP request was holding open.
++async fn shutdown_signal(shutdown_tx: tokio::sync::broadcast::Sender<()>) {
++    let interrupt = async {
++        tokio::signal::ctrl_c()
++            .await
++            .expect("failed to listen for ctrl+c event");
++    };
++
++    #[cfg(unix)]
++    let terminate = async {
++        tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
++            .expect("failed to install the SIGTERM handler")
++            .recv()
++            .await;
++    };
++    #[cfg(not(unix))]
++    let terminate = std::future::pending::<()>();
++
++    tokio::select! {
++        _ = interrupt => {}
++        _ = terminate => {}
++    }
++
++    info!("Received termination signal. Triggering graceful shutdown...");
++    let _ = shutdown_tx.send(());
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++    use std::future::pending;
++    use tokio::time::Instant;
++
++    #[test]
++    fn operational_commands_are_parsed_before_server_startup() {
++        assert_eq!(
++            parse_process_command(["knowledge", "model-check"].map(str::to_owned)).unwrap(),
++            ProcessCommand::KnowledgeModelCheck
++        );
++        assert_eq!(
++            parse_process_command(["credentials".into(), "status".into()]).unwrap(),
++            ProcessCommand::CredentialStatus {
++                required_version: None
++            }
++        );
++        assert_eq!(
++            parse_process_command([
++                "credentials".into(),
++                "status".into(),
++                "--require-version".into(),
++                "2".into(),
++            ])
++            .unwrap(),
++            ProcessCommand::CredentialStatus {
++                required_version: Some(2)
++            }
++        );
++        assert_eq!(
++            parse_process_command(["credentials".into(), "rotate".into()]).unwrap(),
++            ProcessCommand::CredentialRotate
++        );
++    }
++
++    #[test]
++    fn operational_command_rejects_zero_and_unknown_arguments() {
++        assert!(
++            parse_process_command([
++                "credentials".into(),
++                "status".into(),
++                "--require-version".into(),
++                "0".into(),
++            ])
++            .is_err()
++        );
++        assert!(parse_process_command(["credentials".into(), "unknown".into()]).is_err());
++    }
++
++    #[tokio::test(start_paused = true)]
++    async fn drain_deadline_expires_when_no_second_interrupt_arrives() {
++        let (shutdown_tx, mut shutdown_rx) = tokio::sync::broadcast::channel(1);
++        shutdown_tx.send(()).unwrap();
++        let started = Instant::now();
++
++        let outcome = wait_for_drain_end(&mut shutdown_rx, pending(), DRAIN_GRACE).await;
++
++        assert_eq!(outcome, DrainOutcome::DeadlineReached);
++        assert_eq!(started.elapsed(), DRAIN_GRACE);
++    }
++
++    #[tokio::test(start_paused = true)]
++    async fn second_interrupt_ends_the_drain_immediately() {
++        let (shutdown_tx, mut shutdown_rx) = tokio::sync::broadcast::channel(1);
++        shutdown_tx.send(()).unwrap();
++        let started = Instant::now();
++
++        let outcome =
++            wait_for_drain_end(&mut shutdown_rx, std::future::ready(()), DRAIN_GRACE).await;
++
++        assert_eq!(outcome, DrainOutcome::Forced);
++        assert_eq!(started.elapsed(), Duration::ZERO);
++    }
++
++    #[tokio::test(start_paused = true)]
++    async fn a_background_owner_that_ignores_shutdown_is_aborted_inside_the_drain_grace() {
++        let mut handle = tokio::spawn(std::future::pending::<()>());
++        let started = Instant::now();
++
++        join_background("test owner", &mut handle).await;
++
++        assert!(handle.is_finished());
++        assert_eq!(started.elapsed(), DRAIN_GRACE);
++    }
++}

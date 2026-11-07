@@ -5,6 +5,7 @@ use crate::application::workflow::activation::ActivationRequest;
 pub(super) async fn expire_on(db: &mut PgConnection, scope: ActivationRequest) -> AppResult<bool> {
     sqlx::query("SELECT set_config('lock_timeout','1000ms',true),set_config('statement_timeout','1000ms',true)")
         .execute(&mut *db).await?;
+    channel_reply_completion::prelock_on(db, scope).await?;
     // Lock first, then consult the clock: waiting for another transition can cross expiry.
     let run: Option<Uuid> =
         sqlx::query_scalar("SELECT id FROM workflow_runs WHERE company_id=$1 AND id=$2 FOR UPDATE")

@@ -1,0 +1,38 @@
+{
+  "phase": "p04",
+  "gate": "CHS-P04-AG1-R2",
+  "decision": "CHS-P04-D1/r2",
+  "decision_file": "CHS-P04-D1-r2.md",
+  "decision_sha256": "4996b54f5c5c981958df86d7a92086fff366009ced18cda5845a546927e49f26",
+  "head": "769a23aa6ef423e964f8221a8ee6b0743325c6ba",
+  "source_digest": "849e88b7cea90a4c3bf103fc84e45b2c1cf62db8e576b9a2af6e5ca00dfd5efc",
+  "exclusions": [
+    "plan/03-channel-handles-send/COORDINATION.md",
+    "plan/03-channel-handles-send/phases/p01/docs",
+    "plan/03-channel-handles-send/phases/p02/docs",
+    "plan/03-channel-handles-send/phases/p03/docs",
+    "plan/03-channel-handles-send/phases/p04/docs",
+    "plan/03-channel-handles-send/phases/p05/docs",
+    "plan/03-channel-handles-send/phases/p06/docs",
+    "plan/03-channel-handles-send/phases/p07/docs",
+    "plan/03-channel-handles-send/integration/final/docs"
+  ],
+  "accepted_prerequisite_manifest": "/Users/mac02/dev/openbot/plan/03-channel-handles-send/phases/p03/docs/logs/CHS-P03-B1-R2-manifest.json",
+  "coordination_revision": 10,
+  "coordination_pin": "coordination-r10.md",
+  "coordination_sha256": "1f9bc64cb51b1222b4bfc02e04757bf77fc4974dd5758b18d225cc8a7f925419",
+  "notice_revisions": [
+    "I001-I003/r1",
+    "I004/r2",
+    "I005-I006/r1",
+    "C001/r1",
+    "C002/r1",
+    "C003/r2+accepted-addendum",
+    "C004/r2 proposed"
+  ],
+  "findings": [
+    "CHS-P04-AG1-F1",
+    "CHS-P04-AG1-F2"
+  ],
+  "amendment": "CHS-P04-D1-r1-to-r2.diff"
+}

@@ -81,13 +81,17 @@ pub(super) async fn settle(
         .bind(scope.execution.as_uuid())
         .fetch_one(&mut *db)
         .await?;
-    let reconcile = match action_safe {
-        Some(safe) => !safe,
-        None => {
-            matches!(failure, PendingFailure::AttemptsExhausted)
-                && unknown_effect(db, scope).await?
-        }
-    };
+    // A staged terminal proposal owns saved data, never another execution of its handler.
+    let staged: bool=sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM channel_reply_proposals WHERE company_id=$1 AND run_id=$2 AND execution_id=$3)")
+        .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(scope.execution.as_uuid()).fetch_one(&mut *db).await?;
+    let reconcile = !staged
+        && match action_safe {
+            Some(safe) => !safe,
+            None => {
+                matches!(failure, PendingFailure::AttemptsExhausted)
+                    && unknown_effect(db, scope).await?
+            }
+        };
     let routed = if !reconcile
         && matches!(
             failure,

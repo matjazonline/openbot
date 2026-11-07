@@ -89,6 +89,7 @@ pub(in crate::adapters::persistence::workflow) async fn authorize_on(
 ) -> AppResult<JevCredential> {
     let started = tokio::time::Instant::now();
     let scope = claim.fence.scope;
+    channel_reply_completion::prelock_on(tx, scope).await?;
     let hints: Hints = sqlx::query_as(
         "SELECT actor_id,channel_id,thread_id,stored.bundle AS bundle,resources FROM workflow_runs AS run LEFT JOIN workflow_bundles AS stored ON stored.company_id=run.company_id AND stored.digest=run.bundle_digest WHERE run.company_id=$1 AND id=$2",
     )

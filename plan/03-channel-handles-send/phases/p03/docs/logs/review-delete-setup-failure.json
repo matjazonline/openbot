@@ -1,0 +1,6 @@
+{
+  "error": "TypeError: extractall() got an unexpected keyword argument filter",
+  "stage": "archive extraction before diagnostics",
+  "setup_log": "HEAD is now at 769a23aa Record completed autonomous agent integration and review evidence\nPreparing worktree (detached HEAD 769a23aa)\nUpdating files:  77% (5527/7154)\nUpdating files:  78% (5581/7154)\nUpdating files:  79% (5652/7154)\nUpdating files:  80% (5724/7154)\nUpdating files:  81% (5795/7154)\nUpdating files:  82% (5867/7154)\nUpdating files:  83% (5938/7154)\nUpdating files:  84% (6010/7154)\nUpdating files:  85% (6081/7154)\nUpdating files:  86% (6153/7154)\nUpdating files:  87% (6224/7154)\nUpdating files:  88% (6296/7154)\nUpdating files:  89% (6368/7154)\nUpdating files:  90% (6439/7154)\nUpdating files:  91% (6511/7154)\nUpdating files:  92% (6582/7154)\nUpdating files:  93% (6654/7154)\nUpdating files:  94% (6725/7154)\nUpdating files:  95% (6797/7154)\nUpdating files:  96% (6868/7154)\nUpdating files:  97% (6940/7154)\nUpdating files:  98% (7011/7154)\nUpdating files:  99% (7083/7154)\nUpdating files: 100% (7154/7154)\nUpdating files: 100% (7154/7154), done.\n",
+  "source_changes": false
+}

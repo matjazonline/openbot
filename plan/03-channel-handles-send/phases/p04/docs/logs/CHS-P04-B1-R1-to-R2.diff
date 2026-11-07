@@ -1,0 +1,427 @@
+--- a/migrations/20260817000000_init_schema.sql
++++ b/migrations/20260817000000_init_schema.sql
+@@ -13172,6 +13172,9 @@
+             AND filed.entry_kind=CASE WHEN proposal.route_snapshot->'targets'->0->>'kind'='reply_internal' THEN 'note' ELSE 'conversation' END
+             AND NOT EXISTS(SELECT 1 FROM public.workflow_message_destinations AS explicit
+                 WHERE explicit.company_id=tenant AND (explicit.message_id=published_message OR explicit.delivery_id=published_delivery))
++            AND NOT EXISTS(SELECT 1 FROM public.message_deliveries AS other_delivery
++                WHERE other_delivery.company_id=tenant AND other_delivery.message_id=published_message
++                    AND other_delivery.id IS DISTINCT FROM published_delivery)
+             AND ((published_delivery IS NULL AND message.audience='internal_only'
+                     AND (proposal.route_snapshot->'targets'->0->>'kind'='reply_internal'
+                         OR (proposal.route_snapshot->'targets'->0->>'kind'='reply_email' AND context.delivery_policy='in_app_only')))
+@@ -13200,6 +13203,41 @@
+     DEFERRABLE INITIALLY DEFERRED FOR EACH ROW WHEN (NEW.state='published')
+     EXECUTE FUNCTION public.require_channel_reply_publication();
+ 
++CREATE FUNCTION public.channel_reply_message_owner(tenant uuid, canonical uuid)
++RETURNS TABLE(run_id uuid, delivery_id uuid) LANGUAGE sql STABLE STRICT AS $$
++    SELECT final.run_id,final.delivery_id FROM public.channel_reply_decisions AS final
++    JOIN public.workflow_runs AS run ON run.company_id=final.company_id AND run.id=final.run_id
++    JOIN public.companies AS company ON company.id=final.company_id
++    WHERE final.company_id=tenant AND final.message_id=canonical AND final.state='published'
++$$;
++
++-- Membership writers serialize with the final publication's FOR UPDATE lock before inspecting ownership.
++-- An uncommitted foreign parent is not a valid membership target; do not wait on its FK after the check.
++CREATE FUNCTION public.lock_message_publication_boundary(original_company uuid, original_message uuid,
++    replacement_company uuid, replacement_message uuid) RETURNS void LANGUAGE plpgsql AS $$
++BEGIN
++    PERFORM message.id FROM public.messages AS message
++        WHERE (message.company_id,message.id) IN
++            ((original_company,original_message),(replacement_company,replacement_message))
++        ORDER BY message.company_id,message.id FOR KEY SHARE;
++    IF replacement_company IS NOT NULL AND replacement_message IS NOT NULL AND NOT EXISTS(SELECT 1 FROM public.messages
++        WHERE company_id=replacement_company AND id=replacement_message)
++    THEN RAISE EXCEPTION 'message membership target is not committed or owned by this transaction' USING ERRCODE='23503'; END IF;
++END $$;
++
++CREATE FUNCTION public.lock_delivery_publication_boundary(original_company uuid, original_delivery uuid,
++    replacement_company uuid, replacement_delivery uuid) RETURNS void LANGUAGE plpgsql AS $$
++BEGIN
++    PERFORM delivery.id FROM public.message_deliveries AS delivery
++        WHERE (delivery.company_id,delivery.id) IN
++            ((original_company,original_delivery),(replacement_company,replacement_delivery))
++        ORDER BY delivery.company_id,delivery.id FOR KEY SHARE;
++    IF replacement_company IS NOT NULL AND replacement_delivery IS NOT NULL AND NOT EXISTS(SELECT 1 FROM public.message_deliveries
++        WHERE company_id=replacement_company AND id=replacement_delivery)
++    THEN RAISE EXCEPTION 'delivery membership target is not committed or owned by this transaction'
++        USING ERRCODE='23503',CONSTRAINT='message_delivery_parts_delivery_fk',TABLE='message_delivery_parts',SCHEMA='public'; END IF;
++END $$;
++
+ CREATE FUNCTION public.guard_owned_delivery_intent() RETURNS trigger LANGUAGE plpgsql AS $$
+ BEGIN
+     IF TG_OP='DELETE' THEN
+@@ -13208,6 +13246,15 @@
+         THEN RAISE EXCEPTION 'owned delivery is retained with its publication owner' USING ERRCODE='23514'; END IF;
+         RETURN OLD;
+     END IF;
++    IF TG_OP='INSERT' THEN
++        PERFORM public.lock_message_publication_boundary(NULL,NULL,NEW.company_id,NEW.message_id);
++    ELSE
++        PERFORM public.lock_message_publication_boundary(OLD.company_id,OLD.message_id,NEW.company_id,NEW.message_id);
++    END IF;
++    IF EXISTS(SELECT 1 FROM public.channel_reply_message_owner(NEW.company_id,NEW.message_id) AS owner
++        WHERE owner.delivery_id IS DISTINCT FROM NEW.id)
++    THEN RAISE EXCEPTION 'final canonical message requires its exact delivery receipt' USING ERRCODE='23514'; END IF;
++    IF TG_OP='INSERT' THEN RETURN NEW; END IF;
+     IF public.workflow_delivery_origin(OLD.company_id,OLD.id) IS NOT NULL THEN
+         IF (to_jsonb(NEW)-ARRAY['status','attempt_count','max_attempts','available_at','last_error_class','last_error_detail','execution_id',
+             'owner_worker_id','locked_at','lock_expires_at','delivered_at','updated_at','cancellation_requested_at','cancellation_reason',
+@@ -13220,16 +13267,22 @@
+     END IF;
+     RETURN NEW;
+ END $$;
+-CREATE TRIGGER workflow_owned_delivery_intent BEFORE UPDATE OR DELETE ON public.message_deliveries
++CREATE TRIGGER workflow_owned_delivery_intent BEFORE INSERT OR UPDATE OR DELETE ON public.message_deliveries
+     FOR EACH ROW EXECUTE FUNCTION public.guard_owned_delivery_intent();
+ 
+ CREATE FUNCTION public.guard_owned_delivery_part() RETURNS trigger LANGUAGE plpgsql AS $$
+ DECLARE owned boolean;
+ BEGIN
+     IF TG_OP='INSERT' THEN
++        PERFORM public.lock_delivery_publication_boundary(NULL,NULL,NEW.company_id,NEW.delivery_id);
+         IF public.workflow_delivery_origin(NEW.company_id,NEW.delivery_id) IS NOT NULL THEN
+             RAISE EXCEPTION 'owned delivery parts are frozen before publication' USING ERRCODE='23514'; END IF;
+         RETURN NEW;
++    END IF;
++    IF TG_OP='DELETE' THEN
++        PERFORM public.lock_delivery_publication_boundary(OLD.company_id,OLD.delivery_id,NULL,NULL);
++    ELSE
++        PERFORM public.lock_delivery_publication_boundary(OLD.company_id,OLD.delivery_id,NEW.company_id,NEW.delivery_id);
+     END IF;
+     owned:=public.workflow_delivery_origin(OLD.company_id,OLD.delivery_id) IS NOT NULL;
+     IF TG_OP='DELETE' THEN
+@@ -13238,6 +13291,7 @@
+         THEN RAISE EXCEPTION 'owned delivery part is retained with its parent' USING ERRCODE='23514'; END IF;
+         RETURN OLD;
+     END IF;
++    owned:=owned OR public.workflow_delivery_origin(NEW.company_id,NEW.delivery_id) IS NOT NULL;
+     IF owned AND ((to_jsonb(NEW)-ARRAY['status','provider_message_key','attempt_count','last_error_class','last_error_detail',
+             'request_started_at','delivered_at','updated_at']) IS DISTINCT FROM
+         (to_jsonb(OLD)-ARRAY['status','provider_message_key','attempt_count','last_error_class','last_error_detail',
+@@ -13260,16 +13314,13 @@
+     FOR EACH ROW EXECUTE FUNCTION public.guard_channel_reply_message();
+ 
+ CREATE FUNCTION public.guard_channel_reply_message_component() RETURNS trigger LANGUAGE plpgsql AS $$
+-DECLARE tenant uuid; original uuid; replacement uuid;
+-BEGIN
+-    IF TG_OP='INSERT' THEN tenant:=NEW.company_id; replacement:=NEW.message_id;
+-    ELSE tenant:=OLD.company_id; original:=OLD.message_id;
+-        IF TG_OP='UPDATE' THEN replacement:=NEW.message_id; END IF;
+-    END IF;
+-    IF EXISTS(SELECT 1 FROM public.companies WHERE id=tenant)
+-        AND EXISTS(SELECT 1 FROM public.channel_reply_decisions AS final
+-            JOIN public.workflow_runs AS run ON run.company_id=final.company_id AND run.id=final.run_id
+-            WHERE final.company_id=tenant AND final.state='published' AND final.message_id IN (original,replacement))
++DECLARE original_company uuid; original_message uuid; replacement_company uuid; replacement_message uuid;
++BEGIN
++    IF TG_OP<>'INSERT' THEN original_company:=OLD.company_id; original_message:=OLD.message_id; END IF;
++    IF TG_OP<>'DELETE' THEN replacement_company:=NEW.company_id; replacement_message:=NEW.message_id; END IF;
++    PERFORM public.lock_message_publication_boundary(original_company,original_message,replacement_company,replacement_message);
++    IF EXISTS(SELECT 1 FROM public.channel_reply_message_owner(original_company,original_message))
++        OR EXISTS(SELECT 1 FROM public.channel_reply_message_owner(replacement_company,replacement_message))
+     THEN RAISE EXCEPTION 'published final reply association and metadata are immutable' USING ERRCODE='23514'; END IF;
+     IF TG_OP='DELETE' THEN RETURN OLD; END IF;
+     RETURN NEW;
+--- a/src/adapters/persistence/workflow/channel_reply_delivery.rs
++++ b/src/adapters/persistence/workflow/channel_reply_delivery.rs
+@@ -27,7 +27,7 @@
+         "SELECT final_reply.company_id,final_reply.run_id,final_reply.proposal_id,final_reply.integrity, \
+         delivery.channel_id,delivery.source_binding_id,delivery.destination_binding_id \
+         FROM message_deliveries AS delivery JOIN channel_reply_decisions AS final_reply \
+-            ON final_reply.company_id=delivery.company_id AND final_reply.delivery_id=delivery.id \
++            ON final_reply.company_id=delivery.company_id AND final_reply.message_id=delivery.message_id \
+         WHERE delivery.id=$1 AND final_reply.state='published'",
+     )
+     .bind(delivery)
+--- a/src/adapters/persistence/workflow/channel_reply_membership_tests.rs
++++ b/src/adapters/persistence/workflow/channel_reply_membership_tests.rs
+@@ -0,0 +1,276 @@
++use super::*;
++use crate::entities::{
++    message::CanonicalMessageId,
++    transport::{DeliveryId, DeliveryPartId},
++};
++use crate::transport::{DeliveryKey, NewDelivery};
++use sqlx::{PgConnection, postgres::PgQueryResult};
++
++struct MembershipFixture {
++    f: FinalFixture,
++    template: NewDelivery,
++    receipt: ReplyPublicationReceipt,
++}
++struct OrdinaryDelivery {
++    message: CanonicalMessageId,
++    delivery: DeliveryId,
++    part: DeliveryPartId,
++}
++
++async fn ready() -> MembershipFixture {
++    let f = FinalFixture::new("data.map", false).await;
++    f.advance().await;
++    let claim = claim(&f).await;
++    let plan = super::authority::plan(&f, claim).await;
++    let template = plan.destinations[0].delivery.clone().unwrap();
++    let ReplyPublicationOutcome::Published(receipt) =
++        f.p.commit_reply_publication(claim, &plan).await.unwrap()
++    else {
++        panic!("published")
++    };
++    MembershipFixture {
++        f,
++        template,
++        receipt,
++    }
++}
++
++async fn insert_candidate(
++    db: &mut PgConnection,
++    delivery: &NewDelivery,
++) -> Result<PgQueryResult, sqlx::Error> {
++    sqlx::query("INSERT INTO message_deliveries (id,company_id,channel_id,message_id,source_binding_id,destination_binding_id, \
++        external_destination,correlation_id,transport,purpose,idempotency_key,max_attempts,message_audience) \
++        VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)")
++        .bind(delivery.id.as_uuid()).bind(delivery.company_id).bind(delivery.channel_id).bind(delivery.message_id.as_uuid())
++        .bind(delivery.source_binding_id.as_uuid()).bind(delivery.destination_binding_id.as_uuid())
++        .bind(delivery.external_destination.as_ref().map(|destination|destination.as_str()))
++        .bind(delivery.correlation_id.as_uuid()).bind(delivery.transport.as_str()).bind(delivery.purpose.as_str())
++        .bind(delivery.idempotency_key.as_str()).bind(delivery.max_attempts).bind(delivery.message_audience.as_str())
++        .execute(db).await
++}
++
++fn candidate(template: &NewDelivery, message: CanonicalMessageId) -> NewDelivery {
++    let mut delivery = template.clone();
++    delivery.id = DeliveryId::random();
++    delivery.message_id = message;
++    delivery.idempotency_key =
++        DeliveryKey::parse(format!("membership:{}", delivery.id.as_uuid())).unwrap();
++    delivery
++}
++
++async fn insert_extra_part(
++    db: &mut PgConnection,
++    delivery: &NewDelivery,
++    part: DeliveryPartId,
++) -> Result<PgQueryResult, sqlx::Error> {
++    let rendered = &delivery.parts[0];
++    sqlx::query("INSERT INTO message_delivery_parts(id,company_id,delivery_id,part_index,part_key,payload,content_digest) VALUES($1,$2,$3,49,$4,$5,$6)")
++        .bind(part.as_uuid()).bind(delivery.company_id).bind(delivery.id.as_uuid())
++        .bind(format!("membership:{}",part.as_uuid())).bind(serde_json::to_value(&rendered.payload).unwrap())
++        .bind(rendered.digest.as_str()).execute(db).await
++}
++
++async fn ordinary(case: &MembershipFixture) -> OrdinaryDelivery {
++    let message = case.f.s.message().await;
++    let delivery = candidate(&case.template, message);
++    let part = DeliveryPartId::random();
++    let mut db = case.f.p.pool().acquire().await.unwrap();
++    insert_candidate(&mut db, &delivery).await.unwrap();
++    insert_extra_part(&mut db, &delivery, part).await.unwrap();
++    OrdinaryDelivery {
++        message,
++        delivery: delivery.id,
++        part,
++    }
++}
++
++fn rejected<T>(result: Result<T, sqlx::Error>, code: &str) {
++    let error = match result {
++        Err(error) => error,
++        Ok(_) => panic!("invalid membership committed"),
++    };
++    assert_eq!(
++        error
++            .as_database_error()
++            .and_then(|error| error.code())
++            .as_deref(),
++        Some(code)
++    );
++}
++
++#[tokio::test]
++async fn channel_reply_publication_part_membership_checks_incoming_and_outgoing_owner() {
++    let case = ready().await;
++    let donor = ordinary(&case).await;
++    let final_delivery = case.receipt.delivery.unwrap();
++    rejected(
++        sqlx::query(
++            "UPDATE message_delivery_parts SET delivery_id=$3 WHERE company_id=$1 AND id=$2",
++        )
++        .bind(case.f.scope.company.as_uuid())
++        .bind(donor.part.as_uuid())
++        .bind(final_delivery.as_uuid())
++        .execute(case.f.p.pool())
++        .await,
++        "23514",
++    );
++    rejected(sqlx::query("UPDATE message_delivery_parts SET delivery_id=$3 WHERE company_id=$1 AND delivery_id=$2")
++        .bind(case.f.scope.company.as_uuid()).bind(final_delivery.as_uuid()).bind(donor.delivery.as_uuid()).execute(case.f.p.pool()).await,"23514");
++    let count: i64 = sqlx::query_scalar(
++        "SELECT count(*) FROM message_delivery_parts WHERE company_id=$1 AND delivery_id=$2",
++    )
++    .bind(case.f.scope.company.as_uuid())
++    .bind(final_delivery.as_uuid())
++    .fetch_one(case.f.p.pool())
++    .await
++    .unwrap();
++    assert_eq!(count, 1);
++    assert_eq!(sqlx::query("UPDATE message_delivery_parts SET part_key='ordinary-renamed' WHERE company_id=$1 AND id=$2")
++        .bind(case.f.scope.company.as_uuid()).bind(donor.part.as_uuid()).execute(case.f.p.pool()).await.unwrap().rows_affected(),1);
++}
++
++#[tokio::test]
++async fn channel_reply_publication_canonical_delivery_membership_rejects_extra_insert_and_update() {
++    let case = ready().await;
++    let donor = ordinary(&case).await;
++    let extra = candidate(&case.template, case.receipt.message);
++    let mut db = case.f.p.pool().acquire().await.unwrap();
++    rejected(insert_candidate(&mut db, &extra).await, "23514");
++    drop(db);
++    rejected(
++        sqlx::query("UPDATE message_deliveries SET message_id=$3 WHERE company_id=$1 AND id=$2")
++            .bind(case.f.scope.company.as_uuid())
++            .bind(donor.delivery.as_uuid())
++            .bind(case.receipt.message.as_uuid())
++            .execute(case.f.p.pool())
++            .await,
++        "23514",
++    );
++    let second = candidate(&case.template, donor.message);
++    insert_candidate(&mut case.f.p.pool().acquire().await.unwrap(), &second)
++        .await
++        .unwrap();
++    let count: i64 = sqlx::query_scalar(
++        "SELECT count(*) FROM message_deliveries WHERE company_id=$1 AND message_id=$2",
++    )
++    .bind(case.f.scope.company.as_uuid())
++    .bind(case.receipt.message.as_uuid())
++    .fetch_one(case.f.p.pool())
++    .await
++    .unwrap();
++    assert_eq!(
++        count, 1,
++        "ordinary multi-destination delivery does not grant another final effect"
++    );
++    sqlx::query(
++        "UPDATE channel_bindings SET status='paused' WHERE company_id=$1 AND channel_id=$2",
++    )
++    .bind(case.f.scope.company.as_uuid())
++    .bind(case.f.s.channel)
++    .execute(case.f.p.pool())
++    .await
++    .unwrap();
++    let claimed = super::delivery::claim_delivery(&case.f, case.receipt).await;
++    assert!(matches!(
++        crate::transport::DeliveryQueue::begin_part(&case.f.p, &claimed.lease, claimed.parts[0].id)
++            .await
++            .unwrap(),
++        crate::transport::DeliveryOutcome::Cancelled(_)
++    ));
++}
++
++#[tokio::test]
++async fn channel_reply_publication_component_membership_checks_new_tenant_and_message() {
++    let case = ready().await;
++    let donor = Intents::in_fixture(
++        Fixture::in_database(case.f.s.fixture._db.clone(), "membership-donor").await,
++    )
++    .await;
++    sqlx::query("ALTER TABLE workflow_runs ENABLE TRIGGER workflow_run_snapshot_immutable")
++        .execute(case.f.p.pool())
++        .await
++        .unwrap();
++    let source = donor.message().await;
++    let channel = new_channel(&case.f.s.fixture, "membership-target").await;
++    let target_thread = case
++        .f
++        .p
++        .create_thread(channel, "Target", &[])
++        .await
++        .unwrap()
++        .id;
++    rejected(sqlx::query("UPDATE thread_messages SET company_id=$3,channel_id=$4,thread_id=$5,message_id=$6 WHERE company_id=$1 AND message_id=$2")
++        .bind(donor.fixture.target.company.as_uuid()).bind(source.as_uuid()).bind(case.f.scope.company.as_uuid()).bind(channel)
++        .bind(target_thread).bind(case.receipt.message.as_uuid()).execute(case.f.p.pool()).await,"23514");
++    let count: i64 = sqlx::query_scalar(
++        "SELECT count(*) FROM thread_messages WHERE company_id=$1 AND message_id=$2",
++    )
++    .bind(case.f.scope.company.as_uuid())
++    .bind(case.receipt.message.as_uuid())
++    .fetch_one(case.f.p.pool())
++    .await
++    .unwrap();
++    assert_eq!(count, 1);
++    let normal_thread = donor
++        .p()
++        .create_thread(donor.channel, "Ordinary", &[])
++        .await
++        .unwrap()
++        .id;
++    assert_eq!(
++        sqlx::query(
++            "UPDATE thread_messages SET thread_id=$3 WHERE company_id=$1 AND message_id=$2"
++        )
++        .bind(donor.fixture.target.company.as_uuid())
++        .bind(source.as_uuid())
++        .bind(normal_thread)
++        .execute(donor.pool())
++        .await
++        .unwrap()
++        .rows_affected(),
++        1
++    );
++}
++
++#[tokio::test]
++async fn channel_reply_publication_competing_membership_and_commit_keeps_exact_effect_set() {
++    let f = FinalFixture::new("data.map", false).await;
++    f.advance().await;
++    let claim = claim(&f).await;
++    let plan = super::authority::plan(&f, claim).await;
++    let original = plan.destinations[0].delivery.as_ref().unwrap();
++    let extra = candidate(original, original.message_id);
++    let part = DeliveryPartId::random();
++    let mut blocker = f.p.pool().begin().await.unwrap();
++    sqlx::query("SELECT pg_advisory_xact_lock(742981)")
++        .execute(&mut *blocker)
++        .await
++        .unwrap();
++    sqlx::raw_sql(&format!("CREATE FUNCTION hold_membership_publication() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN \
++        IF NEW.id='{}'::uuid THEN PERFORM pg_advisory_xact_lock(742981); END IF; RETURN NEW; END $$; \
++        CREATE TRIGGER hold_membership_publication AFTER INSERT ON message_deliveries FOR EACH ROW EXECUTE FUNCTION hold_membership_publication();",original.id.as_uuid()))
++        .execute(f.p.pool()).await.unwrap();
++    let mutations = async {
++        crate::adapters::persistence::test_support::wait_until_a_backend_is_blocked(f.p.pool())
++            .await;
++        let mut first = f.p.pool().acquire().await.unwrap();
++        let mut second = f.p.pool().acquire().await.unwrap();
++        let (delivery_result, part_result) = tokio::join!(
++            insert_candidate(&mut first, &extra),
++            insert_extra_part(&mut second, original, part)
++        );
++        rejected(delivery_result, "23503");
++        rejected(part_result, "23503");
++        blocker.rollback().await.unwrap();
++    };
++    let (outcome, ()) = tokio::join!(f.p.commit_reply_publication(claim, &plan), mutations);
++    assert!(matches!(
++        outcome.unwrap(),
++        ReplyPublicationOutcome::Published(_)
++    ));
++    let shape:Value=sqlx::query_scalar("SELECT jsonb_build_object('deliveries',(SELECT count(*) FROM message_deliveries WHERE company_id=$1 AND message_id=$2), \
++        'parts',(SELECT count(*) FROM message_delivery_parts WHERE company_id=$1 AND delivery_id=$3))")
++        .bind(f.scope.company.as_uuid()).bind(original.message_id.as_uuid()).bind(original.id.as_uuid()).fetch_one(f.p.pool()).await.unwrap();
++    assert_eq!(shape, json!({"deliveries":1,"parts":1}));
++}
+--- a/src/adapters/persistence/workflow/channel_reply_publication_tests.rs
++++ b/src/adapters/persistence/workflow/channel_reply_publication_tests.rs
+@@ -8,6 +8,8 @@
+ mod integrity;
+ #[path = "channel_reply_publisher_lifecycle_tests.rs"]
+ mod lifecycle;
++#[path = "channel_reply_membership_tests.rs"]
++mod membership;
+ #[path = "channel_reply_recovery_tests.rs"]
+ mod recovery;
+ 

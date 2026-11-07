@@ -69,6 +69,13 @@ async fn control(
     let mut tx = p.pool.begin().await?;
     sqlx::query("SELECT set_config('lock_timeout','1000ms',true),set_config('statement_timeout','1000ms',true)").execute(&mut *tx).await?;
     // Admission takes company authority before its parent run. Inverting this order deadlocks.
+    channel_reply_completion::prelock_control_on(
+        &mut tx,
+        command.company_id,
+        command.run_id,
+        command.actor,
+    )
+    .await?;
     authority::authorize_company(&mut tx, command.company_id, command.actor).await?;
     let head = sqlx::query_as::<_, inspection::HeadRow>(&format!(
         "{} FOR UPDATE OF run",

@@ -1,0 +1,26 @@
+{
+  "command": [
+    "scripts/test-network-isolation.sh",
+    "cargo",
+    "test",
+    "--locked",
+    "--offline",
+    "--lib",
+    "channel_reply_final_approval_",
+    "--",
+    "--nocapture"
+  ],
+  "cwd": "/Users/mac02/dev/openbot",
+  "environment": {
+    "DATABASE_URL": "postgres://mac02@127.0.0.1:65037/openbot_chs",
+    "TEST_DATABASE_URL": "postgres://mac02@127.0.0.1:65037/openbot_chs_test",
+    "SQLX_OFFLINE": "true",
+    "CARGO_INCREMENTAL": "1",
+    "CARGO_BUILD_JOBS": "4",
+    "RUST_MIN_STACK": "2097152"
+  },
+  "started": "2026-11-07T06:02:37.787274+00:00",
+  "seconds": 1.563,
+  "exit_code": 0,
+  "log": "/Users/mac02/dev/openbot/plan/03-channel-handles-send/phases/p05/docs/logs/final-approval-tests-01.log"
+}

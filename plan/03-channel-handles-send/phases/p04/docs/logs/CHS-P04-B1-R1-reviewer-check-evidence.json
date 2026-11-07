@@ -1,0 +1,189 @@
+[
+  {
+    "name": "publication-main-migrate-04",
+    "exit_code": 0,
+    "command": [
+      "cargo",
+      "sqlx",
+      "database",
+      "reset",
+      "-y"
+    ],
+    "environment": {
+      "DATABASE_URL": "postgres://mac02@127.0.0.1:65037/openbot_chs",
+      "TEST_DATABASE_URL": "postgres://mac02@127.0.0.1:65037/openbot_chs_test",
+      "SQLX_OFFLINE": "false",
+      "CARGO_INCREMENTAL": "1",
+      "CARGO_BUILD_JOBS": "4",
+      "RUST_MIN_STACK": "2097152"
+    },
+    "log_sha256": "926e321edcd36445567f6eb79a3b8587b1bec439bae90463abf54a36e1ee957d",
+    "tail": [
+      "Applied 20260817000000/migrate init schema (298.077667ms)"
+    ]
+  },
+  {
+    "name": "publication-test-migrate-04",
+    "exit_code": 0,
+    "command": [
+      "cargo",
+      "sqlx",
+      "database",
+      "reset",
+      "-y",
+      "--database-url",
+      "postgres://mac02@127.0.0.1:65037/openbot_chs_test"
+    ],
+    "environment": {
+      "DATABASE_URL": "postgres://mac02@127.0.0.1:65037/openbot_chs",
+      "TEST_DATABASE_URL": "postgres://mac02@127.0.0.1:65037/openbot_chs_test",
+      "SQLX_OFFLINE": "false",
+      "CARGO_INCREMENTAL": "1",
+      "CARGO_BUILD_JOBS": "4",
+      "RUST_MIN_STACK": "2097152"
+    },
+    "log_sha256": "8ffd7d784744f4c636572bb3c4b955c158ec21f30dd1b344994947d2a7bba7fc",
+    "tail": [
+      "Applied 20260817000000/migrate init schema (301.305875ms)"
+    ]
+  },
+  {
+    "name": "sqlx-prepare-03",
+    "exit_code": 0,
+    "command": [
+      "cargo",
+      "sqlx",
+      "prepare",
+      "--",
+      "--all-targets"
+    ],
+    "environment": {
+      "DATABASE_URL": "postgres://mac02@127.0.0.1:65037/openbot_chs",
+      "TEST_DATABASE_URL": "postgres://mac02@127.0.0.1:65037/openbot_chs_test",
+      "SQLX_OFFLINE": "false",
+      "CARGO_INCREMENTAL": "1",
+      "CARGO_BUILD_JOBS": "4",
+      "RUST_MIN_STACK": "2097152"
+    },
+    "log_sha256": "1094dcb855e3351b10c63e403daa0bfc5ad3c683ca0210f73c3bc5263ead0a52",
+    "tail": [
+      "    Checking open_bots v0.1.0 (/Users/mac02/dev/openbot)",
+      "    Finished `dev` profile [unoptimized + debuginfo] target(s) in 15.11s",
+      "query data written to .sqlx in the current directory; please check this into version control"
+    ]
+  },
+  {
+    "name": "sqlx-check-03",
+    "exit_code": 0,
+    "command": [
+      "cargo",
+      "sqlx",
+      "prepare",
+      "--check",
+      "--",
+      "--all-targets"
+    ],
+    "environment": {
+      "DATABASE_URL": "postgres://mac02@127.0.0.1:65037/openbot_chs",
+      "TEST_DATABASE_URL": "postgres://mac02@127.0.0.1:65037/openbot_chs_test",
+      "SQLX_OFFLINE": "false",
+      "CARGO_INCREMENTAL": "1",
+      "CARGO_BUILD_JOBS": "4",
+      "RUST_MIN_STACK": "2097152"
+    },
+    "log_sha256": "4a2694ea5ce0f975a585cc0d17fc4c275f1a8888378c483e80ebe4aa68d93b5c",
+    "tail": [
+      "    Checking open_bots v0.1.0 (/Users/mac02/dev/openbot)",
+      "    Finished `dev` profile [unoptimized + debuginfo] target(s) in 11.31s"
+    ]
+  },
+  {
+    "name": "clippy-final-03",
+    "exit_code": 0,
+    "command": [
+      "cargo",
+      "clippy",
+      "--locked",
+      "--offline",
+      "--all-targets",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "environment": {
+      "DATABASE_URL": "postgres://mac02@127.0.0.1:65037/openbot_chs",
+      "TEST_DATABASE_URL": "postgres://mac02@127.0.0.1:65037/openbot_chs_test",
+      "SQLX_OFFLINE": "true",
+      "CARGO_INCREMENTAL": "1",
+      "CARGO_BUILD_JOBS": "4",
+      "RUST_MIN_STACK": "2097152"
+    },
+    "log_sha256": "ea208317b76943360cc04f1c2f30d9513f7e7e3f3aeeb20240f0619a0b80b094",
+    "tail": [
+      "    Checking open_bots v0.1.0 (/Users/mac02/dev/openbot)",
+      "    Finished `dev` profile [unoptimized + debuginfo] target(s) in 29.62s"
+    ]
+  },
+  {
+    "name": "fmt-final-03",
+    "exit_code": 0,
+    "command": [
+      "cargo",
+      "fmt",
+      "--all",
+      "--",
+      "--check"
+    ],
+    "environment": {
+      "DATABASE_URL": "postgres://mac02@127.0.0.1:65037/openbot_chs",
+      "TEST_DATABASE_URL": "postgres://mac02@127.0.0.1:65037/openbot_chs_test",
+      "SQLX_OFFLINE": "true",
+      "CARGO_INCREMENTAL": "1",
+      "CARGO_BUILD_JOBS": "4",
+      "RUST_MIN_STACK": "2097152"
+    },
+    "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "tail": []
+  },
+  {
+    "name": "diff-final-03",
+    "exit_code": 0,
+    "command": [
+      "git",
+      "diff",
+      "--check"
+    ],
+    "environment": {
+      "DATABASE_URL": "postgres://mac02@127.0.0.1:65037/openbot_chs",
+      "TEST_DATABASE_URL": "postgres://mac02@127.0.0.1:65037/openbot_chs_test",
+      "SQLX_OFFLINE": "true",
+      "CARGO_INCREMENTAL": "1",
+      "CARGO_BUILD_JOBS": "4",
+      "RUST_MIN_STACK": "2097152"
+    },
+    "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "tail": []
+  },
+  {
+    "name": "graft-final-03",
+    "exit_code": 0,
+    "command": [
+      "graft",
+      "build"
+    ],
+    "environment": {
+      "DATABASE_URL": "postgres://mac02@127.0.0.1:65037/openbot_chs",
+      "TEST_DATABASE_URL": "postgres://mac02@127.0.0.1:65037/openbot_chs_test",
+      "SQLX_OFFLINE": "true",
+      "CARGO_INCREMENTAL": "1",
+      "CARGO_BUILD_JOBS": "4",
+      "RUST_MIN_STACK": "2097152"
+    },
+    "log_sha256": "0d1778665a1f4389071b2d8371f9873631386b1e9a72c6a70d870156ea70bcd1",
+    "tail": [
+      "  parsed: 3 of 1469 files (1466 replayed from cache)",
+      "  \u2192 /Users/mac02/dev/openbot/graft",
+      "  graft/ is git-ignored (added automatically), a local cache; teammates run `graft build` to get their own."
+    ]
+  }
+]

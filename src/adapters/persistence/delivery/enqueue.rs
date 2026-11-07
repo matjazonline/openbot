@@ -146,7 +146,7 @@ async fn insert_part_on(
 
 /// Write one unattributed notification and its frozen parts on the generic queue.
 pub async fn insert_standalone_delivery_on(
-    tx: &mut Transaction<'_, Postgres>,
+    tx: &mut sqlx::PgConnection,
     delivery: &NewStandaloneDelivery,
 ) -> AppResult<DeliveryCreation> {
     let inserted: Option<Uuid> = sqlx::query_scalar(
@@ -165,7 +165,7 @@ pub async fn insert_standalone_delivery_on(
     .bind(delivery.idempotency_key.as_str())
     .bind(delivery.max_attempts)
     .bind(delivery.company_id)
-    .fetch_optional(&mut **tx)
+    .fetch_optional(&mut *tx)
     .await
     .map_err(AppError::from)?;
 
@@ -180,7 +180,7 @@ pub async fn insert_standalone_delivery_on(
         .bind(delivery.transport.as_str())
         .bind(delivery.idempotency_key.as_str())
         .bind(delivery.company_id)
-        .fetch_optional(&mut **tx)
+        .fetch_optional(&mut *tx)
         .await
         .map_err(AppError::from)?;
         return existing
@@ -207,7 +207,7 @@ pub async fn insert_standalone_delivery_on(
 }
 
 async fn insert_part_values(
-    tx: &mut Transaction<'_, Postgres>,
+    tx: &mut sqlx::PgConnection,
     delivery_id: DeliveryId,
     company_id: Uuid,
     transport: crate::entities::transport::TransportKind,
@@ -239,7 +239,7 @@ async fn insert_part_values(
     .bind(part.key.as_str())
     .bind(payload)
     .bind(part.digest.as_str())
-    .execute(&mut **tx)
+    .execute(&mut *tx)
     .await
     .map_err(AppError::from)?;
     Ok(())

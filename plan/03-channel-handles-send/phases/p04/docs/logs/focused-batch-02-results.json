@@ -1,0 +1,60 @@
+[
+  {
+    "name": "sqlx-check-02",
+    "exit_code": 0,
+    "seconds": 11.555,
+    "receipt": "/Users/mac02/dev/openbot/plan/03-channel-handles-send/phases/p04/docs/logs/sqlx-check-02.json"
+  },
+  {
+    "name": "feature-final-tests-02",
+    "exit_code": 0,
+    "seconds": 86.699,
+    "receipt": "/Users/mac02/dev/openbot/plan/03-channel-handles-send/phases/p04/docs/logs/feature-final-tests-02.json",
+    "selected": 125
+  },
+  {
+    "name": "messaging-final-tests-02",
+    "exit_code": 0,
+    "seconds": 28.615,
+    "receipt": "/Users/mac02/dev/openbot/plan/03-channel-handles-send/phases/p04/docs/logs/messaging-final-tests-02.json",
+    "selected": 64
+  },
+  {
+    "name": "delivery-final-tests-02",
+    "exit_code": 0,
+    "seconds": 10.315,
+    "receipt": "/Users/mac02/dev/openbot/plan/03-channel-handles-send/phases/p04/docs/logs/delivery-final-tests-02.json",
+    "selected": 39
+  },
+  {
+    "name": "message-retention-final-tests-02",
+    "exit_code": 0,
+    "seconds": 1.179,
+    "receipt": "/Users/mac02/dev/openbot/plan/03-channel-handles-send/phases/p04/docs/logs/message-retention-final-tests-02.json",
+    "selected": 1
+  },
+  {
+    "name": "clippy-final-02",
+    "exit_code": 0,
+    "seconds": 80.583,
+    "receipt": "/Users/mac02/dev/openbot/plan/03-channel-handles-send/phases/p04/docs/logs/clippy-final-02.json"
+  },
+  {
+    "name": "fmt-final-02",
+    "exit_code": 0,
+    "seconds": 2.199,
+    "receipt": "/Users/mac02/dev/openbot/plan/03-channel-handles-send/phases/p04/docs/logs/fmt-final-02.json"
+  },
+  {
+    "name": "diff-final-02",
+    "exit_code": 0,
+    "seconds": 0.063,
+    "receipt": "/Users/mac02/dev/openbot/plan/03-channel-handles-send/phases/p04/docs/logs/diff-final-02.json"
+  },
+  {
+    "name": "graft-final-02",
+    "exit_code": 0,
+    "seconds": 2.038,
+    "receipt": "/Users/mac02/dev/openbot/plan/03-channel-handles-send/phases/p04/docs/logs/graft-final-02.json"
+  }
+]

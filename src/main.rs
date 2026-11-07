@@ -262,7 +262,6 @@ const NO_BACKWARD_COMPATIBILITY_NOTES: &[&str] = &[
     "plan/hindsight_remaining_work.md",
     "plan/hydradb/01-preserve-memory-scope-isolation.md",
     "plan/hydradb/06-make-memory-ingestion-durable.md",
-    "plan/local_machine_tunnel_plan.md",
     "plan/memory_management/general_plan_instructions.md",
     "plan/opencode_microvm_sandbox_plan.md",
     "plan/outreach_allowlist_plan.md",

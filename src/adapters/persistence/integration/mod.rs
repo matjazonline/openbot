@@ -67,7 +67,7 @@ fn binding_select() -> String {
 /// a usable installation". Revoking an installation therefore stops its bindings in the same
 /// instant, with no mass `UPDATE` to run and nothing to go stale if that update half-succeeds.
 /// A deployment binding has no installation and passes the join on the `IS NULL` arm.
-fn active_binding_select() -> String {
+pub(super) fn active_binding_select() -> String {
     format!(
         "SELECT {BINDING_COLUMNS} \
          FROM channel_bindings AS binding \

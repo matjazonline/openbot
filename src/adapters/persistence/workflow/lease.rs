@@ -279,6 +279,7 @@ pub(super) async fn lock_scope(
     timeout: std::time::Duration,
 ) -> AppResult<Option<(LeaseRun, LeaseJob)>> {
     set_server_timeouts(db, timeout).await?;
+    channel_reply_completion::prelock_on(db, scope).await?;
     // Run-first ordering serializes claims, renewals, cancellation and progression.
     let run = sqlx::query_as::<_, LeaseRun>("SELECT binding_id, max_context_bytes FROM workflow_runs WHERE company_id=$1 AND id=$2 AND state IN ('queued','running') FOR UPDATE")
         .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).fetch_optional(&mut *db).await?;

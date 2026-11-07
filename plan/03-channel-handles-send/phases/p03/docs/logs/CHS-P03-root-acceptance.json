@@ -1,0 +1,40 @@
+{
+  "phase": "p03",
+  "status": "accepted in phase; combined integration pending",
+  "accepted_at": "2026-11-07T02:04:12.930616+00:00",
+  "root_author": "/root, user-confirmed Sol6.1/xhigh",
+  "reviewer": "/root/channel_reply_reviewer requested Astra/high independent context",
+  "review_pass": "CHS-P03-B1-R2",
+  "digest": "849e88b7cea90a4c3bf103fc84e45b2c1cf62db8e576b9a2af6e5ca00dfd5efc",
+  "head": "769a23aa6ef423e964f8221a8ee6b0743325c6ba",
+  "exclusions": [
+    "plan/03-channel-handles-send/COORDINATION.md",
+    "plan/03-channel-handles-send/phases/p01/docs",
+    "plan/03-channel-handles-send/phases/p02/docs",
+    "plan/03-channel-handles-send/phases/p03/docs",
+    "plan/03-channel-handles-send/phases/p04/docs",
+    "plan/03-channel-handles-send/phases/p05/docs",
+    "plan/03-channel-handles-send/phases/p06/docs",
+    "plan/03-channel-handles-send/phases/p07/docs",
+    "plan/03-channel-handles-send/integration/final/docs"
+  ],
+  "architecture": "CHS-P03-D1/r2,CHS-P03-AG1-R2",
+  "findings": {
+    "CHS-P03-B1-F1": "FIXED and independently rechecked"
+  },
+  "coordination_revision": 7,
+  "source_identity": "CHS-P03-B1-R2-root-acceptance-snapshot.txt;103 manifest hashes/absence match",
+  "checks": "author-correction-checks.json,current-affected-result-02.json and referenced prior unaffected records",
+  "distinct_selected": 547,
+  "distinct_passed": 546,
+  "ignored": 1,
+  "failed": 0,
+  "full_suite": false,
+  "limitations": [
+    "Targeted-only per user; no full-suite claim",
+    "One inherited ignored browser fixture exporter",
+    "Two unrelated onboarding failures proved in clean baseline retained in p01, not part of affected selection",
+    "Reviewer runtime sandbox cannot nest guard; root executes diagnostics and B independently inspects evidence",
+    "Canonical publisher/drainer and remaining plan03/plan04 phases pending"
+  ]
+}

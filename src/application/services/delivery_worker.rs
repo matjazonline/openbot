@@ -47,6 +47,9 @@ const ERROR_BACKOFF: Duration = Duration::from_secs(5);
 /// one full-table predicate per half second to find, almost always, nothing.
 const REAP_INTERVAL: Duration = Duration::from_secs(30);
 
+const PROVIDER_TIMEOUT: Duration = Duration::from_secs(30);
+const SHUTDOWN_GRACE: Duration = Duration::from_secs(3);
+
 /// How many deliveries one company may hold in a single batch.
 ///
 /// The claim is global, as a queue claim must be -- tenant-scoping it would leave the other
@@ -101,12 +104,21 @@ impl DeliveryWorker {
         let mut next_reap = Instant::now();
 
         loop {
+            if shutdown_requested(&mut shutdown) {
+                return;
+            }
             if Instant::now() >= next_reap {
-                self.reap().await;
+                tokio::select! {
+                    _ = shutdown.recv() => return,
+                    _ = self.reap() => {}
+                }
                 next_reap = Instant::now() + REAP_INTERVAL;
             }
 
-            let pause = match self.drain_once(&shutdown).await {
+            let Some(result) = self.drain_until_shutdown(&mut shutdown).await else {
+                return;
+            };
+            let pause = match result {
                 // A full batch probably has more behind it, so go straight back round.
                 Ok(claimed) if claimed as i64 >= DELIVERY_CLAIM_BATCH => Duration::ZERO,
                 Ok(_) => POLL_INTERVAL,
@@ -128,12 +140,38 @@ impl DeliveryWorker {
         }
     }
 
+    async fn drain_until_shutdown(
+        &self,
+        shutdown: &mut broadcast::Receiver<()>,
+    ) -> Option<AppResult<usize>> {
+        // Subscribe before checking the owner's pending signal: neither boundary may lose it.
+        let mut active_shutdown = shutdown.resubscribe();
+        if shutdown_requested(shutdown) {
+            return None;
+        }
+        // Keep the actual drain owned here, including the provider and its result settlement.
+        let mut drain = Box::pin(self.drain_once(&mut active_shutdown));
+        tokio::select! {
+            biased;
+            _ = shutdown.recv() => {
+                if tokio::time::timeout(SHUTDOWN_GRACE, &mut drain).await.is_err() {
+                    warn!("Delivery shutdown settlement exceeded its grace; durable leases will recover it");
+                }
+                None
+            }
+            result = &mut drain => Some(result),
+        }
+    }
+
     /// Claim one batch and send it, returning how many rows were claimed.
     ///
     /// The whole batch is claimed under one lease and sent in sequence, so the leases of the
     /// deliveries still waiting are renewed as the batch goes (see [`BatchLeases`]); without that a
     /// slow provider would let the tail of the batch lapse before its turn.
-    pub(crate) async fn drain_once(&self, shutdown: &broadcast::Receiver<()>) -> AppResult<usize> {
+    pub(crate) async fn drain_once(
+        &self,
+        shutdown: &mut broadcast::Receiver<()>,
+    ) -> AppResult<usize> {
         let claimed = self
             .queue
             .claim_deliveries(self.worker_id, self.lease_for, DELIVERY_CLAIM_BATCH)
@@ -142,10 +180,18 @@ impl DeliveryWorker {
 
         let ordered = fair_order(claimed);
         let mut batch = BatchLeases::of(&ordered);
+        let mut stopped = false;
         for delivery in ordered {
             let row = delivery.lease.row;
-            self.deliver(delivery, &mut batch, &mut shutdown.resubscribe())
-                .await;
+            if stopped {
+                self.release_on_shutdown(&delivery.lease, &delivery.record)
+                    .await;
+            } else {
+                stopped = matches!(
+                    self.deliver(delivery, &mut batch, shutdown).await,
+                    DrainProgress::Shutdown
+                );
+            }
             batch.finish(row);
         }
         Ok(count)
@@ -157,12 +203,17 @@ impl DeliveryWorker {
         claimed: ClaimedDelivery,
         batch: &mut BatchLeases,
         shutdown: &mut broadcast::Receiver<()>,
-    ) {
+    ) -> DrainProgress {
         let ClaimedDelivery {
             lease,
             record,
             mut parts,
         } = claimed;
+
+        if shutdown_requested(shutdown) {
+            self.release_on_shutdown(&lease, &record).await;
+            return DrainProgress::Shutdown;
+        }
 
         let Ok(transport) = self.transports.require(record.transport) else {
             // This deployment cannot speak the transport the row names. Terminal rather than
@@ -174,7 +225,7 @@ impl DeliveryWorker {
                 Disposition::Terminal,
             )
             .await;
-            return;
+            return DrainProgress::Continue;
         };
         let sender = Arc::clone(transport.sender());
 
@@ -182,9 +233,9 @@ impl DeliveryWorker {
             // Checked before every provider call rather than once at the top: a multi-part send
             // can outlive its lease between parts, and the reaper may already have handed the row
             // to somebody else.
-            if shutdown.try_recv().is_ok() {
+            if shutdown_requested(shutdown) {
                 self.release_on_shutdown(&lease, &record).await;
-                return;
+                return DrainProgress::Shutdown;
             }
             // Before every provider call, keep this delivery and the rest of the batch live.
             if !batch
@@ -195,11 +246,11 @@ impl DeliveryWorker {
                     delivery_id = %record.id,
                     "Lost the lease on a delivery before sending it; the execution that holds it now owns it"
                 );
-                return;
+                return DrainProgress::Continue;
             }
 
             match self
-                .send_part(&lease, &record, &parts[index], sender.as_ref())
+                .send_part(&lease, &record, &parts[index], sender.as_ref(), shutdown)
                 .await
             {
                 PartProgress::Continue(status) => {
@@ -207,21 +258,23 @@ impl DeliveryWorker {
                 }
                 PartProgress::Finished(status) => {
                     self.record_settled(&record, status);
-                    return;
+                    return DrainProgress::Continue;
                 }
                 PartProgress::Cancelled(status) => {
                     self.record_cancelled(&record, status);
-                    return;
+                    return DrainProgress::Continue;
                 }
+                PartProgress::Shutdown => return DrainProgress::Shutdown,
                 PartProgress::LeaseLost => {
                     warn!(
                         delivery_id = %record.id,
                         "Lost the lease on a delivery mid-send; the execution that holds it now owns the outcome"
                     );
-                    return;
+                    return DrainProgress::Continue;
                 }
             }
         }
+        DrainProgress::Continue
     }
 
     /// One part: fence the start, call the provider, fence the result.
@@ -231,7 +284,12 @@ impl DeliveryWorker {
         record: &DeliveryRecord,
         part: &StoredPart,
         sender: &dyn crate::transport::TransportSender,
+        shutdown: &mut broadcast::Receiver<()>,
     ) -> PartProgress {
+        if shutdown_requested(shutdown) {
+            self.release_on_shutdown(lease, record).await;
+            return PartProgress::Shutdown;
+        }
         // Committed *before* the call. It is what lets a reaper tell "this crashed before the
         // provider saw it" from "this may already have been accepted", and getting that backwards
         // is how one message becomes two.
@@ -245,10 +303,12 @@ impl DeliveryWorker {
             }
         }
 
-        let outcome = sender.send(record, &part.rendered).await;
+        // Box the external provider seam so the drain does not embed its state machine.
+        let result = Box::pin(call_provider(sender, record, &part.rendered, shutdown)).await;
+        let outcome = result.outcome;
         self.record_outcome_metric(record.transport, record.purpose, &outcome);
 
-        match self
+        let progress = match self
             .queue
             .complete_part(PartResult {
                 fence: lease,
@@ -274,6 +334,16 @@ impl DeliveryWorker {
                 );
                 PartProgress::LeaseLost
             }
+        };
+        if result.interrupted {
+            match progress {
+                PartProgress::Finished(status) => self.record_settled(record, status),
+                PartProgress::Cancelled(status) => self.record_cancelled(record, status),
+                _ => {}
+            }
+            PartProgress::Shutdown
+        } else {
+            progress
         }
     }
 
@@ -519,6 +589,59 @@ enum PartProgress {
     Cancelled(DeliveryStatus),
     /// This run no longer owns the delivery. Stop touching it.
     LeaseLost,
+    Shutdown,
+}
+
+enum DrainProgress {
+    Continue,
+    Shutdown,
+}
+
+struct ProviderResult {
+    outcome: ProviderSendOutcome,
+    interrupted: bool,
+}
+
+async fn call_provider(
+    sender: &dyn crate::transport::TransportSender,
+    record: &DeliveryRecord,
+    part: &crate::transport::RenderedPart,
+    shutdown: &mut broadcast::Receiver<()>,
+) -> ProviderResult {
+    if shutdown_requested(shutdown) {
+        return interrupted_provider();
+    }
+    tokio::select! {
+        // Preserve a result already returned when the shutdown signal is also ready.
+        biased;
+        outcome = sender.send(record, part) => ProviderResult { outcome, interrupted: false },
+        _ = shutdown.recv() => interrupted_provider(),
+        _ = tokio::time::sleep(PROVIDER_TIMEOUT) => ProviderResult {
+            outcome: uncertain_provider("Provider call exceeded its deadline"),
+            interrupted: false,
+        },
+    }
+}
+
+fn interrupted_provider() -> ProviderResult {
+    ProviderResult {
+        outcome: uncertain_provider("Shutdown interrupted a provider call"),
+        interrupted: true,
+    }
+}
+
+fn uncertain_provider(detail: &str) -> ProviderSendOutcome {
+    ProviderSendOutcome::OutcomeUnknown {
+        class: FailureClass::Timeout,
+        detail: FailureDetail::parse(detail).expect("bounded static provider diagnostic"),
+    }
+}
+
+fn shutdown_requested(shutdown: &mut broadcast::Receiver<()>) -> bool {
+    !matches!(
+        shutdown.try_recv(),
+        Err(broadcast::error::TryRecvError::Empty)
+    )
 }
 
 /// Interleave a claimed batch so no one tenant is served before every other tenant is started.

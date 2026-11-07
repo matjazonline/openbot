@@ -228,10 +228,12 @@ stored_enum! {
         WorkflowExpired => "workflow_expired",
         /// The run actor's current messaging authority was revoked before the send.
         WorkflowRevoked => "workflow_revoked",
-        /// The frozen recipient is no longer a current member with the frozen address.
+        /// The frozen recipient identity or its permission to receive the content was revoked.
         RecipientRevoked => "recipient_revoked",
         /// A finality breach vetoed further provider entries for the invocation.
         EvidenceConflict => "evidence_conflict",
+        /// The question was answered or its human wait closed before this send.
+        QuestionClosed => "question_closed",
     }
 }
 

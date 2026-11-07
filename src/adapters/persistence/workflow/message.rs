@@ -18,8 +18,12 @@ use std::collections::BTreeSet;
 
 #[path = "message_publish.rs"]
 mod publish;
+#[path = "channel_questions.rs"]
+pub(super) mod questions;
 #[path = "message_receipts.rs"]
 pub(crate) mod receipts;
+#[path = "message_writer.rs"]
+pub(super) mod writer;
 
 pub(super) const MESSAGING: &str = "messaging";
 
@@ -38,17 +42,28 @@ impl action_dispatch::SqlActionAuthority for MessageActionAuthority {
         if company != request.scope.company.as_uuid() {
             return Err(missing());
         }
-        super::authority::authorize_company(tx, request.scope.company, authority.actor).await?;
         let kind =
             MessageKind::parse(request.contract.contract.name.as_str()).ok_or_else(missing)?;
-        Ok(action_dispatch::LockedActionAuthority {
-            resource: messaging_status(request.scope.company)?,
-            policy: CurrentActionPolicy {
-                tool: builtin_message_snapshot(request.scope.company, kind)?,
-                approval_required: false,
-            },
-        })
+        current_message_on(tx, request.scope.company, authority.actor, kind).await
     }
+}
+
+/// The current company messaging rule is shared by explicit actions and designated finals.
+/// Each caller must establish its own invocation grant before using this resource authority.
+pub(super) async fn current_message_on(
+    db: &mut PgConnection,
+    company: CompanyId,
+    actor: WorkflowActor,
+    kind: MessageKind,
+) -> AppResult<action_dispatch::LockedActionAuthority> {
+    authority::authorize_company(db, company, actor).await?;
+    Ok(action_dispatch::LockedActionAuthority {
+        resource: messaging_status(company)?,
+        policy: CurrentActionPolicy {
+            tool: builtin_message_snapshot(company, kind)?,
+            approval_required: false,
+        },
+    })
 }
 
 /// Reconciliation of a message invocation records past truth under the company's current
@@ -75,7 +90,7 @@ pub(super) fn messaging_status(company: CompanyId) -> AppResult<ResourceStatus> 
         id: RuntimeResourceId::new(company.as_uuid()),
         company_id: company,
         kind: TypeName::parse(MESSAGING).map_err(|_| invalid())?,
-        supported_contracts: [MessageKind::Send, MessageKind::Reply]
+        supported_contracts: [MessageKind::Send, MessageKind::Reply, MessageKind::Ask]
             .into_iter()
             .map(|kind| TypeName::parse(kind.name()).map_err(|_| invalid()))
             .collect::<AppResult<BTreeSet<_>>>()?,
@@ -143,11 +158,14 @@ impl MessageActionPreparation for PostgresPersistence {
         let mut tx = begin_http(self).await?;
         let facts = facts(&mut tx, scope).await?;
         let mut inputs = frozen_inputs(&mut tx, &facts, claim, kind).await?;
+        let question_approval =
+            message_kind == MessageKind::Ask && inputs.get("approval").is_some();
         inputs
             .as_object_mut()
             .ok_or_else(invalid)?
             .remove("approval");
-        let request = message_request(scope, &facts, message_kind, inputs)?;
+        let mut request = message_request(scope, &facts, message_kind, inputs)?;
+        request.context.approval_required |= question_approval;
         tx.commit().await?;
         Ok(request)
     }
@@ -157,6 +175,15 @@ impl MessageActionPreparation for PostgresPersistence {
         scope: ActionScope,
         call: &MessageToolCall,
     ) -> AppResult<ActionRequest> {
+        if call.kind == MessageKind::Ask {
+            return Err(missing());
+        }
+        if matches!(
+            call.origin,
+            crate::application::agent::ToolCallOrigin::ChannelFinal(_)
+        ) {
+            return Err(missing());
+        }
         let mut tx = begin_http(self).await?;
         let facts = facts(&mut tx, scope).await?;
         if let crate::application::agent::ToolCallOrigin::Agent(origin) = call.origin {
@@ -223,17 +250,14 @@ pub(super) struct RunRoute {
     delivery_policy: DeliveryPolicy,
 }
 
-async fn run_route_on(
-    tx: &mut Transaction<'_, Postgres>,
-    scope: ActionScope,
-) -> AppResult<RunRoute> {
+async fn run_route_on(tx: &mut PgConnection, scope: ActionScope) -> AppResult<RunRoute> {
     let (slug, correlation, channel, thread, policy): (String, Uuid, Option<Uuid>, Option<Uuid>, String) = sqlx::query_as(
         "SELECT company.slug, run.correlation_id, run.channel_id, run.thread_id, run.delivery_policy FROM workflow_runs AS run \
          JOIN companies AS company ON company.id=run.company_id WHERE run.company_id=$1 AND run.id=$2",
     )
     .bind(scope.company.as_uuid())
     .bind(scope.run.as_uuid())
-    .fetch_optional(&mut **tx)
+    .fetch_optional(&mut *tx)
     .await?
     .ok_or_else(missing)?;
     Ok(RunRoute {
@@ -246,7 +270,7 @@ async fn run_route_on(
 }
 
 pub(super) async fn channel_route_on(
-    tx: &mut Transaction<'_, Postgres>,
+    tx: &mut PgConnection,
     company: CompanyId,
     channel: Uuid,
 ) -> AppResult<Option<ChannelRoute>> {
@@ -257,7 +281,7 @@ pub(super) async fn channel_route_on(
     )
     .bind(company.as_uuid())
     .bind(channel)
-    .fetch_optional(&mut **tx)
+    .fetch_optional(&mut *tx)
     .await?;
     Ok(row.and_then(|(id, name, slug)| {
         Some(ChannelRoute {
@@ -352,7 +376,7 @@ async fn send_target_on(
 
 /// The exact source's one association within the run's scope; never "the latest".
 pub(super) async fn source_association_on(
-    tx: &mut Transaction<'_, Postgres>,
+    tx: &mut PgConnection,
     company: CompanyId,
     source: CanonicalMessageId,
     run_channel: Option<Uuid>,
@@ -369,7 +393,7 @@ pub(super) async fn source_association_on(
     .bind(source.as_uuid())
     .bind(run_thread)
     .bind(run_channel)
-    .fetch_all(&mut **tx)
+    .fetch_all(&mut *tx)
     .await?;
     Ok(match rows.as_slice() {
         [only] => Some(*only),
@@ -387,7 +411,7 @@ struct SourceFacts {
 }
 
 async fn reply_target_on(
-    tx: &mut Transaction<'_, Postgres>,
+    tx: &mut PgConnection,
     company: CompanyId,
     run: &RunRoute,
     source: CanonicalMessageId,
@@ -411,7 +435,7 @@ async fn reply_target_on(
     )
     .bind(company.as_uuid())
     .bind(source.as_uuid())
-    .fetch_optional(&mut **tx)
+    .fetch_optional(&mut *tx)
     .await?
     .ok_or_else(|| refused("the source message does not exist"))?;
     if facts.audience == "internal_only" {
@@ -455,7 +479,7 @@ async fn reply_target_on(
 /// it: the only place it is kept (p08 D1.6). A source with no intent was never accepted inbound
 /// on this channel and starts a chain.
 async fn source_relay_on(
-    tx: &mut Transaction<'_, Postgres>,
+    tx: &mut PgConnection,
     company: CompanyId,
     source: CanonicalMessageId,
     channel: Uuid,
@@ -467,7 +491,7 @@ async fn source_relay_on(
     .bind(company.as_uuid())
     .bind(source.as_uuid())
     .bind(channel)
-    .fetch_optional(&mut **tx)
+    .fetch_optional(&mut *tx)
     .await?;
     let Some((hop_count, trace_channels)) = recorded else {
         return Ok(None);
@@ -505,9 +529,26 @@ pub(super) fn message_builtins(company: CompanyId) -> AppResult<PublicationDepen
             tools: vec![
                 builtin_message_snapshot(company, MessageKind::Send)?,
                 builtin_message_snapshot(company, MessageKind::Reply)?,
+                builtin_message_snapshot(company, MessageKind::Ask)?,
             ],
             ..Default::default()
         },
         children: vec![],
+    })
+}
+
+/// Resolve the same exact-source route used by explicit message.reply.
+pub(super) async fn final_reply_route_on(
+    db: &mut PgConnection,
+    scope: ActionScope,
+    source: CanonicalMessageId,
+) -> AppResult<MessageRoutes> {
+    let run = run_route_on(db, scope).await?;
+    let target = reply_target_on(db, scope.company, &run, source).await?;
+    Ok(MessageRoutes {
+        company_slug: run.company_slug,
+        correlation_id: run.correlation_id,
+        targets: vec![target],
+        delivery_policy: run.delivery_policy,
     })
 }

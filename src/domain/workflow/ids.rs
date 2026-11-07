@@ -138,6 +138,8 @@ uuid_type!(RuntimeResourceId);
 // The saved model tool call of an agent execution (07-D2 §D2.3): the harness invocation
 // identity, persisted before dispatch, which identifies the child a workflow tool call creates.
 uuid_type!(ToolCallId);
+uuid_type!(ReplyProposalId);
+uuid_type!(ChannelReplyId);
 
 #[cfg(test)]
 mod tests {

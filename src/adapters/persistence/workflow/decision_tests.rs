@@ -1,5 +1,7 @@
 use super::super::message_tests::support::member;
 use super::*;
+#[path = "channel_reply_terminal_human_tests.rs"]
+mod channel_reply_terminal_human_tests;
 use crate::adapters::protocols::email::EmailRenderer;
 use crate::application::transport::{DeliveryComposer, TransportRenderers};
 use crate::application::workflow::{activation::*, decisions::*, waits::*};

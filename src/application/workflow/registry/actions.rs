@@ -4,11 +4,24 @@ impl Registration<'_> {
         let mut contract = match self.name() {
             "http.request" => self.http(),
             "tool.call" | "mcp.call" => self.tool(),
-            name @ ("message.send" | "message.reply") => {
+            name @ ("message.send" | "message.reply" | "message.ask") => {
                 let name = name.to_owned();
                 self.check(InputCheck::Message)?;
                 let (properties, required) = message_inputs(&name).expect("message family");
-                Ok(contract(properties, required, message_result()))
+                let output = if name == "message.ask" {
+                    let schema = self.declared_schema("payload_schema")?;
+                    if schema != super::super::triggers::MessageTriggerInput::schema() {
+                        return Err(self.error(
+                            "registry.question_schema",
+                            "A channel question requires the standard message payload_schema",
+                            "payload_schema",
+                        ));
+                    }
+                    schema
+                } else {
+                    message_result()
+                };
+                Ok(contract(properties, required, output))
             }
             _ => unreachable!("action family"),
         }?;
@@ -160,6 +173,11 @@ fn message_inputs(name: &str) -> Option<(Value, &'static [&'static str])> {
         "message.reply" => Some((
             json!({"source_message":uuid(),"content":content()}),
             &["source_message", "content"],
+        )),
+        "message.ask" => Some((
+            json!({"source_message":uuid(),"content":content(),"deadline":text(MAX_DEADLINE),
+                "payload_schema":{"const":super::super::triggers::MessageTriggerInput::schema()}}),
+            &["source_message", "content", "deadline", "payload_schema"],
         )),
         _ => None,
     }

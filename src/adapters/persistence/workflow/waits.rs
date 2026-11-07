@@ -53,7 +53,8 @@ impl WorkflowWaits for PostgresPersistence {
     async fn resume_wait(&self, scope: ActivationRequest) -> AppResult<WaitProgress> {
         tokio::time::timeout(Duration::from_secs(2), async {
             let mut tx = self.pool.begin().await?;
-            let result = wait_commit::resume_on(&mut tx, scope).await?;
+            let result =
+                wait_commit::resume_on(&mut tx, scope, self.channel_reply_notices()).await?;
             tx.commit().await?;
             Ok(result)
         })
@@ -102,6 +103,7 @@ pub(super) async fn lock(
     db: &mut PgConnection,
     scope: ActivationRequest,
 ) -> AppResult<Option<WaitRun>> {
+    channel_reply_completion::prelock_on(db, scope).await?;
     sqlx::query("SELECT set_config('lock_timeout','1000ms',true),set_config('statement_timeout','1000ms',true)").execute(&mut *db).await?;
     let run=sqlx::query_as::<_,WaitRun>("SELECT binding_id,state,deadline,max_steps FROM workflow_runs WHERE company_id=$1 AND id=$2 FOR UPDATE")
         .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).fetch_optional(&mut *db).await?;
@@ -239,6 +241,11 @@ async fn park_on(
 /// to one run serialize on an advisory lock, so the unconsumed bound is exact; consumers never
 /// take it, and a concurrent consumption only lowers the count.
 async fn record_event_on(db: &mut PgConnection, event: WorkflowEvent) -> AppResult<EventIngress> {
+    if event.name.0 == crate::application::workflow::triggers::CHANNEL_QUESTION_REPLY_EVENT {
+        return Err(AppError::BadRequest(
+            "Question responses require trusted reply ingress".into(),
+        ));
+    }
     if event.name.0.is_empty()
         || event.name.0.len() > 128
         || event.correlation.0.is_empty()

@@ -1,0 +1,72 @@
+[
+  {
+    "filter": "publication::storage::tests::",
+    "selected": 5,
+    "exit_code": 0,
+    "inventory": "focused-publication-storage-list-04",
+    "execution": "focused-publication-storage-tests-04"
+  },
+  {
+    "filter": "application::workflow::sample::",
+    "selected": 15,
+    "exit_code": 0,
+    "inventory": "focused-sample-list-04",
+    "execution": "focused-sample-tests-04"
+  },
+  {
+    "filter": "workflow_batch_",
+    "selected": 15,
+    "exit_code": 0,
+    "inventory": "focused-batch-list-04",
+    "execution": "focused-batch-tests-04"
+  },
+  {
+    "filter": "workflow_completion_",
+    "selected": 14,
+    "exit_code": 0,
+    "inventory": "focused-completion-list-04",
+    "execution": "focused-completion-tests-04"
+  },
+  {
+    "filter": "workflow_wait_",
+    "selected": 20,
+    "exit_code": 0,
+    "inventory": "focused-wait-list-04",
+    "execution": "focused-wait-tests-04"
+  },
+  {
+    "filter": "workflow_decision_",
+    "selected": 38,
+    "exit_code": 0,
+    "inventory": "focused-decision-list-04",
+    "execution": "focused-decision-tests-04"
+  },
+  {
+    "filter": "workflow_call_",
+    "selected": 9,
+    "exit_code": 0,
+    "inventory": "focused-child-call-list-04",
+    "execution": "focused-child-call-tests-04"
+  },
+  {
+    "filter": "workflow_repeat_",
+    "selected": 4,
+    "exit_code": 0,
+    "inventory": "focused-child-repeat-list-04",
+    "execution": "focused-child-repeat-tests-04"
+  },
+  {
+    "filter": "workflow_poison_",
+    "selected": 12,
+    "exit_code": 0,
+    "inventory": "focused-poison-recovery-list-04",
+    "execution": "focused-poison-recovery-tests-04"
+  },
+  {
+    "filter": "channel_reply_binding_",
+    "selected": 19,
+    "exit_code": 0,
+    "inventory": "focused-binding-list-04",
+    "execution": "focused-binding-tests-04"
+  }
+]

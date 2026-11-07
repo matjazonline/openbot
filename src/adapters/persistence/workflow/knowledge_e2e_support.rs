@@ -100,8 +100,9 @@ impl SalesJourney {
 
     pub(super) async fn drive(&self, finished_runs: i64) {
         let (_shutdown, receiver) = tokio::sync::broadcast::channel(1);
+        let receiver = tokio::sync::Mutex::new(receiver);
         self.d.run_until("knowledge workflow and actual delivery worker", async || {
-            self.delivery.drain_once(&receiver).await.unwrap();
+            self.delivery.drain_once(&mut *receiver.lock().await).await.unwrap();
             self.d.count("SELECT count(*) FROM workflow_runs WHERE company_id=$1 AND finished_at IS NOT NULL").await >= finished_runs
         }).await;
     }

@@ -4,6 +4,8 @@ use crate::application::workflow::{fixtures::Fixture, publication::*, registry};
 use crate::domain::workflow::{CompanyId, TypeName, VersionId};
 use serde_json::json;
 
+#[path = "channel_reply_terminal_tests.rs"]
+mod channel_reply_terminal_tests;
 #[path = "tools_tests.rs"]
 mod tools_tests;
 fn company() -> CompanyId {
@@ -298,6 +300,10 @@ fn bounded_root_budget_and_external_kinds_never_fall_back() {
         ("memory.save", json!({"saved_ids":["sample"]})),
         ("http.request", json!({"status":200,"headers":{},"body":{}})),
         ("message.reply", message_result()),
+        (
+            "message.ask",
+            crate::application::workflow::triggers::MessageTriggerInput::representative(),
+        ),
         ("wait.timer", json!({"deadline":"2030-01-01T00:00:00Z"})),
         ("wait.event", json!("event")),
     ] {

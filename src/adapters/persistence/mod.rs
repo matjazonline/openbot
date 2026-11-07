@@ -45,6 +45,7 @@ pub mod workflow;
 pub struct PostgresPersistence {
     pool: PgPool,
     credential_cipher: Option<Arc<credentials::CredentialCipher>>,
+    channel_reply_notices: Option<Arc<crate::application::workflow::decisions::DecisionNotices>>,
 }
 
 impl PostgresPersistence {
@@ -52,6 +53,7 @@ impl PostgresPersistence {
         PostgresPersistence {
             pool,
             credential_cipher: None,
+            channel_reply_notices: None,
         }
     }
 
@@ -62,11 +64,28 @@ impl PostgresPersistence {
         Self {
             pool,
             credential_cipher: Some(Arc::new(credential_cipher)),
+            channel_reply_notices: None,
         }
     }
 
     pub fn pool(&self) -> &PgPool {
         &self.pool
+    }
+
+    /// Configure the completion owner before cloning it into runtime services.
+    /// The composer is built from the original persistence, so it cannot retain this value.
+    pub fn with_channel_reply_notices(
+        mut self,
+        notices: crate::application::workflow::decisions::DecisionNotices,
+    ) -> Self {
+        self.channel_reply_notices = Some(Arc::new(notices));
+        self
+    }
+
+    pub(crate) fn channel_reply_notices(
+        &self,
+    ) -> Option<&crate::application::workflow::decisions::DecisionNotices> {
+        self.channel_reply_notices.as_deref()
     }
 
     /// The configured cipher, or an error naming the missing configuration.

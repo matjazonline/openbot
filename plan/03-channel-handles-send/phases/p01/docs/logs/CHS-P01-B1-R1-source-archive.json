@@ -1,0 +1,6 @@
+{
+  "source_manifest": "CHS-P01-B1-R1-manifest.json",
+  "files_verified": 16,
+  "method": "inverse of the three recorded correction edits, each exact original byte hash verified",
+  "archive_sha256": "edb9669dbea42dfb9a33502e6e16abb0140a9aa45f7fcced9f2f52ce2d18ca65"
+}

@@ -26,21 +26,32 @@ pub(super) fn message_trigger(stored: Option<&str>) -> AppResult<Option<MessageT
         .transpose()
 }
 
-pub(super) async fn read_binding(
+pub(super) fn read_binding(
     db: &mut PgConnection,
     company: CompanyId,
     id: WorkflowBindingId,
+) -> impl Future<Output = AppResult<Option<BindingState>>> + '_ {
+    read_binding_at(db, company, id, None)
+}
+
+pub(super) async fn read_binding_at(
+    db: &mut PgConnection,
+    company: CompanyId,
+    id: WorkflowBindingId,
+    selected: Option<BindingRevision>,
 ) -> AppResult<Option<BindingState>> {
     let row = sqlx::query_as::<_, BindingRow>(
         "SELECT binding.company_id, binding.id, binding.state_revision, \
-         binding.configuration_revision, binding.active, binding.channel_id, binding.thread_id, \
+         configuration.revision AS configuration_revision, binding.active, binding.channel_id, binding.thread_id, \
          configuration.version_id, configuration.params, configuration.resources, \
          configuration.run_as_user_id, configuration.message_trigger \
          FROM workflow_bindings AS binding JOIN workflow_binding_revisions AS configuration \
            ON configuration.company_id = binding.company_id AND configuration.binding_id = binding.id \
-           AND configuration.revision = binding.configuration_revision \
+           AND configuration.revision = COALESCE($3,binding.configuration_revision) \
          WHERE binding.company_id = $1 AND binding.id = $2",
-    ).bind(company.as_uuid()).bind(id.as_uuid()).fetch_optional(&mut *db).await?;
+    ).bind(company.as_uuid()).bind(id.as_uuid())
+        .bind(selected.map(|value| revision(value.get())).transpose()?)
+        .fetch_optional(&mut *db).await?;
     let Some(row) = row else { return Ok(None) };
     let bundle = read_version(db, company, VersionId::new(row.version_id)).await?;
     let association = association_from_columns(row.channel_id, row.thread_id)?;

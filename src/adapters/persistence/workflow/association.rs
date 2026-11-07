@@ -4,7 +4,7 @@ use super::*;
 /// Channel settings writers update the channel before replacing grants; direct
 /// grant revocation conflicts with the granted row's SHARE lock below.
 pub(super) async fn authorize_association(
-    tx: &mut Transaction<'_, Postgres>,
+    tx: &mut PgConnection,
     company: CompanyId,
     actor: WorkflowActor,
     association: RelatedAssociation,
@@ -22,13 +22,13 @@ pub(super) async fn authorize_association(
     )
     .bind(company.as_uuid())
     .bind(channel.as_uuid())
-    .fetch_optional(&mut **tx)
+    .fetch_optional(&mut *tx)
     .await?
     .ok_or_else(missing)?;
     let owner: bool = sqlx::query_scalar("SELECT user_id = $2 FROM companies WHERE id = $1")
         .bind(company.as_uuid())
         .bind(actor.user_id())
-        .fetch_one(&mut **tx)
+        .fetch_one(&mut *tx)
         .await?;
     match mode.as_str() {
         "team" | "public" => {}
@@ -47,7 +47,7 @@ pub(super) async fn authorize_association(
             .bind(company.as_uuid())
             .bind(channel.as_uuid())
             .bind(actor.user_id())
-            .fetch_optional(&mut **tx)
+            .fetch_optional(&mut *tx)
             .await?
             .ok_or_else(missing)?;
         }
@@ -57,7 +57,7 @@ pub(super) async fn authorize_association(
         sqlx::query_scalar::<_, Uuid>(
             "SELECT id FROM threads WHERE company_id = $1 AND channel_id = $2 AND id = $3 FOR SHARE",
         ).bind(company.as_uuid()).bind(channel.as_uuid()).bind(thread_id.as_uuid())
-            .fetch_optional(&mut **tx).await?.ok_or_else(missing)?;
+            .fetch_optional(&mut *tx).await?.ok_or_else(missing)?;
     }
     Ok(())
 }

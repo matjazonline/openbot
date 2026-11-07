@@ -1,0 +1,19 @@
+base:   769a23aa6ef423e964f8221a8ee6b0743325c6ba
+digest: 0995151ed93e67f2e5feee8092cdc08687580b79f1d988d40d5d072d5e39decf
+files:
+  migrations/20260817000000_init_schema.sql
+  src/adapters/persistence/workflow/admission.rs
+  src/adapters/persistence/workflow/admission_binding.rs
+  src/adapters/persistence/workflow/binding_rows.rs
+  src/adapters/persistence/workflow/channel_reply.rs
+  src/adapters/persistence/workflow/channel_reply_binding_integrity_tests.rs
+  src/adapters/persistence/workflow/channel_reply_binding_tests.rs
+  src/adapters/persistence/workflow/channel_reply_correlation_tests.rs
+  src/adapters/persistence/workflow/message_intent_tests.rs
+  src/adapters/persistence/workflow/message_intents.rs
+  src/adapters/persistence/workflow/message_reply_tests.rs
+  src/adapters/persistence/workflow/mod.rs
+  src/application/workflow/channel_reply/contract.rs
+  src/application/workflow/channel_reply/contract_tests.rs
+  src/application/workflow/channel_reply/mod.rs
+  src/application/workflow/mod.rs

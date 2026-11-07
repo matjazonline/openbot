@@ -4,8 +4,8 @@ use super::{
 };
 use crate::application::app_error::{AppError, AppResult};
 use crate::domain::workflow::{
-    CompletedStep, CompletionRoute, EngineDisposition, RouteSelection, RunState, TransitionTarget,
-    select_route, validate_context_value,
+    CompletedStep, CompletionRoute, EngineDisposition, ResponseDisposition, RouteSelection,
+    RunState, TransitionTarget, select_route, validate_context_value,
 };
 use async_trait::async_trait;
 use serde_json::{Value, json};
@@ -54,12 +54,15 @@ pub enum BatchDisposition {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BatchResult {
     pub disposition: BatchDisposition,
+    /// Present only when this result observes a successful terminal execution.
+    pub response_disposition: Option<ResponseDisposition>,
     pub completed: u8,
     pub last: ActivationRequest,
     pub continuation: Option<ActivationRequest>,
 }
 
 pub struct PureCompletion {
+    pub response_disposition: ResponseDisposition,
     pub output: Value,
     pub route: RouteSelection,
     pub target: TransitionTarget,
@@ -79,7 +82,7 @@ pub fn is_pure(
         .ok_or_else(|| AppError::Database("Unknown workflow step".into()))?;
     Ok(matches!(
         definition.step_type.as_str(),
-        "data.map" | "decision.rule"
+        "data.map" | "decision.rule" | "channel.no_reply"
     ))
 }
 
@@ -95,7 +98,7 @@ pub fn execute_pure(
         .get(&activation.step)
         .ok_or_else(invalid)?;
     let (output, route) = match definition.step_type.as_str() {
-        "data.map" => (
+        "data.map" | "channel.no_reply" => (
             activation.inputs.get("value").ok_or_else(invalid)?.clone(),
             RouteSelection::Success,
         ),
@@ -153,6 +156,16 @@ pub(super) fn validate_completion(
         )
         .map_err(|_| invalid())?;
     Ok(PureCompletion {
+        response_disposition: if target == TransitionTarget::End
+            && compiled.graph().definition().steps[&activation.step]
+                .step_type
+                .as_str()
+                == "channel.no_reply"
+        {
+            ResponseDisposition::Suppressed
+        } else {
+            ResponseDisposition::Automatic
+        },
         output,
         route,
         target,

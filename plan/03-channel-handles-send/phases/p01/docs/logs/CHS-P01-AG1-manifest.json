@@ -1,0 +1,19 @@
+{
+  "phase": "p01",
+  "decision": "CHS-P01-D1/r1",
+  "base": "769a23aa6ef423e964f8221a8ee6b0743325c6ba",
+  "digest": "4868f6c61a7b3620e19ecddffc2d982d1f51f95c1d206e6fb7f39b8ac3b5b707",
+  "exclusions": [
+    "plan/03-channel-handles-send/COORDINATION.md",
+    "plan/03-channel-handles-send/phases/p01/docs",
+    "plan/03-channel-handles-send/phases/p02/docs",
+    "plan/03-channel-handles-send/phases/p03/docs",
+    "plan/03-channel-handles-send/phases/p04/docs",
+    "plan/03-channel-handles-send/phases/p05/docs",
+    "plan/03-channel-handles-send/phases/p06/docs",
+    "plan/03-channel-handles-send/phases/p07/docs",
+    "plan/03-channel-handles-send/integration/final/docs"
+  ],
+  "coordination_revision": 2,
+  "snapshot_path_prefix": "/Users/mac02/dev/openbot/plan/03-channel-handles-send/phases/p01/docs/logs/tools"
+}

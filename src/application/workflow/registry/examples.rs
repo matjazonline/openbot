@@ -107,7 +107,7 @@ fn values(name: &str) -> Value {
         "decision.agent" => {
             json!({"agent":"reviewer","context":{"message":"hello"},"data_schema":schema})
         }
-        "data.map" => json!({"value":"hello","output_schema":schema}),
+        "data.map" | "channel.no_reply" => json!({"value":"hello","output_schema":schema}),
         "http.request" => {
             json!({"connection":"service","method":"POST","path":"/messages","headers":{"Accept":"application/json"},"body":{"message":"hello"}})
         }
@@ -118,6 +118,11 @@ fn values(name: &str) -> Value {
         }
         "message.reply" => {
             json!({"content":{"body":"hello"},"source_message":"00000000-0000-0000-0000-000000000005"})
+        }
+        "message.ask" => {
+            json!({"content":{"body":"Which option would you prefer?"},
+                "source_message":"00000000-0000-0000-0000-000000000005",
+                "deadline":deadline,"payload_schema":super::super::triggers::MessageTriggerInput::schema()})
         }
         "workflow.call" | "flow.repeat" => json!({"input":{"text":"hello"}}),
         "wait.event" => {

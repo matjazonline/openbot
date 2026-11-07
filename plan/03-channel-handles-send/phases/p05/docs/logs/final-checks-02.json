@@ -1,0 +1,26 @@
+[
+  {
+    "check": "clippy-02",
+    "exit": 0
+  },
+  {
+    "check": "sqlx-prepare-03",
+    "exit": 0
+  },
+  {
+    "check": "sqlx-check-03",
+    "exit": 0
+  },
+  {
+    "check": "fmt-check-02",
+    "exit": 0
+  },
+  {
+    "check": "diff-check-02",
+    "exit": 0
+  },
+  {
+    "check": "graft-build-02",
+    "exit": 0
+  }
+]

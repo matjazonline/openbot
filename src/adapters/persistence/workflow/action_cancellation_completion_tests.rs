@@ -189,7 +189,7 @@ async fn race(
             let completion_pid = blocked(
                 &mut observer,
                 gate_pid,
-                "SELECT completed_at,committed_output",
+                "SELECT response_disposition,completed_at,committed_output",
                 completion.as_mut(),
             )
             .await;
@@ -630,6 +630,7 @@ fn workflow_action_cancellation_completion_ordinary_oracle_discriminates_attempt
     };
     let step = |disposition| CommittedWorkflowStep {
         disposition,
+        response_disposition: ResponseDisposition::Automatic,
         output: step_output(),
         route: RouteSelection::Success,
         target: TransitionTarget::End,

@@ -1,0 +1,10 @@
+Implement channel replies and human input through phase 5
+
+Add designated response ownership, terminal reply disposition, durable final
+response staging/publication, and atomic conversational questions with exact
+human continuation correlation. Preserve current authority and knowledge release
+checks, private approvals, delivery uncertainty, and same-message recovery.
+
+Record independent Astra reviews and focused verification for phases 1–5.
+Retire the local machine tunnel plan and remove its obsolete references.
+Phases 6–7 and autonomous agent history remain pending.

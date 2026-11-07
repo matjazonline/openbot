@@ -1,0 +1,9 @@
+{
+  "owner": "/root plan03 p01 baseline comparison",
+  "worktree": "/private/tmp/openbot-chs-baseline-6ra2cluo/worktree",
+  "target": "/private/tmp/openbot-chs-baseline-6ra2cluo/target",
+  "base": "769a23aa6ef423e964f8221a8ee6b0743325c6ba",
+  "port": 65037,
+  "database": "openbot_chs_baseline",
+  "test_database": "openbot_chs_baseline_test"
+}

@@ -460,7 +460,7 @@ documents the full set.
 
 | Setting | Requirement |
 | --- | --- |
-| `DATABASE_MAX_CONNECTIONS` | Database pool size, default 20. Startup refuses a pool smaller than `9 + 2 × WORKFLOW_WORKER_SLOTS`, naming both keys. |
+| `DATABASE_MAX_CONNECTIONS` | Database pool size, default 20. Startup refuses a pool smaller than `12 + 2 × WORKFLOW_WORKER_SLOTS`, naming both keys. |
 | `WORKFLOW_WORKER_SLOTS` | Concurrent workflow workers per process; 1–16, default 2. Each slot needs two pool connections (its claim or handler transaction and its lease renewal). |
 | `RUNTIME_THREAD_STACK_BYTES` | Stack reserved per async runtime thread; 2 MiB–256 MiB, default 16 MiB. A background job's chain of `async fn` frames can overrun Tokio's 2 MiB default in an unoptimized build; `scripts/stack-budget.sh` is what notices it growing. |
 | `SMTP_ALLOW_PLAINTEXT_LOCAL` | Development-only, default `false`; plaintext is accepted only with no credentials and a host that resolves exclusively to loopback. Never enable it for a deployed relay. |

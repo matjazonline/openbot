@@ -78,6 +78,7 @@ where
         + WorkflowLeases
         + WorkflowLeaseRecovery
         + WorkflowCompletion
+        + super::channel_reply::WorkflowFinalizations
         + WorkflowGuardFailure,
     H: WorkflowHandler,
 {
@@ -201,9 +202,15 @@ where
         }
         // Held across the job and dropped on every way out of it, cancellation included.
         let _active = self.active_jobs.map(ActiveWorkflowJobs::enter);
+        if !matches!(
+            self.port.resume_finalization(scope).await?,
+            super::channel_reply::FinalizationProgress::Unstaged
+        ) {
+            return Ok(WorkDisposition::Done);
+        }
         let kind = self.port.step_kind(scope).await?;
         match kind.0.as_str() {
-            "data.map" | "decision.rule" => {
+            "data.map" | "decision.rule" | "channel.no_reply" => {
                 self.port
                     .advance_pure(scope, BatchBudget::new(16, Duration::from_millis(100))?)
                     .await?;

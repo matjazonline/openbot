@@ -55,7 +55,7 @@ impl Session {
                 validate_completion(bundle, activation, response.output, RouteSelection::Success)
             }
             "context.history" | "memory.load" | "memory.save" | "message.send"
-            | "message.reply" | "http.request" | "mcp.call" | "tool.call" => {
+            | "message.reply" | "message.ask" | "http.request" | "mcp.call" | "tool.call" => {
                 self.external_step(bundle, activation, path, kind, response)
             }
             _ => Err(refused(format!(

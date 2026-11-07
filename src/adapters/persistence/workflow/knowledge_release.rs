@@ -12,10 +12,21 @@ use serde_json::{Value, json};
 
 /// Concrete transport addresses are part of the publication snapshot. Current routing by user
 /// id cannot authorize an address retired between route validation and this MVCC statement.
+#[derive(serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 pub(super) struct MessageRecipient {
     kind: DestinationKind,
     id: Uuid,
     address: Option<EmailAddress>,
+}
+impl MessageRecipient {
+    pub(super) fn reply(id: Uuid, address: Option<EmailAddress>) -> Self {
+        Self {
+            kind: DestinationKind::Reply,
+            id,
+            address,
+        }
+    }
 }
 pub(super) enum MessageRecipients<'a> {
     Current,

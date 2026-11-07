@@ -1,0 +1,18 @@
+[
+  {
+    "check": "deletion-fmt-check-01",
+    "exit": 0
+  },
+  {
+    "check": "deletion-diff-check-01",
+    "exit": 0
+  },
+  {
+    "check": "deletion-reference-check-01",
+    "exit": 0
+  },
+  {
+    "check": "deletion-graft-build-01",
+    "exit": 0
+  }
+]

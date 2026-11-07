@@ -2,6 +2,12 @@
 use super::*;
 use crate::application::workflow::{activation::*, batch::PureCompletion};
 
+pub(super) enum CompletionProgress {
+    Advanced(Option<ActivationRequest>),
+    Parked,
+    Refused,
+}
+
 pub(super) async fn complete(
     db: &mut PgConnection,
     request: ActivationRequest,
@@ -9,8 +15,20 @@ pub(super) async fn complete(
     completion: &PureCompletion,
     max_steps: i32,
     owner: completion_job::CompletionOwner,
-) -> AppResult<Option<ActivationRequest>> {
+    notices: Option<&crate::application::workflow::decisions::DecisionNotices>,
+) -> AppResult<CompletionProgress> {
     check_deadline(db, request).await?;
+    // Box the proposal/approval boundary: every completion family reaches this writer.
+    let Some(final_reply) = Box::pin(channel_reply_refusal::prepare_on(
+        db, request, completion, owner, notices,
+    ))
+    .await?
+    else {
+        return Ok(CompletionProgress::Refused);
+    };
+    if matches!(final_reply, channel_reply_completion::PreparedFinal::Parked) {
+        return Ok(CompletionProgress::Parked);
+    }
     let next = match &completion.target {
         TransitionTarget::End => None,
         TransitionTarget::Step(step) => {
@@ -31,7 +49,7 @@ pub(super) async fn complete(
     };
     let changed = sqlx::query(
         "UPDATE workflow_executions SET committed_output = $4, completed_at = clock_timestamp(), \
-         committed_route = $5, route_target = $6, successor_execution_id = $7 \
+         committed_route = $5, route_target = $6, successor_execution_id = $7, response_disposition = $8 \
          WHERE company_id = $1 AND run_id = $2 AND id = $3 AND completed_at IS NULL",
     )
     .bind(request.company.as_uuid())
@@ -41,6 +59,7 @@ pub(super) async fn complete(
     .bind(route)
     .bind(target)
     .bind(next.map(|n| n.execution.as_uuid()))
+    .bind(completion.response_disposition.as_str())
     .execute(&mut *db)
     .await?;
     if changed.rows_affected() != 1 {
@@ -63,7 +82,8 @@ pub(super) async fn complete(
          $4,run.actor_id,$3 FROM workflow_runs AS run WHERE run.company_id = $1 AND run.id = $2",
     ).bind(request.company.as_uuid()).bind(request.run.as_uuid()).bind(request.execution.as_uuid()).bind(owner.event_kind()).execute(&mut *db).await?;
     completion_job::finish(db, request, owner).await?;
-    Ok(next)
+    channel_reply_completion::commit_on(db, request, final_reply).await?;
+    Ok(CompletionProgress::Advanced(next))
 }
 
 async fn successor(

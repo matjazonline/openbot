@@ -141,6 +141,7 @@ async fn settle_claim(
             .bind(run.as_uuid())
             .execute(&mut **tx)
             .await?;
+            channel_reply::link_run(tx, command, run).await?;
             Ok(true)
         }
         Some(AdmissionClaim::Schedule(claim)) => {
@@ -218,8 +219,16 @@ async fn verify_current(
     if exists.is_none() {
         return Ok(false);
     }
+    let frozen = channel_reply::frozen_revision(
+        tx,
+        command.company_id(),
+        command.binding().id(),
+        command.trigger(),
+    )
+    .await?;
     let Some(current) =
-        binding_rows::read_binding(tx, command.company_id(), command.binding().id()).await?
+        binding_rows::read_binding_at(tx, command.company_id(), command.binding().id(), frozen)
+            .await?
     else {
         return Ok(false);
     };

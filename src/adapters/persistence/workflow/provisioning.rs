@@ -91,6 +91,12 @@ impl ProvisioningPreparation for PostgresPersistence {
         scope: ActionScope,
         call: &ProvisioningToolCall,
     ) -> AppResult<ActionRequest> {
+        if matches!(
+            call.origin,
+            crate::application::agent::ToolCallOrigin::ChannelFinal(_)
+        ) {
+            return Err(missing());
+        }
         let mut tx = begin_http(self).await?;
         let facts = facts(&mut tx, scope).await?;
         if let crate::application::agent::ToolCallOrigin::Agent(origin) = call.origin {

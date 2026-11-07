@@ -1,0 +1,67 @@
+[
+  {
+    "cohort": "hitl-prompt",
+    "prefix": "channel_reply_hitl_prompt_",
+    "selected": 17,
+    "passed": 17,
+    "ignored": 0,
+    "tests": [
+      "adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::integrity::channel_reply_hitl_prompt_ownership_cannot_be_edited_or_removed",
+      "adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::integrity::channel_reply_hitl_prompt_failed_atomic_write_leaves_no_prompt_or_wait",
+      "adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::integrity::channel_reply_hitl_prompt_canonical_content_and_delivery_membership_are_frozen",
+      "application::workflow::registry::channel_question_tests::channel_reply_hitl_prompt_declares_a_human_result_separate_from_its_receipt",
+      "application::workflow::registry::channel_question_tests::channel_reply_hitl_prompt_private_reply_event_cannot_be_declared_generically",
+      "application::workflow::registry::channel_question_tests::channel_reply_hitl_prompt_schema_is_literal_and_exact",
+      "adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::channel_reply_hitl_prompt_uuid_case_and_nanosecond_deadline_keep_the_same_witness",
+      "adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::channel_reply_hitl_prompt_cannot_be_an_agent_or_ad_hoc_tool",
+      "adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::approval::channel_reply_hitl_prompt_approval_notice_stays_private_and_then_parks_the_original_question",
+      "adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::channel_reply_hitl_prompt_competing_publishers_create_one_occurrence",
+      "adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::channel_reply_hitl_prompt_in_app_acceptance_keeps_the_human_wait_open",
+      "adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::channel_reply_hitl_prompt_commits_wait_and_delivery_together",
+      "adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::lifecycle::channel_reply_hitl_prompt_safe_retry_keeps_message_wait_deadline_and_continuation_budget",
+      "adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::commit::channel_reply_hitl_prompt_lost_commit_ack_replays_human_wait_before_transport_receipt",
+      "adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::lifecycle::channel_reply_hitl_prompt_unknown_send_stays_unknown_after_a_human_response",
+      "adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::commit::channel_reply_hitl_prompt_deferred_commit_cannot_outlive_its_real_claim",
+      "adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::lifecycle::channel_reply_hitl_prompt_provider_entry_rechecks_deadline_after_competing_parent_lock"
+    ],
+    "ignored_tests": [],
+    "list": "hitl-prompt-list-05.log",
+    "run": "hitl-prompt-tests-05.log"
+  },
+  {
+    "cohort": "hitl-resume",
+    "prefix": "channel_reply_hitl_resume_",
+    "selected": 10,
+    "passed": 10,
+    "ignored": 0,
+    "tests": [
+      "adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::resume::channel_reply_hitl_resume_before_ack_and_reconstruction_consumes_once",
+      "adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::resume::channel_reply_hitl_resume_ingress_consumes_before_ordinary_admission",
+      "adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::resume::channel_reply_hitl_resume_wrong_respondent_and_prompt_do_not_consume_wait",
+      "adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::resume::channel_reply_hitl_resume_repeated_questions_have_distinct_waits_and_no_reply_keeps_prompts",
+      "adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::resume::channel_reply_hitl_resume_competing_humans_have_one_winner",
+      "adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::resume::channel_reply_hitl_resume_two_live_runs_in_one_thread_stay_independent",
+      "adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::lifecycle::channel_reply_hitl_resume_response_racing_cancellation_cannot_reopen_the_run",
+      "adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::child::channel_reply_hitl_resume_child_question_returns_to_parent_without_suppression",
+      "adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::lifecycle::channel_reply_hitl_resume_recorded_in_time_survives_delayed_wakeup",
+      "adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::lifecycle::channel_reply_hitl_resume_late_response_races_timeout_and_stops_unsent_work_before_wake"
+    ],
+    "ignored_tests": [],
+    "list": "hitl-resume-list-05.log",
+    "run": "hitl-resume-tests-05.log"
+  },
+  {
+    "cohort": "final-approval",
+    "prefix": "channel_reply_final_approval_",
+    "selected": 2,
+    "passed": 2,
+    "ignored": 0,
+    "tests": [
+      "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::question_final_tests::channel_reply_final_approval_question_uses_exact_saved_response",
+      "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::question_final_tests::channel_reply_final_approval_question_rejection_publishes_no_final"
+    ],
+    "ignored_tests": [],
+    "list": "final-approval-list-05.log",
+    "run": "final-approval-tests-05.log"
+  }
+]

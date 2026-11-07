@@ -17,6 +17,12 @@ pub(super) async fn claim_on(
     let Some((run, job)) = lock_scope(db, scope, bound.server_timeout()).await? else {
         return Ok(None);
     };
+    if channel_reply_proposals::existing_on(db, scope)
+        .await?
+        .is_some()
+    {
+        return Ok(None);
+    }
     let binding = admission_binding::read_saved_binding(
         db,
         scope.company,

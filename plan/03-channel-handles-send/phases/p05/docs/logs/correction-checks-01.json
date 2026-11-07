@@ -1,0 +1,14 @@
+[
+  {
+    "check": "migrations-main-04",
+    "exit": 0
+  },
+  {
+    "check": "migrations-test-04",
+    "exit": 0
+  },
+  {
+    "check": "hitl-tests-09",
+    "exit": 101
+  }
+]

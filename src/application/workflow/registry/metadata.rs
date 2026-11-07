@@ -53,7 +53,7 @@ pub(super) fn constraints(name: &str) -> ExecutionConstraints {
     use CapabilityRequirement::*;
     use EffectClass::*;
     let (effect, capabilities) = match name {
-        "data.map" | "decision.rule" => (Pure, vec![]),
+        "data.map" | "decision.rule" | "channel.no_reply" => (Pure, vec![]),
         "context.history" => (BoundedRead, vec![ContextRead]),
         "memory.load" => (BoundedRead, vec![MemoryRead]),
         "memory.save" => (DurableWrite, vec![MemoryWrite]),
@@ -68,7 +68,7 @@ pub(super) fn constraints(name: &str) -> ExecutionConstraints {
             EffectClass::SharedAction,
             vec![CapabilityRequirement::SharedAction],
         ),
-        "message.send" | "message.reply" => (
+        "message.send" | "message.reply" | "message.ask" => (
             EffectClass::SharedAction,
             vec![MessageSend, CapabilityRequirement::SharedAction],
         ),

@@ -1,0 +1,9 @@
+[
+  {
+    "filter": "application::workflow::registry::",
+    "selected": 56,
+    "exit_code": 0,
+    "inventory": "focused-registry-list-03",
+    "execution": "focused-registry-tests-03"
+  }
+]

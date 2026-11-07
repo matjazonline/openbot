@@ -50,10 +50,13 @@ pub(crate) const fn cancellation_detail(reason: DeliveryCancellationReason) -> &
             "The workflow messaging authority was revoked before this delivery went out"
         }
         DeliveryCancellationReason::RecipientRevoked => {
-            "The recipient is no longer a member with the frozen address"
+            "The current recipient identity or clearance no longer permits this delivery"
         }
         DeliveryCancellationReason::EvidenceConflict => {
             "A reconciliation finality breach stopped further sends for this message"
+        }
+        DeliveryCancellationReason::QuestionClosed => {
+            "The question was answered or its human wait closed before this delivery went out"
         }
     }
 }

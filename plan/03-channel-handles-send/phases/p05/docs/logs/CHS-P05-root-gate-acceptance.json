@@ -1,0 +1,8 @@
+{
+  "gate": "CHS-P05-AG1-R1",
+  "decision_sha256": "f453fef4cecb190eff4b8f494adeddfc02d69f41a624f7b669b8770b9737b823",
+  "source_digest": "f26c909acb26d1cd0c9dd4332bc7cc3519f639d27de78b30dcd24212cb5709b8",
+  "accepted": true,
+  "stage": "architecture only",
+  "time": "2026-11-07T05:31:57.859148+00:00"
+}

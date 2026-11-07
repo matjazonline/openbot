@@ -1,0 +1,9 @@
+{
+  "decision": "CHS-P03-D1/r2",
+  "review": "CHS-P03-AG1-R2",
+  "digest": "9afda7394001396e44e0c7276412a8a230100dde1698ed943b5b6392f5fc65a8",
+  "coordination_revision": 6,
+  "source_hashes": "all50 accepted source bytes unchanged",
+  "preserved_external_deletion": "plan/local_machine_tunnel_plan.md",
+  "status": "architecture accepted; implementation/verification pending"
+}

@@ -15,6 +15,11 @@ SELECT
         JOIN tree ON tree.run_id=decision.run_id WHERE decision.company_id=$1 AND decision.submitted_at IS NULL AND wait.state='waiting')
     AND NOT EXISTS(SELECT 1 FROM workflow_message_actions AS action JOIN tree ON tree.run_id=action.run_id
         WHERE action.company_id=$1 AND action.state IN ('pending','uncertain','stalled'))
+    AND NOT EXISTS(SELECT 1 FROM channel_reply_decisions AS final JOIN tree ON tree.run_id=final.run_id
+        LEFT JOIN message_deliveries AS delivery ON delivery.company_id=final.company_id AND delivery.id=final.delivery_id
+        WHERE final.company_id=$1 AND (final.state IN ('pending','claimed')
+            OR (final.state='published' AND final.delivery_id IS NOT NULL
+                AND (delivery.id IS NULL OR delivery.status NOT IN ('delivered','dead_letter')))))
     AND NOT EXISTS(SELECT 1 FROM workflow_runs AS run JOIN tree ON tree.run_id=run.rerun_of_run_id
         WHERE run.company_id=$1 AND NOT EXISTS(SELECT 1 FROM tree AS member WHERE member.run_id=run.id))
     AND NOT EXISTS(SELECT 1 FROM workflow_action_evidence_conflicts AS conflict JOIN tree ON tree.run_id=conflict.run_id WHERE conflict.company_id=$1)

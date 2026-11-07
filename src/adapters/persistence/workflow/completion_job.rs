@@ -5,14 +5,20 @@ use crate::application::workflow::{activation::ActivationRequest, lease::Workflo
 pub(super) enum CompletionOwner {
     Pure,
     Recovered,
-    Parked,
+    Parked(WaitId),
+    Approved {
+        proposal: ReplyProposalId,
+        decision: crate::application::workflow::decisions::DecisionId,
+        continuation: i16,
+    },
     Fenced(WorkflowFence),
 }
 impl CompletionOwner {
     pub(super) fn event_kind(self) -> &'static str {
         match self {
             Self::Recovered => "step_final_error",
-            Self::Parked => "wait_completed",
+            Self::Parked(_) => "wait_completed",
+            Self::Approved { .. } => "channel_reply_approved",
             Self::Pure => "pure_step_completed",
             Self::Fenced(_) => "io_step_completed",
         }
@@ -25,8 +31,8 @@ pub(super) async fn finish(
     owner: CompletionOwner,
 ) -> AppResult<()> {
     match owner {
-        CompletionOwner::Parked | CompletionOwner::Recovered => Ok(()),
-        CompletionOwner::Pure => {
+        CompletionOwner::Parked(_) | CompletionOwner::Recovered => Ok(()),
+        CompletionOwner::Pure | CompletionOwner::Approved { .. } => {
             let changed = sqlx::query("UPDATE background_tasks SET status='completed',updated_at=clock_timestamp() WHERE company_id=$1 AND id=$2 AND workflow_execution_id=$3  AND status='pending' AND worker_id IS NULL AND execution_generation IS NULL AND lock_expires_at IS NULL")
                 .bind(scope.company.as_uuid()).bind(scope.job.0).bind(scope.execution.as_uuid()).execute(db).await?;
             if changed.rows_affected() != 1 {

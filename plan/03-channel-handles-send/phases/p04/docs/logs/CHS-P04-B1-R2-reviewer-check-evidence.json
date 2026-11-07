@@ -1,0 +1,295 @@
+{
+  "cohorts": [
+    {
+      "name": "approvals-final-tests-04",
+      "command": [
+        "scripts/test-network-isolation.sh",
+        "cargo",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "workflow_action_approval_",
+        "--",
+        "--nocapture"
+      ],
+      "exit": 0,
+      "hash_ok": true,
+      "count": 32,
+      "result": [
+        "test result: ok. 32 passed; 0 failed; 0 ignored; 0 measured; 3125 filtered out; finished in 18.18s"
+      ],
+      "guard": true,
+      "stack": "2097152"
+    },
+    {
+      "name": "delivery-final-tests-06",
+      "command": [
+        "scripts/test-network-isolation.sh",
+        "cargo",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "adapters::persistence::delivery::",
+        "--",
+        "--nocapture"
+      ],
+      "exit": 0,
+      "hash_ok": true,
+      "count": 39,
+      "result": [
+        "test result: ok. 39 passed; 0 failed; 0 ignored; 0 measured; 3118 filtered out; finished in 10.58s"
+      ],
+      "guard": true,
+      "stack": "2097152"
+    },
+    {
+      "name": "delivery-worker-final-tests-01",
+      "command": [
+        "scripts/test-network-isolation.sh",
+        "cargo",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "application::services::delivery_worker::tests",
+        "--",
+        "--nocapture"
+      ],
+      "exit": 0,
+      "hash_ok": true,
+      "count": 16,
+      "result": [
+        "test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 3135 filtered out; finished in 3.01s"
+      ],
+      "guard": true,
+      "stack": "2097152"
+    },
+    {
+      "name": "feature-final-tests-04",
+      "command": [
+        "scripts/test-network-isolation.sh",
+        "cargo",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "channel_reply_",
+        "--",
+        "--nocapture"
+      ],
+      "exit": 0,
+      "hash_ok": true,
+      "count": 130,
+      "result": [
+        "test result: ok. 130 passed; 0 failed; 0 ignored; 0 measured; 3027 filtered out; finished in 37.15s"
+      ],
+      "guard": true,
+      "stack": "2097152"
+    },
+    {
+      "name": "intent-final-tests-04",
+      "command": [
+        "scripts/test-network-isolation.sh",
+        "cargo",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "message_intent_",
+        "--",
+        "--nocapture"
+      ],
+      "exit": 0,
+      "hash_ok": true,
+      "count": 14,
+      "result": [
+        "test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 3143 filtered out; finished in 4.95s"
+      ],
+      "guard": true,
+      "stack": "2097152"
+    },
+    {
+      "name": "knowledge-final-tests-04",
+      "command": [
+        "scripts/test-network-isolation.sh",
+        "cargo",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "knowledge_run_level_",
+        "--",
+        "--nocapture"
+      ],
+      "exit": 0,
+      "hash_ok": true,
+      "count": 49,
+      "result": [
+        "test result: ok. 49 passed; 0 failed; 0 ignored; 0 measured; 3108 filtered out; finished in 22.40s"
+      ],
+      "guard": true,
+      "stack": "2097152"
+    },
+    {
+      "name": "membership-final-tests-05",
+      "command": [
+        "scripts/test-network-isolation.sh",
+        "cargo",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "publication_tests::membership::",
+        "--",
+        "--nocapture"
+      ],
+      "exit": 0,
+      "hash_ok": true,
+      "count": 4,
+      "result": [
+        "test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 3153 filtered out; finished in 1.74s"
+      ],
+      "guard": true,
+      "stack": "2097152"
+    },
+    {
+      "name": "message-retention-final-tests-04",
+      "command": [
+        "scripts/test-network-isolation.sh",
+        "cargo",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "storage_message_tests::",
+        "--",
+        "--nocapture"
+      ],
+      "exit": 0,
+      "hash_ok": true,
+      "count": 1,
+      "result": [
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3156 filtered out; finished in 0.91s"
+      ],
+      "guard": true,
+      "stack": "2097152"
+    },
+    {
+      "name": "messaging-final-tests-04",
+      "command": [
+        "scripts/test-network-isolation.sh",
+        "cargo",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "workflow_message_",
+        "--",
+        "--nocapture"
+      ],
+      "exit": 0,
+      "hash_ok": true,
+      "count": 64,
+      "result": [
+        "test result: ok. 64 passed; 0 failed; 0 ignored; 0 measured; 3093 filtered out; finished in 28.40s"
+      ],
+      "guard": true,
+      "stack": "2097152"
+    },
+    {
+      "name": "retention-final-tests-01",
+      "command": [
+        "scripts/test-network-isolation.sh",
+        "cargo",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "run_retention_",
+        "--",
+        "--nocapture"
+      ],
+      "exit": 0,
+      "hash_ok": true,
+      "count": 21,
+      "result": [
+        "test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 3130 filtered out; finished in 136.02s"
+      ],
+      "guard": true,
+      "stack": "2097152"
+    },
+    {
+      "name": "runtime-final-tests-01",
+      "command": [
+        "scripts/test-network-isolation.sh",
+        "cargo",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "infra::workflow::tests::",
+        "--",
+        "--nocapture"
+      ],
+      "exit": 0,
+      "hash_ok": true,
+      "count": 5,
+      "result": [
+        "test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 3146 filtered out; finished in 1.24s"
+      ],
+      "guard": true,
+      "stack": "2097152"
+    },
+    {
+      "name": "sample-final-tests-01",
+      "command": [
+        "scripts/test-network-isolation.sh",
+        "cargo",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "application::workflow::sample::",
+        "--",
+        "--nocapture"
+      ],
+      "exit": 0,
+      "hash_ok": true,
+      "count": 15,
+      "result": [
+        "test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 3136 filtered out; finished in 0.36s"
+      ],
+      "guard": true,
+      "stack": "2097152"
+    },
+    {
+      "name": "transport-final-tests-01",
+      "command": [
+        "scripts/test-network-isolation.sh",
+        "cargo",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "application::transport::",
+        "--",
+        "--nocapture"
+      ],
+      "exit": 0,
+      "hash_ok": true,
+      "count": 26,
+      "result": [
+        "test result: ok. 26 passed; 0 failed; 0 ignored; 0 measured; 3125 filtered out; finished in 0.12s"
+      ],
+      "guard": true,
+      "stack": "2097152"
+    }
+  ],
+  "union": 404,
+  "counts": {
+    "ok": 404
+  },
+  "matches_summary": true
+}

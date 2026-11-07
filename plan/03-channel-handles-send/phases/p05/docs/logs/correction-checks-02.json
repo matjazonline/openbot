@@ -1,0 +1,22 @@
+[
+  {
+    "check": "migrations-main-05",
+    "exit": 0
+  },
+  {
+    "check": "migrations-test-05",
+    "exit": 0
+  },
+  {
+    "check": "hitl-tests-10",
+    "exit": 0
+  },
+  {
+    "check": "release-knowledge-tests-01",
+    "exit": 0
+  },
+  {
+    "check": "upstream-action-tests-01",
+    "exit": 101
+  }
+]

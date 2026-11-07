@@ -1,0 +1,27 @@
+{
+  "phase": "p02",
+  "stage": "architecture gate",
+  "decision": "CHS-P02-D1/r1",
+  "start": "769a23aa6ef423e964f8221a8ee6b0743325c6ba",
+  "review_base": "769a23aa6ef423e964f8221a8ee6b0743325c6ba",
+  "head": "769a23aa6ef423e964f8221a8ee6b0743325c6ba",
+  "digest": "0995151ed93e67f2e5feee8092cdc08687580b79f1d988d40d5d072d5e39decf",
+  "exclusions": [
+    "plan/03-channel-handles-send/COORDINATION.md",
+    "plan/03-channel-handles-send/phases/p01/docs",
+    "plan/03-channel-handles-send/phases/p02/docs",
+    "plan/03-channel-handles-send/phases/p03/docs",
+    "plan/03-channel-handles-send/phases/p04/docs",
+    "plan/03-channel-handles-send/phases/p05/docs",
+    "plan/03-channel-handles-send/phases/p06/docs",
+    "plan/03-channel-handles-send/phases/p07/docs",
+    "plan/03-channel-handles-send/integration/final/docs"
+  ],
+  "preserved_preexisting_changes": "accepted p01 sixteen-file source, exact hashes/archive in p01 B1-R2 manifest",
+  "prerequisite": "CHS-P01-root-acceptance.json and B1-R2 PASS0995151e",
+  "coordination_revision": 3,
+  "notices": [
+    "CHS-C001/r1"
+  ],
+  "source_edits_for_p02": false
+}

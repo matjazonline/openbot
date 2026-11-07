@@ -1,0 +1,161 @@
+[
+  {
+    "receipt": "author-policy-clippy-01.json",
+    "exit_code": 101,
+    "command": [
+      "cargo",
+      "clippy",
+      "--locked",
+      "--offline",
+      "--all-targets",
+      "--",
+      "-D",
+      "warnings"
+    ]
+  },
+  {
+    "receipt": "author-terminal-check-01.json",
+    "exit_code": 101,
+    "command": [
+      "cargo",
+      "check",
+      "--locked",
+      "--offline",
+      "--all-targets"
+    ]
+  },
+  {
+    "receipt": "author-terminal-clippy-01.json",
+    "exit_code": 101,
+    "command": [
+      "cargo",
+      "clippy",
+      "--locked",
+      "--offline",
+      "--all-targets",
+      "--",
+      "-D",
+      "warnings"
+    ]
+  },
+  {
+    "receipt": "author-terminal-slot-tests-01.json",
+    "exit_code": 101,
+    "command": [
+      "scripts/test-network-isolation.sh",
+      "cargo",
+      "test",
+      "--locked",
+      "--offline",
+      "--lib",
+      "channel_reply_tests::completion_tests::slot_tests::",
+      "--",
+      "--nocapture"
+    ]
+  },
+  {
+    "receipt": "author-terminal-tests-01.json",
+    "exit_code": 101,
+    "command": [
+      "scripts/test-network-isolation.sh",
+      "cargo",
+      "test",
+      "--locked",
+      "--offline",
+      "--lib",
+      "channel_reply_completion_",
+      "--",
+      "--nocapture"
+    ]
+  },
+  {
+    "receipt": "author-terminal-tests-02.json",
+    "exit_code": 101,
+    "command": [
+      "scripts/test-network-isolation.sh",
+      "cargo",
+      "test",
+      "--locked",
+      "--offline",
+      "--lib",
+      "channel_reply_tests::completion_tests::",
+      "--",
+      "--nocapture"
+    ]
+  },
+  {
+    "receipt": "author-terminal-tests-04.json",
+    "exit_code": 101,
+    "command": [
+      "scripts/test-network-isolation.sh",
+      "cargo",
+      "test",
+      "--locked",
+      "--offline",
+      "--lib",
+      "channel_reply_tests::completion_tests::",
+      "--",
+      "--nocapture"
+    ]
+  },
+  {
+    "receipt": "author-terminal-tests-06.json",
+    "exit_code": 101,
+    "command": [
+      "scripts/test-network-isolation.sh",
+      "cargo",
+      "test",
+      "--locked",
+      "--offline",
+      "--lib",
+      "channel_reply_tests::completion_tests::",
+      "--",
+      "--nocapture"
+    ]
+  },
+  {
+    "receipt": "author-terminal-tests-07.json",
+    "exit_code": 101,
+    "command": [
+      "scripts/test-network-isolation.sh",
+      "cargo",
+      "test",
+      "--locked",
+      "--offline",
+      "--lib",
+      "channel_reply_tests::completion_tests::",
+      "--",
+      "--nocapture"
+    ]
+  },
+  {
+    "receipt": "author-terminal-tests-08.json",
+    "exit_code": 101,
+    "command": [
+      "scripts/test-network-isolation.sh",
+      "cargo",
+      "test",
+      "--locked",
+      "--offline",
+      "--lib",
+      "channel_reply_tests::completion_tests::",
+      "--",
+      "--nocapture"
+    ]
+  },
+  {
+    "receipt": "author-terminal-tests-09.json",
+    "exit_code": 101,
+    "command": [
+      "scripts/test-network-isolation.sh",
+      "cargo",
+      "test",
+      "--locked",
+      "--offline",
+      "--lib",
+      "channel_reply_tests::completion_tests::",
+      "--",
+      "--nocapture"
+    ]
+  }
+]

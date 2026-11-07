@@ -7,9 +7,6 @@
 use super::super::action_dispatch::{AuthorizedAction, PostgresActionDispatch, SqlLocalAction};
 use super::super::persistence_bound::{Attempt, End, Evidence, WriteBound};
 use super::*;
-use crate::adapters::persistence::delivery::enqueue::insert_delivery_on;
-use crate::adapters::persistence::thread::insert_message_on;
-use crate::application::transport::queue::DeliveryCreation;
 use crate::application::workflow::actions::validate_action_result;
 
 /// Who is asking for the stored state: a fresh observation or an ambiguous-COMMIT resolution
@@ -47,6 +44,14 @@ async fn stored_on(
     let Some(stored) = stored else {
         return Ok(MessagePublication::PossibleDispatchExists);
     };
+    let question: Option<Uuid> = sqlx::query_scalar(
+        "SELECT wait_id FROM workflow_channel_questions WHERE company_id=$1 AND run_id=$2 AND execution_id=$3 AND invocation_id=$4",
+    ).bind(request.scope().company.as_uuid()).bind(request.scope().run.as_uuid())
+        .bind(request.scope().execution.as_uuid()).bind(request.subject.invocation.as_uuid())
+        .fetch_optional(&mut **tx).await?;
+    if let Some(wait) = question {
+        return Ok(MessagePublication::Suspended(WaitId::new(wait)));
+    }
     if let Some(result) = stored.result {
         return Ok(MessagePublication::Committed(ActionReceipt {
             subject: request.subject.clone(),
@@ -67,83 +72,15 @@ async fn stored_on(
 }
 
 /// Destination owners locked in one deterministic order, then compared with the plan.
-async fn recheck_routes_on(
-    tx: &mut Transaction<'_, Postgres>,
-    company: CompanyId,
-    plan: &MessagePlan,
-) -> AppResult<()> {
-    let mut checks: Vec<&RouteCheck> = plan.destinations.iter().map(|d| &d.check).collect();
-    checks.sort_by_key(|check| match check {
-        RouteCheck::Channel { channel } => (0, *channel),
-        RouteCheck::Member { user, .. } => (1, *user),
-        RouteCheck::Source { source, .. } => (2, source.as_uuid()),
-    });
-    for check in checks {
-        let current = match check {
-            RouteCheck::Channel { channel } => channel_exists_on(tx, company, *channel).await?,
-            RouteCheck::Member {
-                user,
-                principal,
-                email,
-                sender,
-            } => {
-                channel_exists_on(tx, company, *sender).await?
-                    && member_on(tx, company, *user, true)
-                        .await?
-                        .is_some_and(|member| {
-                            member.principal == *principal && member.email == *email
-                        })
-            }
-            RouteCheck::Source {
-                source,
-                thread,
-                channel,
-            } => sqlx::query_scalar::<_, bool>(
-                "SELECT EXISTS(SELECT 1 FROM thread_messages WHERE company_id=$1 AND message_id=$2 \
-                   AND thread_id=$3 AND channel_id=$4 FOR KEY SHARE)",
-            )
-            .bind(company.as_uuid())
-            .bind(source.as_uuid())
-            .bind(thread)
-            .bind(channel)
-            .fetch_one(&mut **tx)
-            .await?,
-        };
-        if !current {
-            return Err(AppError::BadRequest(
-                "Workflow message destination changed before publication".into(),
-            ));
-        }
-    }
-    Ok(())
-}
-
-async fn channel_exists_on(
-    tx: &mut Transaction<'_, Postgres>,
-    company: CompanyId,
-    channel: Uuid,
-) -> AppResult<bool> {
-    Ok(sqlx::query_scalar::<_, Uuid>(
-        "SELECT id FROM channels WHERE company_id=$1 AND id=$2 FOR KEY SHARE",
-    )
-    .bind(company.as_uuid())
-    .bind(channel)
-    .fetch_optional(&mut **tx)
-    .await?
-    .is_some())
-}
-
 async fn admission_full_on(
     tx: &mut Transaction<'_, Postgres>,
     request: &ActionDispatchRequest,
 ) -> AppResult<bool> {
-    let held: i64 = sqlx::query_scalar(
-        "SELECT count(*) FROM (SELECT 1 FROM workflow_action_dispatches WHERE company_id=$1 AND execution_id=$2 LIMIT 128) AS bounded",
-    )
-    .bind(request.scope().company.as_uuid())
-    .bind(request.scope().execution.as_uuid())
-    .fetch_one(&mut **tx)
-    .await?;
+    let held: i64 = sqlx::query_scalar("SELECT workflow_message_slots($1,$2)")
+        .bind(request.scope().company.as_uuid())
+        .bind(request.scope().execution.as_uuid())
+        .fetch_one(&mut **tx)
+        .await?;
     Ok(usize::try_from(held).map_err(|_| invalid())? >= MAX_MESSAGE_ACTIONS_PER_EXECUTION)
 }
 
@@ -202,58 +139,8 @@ async fn write_destinations_on(
 ) -> AppResult<()> {
     let scope = request.scope();
     for (ordinal, destination) in plan.destinations.iter().enumerate() {
-        if let Some(thread) = &destination.new_thread {
-            sqlx::query(
-                "INSERT INTO threads (id, company_id, channel_id, subject) VALUES ($1,$2,$3,$4)",
-            )
-            .bind(thread.id)
-            .bind(scope.company.as_uuid())
-            .bind(thread.channel_id)
-            .bind(&thread.subject)
-            .execute(&mut **tx)
-            .await?;
-            // A member's send opens a thread of its own; its recipient is a party to exactly
-            // that thread, so their reply passes ingress there and nowhere else (p08 D1.5.4).
-            if let (DestinationKind::User, Some(principal)) =
-                (destination.kind, destination.principal_id)
-            {
-                sqlx::query(
-                    "INSERT INTO thread_principals (company_id, channel_id, thread_id, principal_id, role) \
-                     VALUES ($1,$2,$3,$4,'participant')",
-                )
-                .bind(scope.company.as_uuid())
-                .bind(thread.channel_id)
-                .bind(thread.id)
-                .bind(principal)
-                .execute(&mut **tx)
-                .await?;
-            }
-        }
-        let inserted = insert_message_on(
-            tx,
-            &destination.message,
-            crate::adapters::persistence::thread::MessageStampSource::Workflow {
-                company: scope.company,
-                run: scope.run,
-            },
-        )
-        .await?;
-        if inserted.canonical_id != destination.message.id {
-            return Err(AppError::Conflict(
-                "Workflow message identity already belongs to another message".into(),
-            ));
-        }
-        let delivery = match &destination.delivery {
-            Some(delivery) => match insert_delivery_on(tx, delivery).await? {
-                DeliveryCreation::Created(id) if id == delivery.id => Some(id.as_uuid()),
-                _ => {
-                    return Err(AppError::Conflict(
-                        "Workflow message delivery key already belongs to another delivery".into(),
-                    ));
-                }
-            },
-            None => None,
-        };
+        // Box the shared storage seam to keep the explicit/final runtime frames bounded.
+        let written = Box::pin(super::writer::write_destination_on(tx, scope, destination)).await?;
         let target = DestinationTarget::of(destination.kind, destination.destination_id);
         sqlx::query(
             "INSERT INTO workflow_message_destinations (company_id,run_id,invocation_id,ordinal,kind,destination_channel_id,destination_user_id,replied_message_id,channel_id,thread_id,message_id,delivery_id,principal_id,recipient_address) \
@@ -269,8 +156,8 @@ async fn write_destinations_on(
         .bind(target.replied_message)
         .bind(destination.channel_id)
         .bind(destination.thread_id)
-        .bind(destination.message.id.as_uuid())
-        .bind(delivery)
+        .bind(written.message.as_uuid())
+        .bind(written.delivery.map(|id| id.as_uuid()))
         .bind(destination.principal_id)
         .bind(destination.recipient.as_ref().map(|address| address.as_str().to_string()))
         .execute(&mut **tx)
@@ -334,8 +221,40 @@ async fn park_on(
     sqlx::query("INSERT INTO workflow_waits (company_id,run_id,execution_id,id,reason,deadline,created_at) SELECT company_id,id,$3,$4,'effect',deadline,clock_timestamp() FROM workflow_runs WHERE company_id=$1 AND id=$2")
         .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(scope.execution.as_uuid()).bind(wait)
         .execute(&mut **tx).await?;
-    let closed = sqlx::query("UPDATE task_attempts SET status='completed',stop_reason='effect_parked',finished_at=clock_timestamp() WHERE task_id=$1 AND attempt_number=$2 AND worker_id=$3 AND execution_generation=$4 AND status='processing'")
+    close_park_on(tx, request, wait, MessagePark::Effect).await
+}
+
+#[derive(Clone, Copy)]
+enum MessagePark {
+    Effect,
+    Question,
+}
+impl MessagePark {
+    const fn stop_reason(self) -> &'static str {
+        match self {
+            Self::Effect => "effect_parked",
+            Self::Question => "question_parked",
+        }
+    }
+    const fn waiting_reason(self) -> &'static str {
+        match self {
+            Self::Effect => "effect",
+            Self::Question => "event",
+        }
+    }
+}
+
+async fn close_park_on(
+    tx: &mut Transaction<'_, Postgres>,
+    request: &ActionDispatchRequest,
+    wait: Uuid,
+    park: MessagePark,
+) -> AppResult<()> {
+    let fence = request.fence;
+    let scope = fence.scope;
+    let closed = sqlx::query("UPDATE task_attempts SET status='completed',stop_reason=$5,finished_at=clock_timestamp() WHERE task_id=$1 AND attempt_number=$2 AND worker_id=$3 AND execution_generation=$4 AND status='processing'")
         .bind(scope.job.0).bind(fence.attempt.0).bind(fence.worker.0).bind(fence.generation.0)
+        .bind(park.stop_reason())
         .execute(&mut **tx).await?;
     let job = sqlx::query("UPDATE background_tasks SET status='completed',updated_at=clock_timestamp(),worker_id=NULL,execution_generation=NULL,locked_at=NULL,lock_expires_at=NULL WHERE company_id=$1 AND id=$2 AND workflow_execution_id=$3  AND status='processing' AND worker_id=$4 AND execution_generation=$5 AND attempt_ordinal=$6 AND lock_expires_at>clock_timestamp()")
         .bind(scope.company.as_uuid()).bind(scope.job.0).bind(scope.execution.as_uuid())
@@ -344,10 +263,19 @@ async fn park_on(
     if closed.rows_affected() != 1 || job.rows_affected() != 1 {
         return Err(super::super::persistence_bound::refused("message park"));
     }
-    sqlx::query("UPDATE workflow_runs SET state='waiting',waiting_reason='effect' WHERE company_id=$1 AND id=$2 AND state IN ('queued','running')")
-        .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).execute(&mut **tx).await?;
+    sqlx::query("UPDATE workflow_runs SET state='waiting',waiting_reason=$3 WHERE company_id=$1 AND id=$2 AND state IN ('queued','running')")
+        .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(park.waiting_reason()).execute(&mut **tx).await?;
     super::super::waits::audit_wait(tx, scope, wait, "wait_parked").await?;
     Ok(())
+}
+
+struct PublicationWrite<'a> {
+    request: &'a ActionDispatchRequest,
+    action: FrozenAction,
+    current_policy: Value,
+    origin: MessageOrigin,
+    plan: &'a MessagePlan,
+    started: tokio::time::Instant,
 }
 
 impl<L: SqlLocalAction> PostgresActionDispatch<MessageActionAuthority, L> {
@@ -397,7 +325,9 @@ impl<L: SqlLocalAction> PostgresActionDispatch<MessageActionAuthority, L> {
                 stored_on(tx, request, &action, Reader::Observe).await?,
             ));
         }
-        if let Err(error) = recheck_routes_on(tx, request.scope().company, plan).await {
+        if let Err(error) =
+            super::writer::recheck_routes_on(tx, request.scope().company, plan).await
+        {
             return Self::rejected_on(tx, request, error)
                 .await
                 .map(End::Rollback);
@@ -414,10 +344,50 @@ impl<L: SqlLocalAction> PostgresActionDispatch<MessageActionAuthority, L> {
                 .await
                 .map(End::Rollback);
         }
+        // Box the atomic write phase; authorization and rendering frames stay off its stack.
+        Box::pin(Self::write_on(
+            tx,
+            PublicationWrite {
+                request,
+                action,
+                current_policy,
+                origin,
+                plan,
+                started,
+            },
+        ))
+        .await
+    }
+
+    async fn write_on(
+        tx: &mut Transaction<'_, Postgres>,
+        publication: PublicationWrite<'_>,
+    ) -> AppResult<End<MessagePublication>> {
+        let PublicationWrite {
+            request,
+            action,
+            current_policy,
+            origin,
+            plan,
+            started,
+        } = publication;
         super::super::persistence_bound::locks_held();
+        // A genuine message action owns the question as well as its transport receipt.
+        // Box the declared-input/ownership checks to keep the I/O poll frame bounded.
+        let question = match Box::pin(super::questions::prepare_on(tx, &action, plan, origin)).await
+        {
+            Ok(question) => question,
+            Err(error) => {
+                return Self::rejected_on(tx, request, error)
+                    .await
+                    .map(End::Rollback);
+            }
+        };
         // Refused before any write: a delivery parks the job, and a park the job could never be
         // reopened from would hold the run until its deadline. The SQL park guard backstops this.
-        if plan.has_delivery() && continuations_exhausted_on(tx, request).await? {
+        if (plan.has_delivery() || question.is_some())
+            && continuations_exhausted_on(tx, request).await?
+        {
             return Ok(End::Rollback(MessagePublication::ContinuationLimit));
         }
         if admission_full_on(tx, request).await? {
@@ -429,12 +399,24 @@ impl<L: SqlLocalAction> PostgresActionDispatch<MessageActionAuthority, L> {
         Self::insert(tx, request, marker, "message", current_policy).await?;
         // Steps and saved model tool calls both park on their own delivery wait; a tool call's
         // receipt later continues the agent job instead of completing the step (D4).
-        let wait = plan.has_delivery().then(Uuid::new_v4);
+        let wait = (plan.has_delivery() || question.is_some()).then(Uuid::new_v4);
         insert_action_on(tx, request, marker, origin, wait, plan.destinations.len()).await?;
         write_destinations_on(tx, request, plan).await?;
         lease::live_window(tx, request.fence, started)
             .await?
             .ok_or_else(conflict)?;
+        if let Some(question) = question {
+            let wait = wait.ok_or_else(invalid)?;
+            super::questions::insert_on(tx, request, wait, question).await?;
+            if !plan.has_delivery() {
+                let result = validate_action_result(&action, plan.accepted_result())?;
+                accept_in_app_on(tx, request, marker, &result).await?;
+            }
+            close_park_on(tx, request, wait, MessagePark::Question).await?;
+            return Ok(End::Commit(MessagePublication::Suspended(WaitId::new(
+                wait,
+            ))));
+        }
         if !plan.has_delivery() {
             let result = validate_action_result(&action, plan.accepted_result())?;
             accept_in_app_on(tx, request, marker, &result).await?;

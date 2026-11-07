@@ -1,0 +1,129 @@
+--- a/migrations/20260817000000_init_schema.sql
++++ b/migrations/20260817000000_init_schema.sql
+@@ -12609,7 +12609,7 @@
+         JOIN public.workflow_binding_revisions AS configuration ON configuration.company_id=settings.company_id
+             AND configuration.binding_id=settings.binding_id AND configuration.revision=settings.binding_revision
+         WHERE settings.company_id=NEW.company_id AND settings.channel_id=NEW.channel_id
+-            AND binding.active AND binding.thread_id IS NULL AND configuration.message_trigger IS NOT NULL;
++            AND binding.thread_id IS NULL AND configuration.message_trigger IS NOT NULL;
+     END IF;
+     RETURN NEW;
+ END $$;
+--- a/src/adapters/persistence/workflow/channel_reply.rs
++++ b/src/adapters/persistence/workflow/channel_reply.rs
+@@ -140,6 +140,13 @@
+     }
+     let configuration = &state.configuration;
+     authority::authorize_company(tx, request.company, configuration.run_as()).await?;
++    association::authorize_association(
++        tx,
++        request.company,
++        configuration.run_as(),
++        RelatedAssociation::Channel(request.channel),
++    )
++    .await?;
+     bindings::verify_selection(tx, configuration).await?;
+     resources::check_readiness(tx, configuration.as_ref().into()).await?;
+     selection.contract.validate(
+--- a/src/adapters/persistence/workflow/channel_reply_binding_integrity_tests.rs
++++ b/src/adapters/persistence/workflow/channel_reply_binding_integrity_tests.rs
+@@ -1,5 +1,99 @@
+ use super::*;
+ use crate::entities::correlation::CorrelationId;
++
++#[tokio::test]
++async fn channel_reply_binding_rechecks_current_run_as_private_channel_visibility() {
++    let s = Intents::new().await;
++    let run_as = member(&s.fixture, "admin").await;
++    sqlx::query("UPDATE users SET email_verified_at=clock_timestamp() WHERE id=$1")
++        .bind(run_as)
++        .execute(s.pool())
++        .await
++        .unwrap();
++    let binding = s.binding(MessageTrigger::Any, Some(run_as)).await;
++    sqlx::query("UPDATE channels SET access_mode='allowlist' WHERE company_id=$1 AND id=$2")
++        .bind(s.fixture.target.company.as_uuid())
++        .bind(s.channel)
++        .execute(s.pool())
++        .await
++        .unwrap();
++    assert!(
++        s.p()
++            .configure_channel_reply(selection(&s, binding, None).await)
++            .await
++            .is_err()
++    );
++    assert!(
++        s.p()
++            .channel_reply_settings(
++                s.fixture.target.company,
++                RelatedChannelId::new(s.channel),
++                s.owner()
++            )
++            .await
++            .unwrap()
++            .is_none()
++    );
++    let principal: Uuid =
++        sqlx::query_scalar("SELECT id FROM principals WHERE company_id=$1 AND user_id=$2")
++            .bind(s.fixture.target.company.as_uuid())
++            .bind(run_as)
++            .fetch_one(s.pool())
++            .await
++            .unwrap();
++    sqlx::query("INSERT INTO channel_principal_grants(company_id,channel_id,principal_id,capability,provenance) \
++        VALUES($1,$2,$3,'view','manager')")
++        .bind(s.fixture.target.company.as_uuid()).bind(s.channel).bind(principal).execute(s.pool()).await.unwrap();
++    let selected = select(&s, binding).await;
++    sqlx::query("DELETE FROM channel_principal_grants WHERE company_id=$1 AND channel_id=$2 AND principal_id=$3")
++        .bind(s.fixture.target.company.as_uuid()).bind(s.channel).bind(principal).execute(s.pool()).await.unwrap();
++    let mut change = selection(&s, binding, Some(selected.revision)).await;
++    change.responder.as_mut().unwrap().contract = literal_contract("Changed");
++    assert!(s.p().configure_channel_reply(change).await.is_err());
++    assert_eq!(
++        s.p()
++            .channel_reply_settings(
++                s.fixture.target.company,
++                RelatedChannelId::new(s.channel),
++                s.owner()
++            )
++            .await
++            .unwrap()
++            .unwrap(),
++        selected
++    );
++}
++
++#[tokio::test]
++async fn channel_reply_binding_inactive_before_ingress_has_visible_refusal_until_selection_cleared()
++{
++    let s = Intents::new().await;
++    let binding = s.binding(MessageTrigger::Any, None).await;
++    let selected = select(&s, binding).await;
++    s.deactivate(binding).await;
++    let refused = s.intent(TO).await;
++    assert_eq!(shape(&s, refused).await, (1, 0));
++    s.drain(&s.admissions(admission(s.p()))).await;
++    assert_eq!(shape(&s, refused).await, (1, 0));
++    let outcomes = s.outcomes(refused).await;
++    assert_eq!(outcomes.len(), 1);
++    assert_eq!(outcomes[&binding.as_uuid()].0, "refused");
++    assert!(s.runs(binding).await.is_empty());
++    s.p()
++        .configure_channel_reply(ConfigureChannelReply {
++            company: s.fixture.target.company,
++            channel: RelatedChannelId::new(s.channel),
++            actor: s.owner(),
++            expected: Some(selected.revision),
++            responder: None,
++        })
++        .await
++        .unwrap();
++    let unselected = s.intent(TO).await;
++    s.drain(&s.admissions(admission(s.p()))).await;
++    assert_eq!(shape(&s, unselected).await, (0, 0));
++    assert!(s.outcomes(unselected).await.is_empty());
++}
+ 
+ #[tokio::test]
+ async fn channel_reply_binding_competing_ingress_claimants_create_one_owned_run() {

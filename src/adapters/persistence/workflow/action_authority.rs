@@ -32,9 +32,17 @@ impl ActionAuthorities for PostgresPersistence {
 /// The unlocked actor is only a lock-order hint. `load_on` verifies it again under
 /// the run lock. Keep a denied authority distinct from operational errors so receipt
 /// return can still report known lost ownership before reporting access denial.
-pub(super) async fn prelock_on(
+pub(super) fn prelock_on(
+    db: &mut PgConnection,
+    scope: ActionScope,
+) -> impl std::future::Future<Output = AppResult<Option<WorkflowActor>>> + '_ {
+    prelock_accounts_on(db, scope, None)
+}
+
+pub(super) async fn prelock_accounts_on(
     tx: &mut PgConnection,
     scope: ActionScope,
+    reviewer: Option<WorkflowActor>,
 ) -> AppResult<Option<WorkflowActor>> {
     let actor: Option<Uuid> =
         sqlx::query_scalar("SELECT actor_id FROM workflow_runs WHERE company_id=$1 AND id=$2")
@@ -49,6 +57,17 @@ pub(super) async fn prelock_on(
     let mut accounts = vec![actor];
     if let Some(requester) = requester {
         accounts.push(requester.user_id());
+    }
+    if let Some(reviewer) = reviewer {
+        accounts.push(reviewer.user_id());
+    }
+    let policy: Option<Value> = sqlx::query_scalar("SELECT context.approval_policy FROM channel_reply_runs AS owned \
+        JOIN channel_reply_contexts AS context USING(company_id,intent_id) WHERE owned.company_id=$1 AND owned.run_id=$2 AND context.approval_policy IS NOT NULL")
+        .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).fetch_optional(&mut *tx).await?;
+    if let Some(policy) = policy {
+        let policy: crate::application::workflow::channel_reply::ReplyApprovalPolicy =
+            serde_json::from_value(policy).map_err(|_| invalid())?;
+        accounts.extend_from_slice(policy.reviewers());
     }
     accounts.sort_unstable();
     accounts.dedup();

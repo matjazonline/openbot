@@ -2,6 +2,11 @@
 //! open, only from the responder the question addressed, and only once; every other reply is
 //! ordinary ingress and is offered to the channel's bindings.
 use super::*;
+
+#[path = "channel_reply_correlation_tests.rs"]
+mod channel_reply_tests;
+#[path = "channel_question_tests.rs"]
+mod question_tests;
 use crate::application::workflow::activation::ActivationRequest;
 use crate::application::workflow::completion::WorkflowCompletion;
 use crate::application::workflow::lease::FencedWorkflowResult;

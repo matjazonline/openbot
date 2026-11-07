@@ -1,0 +1,8 @@
+{
+  "production_source": "exact B1R1 a6efc904",
+  "changed_existing_paths": [
+    "src/adapters/persistence/workflow/channel_question_tests.rs"
+  ],
+  "new_test_file": "src/adapters/persistence/workflow/channel_question_release_tests.rs",
+  "purpose": "Regression on original production code before F1 correction; no provider invoked"
+}

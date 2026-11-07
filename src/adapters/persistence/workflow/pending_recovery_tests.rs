@@ -44,7 +44,7 @@ async fn workflow_poison_failure_commit_abort_and_lost_ack_preserve_results() {
     let before = snapshot(&f).await;
     let mut tx = f.persistence().pool().begin().await.unwrap();
     let result =
-        crate::adapters::persistence::workflow::batch::advance_on(&mut tx, scope, budget(64))
+        crate::adapters::persistence::workflow::batch::advance_on(&mut tx, scope, budget(64), None)
             .await
             .unwrap();
     assert_eq!(result.disposition, BatchDisposition::Failed);

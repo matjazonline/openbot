@@ -1,0 +1,9 @@
+[
+  {
+    "filter": "channel_reply_terminal_",
+    "selected": 19,
+    "exit_code": 101,
+    "inventory": "focused-terminal-list-01",
+    "execution": "focused-terminal-tests-01"
+  }
+]

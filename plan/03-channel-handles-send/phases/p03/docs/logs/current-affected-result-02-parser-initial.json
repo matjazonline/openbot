@@ -1,0 +1,27 @@
+{
+  "distinct_selected": 546,
+  "distinct_passed": 546,
+  "ignored": 0,
+  "failed": 0,
+  "source_logs": [
+    "affected-autonomous-agent-tests-01.log",
+    "affected-batch-tests-01.log",
+    "affected-child-call-tests-01.log",
+    "affected-completion-tests-01.log",
+    "affected-decision-tests-01.log",
+    "affected-feature-tests-01.log",
+    "affected-message-admission-tests-01.log",
+    "affected-messaging-tests-01.log",
+    "affected-pending-recovery-tests-01.log",
+    "affected-protected-action-tests-01.log",
+    "affected-release-tests-01.log",
+    "affected-repeat-tests-01.log",
+    "affected-sample-tests-01.log",
+    "affected-wait-tests-01.log",
+    "final-feature-tests-01.log",
+    "correction-intent-tests-01.log",
+    "correction-retention-tests-01.log"
+  ],
+  "reuse": "R1 unaffected behavior evidence retained; changed DELETE boundary/schema and retention interfaces rerun on corrected current source. No full suite.",
+  "full_suite": false
+}

@@ -178,7 +178,7 @@ async fn workflow_completion_deferred_expiry_and_deadline_commit_guard() {
             .execute(&mut *tx)
             .await
             .unwrap();
-        complete_on(&mut tx, result(claim.fence))
+        complete_on(&mut tx, result(claim.fence), None)
             .await
             .unwrap()
             .unwrap();

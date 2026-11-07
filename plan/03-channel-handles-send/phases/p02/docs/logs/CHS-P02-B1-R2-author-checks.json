@@ -1,0 +1,13 @@
+{
+  "unique_tests": 226,
+  "correction_selected_total": 94,
+  "all_correction_selections_passed": true,
+  "reused_prior_scope": 220,
+  "full_suite": false,
+  "ignored": 0,
+  "before_fix_failures": [
+    "reviewer-failure-kind-tests-01",
+    "correction-budget-before-03",
+    "correction-exhaustion-before-02"
+  ]
+}

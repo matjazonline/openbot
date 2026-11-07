@@ -1,0 +1,39 @@
+[
+  {
+    "name": "sqlx-check-05",
+    "exit_code": 0,
+    "seconds": 13.275,
+    "receipt": "/Users/mac02/dev/openbot/plan/03-channel-handles-send/phases/p04/docs/logs/sqlx-check-05.json"
+  },
+  {
+    "name": "membership-final-tests-05",
+    "exit_code": 0,
+    "seconds": 19.186,
+    "receipt": "/Users/mac02/dev/openbot/plan/03-channel-handles-send/phases/p04/docs/logs/membership-final-tests-05.json",
+    "selected": 4
+  },
+  {
+    "name": "clippy-final-05",
+    "exit_code": 0,
+    "seconds": 28.168,
+    "receipt": "/Users/mac02/dev/openbot/plan/03-channel-handles-send/phases/p04/docs/logs/clippy-final-05.json"
+  },
+  {
+    "name": "fmt-final-05",
+    "exit_code": 0,
+    "seconds": 2.17,
+    "receipt": "/Users/mac02/dev/openbot/plan/03-channel-handles-send/phases/p04/docs/logs/fmt-final-05.json"
+  },
+  {
+    "name": "diff-final-05",
+    "exit_code": 0,
+    "seconds": 0.057,
+    "receipt": "/Users/mac02/dev/openbot/plan/03-channel-handles-send/phases/p04/docs/logs/diff-final-05.json"
+  },
+  {
+    "name": "graft-final-05",
+    "exit_code": 0,
+    "seconds": 2.004,
+    "receipt": "/Users/mac02/dev/openbot/plan/03-channel-handles-send/phases/p04/docs/logs/graft-final-05.json"
+  }
+]

@@ -15,6 +15,7 @@ pub mod board;
 pub mod budget;
 mod canonical;
 pub mod capacity;
+pub mod channel_reply;
 pub mod checkpoints;
 pub mod children;
 pub mod compiler;

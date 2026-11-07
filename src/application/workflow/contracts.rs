@@ -55,7 +55,8 @@ impl IdempotencyKey {
 
 /// Whether a run's message steps email their recipients or publish in-app only (p08 D1.7).
 /// Fixed at admission, inherited by every runtime child and part of replay equivalence.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum DeliveryPolicy {
     #[default]
     Deliver,

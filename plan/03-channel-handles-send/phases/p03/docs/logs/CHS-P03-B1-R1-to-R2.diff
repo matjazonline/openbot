@@ -1,0 +1,56 @@
+--- a/migrations/20260817000000_init_schema.sql
++++ b/migrations/20260817000000_init_schema.sql
+@@ -12977,8 +12977,9 @@
+ CREATE FUNCTION public.guard_channel_reply_decision() RETURNS trigger LANGUAGE plpgsql AS $$
+ BEGIN
+     IF TG_OP='DELETE' THEN
+-        IF OLD.state IN ('pending','claimed') AND EXISTS(SELECT 1 FROM public.companies WHERE id=OLD.company_id) THEN
+-            RAISE EXCEPTION 'live channel response publication cannot be removed' USING ERRCODE='23514'; END IF;
++        IF EXISTS(SELECT 1 FROM public.companies WHERE id=OLD.company_id)
++            AND EXISTS(SELECT 1 FROM public.workflow_runs WHERE company_id=OLD.company_id AND id=OLD.run_id) THEN
++            RAISE EXCEPTION 'channel response decision belongs to its retained run' USING ERRCODE='23514'; END IF;
+         RETURN OLD;
+     END IF;
+     IF TG_OP='INSERT' THEN
+--- a/src/adapters/persistence/workflow/channel_reply_intent_schema_tests.rs
++++ b/src/adapters/persistence/workflow/channel_reply_intent_schema_tests.rs
+@@ -77,6 +77,8 @@
+         decisions, 0,
+         "suppression must not require message approval"
+     );
++    assert_decision_retained_with_run(&f).await;
++    retain_closed_run(&f).await;
+ }
+ 
+ #[tokio::test]
+@@ -173,6 +175,30 @@
+     );
+     assert_eq!(f.state().await["decision"], "failed");
+     assert_eq!(f.state().await["run"], "succeeded");
++    assert_decision_retained_with_run(&f).await;
++    retain_closed_run(&f).await;
++}
++
++async fn assert_decision_retained_with_run(f: &FinalFixture) {
++    let before = f.state().await;
++    let error =
++        sqlx::query("DELETE FROM channel_reply_decisions WHERE company_id=$1 AND run_id=$2")
++            .bind(f.scope.company.as_uuid())
++            .bind(f.scope.run.as_uuid())
++            .execute(f.p.pool())
++            .await
++            .expect_err("a surviving succeeded run must retain its final decision");
++    assert_eq!(
++        error
++            .as_database_error()
++            .and_then(|error| error.code())
++            .as_deref(),
++        Some("23514")
++    );
++    assert_eq!(f.state().await, before);
++}
++
++async fn retain_closed_run(f: &FinalFixture) {
+     let mut retention = f.p.pool().begin().await.unwrap();
+     sqlx::query("DELETE FROM background_tasks WHERE company_id=$1 AND workflow_execution_id=$2")
+         .bind(f.scope.company.as_uuid())

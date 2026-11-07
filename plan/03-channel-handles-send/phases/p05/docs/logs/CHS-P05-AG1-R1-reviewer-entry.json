@@ -1,0 +1,9 @@
+{
+  "branch": "main",
+  "HEAD": "769a23aa6ef423e964f8221a8ee6b0743325c6ba",
+  "snapshot_exit": 0,
+  "source_digest_matches": true,
+  "decision_sha_matches": true,
+  "coordination_sha_matches": true,
+  "coordination_pin_matches": true
+}

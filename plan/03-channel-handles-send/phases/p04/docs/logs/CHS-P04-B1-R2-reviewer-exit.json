@@ -1,0 +1,38 @@
+{
+  "review": "CHS-P04-B1-R2",
+  "reviewer": "/root/channel_reply_review_recovery",
+  "at": "2026-11-07T05:08:54.555129+00:00",
+  "branch": "main",
+  "HEAD": "769a23aa6ef423e964f8221a8ee6b0743325c6ba",
+  "source_digest": "f26c909acb26d1cd0c9dd4332bc7cc3519f639d27de78b30dcd24212cb5709b8",
+  "snapshot_exit": 0,
+  "snapshot_digest_match": true,
+  "manifest_paths": 133,
+  "source_mismatches": [],
+  "exclusions": [
+    "plan/03-channel-handles-send/COORDINATION.md",
+    "plan/03-channel-handles-send/phases/p01/docs",
+    "plan/03-channel-handles-send/phases/p02/docs",
+    "plan/03-channel-handles-send/phases/p03/docs",
+    "plan/03-channel-handles-send/phases/p04/docs",
+    "plan/03-channel-handles-send/phases/p05/docs",
+    "plan/03-channel-handles-send/phases/p06/docs",
+    "plan/03-channel-handles-send/phases/p07/docs",
+    "plan/03-channel-handles-send/integration/final/docs"
+  ],
+  "coordination_revision": 11,
+  "coordination_pin_match": true,
+  "coordination_sha_match": true,
+  "decision_sha": "4996b54f5c5c981958df86d7a92086fff366009ced18cda5845a546927e49f26",
+  "p03_archive_sha_match": true,
+  "p04_archive_sha_match": true,
+  "archive": {
+    "members": 132,
+    "mismatches": []
+  },
+  "phase_delta_paths": 45,
+  "phase_delta_matches_manifest": true,
+  "unrelated_deletion_preserved": true,
+  "runtime_tests_executed_by_reviewer": false,
+  "source_edits_by_reviewer": false
+}

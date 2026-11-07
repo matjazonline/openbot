@@ -52,6 +52,7 @@ async fn fail_on(db: &mut PgConnection, failure: &GuardFailure) -> AppResult<Gua
     let (company, run) = (scope.company.as_uuid(), scope.run.as_uuid());
     sqlx::query("SELECT set_config('lock_timeout','1000ms',true),set_config('statement_timeout','1000ms',true)")
         .execute(&mut *db).await?;
+    channel_reply_completion::prelock_on(db, scope).await?;
     let owner = sqlx::query_as::<_, RunRow>("SELECT state, deadline <= clock_timestamp() AS expired, actor_id FROM workflow_runs WHERE company_id=$1 AND id=$2 FOR UPDATE")
         .bind(company).bind(run).fetch_optional(&mut *db).await?;
     let Some(owner) = owner else {

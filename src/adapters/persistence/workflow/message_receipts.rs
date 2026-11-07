@@ -383,7 +383,7 @@ pub(in crate::adapters::persistence::workflow) async fn confirm_suspension(
                JOIN workflow_message_actions AS action ON action.company_id=$1 AND action.execution_id=$2 AND action.wait_id=$3 \
                JOIN workflow_action_dispatches AS marker ON marker.company_id=action.company_id AND marker.invocation_id=action.invocation_id \
               WHERE attempt.task_id=$4 AND attempt.attempt_number=$5 AND attempt.worker_id=$6 AND attempt.execution_generation=$7 \
-                AND attempt.status='completed' AND attempt.stop_reason='effect_parked' \
+                AND attempt.status='completed' AND attempt.stop_reason IN ('effect_parked','question_parked') \
                 AND marker.job_id=attempt.task_id AND marker.attempt_number=attempt.attempt_number)",
         )
         .bind(fence.scope.company.as_uuid())
@@ -426,6 +426,19 @@ pub(crate) async fn workflow_delivery_admission_on(
     db: &mut PgConnection,
     delivery: Uuid,
 ) -> AppResult<WorkflowDeliveryAdmission> {
+    let final_admission = tokio::time::timeout(
+        Duration::from_secs(7),
+        Box::pin(super::super::channel_reply_delivery::admission_on(
+            db, delivery,
+        )),
+    )
+    .await
+    .map_err(|_| {
+        AppError::DatabaseTimeout("Final delivery authority timed out before provider entry".into())
+    })??;
+    if let Some(admission) = final_admission {
+        return Ok(admission);
+    }
     let link: Option<DeliveryLink> = sqlx::query_as(
         "SELECT target.company_id, target.run_id, action.execution_id, target.kind, target.destination_id, target.principal_id, target.recipient_address \
          FROM message_deliveries AS delivery \
@@ -472,6 +485,9 @@ pub(crate) async fn workflow_delivery_admission_on(
         return Ok(WorkflowDeliveryAdmission::Refuse(
             DeliveryCancellationReason::WorkflowExpired,
         ));
+    }
+    if let Some(reason) = super::questions::delivery_refusal_on(db, delivery).await? {
+        return Ok(WorkflowDeliveryAdmission::Refuse(reason));
     }
     // Remote dispatch refuses new provider entry in a conflicted execution; so does messaging.
     let action_scope = ActionScope {

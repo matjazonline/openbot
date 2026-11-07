@@ -66,6 +66,9 @@ async fn deliver_on(
     tx: &mut Transaction<'_, Postgres>,
     delivery: &IngressReply,
 ) -> AppResult<ReplyIngress> {
+    if let Some(result) = channel_question_replies::deliver_on(tx, delivery).await? {
+        return Ok(result);
+    }
     let Some(destination) = destination_on(tx, delivery).await? else {
         return Ok(ReplyIngress::Unmatched);
     };

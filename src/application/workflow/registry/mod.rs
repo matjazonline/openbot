@@ -30,7 +30,7 @@ use schemas::*;
 use serde_json::{Value, json};
 use std::collections::{BTreeMap, BTreeSet};
 
-pub const CONTRACT_REVISION: &str = "workflow-catalogue-v1.6";
+pub const CONTRACT_REVISION: &str = "workflow-catalogue-v1.8";
 pub const MAX_FACTS: usize = 256;
 pub const MAX_SELECTIONS: usize = 128;
 /// Explicit reviewers of one `decision.human` (user decision Q1, 05-D2 §2): at most this many
@@ -48,7 +48,7 @@ pub const MAX_IDENTIFIER: usize = 128;
 pub const MAX_PATH: usize = 2048;
 pub const MAX_DEADLINE: usize = 64;
 pub const MAX_CORRELATION: usize = 256;
-pub const TYPES: [&str; 19] = [
+pub const TYPES: [&str; 21] = [
     "context.history",
     "memory.load",
     "memory.save",
@@ -59,11 +59,13 @@ pub const TYPES: [&str; 19] = [
     "decision.human",
     "decision.agent",
     "data.map",
+    "channel.no_reply",
     "http.request",
     "tool.call",
     "mcp.call",
     "message.send",
     "message.reply",
+    "message.ask",
     "workflow.call",
     "flow.repeat",
     "wait.event",
@@ -203,6 +205,13 @@ impl<'a> Registration<'a> {
     /// name shares one payload schema, so ingress can validate before any wait exists (05-D1 §11).
     fn event_identity(&mut self, schema: &Value) -> Result<(), Diagnostic> {
         let name = self.literal("event")?;
+        if name.as_str() == Some(super::triggers::CHANNEL_QUESTION_REPLY_EVENT) {
+            return Err(self.error(
+                "registry.reserved_event",
+                "Question events belong to message.ask",
+                "event",
+            ));
+        }
         let conflicting = self.parsed.definition.steps.iter().any(|(id, step)| {
             id != self.id
                 && step.step_type.as_str() == "wait.event"
@@ -311,10 +320,27 @@ impl<'a> Registration<'a> {
                     .unwrap_or(self.parsed.locations[""]),
             ));
         }
+        if self.name() == "channel.no_reply"
+            && !matches!(
+                self.parsed.definition.steps[self.id].routes,
+                Routes::Success(crate::domain::workflow::TransitionTarget::End)
+            )
+        {
+            let path = format!("/steps/{}/routes", self.id);
+            return Err(Diagnostic::at(
+                "registry.terminal_route",
+                "channel.no_reply requires success routing to $end",
+                &path,
+                self.parsed
+                    .locations
+                    .get(&path)
+                    .copied()
+                    .unwrap_or(self.parsed.locations[""]),
+            ));
+        }
         let contract = match self.name() {
-            "http.request" | "tool.call" | "mcp.call" | "message.send" | "message.reply" => {
-                self.action()?
-            }
+            "http.request" | "tool.call" | "mcp.call" | "message.send" | "message.reply"
+            | "message.ask" => self.action()?,
             "workflow.call" | "flow.repeat" => self.child()?,
             _ => self.basic()?,
         };
@@ -396,6 +422,8 @@ fn embedded(mut schema: Value, field: &str) -> Value {
 mod tests;
 
 #[cfg(test)]
+mod channel_reply_terminal_contract_tests;
+#[cfg(test)]
 mod contract_tests;
 #[cfg(test)]
 mod decision_tests;
@@ -453,3 +481,6 @@ mod jev_tests;
 
 #[cfg(test)]
 mod jev_box_tests;
+
+#[cfg(test)]
+mod channel_question_tests;

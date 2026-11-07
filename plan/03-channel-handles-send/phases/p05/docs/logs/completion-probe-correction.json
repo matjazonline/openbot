@@ -1,0 +1,22 @@
+{
+  "reason": "P02 added response_disposition at start of actual completion SELECT. Two concurrency fixtures matched obsolete SELECT completed_at prefix, so they did not observe the actual blocker and waited for the persistence bound. Preserve exact pg_blocking_pids/query matching, genuine competing owners and all ordering/result assertions; update only expected SQL prefix.",
+  "source_query": "src/adapters/persistence/workflow/completion.rs:98",
+  "changed_files": [
+    "src/adapters/persistence/workflow/action_cancellation_completion_tests.rs",
+    "src/adapters/persistence/workflow/action_reconciliation_completion_race_lock_support.rs"
+  ],
+  "partial_cohort": {
+    "selected": 365,
+    "passed_before_stop": 253,
+    "failed": [
+      "adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_receipt_tests::cancellation_boundary_tests::completion_tests::workflow_action_cancellation_completion_race_completion_first",
+      "adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::late_truth_tests::live_boundary_tests::completion_race_tests::workflow_action_reconciliation_completion_race_completion_first"
+    ],
+    "status": "interrupted after two identified stale probes; no cohort pass claim"
+  },
+  "replacement_checks": [
+    "completion-probe-tests-01",
+    "upstream-action-tests-02"
+  ],
+  "broader_successes_not_counted": true
+}

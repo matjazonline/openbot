@@ -43,7 +43,10 @@ async fn sql_marker_for(
 
 /// A complete SQL-only in-app publication cloned from an in-app `source`: marker, action,
 /// thread, message, destination and the atomic receipt.
-async fn sql_publication(db: &mut PgConnection, source: Uuid) -> Result<Uuid, sqlx::Error> {
+pub(super) async fn sql_publication(
+    db: &mut PgConnection,
+    source: Uuid,
+) -> Result<Uuid, sqlx::Error> {
     let invocation = sql_intent(db, source).await?;
     sql_publication_for(db, source, invocation).await
 }

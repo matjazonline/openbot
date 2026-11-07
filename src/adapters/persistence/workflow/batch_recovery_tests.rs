@@ -8,7 +8,9 @@ async fn workflow_batch_deferred_deadline_and_lost_ack_are_atomic() {
         .bind(request.run.as_uuid()).execute(f.persistence().pool()).await.unwrap();
     let before = snapshot(&f).await;
     let mut tx = f.persistence().pool().begin().await.unwrap();
-    advance_on(&mut tx, request, budget(64)).await.unwrap();
+    advance_on(&mut tx, request, budget(64), None)
+        .await
+        .unwrap();
     tokio::time::sleep(Duration::from_millis(360)).await;
     assert!(tx.commit().await.is_err());
     assert_eq!(snapshot(&f).await, before);
@@ -20,7 +22,7 @@ async fn workflow_batch_deferred_deadline_and_lost_ack_are_atomic() {
     .await
     .unwrap();
     let mut tx = f.persistence().pool().begin().await.unwrap();
-    let saved = advance_on(&mut tx, request, budget(1)).await.unwrap();
+    let saved = advance_on(&mut tx, request, budget(1), None).await.unwrap();
     tx.commit().await.unwrap();
     // Simulate losing the commit response and reconnecting through a fresh pool.
     let options = f.persistence().pool().connect_options();

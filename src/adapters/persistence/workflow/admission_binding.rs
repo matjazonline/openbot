@@ -69,7 +69,7 @@ impl WorkflowBindings for PostgresPersistence {
                 saved: true,
             })
         } else {
-            current_binding(&mut tx, company, binding)
+            current_binding(&mut tx, company, binding, trigger)
                 .await?
                 .map(|binding| AdmissionBinding {
                     binding,
@@ -131,8 +131,10 @@ async fn current_binding(
     db: &mut PgConnection,
     company: CompanyId,
     binding: WorkflowBindingId,
+    trigger: &TriggerRef,
 ) -> AppResult<Option<Arc<ConfiguredBinding>>> {
-    let Some(state) = binding_rows::read_binding(db, company, binding).await? else {
+    let frozen = channel_reply::frozen_revision(db, company, binding, trigger).await?;
+    let Some(state) = binding_rows::read_binding_at(db, company, binding, frozen).await? else {
         return Ok(None);
     };
     if !state.active {

@@ -1,0 +1,6 @@
+{
+  "pid": 7757,
+  "command": "/Users/mac02/dev/openbot/target/debug/deps/open_bots-048b7abd3ed0c794 workflow_action_ --nocapture",
+  "signal": "SIGINT",
+  "reason": "Broad action cohort exposed two stale completion SQL probe prefixes. Stop at those established failures and rerun exact affected tests plus the upstream-changed fixture module; preserve all partial output, no full-cohort pass claim."
+}

@@ -1,0 +1,43 @@
+{
+  "phase": "p04",
+  "status": "accepted_in_phase",
+  "integrated": false,
+  "accepted_at": "2026-11-07T05:09:19.260822+00:00",
+  "digest": "f26c909acb26d1cd0c9dd4332bc7cc3519f639d27de78b30dcd24212cb5709b8",
+  "source_paths_verified": 133,
+  "phase_files": 45,
+  "head": "769a23aa6ef423e964f8221a8ee6b0743325c6ba",
+  "snapshot_exclusions": [
+    "plan/03-channel-handles-send/COORDINATION.md",
+    "plan/03-channel-handles-send/phases/p01/docs",
+    "plan/03-channel-handles-send/phases/p02/docs",
+    "plan/03-channel-handles-send/phases/p03/docs",
+    "plan/03-channel-handles-send/phases/p04/docs",
+    "plan/03-channel-handles-send/phases/p05/docs",
+    "plan/03-channel-handles-send/phases/p06/docs",
+    "plan/03-channel-handles-send/phases/p07/docs",
+    "plan/03-channel-handles-send/integration/final/docs"
+  ],
+  "coordination_revision": 11,
+  "coordination_sha256": "6549fec0064a4a32120588fa06a301d622797e7b5d3ffd7d51431f058c22c403",
+  "reviewer": "/root/channel_reply_review_recovery",
+  "reviewer_settings_requested": "gpt-6-astra/high",
+  "review_note": "CHS-P04-B1-R2",
+  "root_author": "/root, user-confirmed Sol6.1/xhigh",
+  "actual_runtime_settings": "unexposed",
+  "finding_dispositions": {
+    "CHS-P04-B1-F1": "FIXED, independent B R2",
+    "CHS-P04-B1-F2": "FIXED, independent B R2"
+  },
+  "checks": "current-affected-summary-02.json",
+  "counts": {
+    "distinct_selected": 404,
+    "passed": 404,
+    "ignored": 0,
+    "failed": 0
+  },
+  "full_suite": false,
+  "review_limitation": "B independently inspected source/callers/receipts; runtime checks root-executed under networkguard/stock2MiB",
+  "predecessor": "R1 whole-review interrupted after saved findings; not accepted; fresh B reviewed complete corrected phase",
+  "remaining": "plan03 p05-p07 and combined targeted integration, then allplan04-history; no commit/push/deploy"
+}

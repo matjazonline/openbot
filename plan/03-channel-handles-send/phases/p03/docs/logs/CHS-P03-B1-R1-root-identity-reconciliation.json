@@ -1,0 +1,22 @@
+{
+  "timestamp": "2026-11-07T01:44:05.375185+00:00",
+  "kind": "root-authored workflow-note path correction",
+  "unexpected_path": "plan/03-channel-handles-send/phases/p03/HANDOFF.md",
+  "preserved_at": "plan/03-channel-handles-send/phases/p03/docs/logs/CHS-P03-B1-R1-unintended-handoff.md",
+  "content_sha256": "6f610003b6df2da15df09e7e0e8c5d561422966021d00427cd64771d68978ab0",
+  "source_changes": false,
+  "recomputed_digest": "19960fb95b5d0a4fcb1547e317cb46fe91161392f76967d2802364eb1843f808",
+  "exclusions": [
+    "plan/03-channel-handles-send/COORDINATION.md",
+    "plan/03-channel-handles-send/phases/p01/docs",
+    "plan/03-channel-handles-send/phases/p02/docs",
+    "plan/03-channel-handles-send/phases/p03/docs",
+    "plan/03-channel-handles-send/phases/p04/docs",
+    "plan/03-channel-handles-send/phases/p05/docs",
+    "plan/03-channel-handles-send/phases/p06/docs",
+    "plan/03-channel-handles-send/phases/p07/docs",
+    "plan/03-channel-handles-send/integration/final/docs"
+  ],
+  "exclusions_changed": false,
+  "cause": "Root appended a frozen-artifact workflow note one directory above the authoritative docs/HANDOFF.md after freezing. Preserved exact note under excluded phase logs; no implementation/deliverable removed or excluded."
+}

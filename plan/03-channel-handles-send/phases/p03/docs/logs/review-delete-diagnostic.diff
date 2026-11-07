@@ -1,0 +1,35 @@
+--- a/src/adapters/persistence/workflow/channel_reply_intent_schema_tests.rs
++++ b/src/adapters/persistence/workflow/channel_reply_intent_schema_tests.rs
+@@ -359,3 +359,32 @@
+     other.advance().await;
+     QueueTenants { burst: f, other }
+ }
++
++
++#[tokio::test]
++async fn channel_reply_review_diagnostic_suppressed_decision_delete() {
++    let f = FinalFixture::new("channel.no_reply", false).await;
++    f.advance().await;
++    let before = f.state().await;
++    let deletion = sqlx::query("DELETE FROM channel_reply_decisions WHERE company_id=$1 AND run_id=$2")
++        .bind(f.scope.company.as_uuid()).bind(f.scope.run.as_uuid())
++        .execute(f.p.pool()).await;
++    let after = f.state().await;
++    eprintln!("suppressed deletion={deletion:?} before={before} after={after}");
++    assert!(deletion.is_err(), "succeeded root lost its durable suppression: {after}");
++}
++
++#[tokio::test]
++async fn channel_reply_review_diagnostic_failed_decision_delete() {
++    let f = FinalFixture::new("data.map", false).await;
++    f.advance().await;
++    let claim = f.p.claim_replies(ReplyPublicationWorker(Uuid::new_v4()), ReplyPublicationPage::try_from(1).unwrap()).await.unwrap()[0];
++    assert!(f.p.release_reply(claim, ReplyPublicationRetry::Terminal(ReplyPublicationFailure::AuthorityRevoked)).await.unwrap());
++    let before = f.state().await;
++    let deletion = sqlx::query("DELETE FROM channel_reply_decisions WHERE company_id=$1 AND run_id=$2")
++        .bind(f.scope.company.as_uuid()).bind(f.scope.run.as_uuid())
++        .execute(f.p.pool()).await;
++    let after = f.state().await;
++    eprintln!("failed deletion={deletion:?} before={before} after={after}");
++    assert!(deletion.is_err(), "succeeded root lost its durable failed publication: {after}");
++}

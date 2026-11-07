@@ -5,7 +5,9 @@ use serde_json::{Value, json};
 pub(super) async fn resume_on(
     db: &mut PgConnection,
     scope: ActivationRequest,
+    notices: Option<&crate::application::workflow::decisions::DecisionNotices>,
 ) -> AppResult<WaitProgress> {
+    channel_reply_completion::prelock_on(db, scope).await?;
     if maintenance::expire_on(db, scope).await? {
         return Ok(WaitProgress::Expired(CommitDisposition::Committed));
     }
@@ -62,7 +64,7 @@ pub(super) async fn resume_on(
     }
     if wait.reason == "child_run" {
         // Box the child continuation: it may start the next round's child (07-D1 §D1.4).
-        return Box::pin(child_waits::resume_on(db, scope, run, wait.id)).await;
+        return Box::pin(child_waits::resume_on(db, scope, run, wait.id, notices)).await;
     }
     if wait.reason == "decision" {
         // Submission settles a decision in its own command; a worker only times it out.
@@ -112,7 +114,7 @@ pub(super) async fn resume_on(
         Wake::Event(event)
     };
     // Box the transactional continuation to keep the debug async stack shallow.
-    Box::pin(advance(db, scope, run, wake)).await
+    Box::pin(advance(db, scope, run, wake, notices)).await
 }
 
 /// Complete the exact delivery wait and reopen the agent job it parked (continuation
@@ -208,6 +210,7 @@ async fn advance(
     scope: ActivationRequest,
     run: waits::WaitRun,
     wake: Wake,
+    notices: Option<&crate::application::workflow::decisions::DecisionNotices>,
 ) -> AppResult<WaitProgress> {
     let binding = admission_binding::read_saved_binding(
         db,
@@ -228,10 +231,18 @@ async fn advance(
             ),
             None,
         ),
-        Wake::Event(event) => (
-            prepare(binding.bundle(), &activation, event.payload.clone()),
-            Some(event.id),
-        ),
+        Wake::Event(event) => {
+            let question = binding.bundle().compiled().graph().definition().steps[&activation.step]
+                .step_type
+                .as_str()
+                == "message.ask";
+            let prepared = if question {
+                prepare_io(binding.bundle(), &activation, event.payload.clone())
+            } else {
+                prepare(binding.bundle(), &activation, event.payload.clone())
+            };
+            (prepared, Some(event.id))
+        }
         // A parked message step completes as the I/O step it is, with its receipt as output.
         Wake::Effect(result) => (prepare_io(binding.bundle(), &activation, result), None),
     };
@@ -242,7 +253,7 @@ async fn advance(
         }
         Err(error) => return Err(error),
     };
-    commit_wake(db, scope, &run, &activation, completion, event).await
+    commit_wake(db, scope, &run, &activation, completion, event, notices).await
 }
 
 /// Complete the parked step with its wake output: the activation limit, the consumed event (if
@@ -254,6 +265,7 @@ pub(super) async fn commit_wake(
     activation: &ActivatedExecution,
     completion: crate::application::workflow::batch::PureCompletion,
     event: Option<Uuid>,
+    notices: Option<&crate::application::workflow::decisions::DecisionNotices>,
 ) -> AppResult<WaitProgress> {
     let max_steps = u64::try_from(run.max_steps).map_err(|_| invalid())?;
     if activation.ordinal > max_steps
@@ -269,8 +281,9 @@ pub(super) async fn commit_wake(
             return Err(invalid());
         }
     }
-    sqlx::query("UPDATE workflow_waits SET state='completed',settled_at=clock_timestamp(),consumed_event_id=$4 WHERE company_id=$1 AND run_id=$2 AND execution_id=$3 AND state='waiting'")
-        .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(scope.execution.as_uuid()).bind(event).execute(&mut *db).await?;
+    let source_wait: Uuid = sqlx::query_scalar("UPDATE workflow_waits SET state='completed',settled_at=clock_timestamp(),consumed_event_id=$4 WHERE company_id=$1 AND run_id=$2 AND execution_id=$3 AND state='waiting' RETURNING id")
+        .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(scope.execution.as_uuid()).bind(event).fetch_one(&mut *db).await?;
+    message::questions::close_on(db, scope).await?;
     sqlx::query("UPDATE workflow_runs SET state='running',waiting_reason=NULL WHERE company_id=$1 AND id=$2")
         .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).execute(&mut *db).await?;
     let successor = batch_commit::complete(
@@ -279,11 +292,22 @@ pub(super) async fn commit_wake(
         activation,
         &completion,
         run.max_steps,
-        completion_job::CompletionOwner::Parked,
+        completion_job::CompletionOwner::Parked(WaitId::new(source_wait)),
+        notices,
     )
     .await?;
+    if matches!(successor, batch_commit::CompletionProgress::Refused) {
+        return Ok(WaitProgress::Failed {
+            disposition: CommitDisposition::Committed,
+            reason: WaitFailureReason::InvalidOutput,
+        });
+    }
+    let batch_commit::CompletionProgress::Advanced(successor) = successor else {
+        return Ok(WaitProgress::Pending);
+    };
     Ok(WaitProgress::Completed(Box::new(CommittedWorkflowStep {
         disposition: CommitDisposition::Committed,
+        response_disposition: completion.response_disposition,
         output: completion.output,
         route: completion.route,
         target: completion.target,
@@ -302,6 +326,7 @@ async fn expire(
 ) -> AppResult<WaitProgress> {
     sqlx::query("UPDATE workflow_waits SET state='expired',settled_at=clock_timestamp() WHERE company_id=$1 AND run_id=$2 AND execution_id=$3 AND state='waiting'")
         .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(scope.execution.as_uuid()).execute(&mut *db).await?;
+    message::questions::close_on(db, scope).await?;
     if run_state == "waiting" {
         sqlx::query("UPDATE workflow_runs SET state='failed',waiting_reason=NULL,terminal_execution_id=$3 WHERE company_id=$1 AND id=$2")
             .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(scope.execution.as_uuid()).execute(&mut *db).await?;
@@ -311,6 +336,7 @@ async fn expire(
 }
 #[derive(sqlx::FromRow)]
 struct SavedResult {
+    response_disposition: String,
     committed_output: Value,
     committed_route: String,
     route_target: String,
@@ -324,14 +350,21 @@ pub(super) async fn saved(
     disposition: CommitDisposition,
     effect: bool,
 ) -> AppResult<WaitProgress> {
-    let saved=sqlx::query_as::<_,SavedResult>("SELECT committed_output,committed_route,route_target,successor_execution_id FROM workflow_executions WHERE company_id=$1 AND run_id=$2 AND id=$3 AND completed_at IS NOT NULL AND committed_route IS NOT NULL")
+    let saved=sqlx::query_as::<_,SavedResult>("SELECT response_disposition,committed_output,committed_route,route_target,successor_execution_id FROM workflow_executions WHERE company_id=$1 AND run_id=$2 AND id=$3 AND completed_at IS NOT NULL AND committed_route IS NOT NULL")
         .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(scope.execution.as_uuid()).fetch_optional(&mut *db).await?;
     let Some(saved) = saved else {
+        if channel_reply_proposals::existing_on(db, scope)
+            .await?
+            .is_some()
+        {
+            return Ok(WaitProgress::Pending);
+        }
         if !effect {
             return Err(invalid());
         }
         return Ok(WaitProgress::Completed(Box::new(CommittedWorkflowStep {
             disposition,
+            response_disposition: ResponseDisposition::Automatic,
             output: Value::Null,
             route: RouteSelection::FinalError,
             target: TransitionTarget::End,
@@ -361,6 +394,7 @@ pub(super) async fn saved(
     };
     Ok(WaitProgress::Completed(Box::new(CommittedWorkflowStep {
         disposition,
+        response_disposition: saved.response_disposition.parse().map_err(|_| invalid())?,
         output: saved.committed_output,
         route: saved_route(&saved.committed_route)?,
         target,

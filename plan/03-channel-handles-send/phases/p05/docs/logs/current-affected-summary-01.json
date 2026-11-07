@@ -1,0 +1,2825 @@
+{
+  "distinct_passed": 425,
+  "failed": 0,
+  "ignored": 0,
+  "full_suite": false,
+  "cohorts": [
+    {
+      "cohort": "hitl-prompt",
+      "prefix": "channel_reply_hitl_prompt_",
+      "selected": 17,
+      "passed": 17,
+      "ignored": 0,
+      "tests": [
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::integrity::channel_reply_hitl_prompt_ownership_cannot_be_edited_or_removed",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::integrity::channel_reply_hitl_prompt_failed_atomic_write_leaves_no_prompt_or_wait",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::integrity::channel_reply_hitl_prompt_canonical_content_and_delivery_membership_are_frozen",
+        "application::workflow::registry::channel_question_tests::channel_reply_hitl_prompt_declares_a_human_result_separate_from_its_receipt",
+        "application::workflow::registry::channel_question_tests::channel_reply_hitl_prompt_private_reply_event_cannot_be_declared_generically",
+        "application::workflow::registry::channel_question_tests::channel_reply_hitl_prompt_schema_is_literal_and_exact",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::channel_reply_hitl_prompt_uuid_case_and_nanosecond_deadline_keep_the_same_witness",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::channel_reply_hitl_prompt_cannot_be_an_agent_or_ad_hoc_tool",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::approval::channel_reply_hitl_prompt_approval_notice_stays_private_and_then_parks_the_original_question",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::channel_reply_hitl_prompt_competing_publishers_create_one_occurrence",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::channel_reply_hitl_prompt_in_app_acceptance_keeps_the_human_wait_open",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::channel_reply_hitl_prompt_commits_wait_and_delivery_together",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::lifecycle::channel_reply_hitl_prompt_safe_retry_keeps_message_wait_deadline_and_continuation_budget",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::commit::channel_reply_hitl_prompt_lost_commit_ack_replays_human_wait_before_transport_receipt",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::lifecycle::channel_reply_hitl_prompt_unknown_send_stays_unknown_after_a_human_response",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::commit::channel_reply_hitl_prompt_deferred_commit_cannot_outlive_its_real_claim",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::lifecycle::channel_reply_hitl_prompt_provider_entry_rechecks_deadline_after_competing_parent_lock"
+      ],
+      "ignored_tests": [],
+      "list": "hitl-prompt-list-05.log",
+      "run": "hitl-prompt-tests-05.log"
+    },
+    {
+      "cohort": "hitl-resume",
+      "prefix": "channel_reply_hitl_resume_",
+      "selected": 10,
+      "passed": 10,
+      "ignored": 0,
+      "tests": [
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::resume::channel_reply_hitl_resume_before_ack_and_reconstruction_consumes_once",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::resume::channel_reply_hitl_resume_ingress_consumes_before_ordinary_admission",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::resume::channel_reply_hitl_resume_wrong_respondent_and_prompt_do_not_consume_wait",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::resume::channel_reply_hitl_resume_repeated_questions_have_distinct_waits_and_no_reply_keeps_prompts",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::resume::channel_reply_hitl_resume_competing_humans_have_one_winner",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::resume::channel_reply_hitl_resume_two_live_runs_in_one_thread_stay_independent",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::lifecycle::channel_reply_hitl_resume_response_racing_cancellation_cannot_reopen_the_run",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::child::channel_reply_hitl_resume_child_question_returns_to_parent_without_suppression",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::lifecycle::channel_reply_hitl_resume_recorded_in_time_survives_delayed_wakeup",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::lifecycle::channel_reply_hitl_resume_late_response_races_timeout_and_stops_unsent_work_before_wake"
+      ],
+      "ignored_tests": [],
+      "list": "hitl-resume-list-05.log",
+      "run": "hitl-resume-tests-05.log"
+    },
+    {
+      "cohort": "final-approval",
+      "prefix": "channel_reply_final_approval_",
+      "selected": 2,
+      "passed": 2,
+      "ignored": 0,
+      "tests": [
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::question_final_tests::channel_reply_final_approval_question_uses_exact_saved_response",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::question_final_tests::channel_reply_final_approval_question_rejection_publishes_no_final"
+      ],
+      "ignored_tests": [],
+      "list": "final-approval-list-05.log",
+      "run": "final-approval-tests-05.log"
+    },
+    {
+      "cohort": "channel-reply",
+      "prefix": "channel_reply_",
+      "selected": 159,
+      "passed": 159,
+      "ignored": 0,
+      "tests": [
+        "adapters::persistence::workflow::tests::admission_tests::batch_tests::child_runtime_tests::channel_reply_terminal_child_tests::channel_reply_terminal_repeat_child_cannot_suppress_parent",
+        "adapters::persistence::workflow::tests::admission_tests::batch_tests::child_runtime_tests::channel_reply_terminal_child_tests::channel_reply_terminal_child_cannot_suppress_parent",
+        "adapters::persistence::workflow::tests::admission_tests::batch_tests::channel_reply_terminal_tests::channel_reply_terminal_competing_completions_commit_one_disposition",
+        "adapters::persistence::workflow::tests::admission_tests::batch_tests::channel_reply_terminal_tests::channel_reply_terminal_final_error_cannot_become_suppressed_success",
+        "adapters::persistence::workflow::tests::admission_tests::batch_tests::child_runtime_tests::channel_reply_terminal_child_tests::channel_reply_terminal_parent_selects_its_own_suppression",
+        "adapters::persistence::workflow::tests::admission_tests::batch_tests::channel_reply_terminal_tests::channel_reply_terminal_ordinary_output_flags_cannot_suppress",
+        "adapters::persistence::workflow::tests::admission_tests::batch_tests::child_runtime_tests::channel_reply_terminal_child_tests::channel_reply_terminal_worker_dispatches_without_io",
+        "adapters::persistence::workflow::tests::admission_tests::batch_tests::channel_reply_terminal_tests::channel_reply_terminal_exhausted_pending_is_effect_free_failure",
+        "adapters::persistence::workflow::tests::admission_tests::batch_tests::channel_reply_terminal_tests::channel_reply_terminal_metadata_is_atomic_and_immutable",
+        "adapters::persistence::workflow::tests::admission_tests::batch_tests::channel_reply_terminal_tests::channel_reply_terminal_invalid_output_fails_or_takes_ordinary_error_route",
+        "adapters::persistence::workflow::tests::admission_tests::lease_tests::completion_tests::channel_reply_terminal_io_tests::channel_reply_terminal_io_predecessor_keeps_receipt_and_local_disposition",
+        "adapters::persistence::workflow::tests::admission_tests::decision_tests::channel_reply_terminal_human_tests::channel_reply_terminal_human_continuation_preserves_notices",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::channel_reply_binding_company_teardown_removes_scoped_selection_and_snapshots",
+        "adapters::persistence::workflow::tests::message_tests::channel_reply_terminal_message_tests::channel_reply_terminal_preserves_an_explicit_published_message",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::channel_reply_binding_competing_assignments_choose_one_current_responder",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::channel_reply_binding_freezes_head_contract_and_responder_at_ingress",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::channel_reply_binding_live_run_blocks_snapshot_and_principal_deletion",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::channel_reply_binding_passive_snapshot_follows_source_retention",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::channel_reply_binding_quiet_and_unselected_ingress_get_no_snapshot",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::channel_reply_binding_rejects_foreign_inactive_thread_and_stale_selection",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::channel_reply_binding_roundtrip_update_clear_and_stale_revision",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::channel_reply_binding_snapshot_and_referenced_source_facts_are_immutable",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::channel_reply_binding_trigger_mismatch_and_revocation_create_no_obligation",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::channel_reply_completion_approval_resumes_exact_saved_output",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::channel_reply_completion_commit_failure_and_lost_ack_preserve_atomic_decision",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::channel_reply_completion_competing_finalizers_create_one_obligation",
+        "adapters::persistence::workflow::tests::admission_tests::batch_tests::child_runtime_tests::channel_reply_terminal_child_tests::channel_reply_terminal_cancellation_competes_without_silent_failure",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::channel_reply_completion_contract_edits_cannot_replace_approved_content",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::channel_reply_completion_missing_notice_configuration_cannot_commit_success",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::channel_reply_completion_policy_change_after_approval_fails_saved_step",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::channel_reply_completion_rejection_uses_failure_without_publication",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::intent_schema_tests::channel_reply_intent_schema_competing_claims_and_fenced_release",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::channel_reply_completion_automatic_and_suppressed_are_atomic",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::intent_schema_tests::channel_reply_intent_schema_cross_tenant_links_and_duplicate_decisions_are_rejected",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::intent_schema_tests::channel_reply_intent_schema_eighth_expired_claim_is_terminal",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::intent_schema_tests::channel_reply_intent_schema_expired_lease_has_one_new_owner",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::intent_schema_tests::channel_reply_intent_schema_live_obligation_and_proposal_are_protected",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::channel_reply_completion_invalid_projection_fails_or_uses_original_error_route",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::intent_schema_tests::channel_reply_intent_schema_queued_root_cannot_forge_a_suppressed_decision",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::intent_schema_tests::channel_reply_intent_schema_success_without_decision_rolls_back",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::intent_schema_tests::channel_reply_intent_schema_suppressed_is_never_claimable",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::intent_schema_tests::channel_reply_intent_schema_terminal_failure_keeps_success_and_allows_retention",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::intent_schema_tests::channel_reply_intent_schema_claim_page_serves_another_tenant_before_a_burst",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::owner_tests::channel_reply_completion_child_terminal_parks_only_the_owned_parent",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::owner_tests::channel_reply_completion_exhausted_saved_child_result_never_reconciles_original_handler",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::owner_tests::channel_reply_completion_fenced_approval_resumes_before_worker_handler",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::owner_tests::channel_reply_completion_human_choice_parks_final_approval_before_success",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::owner_tests::channel_reply_completion_timer_keeps_source_wait_and_final_approval_distinct",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::policy_runtime_tests::channel_reply_completion_approved_job_cannot_claim_a_handler_with_sql",
+        "adapters::persistence::workflow::tests::admission_tests::batch_tests::channel_reply_terminal_tests::channel_reply_terminal_preserves_business_value_and_replays_after_restart",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::policy_runtime_tests::channel_reply_completion_cancellation_and_finalization_share_one_terminal_owner",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::policy_runtime_tests::channel_reply_completion_opposite_reviewers_have_one_formal_winner",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::policy_runtime_tests::channel_reply_completion_private_result_cannot_cross_public_reply_clearance",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::policy_runtime_tests::channel_reply_completion_release_revocation_and_finalization_do_not_deadlock",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::authority::channel_reply_publication_changed_plan_has_no_partial_effects",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::policy_runtime_tests::channel_reply_completion_review_timeout_never_publishes_unapproved_output",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::authority::channel_reply_publication_forged_claims_cannot_load_or_commit",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::authority::channel_reply_publication_policy_change_refuses_without_redirecting",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::authority::channel_reply_publication_rechecks_current_send_authority",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::authority::channel_reply_publication_write_failure_rolls_back_then_replays_original_plan",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::channel_reply_publication_competing_transactions_keep_one_canonical_receipt",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::authority::channel_reply_publication_approved_content_survives_elapsed_review_deadline_and_contract_edit",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::policy_runtime_tests::channel_reply_completion_privileged_reviewers_still_require_payload_clearance",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::channel_reply_publication_internal_source_never_falls_back_to_email",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::policy_runtime_tests::channel_reply_completion_revoked_send_role_still_permits_suppression",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::delivery::channel_reply_delivery_revocation_before_provider_entry_cancels_unsent_work",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::delivery::channel_reply_delivery_safe_retry_keeps_same_message_and_prepared_part",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::delivery::channel_reply_delivery_unknown_is_quarantined_and_cannot_be_rewritten_or_deleted",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::delivery::channel_reply_delivery_expired_started_request_recovers_unknown_without_resend",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::delivery::channel_reply_delivery_unknown_parent_and_run_cannot_be_removed_together",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::integrity::channel_reply_delivery_multipart_cancellation_preserves_accepted_piece",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::delivery::channel_reply_delivery_authority_lock_deadline_leaves_request_unstarted",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::integrity::channel_reply_delivery_resolved_owner_can_be_retained_without_losing_message",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::channel_reply_publication_email_and_in_app_commit_exact_content_and_replay",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::integrity::channel_reply_publication_approved_reviewer_must_retain_payload_clearance",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::integrity::channel_reply_publication_frozen_association_metadata_and_parts_cannot_change",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::lifecycle::channel_reply_recovery_shutdown_cancels_actual_composition_and_releases_claim",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::lifecycle::channel_reply_recovery_shutdown_cancels_actual_publication_transaction",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::lifecycle::channel_reply_recovery_shutdown_during_unacknowledged_claim_retains_real_lease",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::membership::channel_reply_publication_canonical_delivery_membership_rejects_extra_insert_and_update",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::membership::channel_reply_publication_competing_membership_and_commit_keeps_exact_effect_set",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::membership::channel_reply_publication_component_membership_checks_new_tenant_and_message",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::membership::channel_reply_publication_part_membership_checks_incoming_and_outgoing_owner",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::integrity::channel_reply_publication_current_binding_is_required_at_commit_and_provider_entry",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::recovery::channel_reply_recovery_reconstructed_worker_polls_without_a_wakeup",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::recovery::channel_reply_publication_and_delivery_survive_original_execution_deadline",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::integrity::channel_reply_publication_release_rechecked_after_success_and_before_provider",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::recovery::channel_reply_recovery_deferred_commit_expiry_rolls_back_all_effects",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::recovery::channel_reply_recovery_transient_composition_backs_off_and_spares_quiet_tenant",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::question_final_tests::channel_reply_final_approval_question_rejection_publishes_no_final",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::question_final_tests::channel_reply_final_approval_question_uses_exact_saved_response",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::slot_tests::channel_reply_completion_full_execution_rejects_final_without_another_slot",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::slot_tests::channel_reply_completion_rejected_approval_keeps_its_slot_reservation",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::integrity::channel_reply_binding_competing_ingress_claimants_create_one_owned_run",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::integrity::channel_reply_binding_context_insert_and_source_acceptance_roll_back_together",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::slot_tests::channel_reply_completion_reserves_128th_slot_once_under_competing_finalizers",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::integrity::channel_reply_binding_inactive_before_ingress_has_visible_refusal_until_selection_cleared",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::integrity::channel_reply_binding_manual_root_has_no_automatic_response_authority",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::integrity::channel_reply_binding_observer_run_cannot_replace_response_owner",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::integrity::channel_reply_binding_rechecks_current_run_as_private_channel_visibility",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::integrity::channel_reply_binding_thread_scoped_binding_cannot_own_channel_responses",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::policy_tests::channel_reply_completion_policy_rejects_unprivileged_reviewers_and_invalid_sql_shape",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::policy_tests::channel_reply_completion_policy_settings_freeze_duration_for_ingress",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::channel_reply_tests::channel_reply_binding_deferred_human_reply_has_no_response_authority",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::channel_reply_tests::channel_reply_binding_matched_human_reply_retains_only_passive_snapshot",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::approval::channel_reply_hitl_prompt_approval_notice_stays_private_and_then_parks_the_original_question",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::channel_reply_hitl_prompt_cannot_be_an_agent_or_ad_hoc_tool",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::channel_reply_hitl_prompt_commits_wait_and_delivery_together",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::channel_reply_hitl_prompt_competing_publishers_create_one_occurrence",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::channel_reply_hitl_prompt_in_app_acceptance_keeps_the_human_wait_open",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::channel_reply_hitl_prompt_uuid_case_and_nanosecond_deadline_keep_the_same_witness",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::child::channel_reply_hitl_resume_child_question_returns_to_parent_without_suppression",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::integrity::channel_reply_hitl_prompt_canonical_content_and_delivery_membership_are_frozen",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::integrity::channel_reply_hitl_prompt_failed_atomic_write_leaves_no_prompt_or_wait",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::integrity::channel_reply_hitl_prompt_ownership_cannot_be_edited_or_removed",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::lifecycle::channel_reply_hitl_prompt_safe_retry_keeps_message_wait_deadline_and_continuation_budget",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::commit::channel_reply_hitl_prompt_lost_commit_ack_replays_human_wait_before_transport_receipt",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::lifecycle::channel_reply_hitl_prompt_unknown_send_stays_unknown_after_a_human_response",
+        "application::services::delivery_worker::tests::lifecycle::channel_reply_delivery_owner_observes_shutdown_before_claiming",
+        "application::services::delivery_worker::tests::lifecycle::channel_reply_delivery_provider_deadline_cancels_actual_call",
+        "application::services::delivery_worker::tests::lifecycle::channel_reply_delivery_ready_result_wins_simultaneous_shutdown",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::commit::channel_reply_hitl_prompt_deferred_commit_cannot_outlive_its_real_claim",
+        "application::services::delivery_worker::tests::lifecycle::channel_reply_delivery_shutdown_drops_actual_provider_and_records_unknown",
+        "application::services::delivery_worker::tests::lifecycle::channel_reply_delivery_shutdown_preserves_known_result_during_settlement",
+        "application::workflow::channel_reply::approval::tests::channel_reply_completion_policy_enforces_review_and_duration_bounds",
+        "application::workflow::channel_reply::approval::tests::channel_reply_completion_policy_materializes_relative_to_each_response_and_caps_run",
+        "application::workflow::channel_reply::approval::tests::channel_reply_completion_policy_roundtrips_only_static_user_reviewers",
+        "application::workflow::channel_reply::contract::tests::channel_reply_contract_bounds_stored_literals_before_evaluation",
+        "application::workflow::channel_reply::contract::tests::channel_reply_contract_literal_output_still_checks_business_schema",
+        "application::workflow::channel_reply::contract::tests::channel_reply_contract_projects_only_declared_content_and_preserves_result",
+        "application::workflow::channel_reply::contract::tests::channel_reply_contract_refuses_optional_ambiguous_and_non_string_schema_paths",
+        "application::workflow::channel_reply::contract::tests::channel_reply_contract_rejects_missing_wrong_blank_and_oversized_results",
+        "application::workflow::channel_reply::contract::tests::channel_reply_contract_requires_supported_explicit_format_version",
+        "application::workflow::channel_reply::contract::tests::channel_reply_contract_roundtrip_refuses_unknown_fields_and_arbitrary_operators",
+        "application::workflow::channel_reply::contract::tests::channel_reply_contract_uses_existing_reference_pointer_rules",
+        "application::workflow::channel_reply::origin_tests::channel_reply_completion_origin_binds_immutable_proposal_to_effect_identity",
+        "application::workflow::channel_reply::origin_tests::channel_reply_completion_origin_cannot_enter_step_or_model_tool_preparation",
+        "application::workflow::channel_reply::origin_tests::channel_reply_completion_origin_is_restricted_to_the_trusted_company_reply_contract",
+        "application::workflow::channel_reply::origin_tests::channel_reply_completion_origin_roundtrip_and_integrity_are_strict",
+        "application::workflow::registry::channel_question_tests::channel_reply_hitl_prompt_declares_a_human_result_separate_from_its_receipt",
+        "application::workflow::registry::channel_question_tests::channel_reply_hitl_prompt_private_reply_event_cannot_be_declared_generically",
+        "application::workflow::registry::channel_question_tests::channel_reply_hitl_prompt_schema_is_literal_and_exact",
+        "application::workflow::registry::channel_reply_terminal_contract_tests::channel_reply_terminal_contract_accepts_schema_valid_empty_business_values",
+        "application::workflow::registry::channel_reply_terminal_contract_tests::channel_reply_terminal_contract_preflight_charges_all_schema_copies",
+        "application::workflow::registry::channel_reply_terminal_contract_tests::channel_reply_terminal_contract_rejects_nonterminal_and_choice_routes",
+        "application::workflow::registry::channel_reply_terminal_contract_tests::channel_reply_terminal_contract_retains_error_routing_and_typed_value",
+        "application::workflow::registry::channel_reply_terminal_contract_tests::channel_reply_terminal_contract_roundtrip_and_identity",
+        "application::workflow::sample::tests::channel_reply_terminal_tests::channel_reply_terminal_sample_returns_business_value_without_a_script",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::lifecycle::channel_reply_hitl_resume_response_racing_cancellation_cannot_reopen_the_run",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::resume::channel_reply_hitl_resume_before_ack_and_reconstruction_consumes_once",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::resume::channel_reply_hitl_resume_competing_humans_have_one_winner",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::resume::channel_reply_hitl_resume_ingress_consumes_before_ordinary_admission",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::resume::channel_reply_hitl_resume_repeated_questions_have_distinct_waits_and_no_reply_keeps_prompts",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::resume::channel_reply_hitl_resume_wrong_respondent_and_prompt_do_not_consume_wait",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::resume::channel_reply_hitl_resume_two_live_runs_in_one_thread_stay_independent",
+        "application::services::delivery_worker::tests::lifecycle::channel_reply_delivery_shutdown_bounds_stuck_known_settlement",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::lifecycle::channel_reply_hitl_prompt_provider_entry_rechecks_deadline_after_competing_parent_lock",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::lifecycle::channel_reply_hitl_resume_late_response_races_timeout_and_stops_unsent_work_before_wake",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::lifecycle::channel_reply_hitl_resume_recorded_in_time_survives_delayed_wakeup"
+      ],
+      "ignored_tests": [],
+      "list": "channel-reply-list-06.log",
+      "run": "channel-reply-tests-06.log"
+    },
+    {
+      "cohort": "messaging",
+      "prefix": "workflow_message_",
+      "selected": 64,
+      "passed": 64,
+      "ignored": 0,
+      "tests": [
+        "adapters::persistence::workflow::tests::message_tests::reconcile_tests::race_tests::workflow_message_race_competing_settlements_reopen_once",
+        "adapters::persistence::workflow::tests::message_tests::delivery_tests::workflow_message_delivery_begin_part_refuses_a_revoked_actor",
+        "adapters::persistence::workflow::tests::message_tests::authority_tests::workflow_message_publish_revocation_after_a_marker_stays_retryable",
+        "adapters::persistence::workflow::tests::message_tests::reconcile_tests::race_tests::workflow_message_race_settle_and_consumer_compete_for_one_action",
+        "adapters::persistence::workflow::tests::message_tests::delivery_tests::workflow_message_delivery_reaper_locks_parents_and_marks_started_requests_unknown",
+        "adapters::persistence::workflow::tests::message_tests::delivery_tests::workflow_message_delivery_begin_part_refuses_a_recipient_no_longer_a_member",
+        "adapters::persistence::workflow::tests::message_tests::delivery_tests::workflow_message_delivery_begin_part_refuses_a_run_past_its_deadline",
+        "adapters::persistence::workflow::tests::message_tests::delivery_tests::workflow_message_delivery_duplicate_callback_adds_no_event",
+        "adapters::persistence::workflow::tests::message_tests::delivery_tests::workflow_message_race_paused_producer_then_consumer_sees_both_events",
+        "adapters::persistence::workflow::tests::message_tests::reconcile_tests::race_tests::workflow_message_race_settle_consumer_and_begin_part_compete",
+        "adapters::persistence::workflow::tests::message_tests::reconcile_tests::race_tests::workflow_message_race_settle_racing_workflow_cancellation_supersedes",
+        "adapters::persistence::workflow::tests::message_tests::reconcile_tests::veto_tests::workflow_message_reconcile_model_tool_delivery_reopen_never_reopens_the_job",
+        "adapters::persistence::workflow::tests::message_tests::reconcile_tests::veto_tests::workflow_message_reconcile_wrong_association_actor_is_refused",
+        "adapters::persistence::workflow::tests::message_tests::reconcile_tests::workflow_message_reconcile_applied_on_a_live_run_resumes_after_every_destination",
+        "adapters::persistence::workflow::tests::message_tests::race_tests::workflow_message_race_delayed_commit_past_fence_expiry_or_deadline_rolls_back",
+        "adapters::persistence::workflow::tests::message_tests::reconcile_tests::workflow_message_reconcile_applied_on_a_terminal_run_records_truth_only",
+        "adapters::persistence::workflow::tests::message_tests::reconcile_tests::workflow_message_reconcile_conflicted_execution_reopens_nothing",
+        "adapters::persistence::workflow::tests::message_tests::reconcile_tests::veto_tests::workflow_message_reconcile_finality_breach_then_every_destination_final_vetoes_the_receipt",
+        "adapters::persistence::workflow::tests::message_tests::reconcile_tests::veto_tests::workflow_message_reconcile_sql_reopen_refuses_expired_non_final_and_foreign_evidence",
+        "adapters::persistence::workflow::tests::message_tests::reconcile_tests::workflow_message_reconcile_expired_proof_before_begin_part_returns_to_unknown",
+        "adapters::persistence::workflow::tests::message_tests::reconcile_tests::workflow_message_reconcile_expired_proof_is_refused_without_a_grant",
+        "adapters::persistence::workflow::tests::message_tests::reconcile_tests::workflow_message_reconcile_finality_breach_vetoes_resume_and_reopen",
+        "adapters::persistence::workflow::tests::message_tests::reconcile_tests::workflow_message_reconcile_not_applied_reopens_only_the_subject",
+        "adapters::persistence::workflow::tests::message_tests::reconcile_tests::workflow_message_reconcile_stale_snapshot_is_refused_without_a_grant",
+        "adapters::persistence::workflow::tests::message_tests::reconcile_tests::workflow_message_reconcile_unknown_and_refusals_change_nothing",
+        "adapters::persistence::workflow::tests::message_tests::reconcile_tests::workflow_message_sql_evidence_attribution_shape_rejects_forgeries",
+        "adapters::persistence::workflow::tests::message_tests::authority_tests::workflow_message_publish_revoked_authority_is_terminal_rejected_before_any_marker",
+        "adapters::persistence::workflow::tests::message_tests::recovery_tests::workflow_message_model_tool_failed_delivery_continues_the_agent_job",
+        "adapters::persistence::workflow::tests::message_tests::reconcile_tests::workflow_message_unknown_note_through_the_production_composition",
+        "adapters::persistence::workflow::tests::message_tests::recovery_tests::workflow_message_publish_competing_dispatchers_publish_once",
+        "adapters::persistence::workflow::tests::message_tests::recovery_tests::workflow_message_recovery_control_retry_replays_the_failed_receipt",
+        "adapters::persistence::workflow::tests::message_tests::sql_tests::workflow_message_publish_admission_admits_128_and_refuses_129",
+        "adapters::persistence::workflow::tests::message_tests::sql_tests::workflow_message_publish_step_at_the_limit_is_a_terminal_action_limit",
+        "adapters::persistence::workflow::tests::message_tests::sql_tests::workflow_message_sql_admission_backstop_serializes_competing_writers",
+        "adapters::persistence::workflow::tests::message_tests::sql_tests::workflow_message_sql_destination_links_reject_foreign_rows",
+        "adapters::persistence::workflow::tests::message_tests::sql_tests::workflow_message_sql_effect_wait_must_match_its_run_and_action",
+        "adapters::persistence::workflow::tests::message_tests::sql_tests::workflow_message_sql_fence_capture_and_close_identity_reject_forgeries",
+        "adapters::persistence::workflow::tests::message_tests::race_tests::workflow_message_race_ambiguous_publication_commit_resolves_three_ways",
+        "adapters::persistence::workflow::tests::message_tests::sql_tests::workflow_message_sql_park_requires_the_effect_parked_close_cause",
+        "adapters::persistence::workflow::tests::message_tests::reconcile_tests::workflow_message_reconcile_not_applied_exhausted_or_ended_never_resends",
+        "adapters::persistence::workflow::tests::message_tests::sql_tests::workflow_message_sql_step_execution_keeps_one_effect_wait",
+        "adapters::persistence::workflow::tests::message_tests::sql_tests::workflow_message_sql_delivery_provenance_rejects_unproven_exits",
+        "adapters::persistence::workflow::tests::message_tests::thread_tests::correlation_tests::workflow_message_stores_anchored_rendered_headers_without_rederiving_them",
+        "adapters::persistence::workflow::tests::message_tests::thread_tests::workflow_message_thread_external_reply_answers_its_own_source",
+        "adapters::persistence::workflow::tests::message_tests::thread_tests::workflow_message_thread_in_app_reply_stays_in_the_source_thread",
+        "adapters::persistence::workflow::tests::message_tests::thread_tests::workflow_message_thread_inbound_reply_resolves_each_recipients_copy",
+        "adapters::persistence::workflow::tests::message_tests::thread_tests::workflow_message_thread_internal_reply_note_leaves_guards_unchanged",
+        "adapters::persistence::workflow::tests::message_tests::recovery_tests::workflow_message_recovery_existing_marker_is_never_republished",
+        "adapters::persistence::workflow::tests::message_tests::sql_tests::workflow_message_sql_receipt_and_state_guards_reject_forgeries",
+        "adapters::persistence::workflow::tests::message_tests::thread_tests::workflow_message_thread_send_never_joins_the_customer_thread",
+        "adapters::persistence::workflow::tests::message_tests::thread_tests::workflow_message_thread_external_reply_continues_the_source_relay_trace",
+        "adapters::persistence::workflow::tests::message_tests::workflow_message_publish_in_app_channel_commits_receipt_atomically",
+        "application::workflow::supervise::tests::workflow_message_wait_supervisor_confirms_suspension_and_never_releases",
+        "adapters::persistence::workflow::tests::message_tests::workflow_message_receipt_failed_delivery_takes_final_error_and_never_resends",
+        "adapters::persistence::workflow::tests::message_tests::workflow_message_receipt_poison_backs_off_and_stalls_at_five",
+        "adapters::persistence::workflow::tests::message_tests::workflow_message_model_tool_deliveries_park_and_continue_sequentially",
+        "adapters::persistence::workflow::tests::message_tests::workflow_message_receipt_unknown_is_uncertain_until_the_deadline",
+        "adapters::persistence::workflow::tests::message_tests::workflow_message_wait_cancel_supersedes_unsent_and_records_late_truth",
+        "adapters::persistence::workflow::tests::message_tests::recovery_tests::workflow_message_recovery_rolled_back_publication_retries_and_publishes_once",
+        "adapters::persistence::workflow::tests::message_tests::workflow_message_wait_deadline_supersedes_unsent_deliveries",
+        "adapters::persistence::workflow::tests::message_tests::thread_tests::workflow_message_thread_user_send_opens_a_thread_the_member_takes_part_in",
+        "adapters::persistence::workflow::tests::message_tests::workflow_message_wait_user_email_parks_then_resumes_on_accepted_receipt",
+        "adapters::persistence::workflow::tests::message_tests::thread_tests::correlation_tests::workflow_message_invalid_frozen_correlation_creates_no_message_or_delivery",
+        "adapters::persistence::workflow::tests::message_tests::thread_tests::workflow_message_thread_reply_refuses_sources_it_cannot_answer"
+      ],
+      "ignored_tests": [],
+      "list": "messaging-list-06.log",
+      "run": "messaging-tests-06.log"
+    },
+    {
+      "cohort": "reply-ingress",
+      "prefix": "message_reply_",
+      "selected": 13,
+      "passed": 13,
+      "ignored": 0,
+      "tests": [
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::message_reply_crash_replay_matches_once",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::message_reply_recorded_before_the_deadline_is_consumed_after_it",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::message_reply_the_run_can_never_take_is_ordinary_ingress",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::message_reply_that_fell_through_is_never_matched_on_a_retry",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::message_reply_to_a_workflow_reply_matches_only_the_customer_it_answered",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::message_reply_from_the_wrong_responder_or_after_expiry_is_ordinary_ingress",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::message_reply_to_a_channel_post_matches_only_an_in_app_answer",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::message_reply_delivery_failing_on_the_last_attempt_fails_the_intent_observably",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::message_reply_resumes_its_wait_once_and_a_second_reply_is_ordinary",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::message_reply_before_its_wait_parks_is_deferred_until_it_does",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::message_reply_to_an_unawaited_send_is_ordinary_ingress",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::message_reply_racing_wait_expiry_agrees_without_deadlock",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::message_reply_delivery_out_of_time_is_retried_not_settled"
+      ],
+      "ignored_tests": [],
+      "list": "reply-ingress-list-06.log",
+      "run": "reply-ingress-tests-06.log"
+    },
+    {
+      "cohort": "action-approval",
+      "prefix": "workflow_action_approval_",
+      "selected": 32,
+      "passed": 32,
+      "ignored": 0,
+      "tests": [
+        "adapters::persistence::workflow::tests::http_tests::approval_tests::continuation_tests::workflow_action_approval_old_comment_cannot_attach_to_later_wait",
+        "adapters::persistence::workflow::tests::http_tests::approval_tests::continuation_tests::workflow_action_approval_continuation_counter_and_history_cannot_be_forged",
+        "adapters::persistence::workflow::tests::http_tests::approval_tests::continuation_tests::workflow_action_approval_later_submission_competes_with_cancellation",
+        "adapters::persistence::workflow::tests::http_tests::approval_tests::continuation_tests::workflow_action_approval_multiple_effects_resume_without_failure_debit_or_old_approval_reuse",
+        "adapters::persistence::workflow::tests::http_tests::approval_tests::review_tests::workflow_action_approval_audit_kind_binding_preserves_ordinary_uniqueness",
+        "adapters::persistence::workflow::tests::http_tests::approval_tests::continuation_tests::workflow_action_approval_failure_retry_after_continuation_uses_failure_allowance",
+        "adapters::persistence::workflow::tests::http_tests::approval_tests::review_tests::workflow_action_approval_operator_retry_preserves_nonzero_continuation_witness",
+        "adapters::persistence::workflow::tests::http_tests::approval_tests::review_tests::workflow_action_approval_identical_operation_new_call_id_reuses_one_receipt",
+        "adapters::persistence::workflow::tests::http_tests::approval_tests::review_tests::workflow_action_approval_replay_preserves_result_after_later_successor",
+        "adapters::persistence::workflow::tests::http_tests::approval_tests::continuation_tests::workflow_action_approval_continuation_ceiling_refuses_without_resetting_failures",
+        "adapters::persistence::workflow::tests::http_tests::approval_tests::sql_tests::workflow_action_approval_digest_cannot_authorize_changed_arguments",
+        "adapters::persistence::workflow::tests::http_tests::approval_tests::sql_tests::workflow_action_approval_digest_fk_rejects_each_mismatch",
+        "adapters::persistence::workflow::tests::http_tests::approval_tests::sql_tests::workflow_action_approval_invalid_choice_data_and_digest_leave_open",
+        "adapters::persistence::workflow::tests::http_tests::approval_tests::sql_tests::workflow_action_approval_unprovable_notice_key_fails_without_park",
+        "adapters::persistence::workflow::tests::http_tests::approval_tests::continuation_tests::workflow_action_approval_later_expiry_and_rejection_preserve_first_decision",
+        "adapters::persistence::workflow::tests::http_tests::approval_tests::continuation_tests::workflow_action_approval_orphan_wait_and_foreign_audit_are_rejected",
+        "adapters::persistence::workflow::tests::http_tests::approval_tests::workflow_action_approval_competing_reviewers_settle_once",
+        "adapters::persistence::workflow::tests::http_tests::approval_tests::workflow_action_approval_expiry_fails_without_dispatch",
+        "adapters::persistence::workflow::tests::http_tests::approval_tests::review_tests::workflow_action_approval_same_arguments_different_target_or_operation_need_new_approval",
+        "adapters::persistence::workflow::tests::http_tests::approval_tests::workflow_action_approval_last_failure_attempt_can_park_and_resume",
+        "adapters::persistence::workflow::tests::http_tests::approval_tests::workflow_action_approval_park_with_sixteen_approvers_commits_within_bound",
+        "adapters::persistence::workflow::tests::http_tests::approval_tests::workflow_action_approval_reject_registered_operation_has_http_failure",
+        "adapters::persistence::workflow::tests::http_tests::approval_tests::workflow_action_approval_admin_demotion_refuses_park_and_submission",
+        "adapters::persistence::workflow::tests::http_tests::approval_tests::workflow_action_approval_reopen_without_submission_is_rejected",
+        "adapters::persistence::workflow::tests::http_tests::approval_tests::workflow_action_approval_submit_competes_with_expiry",
+        "adapters::persistence::workflow::tests::http_tests::approval_tests::workflow_action_approval_dispatch_claims_next_attempt_and_dispatches_once",
+        "adapters::persistence::workflow::tests::mcp_tests::approval_tests::workflow_action_approval_mcp_never_opens_before_approval_then_calls_once",
+        "adapters::persistence::workflow::tests::mcp_tests::approval_tests::workflow_action_approval_not_applied_proof_never_grants_second_entry",
+        "adapters::persistence::workflow::tests::message_tests::approval_tests::workflow_action_approval_message_then_effect_wait_preserves_both_histories",
+        "adapters::persistence::workflow::tests::http_tests::approval_tests::sql_tests::workflow_action_approval_reopen_checks_transaction_choice_and_accounting",
+        "adapters::persistence::workflow::tests::message_tests::approval_tests::workflow_action_approval_race_message_lost_ack_resolves_park",
+        "adapters::persistence::workflow::tests::http_tests::approval_tests::resolution_tests::workflow_action_approval_race_lost_commit_ack_resolves_exact_park"
+      ],
+      "ignored_tests": [],
+      "list": "action-approval-list-06.log",
+      "run": "action-approval-tests-06.log"
+    },
+    {
+      "cohort": "decisions",
+      "prefix": "workflow_decision_",
+      "selected": 38,
+      "passed": 38,
+      "ignored": 0,
+      "tests": [
+        "adapters::persistence::workflow::tests::admission_tests::decision_tests::authority_tests::workflow_decision_principal_conversion_before_submit_refuses",
+        "adapters::persistence::workflow::tests::admission_tests::decision_tests::authority_tests::workflow_decision_removal_before_park_settles_unavailable",
+        "adapters::persistence::workflow::tests::admission_tests::decision_tests::boundary_tests::workflow_decision_data_configured_context_boundary",
+        "adapters::persistence::workflow::tests::admission_tests::decision_tests::authority_tests::workflow_decision_nonmember_and_removed_membership_are_hidden",
+        "adapters::persistence::workflow::tests::admission_tests::decision_tests::authority_tests::workflow_decision_park_blocks_actual_removal_until_notice_commit",
+        "adapters::persistence::workflow::tests::admission_tests::decision_tests::authority_tests::workflow_decision_submission_blocks_actual_removal_until_commit",
+        "adapters::persistence::workflow::tests::admission_tests::decision_tests::authority_tests::workflow_decision_membership_delete_preserves_settled_history",
+        "adapters::persistence::workflow::tests::admission_tests::decision_tests::authority_tests::workflow_decision_visibility_revocation_serializes_in_both_orders",
+        "adapters::persistence::workflow::tests::admission_tests::decision_tests::authority_tests::workflow_decision_park_loses_to_inflight_member_removal",
+        "adapters::persistence::workflow::tests::admission_tests::decision_tests::authority_tests::workflow_decision_production_removal_preserves_open_and_settled_history",
+        "adapters::persistence::workflow::tests::admission_tests::decision_tests::lifecycle_tests::workflow_decision_notices_are_atomic_private_and_never_settle",
+        "adapters::persistence::workflow::tests::admission_tests::decision_tests::authority_tests::workflow_decision_membership_revocation_serializes_in_both_orders",
+        "adapters::persistence::workflow::tests::admission_tests::decision_tests::lifecycle_tests::workflow_decision_two_runs_one_company_do_not_serialize",
+        "adapters::persistence::workflow::tests::admission_tests::decision_tests::lifecycle_tests::workflow_decision_submission_crossing_deadline_rolls_back",
+        "adapters::persistence::workflow::tests::admission_tests::decision_tests::provenance_tests::workflow_decision_cross_tenant_relationships_and_access",
+        "adapters::persistence::workflow::tests::admission_tests::decision_tests::provenance_tests::workflow_decision_notice_cross_company_and_unique_link",
+        "adapters::persistence::workflow::tests::admission_tests::decision_tests::provenance_tests::workflow_decision_notice_rejects_non_notification_independently",
+        "adapters::persistence::workflow::tests::admission_tests::decision_tests::sql_tests::workflow_decision_comment_bounds_and_immutable_facts",
+        "adapters::persistence::workflow::tests::admission_tests::decision_tests::sql_tests::workflow_decision_reviewer_notice_provenance_rejects_foreign_delivery",
+        "adapters::persistence::workflow::tests::admission_tests::decision_tests::boundary_tests::workflow_decision_feedback_character_and_byte_boundaries",
+        "adapters::persistence::workflow::tests::admission_tests::decision_tests::boundary_tests::workflow_decision_whole_output_cannot_activate_message_delivery",
+        "adapters::persistence::workflow::tests::admission_tests::decision_tests::workflow_decision_invalid_stale_unlisted_and_comment_replay",
+        "adapters::persistence::workflow::tests::admission_tests::decision_tests::lifecycle_tests::workflow_decision_past_deadline_never_parks_and_unavailable_never_routes",
+        "adapters::persistence::workflow::tests::admission_tests::decision_tests::workflow_decision_opted_out_reviewer_gets_no_notice_and_still_reviews",
+        "adapters::persistence::workflow::tests::admission_tests::decision_tests::workflow_decision_park_composition_error_fails_run_unrouted",
+        "adapters::persistence::workflow::tests::admission_tests::decision_tests::workflow_decision_park_submit_restart_replay_and_notices",
+        "application::workflow::registry::decision_tests::workflow_decision_digest_survives_jsonb_numeric_normalization",
+        "adapters::persistence::workflow::tests::admission_tests::decision_tests::workflow_decision_park_unprovable_notice_key_fails_run_unrouted",
+        "adapters::persistence::workflow::tests::admission_tests::decision_tests::workflow_decision_park_waits_for_a_preference_toggle_in_flight",
+        "adapters::persistence::workflow::tests::admission_tests::decision_tests::workflow_decision_park_with_sixteen_reviewers",
+        "adapters::persistence::workflow::tests::admission_tests::decision_tests::workflow_decision_revoked_reviewer_and_foreign_company_are_hidden",
+        "adapters::persistence::workflow::tests::admission_tests::decision_tests::workflow_decision_submit_competes_with_cancel",
+        "adapters::persistence::workflow::tests::admission_tests::decision_tests::workflow_decision_submit_competes_with_timeout",
+        "adapters::persistence::workflow::tests::admission_tests::decision_tests::workflow_decision_timeout_error_route_successor_receives_null",
+        "adapters::persistence::workflow::tests::admission_tests::decision_tests::workflow_decision_timeout_without_error_route_fails_run",
+        "adapters::persistence::workflow::tests::admission_tests::decision_tests::workflow_decision_two_reviewers_compete_for_one_successor",
+        "adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::model_steps::workflow_decision_agent_chooses_only_a_declared_route_with_valid_data",
+        "adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::model_steps::workflow_decision_agent_data_schema_local_references_resolve"
+      ],
+      "ignored_tests": [],
+      "list": "decisions-list-06.log",
+      "run": "decisions-tests-06.log"
+    },
+    {
+      "cohort": "waits",
+      "prefix": "workflow_wait_",
+      "selected": 20,
+      "passed": 20,
+      "ignored": 0,
+      "tests": [
+        "adapters::persistence::workflow::tests::admission_tests::lease_tests::wait_tests::guard_tests::workflow_wait_event_facts_faults_and_bounds_are_enforced",
+        "adapters::persistence::workflow::tests::admission_tests::lease_tests::wait_tests::guard_tests::workflow_wait_consumed_event_does_not_resume_new_wait",
+        "adapters::persistence::workflow::tests::admission_tests::lease_tests::wait_tests::guard_tests::workflow_wait_event_id_collision_across_competing_runs_is_conflict",
+        "adapters::persistence::workflow::tests::admission_tests::lease_tests::wait_tests::guard_tests::workflow_wait_commit_guard_refuses_an_event_recorded_after_the_deadline",
+        "adapters::persistence::workflow::tests::admission_tests::lease_tests::wait_tests::guard_tests::workflow_wait_event_scope_and_consumption_foreign_keys",
+        "adapters::persistence::workflow::tests::admission_tests::lease_tests::wait_tests::deadline_tests::workflow_wait_same_thread_messages_remain_independent",
+        "adapters::persistence::workflow::tests::admission_tests::lease_tests::wait_tests::guard_tests::workflow_wait_event_bound_competing_producers",
+        "adapters::persistence::workflow::tests::admission_tests::lease_tests::wait_tests::guard_tests::workflow_wait_event_stale_event_matches_only_its_correlation",
+        "adapters::persistence::workflow::tests::admission_tests::lease_tests::wait_tests::deadline_tests::workflow_wait_expiry_and_cancellation_do_not_schedule",
+        "adapters::persistence::workflow::tests::admission_tests::lease_tests::wait_tests::guard_tests::workflow_wait_poison_timer_does_not_block_valid_due_work",
+        "adapters::persistence::workflow::tests::admission_tests::lease_tests::wait_tests::guard_tests::workflow_wait_event_deadline_guard_is_independent_of_run_deadline",
+        "adapters::persistence::workflow::tests::admission_tests::lease_tests::wait_tests::workflow_wait_competing_park_signal_resume_and_lost_ack",
+        "adapters::persistence::workflow::tests::admission_tests::lease_tests::wait_tests::guard_tests::workflow_wait_sweep_selection_has_bounded_lock_wait",
+        "adapters::persistence::workflow::tests::admission_tests::lease_tests::wait_tests::deadline_tests::workflow_wait_due_timer_sweeps_once_and_future_timer_waits",
+        "adapters::persistence::workflow::tests::admission_tests::lease_tests::wait_tests::deadline_tests::workflow_wait_commit_crossing_deadline_rolls_back",
+        "adapters::persistence::workflow::tests::admission_tests::lease_tests::wait_tests::deadline_tests::workflow_wait_cancel_races_resume_under_run_lock",
+        "adapters::persistence::workflow::tests::admission_tests::lease_tests::wait_tests::workflow_wait_event_before_park_and_concurrent_arrival",
+        "adapters::persistence::workflow::tests::admission_tests::lease_tests::wait_tests::guard_tests::workflow_wait_expiry_competes_with_resume",
+        "adapters::persistence::workflow::tests::admission_tests::lease_tests::wait_tests::workflow_wait_refuses_scope_kind_and_invalid_events",
+        "adapters::persistence::workflow::tests::admission_tests::lease_tests::wait_tests::workflow_wait_park_and_resume_write_failures_roll_back"
+      ],
+      "ignored_tests": [],
+      "list": "waits-list-06.log",
+      "run": "waits-tests-06.log"
+    },
+    {
+      "cohort": "children",
+      "prefix": "workflow_child_",
+      "selected": 9,
+      "passed": 9,
+      "ignored": 0,
+      "tests": [
+        "adapters::persistence::workflow::tests::admission_tests::batch_tests::child_runtime_tests::workflow_child_timeout_fails_child_and_reaches_parent_error_route",
+        "adapters::persistence::workflow::tests::child_publication_tests::workflow_child_publication_publishes_the_shipped_revision_template_end_to_end",
+        "adapters::persistence::workflow::tests::admission_tests::batch_tests::child_schema_tests::workflow_child_schema_requires_the_parent_wait_of_the_same_execution",
+        "adapters::persistence::workflow::tests::admission_tests::batch_tests::child_configuration_tests::workflow_child_parameters_the_child_refuses_fail_activation_without_a_child",
+        "adapters::persistence::workflow::tests::admission_tests::batch_tests::child_runtime_tests::workflow_child_wait_resumes_after_restart",
+        "adapters::persistence::workflow::tests::admission_tests::batch_tests::child_configuration_tests::workflow_child_gets_its_frozen_params_and_only_its_own_resource_slots",
+        "adapters::persistence::workflow::tests::child_publication_tests::workflow_child_publication_captures_only_selectable_children_of_the_company",
+        "adapters::persistence::workflow::tests::admission_tests::batch_tests::child_runtime_tests::workflow_child_history_is_empty_and_later_messages_stay_invisible",
+        "adapters::persistence::workflow::tests::child_publication_tests::workflow_child_publication_bounds_pins_and_bytes_before_reading_bundles"
+      ],
+      "ignored_tests": [],
+      "list": "children-list-06.log",
+      "run": "children-tests-06.log"
+    },
+    {
+      "cohort": "delivery",
+      "prefix": "adapters::persistence::delivery::tests::",
+      "selected": 38,
+      "passed": 38,
+      "ignored": 0,
+      "tests": [
+        "adapters::persistence::delivery::tests::a_stored_destination_is_read_through_its_own_transport",
+        "adapters::persistence::delivery::tests::a_stored_part_payload_is_decoded_fallibly",
+        "adapters::persistence::delivery::tests::cancellation::the_cancellation_reasons_match_their_database_constraint",
+        "adapters::persistence::delivery::tests::a_stale_execution_cannot_write_over_the_one_that_replaced_it",
+        "adapters::persistence::delivery::tests::a_reaped_lease_retries_only_what_never_reached_the_provider",
+        "adapters::persistence::delivery::tests::a_poison_delivery_goes_terminal_without_spinning",
+        "adapters::persistence::delivery::tests::cancellation::a_begin_part_that_loses_the_parent_lock_starts_no_request",
+        "adapters::persistence::delivery::tests::cancellation::a_held_delivery_starts_no_further_part_once_cancelled",
+        "adapters::persistence::delivery::tests::a_retryable_failure_backs_off_and_the_last_attempt_dead_letters",
+        "adapters::persistence::delivery::tests::cancellation::a_request_already_made_keeps_its_real_outcome",
+        "adapters::persistence::delivery::tests::a_dependent_delivery_waits_and_is_orphaned_when_its_root_dies",
+        "adapters::persistence::delivery::tests::one_key_per_destination_absorbs_a_repeat_and_keeps_two_recipients_apart",
+        "adapters::persistence::delivery::tests::cancellation::a_queued_delivery_is_superseded_and_keeps_its_partial_send",
+        "adapters::persistence::delivery::tests::a_multi_part_delivery_aggregates_from_its_parts",
+        "adapters::persistence::delivery::tests::cancellation::release_failure_and_the_lease_sweep_settle_rather_than_requeue",
+        "adapters::persistence::delivery::tests::tenant_tests::channel_path_fk_delivery_cannot_cross_channels",
+        "adapters::persistence::delivery::tests::competing_standalone_notification_enqueues_create_one_claimable_delivery",
+        "adapters::persistence::delivery::tests::tenant_tests::notification_delivery_tenant_member_removal_cancels_pending_notices",
+        "adapters::persistence::delivery::tests::tenant_tests::notification_delivery_tenant_part_company_must_match_its_delivery",
+        "adapters::persistence::delivery::tests::jsonb_row_context_delivery_reports_id_before_creating_queue_rows",
+        "adapters::persistence::delivery::tests::late_completion::delivery_late_completion_after_the_reaper_took_the_row_is_lease_lost",
+        "adapters::persistence::delivery::tests::tenant_tests::tenant_fk_small_company_deletion_leaves_no_demand_or_poll_rows",
+        "adapters::persistence::delivery::tests::tenant_tests::tenant_fk_small_notification_event_and_recipient_are_tenant_proven",
+        "adapters::persistence::delivery::tests::the_claimable_statuses_match_the_index_the_claim_relies_on",
+        "adapters::persistence::delivery::tests::the_delivery_vocabularies_match_their_database_constraints",
+        "adapters::persistence::delivery::tests::late_completion::delivery_late_completion_after_the_lease_expired_records_the_outcome",
+        "adapters::persistence::delivery::tests::late_completion::delivery_late_completion_races_the_reaper_and_exactly_one_wins",
+        "adapters::persistence::delivery::tests::late_completion::delivery_late_completion_renewal_locks_in_id_order",
+        "adapters::persistence::delivery::tests::late_completion::delivery_late_completion_renewal_races_the_reaper_and_exactly_one_wins",
+        "adapters::persistence::delivery::tests::releasing_a_claim_costs_no_attempt_and_makes_it_immediately_claimable",
+        "adapters::persistence::delivery::tests::schema_constraint_delivery_failure_requires_class_and_bounded_detail",
+        "adapters::persistence::delivery::tests::schema_constraint_retired_delivery_purposes_and_identity_status_are_refused",
+        "adapters::persistence::delivery::tests::tenant_tests::notification_delivery_tenant_company_deletion_removes_notices_and_parts",
+        "adapters::persistence::delivery::tests::tenant_tests::notification_delivery_tenant_removal_first_producer_finds_no_member",
+        "adapters::persistence::delivery::tests::tenant_tests::notification_delivery_tenant_removal_waits_for_a_producer_and_cancels_its_notice",
+        "adapters::persistence::delivery::tests::the_stuck_delivery_census_counts_each_stall_and_not_a_due_delivery",
+        "adapters::persistence::delivery::tests::two_claimants_never_own_the_same_delivery",
+        "adapters::persistence::delivery::tests::late_completion::delivery_late_completion_worker_renews_so_a_slow_batch_completes"
+      ],
+      "ignored_tests": [],
+      "list": "delivery-list-06.log",
+      "run": "delivery-tests-06.log"
+    },
+    {
+      "cohort": "cancellation",
+      "prefix": "adapters::persistence::delivery::cancellation::tests::",
+      "selected": 1,
+      "passed": 1,
+      "ignored": 0,
+      "tests": [
+        "adapters::persistence::delivery::cancellation::tests::every_reason_has_a_detail_the_sql_case_can_carry"
+      ],
+      "ignored_tests": [],
+      "list": "cancellation-list-06.log",
+      "run": "cancellation-tests-06.log"
+    },
+    {
+      "cohort": "samples",
+      "prefix": "application::workflow::sample::",
+      "selected": 15,
+      "passed": 15,
+      "ignored": 0,
+      "tests": [
+        "application::workflow::sample::tests::channel_reply_terminal_tests::channel_reply_terminal_sample_returns_business_value_without_a_script",
+        "application::workflow::sample::tests::jev_tests::jev_box_sample_uses_only_scripted_answers_and_inert_metadata",
+        "application::workflow::sample::tests::jev_tests::jev_box_sample_rejects_tools_tokens_and_invalid_box",
+        "application::workflow::sample::tests::tools_tests::approvals::autonomous_agent_samples_protected_http_binding_requires_explicit_simulated_approval",
+        "application::workflow::sample::tests::tools_tests::approvals::autonomous_agent_samples_protected_child_binding_requires_explicit_simulated_approval",
+        "application::workflow::sample::tests::tools_tests::direct_agent_tools_and_pinned_workflow_tools_stay_in_sample",
+        "application::workflow::sample::tests::tools_tests::direct_tool_inputs_and_outputs_are_validated",
+        "application::workflow::sample::tests::tools_tests::protected_step_workflow_tool_needs_approval_and_executes_child",
+        "application::workflow::sample::tests::pure_and_scripted_routing_share_compiled_validation",
+        "application::workflow::sample::tests::jev_tests::workflow_sample_jev_mixed_thresholds_automatic_and_human_paths",
+        "application::workflow::sample::tests::missing_invalid_unused_and_oversized_scripts_fail_explicitly",
+        "application::workflow::sample::tests::bounded_root_budget_and_external_kinds_never_fall_back",
+        "application::workflow::sample::tests::repeated_human_revision_carries_edited_artifact_feedback_and_captures_reply",
+        "application::workflow::sample::tests::tools_tests::direct_mcp_tool_uses_the_production_result_envelope",
+        "application::workflow::sample::tests::descendants_cannot_replenish_root_budgets_and_report_size_is_bounded"
+      ],
+      "ignored_tests": [],
+      "list": "samples-list-06.log",
+      "run": "samples-tests-06.log"
+    },
+    {
+      "cohort": "registry",
+      "prefix": "workflow_registry_",
+      "selected": 28,
+      "passed": 28,
+      "ignored": 0,
+      "tests": [
+        "application::workflow::registry::review1_tests::workflow_registry_dialects_follow_active_custom_targets_only",
+        "application::workflow::registry::contract_tests::workflow_registry_choice_resource_child_deadline_and_schema_errors",
+        "application::workflow::registry::review1_tests::workflow_registry_classifier_contract_excludes_scalar_loopholes",
+        "application::workflow::registry::decision_tests::workflow_registry_event_name_is_literal_and_has_one_schema",
+        "application::workflow::registry::contract_tests::workflow_registry_native_schema_resources_survive_nested_contracts",
+        "application::workflow::registry::runtime_tests::workflow_registry_child_params_are_static_and_resources_match_by_slot",
+        "application::workflow::registry::contract_tests::workflow_registry_per_step_schemas_and_choices_remain_distinct",
+        "application::workflow::registry::runtime_tests::workflow_registry_facts_bounded_unique_and_identity_sensitive",
+        "application::workflow::registry::decision_tests::workflow_registry_action_approval_allows_dynamic_deadline_but_validates_it",
+        "application::workflow::registry::schema_tests::workflow_registry_metadata_matches_effect_families_and_never_claims_authorization",
+        "application::workflow::registry::runtime_tests::workflow_registry_dynamic_http_and_deadline_checks_are_authoritative_and_redacted",
+        "application::workflow::registry::runtime_tests::workflow_registry_human_feedback_and_repeat_output_constraints",
+        "application::workflow::registry::schema_tests::workflow_registry_nested_schema_refs_ids_and_data_keywords_preserve_native_meaning",
+        "application::workflow::registry::schema_tests::workflow_registry_semantic_errors_locate_literal_values_without_leaking_them",
+        "application::workflow::registry::decision_tests::workflow_registry_decision_object_cannot_be_disclosed_as_message_content",
+        "application::workflow::registry::tests::workflow_registry_context_history_replaces_context_load",
+        "application::workflow::registry::tests::workflow_registry_agent_action_approval_uses_shared_static_policy",
+        "application::workflow::registry::schema_tests::workflow_registry_schema_budget_retains_external_recursion_depth_node_byte_rejection",
+        "application::workflow::registry::decision_tests::workflow_registry_decision_reviewers_static_nested_and_bounded",
+        "application::workflow::registry::review1_tests::workflow_registry_expansion_rejects_reused_facts_before_specialization",
+        "application::workflow::registry::runtime_tests::workflow_registry_mcp_output_and_downstream_structured_reference",
+        "application::workflow::registry::review1_tests::workflow_registry_mcp_all_protocol_content_variants_and_bounds",
+        "application::workflow::registry::contract_tests::workflow_registry_static_declarations_and_nested_configuration_are_checked",
+        "application::workflow::registry::review1_tests::workflow_registry_shared_actions_advertise_durable_suspension",
+        "application::workflow::registry::runtime_tests::workflow_registry_each_type_validates_dynamic_required_inputs",
+        "application::workflow::registry::tests::workflow_registry_exact_catalogue_and_help_examples_compile",
+        "application::workflow::registry::decision_tests::workflow_registry_action_approval_reviewers_are_static_and_bounded",
+        "application::workflow::registry::tests::workflow_registry_every_type_rejects_missing_invalid_and_unknown_fields"
+      ],
+      "ignored_tests": [],
+      "list": "registry-list-07.log",
+      "run": "registry-tests-07.log"
+    },
+    {
+      "cohort": "storage-semantics",
+      "prefix": "workflow_storage_",
+      "selected": 7,
+      "passed": 7,
+      "ignored": 0,
+      "tests": [
+        "application::workflow::publication::storage::tests::workflow_storage_deserialization_preserves_name_invariants",
+        "application::workflow::storage::tests::workflow_storage_cursor_advances_past_full_error_and_protected_page_without_time_advance",
+        "application::workflow::storage::tests::workflow_storage_shutdown_drops_pending_write_and_joins",
+        "application::workflow::storage::tests::workflow_storage_full_error_page_still_has_positive_worker_delay",
+        "application::workflow::publication::storage::tests::workflow_storage_rejects_incompatible_compiler_before_rebuilding",
+        "application::workflow::publication::storage::tests::workflow_storage_rejects_corruption_and_compiler_drift",
+        "application::workflow::publication::storage::tests::workflow_storage_restores_all_frozen_fixtures_and_child_identity"
+      ],
+      "ignored_tests": [],
+      "list": "storage-semantics-list-07.log",
+      "run": "storage-semantics-tests-07.log"
+    },
+    {
+      "cohort": "attempt-schema",
+      "prefix": "schema_constraint_attempt_stop_reason_matrix",
+      "selected": 1,
+      "passed": 1,
+      "ignored": 0,
+      "tests": [
+        "adapters::persistence::workflow::tests::admission_tests::lease_tests::schema_constraint_tests::schema_constraint_attempt_stop_reason_matrix"
+      ],
+      "ignored_tests": [],
+      "list": "attempt-schema-list-07.log",
+      "run": "attempt-schema-tests-07.log"
+    }
+  ],
+  "current_addenda": [
+    "hitl-tests-08.log",
+    "message-entry-tests-08.log"
+  ],
+  "evidence_reuse": "The final helper extraction returns the same QuestionClosed/WorkflowRevoked veto directly instead of a local enum; its SQL, predicates and order are unchanged. Current28 HITL and ordinary provider-entry/duplicate-callback check reran after that extraction. Unaffected final-only, explicit-message, decision, wait, child, transport and sample evidence is reused. The only later changes are the catalogue help assertion, a Copy-value test lint fix and rustfmt.",
+  "tests": {
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::integrity::channel_reply_hitl_prompt_ownership_cannot_be_edited_or_removed": {
+      "result": "PASS",
+      "evidence": "hitl-tests-08.log",
+      "cohort": "current question/helper checks"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::integrity::channel_reply_hitl_prompt_failed_atomic_write_leaves_no_prompt_or_wait": {
+      "result": "PASS",
+      "evidence": "hitl-tests-08.log",
+      "cohort": "current question/helper checks"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::integrity::channel_reply_hitl_prompt_canonical_content_and_delivery_membership_are_frozen": {
+      "result": "PASS",
+      "evidence": "hitl-tests-08.log",
+      "cohort": "current question/helper checks"
+    },
+    "application::workflow::registry::channel_question_tests::channel_reply_hitl_prompt_declares_a_human_result_separate_from_its_receipt": {
+      "result": "PASS",
+      "evidence": "hitl-tests-08.log",
+      "cohort": "current question/helper checks"
+    },
+    "application::workflow::registry::channel_question_tests::channel_reply_hitl_prompt_private_reply_event_cannot_be_declared_generically": {
+      "result": "PASS",
+      "evidence": "hitl-tests-08.log",
+      "cohort": "current question/helper checks"
+    },
+    "application::workflow::registry::channel_question_tests::channel_reply_hitl_prompt_schema_is_literal_and_exact": {
+      "result": "PASS",
+      "evidence": "hitl-tests-08.log",
+      "cohort": "current question/helper checks"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::channel_reply_hitl_prompt_uuid_case_and_nanosecond_deadline_keep_the_same_witness": {
+      "result": "PASS",
+      "evidence": "hitl-tests-08.log",
+      "cohort": "current question/helper checks"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::channel_reply_hitl_prompt_cannot_be_an_agent_or_ad_hoc_tool": {
+      "result": "PASS",
+      "evidence": "hitl-tests-08.log",
+      "cohort": "current question/helper checks"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::approval::channel_reply_hitl_prompt_approval_notice_stays_private_and_then_parks_the_original_question": {
+      "result": "PASS",
+      "evidence": "hitl-tests-08.log",
+      "cohort": "current question/helper checks"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::channel_reply_hitl_prompt_competing_publishers_create_one_occurrence": {
+      "result": "PASS",
+      "evidence": "hitl-tests-08.log",
+      "cohort": "current question/helper checks"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::channel_reply_hitl_prompt_in_app_acceptance_keeps_the_human_wait_open": {
+      "result": "PASS",
+      "evidence": "hitl-tests-08.log",
+      "cohort": "current question/helper checks"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::channel_reply_hitl_prompt_commits_wait_and_delivery_together": {
+      "result": "PASS",
+      "evidence": "hitl-tests-08.log",
+      "cohort": "current question/helper checks"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::lifecycle::channel_reply_hitl_prompt_safe_retry_keeps_message_wait_deadline_and_continuation_budget": {
+      "result": "PASS",
+      "evidence": "hitl-tests-08.log",
+      "cohort": "current question/helper checks"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::commit::channel_reply_hitl_prompt_lost_commit_ack_replays_human_wait_before_transport_receipt": {
+      "result": "PASS",
+      "evidence": "hitl-tests-08.log",
+      "cohort": "current question/helper checks"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::lifecycle::channel_reply_hitl_prompt_unknown_send_stays_unknown_after_a_human_response": {
+      "result": "PASS",
+      "evidence": "hitl-tests-08.log",
+      "cohort": "current question/helper checks"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::commit::channel_reply_hitl_prompt_deferred_commit_cannot_outlive_its_real_claim": {
+      "result": "PASS",
+      "evidence": "hitl-tests-08.log",
+      "cohort": "current question/helper checks"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::lifecycle::channel_reply_hitl_prompt_provider_entry_rechecks_deadline_after_competing_parent_lock": {
+      "result": "PASS",
+      "evidence": "hitl-tests-08.log",
+      "cohort": "current question/helper checks"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::resume::channel_reply_hitl_resume_before_ack_and_reconstruction_consumes_once": {
+      "result": "PASS",
+      "evidence": "hitl-tests-08.log",
+      "cohort": "current question/helper checks"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::resume::channel_reply_hitl_resume_ingress_consumes_before_ordinary_admission": {
+      "result": "PASS",
+      "evidence": "hitl-tests-08.log",
+      "cohort": "current question/helper checks"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::resume::channel_reply_hitl_resume_wrong_respondent_and_prompt_do_not_consume_wait": {
+      "result": "PASS",
+      "evidence": "hitl-tests-08.log",
+      "cohort": "current question/helper checks"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::resume::channel_reply_hitl_resume_repeated_questions_have_distinct_waits_and_no_reply_keeps_prompts": {
+      "result": "PASS",
+      "evidence": "hitl-tests-08.log",
+      "cohort": "current question/helper checks"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::resume::channel_reply_hitl_resume_competing_humans_have_one_winner": {
+      "result": "PASS",
+      "evidence": "hitl-tests-08.log",
+      "cohort": "current question/helper checks"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::resume::channel_reply_hitl_resume_two_live_runs_in_one_thread_stay_independent": {
+      "result": "PASS",
+      "evidence": "hitl-tests-08.log",
+      "cohort": "current question/helper checks"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::lifecycle::channel_reply_hitl_resume_response_racing_cancellation_cannot_reopen_the_run": {
+      "result": "PASS",
+      "evidence": "hitl-tests-08.log",
+      "cohort": "current question/helper checks"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::child::channel_reply_hitl_resume_child_question_returns_to_parent_without_suppression": {
+      "result": "PASS",
+      "evidence": "hitl-tests-08.log",
+      "cohort": "current question/helper checks"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::lifecycle::channel_reply_hitl_resume_recorded_in_time_survives_delayed_wakeup": {
+      "result": "PASS",
+      "evidence": "hitl-tests-08.log",
+      "cohort": "current question/helper checks"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::lifecycle::channel_reply_hitl_resume_late_response_races_timeout_and_stops_unsent_work_before_wake": {
+      "result": "PASS",
+      "evidence": "hitl-tests-08.log",
+      "cohort": "current question/helper checks"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::question_final_tests::channel_reply_final_approval_question_uses_exact_saved_response": {
+      "result": "PASS",
+      "evidence": "channel-reply-tests-06.log",
+      "cohort": "channel-reply"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::question_final_tests::channel_reply_final_approval_question_rejection_publishes_no_final": {
+      "result": "PASS",
+      "evidence": "channel-reply-tests-06.log",
+      "cohort": "channel-reply"
+    },
+    "adapters::persistence::workflow::tests::admission_tests::batch_tests::child_runtime_tests::channel_reply_terminal_child_tests::channel_reply_terminal_repeat_child_cannot_suppress_parent": {
+      "result": "PASS",
+      "evidence": "channel-reply-tests-06.log",
+      "cohort": "channel-reply"
+    },
+    "adapters::persistence::workflow::tests::admission_tests::batch_tests::child_runtime_tests::channel_reply_terminal_child_tests::channel_reply_terminal_child_cannot_suppress_parent": {
+      "result": "PASS",
+      "evidence": "channel-reply-tests-06.log",
+      "cohort": "channel-reply"
+    },
+    "adapters::persistence::workflow::tests::admission_tests::batch_tests::channel_reply_terminal_tests::channel_reply_terminal_competing_completions_commit_one_disposition": {
+      "result": "PASS",
+      "evidence": "channel-reply-tests-06.log",
+      "cohort": "channel-reply"
+    },
+    "adapters::persistence::workflow::tests::admission_tests::batch_tests::channel_reply_terminal_tests::channel_reply_terminal_final_error_cannot_become_suppressed_success": {
+      "result": "PASS",
+      "evidence": "channel-reply-tests-06.log",
+      "cohort": "channel-reply"
+    },
+    "adapters::persistence::workflow::tests::admission_tests::batch_tests::child_runtime_tests::channel_reply_terminal_child_tests::channel_reply_terminal_parent_selects_its_own_suppression": {
+      "result": "PASS",
+      "evidence": "channel-reply-tests-06.log",
+      "cohort": "channel-reply"
+    },
+    "adapters::persistence::workflow::tests::admission_tests::batch_tests::channel_reply_terminal_tests::channel_reply_terminal_ordinary_output_flags_cannot_suppress": {
+      "result": "PASS",
+      "evidence": "channel-reply-tests-06.log",
+      "cohort": "channel-reply"
+    },
+    "adapters::persistence::workflow::tests::admission_tests::batch_tests::child_runtime_tests::channel_reply_terminal_child_tests::channel_reply_terminal_worker_dispatches_without_io": {
+      "result": "PASS",
+      "evidence": "channel-reply-tests-06.log",
+      "cohort": "channel-reply"
+    },
+    "adapters::persistence::workflow::tests::admission_tests::batch_tests::channel_reply_terminal_tests::channel_reply_terminal_exhausted_pending_is_effect_free_failure": {
+      "result": "PASS",
+      "evidence": "channel-reply-tests-06.log",
+      "cohort": "channel-reply"
+    },
+    "adapters::persistence::workflow::tests::admission_tests::batch_tests::channel_reply_terminal_tests::channel_reply_terminal_metadata_is_atomic_and_immutable": {
+      "result": "PASS",
+      "evidence": "channel-reply-tests-06.log",
+      "cohort": "channel-reply"
+    },
+    "adapters::persistence::workflow::tests::admission_tests::batch_tests::channel_reply_terminal_tests::channel_reply_terminal_invalid_output_fails_or_takes_ordinary_error_route": {
+      "result": "PASS",
+      "evidence": "channel-reply-tests-06.log",
+      "cohort": "channel-reply"
+    },
+    "adapters::persistence::workflow::tests::admission_tests::lease_tests::completion_tests::channel_reply_terminal_io_tests::channel_reply_terminal_io_predecessor_keeps_receipt_and_local_disposition": {
+      "result": "PASS",
+      "evidence": "channel-reply-tests-06.log",
+      "cohort": "channel-reply"
+    },
+    "adapters::persistence::workflow::tests::admission_tests::decision_tests::channel_reply_terminal_human_tests::channel_reply_terminal_human_continuation_preserves_notices": {
+      "result": "PASS",
+      "evidence": "channel-reply-tests-06.log",
+      "cohort": "channel-reply"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::channel_reply_binding_company_teardown_removes_scoped_selection_and_snapshots": {
+      "result": "PASS",
+      "evidence": "channel-reply-tests-06.log",
+      "cohort": "channel-reply"
+    },
+    "adapters::persistence::workflow::tests::message_tests::channel_reply_terminal_message_tests::channel_reply_terminal_preserves_an_explicit_published_message": {
+      "result": "PASS",
+      "evidence": "channel-reply-tests-06.log",
+      "cohort": "channel-reply"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::channel_reply_binding_competing_assignments_choose_one_current_responder": {
+      "result": "PASS",
+      "evidence": "channel-reply-tests-06.log",
+      "cohort": "channel-reply"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::channel_reply_binding_freezes_head_contract_and_responder_at_ingress": {
+      "result": "PASS",
+      "evidence": "channel-reply-tests-06.log",
+      "cohort": "channel-reply"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::channel_reply_binding_live_run_blocks_snapshot_and_principal_deletion": {
+      "result": "PASS",
+      "evidence": "channel-reply-tests-06.log",
+      "cohort": "channel-reply"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::channel_reply_binding_passive_snapshot_follows_source_retention": {
+      "result": "PASS",
+      "evidence": "channel-reply-tests-06.log",
+      "cohort": "channel-reply"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::channel_reply_binding_quiet_and_unselected_ingress_get_no_snapshot": {
+      "result": "PASS",
+      "evidence": "channel-reply-tests-06.log",
+      "cohort": "channel-reply"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::channel_reply_binding_rejects_foreign_inactive_thread_and_stale_selection": {
+      "result": "PASS",
+      "evidence": "channel-reply-tests-06.log",
+      "cohort": "channel-reply"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::channel_reply_binding_roundtrip_update_clear_and_stale_revision": {
+      "result": "PASS",
+      "evidence": "channel-reply-tests-06.log",
+      "cohort": "channel-reply"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::channel_reply_binding_snapshot_and_referenced_source_facts_are_immutable": {
+      "result": "PASS",
+      "evidence": "channel-reply-tests-06.log",
+      "cohort": "channel-reply"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::channel_reply_binding_trigger_mismatch_and_revocation_create_no_obligation": {
+      "result": "PASS",
+      "evidence": "channel-reply-tests-06.log",
+      "cohort": "channel-reply"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::channel_reply_completion_approval_resumes_exact_saved_output": {
+      "result": "PASS",
+      "evidence": "channel-reply-tests-06.log",
+      "cohort": "channel-reply"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::channel_reply_completion_commit_failure_and_lost_ack_preserve_atomic_decision": {
+      "result": "PASS",
+      "evidence": "channel-reply-tests-06.log",
+      "cohort": "channel-reply"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::channel_reply_completion_competing_finalizers_create_one_obligation": {
+      "result": "PASS",
+      "evidence": "channel-reply-tests-06.log",
+      "cohort": "channel-reply"
+    },
+    "adapters::persistence::workflow::tests::admission_tests::batch_tests::child_runtime_tests::channel_reply_terminal_child_tests::channel_reply_terminal_cancellation_competes_without_silent_failure": {
+      "result": "PASS",
+      "evidence": "channel-reply-tests-06.log",
+      "cohort": "channel-reply"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::channel_reply_completion_contract_edits_cannot_replace_approved_content": {
+      "result": "PASS",
+      "evidence": "channel-reply-tests-06.log",
+      "cohort": "channel-reply"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::channel_reply_completion_missing_notice_configuration_cannot_commit_success": {
+      "result": "PASS",
+      "evidence": "channel-reply-tests-06.log",
+      "cohort": "channel-reply"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::channel_reply_completion_policy_change_after_approval_fails_saved_step": {
+      "result": "PASS",
+      "evidence": "channel-reply-tests-06.log",
+      "cohort": "channel-reply"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::channel_reply_completion_rejection_uses_failure_without_publication": {
+      "result": "PASS",
+      "evidence": "channel-reply-tests-06.log",
+      "cohort": "channel-reply"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::intent_schema_tests::channel_reply_intent_schema_competing_claims_and_fenced_release": {
+      "result": "PASS",
+      "evidence": "channel-reply-tests-06.log",
+      "cohort": "channel-reply"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::channel_reply_completion_automatic_and_suppressed_are_atomic": {
+      "result": "PASS",
+      "evidence": "channel-reply-tests-06.log",
+      "cohort": "channel-reply"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::intent_schema_tests::channel_reply_intent_schema_cross_tenant_links_and_duplicate_decisions_are_rejected": {
+      "result": "PASS",
+      "evidence": "channel-reply-tests-06.log",
+      "cohort": "channel-reply"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::intent_schema_tests::channel_reply_intent_schema_eighth_expired_claim_is_terminal": {
+      "result": "PASS",
+      "evidence": "channel-reply-tests-06.log",
+      "cohort": "channel-reply"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::intent_schema_tests::channel_reply_intent_schema_expired_lease_has_one_new_owner": {
+      "result": "PASS",
+      "evidence": "channel-reply-tests-06.log",
+      "cohort": "channel-reply"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::intent_schema_tests::channel_reply_intent_schema_live_obligation_and_proposal_are_protected": {
+      "result": "PASS",
+      "evidence": "channel-reply-tests-06.log",
+      "cohort": "channel-reply"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::channel_reply_completion_invalid_projection_fails_or_uses_original_error_route": {
+      "result": "PASS",
+      "evidence": "channel-reply-tests-06.log",
+      "cohort": "channel-reply"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::intent_schema_tests::channel_reply_intent_schema_queued_root_cannot_forge_a_suppressed_decision": {
+      "result": "PASS",
+      "evidence": "channel-reply-tests-06.log",
+      "cohort": "channel-reply"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::intent_schema_tests::channel_reply_intent_schema_success_without_decision_rolls_back": {
+      "result": "PASS",
+      "evidence": "channel-reply-tests-06.log",
+      "cohort": "channel-reply"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::intent_schema_tests::channel_reply_intent_schema_suppressed_is_never_claimable": {
+      "result": "PASS",
+      "evidence": "channel-reply-tests-06.log",
+      "cohort": "channel-reply"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::intent_schema_tests::channel_reply_intent_schema_terminal_failure_keeps_success_and_allows_retention": {
+      "result": "PASS",
+      "evidence": "channel-reply-tests-06.log",
+      "cohort": "channel-reply"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::intent_schema_tests::channel_reply_intent_schema_claim_page_serves_another_tenant_before_a_burst": {
+      "result": "PASS",
+      "evidence": "channel-reply-tests-06.log",
+      "cohort": "channel-reply"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::owner_tests::channel_reply_completion_child_terminal_parks_only_the_owned_parent": {
+      "result": "PASS",
+      "evidence": "channel-reply-tests-06.log",
+      "cohort": "channel-reply"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::owner_tests::channel_reply_completion_exhausted_saved_child_result_never_reconciles_original_handler": {
+      "result": "PASS",
+      "evidence": "channel-reply-tests-06.log",
+      "cohort": "channel-reply"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::owner_tests::channel_reply_completion_fenced_approval_resumes_before_worker_handler": {
+      "result": "PASS",
+      "evidence": "channel-reply-tests-06.log",
+      "cohort": "channel-reply"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::owner_tests::channel_reply_completion_human_choice_parks_final_approval_before_success": {
+      "result": "PASS",
+      "evidence": "channel-reply-tests-06.log",
+      "cohort": "channel-reply"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::owner_tests::channel_reply_completion_timer_keeps_source_wait_and_final_approval_distinct": {
+      "result": "PASS",
+      "evidence": "channel-reply-tests-06.log",
+      "cohort": "channel-reply"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::policy_runtime_tests::channel_reply_completion_approved_job_cannot_claim_a_handler_with_sql": {
+      "result": "PASS",
+      "evidence": "channel-reply-tests-06.log",
+      "cohort": "channel-reply"
+    },
+    "adapters::persistence::workflow::tests::admission_tests::batch_tests::channel_reply_terminal_tests::channel_reply_terminal_preserves_business_value_and_replays_after_restart": {
+      "result": "PASS",
+      "evidence": "channel-reply-tests-06.log",
+      "cohort": "channel-reply"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::policy_runtime_tests::channel_reply_completion_cancellation_and_finalization_share_one_terminal_owner": {
+      "result": "PASS",
+      "evidence": "channel-reply-tests-06.log",
+      "cohort": "channel-reply"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::policy_runtime_tests::channel_reply_completion_opposite_reviewers_have_one_formal_winner": {
+      "result": "PASS",
+      "evidence": "channel-reply-tests-06.log",
+      "cohort": "channel-reply"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::policy_runtime_tests::channel_reply_completion_private_result_cannot_cross_public_reply_clearance": {
+      "result": "PASS",
+      "evidence": "channel-reply-tests-06.log",
+      "cohort": "channel-reply"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::policy_runtime_tests::channel_reply_completion_release_revocation_and_finalization_do_not_deadlock": {
+      "result": "PASS",
+      "evidence": "channel-reply-tests-06.log",
+      "cohort": "channel-reply"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::authority::channel_reply_publication_changed_plan_has_no_partial_effects": {
+      "result": "PASS",
+      "evidence": "channel-reply-tests-06.log",
+      "cohort": "channel-reply"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::policy_runtime_tests::channel_reply_completion_review_timeout_never_publishes_unapproved_output": {
+      "result": "PASS",
+      "evidence": "channel-reply-tests-06.log",
+      "cohort": "channel-reply"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::authority::channel_reply_publication_forged_claims_cannot_load_or_commit": {
+      "result": "PASS",
+      "evidence": "channel-reply-tests-06.log",
+      "cohort": "channel-reply"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::authority::channel_reply_publication_policy_change_refuses_without_redirecting": {
+      "result": "PASS",
+      "evidence": "channel-reply-tests-06.log",
+      "cohort": "channel-reply"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::authority::channel_reply_publication_rechecks_current_send_authority": {
+      "result": "PASS",
+      "evidence": "channel-reply-tests-06.log",
+      "cohort": "channel-reply"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::authority::channel_reply_publication_write_failure_rolls_back_then_replays_original_plan": {
+      "result": "PASS",
+      "evidence": "channel-reply-tests-06.log",
+      "cohort": "channel-reply"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::channel_reply_publication_competing_transactions_keep_one_canonical_receipt": {
+      "result": "PASS",
+      "evidence": "channel-reply-tests-06.log",
+      "cohort": "channel-reply"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::authority::channel_reply_publication_approved_content_survives_elapsed_review_deadline_and_contract_edit": {
+      "result": "PASS",
+      "evidence": "channel-reply-tests-06.log",
+      "cohort": "channel-reply"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::policy_runtime_tests::channel_reply_completion_privileged_reviewers_still_require_payload_clearance": {
+      "result": "PASS",
+      "evidence": "channel-reply-tests-06.log",
+      "cohort": "channel-reply"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::channel_reply_publication_internal_source_never_falls_back_to_email": {
+      "result": "PASS",
+      "evidence": "channel-reply-tests-06.log",
+      "cohort": "channel-reply"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::policy_runtime_tests::channel_reply_completion_revoked_send_role_still_permits_suppression": {
+      "result": "PASS",
+      "evidence": "channel-reply-tests-06.log",
+      "cohort": "channel-reply"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::delivery::channel_reply_delivery_revocation_before_provider_entry_cancels_unsent_work": {
+      "result": "PASS",
+      "evidence": "channel-reply-tests-06.log",
+      "cohort": "channel-reply"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::delivery::channel_reply_delivery_safe_retry_keeps_same_message_and_prepared_part": {
+      "result": "PASS",
+      "evidence": "channel-reply-tests-06.log",
+      "cohort": "channel-reply"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::delivery::channel_reply_delivery_unknown_is_quarantined_and_cannot_be_rewritten_or_deleted": {
+      "result": "PASS",
+      "evidence": "channel-reply-tests-06.log",
+      "cohort": "channel-reply"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::delivery::channel_reply_delivery_expired_started_request_recovers_unknown_without_resend": {
+      "result": "PASS",
+      "evidence": "channel-reply-tests-06.log",
+      "cohort": "channel-reply"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::delivery::channel_reply_delivery_unknown_parent_and_run_cannot_be_removed_together": {
+      "result": "PASS",
+      "evidence": "channel-reply-tests-06.log",
+      "cohort": "channel-reply"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::integrity::channel_reply_delivery_multipart_cancellation_preserves_accepted_piece": {
+      "result": "PASS",
+      "evidence": "channel-reply-tests-06.log",
+      "cohort": "channel-reply"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::delivery::channel_reply_delivery_authority_lock_deadline_leaves_request_unstarted": {
+      "result": "PASS",
+      "evidence": "channel-reply-tests-06.log",
+      "cohort": "channel-reply"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::integrity::channel_reply_delivery_resolved_owner_can_be_retained_without_losing_message": {
+      "result": "PASS",
+      "evidence": "channel-reply-tests-06.log",
+      "cohort": "channel-reply"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::channel_reply_publication_email_and_in_app_commit_exact_content_and_replay": {
+      "result": "PASS",
+      "evidence": "channel-reply-tests-06.log",
+      "cohort": "channel-reply"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::integrity::channel_reply_publication_approved_reviewer_must_retain_payload_clearance": {
+      "result": "PASS",
+      "evidence": "channel-reply-tests-06.log",
+      "cohort": "channel-reply"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::integrity::channel_reply_publication_frozen_association_metadata_and_parts_cannot_change": {
+      "result": "PASS",
+      "evidence": "channel-reply-tests-06.log",
+      "cohort": "channel-reply"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::lifecycle::channel_reply_recovery_shutdown_cancels_actual_composition_and_releases_claim": {
+      "result": "PASS",
+      "evidence": "channel-reply-tests-06.log",
+      "cohort": "channel-reply"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::lifecycle::channel_reply_recovery_shutdown_cancels_actual_publication_transaction": {
+      "result": "PASS",
+      "evidence": "channel-reply-tests-06.log",
+      "cohort": "channel-reply"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::lifecycle::channel_reply_recovery_shutdown_during_unacknowledged_claim_retains_real_lease": {
+      "result": "PASS",
+      "evidence": "channel-reply-tests-06.log",
+      "cohort": "channel-reply"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::membership::channel_reply_publication_canonical_delivery_membership_rejects_extra_insert_and_update": {
+      "result": "PASS",
+      "evidence": "channel-reply-tests-06.log",
+      "cohort": "channel-reply"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::membership::channel_reply_publication_competing_membership_and_commit_keeps_exact_effect_set": {
+      "result": "PASS",
+      "evidence": "channel-reply-tests-06.log",
+      "cohort": "channel-reply"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::membership::channel_reply_publication_component_membership_checks_new_tenant_and_message": {
+      "result": "PASS",
+      "evidence": "channel-reply-tests-06.log",
+      "cohort": "channel-reply"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::membership::channel_reply_publication_part_membership_checks_incoming_and_outgoing_owner": {
+      "result": "PASS",
+      "evidence": "channel-reply-tests-06.log",
+      "cohort": "channel-reply"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::integrity::channel_reply_publication_current_binding_is_required_at_commit_and_provider_entry": {
+      "result": "PASS",
+      "evidence": "channel-reply-tests-06.log",
+      "cohort": "channel-reply"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::recovery::channel_reply_recovery_reconstructed_worker_polls_without_a_wakeup": {
+      "result": "PASS",
+      "evidence": "channel-reply-tests-06.log",
+      "cohort": "channel-reply"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::recovery::channel_reply_publication_and_delivery_survive_original_execution_deadline": {
+      "result": "PASS",
+      "evidence": "channel-reply-tests-06.log",
+      "cohort": "channel-reply"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::integrity::channel_reply_publication_release_rechecked_after_success_and_before_provider": {
+      "result": "PASS",
+      "evidence": "channel-reply-tests-06.log",
+      "cohort": "channel-reply"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::recovery::channel_reply_recovery_deferred_commit_expiry_rolls_back_all_effects": {
+      "result": "PASS",
+      "evidence": "channel-reply-tests-06.log",
+      "cohort": "channel-reply"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::recovery::channel_reply_recovery_transient_composition_backs_off_and_spares_quiet_tenant": {
+      "result": "PASS",
+      "evidence": "channel-reply-tests-06.log",
+      "cohort": "channel-reply"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::slot_tests::channel_reply_completion_full_execution_rejects_final_without_another_slot": {
+      "result": "PASS",
+      "evidence": "channel-reply-tests-06.log",
+      "cohort": "channel-reply"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::slot_tests::channel_reply_completion_rejected_approval_keeps_its_slot_reservation": {
+      "result": "PASS",
+      "evidence": "channel-reply-tests-06.log",
+      "cohort": "channel-reply"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::integrity::channel_reply_binding_competing_ingress_claimants_create_one_owned_run": {
+      "result": "PASS",
+      "evidence": "channel-reply-tests-06.log",
+      "cohort": "channel-reply"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::integrity::channel_reply_binding_context_insert_and_source_acceptance_roll_back_together": {
+      "result": "PASS",
+      "evidence": "channel-reply-tests-06.log",
+      "cohort": "channel-reply"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::slot_tests::channel_reply_completion_reserves_128th_slot_once_under_competing_finalizers": {
+      "result": "PASS",
+      "evidence": "channel-reply-tests-06.log",
+      "cohort": "channel-reply"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::integrity::channel_reply_binding_inactive_before_ingress_has_visible_refusal_until_selection_cleared": {
+      "result": "PASS",
+      "evidence": "channel-reply-tests-06.log",
+      "cohort": "channel-reply"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::integrity::channel_reply_binding_manual_root_has_no_automatic_response_authority": {
+      "result": "PASS",
+      "evidence": "channel-reply-tests-06.log",
+      "cohort": "channel-reply"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::integrity::channel_reply_binding_observer_run_cannot_replace_response_owner": {
+      "result": "PASS",
+      "evidence": "channel-reply-tests-06.log",
+      "cohort": "channel-reply"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::integrity::channel_reply_binding_rechecks_current_run_as_private_channel_visibility": {
+      "result": "PASS",
+      "evidence": "channel-reply-tests-06.log",
+      "cohort": "channel-reply"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::integrity::channel_reply_binding_thread_scoped_binding_cannot_own_channel_responses": {
+      "result": "PASS",
+      "evidence": "channel-reply-tests-06.log",
+      "cohort": "channel-reply"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::policy_tests::channel_reply_completion_policy_rejects_unprivileged_reviewers_and_invalid_sql_shape": {
+      "result": "PASS",
+      "evidence": "channel-reply-tests-06.log",
+      "cohort": "channel-reply"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::policy_tests::channel_reply_completion_policy_settings_freeze_duration_for_ingress": {
+      "result": "PASS",
+      "evidence": "channel-reply-tests-06.log",
+      "cohort": "channel-reply"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::channel_reply_tests::channel_reply_binding_deferred_human_reply_has_no_response_authority": {
+      "result": "PASS",
+      "evidence": "channel-reply-tests-06.log",
+      "cohort": "channel-reply"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::channel_reply_tests::channel_reply_binding_matched_human_reply_retains_only_passive_snapshot": {
+      "result": "PASS",
+      "evidence": "channel-reply-tests-06.log",
+      "cohort": "channel-reply"
+    },
+    "application::services::delivery_worker::tests::lifecycle::channel_reply_delivery_owner_observes_shutdown_before_claiming": {
+      "result": "PASS",
+      "evidence": "channel-reply-tests-06.log",
+      "cohort": "channel-reply"
+    },
+    "application::services::delivery_worker::tests::lifecycle::channel_reply_delivery_provider_deadline_cancels_actual_call": {
+      "result": "PASS",
+      "evidence": "channel-reply-tests-06.log",
+      "cohort": "channel-reply"
+    },
+    "application::services::delivery_worker::tests::lifecycle::channel_reply_delivery_ready_result_wins_simultaneous_shutdown": {
+      "result": "PASS",
+      "evidence": "channel-reply-tests-06.log",
+      "cohort": "channel-reply"
+    },
+    "application::services::delivery_worker::tests::lifecycle::channel_reply_delivery_shutdown_drops_actual_provider_and_records_unknown": {
+      "result": "PASS",
+      "evidence": "channel-reply-tests-06.log",
+      "cohort": "channel-reply"
+    },
+    "application::services::delivery_worker::tests::lifecycle::channel_reply_delivery_shutdown_preserves_known_result_during_settlement": {
+      "result": "PASS",
+      "evidence": "channel-reply-tests-06.log",
+      "cohort": "channel-reply"
+    },
+    "application::workflow::channel_reply::approval::tests::channel_reply_completion_policy_enforces_review_and_duration_bounds": {
+      "result": "PASS",
+      "evidence": "channel-reply-tests-06.log",
+      "cohort": "channel-reply"
+    },
+    "application::workflow::channel_reply::approval::tests::channel_reply_completion_policy_materializes_relative_to_each_response_and_caps_run": {
+      "result": "PASS",
+      "evidence": "channel-reply-tests-06.log",
+      "cohort": "channel-reply"
+    },
+    "application::workflow::channel_reply::approval::tests::channel_reply_completion_policy_roundtrips_only_static_user_reviewers": {
+      "result": "PASS",
+      "evidence": "channel-reply-tests-06.log",
+      "cohort": "channel-reply"
+    },
+    "application::workflow::channel_reply::contract::tests::channel_reply_contract_bounds_stored_literals_before_evaluation": {
+      "result": "PASS",
+      "evidence": "channel-reply-tests-06.log",
+      "cohort": "channel-reply"
+    },
+    "application::workflow::channel_reply::contract::tests::channel_reply_contract_literal_output_still_checks_business_schema": {
+      "result": "PASS",
+      "evidence": "channel-reply-tests-06.log",
+      "cohort": "channel-reply"
+    },
+    "application::workflow::channel_reply::contract::tests::channel_reply_contract_projects_only_declared_content_and_preserves_result": {
+      "result": "PASS",
+      "evidence": "channel-reply-tests-06.log",
+      "cohort": "channel-reply"
+    },
+    "application::workflow::channel_reply::contract::tests::channel_reply_contract_refuses_optional_ambiguous_and_non_string_schema_paths": {
+      "result": "PASS",
+      "evidence": "channel-reply-tests-06.log",
+      "cohort": "channel-reply"
+    },
+    "application::workflow::channel_reply::contract::tests::channel_reply_contract_rejects_missing_wrong_blank_and_oversized_results": {
+      "result": "PASS",
+      "evidence": "channel-reply-tests-06.log",
+      "cohort": "channel-reply"
+    },
+    "application::workflow::channel_reply::contract::tests::channel_reply_contract_requires_supported_explicit_format_version": {
+      "result": "PASS",
+      "evidence": "channel-reply-tests-06.log",
+      "cohort": "channel-reply"
+    },
+    "application::workflow::channel_reply::contract::tests::channel_reply_contract_roundtrip_refuses_unknown_fields_and_arbitrary_operators": {
+      "result": "PASS",
+      "evidence": "channel-reply-tests-06.log",
+      "cohort": "channel-reply"
+    },
+    "application::workflow::channel_reply::contract::tests::channel_reply_contract_uses_existing_reference_pointer_rules": {
+      "result": "PASS",
+      "evidence": "channel-reply-tests-06.log",
+      "cohort": "channel-reply"
+    },
+    "application::workflow::channel_reply::origin_tests::channel_reply_completion_origin_binds_immutable_proposal_to_effect_identity": {
+      "result": "PASS",
+      "evidence": "channel-reply-tests-06.log",
+      "cohort": "channel-reply"
+    },
+    "application::workflow::channel_reply::origin_tests::channel_reply_completion_origin_cannot_enter_step_or_model_tool_preparation": {
+      "result": "PASS",
+      "evidence": "channel-reply-tests-06.log",
+      "cohort": "channel-reply"
+    },
+    "application::workflow::channel_reply::origin_tests::channel_reply_completion_origin_is_restricted_to_the_trusted_company_reply_contract": {
+      "result": "PASS",
+      "evidence": "channel-reply-tests-06.log",
+      "cohort": "channel-reply"
+    },
+    "application::workflow::channel_reply::origin_tests::channel_reply_completion_origin_roundtrip_and_integrity_are_strict": {
+      "result": "PASS",
+      "evidence": "channel-reply-tests-06.log",
+      "cohort": "channel-reply"
+    },
+    "application::workflow::registry::channel_reply_terminal_contract_tests::channel_reply_terminal_contract_accepts_schema_valid_empty_business_values": {
+      "result": "PASS",
+      "evidence": "channel-reply-tests-06.log",
+      "cohort": "channel-reply"
+    },
+    "application::workflow::registry::channel_reply_terminal_contract_tests::channel_reply_terminal_contract_preflight_charges_all_schema_copies": {
+      "result": "PASS",
+      "evidence": "channel-reply-tests-06.log",
+      "cohort": "channel-reply"
+    },
+    "application::workflow::registry::channel_reply_terminal_contract_tests::channel_reply_terminal_contract_rejects_nonterminal_and_choice_routes": {
+      "result": "PASS",
+      "evidence": "channel-reply-tests-06.log",
+      "cohort": "channel-reply"
+    },
+    "application::workflow::registry::channel_reply_terminal_contract_tests::channel_reply_terminal_contract_retains_error_routing_and_typed_value": {
+      "result": "PASS",
+      "evidence": "channel-reply-tests-06.log",
+      "cohort": "channel-reply"
+    },
+    "application::workflow::registry::channel_reply_terminal_contract_tests::channel_reply_terminal_contract_roundtrip_and_identity": {
+      "result": "PASS",
+      "evidence": "channel-reply-tests-06.log",
+      "cohort": "channel-reply"
+    },
+    "application::workflow::sample::tests::channel_reply_terminal_tests::channel_reply_terminal_sample_returns_business_value_without_a_script": {
+      "result": "PASS",
+      "evidence": "samples-tests-06.log",
+      "cohort": "samples"
+    },
+    "application::services::delivery_worker::tests::lifecycle::channel_reply_delivery_shutdown_bounds_stuck_known_settlement": {
+      "result": "PASS",
+      "evidence": "channel-reply-tests-06.log",
+      "cohort": "channel-reply"
+    },
+    "adapters::persistence::workflow::tests::message_tests::reconcile_tests::race_tests::workflow_message_race_competing_settlements_reopen_once": {
+      "result": "PASS",
+      "evidence": "messaging-tests-06.log",
+      "cohort": "messaging"
+    },
+    "adapters::persistence::workflow::tests::message_tests::delivery_tests::workflow_message_delivery_begin_part_refuses_a_revoked_actor": {
+      "result": "PASS",
+      "evidence": "messaging-tests-06.log",
+      "cohort": "messaging"
+    },
+    "adapters::persistence::workflow::tests::message_tests::authority_tests::workflow_message_publish_revocation_after_a_marker_stays_retryable": {
+      "result": "PASS",
+      "evidence": "messaging-tests-06.log",
+      "cohort": "messaging"
+    },
+    "adapters::persistence::workflow::tests::message_tests::reconcile_tests::race_tests::workflow_message_race_settle_and_consumer_compete_for_one_action": {
+      "result": "PASS",
+      "evidence": "messaging-tests-06.log",
+      "cohort": "messaging"
+    },
+    "adapters::persistence::workflow::tests::message_tests::delivery_tests::workflow_message_delivery_reaper_locks_parents_and_marks_started_requests_unknown": {
+      "result": "PASS",
+      "evidence": "messaging-tests-06.log",
+      "cohort": "messaging"
+    },
+    "adapters::persistence::workflow::tests::message_tests::delivery_tests::workflow_message_delivery_begin_part_refuses_a_recipient_no_longer_a_member": {
+      "result": "PASS",
+      "evidence": "messaging-tests-06.log",
+      "cohort": "messaging"
+    },
+    "adapters::persistence::workflow::tests::message_tests::delivery_tests::workflow_message_delivery_begin_part_refuses_a_run_past_its_deadline": {
+      "result": "PASS",
+      "evidence": "messaging-tests-06.log",
+      "cohort": "messaging"
+    },
+    "adapters::persistence::workflow::tests::message_tests::delivery_tests::workflow_message_delivery_duplicate_callback_adds_no_event": {
+      "result": "PASS",
+      "evidence": "message-entry-tests-08.log",
+      "cohort": "current question/helper checks"
+    },
+    "adapters::persistence::workflow::tests::message_tests::delivery_tests::workflow_message_race_paused_producer_then_consumer_sees_both_events": {
+      "result": "PASS",
+      "evidence": "messaging-tests-06.log",
+      "cohort": "messaging"
+    },
+    "adapters::persistence::workflow::tests::message_tests::reconcile_tests::race_tests::workflow_message_race_settle_consumer_and_begin_part_compete": {
+      "result": "PASS",
+      "evidence": "messaging-tests-06.log",
+      "cohort": "messaging"
+    },
+    "adapters::persistence::workflow::tests::message_tests::reconcile_tests::race_tests::workflow_message_race_settle_racing_workflow_cancellation_supersedes": {
+      "result": "PASS",
+      "evidence": "messaging-tests-06.log",
+      "cohort": "messaging"
+    },
+    "adapters::persistence::workflow::tests::message_tests::reconcile_tests::veto_tests::workflow_message_reconcile_model_tool_delivery_reopen_never_reopens_the_job": {
+      "result": "PASS",
+      "evidence": "messaging-tests-06.log",
+      "cohort": "messaging"
+    },
+    "adapters::persistence::workflow::tests::message_tests::reconcile_tests::veto_tests::workflow_message_reconcile_wrong_association_actor_is_refused": {
+      "result": "PASS",
+      "evidence": "messaging-tests-06.log",
+      "cohort": "messaging"
+    },
+    "adapters::persistence::workflow::tests::message_tests::reconcile_tests::workflow_message_reconcile_applied_on_a_live_run_resumes_after_every_destination": {
+      "result": "PASS",
+      "evidence": "messaging-tests-06.log",
+      "cohort": "messaging"
+    },
+    "adapters::persistence::workflow::tests::message_tests::race_tests::workflow_message_race_delayed_commit_past_fence_expiry_or_deadline_rolls_back": {
+      "result": "PASS",
+      "evidence": "messaging-tests-06.log",
+      "cohort": "messaging"
+    },
+    "adapters::persistence::workflow::tests::message_tests::reconcile_tests::workflow_message_reconcile_applied_on_a_terminal_run_records_truth_only": {
+      "result": "PASS",
+      "evidence": "messaging-tests-06.log",
+      "cohort": "messaging"
+    },
+    "adapters::persistence::workflow::tests::message_tests::reconcile_tests::workflow_message_reconcile_conflicted_execution_reopens_nothing": {
+      "result": "PASS",
+      "evidence": "messaging-tests-06.log",
+      "cohort": "messaging"
+    },
+    "adapters::persistence::workflow::tests::message_tests::reconcile_tests::veto_tests::workflow_message_reconcile_finality_breach_then_every_destination_final_vetoes_the_receipt": {
+      "result": "PASS",
+      "evidence": "messaging-tests-06.log",
+      "cohort": "messaging"
+    },
+    "adapters::persistence::workflow::tests::message_tests::reconcile_tests::veto_tests::workflow_message_reconcile_sql_reopen_refuses_expired_non_final_and_foreign_evidence": {
+      "result": "PASS",
+      "evidence": "messaging-tests-06.log",
+      "cohort": "messaging"
+    },
+    "adapters::persistence::workflow::tests::message_tests::reconcile_tests::workflow_message_reconcile_expired_proof_before_begin_part_returns_to_unknown": {
+      "result": "PASS",
+      "evidence": "messaging-tests-06.log",
+      "cohort": "messaging"
+    },
+    "adapters::persistence::workflow::tests::message_tests::reconcile_tests::workflow_message_reconcile_expired_proof_is_refused_without_a_grant": {
+      "result": "PASS",
+      "evidence": "messaging-tests-06.log",
+      "cohort": "messaging"
+    },
+    "adapters::persistence::workflow::tests::message_tests::reconcile_tests::workflow_message_reconcile_finality_breach_vetoes_resume_and_reopen": {
+      "result": "PASS",
+      "evidence": "messaging-tests-06.log",
+      "cohort": "messaging"
+    },
+    "adapters::persistence::workflow::tests::message_tests::reconcile_tests::workflow_message_reconcile_not_applied_reopens_only_the_subject": {
+      "result": "PASS",
+      "evidence": "messaging-tests-06.log",
+      "cohort": "messaging"
+    },
+    "adapters::persistence::workflow::tests::message_tests::reconcile_tests::workflow_message_reconcile_stale_snapshot_is_refused_without_a_grant": {
+      "result": "PASS",
+      "evidence": "messaging-tests-06.log",
+      "cohort": "messaging"
+    },
+    "adapters::persistence::workflow::tests::message_tests::reconcile_tests::workflow_message_reconcile_unknown_and_refusals_change_nothing": {
+      "result": "PASS",
+      "evidence": "messaging-tests-06.log",
+      "cohort": "messaging"
+    },
+    "adapters::persistence::workflow::tests::message_tests::reconcile_tests::workflow_message_sql_evidence_attribution_shape_rejects_forgeries": {
+      "result": "PASS",
+      "evidence": "messaging-tests-06.log",
+      "cohort": "messaging"
+    },
+    "adapters::persistence::workflow::tests::message_tests::authority_tests::workflow_message_publish_revoked_authority_is_terminal_rejected_before_any_marker": {
+      "result": "PASS",
+      "evidence": "messaging-tests-06.log",
+      "cohort": "messaging"
+    },
+    "adapters::persistence::workflow::tests::message_tests::recovery_tests::workflow_message_model_tool_failed_delivery_continues_the_agent_job": {
+      "result": "PASS",
+      "evidence": "messaging-tests-06.log",
+      "cohort": "messaging"
+    },
+    "adapters::persistence::workflow::tests::message_tests::reconcile_tests::workflow_message_unknown_note_through_the_production_composition": {
+      "result": "PASS",
+      "evidence": "messaging-tests-06.log",
+      "cohort": "messaging"
+    },
+    "adapters::persistence::workflow::tests::message_tests::recovery_tests::workflow_message_publish_competing_dispatchers_publish_once": {
+      "result": "PASS",
+      "evidence": "messaging-tests-06.log",
+      "cohort": "messaging"
+    },
+    "adapters::persistence::workflow::tests::message_tests::recovery_tests::workflow_message_recovery_control_retry_replays_the_failed_receipt": {
+      "result": "PASS",
+      "evidence": "messaging-tests-06.log",
+      "cohort": "messaging"
+    },
+    "adapters::persistence::workflow::tests::message_tests::sql_tests::workflow_message_publish_admission_admits_128_and_refuses_129": {
+      "result": "PASS",
+      "evidence": "messaging-tests-06.log",
+      "cohort": "messaging"
+    },
+    "adapters::persistence::workflow::tests::message_tests::sql_tests::workflow_message_publish_step_at_the_limit_is_a_terminal_action_limit": {
+      "result": "PASS",
+      "evidence": "messaging-tests-06.log",
+      "cohort": "messaging"
+    },
+    "adapters::persistence::workflow::tests::message_tests::sql_tests::workflow_message_sql_admission_backstop_serializes_competing_writers": {
+      "result": "PASS",
+      "evidence": "messaging-tests-06.log",
+      "cohort": "messaging"
+    },
+    "adapters::persistence::workflow::tests::message_tests::sql_tests::workflow_message_sql_destination_links_reject_foreign_rows": {
+      "result": "PASS",
+      "evidence": "messaging-tests-06.log",
+      "cohort": "messaging"
+    },
+    "adapters::persistence::workflow::tests::message_tests::sql_tests::workflow_message_sql_effect_wait_must_match_its_run_and_action": {
+      "result": "PASS",
+      "evidence": "messaging-tests-06.log",
+      "cohort": "messaging"
+    },
+    "adapters::persistence::workflow::tests::message_tests::sql_tests::workflow_message_sql_fence_capture_and_close_identity_reject_forgeries": {
+      "result": "PASS",
+      "evidence": "messaging-tests-06.log",
+      "cohort": "messaging"
+    },
+    "adapters::persistence::workflow::tests::message_tests::race_tests::workflow_message_race_ambiguous_publication_commit_resolves_three_ways": {
+      "result": "PASS",
+      "evidence": "messaging-tests-06.log",
+      "cohort": "messaging"
+    },
+    "adapters::persistence::workflow::tests::message_tests::sql_tests::workflow_message_sql_park_requires_the_effect_parked_close_cause": {
+      "result": "PASS",
+      "evidence": "messaging-tests-06.log",
+      "cohort": "messaging"
+    },
+    "adapters::persistence::workflow::tests::message_tests::reconcile_tests::workflow_message_reconcile_not_applied_exhausted_or_ended_never_resends": {
+      "result": "PASS",
+      "evidence": "messaging-tests-06.log",
+      "cohort": "messaging"
+    },
+    "adapters::persistence::workflow::tests::message_tests::sql_tests::workflow_message_sql_step_execution_keeps_one_effect_wait": {
+      "result": "PASS",
+      "evidence": "messaging-tests-06.log",
+      "cohort": "messaging"
+    },
+    "adapters::persistence::workflow::tests::message_tests::sql_tests::workflow_message_sql_delivery_provenance_rejects_unproven_exits": {
+      "result": "PASS",
+      "evidence": "messaging-tests-06.log",
+      "cohort": "messaging"
+    },
+    "adapters::persistence::workflow::tests::message_tests::thread_tests::correlation_tests::workflow_message_stores_anchored_rendered_headers_without_rederiving_them": {
+      "result": "PASS",
+      "evidence": "messaging-tests-06.log",
+      "cohort": "messaging"
+    },
+    "adapters::persistence::workflow::tests::message_tests::thread_tests::workflow_message_thread_external_reply_answers_its_own_source": {
+      "result": "PASS",
+      "evidence": "messaging-tests-06.log",
+      "cohort": "messaging"
+    },
+    "adapters::persistence::workflow::tests::message_tests::thread_tests::workflow_message_thread_in_app_reply_stays_in_the_source_thread": {
+      "result": "PASS",
+      "evidence": "messaging-tests-06.log",
+      "cohort": "messaging"
+    },
+    "adapters::persistence::workflow::tests::message_tests::thread_tests::workflow_message_thread_inbound_reply_resolves_each_recipients_copy": {
+      "result": "PASS",
+      "evidence": "messaging-tests-06.log",
+      "cohort": "messaging"
+    },
+    "adapters::persistence::workflow::tests::message_tests::thread_tests::workflow_message_thread_internal_reply_note_leaves_guards_unchanged": {
+      "result": "PASS",
+      "evidence": "messaging-tests-06.log",
+      "cohort": "messaging"
+    },
+    "adapters::persistence::workflow::tests::message_tests::recovery_tests::workflow_message_recovery_existing_marker_is_never_republished": {
+      "result": "PASS",
+      "evidence": "messaging-tests-06.log",
+      "cohort": "messaging"
+    },
+    "adapters::persistence::workflow::tests::message_tests::sql_tests::workflow_message_sql_receipt_and_state_guards_reject_forgeries": {
+      "result": "PASS",
+      "evidence": "messaging-tests-06.log",
+      "cohort": "messaging"
+    },
+    "adapters::persistence::workflow::tests::message_tests::thread_tests::workflow_message_thread_send_never_joins_the_customer_thread": {
+      "result": "PASS",
+      "evidence": "messaging-tests-06.log",
+      "cohort": "messaging"
+    },
+    "adapters::persistence::workflow::tests::message_tests::thread_tests::workflow_message_thread_external_reply_continues_the_source_relay_trace": {
+      "result": "PASS",
+      "evidence": "messaging-tests-06.log",
+      "cohort": "messaging"
+    },
+    "adapters::persistence::workflow::tests::message_tests::workflow_message_publish_in_app_channel_commits_receipt_atomically": {
+      "result": "PASS",
+      "evidence": "messaging-tests-06.log",
+      "cohort": "messaging"
+    },
+    "application::workflow::supervise::tests::workflow_message_wait_supervisor_confirms_suspension_and_never_releases": {
+      "result": "PASS",
+      "evidence": "messaging-tests-06.log",
+      "cohort": "messaging"
+    },
+    "adapters::persistence::workflow::tests::message_tests::workflow_message_receipt_failed_delivery_takes_final_error_and_never_resends": {
+      "result": "PASS",
+      "evidence": "messaging-tests-06.log",
+      "cohort": "messaging"
+    },
+    "adapters::persistence::workflow::tests::message_tests::workflow_message_receipt_poison_backs_off_and_stalls_at_five": {
+      "result": "PASS",
+      "evidence": "messaging-tests-06.log",
+      "cohort": "messaging"
+    },
+    "adapters::persistence::workflow::tests::message_tests::workflow_message_model_tool_deliveries_park_and_continue_sequentially": {
+      "result": "PASS",
+      "evidence": "messaging-tests-06.log",
+      "cohort": "messaging"
+    },
+    "adapters::persistence::workflow::tests::message_tests::workflow_message_receipt_unknown_is_uncertain_until_the_deadline": {
+      "result": "PASS",
+      "evidence": "messaging-tests-06.log",
+      "cohort": "messaging"
+    },
+    "adapters::persistence::workflow::tests::message_tests::workflow_message_wait_cancel_supersedes_unsent_and_records_late_truth": {
+      "result": "PASS",
+      "evidence": "messaging-tests-06.log",
+      "cohort": "messaging"
+    },
+    "adapters::persistence::workflow::tests::message_tests::recovery_tests::workflow_message_recovery_rolled_back_publication_retries_and_publishes_once": {
+      "result": "PASS",
+      "evidence": "messaging-tests-06.log",
+      "cohort": "messaging"
+    },
+    "adapters::persistence::workflow::tests::message_tests::workflow_message_wait_deadline_supersedes_unsent_deliveries": {
+      "result": "PASS",
+      "evidence": "messaging-tests-06.log",
+      "cohort": "messaging"
+    },
+    "adapters::persistence::workflow::tests::message_tests::thread_tests::workflow_message_thread_user_send_opens_a_thread_the_member_takes_part_in": {
+      "result": "PASS",
+      "evidence": "messaging-tests-06.log",
+      "cohort": "messaging"
+    },
+    "adapters::persistence::workflow::tests::message_tests::workflow_message_wait_user_email_parks_then_resumes_on_accepted_receipt": {
+      "result": "PASS",
+      "evidence": "messaging-tests-06.log",
+      "cohort": "messaging"
+    },
+    "adapters::persistence::workflow::tests::message_tests::thread_tests::correlation_tests::workflow_message_invalid_frozen_correlation_creates_no_message_or_delivery": {
+      "result": "PASS",
+      "evidence": "messaging-tests-06.log",
+      "cohort": "messaging"
+    },
+    "adapters::persistence::workflow::tests::message_tests::thread_tests::workflow_message_thread_reply_refuses_sources_it_cannot_answer": {
+      "result": "PASS",
+      "evidence": "messaging-tests-06.log",
+      "cohort": "messaging"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::message_reply_crash_replay_matches_once": {
+      "result": "PASS",
+      "evidence": "reply-ingress-tests-06.log",
+      "cohort": "reply-ingress"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::message_reply_recorded_before_the_deadline_is_consumed_after_it": {
+      "result": "PASS",
+      "evidence": "reply-ingress-tests-06.log",
+      "cohort": "reply-ingress"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::message_reply_the_run_can_never_take_is_ordinary_ingress": {
+      "result": "PASS",
+      "evidence": "reply-ingress-tests-06.log",
+      "cohort": "reply-ingress"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::message_reply_that_fell_through_is_never_matched_on_a_retry": {
+      "result": "PASS",
+      "evidence": "reply-ingress-tests-06.log",
+      "cohort": "reply-ingress"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::message_reply_to_a_workflow_reply_matches_only_the_customer_it_answered": {
+      "result": "PASS",
+      "evidence": "reply-ingress-tests-06.log",
+      "cohort": "reply-ingress"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::message_reply_from_the_wrong_responder_or_after_expiry_is_ordinary_ingress": {
+      "result": "PASS",
+      "evidence": "reply-ingress-tests-06.log",
+      "cohort": "reply-ingress"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::message_reply_to_a_channel_post_matches_only_an_in_app_answer": {
+      "result": "PASS",
+      "evidence": "reply-ingress-tests-06.log",
+      "cohort": "reply-ingress"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::message_reply_delivery_failing_on_the_last_attempt_fails_the_intent_observably": {
+      "result": "PASS",
+      "evidence": "reply-ingress-tests-06.log",
+      "cohort": "reply-ingress"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::message_reply_resumes_its_wait_once_and_a_second_reply_is_ordinary": {
+      "result": "PASS",
+      "evidence": "reply-ingress-tests-06.log",
+      "cohort": "reply-ingress"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::message_reply_before_its_wait_parks_is_deferred_until_it_does": {
+      "result": "PASS",
+      "evidence": "reply-ingress-tests-06.log",
+      "cohort": "reply-ingress"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::message_reply_to_an_unawaited_send_is_ordinary_ingress": {
+      "result": "PASS",
+      "evidence": "reply-ingress-tests-06.log",
+      "cohort": "reply-ingress"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::message_reply_racing_wait_expiry_agrees_without_deadlock": {
+      "result": "PASS",
+      "evidence": "reply-ingress-tests-06.log",
+      "cohort": "reply-ingress"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::message_reply_delivery_out_of_time_is_retried_not_settled": {
+      "result": "PASS",
+      "evidence": "reply-ingress-tests-06.log",
+      "cohort": "reply-ingress"
+    },
+    "adapters::persistence::workflow::tests::http_tests::approval_tests::continuation_tests::workflow_action_approval_old_comment_cannot_attach_to_later_wait": {
+      "result": "PASS",
+      "evidence": "action-approval-tests-06.log",
+      "cohort": "action-approval"
+    },
+    "adapters::persistence::workflow::tests::http_tests::approval_tests::continuation_tests::workflow_action_approval_continuation_counter_and_history_cannot_be_forged": {
+      "result": "PASS",
+      "evidence": "action-approval-tests-06.log",
+      "cohort": "action-approval"
+    },
+    "adapters::persistence::workflow::tests::http_tests::approval_tests::continuation_tests::workflow_action_approval_later_submission_competes_with_cancellation": {
+      "result": "PASS",
+      "evidence": "action-approval-tests-06.log",
+      "cohort": "action-approval"
+    },
+    "adapters::persistence::workflow::tests::http_tests::approval_tests::continuation_tests::workflow_action_approval_multiple_effects_resume_without_failure_debit_or_old_approval_reuse": {
+      "result": "PASS",
+      "evidence": "action-approval-tests-06.log",
+      "cohort": "action-approval"
+    },
+    "adapters::persistence::workflow::tests::http_tests::approval_tests::review_tests::workflow_action_approval_audit_kind_binding_preserves_ordinary_uniqueness": {
+      "result": "PASS",
+      "evidence": "action-approval-tests-06.log",
+      "cohort": "action-approval"
+    },
+    "adapters::persistence::workflow::tests::http_tests::approval_tests::continuation_tests::workflow_action_approval_failure_retry_after_continuation_uses_failure_allowance": {
+      "result": "PASS",
+      "evidence": "action-approval-tests-06.log",
+      "cohort": "action-approval"
+    },
+    "adapters::persistence::workflow::tests::http_tests::approval_tests::review_tests::workflow_action_approval_operator_retry_preserves_nonzero_continuation_witness": {
+      "result": "PASS",
+      "evidence": "action-approval-tests-06.log",
+      "cohort": "action-approval"
+    },
+    "adapters::persistence::workflow::tests::http_tests::approval_tests::review_tests::workflow_action_approval_identical_operation_new_call_id_reuses_one_receipt": {
+      "result": "PASS",
+      "evidence": "action-approval-tests-06.log",
+      "cohort": "action-approval"
+    },
+    "adapters::persistence::workflow::tests::http_tests::approval_tests::review_tests::workflow_action_approval_replay_preserves_result_after_later_successor": {
+      "result": "PASS",
+      "evidence": "action-approval-tests-06.log",
+      "cohort": "action-approval"
+    },
+    "adapters::persistence::workflow::tests::http_tests::approval_tests::continuation_tests::workflow_action_approval_continuation_ceiling_refuses_without_resetting_failures": {
+      "result": "PASS",
+      "evidence": "action-approval-tests-06.log",
+      "cohort": "action-approval"
+    },
+    "adapters::persistence::workflow::tests::http_tests::approval_tests::sql_tests::workflow_action_approval_digest_cannot_authorize_changed_arguments": {
+      "result": "PASS",
+      "evidence": "action-approval-tests-06.log",
+      "cohort": "action-approval"
+    },
+    "adapters::persistence::workflow::tests::http_tests::approval_tests::sql_tests::workflow_action_approval_digest_fk_rejects_each_mismatch": {
+      "result": "PASS",
+      "evidence": "action-approval-tests-06.log",
+      "cohort": "action-approval"
+    },
+    "adapters::persistence::workflow::tests::http_tests::approval_tests::sql_tests::workflow_action_approval_invalid_choice_data_and_digest_leave_open": {
+      "result": "PASS",
+      "evidence": "action-approval-tests-06.log",
+      "cohort": "action-approval"
+    },
+    "adapters::persistence::workflow::tests::http_tests::approval_tests::sql_tests::workflow_action_approval_unprovable_notice_key_fails_without_park": {
+      "result": "PASS",
+      "evidence": "action-approval-tests-06.log",
+      "cohort": "action-approval"
+    },
+    "adapters::persistence::workflow::tests::http_tests::approval_tests::continuation_tests::workflow_action_approval_later_expiry_and_rejection_preserve_first_decision": {
+      "result": "PASS",
+      "evidence": "action-approval-tests-06.log",
+      "cohort": "action-approval"
+    },
+    "adapters::persistence::workflow::tests::http_tests::approval_tests::continuation_tests::workflow_action_approval_orphan_wait_and_foreign_audit_are_rejected": {
+      "result": "PASS",
+      "evidence": "action-approval-tests-06.log",
+      "cohort": "action-approval"
+    },
+    "adapters::persistence::workflow::tests::http_tests::approval_tests::workflow_action_approval_competing_reviewers_settle_once": {
+      "result": "PASS",
+      "evidence": "action-approval-tests-06.log",
+      "cohort": "action-approval"
+    },
+    "adapters::persistence::workflow::tests::http_tests::approval_tests::workflow_action_approval_expiry_fails_without_dispatch": {
+      "result": "PASS",
+      "evidence": "action-approval-tests-06.log",
+      "cohort": "action-approval"
+    },
+    "adapters::persistence::workflow::tests::http_tests::approval_tests::review_tests::workflow_action_approval_same_arguments_different_target_or_operation_need_new_approval": {
+      "result": "PASS",
+      "evidence": "action-approval-tests-06.log",
+      "cohort": "action-approval"
+    },
+    "adapters::persistence::workflow::tests::http_tests::approval_tests::workflow_action_approval_last_failure_attempt_can_park_and_resume": {
+      "result": "PASS",
+      "evidence": "action-approval-tests-06.log",
+      "cohort": "action-approval"
+    },
+    "adapters::persistence::workflow::tests::http_tests::approval_tests::workflow_action_approval_park_with_sixteen_approvers_commits_within_bound": {
+      "result": "PASS",
+      "evidence": "action-approval-tests-06.log",
+      "cohort": "action-approval"
+    },
+    "adapters::persistence::workflow::tests::http_tests::approval_tests::workflow_action_approval_reject_registered_operation_has_http_failure": {
+      "result": "PASS",
+      "evidence": "action-approval-tests-06.log",
+      "cohort": "action-approval"
+    },
+    "adapters::persistence::workflow::tests::http_tests::approval_tests::workflow_action_approval_admin_demotion_refuses_park_and_submission": {
+      "result": "PASS",
+      "evidence": "action-approval-tests-06.log",
+      "cohort": "action-approval"
+    },
+    "adapters::persistence::workflow::tests::http_tests::approval_tests::workflow_action_approval_reopen_without_submission_is_rejected": {
+      "result": "PASS",
+      "evidence": "action-approval-tests-06.log",
+      "cohort": "action-approval"
+    },
+    "adapters::persistence::workflow::tests::http_tests::approval_tests::workflow_action_approval_submit_competes_with_expiry": {
+      "result": "PASS",
+      "evidence": "action-approval-tests-06.log",
+      "cohort": "action-approval"
+    },
+    "adapters::persistence::workflow::tests::http_tests::approval_tests::workflow_action_approval_dispatch_claims_next_attempt_and_dispatches_once": {
+      "result": "PASS",
+      "evidence": "action-approval-tests-06.log",
+      "cohort": "action-approval"
+    },
+    "adapters::persistence::workflow::tests::mcp_tests::approval_tests::workflow_action_approval_mcp_never_opens_before_approval_then_calls_once": {
+      "result": "PASS",
+      "evidence": "action-approval-tests-06.log",
+      "cohort": "action-approval"
+    },
+    "adapters::persistence::workflow::tests::mcp_tests::approval_tests::workflow_action_approval_not_applied_proof_never_grants_second_entry": {
+      "result": "PASS",
+      "evidence": "action-approval-tests-06.log",
+      "cohort": "action-approval"
+    },
+    "adapters::persistence::workflow::tests::message_tests::approval_tests::workflow_action_approval_message_then_effect_wait_preserves_both_histories": {
+      "result": "PASS",
+      "evidence": "action-approval-tests-06.log",
+      "cohort": "action-approval"
+    },
+    "adapters::persistence::workflow::tests::http_tests::approval_tests::sql_tests::workflow_action_approval_reopen_checks_transaction_choice_and_accounting": {
+      "result": "PASS",
+      "evidence": "action-approval-tests-06.log",
+      "cohort": "action-approval"
+    },
+    "adapters::persistence::workflow::tests::message_tests::approval_tests::workflow_action_approval_race_message_lost_ack_resolves_park": {
+      "result": "PASS",
+      "evidence": "action-approval-tests-06.log",
+      "cohort": "action-approval"
+    },
+    "adapters::persistence::workflow::tests::http_tests::approval_tests::resolution_tests::workflow_action_approval_race_lost_commit_ack_resolves_exact_park": {
+      "result": "PASS",
+      "evidence": "action-approval-tests-06.log",
+      "cohort": "action-approval"
+    },
+    "adapters::persistence::workflow::tests::admission_tests::decision_tests::authority_tests::workflow_decision_principal_conversion_before_submit_refuses": {
+      "result": "PASS",
+      "evidence": "decisions-tests-06.log",
+      "cohort": "decisions"
+    },
+    "adapters::persistence::workflow::tests::admission_tests::decision_tests::authority_tests::workflow_decision_removal_before_park_settles_unavailable": {
+      "result": "PASS",
+      "evidence": "decisions-tests-06.log",
+      "cohort": "decisions"
+    },
+    "adapters::persistence::workflow::tests::admission_tests::decision_tests::boundary_tests::workflow_decision_data_configured_context_boundary": {
+      "result": "PASS",
+      "evidence": "decisions-tests-06.log",
+      "cohort": "decisions"
+    },
+    "adapters::persistence::workflow::tests::admission_tests::decision_tests::authority_tests::workflow_decision_nonmember_and_removed_membership_are_hidden": {
+      "result": "PASS",
+      "evidence": "decisions-tests-06.log",
+      "cohort": "decisions"
+    },
+    "adapters::persistence::workflow::tests::admission_tests::decision_tests::authority_tests::workflow_decision_park_blocks_actual_removal_until_notice_commit": {
+      "result": "PASS",
+      "evidence": "decisions-tests-06.log",
+      "cohort": "decisions"
+    },
+    "adapters::persistence::workflow::tests::admission_tests::decision_tests::authority_tests::workflow_decision_submission_blocks_actual_removal_until_commit": {
+      "result": "PASS",
+      "evidence": "decisions-tests-06.log",
+      "cohort": "decisions"
+    },
+    "adapters::persistence::workflow::tests::admission_tests::decision_tests::authority_tests::workflow_decision_membership_delete_preserves_settled_history": {
+      "result": "PASS",
+      "evidence": "decisions-tests-06.log",
+      "cohort": "decisions"
+    },
+    "adapters::persistence::workflow::tests::admission_tests::decision_tests::authority_tests::workflow_decision_visibility_revocation_serializes_in_both_orders": {
+      "result": "PASS",
+      "evidence": "decisions-tests-06.log",
+      "cohort": "decisions"
+    },
+    "adapters::persistence::workflow::tests::admission_tests::decision_tests::authority_tests::workflow_decision_park_loses_to_inflight_member_removal": {
+      "result": "PASS",
+      "evidence": "decisions-tests-06.log",
+      "cohort": "decisions"
+    },
+    "adapters::persistence::workflow::tests::admission_tests::decision_tests::authority_tests::workflow_decision_production_removal_preserves_open_and_settled_history": {
+      "result": "PASS",
+      "evidence": "decisions-tests-06.log",
+      "cohort": "decisions"
+    },
+    "adapters::persistence::workflow::tests::admission_tests::decision_tests::lifecycle_tests::workflow_decision_notices_are_atomic_private_and_never_settle": {
+      "result": "PASS",
+      "evidence": "decisions-tests-06.log",
+      "cohort": "decisions"
+    },
+    "adapters::persistence::workflow::tests::admission_tests::decision_tests::authority_tests::workflow_decision_membership_revocation_serializes_in_both_orders": {
+      "result": "PASS",
+      "evidence": "decisions-tests-06.log",
+      "cohort": "decisions"
+    },
+    "adapters::persistence::workflow::tests::admission_tests::decision_tests::lifecycle_tests::workflow_decision_two_runs_one_company_do_not_serialize": {
+      "result": "PASS",
+      "evidence": "decisions-tests-06.log",
+      "cohort": "decisions"
+    },
+    "adapters::persistence::workflow::tests::admission_tests::decision_tests::lifecycle_tests::workflow_decision_submission_crossing_deadline_rolls_back": {
+      "result": "PASS",
+      "evidence": "decisions-tests-06.log",
+      "cohort": "decisions"
+    },
+    "adapters::persistence::workflow::tests::admission_tests::decision_tests::provenance_tests::workflow_decision_cross_tenant_relationships_and_access": {
+      "result": "PASS",
+      "evidence": "decisions-tests-06.log",
+      "cohort": "decisions"
+    },
+    "adapters::persistence::workflow::tests::admission_tests::decision_tests::provenance_tests::workflow_decision_notice_cross_company_and_unique_link": {
+      "result": "PASS",
+      "evidence": "decisions-tests-06.log",
+      "cohort": "decisions"
+    },
+    "adapters::persistence::workflow::tests::admission_tests::decision_tests::provenance_tests::workflow_decision_notice_rejects_non_notification_independently": {
+      "result": "PASS",
+      "evidence": "decisions-tests-06.log",
+      "cohort": "decisions"
+    },
+    "adapters::persistence::workflow::tests::admission_tests::decision_tests::sql_tests::workflow_decision_comment_bounds_and_immutable_facts": {
+      "result": "PASS",
+      "evidence": "decisions-tests-06.log",
+      "cohort": "decisions"
+    },
+    "adapters::persistence::workflow::tests::admission_tests::decision_tests::sql_tests::workflow_decision_reviewer_notice_provenance_rejects_foreign_delivery": {
+      "result": "PASS",
+      "evidence": "decisions-tests-06.log",
+      "cohort": "decisions"
+    },
+    "adapters::persistence::workflow::tests::admission_tests::decision_tests::boundary_tests::workflow_decision_feedback_character_and_byte_boundaries": {
+      "result": "PASS",
+      "evidence": "decisions-tests-06.log",
+      "cohort": "decisions"
+    },
+    "adapters::persistence::workflow::tests::admission_tests::decision_tests::boundary_tests::workflow_decision_whole_output_cannot_activate_message_delivery": {
+      "result": "PASS",
+      "evidence": "decisions-tests-06.log",
+      "cohort": "decisions"
+    },
+    "adapters::persistence::workflow::tests::admission_tests::decision_tests::workflow_decision_invalid_stale_unlisted_and_comment_replay": {
+      "result": "PASS",
+      "evidence": "decisions-tests-06.log",
+      "cohort": "decisions"
+    },
+    "adapters::persistence::workflow::tests::admission_tests::decision_tests::lifecycle_tests::workflow_decision_past_deadline_never_parks_and_unavailable_never_routes": {
+      "result": "PASS",
+      "evidence": "decisions-tests-06.log",
+      "cohort": "decisions"
+    },
+    "adapters::persistence::workflow::tests::admission_tests::decision_tests::workflow_decision_opted_out_reviewer_gets_no_notice_and_still_reviews": {
+      "result": "PASS",
+      "evidence": "decisions-tests-06.log",
+      "cohort": "decisions"
+    },
+    "adapters::persistence::workflow::tests::admission_tests::decision_tests::workflow_decision_park_composition_error_fails_run_unrouted": {
+      "result": "PASS",
+      "evidence": "decisions-tests-06.log",
+      "cohort": "decisions"
+    },
+    "adapters::persistence::workflow::tests::admission_tests::decision_tests::workflow_decision_park_submit_restart_replay_and_notices": {
+      "result": "PASS",
+      "evidence": "decisions-tests-06.log",
+      "cohort": "decisions"
+    },
+    "application::workflow::registry::decision_tests::workflow_decision_digest_survives_jsonb_numeric_normalization": {
+      "result": "PASS",
+      "evidence": "decisions-tests-06.log",
+      "cohort": "decisions"
+    },
+    "adapters::persistence::workflow::tests::admission_tests::decision_tests::workflow_decision_park_unprovable_notice_key_fails_run_unrouted": {
+      "result": "PASS",
+      "evidence": "decisions-tests-06.log",
+      "cohort": "decisions"
+    },
+    "adapters::persistence::workflow::tests::admission_tests::decision_tests::workflow_decision_park_waits_for_a_preference_toggle_in_flight": {
+      "result": "PASS",
+      "evidence": "decisions-tests-06.log",
+      "cohort": "decisions"
+    },
+    "adapters::persistence::workflow::tests::admission_tests::decision_tests::workflow_decision_park_with_sixteen_reviewers": {
+      "result": "PASS",
+      "evidence": "decisions-tests-06.log",
+      "cohort": "decisions"
+    },
+    "adapters::persistence::workflow::tests::admission_tests::decision_tests::workflow_decision_revoked_reviewer_and_foreign_company_are_hidden": {
+      "result": "PASS",
+      "evidence": "decisions-tests-06.log",
+      "cohort": "decisions"
+    },
+    "adapters::persistence::workflow::tests::admission_tests::decision_tests::workflow_decision_submit_competes_with_cancel": {
+      "result": "PASS",
+      "evidence": "decisions-tests-06.log",
+      "cohort": "decisions"
+    },
+    "adapters::persistence::workflow::tests::admission_tests::decision_tests::workflow_decision_submit_competes_with_timeout": {
+      "result": "PASS",
+      "evidence": "decisions-tests-06.log",
+      "cohort": "decisions"
+    },
+    "adapters::persistence::workflow::tests::admission_tests::decision_tests::workflow_decision_timeout_error_route_successor_receives_null": {
+      "result": "PASS",
+      "evidence": "decisions-tests-06.log",
+      "cohort": "decisions"
+    },
+    "adapters::persistence::workflow::tests::admission_tests::decision_tests::workflow_decision_timeout_without_error_route_fails_run": {
+      "result": "PASS",
+      "evidence": "decisions-tests-06.log",
+      "cohort": "decisions"
+    },
+    "adapters::persistence::workflow::tests::admission_tests::decision_tests::workflow_decision_two_reviewers_compete_for_one_successor": {
+      "result": "PASS",
+      "evidence": "decisions-tests-06.log",
+      "cohort": "decisions"
+    },
+    "adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::model_steps::workflow_decision_agent_chooses_only_a_declared_route_with_valid_data": {
+      "result": "PASS",
+      "evidence": "decisions-tests-06.log",
+      "cohort": "decisions"
+    },
+    "adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::model_steps::workflow_decision_agent_data_schema_local_references_resolve": {
+      "result": "PASS",
+      "evidence": "decisions-tests-06.log",
+      "cohort": "decisions"
+    },
+    "adapters::persistence::workflow::tests::admission_tests::lease_tests::wait_tests::guard_tests::workflow_wait_event_facts_faults_and_bounds_are_enforced": {
+      "result": "PASS",
+      "evidence": "waits-tests-06.log",
+      "cohort": "waits"
+    },
+    "adapters::persistence::workflow::tests::admission_tests::lease_tests::wait_tests::guard_tests::workflow_wait_consumed_event_does_not_resume_new_wait": {
+      "result": "PASS",
+      "evidence": "waits-tests-06.log",
+      "cohort": "waits"
+    },
+    "adapters::persistence::workflow::tests::admission_tests::lease_tests::wait_tests::guard_tests::workflow_wait_event_id_collision_across_competing_runs_is_conflict": {
+      "result": "PASS",
+      "evidence": "waits-tests-06.log",
+      "cohort": "waits"
+    },
+    "adapters::persistence::workflow::tests::admission_tests::lease_tests::wait_tests::guard_tests::workflow_wait_commit_guard_refuses_an_event_recorded_after_the_deadline": {
+      "result": "PASS",
+      "evidence": "waits-tests-06.log",
+      "cohort": "waits"
+    },
+    "adapters::persistence::workflow::tests::admission_tests::lease_tests::wait_tests::guard_tests::workflow_wait_event_scope_and_consumption_foreign_keys": {
+      "result": "PASS",
+      "evidence": "waits-tests-06.log",
+      "cohort": "waits"
+    },
+    "adapters::persistence::workflow::tests::admission_tests::lease_tests::wait_tests::deadline_tests::workflow_wait_same_thread_messages_remain_independent": {
+      "result": "PASS",
+      "evidence": "waits-tests-06.log",
+      "cohort": "waits"
+    },
+    "adapters::persistence::workflow::tests::admission_tests::lease_tests::wait_tests::guard_tests::workflow_wait_event_bound_competing_producers": {
+      "result": "PASS",
+      "evidence": "waits-tests-06.log",
+      "cohort": "waits"
+    },
+    "adapters::persistence::workflow::tests::admission_tests::lease_tests::wait_tests::guard_tests::workflow_wait_event_stale_event_matches_only_its_correlation": {
+      "result": "PASS",
+      "evidence": "waits-tests-06.log",
+      "cohort": "waits"
+    },
+    "adapters::persistence::workflow::tests::admission_tests::lease_tests::wait_tests::deadline_tests::workflow_wait_expiry_and_cancellation_do_not_schedule": {
+      "result": "PASS",
+      "evidence": "waits-tests-06.log",
+      "cohort": "waits"
+    },
+    "adapters::persistence::workflow::tests::admission_tests::lease_tests::wait_tests::guard_tests::workflow_wait_poison_timer_does_not_block_valid_due_work": {
+      "result": "PASS",
+      "evidence": "waits-tests-06.log",
+      "cohort": "waits"
+    },
+    "adapters::persistence::workflow::tests::admission_tests::lease_tests::wait_tests::guard_tests::workflow_wait_event_deadline_guard_is_independent_of_run_deadline": {
+      "result": "PASS",
+      "evidence": "waits-tests-06.log",
+      "cohort": "waits"
+    },
+    "adapters::persistence::workflow::tests::admission_tests::lease_tests::wait_tests::workflow_wait_competing_park_signal_resume_and_lost_ack": {
+      "result": "PASS",
+      "evidence": "waits-tests-06.log",
+      "cohort": "waits"
+    },
+    "adapters::persistence::workflow::tests::admission_tests::lease_tests::wait_tests::guard_tests::workflow_wait_sweep_selection_has_bounded_lock_wait": {
+      "result": "PASS",
+      "evidence": "waits-tests-06.log",
+      "cohort": "waits"
+    },
+    "adapters::persistence::workflow::tests::admission_tests::lease_tests::wait_tests::deadline_tests::workflow_wait_due_timer_sweeps_once_and_future_timer_waits": {
+      "result": "PASS",
+      "evidence": "waits-tests-06.log",
+      "cohort": "waits"
+    },
+    "adapters::persistence::workflow::tests::admission_tests::lease_tests::wait_tests::deadline_tests::workflow_wait_commit_crossing_deadline_rolls_back": {
+      "result": "PASS",
+      "evidence": "waits-tests-06.log",
+      "cohort": "waits"
+    },
+    "adapters::persistence::workflow::tests::admission_tests::lease_tests::wait_tests::deadline_tests::workflow_wait_cancel_races_resume_under_run_lock": {
+      "result": "PASS",
+      "evidence": "waits-tests-06.log",
+      "cohort": "waits"
+    },
+    "adapters::persistence::workflow::tests::admission_tests::lease_tests::wait_tests::workflow_wait_event_before_park_and_concurrent_arrival": {
+      "result": "PASS",
+      "evidence": "waits-tests-06.log",
+      "cohort": "waits"
+    },
+    "adapters::persistence::workflow::tests::admission_tests::lease_tests::wait_tests::guard_tests::workflow_wait_expiry_competes_with_resume": {
+      "result": "PASS",
+      "evidence": "waits-tests-06.log",
+      "cohort": "waits"
+    },
+    "adapters::persistence::workflow::tests::admission_tests::lease_tests::wait_tests::workflow_wait_refuses_scope_kind_and_invalid_events": {
+      "result": "PASS",
+      "evidence": "waits-tests-06.log",
+      "cohort": "waits"
+    },
+    "adapters::persistence::workflow::tests::admission_tests::lease_tests::wait_tests::workflow_wait_park_and_resume_write_failures_roll_back": {
+      "result": "PASS",
+      "evidence": "waits-tests-06.log",
+      "cohort": "waits"
+    },
+    "adapters::persistence::workflow::tests::admission_tests::batch_tests::child_runtime_tests::workflow_child_timeout_fails_child_and_reaches_parent_error_route": {
+      "result": "PASS",
+      "evidence": "children-tests-06.log",
+      "cohort": "children"
+    },
+    "adapters::persistence::workflow::tests::child_publication_tests::workflow_child_publication_publishes_the_shipped_revision_template_end_to_end": {
+      "result": "PASS",
+      "evidence": "children-tests-06.log",
+      "cohort": "children"
+    },
+    "adapters::persistence::workflow::tests::admission_tests::batch_tests::child_schema_tests::workflow_child_schema_requires_the_parent_wait_of_the_same_execution": {
+      "result": "PASS",
+      "evidence": "children-tests-06.log",
+      "cohort": "children"
+    },
+    "adapters::persistence::workflow::tests::admission_tests::batch_tests::child_configuration_tests::workflow_child_parameters_the_child_refuses_fail_activation_without_a_child": {
+      "result": "PASS",
+      "evidence": "children-tests-06.log",
+      "cohort": "children"
+    },
+    "adapters::persistence::workflow::tests::admission_tests::batch_tests::child_runtime_tests::workflow_child_wait_resumes_after_restart": {
+      "result": "PASS",
+      "evidence": "children-tests-06.log",
+      "cohort": "children"
+    },
+    "adapters::persistence::workflow::tests::admission_tests::batch_tests::child_configuration_tests::workflow_child_gets_its_frozen_params_and_only_its_own_resource_slots": {
+      "result": "PASS",
+      "evidence": "children-tests-06.log",
+      "cohort": "children"
+    },
+    "adapters::persistence::workflow::tests::child_publication_tests::workflow_child_publication_captures_only_selectable_children_of_the_company": {
+      "result": "PASS",
+      "evidence": "children-tests-06.log",
+      "cohort": "children"
+    },
+    "adapters::persistence::workflow::tests::admission_tests::batch_tests::child_runtime_tests::workflow_child_history_is_empty_and_later_messages_stay_invisible": {
+      "result": "PASS",
+      "evidence": "children-tests-06.log",
+      "cohort": "children"
+    },
+    "adapters::persistence::workflow::tests::child_publication_tests::workflow_child_publication_bounds_pins_and_bytes_before_reading_bundles": {
+      "result": "PASS",
+      "evidence": "children-tests-06.log",
+      "cohort": "children"
+    },
+    "adapters::persistence::delivery::tests::a_stored_destination_is_read_through_its_own_transport": {
+      "result": "PASS",
+      "evidence": "delivery-tests-06.log",
+      "cohort": "delivery"
+    },
+    "adapters::persistence::delivery::tests::a_stored_part_payload_is_decoded_fallibly": {
+      "result": "PASS",
+      "evidence": "delivery-tests-06.log",
+      "cohort": "delivery"
+    },
+    "adapters::persistence::delivery::tests::cancellation::the_cancellation_reasons_match_their_database_constraint": {
+      "result": "PASS",
+      "evidence": "delivery-tests-06.log",
+      "cohort": "delivery"
+    },
+    "adapters::persistence::delivery::tests::a_stale_execution_cannot_write_over_the_one_that_replaced_it": {
+      "result": "PASS",
+      "evidence": "delivery-tests-06.log",
+      "cohort": "delivery"
+    },
+    "adapters::persistence::delivery::tests::a_reaped_lease_retries_only_what_never_reached_the_provider": {
+      "result": "PASS",
+      "evidence": "delivery-tests-06.log",
+      "cohort": "delivery"
+    },
+    "adapters::persistence::delivery::tests::a_poison_delivery_goes_terminal_without_spinning": {
+      "result": "PASS",
+      "evidence": "delivery-tests-06.log",
+      "cohort": "delivery"
+    },
+    "adapters::persistence::delivery::tests::cancellation::a_begin_part_that_loses_the_parent_lock_starts_no_request": {
+      "result": "PASS",
+      "evidence": "delivery-tests-06.log",
+      "cohort": "delivery"
+    },
+    "adapters::persistence::delivery::tests::cancellation::a_held_delivery_starts_no_further_part_once_cancelled": {
+      "result": "PASS",
+      "evidence": "delivery-tests-06.log",
+      "cohort": "delivery"
+    },
+    "adapters::persistence::delivery::tests::a_retryable_failure_backs_off_and_the_last_attempt_dead_letters": {
+      "result": "PASS",
+      "evidence": "delivery-tests-06.log",
+      "cohort": "delivery"
+    },
+    "adapters::persistence::delivery::tests::cancellation::a_request_already_made_keeps_its_real_outcome": {
+      "result": "PASS",
+      "evidence": "delivery-tests-06.log",
+      "cohort": "delivery"
+    },
+    "adapters::persistence::delivery::tests::a_dependent_delivery_waits_and_is_orphaned_when_its_root_dies": {
+      "result": "PASS",
+      "evidence": "delivery-tests-06.log",
+      "cohort": "delivery"
+    },
+    "adapters::persistence::delivery::tests::one_key_per_destination_absorbs_a_repeat_and_keeps_two_recipients_apart": {
+      "result": "PASS",
+      "evidence": "delivery-tests-06.log",
+      "cohort": "delivery"
+    },
+    "adapters::persistence::delivery::tests::cancellation::a_queued_delivery_is_superseded_and_keeps_its_partial_send": {
+      "result": "PASS",
+      "evidence": "delivery-tests-06.log",
+      "cohort": "delivery"
+    },
+    "adapters::persistence::delivery::tests::a_multi_part_delivery_aggregates_from_its_parts": {
+      "result": "PASS",
+      "evidence": "delivery-tests-06.log",
+      "cohort": "delivery"
+    },
+    "adapters::persistence::delivery::tests::cancellation::release_failure_and_the_lease_sweep_settle_rather_than_requeue": {
+      "result": "PASS",
+      "evidence": "delivery-tests-06.log",
+      "cohort": "delivery"
+    },
+    "adapters::persistence::delivery::tests::tenant_tests::channel_path_fk_delivery_cannot_cross_channels": {
+      "result": "PASS",
+      "evidence": "delivery-tests-06.log",
+      "cohort": "delivery"
+    },
+    "adapters::persistence::delivery::tests::competing_standalone_notification_enqueues_create_one_claimable_delivery": {
+      "result": "PASS",
+      "evidence": "delivery-tests-06.log",
+      "cohort": "delivery"
+    },
+    "adapters::persistence::delivery::tests::tenant_tests::notification_delivery_tenant_member_removal_cancels_pending_notices": {
+      "result": "PASS",
+      "evidence": "delivery-tests-06.log",
+      "cohort": "delivery"
+    },
+    "adapters::persistence::delivery::tests::tenant_tests::notification_delivery_tenant_part_company_must_match_its_delivery": {
+      "result": "PASS",
+      "evidence": "delivery-tests-06.log",
+      "cohort": "delivery"
+    },
+    "adapters::persistence::delivery::tests::jsonb_row_context_delivery_reports_id_before_creating_queue_rows": {
+      "result": "PASS",
+      "evidence": "delivery-tests-06.log",
+      "cohort": "delivery"
+    },
+    "adapters::persistence::delivery::tests::late_completion::delivery_late_completion_after_the_reaper_took_the_row_is_lease_lost": {
+      "result": "PASS",
+      "evidence": "delivery-tests-06.log",
+      "cohort": "delivery"
+    },
+    "adapters::persistence::delivery::tests::tenant_tests::tenant_fk_small_company_deletion_leaves_no_demand_or_poll_rows": {
+      "result": "PASS",
+      "evidence": "delivery-tests-06.log",
+      "cohort": "delivery"
+    },
+    "adapters::persistence::delivery::tests::tenant_tests::tenant_fk_small_notification_event_and_recipient_are_tenant_proven": {
+      "result": "PASS",
+      "evidence": "delivery-tests-06.log",
+      "cohort": "delivery"
+    },
+    "adapters::persistence::delivery::tests::the_claimable_statuses_match_the_index_the_claim_relies_on": {
+      "result": "PASS",
+      "evidence": "delivery-tests-06.log",
+      "cohort": "delivery"
+    },
+    "adapters::persistence::delivery::tests::the_delivery_vocabularies_match_their_database_constraints": {
+      "result": "PASS",
+      "evidence": "delivery-tests-06.log",
+      "cohort": "delivery"
+    },
+    "adapters::persistence::delivery::tests::late_completion::delivery_late_completion_after_the_lease_expired_records_the_outcome": {
+      "result": "PASS",
+      "evidence": "delivery-tests-06.log",
+      "cohort": "delivery"
+    },
+    "adapters::persistence::delivery::tests::late_completion::delivery_late_completion_races_the_reaper_and_exactly_one_wins": {
+      "result": "PASS",
+      "evidence": "delivery-tests-06.log",
+      "cohort": "delivery"
+    },
+    "adapters::persistence::delivery::tests::late_completion::delivery_late_completion_renewal_locks_in_id_order": {
+      "result": "PASS",
+      "evidence": "delivery-tests-06.log",
+      "cohort": "delivery"
+    },
+    "adapters::persistence::delivery::tests::late_completion::delivery_late_completion_renewal_races_the_reaper_and_exactly_one_wins": {
+      "result": "PASS",
+      "evidence": "delivery-tests-06.log",
+      "cohort": "delivery"
+    },
+    "adapters::persistence::delivery::tests::releasing_a_claim_costs_no_attempt_and_makes_it_immediately_claimable": {
+      "result": "PASS",
+      "evidence": "delivery-tests-06.log",
+      "cohort": "delivery"
+    },
+    "adapters::persistence::delivery::tests::schema_constraint_delivery_failure_requires_class_and_bounded_detail": {
+      "result": "PASS",
+      "evidence": "delivery-tests-06.log",
+      "cohort": "delivery"
+    },
+    "adapters::persistence::delivery::tests::schema_constraint_retired_delivery_purposes_and_identity_status_are_refused": {
+      "result": "PASS",
+      "evidence": "delivery-tests-06.log",
+      "cohort": "delivery"
+    },
+    "adapters::persistence::delivery::tests::tenant_tests::notification_delivery_tenant_company_deletion_removes_notices_and_parts": {
+      "result": "PASS",
+      "evidence": "delivery-tests-06.log",
+      "cohort": "delivery"
+    },
+    "adapters::persistence::delivery::tests::tenant_tests::notification_delivery_tenant_removal_first_producer_finds_no_member": {
+      "result": "PASS",
+      "evidence": "delivery-tests-06.log",
+      "cohort": "delivery"
+    },
+    "adapters::persistence::delivery::tests::tenant_tests::notification_delivery_tenant_removal_waits_for_a_producer_and_cancels_its_notice": {
+      "result": "PASS",
+      "evidence": "delivery-tests-06.log",
+      "cohort": "delivery"
+    },
+    "adapters::persistence::delivery::tests::the_stuck_delivery_census_counts_each_stall_and_not_a_due_delivery": {
+      "result": "PASS",
+      "evidence": "delivery-tests-06.log",
+      "cohort": "delivery"
+    },
+    "adapters::persistence::delivery::tests::two_claimants_never_own_the_same_delivery": {
+      "result": "PASS",
+      "evidence": "delivery-tests-06.log",
+      "cohort": "delivery"
+    },
+    "adapters::persistence::delivery::tests::late_completion::delivery_late_completion_worker_renews_so_a_slow_batch_completes": {
+      "result": "PASS",
+      "evidence": "delivery-tests-06.log",
+      "cohort": "delivery"
+    },
+    "adapters::persistence::delivery::cancellation::tests::every_reason_has_a_detail_the_sql_case_can_carry": {
+      "result": "PASS",
+      "evidence": "cancellation-tests-06.log",
+      "cohort": "cancellation"
+    },
+    "application::workflow::sample::tests::jev_tests::jev_box_sample_uses_only_scripted_answers_and_inert_metadata": {
+      "result": "PASS",
+      "evidence": "samples-tests-06.log",
+      "cohort": "samples"
+    },
+    "application::workflow::sample::tests::jev_tests::jev_box_sample_rejects_tools_tokens_and_invalid_box": {
+      "result": "PASS",
+      "evidence": "samples-tests-06.log",
+      "cohort": "samples"
+    },
+    "application::workflow::sample::tests::tools_tests::approvals::autonomous_agent_samples_protected_http_binding_requires_explicit_simulated_approval": {
+      "result": "PASS",
+      "evidence": "samples-tests-06.log",
+      "cohort": "samples"
+    },
+    "application::workflow::sample::tests::tools_tests::approvals::autonomous_agent_samples_protected_child_binding_requires_explicit_simulated_approval": {
+      "result": "PASS",
+      "evidence": "samples-tests-06.log",
+      "cohort": "samples"
+    },
+    "application::workflow::sample::tests::tools_tests::direct_agent_tools_and_pinned_workflow_tools_stay_in_sample": {
+      "result": "PASS",
+      "evidence": "samples-tests-06.log",
+      "cohort": "samples"
+    },
+    "application::workflow::sample::tests::tools_tests::direct_tool_inputs_and_outputs_are_validated": {
+      "result": "PASS",
+      "evidence": "samples-tests-06.log",
+      "cohort": "samples"
+    },
+    "application::workflow::sample::tests::tools_tests::protected_step_workflow_tool_needs_approval_and_executes_child": {
+      "result": "PASS",
+      "evidence": "samples-tests-06.log",
+      "cohort": "samples"
+    },
+    "application::workflow::sample::tests::pure_and_scripted_routing_share_compiled_validation": {
+      "result": "PASS",
+      "evidence": "samples-tests-06.log",
+      "cohort": "samples"
+    },
+    "application::workflow::sample::tests::jev_tests::workflow_sample_jev_mixed_thresholds_automatic_and_human_paths": {
+      "result": "PASS",
+      "evidence": "samples-tests-06.log",
+      "cohort": "samples"
+    },
+    "application::workflow::sample::tests::missing_invalid_unused_and_oversized_scripts_fail_explicitly": {
+      "result": "PASS",
+      "evidence": "samples-tests-06.log",
+      "cohort": "samples"
+    },
+    "application::workflow::sample::tests::bounded_root_budget_and_external_kinds_never_fall_back": {
+      "result": "PASS",
+      "evidence": "samples-tests-06.log",
+      "cohort": "samples"
+    },
+    "application::workflow::sample::tests::repeated_human_revision_carries_edited_artifact_feedback_and_captures_reply": {
+      "result": "PASS",
+      "evidence": "samples-tests-06.log",
+      "cohort": "samples"
+    },
+    "application::workflow::sample::tests::tools_tests::direct_mcp_tool_uses_the_production_result_envelope": {
+      "result": "PASS",
+      "evidence": "samples-tests-06.log",
+      "cohort": "samples"
+    },
+    "application::workflow::sample::tests::descendants_cannot_replenish_root_budgets_and_report_size_is_bounded": {
+      "result": "PASS",
+      "evidence": "samples-tests-06.log",
+      "cohort": "samples"
+    },
+    "application::workflow::registry::review1_tests::workflow_registry_dialects_follow_active_custom_targets_only": {
+      "result": "PASS",
+      "evidence": "registry-tests-07.log",
+      "cohort": "registry"
+    },
+    "application::workflow::registry::contract_tests::workflow_registry_choice_resource_child_deadline_and_schema_errors": {
+      "result": "PASS",
+      "evidence": "registry-tests-07.log",
+      "cohort": "registry"
+    },
+    "application::workflow::registry::review1_tests::workflow_registry_classifier_contract_excludes_scalar_loopholes": {
+      "result": "PASS",
+      "evidence": "registry-tests-07.log",
+      "cohort": "registry"
+    },
+    "application::workflow::registry::decision_tests::workflow_registry_event_name_is_literal_and_has_one_schema": {
+      "result": "PASS",
+      "evidence": "registry-tests-07.log",
+      "cohort": "registry"
+    },
+    "application::workflow::registry::contract_tests::workflow_registry_native_schema_resources_survive_nested_contracts": {
+      "result": "PASS",
+      "evidence": "registry-tests-07.log",
+      "cohort": "registry"
+    },
+    "application::workflow::registry::runtime_tests::workflow_registry_child_params_are_static_and_resources_match_by_slot": {
+      "result": "PASS",
+      "evidence": "registry-tests-07.log",
+      "cohort": "registry"
+    },
+    "application::workflow::registry::contract_tests::workflow_registry_per_step_schemas_and_choices_remain_distinct": {
+      "result": "PASS",
+      "evidence": "registry-tests-07.log",
+      "cohort": "registry"
+    },
+    "application::workflow::registry::runtime_tests::workflow_registry_facts_bounded_unique_and_identity_sensitive": {
+      "result": "PASS",
+      "evidence": "registry-tests-07.log",
+      "cohort": "registry"
+    },
+    "application::workflow::registry::decision_tests::workflow_registry_action_approval_allows_dynamic_deadline_but_validates_it": {
+      "result": "PASS",
+      "evidence": "registry-tests-07.log",
+      "cohort": "registry"
+    },
+    "application::workflow::registry::schema_tests::workflow_registry_metadata_matches_effect_families_and_never_claims_authorization": {
+      "result": "PASS",
+      "evidence": "registry-tests-07.log",
+      "cohort": "registry"
+    },
+    "application::workflow::registry::runtime_tests::workflow_registry_dynamic_http_and_deadline_checks_are_authoritative_and_redacted": {
+      "result": "PASS",
+      "evidence": "registry-tests-07.log",
+      "cohort": "registry"
+    },
+    "application::workflow::registry::runtime_tests::workflow_registry_human_feedback_and_repeat_output_constraints": {
+      "result": "PASS",
+      "evidence": "registry-tests-07.log",
+      "cohort": "registry"
+    },
+    "application::workflow::registry::schema_tests::workflow_registry_nested_schema_refs_ids_and_data_keywords_preserve_native_meaning": {
+      "result": "PASS",
+      "evidence": "registry-tests-07.log",
+      "cohort": "registry"
+    },
+    "application::workflow::registry::schema_tests::workflow_registry_semantic_errors_locate_literal_values_without_leaking_them": {
+      "result": "PASS",
+      "evidence": "registry-tests-07.log",
+      "cohort": "registry"
+    },
+    "application::workflow::registry::decision_tests::workflow_registry_decision_object_cannot_be_disclosed_as_message_content": {
+      "result": "PASS",
+      "evidence": "registry-tests-07.log",
+      "cohort": "registry"
+    },
+    "application::workflow::registry::tests::workflow_registry_context_history_replaces_context_load": {
+      "result": "PASS",
+      "evidence": "registry-tests-07.log",
+      "cohort": "registry"
+    },
+    "application::workflow::registry::tests::workflow_registry_agent_action_approval_uses_shared_static_policy": {
+      "result": "PASS",
+      "evidence": "registry-tests-07.log",
+      "cohort": "registry"
+    },
+    "application::workflow::registry::schema_tests::workflow_registry_schema_budget_retains_external_recursion_depth_node_byte_rejection": {
+      "result": "PASS",
+      "evidence": "registry-tests-07.log",
+      "cohort": "registry"
+    },
+    "application::workflow::registry::decision_tests::workflow_registry_decision_reviewers_static_nested_and_bounded": {
+      "result": "PASS",
+      "evidence": "registry-tests-07.log",
+      "cohort": "registry"
+    },
+    "application::workflow::registry::review1_tests::workflow_registry_expansion_rejects_reused_facts_before_specialization": {
+      "result": "PASS",
+      "evidence": "registry-tests-07.log",
+      "cohort": "registry"
+    },
+    "application::workflow::registry::runtime_tests::workflow_registry_mcp_output_and_downstream_structured_reference": {
+      "result": "PASS",
+      "evidence": "registry-tests-07.log",
+      "cohort": "registry"
+    },
+    "application::workflow::registry::review1_tests::workflow_registry_mcp_all_protocol_content_variants_and_bounds": {
+      "result": "PASS",
+      "evidence": "registry-tests-07.log",
+      "cohort": "registry"
+    },
+    "application::workflow::registry::contract_tests::workflow_registry_static_declarations_and_nested_configuration_are_checked": {
+      "result": "PASS",
+      "evidence": "registry-tests-07.log",
+      "cohort": "registry"
+    },
+    "application::workflow::registry::review1_tests::workflow_registry_shared_actions_advertise_durable_suspension": {
+      "result": "PASS",
+      "evidence": "registry-tests-07.log",
+      "cohort": "registry"
+    },
+    "application::workflow::registry::runtime_tests::workflow_registry_each_type_validates_dynamic_required_inputs": {
+      "result": "PASS",
+      "evidence": "registry-tests-07.log",
+      "cohort": "registry"
+    },
+    "application::workflow::registry::tests::workflow_registry_exact_catalogue_and_help_examples_compile": {
+      "result": "PASS",
+      "evidence": "registry-tests-07.log",
+      "cohort": "registry"
+    },
+    "application::workflow::registry::decision_tests::workflow_registry_action_approval_reviewers_are_static_and_bounded": {
+      "result": "PASS",
+      "evidence": "registry-tests-07.log",
+      "cohort": "registry"
+    },
+    "application::workflow::registry::tests::workflow_registry_every_type_rejects_missing_invalid_and_unknown_fields": {
+      "result": "PASS",
+      "evidence": "registry-tests-07.log",
+      "cohort": "registry"
+    },
+    "application::workflow::publication::storage::tests::workflow_storage_deserialization_preserves_name_invariants": {
+      "result": "PASS",
+      "evidence": "storage-semantics-tests-07.log",
+      "cohort": "storage-semantics"
+    },
+    "application::workflow::storage::tests::workflow_storage_cursor_advances_past_full_error_and_protected_page_without_time_advance": {
+      "result": "PASS",
+      "evidence": "storage-semantics-tests-07.log",
+      "cohort": "storage-semantics"
+    },
+    "application::workflow::storage::tests::workflow_storage_shutdown_drops_pending_write_and_joins": {
+      "result": "PASS",
+      "evidence": "storage-semantics-tests-07.log",
+      "cohort": "storage-semantics"
+    },
+    "application::workflow::storage::tests::workflow_storage_full_error_page_still_has_positive_worker_delay": {
+      "result": "PASS",
+      "evidence": "storage-semantics-tests-07.log",
+      "cohort": "storage-semantics"
+    },
+    "application::workflow::publication::storage::tests::workflow_storage_rejects_incompatible_compiler_before_rebuilding": {
+      "result": "PASS",
+      "evidence": "storage-semantics-tests-07.log",
+      "cohort": "storage-semantics"
+    },
+    "application::workflow::publication::storage::tests::workflow_storage_rejects_corruption_and_compiler_drift": {
+      "result": "PASS",
+      "evidence": "storage-semantics-tests-07.log",
+      "cohort": "storage-semantics"
+    },
+    "application::workflow::publication::storage::tests::workflow_storage_restores_all_frozen_fixtures_and_child_identity": {
+      "result": "PASS",
+      "evidence": "storage-semantics-tests-07.log",
+      "cohort": "storage-semantics"
+    },
+    "adapters::persistence::workflow::tests::admission_tests::lease_tests::schema_constraint_tests::schema_constraint_attempt_stop_reason_matrix": {
+      "result": "PASS",
+      "evidence": "attempt-schema-tests-07.log",
+      "cohort": "attempt-schema"
+    },
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::integrity::channel_reply_hitl_prompt_true_company_teardown_removes_its_owned_question_and_unknown_delivery": {
+      "result": "PASS",
+      "evidence": "hitl-tests-08.log",
+      "cohort": "current question/helper checks"
+    }
+  },
+  "final_checks": [
+    {
+      "check": "clippy-02",
+      "exit": 0
+    },
+    {
+      "check": "sqlx-prepare-03",
+      "exit": 0
+    },
+    {
+      "check": "sqlx-check-03",
+      "exit": 0
+    },
+    {
+      "check": "fmt-check-02",
+      "exit": 0
+    },
+    {
+      "check": "diff-check-02",
+      "exit": 0
+    },
+    {
+      "check": "graft-build-02",
+      "exit": 0
+    }
+  ],
+  "fresh_migrations": [
+    "migrations-main-03.json",
+    "migrations-test-03.json"
+  ],
+  "actual_sqlx_prepare": "sqlx-prepare-03.json",
+  "sqlx_check": "sqlx-check-03.json",
+  "failed_check_receipts_retained": [
+    "compile-01.json",
+    "hitl-tests-01.json",
+    "channel-reply-tests-05.json",
+    "registry-tests-06.json",
+    "clippy-01.json"
+  ]
+}

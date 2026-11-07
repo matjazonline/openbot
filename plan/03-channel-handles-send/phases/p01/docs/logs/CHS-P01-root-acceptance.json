@@ -1,0 +1,18 @@
+{
+  "phase": "p01",
+  "status": "accepted in phase; pending whole-plan combined integration",
+  "digest": "0995151ed93e67f2e5feee8092cdc08687580b79f1d988d40d5d072d5e39decf",
+  "head": "769a23aa6ef423e964f8221a8ee6b0743325c6ba",
+  "review_pass": "CHS-P01-B1-R2",
+  "architecture_pass": "CHS-P01-AG2-R1 for D1/r3",
+  "findings": "CHS-P01-B1-F1/F2 fixed by B",
+  "coordination_revision": 2,
+  "source_fresh": true,
+  "required_affected_author_checks": "PASS",
+  "primary_unique_selected": 84,
+  "primary_unique_pass": 82,
+  "confirmed_inherited_failures": 2,
+  "sample_guard_tests": 4,
+  "full_suite": false,
+  "commit_or_deploy": false
+}

@@ -1,0 +1,1260 @@
+--- a/migrations/20260817000000_init_schema.sql
++++ b/migrations/20260817000000_init_schema.sql
+@@ -1234,8 +1234,8 @@
+             USING ERRCODE = '23514', CONSTRAINT = 'workflow_guard:workflow_activation_immutable';
+     END IF;
+     IF OLD.completed_at IS NOT NULL AND
+-       (NEW.completed_at, NEW.committed_output) IS DISTINCT FROM
+-       (OLD.completed_at, OLD.committed_output) THEN
++       (NEW.completed_at, NEW.committed_output, NEW.response_disposition) IS DISTINCT FROM
++       (OLD.completed_at, OLD.committed_output, OLD.response_disposition) THEN
+         RAISE EXCEPTION 'workflow committed output is immutable'
+             USING ERRCODE = '23514', CONSTRAINT = 'workflow_guard:workflow_output_immutable';
+     END IF;
+@@ -5149,10 +5149,13 @@
+     frozen_inputs jsonb,
+     completed_at timestamp with time zone,
+     committed_output jsonb,
++    response_disposition text DEFAULT 'automatic'::text NOT NULL,
+     frozen_choice text,
+     committed_route text,
+     route_target text,
+     successor_execution_id uuid,
++    CONSTRAINT workflow_response_disposition CHECK (response_disposition IN ('automatic', 'suppressed')),
++    CONSTRAINT workflow_suppressed_terminal CHECK (response_disposition <> 'suppressed' OR (completed_at IS NOT NULL AND committed_route IS NOT NULL AND committed_route = 'success' AND route_target IS NOT NULL AND route_target = '$end')),
+     CONSTRAINT workflow_choice_shape CHECK (((frozen_choice IS NULL) OR ((activated_at IS NOT NULL) AND ((octet_length(frozen_choice) >= 1) AND (octet_length(frozen_choice) <= 128))))),
+     CONSTRAINT workflow_execution_activation_shape CHECK ((((activated_at IS NULL) AND (frozen_inputs IS NULL)) OR ((activated_at IS NOT NULL) AND (frozen_inputs IS NOT NULL) AND (jsonb_typeof(frozen_inputs) = 'object'::text) AND (octet_length((frozen_inputs)::text) <= 1048576)))),
+     CONSTRAINT workflow_execution_output_shape CHECK ((((completed_at IS NULL) AND (committed_output IS NULL)) OR ((completed_at IS NOT NULL) AND (committed_output IS NOT NULL) AND (activated_at IS NOT NULL) AND (completed_at >= activated_at) AND (octet_length((committed_output)::text) <= 1048576)))),
+@@ -8807,7 +8810,7 @@
+ -- Name: workflow_executions workflow_executions_preserve_facts; Type: TRIGGER; Schema: public; Owner: -
+ --
+ 
+-CREATE TRIGGER workflow_executions_preserve_facts BEFORE UPDATE OF activated_at, frozen_inputs, completed_at, committed_output ON public.workflow_executions FOR EACH ROW EXECUTE FUNCTION public.preserve_workflow_execution_facts();
++CREATE TRIGGER workflow_executions_preserve_facts BEFORE UPDATE OF activated_at, frozen_inputs, completed_at, committed_output, response_disposition ON public.workflow_executions FOR EACH ROW EXECUTE FUNCTION public.preserve_workflow_execution_facts();
+ 
+ 
+ --
+--- a/src/adapters/persistence/workflow/action_cancellation_completion_tests.rs
++++ b/src/adapters/persistence/workflow/action_cancellation_completion_tests.rs
+@@ -630,6 +630,7 @@
+     };
+     let step = |disposition| CommittedWorkflowStep {
+         disposition,
++        response_disposition: ResponseDisposition::Automatic,
+         output: step_output(),
+         route: RouteSelection::Success,
+         target: TransitionTarget::End,
+--- a/src/adapters/persistence/workflow/batch.rs
++++ b/src/adapters/persistence/workflow/batch.rs
+@@ -12,6 +12,7 @@
+ #[derive(sqlx::FromRow)]
+ struct BatchExecution {
+     step_id: String,
++    response_disposition: String,
+     completed_at: Option<chrono::DateTime<chrono::Utc>>,
+     committed_route: Option<String>,
+     route_target: Option<String>,
+@@ -122,6 +123,7 @@
+             batch_commit::check_deadline(db, request).await?;
+             return Ok(BatchResult {
+                 disposition: BatchDisposition::Boundary,
++                response_disposition: None,
+                 completed,
+                 last: current,
+                 continuation: Some(current),
+@@ -134,6 +136,7 @@
+                 pending_recovery::Pending::Deferred => {
+                     return Ok(BatchResult {
+                         disposition: BatchDisposition::Deferred,
++                        response_disposition: None,
+                         completed,
+                         last: current,
+                         continuation: None,
+@@ -154,6 +157,7 @@
+             batch_commit::check_deadline(db, request).await?;
+             return Ok(BatchResult {
+                 disposition: BatchDisposition::Completed,
++                response_disposition: Some(completion.response_disposition),
+                 completed,
+                 last: current,
+                 continuation: None,
+@@ -163,6 +167,7 @@
+             batch_commit::check_deadline(db, request).await?;
+             return Ok(BatchResult {
+                 disposition: BatchDisposition::Yielded,
++                response_disposition: None,
+                 completed,
+                 last: current,
+                 continuation: Some(next),
+@@ -178,7 +183,7 @@
+     request: ActivationRequest,
+ ) -> AppResult<BatchExecution> {
+     let row = sqlx::query_as::<_, BatchExecution>(
+-        "SELECT step_id, completed_at, committed_route, route_target, successor_execution_id \
++        "SELECT step_id, response_disposition, completed_at, committed_route, route_target, successor_execution_id \
+          FROM workflow_executions WHERE company_id = $1 AND run_id = $2 AND id = $3 FOR UPDATE",
+     )
+     .bind(request.company.as_uuid())
+@@ -232,6 +237,13 @@
+     };
+     Ok(BatchResult {
+         disposition: BatchDisposition::Replay,
++        response_disposition: if row.route_target.as_deref() == Some("$end")
++            && row.committed_route.as_deref() != Some("final_error")
++        {
++            Some(row.response_disposition.parse().map_err(|_| invalid())?)
++        } else {
++            None
++        },
+         completed: 0,
+         last: request,
+         continuation,
+@@ -244,6 +256,7 @@
+ fn failed(last: ActivationRequest, completed: u8) -> BatchResult {
+     BatchResult {
+         disposition: BatchDisposition::Failed,
++        response_disposition: None,
+         completed,
+         last,
+         continuation: None,
+--- a/src/adapters/persistence/workflow/batch_commit.rs
++++ b/src/adapters/persistence/workflow/batch_commit.rs
+@@ -31,7 +31,7 @@
+     };
+     let changed = sqlx::query(
+         "UPDATE workflow_executions SET committed_output = $4, completed_at = clock_timestamp(), \
+-         committed_route = $5, route_target = $6, successor_execution_id = $7 \
++         committed_route = $5, route_target = $6, successor_execution_id = $7, response_disposition = $8 \
+          WHERE company_id = $1 AND run_id = $2 AND id = $3 AND completed_at IS NULL",
+     )
+     .bind(request.company.as_uuid())
+@@ -41,6 +41,7 @@
+     .bind(route)
+     .bind(target)
+     .bind(next.map(|n| n.execution.as_uuid()))
++    .bind(completion.response_disposition.as_str())
+     .execute(&mut *db)
+     .await?;
+     if changed.rows_affected() != 1 {
+--- a/src/adapters/persistence/workflow/batch_tests.rs
++++ b/src/adapters/persistence/workflow/batch_tests.rs
+@@ -1,4 +1,6 @@
+ use super::*;
++#[path = "channel_reply_terminal_tests.rs"]
++mod channel_reply_terminal_tests;
+ #[path = "child_configuration_tests.rs"]
+ mod child_configuration_tests;
+ #[path = "child_decision_round_tests.rs"]
+--- a/src/adapters/persistence/workflow/channel_reply_terminal_child_tests.rs
++++ b/src/adapters/persistence/workflow/channel_reply_terminal_child_tests.rs
+@@ -0,0 +1,160 @@
++use super::*;
++
++#[tokio::test]
++async fn channel_reply_terminal_repeat_child_cannot_suppress_parent() {
++    let mut leaf = round_child();
++    leaf["steps"]["review"] = json!({"type":"channel.no_reply","with":{
++        "value":{"literal":{"choice":"accept","artifact":{"body":"done"},"feedback":""}},
++        "output_schema":{"literal":leaf["output_schema"]}},"routes":{"success":"$end"}});
++    let (f, parent) =
++        AdmissionFixture::with_child(leaf, |child, version| repeat_parent(child, version, 1)).await;
++    f.persistence().park_child(parent).await.unwrap().unwrap();
++    let child = f.current_child(parent).await.unwrap();
++    assert_eq!(
++        f.persistence()
++            .advance_pure(child, budget(4))
++            .await
++            .unwrap()
++            .response_disposition,
++        Some(ResponseDisposition::Suppressed)
++    );
++    let step = match f.persistence().resume_wait(parent).await.unwrap() {
++        WaitProgress::Completed(step) => step,
++        other => panic!("{other:?}"),
++    };
++    assert_eq!(step.response_disposition, ResponseDisposition::Automatic);
++    assert_eq!(step.output["result"]["artifact"]["body"], "done");
++    assert_eq!(
++        f.persistence()
++            .advance_pure(step.successor.unwrap(), budget(4))
++            .await
++            .unwrap()
++            .response_disposition,
++        Some(ResponseDisposition::Automatic)
++    );
++}
++
++#[tokio::test]
++async fn channel_reply_terminal_worker_dispatches_without_io() {
++    let (f, scope) = fixture(example("channel.no_reply")).await;
++    let worker = WorkflowWorker {
++        port: f.persistence(),
++        handler: &NoIo,
++        notices: None,
++        worker: WorkflowWorkerId(Uuid::new_v4()),
++        lease: LeasePolicy::new(Duration::from_secs(3)).unwrap(),
++        poll: PollPolicy::new(Duration::from_millis(50), 16).unwrap(),
++        active_jobs: None,
++        monitoring: None,
++    };
++    let cancel = tokio_util::sync::CancellationToken::new();
++    assert_eq!(
++        worker
++            .process(
++                PollCandidate {
++                    scope,
++                    work: PollWork::Job
++                },
++                &cancel
++            )
++            .await
++            .unwrap(),
++        WorkDisposition::Done
++    );
++    assert_eq!(state(&f, scope.run).await, "succeeded");
++    assert_eq!(
++        snapshot(&f).await["executions"][0]["response_disposition"],
++        "suppressed"
++    );
++}
++
++#[tokio::test]
++async fn channel_reply_terminal_child_cannot_suppress_parent() {
++    let (f, scopes) = AdmissionFixture::chain(example("channel.no_reply"), 1).await;
++    let (parent, child) = (scopes[0], scopes[1]);
++    let done = f
++        .persistence()
++        .advance_pure(child, budget(4))
++        .await
++        .unwrap();
++    assert_eq!(
++        done.response_disposition,
++        Some(ResponseDisposition::Suppressed)
++    );
++    let step = match f.persistence().resume_wait(parent).await.unwrap() {
++        WaitProgress::Completed(step) => step,
++        other => panic!("{other:?}"),
++    };
++    assert_eq!(step.response_disposition, ResponseDisposition::Automatic);
++    assert_eq!(step.output, json!("hello"));
++    let replay = match f.persistence().resume_wait(parent).await.unwrap() {
++        WaitProgress::Completed(step) => step,
++        other => panic!("{other:?}"),
++    };
++    assert_eq!(replay.response_disposition, ResponseDisposition::Automatic);
++}
++
++#[tokio::test]
++async fn channel_reply_terminal_parent_selects_its_own_suppression() {
++    let (f,parent)=AdmissionFixture::with_child(data_map(),|child,version| {
++        let mut source=child_support::call_source(child,version);
++        source["steps"]["start"]["routes"]["success"]=json!("finish");
++        source["steps"]["finish"]=json!({"type":"channel.no_reply","with":{
++            "value":{"ref":"/steps/start/output"},"output_schema":{"literal":true}},"routes":{"success":"$end"}});
++        source
++    }).await;
++    f.persistence().park_child(parent).await.unwrap().unwrap();
++    let child = f.current_child(parent).await.unwrap();
++    assert_eq!(
++        f.persistence()
++            .advance_pure(child, budget(4))
++            .await
++            .unwrap()
++            .response_disposition,
++        Some(ResponseDisposition::Automatic)
++    );
++    let step = match f.persistence().resume_wait(parent).await.unwrap() {
++        WaitProgress::Completed(step) => step,
++        other => panic!("{other:?}"),
++    };
++    assert_eq!(step.response_disposition, ResponseDisposition::Automatic);
++    let done = f
++        .persistence()
++        .advance_pure(step.successor.unwrap(), budget(4))
++        .await
++        .unwrap();
++    assert_eq!(
++        done.response_disposition,
++        Some(ResponseDisposition::Suppressed)
++    );
++}
++
++#[tokio::test]
++async fn channel_reply_terminal_cancellation_competes_without_silent_failure() {
++    for _ in 0..3 {
++        let (f, scope) = fixture(example("channel.no_reply")).await;
++        let barrier = Barrier::new(2);
++        let complete = async {
++            barrier.wait().await;
++            f.persistence().advance_pure(scope, budget(4)).await
++        };
++        let cancel = async {
++            barrier.wait().await;
++            cancel_current(&f, scope, "terminal.cancel").await
++        };
++        let (completed, _) = tokio::join!(complete, cancel);
++        let saved = snapshot(&f).await;
++        match saved["runs"][0]["state"].as_str().unwrap() {
++            "succeeded" => assert_eq!(
++                completed.unwrap().response_disposition,
++                Some(ResponseDisposition::Suppressed)
++            ),
++            "cancelled" => {
++                assert!(completed.is_err());
++                assert_eq!(saved["executions"][0]["response_disposition"], "automatic");
++                assert_eq!(saved["executions"][0]["completed_at"], Value::Null);
++            }
++            other => panic!("{other}"),
++        }
++    }
++}
+--- a/src/adapters/persistence/workflow/channel_reply_terminal_human_tests.rs
++++ b/src/adapters/persistence/workflow/channel_reply_terminal_human_tests.rs
+@@ -0,0 +1,33 @@
++use super::*;
++use crate::application::workflow::batch::{BatchBudget, WorkflowBatch};
++use std::time::Duration;
++
++#[tokio::test]
++async fn channel_reply_terminal_human_continuation_preserves_notices() {
++    let f = Box::pin(DecisionFixture::configured(1, |source| {
++        source["steps"]["finish"]["type"] = json!("channel.no_reply");
++    }))
++    .await;
++    let view = f.park().await;
++    let before = f.counts().await;
++    let applied = f
++        .persistence()
++        .submit_decision(f.submit(&view, 0, "terminal.human"))
++        .await
++        .unwrap();
++    let done = f
++        .persistence()
++        .advance_pure(
++            applied.successor.unwrap(),
++            BatchBudget::new(4, Duration::from_secs(1)).unwrap(),
++        )
++        .await
++        .unwrap();
++    assert_eq!(
++        done.response_disposition,
++        Some(ResponseDisposition::Suppressed)
++    );
++    let after = f.counts().await;
++    assert_eq!(after["deliveries"], before["deliveries"]);
++    assert_eq!(after["run"], "succeeded");
++}
+--- a/src/adapters/persistence/workflow/channel_reply_terminal_io_tests.rs
++++ b/src/adapters/persistence/workflow/channel_reply_terminal_io_tests.rs
+@@ -0,0 +1,37 @@
++use super::*;
++
++#[tokio::test]
++async fn channel_reply_terminal_io_predecessor_keeps_receipt_and_local_disposition() {
++    let mut source = chain();
++    source["steps"]["finish"]["type"] = json!("channel.no_reply");
++    let (f, claim) = claimed(source).await;
++    let p = f.persistence();
++    let done = p
++        .settled()
++        .complete_io(result(claim.fence))
++        .await
++        .unwrap()
++        .unwrap();
++    assert_eq!(done.response_disposition, ResponseDisposition::Automatic);
++    let restarted = PostgresPersistence::new(p.pool().clone());
++    let replay = restarted
++        .settled()
++        .complete_io(result(claim.fence))
++        .await
++        .unwrap()
++        .unwrap();
++    assert_eq!(replay.response_disposition, done.response_disposition);
++    assert_eq!(replay.output, done.output);
++    let terminal = p
++        .advance_pure(
++            done.successor.unwrap(),
++            BatchBudget::new(4, Duration::from_secs(1)).unwrap(),
++        )
++        .await
++        .unwrap();
++    assert_eq!(
++        terminal.response_disposition,
++        Some(ResponseDisposition::Suppressed)
++    );
++    assert_eq!(state(&f).await["attempts"][0]["status"], "completed");
++}
+--- a/src/adapters/persistence/workflow/channel_reply_terminal_message_tests.rs
++++ b/src/adapters/persistence/workflow/channel_reply_terminal_message_tests.rs
+@@ -0,0 +1,84 @@
++use super::*;
++use crate::application::workflow::{batch::*, completion::*};
++use std::time::Duration;
++
++#[tokio::test]
++async fn channel_reply_terminal_preserves_an_explicit_published_message() {
++    use crate::application::workflow::polling::WorkflowStepKind;
++    let fixture = Fixture::new().await;
++    let channel = new_channel(&fixture, "explicit").await;
++    let mut source: Value =
++        serde_json::from_str(&registry::example("message.send").unwrap().source).unwrap();
++    source["steps"]["start"]["with"] = json!({
++        "content":{"literal":{"subject":"Status","body":"Already sent"}},
++        "destinations":{"literal":[{"kind":"channel","id":channel}]}});
++    source["steps"]["start"]["routes"]["success"] = json!("finish");
++    source["steps"]["finish"] = json!({"type":"channel.no_reply","with":{
++        "value":{"literal":"done"},"output_schema":{"literal":{"type":"string"}}},"routes":{"success":"$end"}});
++    let version = Box::pin(published_terminal(&fixture, source)).await;
++    let target = Box::pin(bound(&fixture, version)).await;
++    let scope = admitted(&fixture, target, channel, "explicit-terminal").await;
++    let p = &fixture.persistence;
++    let claim = p
++        .claim_io(scope, WorkflowWorkerId(Uuid::new_v4()), lease())
++        .await
++        .unwrap()
++        .unwrap();
++    let output = match runtime(p)
++        .execute(&WorkflowStepKind("message.send".into()), &claim)
++        .await
++    {
++        WorkflowHandlerOutcome::Completed(result) => result.unwrap(),
++        other => panic!("{other:?}"),
++    };
++    let step = p
++        .complete_io(FencedWorkflowResult {
++            fence: claim.fence,
++            output,
++            policy: lease(),
++        })
++        .await
++        .unwrap()
++        .unwrap();
++    let messages: Value =
++        sqlx::query_scalar("SELECT jsonb_agg(to_jsonb(message) ORDER BY id) FROM messages message")
++            .fetch_one(p.pool())
++            .await
++            .unwrap();
++    assert_eq!(messages.as_array().unwrap().len(), 1);
++    let done = p
++        .advance_pure(
++            step.successor.unwrap(),
++            BatchBudget::new(4, Duration::from_secs(1)).unwrap(),
++        )
++        .await
++        .unwrap();
++    assert_eq!(
++        done.response_disposition,
++        Some(ResponseDisposition::Suppressed)
++    );
++    let after: Value =
++        sqlx::query_scalar("SELECT jsonb_agg(to_jsonb(message) ORDER BY id) FROM messages message")
++            .fetch_one(p.pool())
++            .await
++            .unwrap();
++    assert_eq!(after, messages);
++}
++
++async fn published_terminal(fixture: &Fixture, source: Value) -> VersionId {
++    let directory = message::MessagePublicationDirectory {
++        persistence: fixture.persistence.clone(),
++    };
++    let definitions = DefinitionService::new(
++        Preflight,
++        fixture.persistence.clone(),
++        WorkflowSourceDecoder,
++        directory,
++    );
++    let mut draft = fixture.save(None);
++    draft.content.source = source.to_string();
++    definitions.save(draft).await.unwrap();
++    let publication = fixture.publish();
++    definitions.publish(publication.clone()).await.unwrap();
++    publication.version
++}
+--- a/src/adapters/persistence/workflow/channel_reply_terminal_tests.rs
++++ b/src/adapters/persistence/workflow/channel_reply_terminal_tests.rs
+@@ -0,0 +1,235 @@
++use super::*;
++
++#[derive(Debug, PartialEq, Eq, sqlx::FromRow)]
++struct Effects {
++    messages: i64,
++    deliveries: i64,
++    contexts: i64,
++    runs: i64,
++}
++
++#[derive(sqlx::FromRow)]
++struct Pending {
++    job: Uuid,
++    execution: Uuid,
++}
++
++fn terminal(kind: &str, value: Value) -> Value {
++    let mut source: Value = serde_json::from_str(&registry::example(kind).unwrap().source).unwrap();
++    source["steps"]["start"]["with"] =
++        json!({"value":{"literal":value},"output_schema":{"literal":true}});
++    source
++}
++
++#[tokio::test]
++async fn channel_reply_terminal_final_error_cannot_become_suppressed_success() {
++    let mut source = terminal("channel.no_reply", json!(42));
++    source["output_schema"] = json!({"type":"string"});
++    source["steps"]["start"]["routes"]["error"] = json!("$end");
++    let (f, scope) = fixture(source).await;
++    let done = f
++        .persistence()
++        .advance_pure(scope, budget(4))
++        .await
++        .unwrap();
++    assert_eq!(done.disposition, BatchDisposition::Failed);
++    assert_eq!(done.response_disposition, None);
++    let state = snapshot(&f).await;
++    assert_eq!(state["runs"][0]["state"], "failed");
++    assert_eq!(state["executions"][0]["committed_route"], "final_error");
++    assert_eq!(state["executions"][0]["response_disposition"], "automatic");
++    let replay = f
++        .persistence()
++        .advance_pure(scope, budget(4))
++        .await
++        .unwrap();
++    assert_eq!(replay.response_disposition, None);
++    assert_eq!(snapshot(&f).await, state);
++}
++
++#[tokio::test]
++async fn channel_reply_terminal_preserves_business_value_and_replays_after_restart() {
++    for value in [
++        json!(null),
++        json!(""),
++        json!({}),
++        json!([]),
++        json!({"answer":"done","no_reply":false}),
++    ] {
++        let (f, scope) = fixture(terminal("channel.no_reply", value.clone())).await;
++        let done = f
++            .persistence()
++            .advance_pure(scope, budget(4))
++            .await
++            .unwrap();
++        assert_eq!(
++            done.response_disposition,
++            Some(ResponseDisposition::Suppressed)
++        );
++        let before = snapshot(&f).await;
++        assert_eq!(before["runs"][0]["state"], "succeeded");
++        assert_eq!(before["executions"][0]["committed_output"], value);
++        assert_eq!(
++            before["executions"][0]["response_disposition"],
++            "suppressed"
++        );
++        let restarted = PostgresPersistence::new(f.persistence().pool().clone());
++        let replay = restarted.advance_pure(scope, budget(4)).await.unwrap();
++        assert_eq!(replay.disposition, BatchDisposition::Replay);
++        assert_eq!(replay.response_disposition, done.response_disposition);
++        assert_eq!(snapshot(&f).await, before);
++        let authority: Effects = sqlx::query_as("SELECT (SELECT count(*) FROM messages) AS messages,(SELECT count(*) FROM message_deliveries) AS deliveries,(SELECT count(*) FROM channel_reply_contexts) AS contexts,(SELECT count(*) FROM channel_reply_runs) AS runs")
++            .fetch_one(f.persistence().pool()).await.unwrap();
++        assert_eq!(
++            authority,
++            Effects {
++                messages: 0,
++                deliveries: 0,
++                contexts: 0,
++                runs: 0
++            }
++        );
++    }
++}
++
++#[tokio::test]
++async fn channel_reply_terminal_ordinary_output_flags_cannot_suppress() {
++    let value = json!({"no_reply":true,"response_disposition":"suppressed","answer":"done"});
++    let (f, scope) = fixture(terminal("data.map", value.clone())).await;
++    let done = f
++        .persistence()
++        .advance_pure(scope, budget(4))
++        .await
++        .unwrap();
++    assert_eq!(
++        done.response_disposition,
++        Some(ResponseDisposition::Automatic)
++    );
++    let before = snapshot(&f).await;
++    assert_eq!(before["executions"][0]["committed_output"], value);
++    assert_eq!(before["executions"][0]["response_disposition"], "automatic");
++    assert_eq!(
++        f.persistence()
++            .advance_pure(scope, budget(4))
++            .await
++            .unwrap()
++            .response_disposition,
++        done.response_disposition
++    );
++}
++
++#[tokio::test]
++async fn channel_reply_terminal_invalid_output_fails_or_takes_ordinary_error_route() {
++    for recover in [false, true] {
++        let mut source = terminal("channel.no_reply", json!(42));
++        source["output_schema"] = json!({"type":"string"});
++        if recover {
++            source["steps"]["start"]["routes"]["error"] = json!("recover");
++            source["steps"]["recover"] =
++                terminal("data.map", json!("recovered"))["steps"]["start"].clone();
++        }
++        let (f, scope) = fixture(source).await;
++        let failed = f
++            .persistence()
++            .advance_pure(scope, budget(4))
++            .await
++            .unwrap();
++        assert_eq!(failed.disposition, BatchDisposition::Failed);
++        assert_eq!(failed.response_disposition, None);
++        let mut state = snapshot(&f).await;
++        assert_eq!(state["executions"][0]["response_disposition"], "automatic");
++        if recover {
++            let next = sqlx::query_as::<_, Pending>(
++                "SELECT id AS job,workflow_execution_id AS execution FROM background_tasks WHERE status='pending'",
++            )
++            .fetch_one(f.persistence().pool())
++            .await
++            .unwrap();
++            let done = f
++                .persistence()
++                .advance_pure(
++                    ActivationRequest {
++                        job: WorkflowJobId(next.job),
++                        execution: ExecutionId::new(next.execution),
++                        ..scope
++                    },
++                    budget(4),
++                )
++                .await
++                .unwrap();
++            assert_eq!(
++                done.response_disposition,
++                Some(ResponseDisposition::Automatic)
++            );
++            state = snapshot(&f).await;
++        }
++        assert_eq!(
++            state["runs"][0]["state"],
++            if recover { "succeeded" } else { "failed" }
++        );
++    }
++}
++
++#[tokio::test]
++async fn channel_reply_terminal_competing_completions_commit_one_disposition() {
++    let (f, scope) = fixture(terminal("channel.no_reply", json!("done"))).await;
++    let barrier = Barrier::new(2);
++    let complete = || async {
++        barrier.wait().await;
++        f.persistence()
++            .advance_pure(scope, budget(4))
++            .await
++            .unwrap()
++    };
++    let (a, b) = tokio::join!(complete(), complete());
++    assert_ne!(a.disposition, b.disposition);
++    assert_eq!(
++        a.response_disposition,
++        Some(ResponseDisposition::Suppressed)
++    );
++    assert_eq!(a.response_disposition, b.response_disposition);
++    let state = snapshot(&f).await;
++    assert_eq!(state["executions"].as_array().unwrap().len(), 1);
++    assert_eq!(state["events"].as_array().unwrap().len(), 2);
++}
++
++#[tokio::test]
++async fn channel_reply_terminal_metadata_is_atomic_and_immutable() {
++    let (f, scope) = fixture(terminal("channel.no_reply", json!("done"))).await;
++    assert!(
++        sqlx::query("UPDATE workflow_executions SET response_disposition='suppressed' WHERE id=$1")
++            .bind(scope.execution.as_uuid())
++            .execute(f.persistence().pool())
++            .await
++            .is_err()
++    );
++    let before = snapshot(&f).await;
++    sqlx::raw_sql("CREATE FUNCTION terminal_fault() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'injected terminal failure'; END $$; CREATE TRIGGER terminal_fault AFTER UPDATE ON workflow_runs FOR EACH ROW EXECUTE FUNCTION terminal_fault();")
++        .execute(f.persistence().pool()).await.unwrap();
++    assert!(
++        f.persistence()
++            .advance_pure(scope, budget(4))
++            .await
++            .is_err()
++    );
++    assert_eq!(snapshot(&f).await, before);
++    sqlx::raw_sql("DROP TRIGGER terminal_fault ON workflow_runs; DROP FUNCTION terminal_fault();")
++        .execute(f.persistence().pool())
++        .await
++        .unwrap();
++    f.persistence()
++        .advance_pure(scope, budget(4))
++        .await
++        .unwrap();
++    assert!(
++        sqlx::query("UPDATE workflow_executions SET response_disposition='automatic' WHERE id=$1")
++            .bind(scope.execution.as_uuid())
++            .execute(f.persistence().pool())
++            .await
++            .is_err()
++    );
++    assert_eq!(
++        snapshot(&f).await["executions"][0]["response_disposition"],
++        "suppressed"
++    );
++}
+--- a/src/adapters/persistence/workflow/child_runtime_tests.rs
++++ b/src/adapters/persistence/workflow/child_runtime_tests.rs
+@@ -1,6 +1,8 @@
+ //! Runtime `workflow.call` (07-D1 §D1.2, §D1.4, §D1.5, §D1.9): park, consume, cancel, expire.
+ use super::child_repeat_tests::{repeat_parent, round_child};
+ use super::*;
++#[path = "channel_reply_terminal_child_tests.rs"]
++mod channel_reply_terminal_child_tests;
+ use crate::adapters::persistence::workflow::tests::admission_tests::admission_history_tests::Conversation;
+ use crate::application::workflow::children::WorkflowChildren;
+ use crate::application::workflow::completion::CommitDisposition;
+--- a/src/adapters/persistence/workflow/completion.rs
++++ b/src/adapters/persistence/workflow/completion.rs
+@@ -11,6 +11,7 @@
+ }
+ #[derive(sqlx::FromRow)]
+ struct CompletionExecution {
++    response_disposition: String,
+     completed_at: Option<chrono::DateTime<chrono::Utc>>,
+     committed_output: Option<Value>,
+     committed_route: Option<String>,
+@@ -85,7 +86,7 @@
+     let Some(run) = run else {
+         return Ok(None);
+     };
+-    let row = sqlx::query_as::<_, CompletionExecution>("SELECT completed_at,committed_output,committed_route,route_target,successor_execution_id FROM workflow_executions WHERE company_id=$1 AND run_id=$2 AND id=$3 FOR UPDATE")
++    let row = sqlx::query_as::<_, CompletionExecution>("SELECT response_disposition,completed_at,committed_output,committed_route,route_target,successor_execution_id FROM workflow_executions WHERE company_id=$1 AND run_id=$2 AND id=$3 FOR UPDATE")
+         .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(scope.execution.as_uuid()).fetch_optional(&mut *db).await?;
+     let Some(row) = row else {
+         return Ok(None);
+@@ -139,6 +140,7 @@
+     .await?;
+     Ok(Some(CommittedWorkflowStep {
+         disposition: CommitDisposition::Committed,
++        response_disposition: completion.response_disposition,
+         output: completion.output,
+         route: completion.route,
+         target: completion.target,
+@@ -278,6 +280,7 @@
+     };
+     Ok(Some(CommittedWorkflowStep {
+         disposition: CommitDisposition::Replayed,
++        response_disposition: row.response_disposition.parse().map_err(|_| invalid())?,
+         output: result.output,
+         route,
+         target,
+--- a/src/adapters/persistence/workflow/completion_tests.rs
++++ b/src/adapters/persistence/workflow/completion_tests.rs
+@@ -1,4 +1,6 @@
+ use super::*;
++#[path = "channel_reply_terminal_io_tests.rs"]
++mod channel_reply_terminal_io_tests;
+ use crate::application::workflow::{batch::*, completion::*, supervise::*};
+ 
+ fn output() -> Value {
+--- a/src/adapters/persistence/workflow/decision_tests.rs
++++ b/src/adapters/persistence/workflow/decision_tests.rs
+@@ -1,5 +1,7 @@
+ use super::super::message_tests::support::member;
+ use super::*;
++#[path = "channel_reply_terminal_human_tests.rs"]
++mod channel_reply_terminal_human_tests;
+ use crate::adapters::protocols::email::EmailRenderer;
+ use crate::application::transport::{DeliveryComposer, TransportRenderers};
+ use crate::application::workflow::{activation::*, decisions::*, waits::*};
+--- a/src/adapters/persistence/workflow/message_tests.rs
++++ b/src/adapters/persistence/workflow/message_tests.rs
+@@ -1,5 +1,7 @@
+ //! 04.11 provider-neutral messaging against real PostgreSQL (decisions D2 + D3 + D4).
+ use super::*;
++#[path = "channel_reply_terminal_message_tests.rs"]
++mod channel_reply_terminal_message_tests;
+ use crate::application::workflow::{
+     lease::*,
+     polling::{PollWork, WorkflowPolling},
+--- a/src/adapters/persistence/workflow/recovery.rs
++++ b/src/adapters/persistence/workflow/recovery.rs
+@@ -254,6 +254,7 @@
+             || activation.ordinal < u64::try_from(run.max_steps).map_err(|_| invalid())?
+         {
+             let completion = PureCompletion {
++                response_disposition: ResponseDisposition::Automatic,
+                 output: serde_json::Value::Null,
+                 route: RouteSelection::FinalError,
+                 state: if target == TransitionTarget::End {
+--- a/src/adapters/persistence/workflow/wait_commit.rs
++++ b/src/adapters/persistence/workflow/wait_commit.rs
+@@ -284,6 +284,7 @@
+     .await?;
+     Ok(WaitProgress::Completed(Box::new(CommittedWorkflowStep {
+         disposition: CommitDisposition::Committed,
++        response_disposition: completion.response_disposition,
+         output: completion.output,
+         route: completion.route,
+         target: completion.target,
+@@ -311,6 +312,7 @@
+ }
+ #[derive(sqlx::FromRow)]
+ struct SavedResult {
++    response_disposition: String,
+     committed_output: Value,
+     committed_route: String,
+     route_target: String,
+@@ -324,7 +326,7 @@
+     disposition: CommitDisposition,
+     effect: bool,
+ ) -> AppResult<WaitProgress> {
+-    let saved=sqlx::query_as::<_,SavedResult>("SELECT committed_output,committed_route,route_target,successor_execution_id FROM workflow_executions WHERE company_id=$1 AND run_id=$2 AND id=$3 AND completed_at IS NOT NULL AND committed_route IS NOT NULL")
++    let saved=sqlx::query_as::<_,SavedResult>("SELECT response_disposition,committed_output,committed_route,route_target,successor_execution_id FROM workflow_executions WHERE company_id=$1 AND run_id=$2 AND id=$3 AND completed_at IS NOT NULL AND committed_route IS NOT NULL")
+         .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(scope.execution.as_uuid()).fetch_optional(&mut *db).await?;
+     let Some(saved) = saved else {
+         if !effect {
+@@ -332,6 +334,7 @@
+         }
+         return Ok(WaitProgress::Completed(Box::new(CommittedWorkflowStep {
+             disposition,
++            response_disposition: ResponseDisposition::Automatic,
+             output: Value::Null,
+             route: RouteSelection::FinalError,
+             target: TransitionTarget::End,
+@@ -361,6 +364,7 @@
+     };
+     Ok(WaitProgress::Completed(Box::new(CommittedWorkflowStep {
+         disposition,
++        response_disposition: saved.response_disposition.parse().map_err(|_| invalid())?,
+         output: saved.committed_output,
+         route: saved_route(&saved.committed_route)?,
+         target,
+--- a/src/application/workflow/batch.rs
++++ b/src/application/workflow/batch.rs
+@@ -4,8 +4,8 @@
+ };
+ use crate::application::app_error::{AppError, AppResult};
+ use crate::domain::workflow::{
+-    CompletedStep, CompletionRoute, EngineDisposition, RouteSelection, RunState, TransitionTarget,
+-    select_route, validate_context_value,
++    CompletedStep, CompletionRoute, EngineDisposition, ResponseDisposition, RouteSelection,
++    RunState, TransitionTarget, select_route, validate_context_value,
+ };
+ use async_trait::async_trait;
+ use serde_json::{Value, json};
+@@ -54,12 +54,15 @@
+ #[derive(Debug, Clone, PartialEq, Eq)]
+ pub struct BatchResult {
+     pub disposition: BatchDisposition,
++    /// Present only when this result observes a successful terminal execution.
++    pub response_disposition: Option<ResponseDisposition>,
+     pub completed: u8,
+     pub last: ActivationRequest,
+     pub continuation: Option<ActivationRequest>,
+ }
+ 
+ pub struct PureCompletion {
++    pub response_disposition: ResponseDisposition,
+     pub output: Value,
+     pub route: RouteSelection,
+     pub target: TransitionTarget,
+@@ -79,7 +82,7 @@
+         .ok_or_else(|| AppError::Database("Unknown workflow step".into()))?;
+     Ok(matches!(
+         definition.step_type.as_str(),
+-        "data.map" | "decision.rule"
++        "data.map" | "decision.rule" | "channel.no_reply"
+     ))
+ }
+ 
+@@ -95,7 +98,7 @@
+         .get(&activation.step)
+         .ok_or_else(invalid)?;
+     let (output, route) = match definition.step_type.as_str() {
+-        "data.map" => (
++        "data.map" | "channel.no_reply" => (
+             activation.inputs.get("value").ok_or_else(invalid)?.clone(),
+             RouteSelection::Success,
+         ),
+@@ -153,6 +156,16 @@
+         )
+         .map_err(|_| invalid())?;
+     Ok(PureCompletion {
++        response_disposition: if target == TransitionTarget::End
++            && compiled.graph().definition().steps[&activation.step]
++                .step_type
++                .as_str()
++                == "channel.no_reply"
++        {
++            ResponseDisposition::Suppressed
++        } else {
++            ResponseDisposition::Automatic
++        },
+         output,
+         route,
+         target,
+--- a/src/application/workflow/compiler/mod.rs
++++ b/src/application/workflow/compiler/mod.rs
+@@ -6,7 +6,7 @@
+ /// context/evaluation budgets, registry specialization or interpreter semantics,
+ /// even when the serialized representation would remain identical. Old revisions
+ /// require an explicit compatible loader; they must never be silently recompiled.
+-pub const SEMANTIC_REVISION: u32 = 7;
++pub const SEMANTIC_REVISION: u32 = 8;
+ mod agent_selection;
+ mod analysis;
+ mod binding;
+--- a/src/application/workflow/completion.rs
++++ b/src/application/workflow/completion.rs
+@@ -1,7 +1,7 @@
+ //! Validated successful progression. Failure recovery and parking have separate owners.
+ use super::{activation::*, batch::*, lease::FencedWorkflowResult, publication::PublishedBundle};
+ use crate::application::app_error::{AppError, AppResult};
+-use crate::domain::workflow::{ChoiceName, RouteSelection, TransitionTarget};
++use crate::domain::workflow::{ChoiceName, ResponseDisposition, RouteSelection, TransitionTarget};
+ use async_trait::async_trait;
+ use serde_json::Value;
+ 
+@@ -14,6 +14,7 @@
+ #[derive(Debug, Clone, PartialEq)]
+ pub struct CommittedWorkflowStep {
+     pub disposition: CommitDisposition,
++    pub response_disposition: ResponseDisposition,
+     pub output: Value,
+     pub route: RouteSelection,
+     pub target: TransitionTarget,
+--- a/src/application/workflow/registry/channel_reply_terminal_contract_tests.rs
++++ b/src/application/workflow/registry/channel_reply_terminal_contract_tests.rs
+@@ -0,0 +1,75 @@
++use super::tests::{changed, compile_example, step};
++use super::*;
++use uuid::Uuid;
++
++#[test]
++fn channel_reply_terminal_contract_roundtrip_and_identity() {
++    let sample = example("channel.no_reply").unwrap();
++    let compiled = compile_example(&sample).unwrap();
++    let roundtrip = compile(
++        crate::adapters::workflow_source::decode(compiled.source()).unwrap(),
++        VersionId::new(Uuid::nil()),
++        &sample.facts,
++        &sample.dependencies,
++    )
++    .unwrap();
++    assert_eq!(roundtrip.representation(), compiled.representation());
++    assert_eq!(compiler::SEMANTIC_REVISION, 8);
++    assert_eq!(
++        compiled.representation()["descriptors"]["start"]["registration"]["revision"],
++        CONTRACT_REVISION
++    );
++    assert_eq!(
++        metadata::constraints("channel.no_reply").effect,
++        EffectClass::Pure
++    );
++    let ordinary = compile_example(&example("data.map").unwrap()).unwrap();
++    assert_ne!(compiled.representation(), ordinary.representation());
++}
++
++#[test]
++fn channel_reply_terminal_contract_rejects_nonterminal_and_choice_routes() {
++    for routes in [json!({"success":"next"}), json!({"choices":{"yes":"$end"}})] {
++        let mut sample = example("channel.no_reply").unwrap();
++        changed(&mut sample, |source| {
++            source["steps"]["start"]["routes"] = routes;
++            source["steps"]["next"] = json!({"type":"data.map","with":{
++                "value":{"literal":"done"},"output_schema":{"literal":true}},"routes":{"success":"$end"}});
++        });
++        assert_eq!(
++            compile_example(&sample).err().unwrap().code,
++            "registry.terminal_route"
++        );
++    }
++}
++
++#[test]
++fn channel_reply_terminal_contract_retains_error_routing_and_typed_value() {
++    let mut sample = example("channel.no_reply").unwrap();
++    changed(&mut sample, |source| {
++        source["steps"]["start"]["routes"]["error"] = json!("recover");
++        source["steps"]["recover"] = json!({"type":"data.map","with":{
++            "value":{"literal":"recovered"},"output_schema":{"literal":true}},"routes":{"success":"$end"}});
++    });
++    let compiled = compile_example(&sample).unwrap();
++    assert!(compiled.validate_step_output(&step(), &json!(7)).is_err());
++    assert!(
++        compiled
++            .validate_step_output(&step(), &json!("done"))
++            .is_ok()
++    );
++}
++
++#[test]
++fn channel_reply_terminal_contract_accepts_schema_valid_empty_business_values() {
++    for value in [json!(null), json!(""), json!({}), json!([])] {
++        let mut sample = example("channel.no_reply").unwrap();
++        changed(&mut sample, |source| {
++            source["steps"]["start"]["with"] = json!({
++                "value":{"literal":value},"output_schema":{"literal":true}});
++        });
++        let compiled = compile_example(&sample).unwrap();
++        compiled.validate_step_output(&step(), &value).unwrap();
++        compiled.validate_output(&value).unwrap();
++    }
++}
+--- a/src/application/workflow/registry/examples.rs
++++ b/src/application/workflow/registry/examples.rs
+@@ -107,7 +107,7 @@
+         "decision.agent" => {
+             json!({"agent":"reviewer","context":{"message":"hello"},"data_schema":schema})
+         }
+-        "data.map" => json!({"value":"hello","output_schema":schema}),
++        "data.map" | "channel.no_reply" => json!({"value":"hello","output_schema":schema}),
+         "http.request" => {
+             json!({"connection":"service","method":"POST","path":"/messages","headers":{"Accept":"application/json"},"body":{"message":"hello"}})
+         }
+--- a/src/application/workflow/registry/families.rs
++++ b/src/application/workflow/registry/families.rs
+@@ -27,7 +27,7 @@
+                     &["saved_ids"],
+                 ),
+             )),
+-            "ai.classify" | "agent.run" | "data.map" => self.schema_output(),
++            "ai.classify" | "agent.run" | "data.map" | "channel.no_reply" => self.schema_output(),
+             "decision.rule" | "decision.human" | "decision.agent" => self.decision(),
+             "wait.event" | "wait.timer" => self.wait(),
+             _ => unreachable!("basic registration family"),
+@@ -37,7 +37,7 @@
+         let schema = self.declared_schema("output_schema")?;
+         let declaration = json!({"const":schema});
+         let mut result = match self.name() {
+-            "data.map" => contract(
++            "data.map" | "channel.no_reply" => contract(
+                 json!({"value":embedded(schema.clone(),"mapped"),"output_schema":declaration}),
+                 &["value", "output_schema"],
+                 schema,
+--- a/src/application/workflow/registry/help.rs
++++ b/src/application/workflow/registry/help.rs
+@@ -80,6 +80,9 @@
+         "data.map" => {
+             "Pure typed construction, no scripts; output is value itself and follows output_schema."
+         }
++        "channel.no_reply" => {
++            "Finish this run successfully without an automatic channel reply. Return the explicit value unchanged, validated against output_schema and the workflow output schema. Success must route to $end. Earlier explicit messages remain published; children cannot suppress their parent's reply."
++        }
+         "http.request" => {
+             "Declared http slot, relative path (2048 characters), at most 64 headers. HTTP verbs never establish replay safety. Shared action receipts/reconciliation required."
+         }
+--- a/src/application/workflow/registry/metadata.rs
++++ b/src/application/workflow/registry/metadata.rs
+@@ -53,7 +53,7 @@
+     use CapabilityRequirement::*;
+     use EffectClass::*;
+     let (effect, capabilities) = match name {
+-        "data.map" | "decision.rule" => (Pure, vec![]),
++        "data.map" | "decision.rule" | "channel.no_reply" => (Pure, vec![]),
+         "context.history" => (BoundedRead, vec![ContextRead]),
+         "memory.load" => (BoundedRead, vec![MemoryRead]),
+         "memory.save" => (DurableWrite, vec![MemoryWrite]),
+--- a/src/application/workflow/registry/mod.rs
++++ b/src/application/workflow/registry/mod.rs
+@@ -30,7 +30,7 @@
+ use serde_json::{Value, json};
+ use std::collections::{BTreeMap, BTreeSet};
+ 
+-pub const CONTRACT_REVISION: &str = "workflow-catalogue-v1.6";
++pub const CONTRACT_REVISION: &str = "workflow-catalogue-v1.7";
+ pub const MAX_FACTS: usize = 256;
+ pub const MAX_SELECTIONS: usize = 128;
+ /// Explicit reviewers of one `decision.human` (user decision Q1, 05-D2 §2): at most this many
+@@ -48,7 +48,7 @@
+ pub const MAX_PATH: usize = 2048;
+ pub const MAX_DEADLINE: usize = 64;
+ pub const MAX_CORRELATION: usize = 256;
+-pub const TYPES: [&str; 19] = [
++pub const TYPES: [&str; 20] = [
+     "context.history",
+     "memory.load",
+     "memory.save",
+@@ -59,6 +59,7 @@
+     "decision.human",
+     "decision.agent",
+     "data.map",
++    "channel.no_reply",
+     "http.request",
+     "tool.call",
+     "mcp.call",
+@@ -311,6 +312,24 @@
+                     .unwrap_or(self.parsed.locations[""]),
+             ));
+         }
++        if self.name() == "channel.no_reply"
++            && !matches!(
++                self.parsed.definition.steps[self.id].routes,
++                Routes::Success(crate::domain::workflow::TransitionTarget::End)
++            )
++        {
++            let path = format!("/steps/{}/routes", self.id);
++            return Err(Diagnostic::at(
++                "registry.terminal_route",
++                "channel.no_reply requires success routing to $end",
++                &path,
++                self.parsed
++                    .locations
++                    .get(&path)
++                    .copied()
++                    .unwrap_or(self.parsed.locations[""]),
++            ));
++        }
+         let contract = match self.name() {
+             "http.request" | "tool.call" | "mcp.call" | "message.send" | "message.reply" => {
+                 self.action()?
+@@ -396,6 +415,8 @@
+ mod tests;
+ 
+ #[cfg(test)]
++mod channel_reply_terminal_contract_tests;
++#[cfg(test)]
+ mod contract_tests;
+ #[cfg(test)]
+ mod decision_tests;
+--- a/src/application/workflow/registry/runtime_tests.rs
++++ b/src/application/workflow/registry/runtime_tests.rs
+@@ -71,7 +71,7 @@
+             "agent.run" | "decision.agent" => ("agent", json!(3)),
+             "decision.rule" => ("data", json!(3)),
+             "decision.human" => ("deadline", json!("bad")),
+-            "data.map" => ("value", json!(3)),
++            "data.map" | "channel.no_reply" => ("value", json!(3)),
+             "http.request" => ("method", json!("BOGUS")),
+             "tool.call" | "mcp.call" => ("arguments", json!({"key":3})),
+             "message.send" | "message.reply" => ("content", json!({"body":true})),
+--- a/src/application/workflow/registry/tests.rs
++++ b/src/application/workflow/registry/tests.rs
+@@ -37,13 +37,13 @@
+ }
+ #[test]
+ fn workflow_registry_exact_catalogue_and_help_examples_compile() {
+-    let expected = "agent.run ai.classify context.history data.map decision.agent decision.human decision.rule flow.repeat http.request jev.evaluate mcp.call memory.load memory.save message.reply message.send tool.call wait.event wait.timer workflow.call";
++    let expected = "agent.run ai.classify channel.no_reply context.history data.map decision.agent decision.human decision.rule flow.repeat http.request jev.evaluate mcp.call memory.load memory.save message.reply message.send tool.call wait.event wait.timer workflow.call";
+     assert_eq!(
+         TYPES.iter().copied().collect::<BTreeSet<_>>(),
+         expected.split_whitespace().collect()
+     );
+-    assert_eq!(TYPES.len(), 19);
+-    assert_eq!(TYPES.iter().collect::<BTreeSet<_>>().len(), 19);
++    assert_eq!(TYPES.len(), 20);
++    assert_eq!(TYPES.iter().collect::<BTreeSet<_>>().len(), 20);
+     for name in TYPES {
+         let example = example(name).unwrap();
+         let compiled = compile_example(&example).unwrap_or_else(|e| panic!("{name}: {e:?}"));
+--- a/src/application/workflow/sample/channel_reply_terminal_tests.rs
++++ b/src/application/workflow/sample/channel_reply_terminal_tests.rs
+@@ -0,0 +1,25 @@
++use super::*;
++
++#[test]
++fn channel_reply_terminal_sample_returns_business_value_without_a_script() {
++    let value = json!({"answer":"done","no_reply":false});
++    let mut source = source("channel.no_reply");
++    source["steps"]["start"]["with"] =
++        json!({"value":{"literal":value},"output_schema":{"literal":true}});
++    let report = execute(
++        build(&source, DependencySnapshots::default(), vec![]),
++        request(vec![]),
++    )
++    .unwrap();
++    complete(&report);
++    assert_eq!(report.output, Some(value));
++    assert!(report.effects.is_empty());
++    source["output_schema"] = json!({"type":"integer"});
++    let report = execute(
++        build(&source, DependencySnapshots::default(), vec![]),
++        request(vec![]),
++    )
++    .unwrap();
++    assert_eq!(report.status, SampleStatus::Stopped);
++    assert!(report.output.is_none());
++}
+--- a/src/application/workflow/sample/tests.rs
++++ b/src/application/workflow/sample/tests.rs
+@@ -4,6 +4,8 @@
+ use crate::domain::workflow::{CompanyId, TypeName, VersionId};
+ use serde_json::json;
+ 
++#[path = "channel_reply_terminal_tests.rs"]
++mod channel_reply_terminal_tests;
+ #[path = "tools_tests.rs"]
+ mod tools_tests;
+ fn company() -> CompanyId {
+--- a/src/application/workflow/worker.rs
++++ b/src/application/workflow/worker.rs
+@@ -203,7 +203,7 @@
+         let _active = self.active_jobs.map(ActiveWorkflowJobs::enter);
+         let kind = self.port.step_kind(scope).await?;
+         match kind.0.as_str() {
+-            "data.map" | "decision.rule" => {
++            "data.map" | "decision.rule" | "channel.no_reply" => {
+                 self.port
+                     .advance_pure(scope, BatchBudget::new(16, Duration::from_millis(100))?)
+                     .await?;
+--- a/src/domain/workflow/mod.rs
++++ b/src/domain/workflow/mod.rs
+@@ -12,6 +12,7 @@
+ mod ids;
+ mod outcome;
+ mod recovery;
++mod response;
+ mod rule;
+ mod state;
+ mod transition;
+@@ -51,6 +52,7 @@
+     AttemptBudget, RecoveryDecision, RecoveryLimit, RecoveryPolicy, RecoveryPolicyError,
+     RecoverySnapshot, RetrySafety,
+ };
++pub use response::{InvalidResponseDisposition, ResponseDisposition};
+ pub use rule::{OrderedRule, RuleCase, RuleError};
+ pub use state::{RunState, RunStateError, WaitingReason};
+ pub use transition::{RouteError, RouteSelection, TransitionTarget, select_route};
+--- a/src/domain/workflow/response.rs
++++ b/src/domain/workflow/response.rs
+@@ -0,0 +1,32 @@
++//! Terminal response policy belongs to a committed execution, not its business output.
++#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
++#[serde(rename_all = "snake_case")]
++pub enum ResponseDisposition {
++    Automatic,
++    Suppressed,
++}
++
++impl ResponseDisposition {
++    pub fn as_str(self) -> &'static str {
++        match self {
++            Self::Automatic => "automatic",
++            Self::Suppressed => "suppressed",
++        }
++    }
++}
++
++#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
++#[error("Invalid workflow response disposition")]
++pub struct InvalidResponseDisposition;
++
++impl std::str::FromStr for ResponseDisposition {
++    type Err = InvalidResponseDisposition;
++
++    fn from_str(value: &str) -> Result<Self, Self::Err> {
++        match value {
++            "automatic" => Ok(Self::Automatic),
++            "suppressed" => Ok(Self::Suppressed),
++            _ => Err(InvalidResponseDisposition),
++        }
++    }
++}

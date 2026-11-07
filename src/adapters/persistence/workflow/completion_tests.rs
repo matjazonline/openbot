@@ -1,4 +1,6 @@
 use super::*;
+#[path = "channel_reply_terminal_io_tests.rs"]
+mod channel_reply_terminal_io_tests;
 use crate::application::workflow::{batch::*, completion::*, supervise::*};
 
 fn output() -> Value {

@@ -1,0 +1,58 @@
+[
+  {
+    "filter": "message_intent_",
+    "selected": 14,
+    "exit_code": 0,
+    "inventory": "regression-message-intents-list-01",
+    "execution": "regression-message-intents-tests-01"
+  },
+  {
+    "filter": "message_reply_",
+    "selected": 13,
+    "exit_code": 0,
+    "inventory": "regression-message-replies-list-01",
+    "execution": "regression-message-replies-tests-01"
+  },
+  {
+    "filter": "workflow_binding_sql_",
+    "selected": 7,
+    "exit_code": 0,
+    "inventory": "regression-bindings-list-01",
+    "execution": "regression-bindings-tests-01"
+  },
+  {
+    "filter": "workflow_admission_binding_",
+    "selected": 4,
+    "exit_code": 0,
+    "inventory": "regression-admission-snapshots-list-01",
+    "execution": "regression-admission-snapshots-tests-01"
+  },
+  {
+    "filter": "schedule_binding_must_fit_the_schedule_channel",
+    "selected": 1,
+    "exit_code": 0,
+    "inventory": "regression-schedule-binding-list-01",
+    "execution": "regression-schedule-binding-tests-01"
+  },
+  {
+    "filter": "binding_reconfiguration_is_refused_by_an_incompatible_schedule",
+    "selected": 1,
+    "exit_code": 0,
+    "inventory": "regression-schedule-reconfiguration-list-01",
+    "execution": "regression-schedule-reconfiguration-tests-01"
+  },
+  {
+    "filter": "builder_provisions_an_assistant_for_a_signed_in_admin",
+    "selected": 1,
+    "exit_code": 0,
+    "inventory": "regression-provisioning-list-01",
+    "execution": "regression-provisioning-tests-01"
+  },
+  {
+    "filter": "adapters::persistence::onboarding::tests::",
+    "selected": 13,
+    "exit_code": 101,
+    "inventory": "regression-onboarding-list-01",
+    "execution": "regression-onboarding-tests-01"
+  }
+]

@@ -1,5 +1,7 @@
 //! 04.11 provider-neutral messaging against real PostgreSQL (decisions D2 + D3 + D4).
 use super::*;
+#[path = "channel_reply_terminal_message_tests.rs"]
+mod channel_reply_terminal_message_tests;
 use crate::application::workflow::{
     lease::*,
     polling::{PollWork, WorkflowPolling},

@@ -22,6 +22,7 @@ async fn schema_constraint_attempt_stop_reason_matrix() {
         None,
         Some("completed"),
         Some("effect_parked"),
+        Some("question_parked"),
         Some("approval_parked"),
         Some("child_parked"),
         Some("timed_out"),
@@ -33,7 +34,13 @@ async fn schema_constraint_attempt_stop_reason_matrix() {
                 "processing" => reason.is_none(),
                 "completed" => matches!(
                     reason,
-                    Some("completed" | "effect_parked" | "approval_parked" | "child_parked")
+                    Some(
+                        "completed"
+                            | "effect_parked"
+                            | "question_parked"
+                            | "approval_parked"
+                            | "child_parked"
+                    )
                 ),
                 "failed" => matches!(reason, None | Some("timed_out" | "lease_lost")),
                 _ => unreachable!(),

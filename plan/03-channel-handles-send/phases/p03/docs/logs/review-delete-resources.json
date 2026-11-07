@@ -1,0 +1,9 @@
+{
+  "worktree": "/var/folders/qc/f8s9x42x5sz6vbh79sb0cfth0000gn/T/openbot-chs-p03-review-delete-bkvmtj75/worktree",
+  "container": "/var/folders/qc/f8s9x42x5sz6vbh79sb0cfth0000gn/T/openbot-chs-p03-review-delete-bkvmtj75",
+  "preserve_until_review_complete": true,
+  "source_digest": "19960fb95b5d0a4fcb1547e317cb46fe91161392f76967d2802364eb1843f808",
+  "diagnostic_patch": "review-delete-diagnostic.diff",
+  "database_pair": "openbot_chs/openbot_chs_test",
+  "target": "/Users/mac02/dev/openbot/target"
+}

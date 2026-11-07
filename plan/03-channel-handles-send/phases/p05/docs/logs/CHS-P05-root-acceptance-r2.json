@@ -1,0 +1,13 @@
+{
+  "phase": "p05",
+  "status": "accepted in phase; combined integration pending; user-requested deletion cleanup checkpoint pending",
+  "digest": "b19e36e177e79bf0389c67b9ac1f8a04e46620d2640015d780b67e6482bb03e9",
+  "head": "f6e133058c69e28c173850657b134b83ac7c6224",
+  "review": "CHS-P05-B1-R2 PASS",
+  "finding": "CHS-P05-B1-F1 FIXED",
+  "distinct_targeted_passed": 500,
+  "full_suite": false,
+  "source_verified": true,
+  "coordination_review_pin": 15,
+  "new_user_steering": "Include pre-existing plan deletion in commit; no question contract change. Refresh exact checkpoint review for startup/docs cleanup."
+}

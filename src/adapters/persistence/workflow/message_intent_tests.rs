@@ -17,6 +17,8 @@ use std::time::Duration;
 use tokio::sync::Notify;
 use tokio_util::sync::CancellationToken;
 
+#[path = "channel_reply_binding_tests.rs"]
+mod channel_reply_tests;
 #[path = "message_reply_tests.rs"]
 mod reply_tests;
 #[path = "tenant_fk_intent_tests.rs"]
@@ -258,12 +260,22 @@ impl Intents {
     /// `intent` under a delivery policy, as a simulation's in-app test mode writes it.
     async fn intent_with(&self, facts: Facts, policy: &str) -> Uuid {
         let message = self.message().await;
+        self.intent_from_message(facts, policy, message).await
+    }
+
+    async fn intent_from_message(
+        &self,
+        facts: Facts,
+        policy: &str,
+        message: CanonicalMessageId,
+    ) -> Uuid {
         let id = Uuid::new_v4();
         sqlx::query(
             "INSERT INTO workflow_message_intents (company_id, id, message_id, channel_id, \
                thread_id, role, mentioned, admissible, origin, responder_principal_id, hop_count, \
                trace_channels, delivery_policy, correlation_id) \
-             SELECT $1, $2, message.id, $3, $4, $5, $6, $7, 'external', message.author_principal_id, \
+             SELECT $1, $2, message.id, $3, $4, $5, $6, $7, \
+               CASE WHEN message.audience='internal_only' THEN 'internal' ELSE 'external' END, message.author_principal_id, \
                0, '{}', $9, $2 \
              FROM messages AS message WHERE message.company_id = $1 AND message.id = $8",
         )
