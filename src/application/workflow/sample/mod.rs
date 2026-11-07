@@ -22,6 +22,7 @@ pub use definitions::{
     PreparedSample, SampleAgentSelection, SampleConfigurationHash, SampleWorkflowSelection,
 };
 mod dispatch;
+mod responses;
 mod tools;
 mod types;
 pub use types::*;
@@ -32,6 +33,8 @@ struct ScriptKey {
     step: StepId,
 }
 struct Session {
+    response_contract: Option<super::channel_reply::ChannelReplyContract>,
+    response_approval_policy: Option<super::channel_reply::ReplyApprovalPolicy>,
     agents: BTreeMap<
         crate::entities::agent_capability::AgentId,
         crate::application::agent::ResolvedAgentDefinition,
@@ -93,6 +96,8 @@ pub fn execute(sample: PreparedSample) -> AppResult<SampleReport> {
     } = sample;
     let scripts = script_queues(request.scripts)?;
     let mut session = Session {
+        response_contract: request.response_contract,
+        response_approval_policy: request.response_approval_policy,
         agents,
         workflows,
         scripts,
@@ -105,6 +110,7 @@ pub fn execute(sample: PreparedSample) -> AppResult<SampleReport> {
             .clone(),
         report_bytes: 1024,
         report: SampleReport {
+            response: None,
             content_hash: bundle.content_hash().clone(),
             configuration_hash,
             agent_selections,
@@ -229,7 +235,12 @@ impl Session {
                 .outputs
                 .insert(step.clone(), completion.output.clone());
             match completion.target {
-                TransitionTarget::End => return Ok(completion.output),
+                TransitionTarget::End => {
+                    if frame.depth == 0 {
+                        self.completed_response(&bundle, &completion)?;
+                    }
+                    return Ok(completion.output);
+                }
                 TransitionTarget::Step(next) => step = next,
             }
         }

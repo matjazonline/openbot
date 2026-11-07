@@ -33,8 +33,13 @@ pub const PROVISIONING_INVALID: &str = "workflow.invalid_input";
 /// The step types the Agent Builder may add to a new agent's workflow: model-only or pure steps,
 /// which need no connection, parameter or outbound destination. Any other step is added in the
 /// workflow editor.
-pub const BUILDER_STEP_TYPES: [&str; 4] =
-    ["ai.classify", "decision.agent", "decision.rule", "data.map"];
+pub const BUILDER_STEP_TYPES: [&str; 5] = [
+    "ai.classify",
+    "decision.agent",
+    "decision.rule",
+    "data.map",
+    "channel.no_reply",
+];
 
 /// The most agents `list_company_agents` returns, by slug.
 pub const MAX_LISTED_AGENTS: usize = 200;

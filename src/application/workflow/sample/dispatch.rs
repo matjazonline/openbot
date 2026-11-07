@@ -37,7 +37,13 @@ impl Session {
         {
             return self.workflow_tool_step(bundle, frame, activation, path, &tool);
         }
-        let response = self.response(bundle, &activation.step)?;
+        let response = match self.response(bundle, &activation.step) {
+            Ok(response) => response,
+            Err(error) => {
+                self.waiting_response(kind, activation)?;
+                return Err(error);
+            }
+        };
         if kind == "jev.evaluate" {
             return self.jev(bundle, activation, response);
         }

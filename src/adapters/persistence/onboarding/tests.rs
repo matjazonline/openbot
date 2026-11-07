@@ -341,7 +341,29 @@ async fn onboarding_same_key_replays_and_new_key_after_channel_deletion_and_agen
     )
     .unwrap();
     // A channel with workflow configuration is intentionally retained. This private fixture has
-    // no runs; remove its unused binding before exercising channel deletion.
+    // no runs; explicitly clear its selected response, then remove the unused binding.
+    use crate::application::workflow::channel_reply::{ChannelReplies, ConfigureChannelReply};
+    let actor = crate::application::workflow::WorkflowActor::authenticated(f.owner).unwrap();
+    let company = crate::domain::workflow::CompanyId::new(f.company);
+    let response_channel = crate::application::workflow::RelatedChannelId::new(channel);
+    let selected = f
+        .persistence
+        .channel_reply_settings(company, response_channel, actor)
+        .await
+        .unwrap()
+        .unwrap();
+    assert!(selected.responder.is_some());
+    f.persistence
+        .configure_channel_reply(ConfigureChannelReply {
+            company,
+            channel: response_channel,
+            actor,
+            expected: Some(selected.revision),
+            responder: None,
+            approval_policy: None,
+        })
+        .await
+        .unwrap();
     let removed =
         sqlx::query("DELETE FROM workflow_bindings WHERE company_id = $1 AND channel_id = $2")
             .bind(f.company)

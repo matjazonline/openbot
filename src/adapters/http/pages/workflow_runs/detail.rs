@@ -167,6 +167,7 @@ pub fn run_body(view: &RunPaneView<'_>) -> String {
             </div>
             <div class="flex-1 space-y-6 overflow-y-auto px-4 py-4 sm:px-6">
                 {facts}
+                {response}
                 {dependencies}
                 {controls}
                 <section class="space-y-2"><h3 class="font-semibold">Graph</h3>{graph}</section>
@@ -197,6 +198,18 @@ pub fn run_body(view: &RunPaneView<'_>) -> String {
         deadline = format_date_time(summary.deadline),
         dependencies = super::provenance::dependencies(run),
         facts = facts(view),
+        response = run
+            .response
+            .as_ref()
+            .map(|response| {
+                let ids = std::collections::HashSet::from([id]);
+                super::channel_response_panel(
+                    response,
+                    company_id,
+                    super::RunLinkAccess::Authorized(&ids),
+                )
+            })
+            .unwrap_or_default(),
         controls = controls(view),
         graph = view.graph_html,
         timeline = timeline(view),

@@ -4838,6 +4838,8 @@ fn test_thread_runs(activity: ThreadActivity) -> crate::application::thread_acti
         }],
         has_more: false,
         message_runs: vec![],
+        response_outcomes: vec![],
+        responses_truncated: false,
     }
 }
 

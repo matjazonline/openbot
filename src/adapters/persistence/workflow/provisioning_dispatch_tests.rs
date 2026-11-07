@@ -903,3 +903,6 @@ mod knowledge_provisioning_tests;
 
 #[path = "autonomous_agent_provisioning_atomic_tests.rs"]
 mod autonomous_provisioning;
+
+#[path = "channel_reply_native_tests.rs"]
+mod channel_reply_native_tests;

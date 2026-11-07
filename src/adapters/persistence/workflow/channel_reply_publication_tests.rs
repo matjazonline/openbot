@@ -12,6 +12,8 @@ mod lifecycle;
 mod membership;
 #[path = "channel_reply_recovery_tests.rs"]
 mod recovery;
+#[path = "channel_reply_views_tests.rs"]
+mod views;
 
 pub(super) fn publisher(f: &FinalFixture) -> ChannelReplyPublisher<PostgresPersistence> {
     ChannelReplyPublisher::new(

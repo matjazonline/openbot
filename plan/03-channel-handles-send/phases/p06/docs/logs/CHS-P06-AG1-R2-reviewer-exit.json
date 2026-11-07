@@ -1,0 +1,12 @@
+{
+  "branch": "codex/chs-p06-3f43t2k7",
+  "HEAD": "97e5d60dc538e26c7cb976a8d63772eed80baff2",
+  "digest_matches": true,
+  "source_mismatches": [],
+  "coordination_matches": true,
+  "isolated_coordination_matches": true,
+  "pin_hash_matches": true,
+  "decision_hash_matches": true,
+  "verification_pass": true,
+  "receipt_note": "Initial wrapper assertion accidentally treated empty source_mismatches as a required truthy match flag; explicit named-flag validation corrected that receipt-check typo. All actual snapshot/hash/identity checks passed unchanged."
+}

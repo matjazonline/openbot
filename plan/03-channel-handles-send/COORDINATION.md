@@ -2,7 +2,7 @@
 
 - Authority: `/Users/mac02/dev/openbot/plan/03-channel-handles-send/COORDINATION.md`
 - Writer: `/root`, working in `/Users/mac02/dev/openbot` on `main`.
-- Revision: 17
+- Revision: 27
 - Workflow: `implement-astra-reviewed-2-2`.
 
 ## Plan-wide instructions
@@ -24,7 +24,8 @@
 | p03 | `/root`, accepted `849e88b7`, combined integration pending | `/Users/mac02/dev/openbot` | `phases/p03/docs/{TASK,HANDOFF}.md` |
 | p04 | `/root`, accepted `f26c909a`, combined integration pending | `/Users/mac02/dev/openbot` | `phases/p04/docs/{TASK,HANDOFF}.md` |
 | p05 | `/root`, accepted `6153d305`, combined integration pending | `/Users/mac02/dev/openbot` | `phases/p05/docs/{TASK,HANDOFF}.md` |
-| p06–p07 | `/root`, authorized, pending dependencies | `/Users/mac02/dev/openbot` | `phases/pNN/docs/{TASK,HANDOFF}.md` when started |
+| p06 | `/root`, accepted90f382b9, combined integration pending | `/private/tmp/openbot-chs-p06-3f43t2k7/worktree` | `/private/tmp/openbot-chs-p06-3f43t2k7/worktree/plan/03-channel-handles-send/phases/p06/docs/{TASK,HANDOFF}.md` |
+| p07 | `/root`, registering after accepted p06 | `/private/tmp/openbot-chs-p06-3f43t2k7/worktree` | `phases/p07/docs/{TASK,HANDOFF}.md` in isolated worktree |
 
 ## Cross-phase notices
 
@@ -136,3 +137,63 @@
 - Unchanged D1/r1 question contract accepted at source6153d305283d257f724e4a1e659fa04ef66c4688403dcce5165b5e6257ccde8c, HEADf6e133058c69e28c173850657b134b83ac7c6224. B PASS CHS-P05-B1-R3 reuses whole-phase R2; CHS-P05-B1-F1 FIXED. Root receipt phases/p05/docs/logs/CHS-P05-root-acceptance.json.
 -500distinct targetedPASS/0ignored, fresh owned migrations05, actual SQLxprepare/check04, all-target lint/fmt/diff/graphPASS; deletion cleanup offline bins compilation/reference checksPASS. No full-suite/provider-readiness claim.
 - p05 satisfies C001–C005 and I007r2 including user-authorized plan deletion; ordinary main commit/push checkpoint now authorized. p06/p07/final must preserve accepted contracts and recheck current source; combined integration pending. Continue all history after plan03 acceptance.
+
+## Sequential p06 startup and completed push checkpoint (revision18)
+
+- I007r2 satisfied: normal origin/main push97e5d60dc538e26c7cb976a8d63772eed80baff2 includes accepted p01–p05 implementation/evidence and authorized plan deletion. All156 accepted source paths verified against committed bytes. Root receipt p05/docs/logs/CHS-P05-main-push.json. No deployment/full suite.
+- p06 acknowledges I001–I003/r1,I004/r2,I005–I006/r1,I007/r2 completed,C001/r1,C002/r1,C003/r2,C004/r2,C005/r1 accepted producer. Starts from exact accepted p05 artifact6153d305 and commit97e5d60d. Current source is committed; p05 push receipt/handoff are workflow-only local changes. p06 owns thin authoring/settings adapters, authorized outcome projections, examples/templates, sealed preview, bounded operational events/docs. No new durable owner/queue/approval authority. Reopen architecture gate if investigation requires changing those accepted contracts.
+
+### CHS-C006 / r1 — proposed fresh native responder initialization and sealed preview
+
+- Proposed; p06 D1/r1 gate pending, no dependent implementation. Targets p06/p07/final/history. Fresh native assistant constructor explicitly selects only its newly active binding in the same existing savepoint, with validated body projection and no extra policy/account set. Default final reply becomes automatic from typed business output; existing editable business draft review and custom ordering preserved. No obligation/grant is inferred until actual C001 ingress admission.
+- Sample-only projection/policy enter sealed configuration identityv2; root trusted disposition and typed missing-script waits drive previews, never production effects. C001–C005, current budgets/privacy/release/recovery remain binding. Whole decision text p06/docs/logs/CHS-P06-D1-r1.md is authoritative; activate only on independent exact decision PASS.
+- p06 acknowledges proposed r1, dependent edits paused. Other independently drafted UI/read-only/observation changes receive eventual whole-phase review, not acceptance from this gate.
+
+## P06 isolated continuation (revision20)
+
+- Completed gate CHS-P06-AG1-R1 CHANGES REQUIRED, high F1 terminal-route adaptation; source never accepted. External verification scripts changed during its exit audit. Preserve all primary/external source work.
+- Root/A p06 implementation and B records continue in `/private/tmp/openbot-chs-p06-3f43t2k7/worktree`, branch `codex/chs-p06-3f43t2k7`, base97e5d60d, from exact31-path root-owned export with hashes in p06/docs/logs/isolation-export.json. Primary initial p06 draft is retained untouched, not authoritative for subsequent implementation; integration must merge changes against that exact export. Only root-owned phase source was exported, not another session's evolving Cargo/CI/tools. Original completed review records preserved; authoritative p06 records now inside isolated worktree.
+- Authoritative coordination remains this exact primary path, writer/root. Synchronize the isolated workflow-only copy and immutable notice pin at each boundary; no assumption of automatic worktree sync. Same9 relative snapshot exclusions. New p06 DBsopenbot_chs_p06(_test) on ownedPG65037, separate targetinsideisolatedcheckout; primary/baseline resources retained. No current source gate PASS. C006/r1 still proposed, fix all F1 design paths together then one decision recheck before default/bootstrap/sample edits.
+
+### CHS-C006 / r2 — revised native terminal paths and sealed preview (proposed)
+
+- Supersedes proposed r1 for implementation; exact p06 D1/r2 gate recheck pending. Addresses high CHS-P06-AG1-F1: real native business reject routes to typed terminal NoReply and closes its decision, approved/edited reply remains the final business object. Native custom End routes are refused at authoring unless the step is trusted NoReply; saved response is retained after normal custom tail work. No schema-validation weakening or payload suppression flags; C003 protected final rejection unchanged. Budgets unchanged.
+- Fresh native same-transaction responder selection, sealed preview identityv2 and C001–C005 contracts retain D1r1 invariants. Current isolated p06 worktree/records from revision20 remain authoritative; root acknowledges r2 and pauses dependent changes until independent exact decision PASS.
+
+### CHS-C006 / r2 — active after architecture acceptance (revision22)
+
+- B PASS CHS-P06-AG1-R2 for exact D1/r2 SHAbbef5246c9403f3279a7398d6d9d7cdea8d9dbf516e1c598a211c6404509811b; root exact decision/source verification recorded in isolated p06/docs/logs/CHS-P06-root-gate-acceptance.json. F1 resolved at architecture level; dependent implementation may begin. No code/phase acceptance inferred.
+- Native default/bootstrap and sealed preview contract unchanged from proposed C006r2; all C001–C005/privacy/release/budget invariants remain required. p06 source writers stay in the isolated worktree; primary initial export and external tooling preserved pending explicit integration comparison. p07/history/final consume accepted producer only after full p06 implementation/code review.
+
+
+### CHS-C006 / r2 — accepted producer (coordination revision23)
+
+- P06 accepted source90f382b9e60fff25ef5f6f304a413eb395d95b8e447d5b944ebe7b9d0895073e, base/HEAD97e5d60d, independent whole-phase PASS CHS-P06-B1-R3. Root verified all74sourcehashes/snapshot andcoord22; isolated p06/docs/logs/CHS-P06-root-acceptance.json.
+- Settings thin CAS/auth adapters, typed native automatic defaults/bootstrap/rejection/custom-tail budgets, sealed sampleidentityv2/previews, bounded authorized outcomes/exactoriginalsource/actualrootbudgetcurrentturns and descendantreviewmetadata. Observation-only IDs/state wakeups include realformaldecision insertion and actualdecisionwait state settlement, bounded actualrun+budgetroot(max2); no new send/decision authority. C001–C005 remain binding.
+- F1 later-source questions,F2 nestedformal-reviewlive reconciliation,F3 onboardingclearteardownFIXED.232distinctaffectedRustPASS/1existingignored, actualfreshmigrations04/SQLxprepare-check03/offlineClippy05/fmt04/CSS/boundary/graft andfocusedbrowserPASSwithexplicitreuse. No fullsuite/liveproviderclaim; standalone liveauthoringjourney withoutserver3001 unavailable, affectedrealroute/render/browserprotocol coverage retained.
+- P07 acknowledges acceptedproducer and registers in same isolated worktree for real worker/publisher/delivery e2e and combined integration. Preserve primaryinitial31draftpaths andsevenexternalverificationfiles; compareexporthashes andmergeexternalCIadditions, neveroverwrite. Completedmainpush97/deletiononly; no newpushauthorization.
+- P07 integration must audit nested conversational-question live updates as well as formal-review updates: current formal triggers cover decision insertion/decision-wait settlement. Do not infer arbitrary-depth question wakeups from formal-review proof; include the real child HITL/live-policy journey in the combined affected-scope gate. This is an integration verification obligation, not a new accepted source claim.
+
+### CHS-C007 / r1 — nested conversational question observations
+- State: active.
+- Origin: p07 root, TASK CHS-P07-D1/r1; logs/nested-question-red-02.log reproduces a local grandchild question with two unchanged child_run ancestors and no workflow_run_changed for the owning root.
+- Targets: p07, final integration, future history phases where run/question observations are affected.
+- Instruction: retain genuine shared-budget/exact-destination response ownership; wake the actual question run and real budget root (existing LIMIT2 helper) on question insertion and actual event-wait settlement. No payload/respondent/wait/decision content in notices, no ownership grants, provider changes, polling service or bound increases.
+- Dependencies: accepted C006/r2 projection/notification producer; P07 observation-only correction. Established observation schema pattern, not a new persistent ownership, authorization, concurrency or recovery protocol; no new architecture gate required. P06 historical acceptance remains narrower, combined readiness requires P07 review.
+- Verification: genuine nested local-question park and real answer root wakes, unchanged ancestor states, current reread, private-data absence; regression on formal reviews and provider status notifications. A per-transition collector fails if its 16-event test budget is exhausted; production helper remains LIMIT2. Existing formal-review collector4 unchanged.
+- Responses: p07 acknowledged r1, implementation pending focused green and independent batch review; future history pending startup impact assessment.
+
+## CHS-I007 / r3 — complete plan03 commit/push checkpoint
+
+- State: active, supersedes r2 only for the next checkpoint; retain r2 completed p05 receipt.
+- User explicitly authorized: also push when plan03 is fully complete, then continue with plan04 history. Root may commit/push the independently accepted, integrated plan03 owned changes and workflow evidence to main after p07/final acceptance. Do not include independent external skill edits/deletions, Cargo changes, source_modules/evidence-validator work, or their shared-file hunks without separate authorization; preserve them locally. Earlier authorized local_machine_tunnel_plan deletion already committed at97e5d60d. No deployment authorization.
+- Targets: p07/final integration and plan04 startup. Verification: final plan03 exact acceptance, scoped staging/tree audit, normal fast-forward push and main/origin receipt; then history implementation. User targeted-tests-only persists.
+- Response p07: acknowledged r3; no push before final acceptance. Plan04 pending startup acknowledgement.
+
+## P07 accepted producer / C007-r1 disposition
+
+P07 whole phase and final combined frozen-source review CHS-P07-B1-R1 PASS for cb9845d3593414402b1834fe230e14d9adb4361df98c96ee88434d3a035c338c; root independently verified114sourcehashes/archive/coord25 at acceptance, no actionable findings,226 distinct targetedRust/16browserPASS. Original01–07 implementation phases now accepted. C007/r1 satisfied in accepted producer by real nested local question park/answer wake and unchanged ancestors; I004/r2 targeted-only retained. P06 combined readiness covered by P07 review. Primary integration, separate clean original-dependency scoped checkout gate, owned-only staging/commit/push per I007/r3 remain pending; plan03 not yet complete and history implementation waits for that checkpoint. P07 source worktree stays frozen; no source edits while committing preserved inputs. Evidence p07/docs/logs/CHS-P07-root-acceptance.json and REVIEW.md.
+
+## Final primary integration / scoped commit gate
+
+Original-dependency clean checkout13e2e+offlinealltargetClippy PASS. Root verified all80 scoped source blobs against the intended commit manifest, integrated them into primary, and preserved34 other external paths plus2shared file hunks. Staging contains only owned source and plan03 workflow evidence; raw outputs/generated browser fixtures are packaged byte-for-byte with checksum indexes, not whitespace-normalized or exempted. Combined114-path archive/diffs/merge/backup remain local to avoid publishing unrelated source; portable owned80 archive is committed. Index whitespace PASS. All seven phases and combined review accepted; normal scoped main commit/push I007/r3 is the remaining checkpoint, then all04 history.

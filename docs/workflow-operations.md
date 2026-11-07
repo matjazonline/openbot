@@ -163,3 +163,72 @@ pixels per side, with at most four assets and the same aggregate 64 KiB wire cap
 Images require Jev 1.13/1.14 and Box 1.14. A missing storage configuration or revoked,
 changed or oversized attachment produces an explicit failure, never an external URL
 fetch. See the exact [image contract](workflow-language-v1.md#experimental-jev-images-and-box).
+
+## Channel responses and human questions
+
+The channel's **Automatic response** card chooses one active message binding and a version1
+subject/body projection from its final business result. Other bindings observe. Selection requires
+current company administration, channel visibility, run-as visibility and resource readiness.
+`GET` and `PUT /api/companies/{company_id}/channels/{channel_id}/response` use the same checks.
+PUT carries `expected_revision` (null for the first save), `responder` (null to clear), and optional
+`approval_policy`. A responder contains `binding_id`, `expected_binding_state_revision`, and
+`contract`, for example:
+
+```json
+{"format_version":1,"subject":{"literal":"Response"},"body":{"ref":"/input/body"}}
+```
+
+References select required string fields of the declared final output. The optional final approval
+policy is `{"reviewers":[{"kind":"user","id":"CURRENT_ADMIN_UUID"}],"review_timeout_seconds":300}`.
+Reviewers must currently be company admins who can see the channel. Re-read after a revision
+conflict; a stale form keeps its typed values and offers an explicit reload. Clearing selection
+persists a new revision. Replaying a native create command never restores a cleared responder.
+Fresh native assistant channels select only their new active binding in the provisioning transaction.
+Native templates return typed `{body}` output, with no explicit final send. Editable business review
+publishes the approved/edited body; rejection closes review and finishes without reply. This differs
+from rejecting protected final publication, which refuses that final effect.
+
+`channel.no_reply` (**Finish without reply**) returns its explicit business value and must route
+success to `$end`. It suppresses only this run's automatic final reply. Business schemas still apply;
+null or empty business output is valid when its schema permits it. Earlier explicit messages remain.
+A child cannot suppress its parent's response. Native custom steps cannot route directly to `$end`
+unless they use this terminal type. Normal AfterReply work returns the saved reply afterward;
+composition refuses paths exceeding the unchanged activation budget.
+
+`message.ask` atomically posts a prompt and registers a human wait. Only a correlated reply from the
+expected source author resumes it; provider acceptance does not resolve the human wait. Formal
+review remains private and separate. The authoring reference includes five runnable response examples.
+Samples accept optional sample-only response mapping/policy, include both in their frozen identity,
+and preview automatic, unmapped, suppressed or waiting outcomes. They create no live run, delivery
+or reviewer notification. Sample results cannot authorize production publication.
+
+Run and conversation response panels link the exact original message even outside the current
+message window. At most 50 response roots are displayed; truncation is explicit. Execution success,
+human/reviewer waiting, canonical publication and provider delivery remain separate facts:
+
+| Display | Meaning |
+| --- | --- |
+| Processing | Business work is active. |
+| Waiting for your response / reviewer | Work is parked; an accepted prompt does not imply a human answer. |
+| Work completed; reply pending | Business success is retained while publication or delivery proceeds. |
+| Completed; reply posted / sent | Local publication or provider acceptance, never a read receipt. |
+| Work completed; reply needs attention | Business result remains completed; inspect the linked delivery. |
+| Completed without reply | Trusted terminal suppression; prior explicit messages remain. |
+| Failed / cancelled | Earlier message history remains authoritative. |
+
+Safe queue retries reuse the same canonical message, delivery and accepted parts. Do not retry a
+completed business run to repair delivery. The delivery page provides inspection/reload, not a
+manual blind resend command. Unknown provider outcomes remain quarantined; inspect saved provider
+identity/evidence. Existing cancellation fences unsent work and never recalls accepted messages.
+Final publication survives a valid successful run's historical deadline but still requires current
+authority, policy, knowledge release and a genuine publication claim. Review payloads and proposal
+identities are absent from public conversation outcomes; restricted source/run content hides the
+corresponding response metadata.
+
+Structured final-response logs contain company/run/execution/intent/proposal/message/delivery IDs
+and bounded status codes. Staged logs precede transaction commit; re-read durable state to establish
+commit. `workflow_channel_reply_publications_total` uses only bounded outcome labels: published,
+failed, retry, lease_lost, error. Existing delivery unknown/dead/retry and overdue-work monitoring
+continues to apply. Never add message text, recipient lists or approval tokens to logs or labels.
+These changes require a fresh database using the sole initialization migration; no old rows are
+rewritten and there is no compatibility rollout.

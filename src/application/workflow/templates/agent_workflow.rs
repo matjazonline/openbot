@@ -18,6 +18,8 @@ pub const HISTORY_STEP: &str = "context";
 pub const REPLY_STEP: &str = "reply";
 /// The gate a reviewed channel adds before its reply.
 pub const REVIEW_STEP: &str = "review";
+const REVIEW_REJECTED_STEP: &str = "review_rejected";
+const FINISH_RESPONSE_STEP: &str = "finish_response";
 /// The route target a custom step names for whichever step follows it.
 pub const NEXT_STEP: &str = "$next";
 const END_STEP: &str = "$end";
@@ -76,6 +78,7 @@ impl AgentWorkflow {
     ) -> Result<SourceNode, Diagnostic> {
         let decoded = decoder.decode(base)?;
         let root = entries(&decoded.root, "")?;
+        let schema = self.response_schema(&root)?;
         let mut base_steps = BaseSteps::read(&root)?;
         self.check_steps()?;
         let custom = |slot| self.steps.iter().filter(move |step| step.slot == slot);
@@ -107,15 +110,14 @@ impl AgentWorkflow {
         }
         reply_with(&mut reply, &answer)?;
         chain.push(Link::base(REPLY_STEP, reply));
-        chain.extend(custom(StepSlot::AfterReply).map(Link::custom));
-
-        let steps = route(chain)?;
+        let steps = self.complete_chain(chain, &schema, &root)?;
         let entry = steps.first().map(|(id, _)| id.clone()).unwrap_or_default();
         root.into_iter()
             .map(|(key, node)| {
                 let value = match key.as_str() {
                     "entry" => SourceNode::Value(Value::String(entry.clone())),
                     "steps" => SourceNode::Mapping(steps.clone()),
+                    "output_schema" => SourceNode::Value(schema.clone()),
                     "parameter_schema" if self.reviewed => {
                         SourceNode::Value(with_reviewer(json_value(node, "/parameter_schema")?)?)
                     }
@@ -127,6 +129,81 @@ impl AgentWorkflow {
             .map(SourceNode::Mapping)
     }
 
+    fn complete_chain(
+        &self,
+        mut chain: Vec<Link>,
+        schema: &Value,
+        root: &[(String, &LocatedNode)],
+    ) -> Result<Vec<(String, SourceNode)>, Diagnostic> {
+        let tail: Vec<_> = self
+            .steps
+            .iter()
+            .filter(|step| step.slot == StepSlot::AfterReply)
+            .collect();
+        chain.extend(tail.iter().map(|step| Link::custom(step)));
+        if !tail.is_empty()
+            && !tail
+                .last()
+                .is_some_and(|step| step.definition["type"] == "channel.no_reply")
+        {
+            chain.push(Link::base(
+                FINISH_RESPONSE_STEP,
+                response_map(&format!("/steps/{REPLY_STEP}/output"), schema),
+            ));
+        }
+        let limit = root
+            .iter()
+            .find(|(key, _)| key == "limits")
+            .map(|(_, node)| json_value(node, "/limits"))
+            .transpose()?
+            .and_then(|limits| limits.get("max_steps").and_then(Value::as_u64))
+            .ok_or_else(|| {
+                invalid(
+                    "/limits/max_steps",
+                    "The base needs an explicit step budget",
+                )
+            })?;
+        if chain.len() as u64 > limit {
+            return Err(invalid(
+                "/steps",
+                "The composed response and custom steps exceed the base step budget; reduce custom steps",
+            ));
+        }
+        let mut steps = route(chain)?;
+        if self.reviewed {
+            let rejected = json!({"type":"channel.no_reply","with":{
+                "value":{"object":{"body":{"literal":""},"review":{"ref":"/steps/review/output"}}},
+                "output_schema":{"literal":schema}},"routes":{"success":"$end"}});
+            steps.push((
+                REVIEW_REJECTED_STEP.into(),
+                ordered(rejected.as_object().cloned().expect("object")),
+            ));
+        }
+        Ok(steps)
+    }
+
+    fn response_schema(&self, root: &[(String, &LocatedNode)]) -> Result<Value, Diagnostic> {
+        let node = root
+            .iter()
+            .find(|(key, _)| key == "output_schema")
+            .map(|(_, node)| *node)
+            .ok_or_else(|| invalid("/output_schema", "The base needs a response schema"))?;
+        let mut schema = json_value(node, "/output_schema")?;
+        if self.reviewed {
+            schema
+                .get_mut("properties")
+                .and_then(Value::as_object_mut)
+                .ok_or_else(|| {
+                    invalid(
+                        "/output_schema",
+                        "The base response schema needs object properties",
+                    )
+                })?
+                .insert("review".into(), json!({"type":"object"}));
+        }
+        Ok(schema)
+    }
+
     fn check_steps(&self) -> Result<(), Diagnostic> {
         if self.steps.len() > MAX_CUSTOM_STEPS {
             return Err(invalid(
@@ -134,7 +211,14 @@ impl AgentWorkflow {
                 &format!("At most {MAX_CUSTOM_STEPS} custom steps are allowed"),
             ));
         }
-        let mut seen = BTreeSet::from([HISTORY_STEP, REPLY_AGENT_STEP, REPLY_STEP, REVIEW_STEP]);
+        let mut seen = BTreeSet::from([
+            HISTORY_STEP,
+            REPLY_AGENT_STEP,
+            REPLY_STEP,
+            REVIEW_STEP,
+            REVIEW_REJECTED_STEP,
+            FINISH_RESPONSE_STEP,
+        ]);
         for step in &self.steps {
             let at = format!("/steps/{}", step.id);
             if StepId::parse(&step.id).is_err() {
@@ -148,6 +232,11 @@ impl AgentWorkflow {
             }
             if !step.definition.get("type").is_some_and(Value::is_string) {
                 return Err(invalid(&at, "A custom step needs a type"));
+            }
+            if step.definition["type"] != "channel.no_reply"
+                && let Some(routes) = step.definition.get("routes")
+            {
+                reject_custom_end(routes, &format!("{at}/routes"))?;
             }
         }
         Ok(())
@@ -238,7 +327,9 @@ fn route(chain: Vec<Link>) -> Result<Vec<(String, SourceNode)>, Diagnostic> {
         .map(|(mut link, next)| {
             let routes = match link.routes {
                 Routes::Base => json!({"success": next}),
-                Routes::Review => json!({"choices": {"approve": next, "reject": END_STEP}}),
+                Routes::Review => {
+                    json!({"choices": {"approve": next, "reject": REVIEW_REJECTED_STEP}})
+                }
                 Routes::Custom => {
                     let mut routes = link
                         .step
@@ -344,8 +435,28 @@ fn reply_with(reply: &mut Map<String, Value>, answer: &str) -> Result<(), Diagno
                 "The base reply has no inputs",
             )
         })?;
-    content.insert("content".into(), json!({"ref": answer}));
+    content.insert("value".into(), json!({"ref": answer}));
     Ok(())
+}
+
+fn reject_custom_end(routes: &Value, at: &str) -> Result<(), Diagnostic> {
+    match routes {
+        Value::String(target) if target == END_STEP => Err(invalid(
+            at,
+            "Use a terminal channel.no_reply (Finish without reply) for intentional silence; custom steps cannot end the native response directly",
+        )),
+        Value::Object(routes) => routes
+            .values()
+            .try_for_each(|route| reject_custom_end(route, at)),
+        _ => Ok(()),
+    }
+}
+
+fn response_map(answer: &str, schema: &Value) -> Map<String, Value> {
+    json!({"type":"data.map","with":{"value":{"ref":answer},"output_schema":{"literal":schema}}})
+        .as_object()
+        .cloned()
+        .expect("object")
 }
 
 /// The base's parameters plus the reviewer the review gate names.

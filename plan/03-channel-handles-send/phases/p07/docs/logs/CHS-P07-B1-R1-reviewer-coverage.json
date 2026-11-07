@@ -1,0 +1,21 @@
+{
+  "stage": "whole phase07 and final combined integration",
+  "artifact": "cb9845d3593414402b1834fe230e14d9adb4361df98c96ee88434d3a035c338c",
+  "paths": {
+    ".github/workflows/ci.yml": "Shared merge: preserved new response-form browser gate, external evidence/source-reachability gates, original migration/query-statistics/SQLx/network/runtime/stack/lease/security inventory; no required gate removed.",
+    "docs/workflow-verification.md": "Current focused commands and identity/recovery/notification assertions agree with implemented tests; no live-provider claim.",
+    "migrations/20260817000000_init_schema.sql": "Question INSERT and exact same-company/run/wait event settlement reuse existing actual-run plus genuine budget-root LIMIT2 helper; transaction-local IDs/state-only events, no owner/permission/queue mutation. Checked question creation order, event reader and authorized consumer.",
+    "scripts/check.sh": "Shared merge preserves response browser test and adds external evidence/source module checks. Original omission versus full CI remains documented by plan; not treated as sufficient final verification.",
+    "src/adapters/persistence/workflow/channel_reply_continuation_views_support.rs": "All depth/refactor changes and new regression inspected: genuine two-level child parking, local prompt without provider wake, listener before transition, root refresh at park and answer, current reader changes, bounded16 event collector.",
+    "src/adapters/persistence/workflow/channel_reply_e2e_hitl_tests.rs": "All tests/helpers: same root across multiple questions and changed settings, exact question source, two waits/concurrent ingress/duplicate, grandchild local suppression, formal exact artifact approve/reject/replay and reconstruction, current transport revocation.",
+    "src/adapters/persistence/workflow/channel_reply_e2e_recovery_tests.rs": "New engine/new wakeups after committed unpublished obligation; remote counted acceptance blocks receipt, real delivery shutdown settles unknown, new worker must not resend; stored identities/output/model counts inspected.",
+    "src/adapters/persistence/workflow/channel_reply_e2e_support.rs": "Counted scripted provider behind real delivery worker, actual email payload decode, retry/unknown/lost-receipt cases, drop/shutdown handling, production binding selection/ingress and exact saved-result queries.",
+    "src/adapters/persistence/workflow/channel_reply_e2e_tests.rs": "All six tests: manual/scheduled source-looking input conveys no grant, quiet/in-app policies, two sources plus observers, explicit-final suppression, delivery retry identity/model count, reconstructed unknown quarantine.",
+    "src/adapters/persistence/workflow/message_ingress_tests.rs": "Module reachability and revisioned configure_response port helper. Traced Deployment to production composition, isolated own_database fixture, workers stopped between test seams.",
+    "src/adapters/persistence/workflow/reviewed_delivery_tests.rs": "Existing reviewed-email fixture now explicitly selects real responder through CAS settings, awaits actual publication/delivery; comments still create no final decision, exact accepted artifact assertion retained."
+  },
+  "unchanged_p06_paths": 69,
+  "p06_reused_review": "CHS-P06-B1-R1/R2/R3; final90f382b9",
+  "external_paths": 36,
+  "external_review_scope": "Integration effects of pinned Cargo dev dependency, source-module/evidence checks and shared CI/check merges. External skill changes are preserved inputs, not reauthored or fully audited."
+}

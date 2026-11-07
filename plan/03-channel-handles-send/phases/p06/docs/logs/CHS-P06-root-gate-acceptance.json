@@ -1,0 +1,11 @@
+{
+  "status": "architecture accepted only; implementation acceptance pending",
+  "decision": "CHS-P06-D1/r2",
+  "decision_sha256": "bbef5246c9403f3279a7398d6d9d7cdea8d9dbf516e1c598a211c6404509811b",
+  "source_digest": "12004bd37b416ffe9000c47d04281525fbd8882877ab3352a2cd346290f53953",
+  "head": "97e5d60dc538e26c7cb976a8d63772eed80baff2",
+  "review": "CHS-P06-AG1-R2 PASS",
+  "finding": "CHS-P06-AG1-F1 resolved at architecture level; runtime proof required",
+  "coordination_pin": 21,
+  "source_verified": true
+}

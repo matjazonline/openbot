@@ -112,7 +112,7 @@ create_check_database() {
 
 gate "Generated CSS is current" generated_css_is_current
 gate "SSE navigation lifecycle" \
-  node --test scripts/tests/sse-navigation.mjs scripts/tests/agent-runtime.mjs
+  node --test scripts/tests/sse-navigation.mjs scripts/tests/agent-runtime.mjs scripts/tests/channel-response-authoring.mjs
 gate "Deployment script tests" deployment_script_tests
 gate "Formatting" cargo fmt --all -- --check
 gate "Patch whitespace" git diff HEAD --check

@@ -13518,3 +13518,77 @@ CREATE CONSTRAINT TRIGGER workflow_question_provider_entry_guard AFTER UPDATE ON
     DEFERRABLE INITIALLY DEFERRED FOR EACH ROW
     WHEN (NEW.status='sending' AND OLD.status IN ('prepared','retryable'))
     EXECUTE FUNCTION public.workflow_question_provider_entry_guard();
+
+-- Response/delivery changes wake existing readers; events carry identities, never payloads.
+CREATE FUNCTION public.notify_channel_response_run(tenant uuid, responding_run uuid) RETURNS void
+LANGUAGE plpgsql AS $$
+DECLARE related record;
+BEGIN
+    FOR related IN
+        SELECT run.company_id,run.id,run.channel_id,run.thread_id,run.state,run.waiting_reason
+        FROM public.workflow_runs AS run
+        WHERE run.company_id=tenant AND (run.id=responding_run OR run.id=(
+            SELECT budget.root_run_id FROM public.workflow_run_budgets AS budget
+            WHERE budget.company_id=tenant AND budget.run_id=responding_run))
+        ORDER BY run.id LIMIT 2
+    LOOP
+        PERFORM pg_notify('workflow_run_changed',json_build_object(
+            'company_id',related.company_id,'channel_id',related.channel_id,'thread_id',related.thread_id,
+            'run_id',related.id,'state',related.state,'waiting_reason',related.waiting_reason)::text);
+        IF related.thread_id IS NOT NULL THEN
+            PERFORM pg_notify('thread_activity',json_build_object(
+                'company_id',related.company_id,'channel_id',related.channel_id,'thread_id',related.thread_id)::text);
+        END IF;
+    END LOOP;
+END $$;
+
+CREATE FUNCTION public.notify_channel_response_decision_changed() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    PERFORM public.notify_channel_response_run(NEW.company_id,NEW.run_id);
+    RETURN NULL;
+END $$;
+CREATE TRIGGER channel_reply_decision_notify_inserted AFTER INSERT ON public.channel_reply_decisions
+    FOR EACH ROW EXECUTE FUNCTION public.notify_channel_response_decision_changed();
+CREATE TRIGGER channel_reply_decision_notify_changed AFTER UPDATE OF state ON public.channel_reply_decisions
+    FOR EACH ROW WHEN (OLD.state IS DISTINCT FROM NEW.state)
+    EXECUTE FUNCTION public.notify_channel_response_decision_changed();
+
+CREATE FUNCTION public.notify_channel_response_delivery_changed() RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE owner_run uuid;
+BEGIN
+    SELECT owner.run_id INTO owner_run
+        FROM public.workflow_channel_message_owner(NEW.company_id,NEW.message_id) AS owner
+        WHERE owner.delivery_id=NEW.id LIMIT 1;
+    IF owner_run IS NOT NULL THEN
+        PERFORM public.notify_channel_response_run(NEW.company_id,owner_run);
+    END IF;
+    RETURN NULL;
+END $$;
+CREATE TRIGGER channel_response_delivery_notify_changed AFTER UPDATE OF status ON public.message_deliveries
+    FOR EACH ROW WHEN (OLD.status IS DISTINCT FROM NEW.status)
+    EXECUTE FUNCTION public.notify_channel_response_delivery_changed();
+
+-- A nested formal review leaves ancestors parked for child_run. Wake the real
+-- budget root so its already-open pane re-reads, without exposing the decision.
+CREATE TRIGGER channel_response_review_notify_inserted AFTER INSERT ON public.workflow_decisions
+    FOR EACH ROW EXECUTE FUNCTION public.notify_channel_response_decision_changed();
+CREATE TRIGGER channel_response_review_notify_changed AFTER UPDATE OF state ON public.workflow_waits
+    FOR EACH ROW WHEN (NEW.reason='decision' AND OLD.state IS DISTINCT FROM NEW.state)
+    EXECUTE FUNCTION public.notify_channel_response_decision_changed();
+
+-- Local prompts have no delivery transition. A nested question must refresh the
+-- owning root when it parks and when its human wait settles, including early input.
+CREATE TRIGGER channel_response_question_notify_inserted AFTER INSERT ON public.workflow_channel_questions
+    FOR EACH ROW EXECUTE FUNCTION public.notify_channel_response_decision_changed();
+CREATE FUNCTION public.notify_channel_response_question_settled() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM public.workflow_channel_questions AS question
+        WHERE question.company_id=NEW.company_id AND question.wait_id=NEW.id AND question.run_id=NEW.run_id)
+    THEN
+        PERFORM public.notify_channel_response_run(NEW.company_id,NEW.run_id);
+    END IF;
+    RETURN NULL;
+END $$;
+CREATE TRIGGER channel_response_question_notify_changed AFTER UPDATE OF state ON public.workflow_waits
+    FOR EACH ROW WHEN (NEW.reason='event' AND OLD.state IS DISTINCT FROM NEW.state)
+    EXECUTE FUNCTION public.notify_channel_response_question_settled();

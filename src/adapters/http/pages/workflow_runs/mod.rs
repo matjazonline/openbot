@@ -10,7 +10,9 @@ use std::collections::HashMap;
 mod board;
 mod detail;
 mod provenance;
+mod responses;
 mod step;
+pub use responses::{channel_response_panel, thread_response_outcomes};
 
 pub use board::*;
 pub use detail::*;

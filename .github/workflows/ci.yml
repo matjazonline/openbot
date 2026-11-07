@@ -43,7 +43,7 @@ jobs:
       - name: Run counts browser protocol
         run: npm run test:run-counts
       - name: SSE navigation lifecycle
-        run: node --test scripts/tests/sse-navigation.mjs scripts/tests/agent-runtime.mjs scripts/tests/workflow-runs.mjs scripts/tests/workflow-conversations.mjs scripts/tests/workflow-samples.mjs
+        run: node --test scripts/tests/sse-navigation.mjs scripts/tests/agent-runtime.mjs scripts/tests/channel-response-authoring.mjs scripts/tests/workflow-runs.mjs scripts/tests/workflow-conversations.mjs scripts/tests/workflow-samples.mjs
       - name: Deployment script tests
         run: |
           scripts/tests/deploy.sh

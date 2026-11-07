@@ -49,3 +49,48 @@ and pinned git revisions remain in force, and the production container remains n
 The context graph could not be refreshed in this workspace: `graft`, indexed graph files and a
 graft connector were unavailable. Phase10 used the scoped source/owner inventory archived with its review records instead;
 run `graft build` in an environment with the repository's graph tool before relying on graph spans.
+
+
+## Channel response verification
+
+Use disposable PostgreSQL18 databases and the loopback network guard. The focused response groups
+are `channel_reply_e2e_`, `channel_reply_authoring_`, `channel_reply_views_` and
+`channel_reply_controls_`:
+
+```sh
+scripts/test-network-isolation.sh cargo test --locked --offline --lib channel_reply_e2e_
+scripts/test-network-isolation.sh cargo test --locked --offline --lib channel_reply_authoring_
+scripts/test-network-isolation.sh cargo test --locked --offline --lib channel_reply_views_
+scripts/test-network-isolation.sh cargo test --locked --offline --lib channel_reply_controls_
+```
+
+The end-to-end group uses the production workflow composition, real PostgreSQL and delivery
+worker, and a counted scripted provider. It checks independent automatic replies with observers,
+silent completion and explicit replies, safe retry without another model call, quarantined
+uncertainty, human rounds and concurrent waits, child continuation, frozen contracts, exact final
+approval, quiet ingress and in-app publication. Recovery cases reconstruct the engine with a
+committed final intent and interrupt a provider after remote acceptance before its receipt returns.
+These checks establish the stored identities and scripted effects, not live provider readiness.
+Existing focused database races and transaction fault tests retain coverage of finalization,
+publication acknowledgements, cancellation, current authority and decision settlement.
+
+Authoring coverage includes settings authorization/CAS, invalid projection, preserved and escaped
+stale input, native create replay after explicit clear, competing create claimants, rollback of
+invalid custom terminal routes, edited approval/rejection, all five compiling/executing examples,
+and sealed sample response identity. Views cover independent execution/publication/transport states,
+source identity outside the message window, response pagination, current classification/tenant
+visibility and real transaction-only delivery wakeups. Controls retain accepted/unknown truth and
+provide no blind resend or completed-business retry button.
+Nested local questions and formal reviews wake the actual root even while intermediate runs
+remain parked for their children; their notifications carry identifiers and state only. Readers
+recheck current visibility and reread the stored question/review before rendering it.
+
+Affected checks also include native provisioning/onboarding, template/fixture composition, registry
+terminal routes, authoring/sample/run/conversation/decision browser protocols, capability-boundary
+checks, `npm run check:css`, formatting, locked offline compilation/Clippy, fresh migrations and
+actual `cargo sqlx prepare` followed by `cargo sqlx prepare --check -- --all-targets`. Set owned
+`DATABASE_URL` and `TEST_DATABASE_URL`; never use a development/production reset for this purpose.
+Keep stock2MiB test stacks for focused runtime evidence. Run only affected tests during this task,
+including final integration, per the explicit targeted-only instruction; do not claim a full-suite
+pass. Exact executed commands, nonzero selected counts, failures and independent review identities
+belong in plan03 phase records. A test name in this map alone is not passing evidence.

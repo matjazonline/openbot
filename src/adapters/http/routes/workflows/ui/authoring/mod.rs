@@ -26,6 +26,7 @@ use std::collections::BTreeMap;
 
 mod agent_picker;
 mod bindings;
+mod channel_response;
 mod editor;
 mod library;
 mod sample;
@@ -50,9 +51,10 @@ const ACTIVATE_ROUTE: &str = "/ui/workflows/{workflow_id}/bindings/{binding_id}/
 const DEACTIVATE_ROUTE: &str = "/ui/workflows/{workflow_id}/bindings/{binding_id}/deactivate";
 const REGISTER_TOOL_ROUTE: &str = "/ui/workflows/{workflow_id}/tools";
 const REVOKE_TOOL_ROUTE: &str = "/ui/workflows/tools/revoke";
+const RESPONSE_ROUTE: &str = "/ui/workflows/channels/{channel_id}/response";
 /// Every write this workspace registers; the CSRF test routes these same patterns.
 #[cfg(test)]
-const WRITE_ROUTES: [&str; 13] = [
+const WRITE_ROUTES: [&str; 14] = [
     NEW_ROUTE,
     COPY_ROUTE,
     SAVE_ROUTE,
@@ -64,6 +66,7 @@ const WRITE_ROUTES: [&str; 13] = [
     DEACTIVATE_ROUTE,
     REGISTER_TOOL_ROUTE,
     REVOKE_TOOL_ROUTE,
+    RESPONSE_ROUTE,
     agent_picker::PICKER_ROUTE,
     agent_picker::APPLY_ROUTE,
 ];
@@ -97,6 +100,7 @@ pub(super) fn router() -> Router<AppState> {
             "/ui/workflows/channels/{channel_id}/bindings",
             get(channel_bindings),
         )
+        .route(RESPONSE_ROUTE, post(channel_response::save_response))
         .route("/ui/workflows/tools", get(tools_pane))
         .route(REVOKE_TOOL_ROUTE, post(revoke_tool))
         .route(REGISTER_TOOL_ROUTE, post(register_tool))

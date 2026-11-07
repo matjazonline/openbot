@@ -23,6 +23,8 @@ fn target(setup: &AgentSetup, graph: &GraphWorkflow) -> DefinitionTarget {
 
 fn sample_request(responses: Vec<Value>) -> SampleRequest {
     SampleRequest {
+        response_contract: None,
+        response_approval_policy: None,
         input: json!({}),
         params: json!({}),
         scripts: serde_json::from_value(Value::Array(responses)).unwrap(),

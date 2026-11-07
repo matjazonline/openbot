@@ -478,6 +478,10 @@ impl RunViews for PostgresPersistence {
             draft_revision: revision_of(facts.draft_revision)?,
             channel_name: facts.channel_name,
             trigger_message: self.trigger_message(company, run).await?,
+            response: super::channel_reply_views::read(self, company, viewer, &[run.as_uuid()])
+                .await?
+                .into_iter()
+                .next(),
             input: facts.input,
             params: facts.params,
             lineage,

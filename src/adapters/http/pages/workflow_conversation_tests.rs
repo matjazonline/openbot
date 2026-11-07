@@ -24,6 +24,8 @@ fn conversations_identify_each_run_and_its_own_reply() {
         ],
         has_more: true,
         message_runs: vec![],
+        response_outcomes: vec![],
+        responses_truncated: false,
     };
     let mut inbound = mailbox_message(thread.id, "Question");
     inbound.run_ids = vec![first, second];

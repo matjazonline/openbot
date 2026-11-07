@@ -52,6 +52,7 @@ mod channel_reply_publish_plan;
 mod channel_reply_publish_read;
 mod channel_reply_refusal;
 mod channel_reply_resume;
+pub(crate) mod channel_reply_views;
 mod checkpoints;
 pub mod child_publication;
 mod child_waits;

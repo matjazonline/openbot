@@ -11,6 +11,7 @@ import re
 import sys
 
 PURE = {
+    'channel_reply::ChannelReplyContract', 'channel_reply::ReplyApprovalPolicy',
     'WorkflowActor', 'activation::ActivatedExecution', 'activation::prepare_activation',
     'batch::PureCompletion', 'batch::execute_pure', 'batch::validate_completion',
     'completion::prepare_io', 'compiler::Diagnostic', 'compiler::Schema', 'compiler::SourceSpan',
@@ -73,7 +74,8 @@ def permitted(path):
                 'crate::application::agent::AgentKey','crate::application::agent::ActionEffect',
                 'crate::entities::agent_capability::AgentBindingSource::Mcp',
                 'crate::application::agent::ActionEffect::Read','crate::application::agent::ActionEffect::Write'):return True
-    if path in ('crate::app_error::AppError','crate::app_error::AppResult'):return True
+    if path in ('crate::app_error::AppError','crate::app_error::AppResult',
+                'crate::application::transport::CanonicalContent'):return True
     prefix='crate::application::workflow::'
     if path.startswith(prefix):return path[len(prefix):] in PURE
     if path.split('::')[0] in EXTERNAL:return True

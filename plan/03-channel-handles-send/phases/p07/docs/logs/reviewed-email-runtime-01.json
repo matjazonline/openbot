@@ -1,0 +1,25 @@
+{
+  "command": [
+    "scripts/test-network-isolation.sh",
+    "cargo",
+    "test",
+    "--locked",
+    "--offline",
+    "--lib",
+    "workflow_cutover_reviewed_email_delivers_exact_accepted_artifact"
+  ],
+  "cwd": "/private/tmp/openbot-chs-p06-3f43t2k7/worktree",
+  "environment": {
+    "DATABASE_URL": "postgres://mac02@127.0.0.1:65037/openbot_chs_p07",
+    "TEST_DATABASE_URL": "postgres://mac02@127.0.0.1:65037/openbot_chs_p07_test",
+    "SQLX_OFFLINE": "true",
+    "CARGO_INCREMENTAL": "1",
+    "CARGO_TARGET_DIR": "/private/tmp/openbot-chs-p06-3f43t2k7/worktree/target",
+    "CARGO_BUILD_JOBS": "4",
+    "RUST_MIN_STACK": "2097152"
+  },
+  "started": "2026-11-07T10:09:46.437283+00:00",
+  "seconds": 8.328,
+  "exit_code": 101,
+  "log": "/private/tmp/openbot-chs-p06-3f43t2k7/worktree/plan/03-channel-handles-send/phases/p07/docs/logs/reviewed-email-runtime-01.log"
+}

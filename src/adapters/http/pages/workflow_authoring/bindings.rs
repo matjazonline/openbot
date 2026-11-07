@@ -647,52 +647,27 @@ pub struct ChannelBindingsCard<'a> {
     pub company_id: Uuid,
     pub bindings: &'a [BindingUse],
     pub truncated: bool,
+    pub response: Option<&'a ChannelResponseSettingsView<'a>>,
 }
 
 /// "Workflows on this channel": the bindings on the channel (and its threads), and plainly
 /// whether any active one answers its messages.
 pub fn channel_bindings_card(card: &ChannelBindingsCard<'_>) -> String {
     let company_id = card.company_id;
-    let answering = card.bindings.iter().any(|binding| {
-        binding.binding.active
-            && binding.binding.message_trigger.is_some()
-            && matches!(binding.binding.association, RelatedAssociation::Channel(_))
-    });
-    let status = if answering {
-        r#"<p class="text-sm">An active workflow answers this channel's messages under its trigger.</p>"#
+    let responding = card
+        .response
+        .and_then(|view| view.settings)
+        .and_then(|settings| settings.responder.as_ref())
+        .map(|selected| selected.binding.as_uuid());
+    let status = if responding.is_some() {
+        r#"<p class="text-sm">The selected responding binding owns the automatic final response when active under its message trigger. Other message bindings observe.</p>"#
     } else {
-        r#"<div role="status" class="alert alert-warning text-sm">No active workflow answers this channel's messages. Messages are stored and nothing runs until a binding with a message trigger is activated.</div>"#
+        r#"<div role="status" class="alert alert-warning text-sm">No responding workflow is selected. Active message bindings may observe and send explicit messages.</div>"#
     };
     let rows: String = card
         .bindings
         .iter()
-        .map(|binding| {
-            let summary = &binding.binding;
-            let workflow = summary.workflow.as_uuid();
-            format!(
-                r#"<li class="py-2"><div class="flex flex-wrap items-center gap-2">
-                    <a class="link font-semibold" href="/ui/workflows?company_id={company_id}&amp;workflow_id={workflow}&amp;tab=bindings">{title}</a>{state}</div>
-                    <p class="text-xs opacity-70">{association} · {trigger}</p></li>"#,
-                title = escape_html_text(if binding.workflow_title.is_empty() {
-                    "(untitled workflow)"
-                } else {
-                    &binding.workflow_title
-                }),
-                state = if summary.active {
-                    r#"<span class="badge badge-sm badge-success">active</span>"#
-                } else {
-                    r#"<span class="badge badge-sm badge-ghost">paused</span>"#
-                },
-                association = match summary.association {
-                    RelatedAssociation::Thread { .. } => "one thread",
-                    _ => "the whole channel",
-                },
-                trigger = match summary.message_trigger {
-                    Some(trigger) => format!("message trigger {}", trigger.as_str()),
-                    None => "no message trigger".to_owned(),
-                },
-            )
-        })
+        .map(|binding| channel_binding_row(binding, company_id, responding))
         .collect();
     let list = if card.bindings.is_empty() {
         r#"<p class="text-xs opacity-70">No workflow is bound to this channel.</p>"#.to_owned()
@@ -703,12 +678,48 @@ pub fn channel_bindings_card(card: &ChannelBindingsCard<'_>) -> String {
         r#"<section id="channel-workflows-card" class="space-y-3 rounded-box border border-base-300 p-4">
             <div><h3 class="text-sm font-bold">Workflows on this channel</h3>
             <p class="text-xs opacity-70">Bind a workflow from its Bindings tab in Workflows.</p></div>
-            {status}{list}{cut}
+            {status}{list}{cut}{response}
         </section>"#,
         cut = if card.truncated {
             r#"<p class="text-xs text-error">Only the first 200 bindings are listed.</p>"#
         } else {
             ""
         },
+        response = card
+            .response
+            .map(channel_response_settings)
+            .unwrap_or_default(),
+    )
+}
+
+fn channel_binding_row(binding: &BindingUse, company_id: Uuid, responding: Option<Uuid>) -> String {
+    let summary = &binding.binding;
+    let workflow = summary.workflow.as_uuid();
+    format!(
+        r#"<li class="py-2"><div class="flex flex-wrap items-center gap-2">
+        <a class="link font-semibold" href="/ui/workflows?company_id={company_id}&amp;workflow_id={workflow}&amp;tab=bindings">{title}</a>
+        <span class="badge badge-sm">{state}</span><span class="badge badge-sm">{role}</span></div>
+        <p class="text-xs opacity-70">{association} · {trigger}</p></li>"#,
+        title = escape_html_text(if binding.workflow_title.is_empty() {
+            "(untitled workflow)"
+        } else {
+            &binding.workflow_title
+        }),
+        state = if summary.active { "active" } else { "paused" },
+        role = if Some(summary.binding.as_uuid()) == responding {
+            "responding"
+        } else if summary.message_trigger.is_some() {
+            "observing"
+        } else {
+            "no automatic response"
+        },
+        association = match summary.association {
+            RelatedAssociation::Thread { .. } => "one thread",
+            _ => "the whole channel",
+        },
+        trigger = summary
+            .message_trigger
+            .map(|trigger| format!("message trigger {}", trigger.as_str()))
+            .unwrap_or_else(|| "no message trigger".to_owned())
     )
 }

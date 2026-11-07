@@ -62,6 +62,12 @@ impl WorkflowServices {
         &self.persistence
     }
 
+    pub fn channel_replies(
+        &self,
+    ) -> &dyn crate::application::workflow::channel_reply::ChannelReplies {
+        &self.persistence
+    }
+
     /// A published version of this company whose workflow is not archived — the one a binding
     /// may select — for the binding form's parameter fields and resource slots (p09 B1b). It
     /// authorizes nothing; the route has.

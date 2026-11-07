@@ -309,6 +309,9 @@ async fn stage_on(
             db, scope, proposal, invocation, &action, owner, approval,
         ))
         .await?;
+        tracing::info!(company_id=%scope.company.as_uuid(), run_id=%scope.run.as_uuid(),
+            execution_id=%scope.execution.as_uuid(), proposal_id=%proposal,
+            status="waiting_for_review", "Final response wait staged");
         return Ok(PreparedFinal::Parked);
     }
     Ok(PreparedFinal::Automatic {
@@ -400,5 +403,9 @@ pub(super) async fn commit_on(
         VALUES($1,$2,$3,$4,$5,$6,$7,CASE WHEN $5='suppressed' THEN 'suppressed' ELSE 'pending' END)")
         .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(scope.execution.as_uuid()).bind(columns.intent)
         .bind(columns.disposition.as_str()).bind(columns.proposal).bind(columns.integrity.map(|value| value.as_hex())).execute(db).await?;
+    tracing::info!(company_id=%scope.company.as_uuid(), run_id=%scope.run.as_uuid(),
+        execution_id=%scope.execution.as_uuid(), intent_id=%columns.intent,
+        disposition=columns.disposition.as_str(), proposal_id=?columns.proposal,
+        "Final response disposition staged");
     Ok(())
 }

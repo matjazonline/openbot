@@ -29,6 +29,7 @@ use crate::{
 
 mod bindings;
 mod board;
+mod channel_replies;
 mod decisions;
 mod definitions;
 mod jev;
@@ -72,6 +73,10 @@ pub fn router() -> Router<AppState> {
             post(definitions::copy_template),
         )
         .route(&format!("{company}/workflow-bindings"), get(bindings::list))
+        .route(
+            &format!("{company}/channels/{{channel_id}}/response"),
+            get(channel_replies::read).put(channel_replies::configure),
+        )
         .route(
             &format!("{company}/workflow-bindings/{{binding_id}}"),
             get(bindings::read).put(bindings::configure),

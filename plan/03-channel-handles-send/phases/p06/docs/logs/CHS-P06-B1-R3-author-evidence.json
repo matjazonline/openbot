@@ -1,0 +1,835 @@
+{
+  "scope": "affected focused checks only; no full suite execution",
+  "rust_distinct_passed": 232,
+  "rust_passed": {
+    "adapters::http::pages::workflow_authoring::sample::tests::channel_reply_authoring_sample_preview_escapes_content_and_explains_human_waits": [
+      "authoring-tests-04"
+    ],
+    "application::workflow::sample::tests::channel_reply_preview_tests::channel_reply_authoring_sample_child_suppression_does_not_suppress_the_root": [
+      "authoring-tests-04"
+    ],
+    "application::workflow::sample::tests::channel_reply_preview_tests::channel_reply_authoring_sample_invalid_mapping_is_refused_and_question_approval_is_distinct": [
+      "authoring-tests-04"
+    ],
+    "application::workflow::sample::tests::channel_reply_preview_tests::channel_reply_authoring_sample_seals_mapping_and_policy_and_previews_output": [
+      "authoring-tests-04",
+      "samples-tests-02"
+    ],
+    "application::workflow::sample::tests::channel_reply_preview_tests::channel_reply_authoring_sample_suppression_skips_projection_for_valid_empty_values": [
+      "authoring-tests-04",
+      "samples-tests-02"
+    ],
+    "application::workflow::templates::agent_workflow::tests::channel_reply_authoring_custom_end_requires_terminal_no_reply": [
+      "authoring-tests-04",
+      "templates-tests-02"
+    ],
+    "application::workflow::sample::tests::channel_reply_preview_tests::channel_reply_authoring_five_examples_compile_and_execute_without_production_effects": [
+      "authoring-tests-04",
+      "samples-tests-02"
+    ],
+    "application::workflow::sample::tests::channel_reply_preview_tests::channel_reply_authoring_native_review_reject_completes_suppressed_and_edit_is_the_response": [
+      "authoring-tests-04",
+      "samples-tests-02"
+    ],
+    "application::workflow::sample::tests::channel_reply_preview_tests::channel_reply_authoring_sample_missing_human_script_has_typed_wait_preview": [
+      "authoring-tests-04",
+      "samples-tests-02"
+    ],
+    "adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::channel_reply_native_tests::channel_reply_authoring_native_invalid_custom_end_rolls_back_every_resource": [
+      "authoring-tests-04"
+    ],
+    "adapters::http::routes::workflows::ui::authoring::tests::bindings_tests::channel_response_tests::channel_reply_authoring_rejects_invalid_projection_before_activation_and_keeps_selection": [
+      "authoring-tests-04",
+      "http-authoring-tests-01"
+    ],
+    "adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::channel_reply_native_tests::channel_reply_authoring_native_competing_commands_share_one_selection": [
+      "authoring-tests-04"
+    ],
+    "adapters::http::routes::workflows::ui::authoring::tests::bindings_tests::channel_response_tests::channel_reply_authoring_select_clear_stale_form_and_escaped_rejection": [
+      "authoring-tests-04",
+      "http-authoring-tests-01"
+    ],
+    "adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::channel_reply_native_tests::channel_reply_authoring_native_bootstrap_selects_once_and_replay_preserves_clear": [
+      "authoring-tests-04"
+    ],
+    "adapters::http::routes::workflows::ui::authoring::tests::bindings_tests::channel_response_tests::channel_reply_authoring_json_routes_share_current_settings_and_conflict_scope": [
+      "authoring-tests-04"
+    ],
+    "adapters::http::routes::workflows::ui::authoring::tests::bindings_tests::channel_response_tests::channel_reply_authoring_private_foreign_and_member_requests_reveal_no_settings": [
+      "authoring-tests-04",
+      "http-authoring-tests-01"
+    ],
+    "adapters::persistence::workflow::tests::message_tests::ingress_tests::provisioning_runtime_tests::channel_reply_native_runtime_tests::channel_reply_authoring_native_real_review_closes_reject_and_publishes_only_edited_approval": [
+      "authoring-tests-04",
+      "native-runtime-tests-03"
+    ],
+    "adapters::persistence::workflow::tests::message_tests::ingress_tests::provisioning_runtime_tests::builder_stops_a_listing_loop_once_its_result_repeats": [
+      "native-runtime-tests-03"
+    ],
+    "adapters::persistence::workflow::tests::message_tests::ingress_tests::provisioning_runtime_tests::requester_locks::delegated_provisioning_locks_requester_before_company": [
+      "native-runtime-tests-03"
+    ],
+    "adapters::persistence::workflow::tests::message_tests::ingress_tests::provisioning_runtime_tests::reviewed_assistants_park_their_answer_until_the_run_deadline": [
+      "native-runtime-tests-03"
+    ],
+    "adapters::persistence::workflow::tests::message_tests::ingress_tests::provisioning_runtime_tests::builder_refuses_members_and_emailed_requests": [
+      "native-runtime-tests-03"
+    ],
+    "adapters::persistence::workflow::tests::message_tests::ingress_tests::provisioning_runtime_tests::builder_provisions_an_assistant_for_a_signed_in_admin": [
+      "native-runtime-tests-03"
+    ],
+    "adapters::persistence::workflow::tests::message_tests::ingress_tests::provisioning_runtime_tests::builder_adds_custom_steps_to_the_new_agents_workflow": [
+      "native-runtime-tests-03"
+    ],
+    "adapters::persistence::workflow::tests::message_tests::ingress_tests::provisioning_runtime_tests::builder_sees_the_conversation_so_far": [
+      "native-runtime-tests-03"
+    ],
+    "application::workflow::templates::tests::validation::workflow_templates_catalogue_preflights_all_entries_and_aggregate_before_decoding": [
+      "templates-tests-02"
+    ],
+    "application::workflow::templates::tests::validation::workflow_templates_rebase_block_scalar_identity": [
+      "templates-tests-02"
+    ],
+    "application::workflow::templates::tests::validation::workflow_templates_rebase_preserves_literal_comment_quotes_and_child_pins": [
+      "templates-tests-02"
+    ],
+    "application::workflow::templates::tests::validation::workflow_templates_rebase_enforces_exact_source_byte_boundary": [
+      "templates-tests-02"
+    ],
+    "application::workflow::templates::agent_workflow::tests::custom_steps_that_would_break_the_base_are_refused": [
+      "templates-tests-02"
+    ],
+    "application::workflow::templates::tests::validation::workflow_templates_offered_source_errors_remain_located_and_actionable": [
+      "templates-tests-02"
+    ],
+    "application::workflow::templates::tests::validation::workflow_templates_reject_nil_template_root": [
+      "templates-tests-02"
+    ],
+    "application::workflow::templates::tests::workflow_templates_real_membership_authorizes_before_lookup_or_preparation": [
+      "templates-tests-02"
+    ],
+    "application::workflow::templates::tests::workflow_templates_stale_missing_colliding_and_revoked_copies_do_not_overwrite": [
+      "templates-tests-02"
+    ],
+    "application::workflow::templates::tests::workflow_templates_copy_snapshots_survive_update_withdrawal_and_company_isolation": [
+      "templates-tests-02"
+    ],
+    "application::workflow::templates::agent_workflow::tests::the_largest_composition_fits_the_base_step_limit": [
+      "templates-tests-02"
+    ],
+    "application::workflow::templates::agent_workflow::tests::the_base_composes_to_itself_and_the_reviewed_mode_to_its_template": [
+      "templates-tests-02"
+    ],
+    "application::workflow::templates::tests::the_shipped_catalogue_holds_the_reply_mode_templates": [
+      "templates-tests-02"
+    ],
+    "application::workflow::templates::agent_workflow::tests::custom_steps_join_the_base_in_their_slots": [
+      "templates-tests-02"
+    ],
+    "application::workflow::templates::tests::workflow_templates_company_declarations_remain_unpublished_source_only": [
+      "templates-tests-02"
+    ],
+    "application::workflow::sample::tests::channel_reply_terminal_tests::channel_reply_terminal_sample_returns_business_value_without_a_script": [
+      "samples-tests-02"
+    ],
+    "application::workflow::sample::tests::jev_tests::jev_box_sample_uses_only_scripted_answers_and_inert_metadata": [
+      "samples-tests-02"
+    ],
+    "application::workflow::sample::tests::jev_tests::jev_box_sample_rejects_tools_tokens_and_invalid_box": [
+      "samples-tests-02"
+    ],
+    "application::workflow::sample::tests::tools_tests::approvals::autonomous_agent_samples_protected_http_binding_requires_explicit_simulated_approval": [
+      "samples-tests-02"
+    ],
+    "application::workflow::sample::tests::missing_invalid_unused_and_oversized_scripts_fail_explicitly": [
+      "samples-tests-02"
+    ],
+    "application::workflow::sample::tests::tools_tests::approvals::autonomous_agent_samples_protected_child_binding_requires_explicit_simulated_approval": [
+      "samples-tests-02"
+    ],
+    "application::workflow::sample::tests::tools_tests::direct_agent_tools_and_pinned_workflow_tools_stay_in_sample": [
+      "samples-tests-02"
+    ],
+    "application::workflow::sample::tests::tools_tests::direct_tool_inputs_and_outputs_are_validated": [
+      "samples-tests-02"
+    ],
+    "application::workflow::sample::tests::pure_and_scripted_routing_share_compiled_validation": [
+      "samples-tests-02"
+    ],
+    "application::workflow::sample::tests::jev_tests::workflow_sample_jev_mixed_thresholds_automatic_and_human_paths": [
+      "samples-tests-02"
+    ],
+    "application::workflow::sample::tests::tools_tests::protected_step_workflow_tool_needs_approval_and_executes_child": [
+      "samples-tests-02"
+    ],
+    "application::workflow::sample::tests::bounded_root_budget_and_external_kinds_never_fall_back": [
+      "samples-tests-02"
+    ],
+    "application::workflow::sample::tests::repeated_human_revision_carries_edited_artifact_feedback_and_captures_reply": [
+      "samples-tests-02"
+    ],
+    "application::workflow::sample::tests::tools_tests::direct_mcp_tool_uses_the_production_result_envelope": [
+      "samples-tests-02"
+    ],
+    "application::workflow::sample::tests::descendants_cannot_replenish_root_budgets_and_report_size_is_bounded": [
+      "samples-tests-02"
+    ],
+    "application::workflow::fixtures::tests::workflow_fixtures_autonomous_omission_uses_frozen_saved_defaults": [
+      "fixtures-tests-01"
+    ],
+    "application::workflow::fixtures::tests::workflow_fixtures_reply_templates_pass_the_subject_and_history_to_the_agent": [
+      "fixtures-tests-01"
+    ],
+    "application::workflow::fixtures::tests::workflow_fixtures_review_routes_human_edits_and_requires_rejection_feedback": [
+      "fixtures-tests-01"
+    ],
+    "application::workflow::fixtures::tests::workflow_fixtures_successor_maps_human_feedback_and_data_explicitly": [
+      "fixtures-tests-01"
+    ],
+    "application::workflow::fixtures::tests::workflow_fixtures_triage_selects_declared_routes_and_default": [
+      "fixtures-tests-01"
+    ],
+    "application::workflow::fixtures::tests::workflow_fixtures_revision_rounds_carry_feedback_and_never_approve_on_exhaustion": [
+      "fixtures-tests-01"
+    ],
+    "application::workflow::fixtures::tests::workflow_fixtures_revision_contract_pins_rounds_and_accepted_data": [
+      "fixtures-tests-01"
+    ],
+    "application::workflow::fixtures::tests::workflow_fixtures_revision_escalation_reaches_a_specialist_with_artifact_and_feedback": [
+      "fixtures-tests-01"
+    ],
+    "application::workflow::fixtures::tests::workflow_fixtures_mcp_preserves_typed_arguments_results_and_missing_default": [
+      "fixtures-tests-01"
+    ],
+    "application::workflow::fixtures::tests::workflow_fixtures_invalid_variants_return_source_located_errors": [
+      "fixtures-tests-01"
+    ],
+    "application::workflow::fixtures::tests::workflow_fixtures_taking_a_message_accept_the_standard_message_input": [
+      "fixtures-tests-01"
+    ],
+    "application::workflow::fixtures::tests::workflow_fixtures_all_compile_and_freeze_with_real_child_content": [
+      "fixtures-tests-01"
+    ],
+    "application::workflow::fixtures::tests::workflow_fixtures_mcp_required_result_and_recursive_child_are_rejected": [
+      "fixtures-tests-01"
+    ],
+    "application::workflow::fixtures::tests::workflow_fixtures_nested_defaults_and_allof_keep_compile_work_bounded": [
+      "fixtures-tests-01"
+    ],
+    "application::workflow::fixtures::tests::workflow_fixtures_mcp_constructed_arguments_check_allof_contracts": [
+      "fixtures-tests-01"
+    ],
+    "application::workflow::authoring::tests::the_diff_aligns_changed_lines_between_shared_ones": [
+      "graph-tests-01"
+    ],
+    "application::workflow::authoring::tests::a_diff_past_the_cell_bound_shows_the_middle_as_two_blocks": [
+      "graph-tests-01"
+    ],
+    "application::workflow::authoring::tests::a_schema_without_properties_takes_the_params_as_one_json_object": [
+      "graph-tests-01"
+    ],
+    "application::workflow::authoring::tests::parameter_fields_follow_the_schema_and_build_the_params_object": [
+      "graph-tests-01"
+    ],
+    "application::workflow::authoring::tests::stored_params_open_as_fields_only_when_saving_them_unchanged_stores_the_same_object": [
+      "graph-tests-01"
+    ],
+    "application::workflow::authoring::tests::a_branching_graph_places_siblings_side_by_side": [
+      "graph-tests-01"
+    ],
+    "application::workflow::authoring::tests::the_graph_layers_every_route_downward_and_ends_below_every_step": [
+      "graph-tests-01"
+    ],
+    "application::workflow::authoring::tests::needs_name_each_literal_mcp_slot_tool_and_called_tool_once": [
+      "graph-tests-01"
+    ],
+    "application::workflow::authoring::tests::the_catalogue_covers_every_runnable_type_with_a_compiling_example": [
+      "graph-tests-01"
+    ],
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::views::channel_reply_views_completed_work_and_safe_delivery_retry_are_independent": [
+      "views-tests-03",
+      "views-tests-04",
+      "nested-review-regression-green-02"
+    ],
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::views::channel_reply_views_classification_and_company_scope_hide_response_details": [
+      "views-tests-03",
+      "views-tests-04",
+      "nested-review-regression-green-02"
+    ],
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::views::channel_reply_views_delivery_wakes_the_completed_run_and_conversation_with_ids_only": [
+      "views-tests-03",
+      "views-tests-04",
+      "nested-review-regression-green-02"
+    ],
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::views::channel_reply_views_notifications_are_transactional_and_rollback_is_silent": [
+      "views-tests-03",
+      "views-tests-04",
+      "nested-review-regression-green-02"
+    ],
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::views::channel_reply_views_response_rows_are_bounded_independently_of_message_attribution": [
+      "views-tests-03",
+      "views-tests-04",
+      "nested-review-regression-green-02"
+    ],
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::views::channel_reply_views_source_outside_the_message_window_retains_its_exact_identity": [
+      "views-tests-03",
+      "views-tests-04",
+      "nested-review-regression-green-02"
+    ],
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::views::channel_reply_views_suppression_and_private_review_are_separate_from_publication": [
+      "views-tests-03",
+      "views-tests-04",
+      "nested-review-regression-green-02"
+    ],
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::views::channel_reply_controls_unknown_delivery_is_visible_without_a_business_or_blind_resend_control": [
+      "controls-tests-01"
+    ],
+    "adapters::http::routes::workflows::ui::authoring::tests::bindings_tests::a_refused_binding_keeps_every_choice_and_says_why": [
+      "http-authoring-tests-01"
+    ],
+    "adapters::http::routes::workflows::ui::authoring::tests::a_blank_draft_is_created_once_per_key_and_validates_as_a_one_step_graph": [
+      "http-authoring-tests-01"
+    ],
+    "adapters::http::routes::workflows::ui::authoring::tests::bindings_tests::an_archived_workflows_binding_can_still_be_paused_but_not_activated_or_configured": [
+      "http-authoring-tests-01"
+    ],
+    "adapters::http::routes::workflows::ui::authoring::tests::bindings_tests::a_resource_that_is_not_ready_is_refused_as_such_on_create_configure_and_activate": [
+      "http-authoring-tests-01"
+    ],
+    "adapters::http::routes::workflows::ui::authoring::tests::agent_picker_tests::autonomous_agent_authoring_workflow_picker_preserves_unsaved_source_and_selected_agent_outside_page": [
+      "http-authoring-tests-01"
+    ],
+    "adapters::http::routes::workflows::ui::authoring::tests::bindings_tests::a_binding_is_created_once_paused_then_activated_at_the_revision_seen": [
+      "http-authoring-tests-01"
+    ],
+    "adapters::http::routes::workflows::ui::authoring::tests::agent_picker_tests::autonomous_agent_authoring_workflow_picker_refuses_foreign_actor_agent_workflow_and_non_model_step": [
+      "http-authoring-tests-01"
+    ],
+    "adapters::http::routes::workflows::ui::authoring::tests::access_tests::an_admin_of_another_company_reaches_no_write_or_version_of_this_one": [
+      "http-authoring-tests-01"
+    ],
+    "adapters::http::routes::workflows::ui::authoring::tests::access_tests::other_tenants_and_plain_members_reach_no_workflow_and_admins_do": [
+      "http-authoring-tests-01"
+    ],
+    "adapters::http::routes::workflows::ui::authoring::tests::agent_picker_tests::autonomous_agent_authoring_workflow_picker_uses_current_hint_and_keeps_model_only_steps_tool_free": [
+      "http-authoring-tests-01"
+    ],
+    "adapters::http::routes::workflows::ui::authoring::tests::access_tests::workflow_company_lookup_failures_remain_server_errors_on_pages_and_panes": [
+      "http-authoring-tests-01"
+    ],
+    "adapters::http::routes::workflows::ui::authoring::tests::access_tests::hostile_text_is_escaped_in_the_list_the_editor_and_the_preview": [
+      "http-authoring-tests-01"
+    ],
+    "adapters::http::routes::workflows::ui::authoring::tests::a_template_copy_is_keyed_and_a_stale_catalogue_revision_is_refused": [
+      "http-authoring-tests-01"
+    ],
+    "adapters::http::routes::workflows::ui::authoring::tests::bindings_tests::a_version_change_renders_that_versions_fields_and_keeps_matching_values": [
+      "http-authoring-tests-01"
+    ],
+    "adapters::http::routes::workflows::ui::authoring::tests::bindings_tests::channels_an_admin_cannot_see_stay_out_of_the_tab_the_form_and_the_card": [
+      "http-authoring-tests-01"
+    ],
+    "adapters::http::routes::workflows::ui::authoring::tests::bindings_tests::configure_saves_at_the_revision_seen_and_a_stale_one_keeps_the_choices": [
+      "http-authoring-tests-01"
+    ],
+    "adapters::http::routes::workflows::ui::authoring::tests::bindings_tests::hostile_names_are_escaped_in_the_tab_the_form_and_the_card": [
+      "http-authoring-tests-01"
+    ],
+    "adapters::http::routes::workflows::ui::authoring::tests::bindings_tests::other_tenants_and_plain_members_reach_no_binding": [
+      "http-authoring-tests-01"
+    ],
+    "adapters::http::routes::workflows::ui::authoring::tests::bindings_tests::params_the_fields_cannot_carry_open_as_json_and_save_unchanged": [
+      "http-authoring-tests-01"
+    ],
+    "adapters::http::routes::workflows::ui::authoring::tests::destination_tests::binding_destinations_authorize_tenant_role_and_private_channel": [
+      "http-authoring-tests-01"
+    ],
+    "adapters::http::routes::workflows::ui::authoring::tests::editor_tests::a_concurrent_save_keeps_the_authors_text_and_shows_what_the_other_saved": [
+      "http-authoring-tests-01"
+    ],
+    "adapters::http::routes::workflows::ui::authoring::tests::editor_tests::a_draft_naming_more_tools_than_are_offered_still_saves_and_renders": [
+      "http-authoring-tests-01"
+    ],
+    "adapters::http::routes::workflows::ui::authoring::tests::editor_tests::a_draft_that_moves_after_the_save_keeps_the_text_and_says_both": [
+      "http-authoring-tests-01"
+    ],
+    "adapters::http::routes::workflows::ui::authoring::tests::editor_tests::a_save_refreshes_the_sidebar_and_a_changed_publication_is_flagged": [
+      "http-authoring-tests-01"
+    ],
+    "adapters::http::routes::workflows::ui::authoring::tests::editor_tests::a_source_and_description_that_start_with_a_newline_keep_it": [
+      "http-authoring-tests-01"
+    ],
+    "adapters::http::routes::workflows::ui::authoring::tests::editor_tests::an_invalid_source_is_saved_kept_and_located": [
+      "http-authoring-tests-01"
+    ],
+    "adapters::http::routes::workflows::ui::authoring::tests::editor_tests::archiving_refuses_a_stale_revision_then_locks_the_draft": [
+      "http-authoring-tests-01"
+    ],
+    "adapters::http::routes::workflows::ui::authoring::tests::editor_tests::the_editor_guards_unsaved_text_and_reports_only_the_work_it_does": [
+      "http-authoring-tests-01"
+    ],
+    "adapters::http::routes::workflows::ui::authoring::tests::editor_tests::the_editor_offers_a_needed_mcp_tool_past_any_company_wide_count_and_cuts_per_tool": [
+      "http-authoring-tests-01"
+    ],
+    "adapters::http::routes::workflows::ui::authoring::tests::jev_tests::workflow_authoring_jev_catalogue_binding_and_sample": [
+      "http-authoring-tests-01"
+    ],
+    "adapters::http::routes::workflows::ui::authoring::tests::jev_tests::workflow_authoring_jev_company_forms_permissions_rotation_and_readiness": [
+      "http-authoring-tests-01"
+    ],
+    "adapters::http::routes::workflows::ui::authoring::tests::publish_tests::a_parameter_selected_agent_step_previews_every_published_candidate": [
+      "http-authoring-tests-01"
+    ],
+    "adapters::http::routes::workflows::ui::authoring::tests::publish_tests::a_parameter_selected_step_lists_its_own_parameters_agents": [
+      "http-authoring-tests-01"
+    ],
+    "adapters::http::routes::workflows::ui::authoring::tests::publish_tests::a_publish_conflict_that_is_not_a_moved_draft_says_what_the_command_said": [
+      "http-authoring-tests-01"
+    ],
+    "adapters::http::routes::workflows::ui::authoring::tests::selections_read_only_well_formed_connection_fields": [
+      "http-authoring-tests-01"
+    ],
+    "adapters::http::routes::workflows::ui::authoring::tests::publish_tests::a_publish_of_a_revision_that_is_no_longer_the_draft_is_refused_in_the_editor": [
+      "http-authoring-tests-01"
+    ],
+    "adapters::http::routes::workflows::ui::authoring::tests::publish_tests::an_agent_step_previews_the_published_agent_reference_and_use": [
+      "http-authoring-tests-01"
+    ],
+    "adapters::http::routes::workflows::ui::authoring::tests::publish_tests::an_mcp_step_validates_publishes_through_the_selected_slot_and_locates_bad_arguments": [
+      "http-authoring-tests-01"
+    ],
+    "adapters::http::routes::workflows::ui::authoring::tests::publish_tests::publishing_moves_no_binding_and_versions_compare_line_by_line": [
+      "http-authoring-tests-01"
+    ],
+    "adapters::http::routes::workflows::ui::authoring::tests::run_board_view_filter_workflow_pages_link_to_the_board": [
+      "http-authoring-tests-01"
+    ],
+    "adapters::http::routes::workflows::ui::authoring::tests::registration_authority_tests::autonomous_agent_authoring_workflow_registration_revocation_refuses_admission_without_republishing_workflow": [
+      "http-authoring-tests-01"
+    ],
+    "adapters::http::routes::workflows::ui::authoring::tests::sample_tests::autonomous_agent_samples_keep_old_capture_and_hash_after_draft_changes": [
+      "http-authoring-tests-01"
+    ],
+    "adapters::http::routes::workflows::ui::authoring::tests::sample_tests::autonomous_agent_samples_release_rechecks_admin_after_competing_role_revocation": [
+      "http-authoring-tests-01"
+    ],
+    "adapters::http::routes::workflows::ui::authoring::tests::sample_tests::sample_direct_workflow_tool_child_and_message_have_zero_production_effects": [
+      "http-authoring-tests-01"
+    ],
+    "adapters::http::routes::workflows::ui::authoring::tests::sample_tests::sample_mcp_fixture_never_contacts_selected_endpoint_and_rejects_foreign_selection": [
+      "http-authoring-tests-01"
+    ],
+    "adapters::http::routes::workflows::ui::authoring::tests::sample_tests::samples_authorize_tenant_revision_and_preserve_invalid_hostile_text": [
+      "http-authoring-tests-01"
+    ],
+    "adapters::http::routes::workflows::ui::authoring::tests::the_catalogue_lists_every_runnable_type_and_the_agents_a_step_can_name": [
+      "http-authoring-tests-01"
+    ],
+    "adapters::http::routes::workflows::ui::authoring::tests::the_sidebar_pages_through_every_draft": [
+      "http-authoring-tests-01"
+    ],
+    "adapters::http::routes::workflows::ui::authoring::tests::tools_tests::a_tool_name_is_registered_re_pinned_re_pointed_and_revoked_saying_what_each_does": [
+      "http-authoring-tests-01"
+    ],
+    "adapters::http::routes::workflows::ui::authoring::tests::tools_tests::autonomous_agent_authoring_usage_refuses_members_and_foreign_agents": [
+      "http-authoring-tests-01"
+    ],
+    "adapters::http::routes::workflows::ui::authoring::tests::tools_tests::used_by_lists_a_binding_that_reaches_the_agent_only_through_a_child_diamond": [
+      "http-authoring-tests-01"
+    ],
+    "adapters::http::routes::workflows::ui::authoring::tests::access_tests::every_workspace_write_refuses_a_cross_origin_cookie_post": [
+      "http-csrf-tests-02"
+    ],
+    "adapters::http::routes::ui::stream_tests::message_source_tests::source_message_outside_window_is_exact_and_authorized": [
+      "source-browser-fixtures-01"
+    ],
+    "adapters::http::pages::workflow_decision::tests::decision_browser_markup_and_closed_draft_recovery": [
+      "decision-browser-fixtures-01"
+    ],
+    "adapters::http::routes::workflows::ui::runs::tests::board_view_tests::run_board_view_filter_reports_a_cut_option_list": [
+      "run-views-tests-01"
+    ],
+    "adapters::http::routes::workflows::ui::runs::tests::board_view_tests::run_board_view_live_moves_a_finished_run_out_of_the_window_on_a_later_read": [
+      "run-views-tests-01"
+    ],
+    "adapters::http::routes::workflows::ui::runs::tests::board_view_tests::run_board_view_filter_refuses_another_tenants_ids": [
+      "run-views-tests-01"
+    ],
+    "adapters::http::routes::workflows::ui::runs::tests::board_view_tests::run_board_view_filter_scopes_both_views_alone_and_combined": [
+      "run-views-tests-01"
+    ],
+    "adapters::http::routes::workflows::ui::runs::tests::board_view_tests::run_board_view_live_sends_no_wake_up_for_a_hidden_channel": [
+      "run-views-tests-01"
+    ],
+    "adapters::http::routes::workflows::ui::runs::tests::board_view_tests::run_board_view_refuses_plain_members_and_other_tenants": [
+      "run-views-tests-01"
+    ],
+    "adapters::http::routes::workflows::ui::runs::tests::board_view_tests::run_board_view_opens_the_pane_answers_its_region_and_leaves_the_list_alone": [
+      "run-views-tests-01"
+    ],
+    "adapters::http::routes::workflows::ui::runs::tests::board_view_tests::run_board_view_escapes_a_hostile_workflow_title": [
+      "run-views-tests-01"
+    ],
+    "adapters::http::routes::workflows::ui::runs::tests::board_view_tests::run_board_view_cut_column_links_to_the_list_with_its_scope": [
+      "run-views-tests-01"
+    ],
+    "adapters::http::routes::workflows::ui::runs::tests::board_view_tests::run_board_view_live_reconciles_a_change_before_subscribing_on_the_first_resync": [
+      "run-views-tests-01"
+    ],
+    "adapters::http::routes::workflows::ui::runs::tests::a_run_with_a_child_shows_its_lineage_steps_and_controls_through_the_parent": [
+      "run-views-tests-01"
+    ],
+    "adapters::http::routes::workflows::ui::runs::tests::every_runs_write_refuses_a_cross_origin_cookie_post": [
+      "run-views-tests-01"
+    ],
+    "adapters::http::routes::workflows::ui::runs::tests::board_view_tests::run_board_view_filter_switch_and_links_keep_the_scope": [
+      "run-views-tests-01"
+    ],
+    "adapters::http::routes::workflows::ui::runs::tests::pages_tests::knowledge_view_run_pane_drops_input_parameter_and_action_payloads": [
+      "run-views-tests-01"
+    ],
+    "adapters::http::routes::workflows::ui::runs::tests::pages_tests::an_unfinished_step_of_an_ended_run_reads_as_stopped": [
+      "run-views-tests-01"
+    ],
+    "adapters::http::routes::workflows::ui::runs::tests::pages_tests::reconciliation_is_offered_as_an_annotation_and_a_step_shows_usage_and_receipts": [
+      "run-views-tests-01"
+    ],
+    "adapters::http::routes::workflows::ui::runs::tests::board_view_tests::run_board_view_shows_six_columns_in_order_with_their_totals": [
+      "run-views-tests-01"
+    ],
+    "adapters::http::routes::workflows::ui::runs::tests::controls_tests::an_accepted_action_shows_its_receipt_and_cancel_names_it": [
+      "run-views-tests-01"
+    ],
+    "adapters::http::routes::workflows::ui::runs::tests::controls_tests::a_redraw_repeats_its_keys_until_the_command_shows_on_the_page": [
+      "run-views-tests-01"
+    ],
+    "adapters::http::routes::workflows::ui::runs::tests::authorization_tests::reconciliation_and_step_refuse_foreign_and_hidden_channel_identities": [
+      "run-views-tests-01"
+    ],
+    "adapters::http::routes::workflows::ui::runs::tests::controls_tests::an_uncertain_action_is_annotated_from_the_pane_and_its_step_shows_the_attempt": [
+      "run-views-tests-01"
+    ],
+    "adapters::http::routes::workflows::ui::runs::tests::events_tests::a_lagging_stream_asks_every_view_to_read_again": [
+      "run-views-tests-01"
+    ],
+    "adapters::http::routes::workflows::ui::runs::tests::controls_tests::controls_act_at_the_revision_seen_and_say_what_they_did": [
+      "run-views-tests-01"
+    ],
+    "adapters::http::routes::workflows::ui::runs::tests::events_tests::the_event_stream_ticks_while_access_holds_and_ends_when_it_is_lost": [
+      "run-views-tests-01"
+    ],
+    "adapters::http::routes::workflows::ui::runs::tests::events_tests::the_event_stream_wakes_with_resync_first_and_names_only_visible_runs": [
+      "run-views-tests-01"
+    ],
+    "adapters::http::routes::workflows::ui::runs::tests::other_tenants_and_plain_members_reach_no_run_and_hostile_content_is_escaped": [
+      "run-views-tests-01"
+    ],
+    "adapters::http::routes::workflows::ui::runs::tests::the_list_pages_over_runs_an_admin_cannot_see_and_labels_reruns_and_children": [
+      "run-views-tests-01"
+    ],
+    "adapters::http::pages::tests::workflow_conversation_tests::a_visible_reply_does_not_offer_a_link_to_an_inaccessible_producer": [
+      "conversation-tests-01"
+    ],
+    "adapters::http::pages::tests::workflow_conversation_tests::conversations_identify_each_run_and_its_own_reply": [
+      "conversation-tests-01"
+    ],
+    "adapters::http::routes::ui::stream_tests::conversation_stream_tests::both_runs_reconcile_on_connect_wakeup_and_reconnect": [
+      "conversation-stream-tests-01"
+    ],
+    "adapters::http::routes::ui::stream_tests::conversation_stream_tests::conversation_reads_refuse_foreign_scope_and_private_channels": [
+      "conversation-stream-tests-01"
+    ],
+    "adapters::http::routes::onboarding::tests::onboarding_pages_render_each_step": [
+      "onboarding-tests-01",
+      "onboarding-tests-02"
+    ],
+    "adapters::http::routes::onboarding::authorization_tests::onboarding_page_hides_foreign_companies_and_refuses_members": [
+      "onboarding-tests-01",
+      "onboarding-tests-02"
+    ],
+    "adapters::http::routes::onboarding::authorization_tests::onboarding_submission_key_is_required_and_denials_propagate": [
+      "onboarding-tests-01",
+      "onboarding-tests-02"
+    ],
+    "adapters::http::routes::onboarding::tests::the_channel_step_gives_each_modelled_agent_one_assistant_channel": [
+      "onboarding-tests-01",
+      "onboarding-tests-02"
+    ],
+    "adapters::persistence::onboarding::tests::onboarding_new_owner_with_new_key_does_not_replay_the_previous_owners_command": [
+      "onboarding-tests-01",
+      "onboarding-tests-02"
+    ],
+    "adapters::persistence::onboarding::tests::onboarding_denials_and_invalid_selection_have_no_provider_effects": [
+      "onboarding-tests-01",
+      "onboarding-tests-02"
+    ],
+    "adapters::persistence::onboarding::tests::onboarding_library_model_lookup_failure_remains_an_infrastructure_error": [
+      "onboarding-tests-01",
+      "onboarding-tests-02"
+    ],
+    "adapters::persistence::onboarding::tests::onboarding_cancellation_drops_provider_and_releases_company_lock": [
+      "onboarding-tests-01",
+      "onboarding-tests-02"
+    ],
+    "adapters::persistence::onboarding::tests::onboarding_one_connection_progresses_with_real_custom_library_and_competitor": [
+      "onboarding-tests-01",
+      "onboarding-tests-02"
+    ],
+    "adapters::persistence::onboarding::tests::onboarding_provider_failure_releases_transaction_for_retry": [
+      "onboarding-tests-01",
+      "onboarding-tests-02"
+    ],
+    "adapters::persistence::onboarding::tests::onboarding_address_refusal_keeps_the_agent_and_other_channels": [
+      "onboarding-tests-01",
+      "onboarding-tests-02"
+    ],
+    "adapters::persistence::onboarding::tests::onboarding_new_key_after_rename_does_not_replay_an_old_channel": [
+      "onboarding-tests-01",
+      "onboarding-tests-02"
+    ],
+    "adapters::persistence::onboarding::tests::onboarding_same_key_custom_competitors_wait_for_company_and_generate_once": [
+      "onboarding-tests-01",
+      "onboarding-tests-02"
+    ],
+    "adapters::persistence::onboarding::tests::onboarding_second_channel_error_rolls_back_every_effect": [
+      "onboarding-tests-01",
+      "onboarding-tests-02"
+    ],
+    "adapters::persistence::onboarding::tests::onboarding_prompt_and_operation_timeouts_cancel_and_allow_retry": [
+      "onboarding-tests-01",
+      "onboarding-tests-02"
+    ],
+    "adapters::persistence::onboarding::tests::onboarding_selection_is_bounded_and_custom_fields_are_paired": [
+      "onboarding-tests-01",
+      "onboarding-tests-02"
+    ],
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::views::continuations::channel_reply_views_child_review_classification_does_not_reveal_private_wait_metadata": [
+      "continuation-regressions-green-04",
+      "views-tests-04",
+      "nested-review-regression-green-02"
+    ],
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::views::continuations::channel_reply_views_child_later_question_preserves_owning_root_and_continues": [
+      "continuation-regressions-green-04",
+      "views-tests-04",
+      "nested-review-regression-green-02"
+    ],
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::views::continuations::channel_reply_views_child_review_wakes_and_reconciles_the_unchanged_parent": [
+      "continuation-regressions-green-04",
+      "views-tests-04",
+      "nested-review-regression-green-02"
+    ],
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::views::continuations::channel_reply_views_later_question_uses_actual_answer_and_keeps_original_source": [
+      "continuation-regressions-green-04",
+      "views-tests-04",
+      "nested-review-regression-green-02"
+    ],
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::views::continuations::channel_reply_views_expired_child_review_advances_parent_without_stale_wait_label": [
+      "continuation-regressions-green-04",
+      "views-tests-04",
+      "nested-review-regression-green-02"
+    ],
+    "adapters::persistence::onboarding::tests::onboarding_same_key_replays_and_new_key_after_channel_deletion_and_agent_rename_is_fresh": [
+      "onboarding-tests-02"
+    ],
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::views::continuations::channel_reply_views_nested_review_emits_a_root_wakeup_without_an_ancestor_state_change": [
+      "nested-review-regression-green-02"
+    ],
+    "adapters::persistence::workflow::tests::admission_tests::decision_tests::boundary_tests::workflow_decision_data_configured_context_boundary": [
+      "formal-decision-tests-03"
+    ],
+    "adapters::persistence::workflow::tests::admission_tests::decision_tests::authority_tests::workflow_decision_removal_before_park_settles_unavailable": [
+      "formal-decision-tests-03"
+    ],
+    "adapters::persistence::workflow::tests::admission_tests::decision_tests::authority_tests::workflow_decision_principal_conversion_before_submit_refuses": [
+      "formal-decision-tests-03"
+    ],
+    "adapters::persistence::workflow::tests::admission_tests::decision_tests::authority_tests::workflow_decision_nonmember_and_removed_membership_are_hidden": [
+      "formal-decision-tests-03"
+    ],
+    "adapters::persistence::workflow::tests::admission_tests::decision_tests::authority_tests::workflow_decision_park_blocks_actual_removal_until_notice_commit": [
+      "formal-decision-tests-03"
+    ],
+    "adapters::persistence::workflow::tests::admission_tests::decision_tests::authority_tests::workflow_decision_membership_delete_preserves_settled_history": [
+      "formal-decision-tests-03"
+    ],
+    "adapters::persistence::workflow::tests::admission_tests::decision_tests::authority_tests::workflow_decision_submission_blocks_actual_removal_until_commit": [
+      "formal-decision-tests-03"
+    ],
+    "adapters::persistence::workflow::tests::admission_tests::decision_tests::lifecycle_tests::workflow_decision_notices_are_atomic_private_and_never_settle": [
+      "formal-decision-tests-03"
+    ],
+    "adapters::persistence::workflow::tests::admission_tests::decision_tests::lifecycle_tests::workflow_decision_submission_crossing_deadline_rolls_back": [
+      "formal-decision-tests-03"
+    ],
+    "adapters::persistence::workflow::tests::admission_tests::decision_tests::lifecycle_tests::workflow_decision_two_runs_one_company_do_not_serialize": [
+      "formal-decision-tests-03"
+    ],
+    "adapters::persistence::workflow::tests::admission_tests::decision_tests::provenance_tests::workflow_decision_cross_tenant_relationships_and_access": [
+      "formal-decision-tests-03"
+    ],
+    "adapters::persistence::workflow::tests::admission_tests::decision_tests::authority_tests::workflow_decision_production_removal_preserves_open_and_settled_history": [
+      "formal-decision-tests-03"
+    ],
+    "adapters::persistence::workflow::tests::admission_tests::decision_tests::provenance_tests::workflow_decision_notice_cross_company_and_unique_link": [
+      "formal-decision-tests-03"
+    ],
+    "adapters::persistence::workflow::tests::admission_tests::decision_tests::authority_tests::workflow_decision_membership_revocation_serializes_in_both_orders": [
+      "formal-decision-tests-03"
+    ],
+    "adapters::persistence::workflow::tests::admission_tests::decision_tests::authority_tests::workflow_decision_visibility_revocation_serializes_in_both_orders": [
+      "formal-decision-tests-03"
+    ],
+    "adapters::persistence::workflow::tests::admission_tests::decision_tests::authority_tests::workflow_decision_park_loses_to_inflight_member_removal": [
+      "formal-decision-tests-03"
+    ],
+    "adapters::persistence::workflow::tests::admission_tests::decision_tests::boundary_tests::workflow_decision_whole_output_cannot_activate_message_delivery": [
+      "formal-decision-tests-03"
+    ],
+    "adapters::persistence::workflow::tests::admission_tests::decision_tests::provenance_tests::workflow_decision_notice_rejects_non_notification_independently": [
+      "formal-decision-tests-03"
+    ],
+    "adapters::persistence::workflow::tests::admission_tests::decision_tests::lifecycle_tests::workflow_decision_past_deadline_never_parks_and_unavailable_never_routes": [
+      "formal-decision-tests-03"
+    ],
+    "adapters::persistence::workflow::tests::admission_tests::decision_tests::boundary_tests::workflow_decision_feedback_character_and_byte_boundaries": [
+      "formal-decision-tests-03"
+    ],
+    "adapters::persistence::workflow::tests::admission_tests::decision_tests::sql_tests::workflow_decision_comment_bounds_and_immutable_facts": [
+      "formal-decision-tests-03"
+    ],
+    "adapters::persistence::workflow::tests::admission_tests::decision_tests::sql_tests::workflow_decision_reviewer_notice_provenance_rejects_foreign_delivery": [
+      "formal-decision-tests-03"
+    ],
+    "adapters::persistence::workflow::tests::admission_tests::decision_tests::workflow_decision_invalid_stale_unlisted_and_comment_replay": [
+      "formal-decision-tests-03"
+    ],
+    "adapters::persistence::workflow::tests::admission_tests::decision_tests::workflow_decision_opted_out_reviewer_gets_no_notice_and_still_reviews": [
+      "formal-decision-tests-03"
+    ],
+    "adapters::persistence::workflow::tests::admission_tests::decision_tests::workflow_decision_park_composition_error_fails_run_unrouted": [
+      "formal-decision-tests-03"
+    ],
+    "adapters::persistence::workflow::tests::admission_tests::decision_tests::workflow_decision_park_submit_restart_replay_and_notices": [
+      "formal-decision-tests-03"
+    ],
+    "application::workflow::registry::decision_tests::workflow_decision_digest_survives_jsonb_numeric_normalization": [
+      "formal-decision-tests-03"
+    ],
+    "adapters::persistence::workflow::tests::admission_tests::decision_tests::workflow_decision_park_unprovable_notice_key_fails_run_unrouted": [
+      "formal-decision-tests-03"
+    ],
+    "adapters::persistence::workflow::tests::admission_tests::decision_tests::workflow_decision_park_waits_for_a_preference_toggle_in_flight": [
+      "formal-decision-tests-03"
+    ],
+    "adapters::persistence::workflow::tests::admission_tests::decision_tests::workflow_decision_park_with_sixteen_reviewers": [
+      "formal-decision-tests-03"
+    ],
+    "adapters::persistence::workflow::tests::admission_tests::decision_tests::workflow_decision_revoked_reviewer_and_foreign_company_are_hidden": [
+      "formal-decision-tests-03"
+    ],
+    "adapters::persistence::workflow::tests::admission_tests::decision_tests::workflow_decision_submit_competes_with_cancel": [
+      "formal-decision-tests-03"
+    ],
+    "adapters::persistence::workflow::tests::admission_tests::decision_tests::workflow_decision_submit_competes_with_timeout": [
+      "formal-decision-tests-03"
+    ],
+    "adapters::persistence::workflow::tests::admission_tests::decision_tests::workflow_decision_timeout_error_route_successor_receives_null": [
+      "formal-decision-tests-03"
+    ],
+    "adapters::persistence::workflow::tests::admission_tests::decision_tests::workflow_decision_timeout_without_error_route_fails_run": [
+      "formal-decision-tests-03"
+    ],
+    "adapters::persistence::workflow::tests::admission_tests::decision_tests::workflow_decision_two_reviewers_compete_for_one_successor": [
+      "formal-decision-tests-03"
+    ],
+    "adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::model_steps::workflow_decision_agent_chooses_only_a_declared_route_with_valid_data": [
+      "formal-decision-tests-03"
+    ],
+    "adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::model_steps::workflow_decision_agent_data_schema_local_references_resolve": [
+      "formal-decision-tests-03"
+    ]
+  },
+  "existing_ignored": [
+    "adapters::http::routes::workflows::ui::authoring::tests::agent_picker_tests::dump_autonomous_workflow_agent_picker_browser_fixtures"
+  ],
+  "failed_then_fixed": {
+    "adapters::http::routes::workflows::ui::authoring::tests::access_tests::every_workspace_write_refuses_a_cross_origin_cookie_post": [
+      "http-authoring-tests-01"
+    ]
+  },
+  "unresolved_in_selected_census": {},
+  "non_rust_receipts": [
+    "sample-boundary-01",
+    "sample-boundary-tests-01",
+    "css-check-02",
+    "response-browser-04",
+    "decision-browser-03"
+  ],
+  "reused_browser_individual_passes": {
+    "log": "browser-protocols-02.log",
+    "passing_names": [
+      "ordinary page links release every stream before navigation",
+      "HTMX/prevented clicks, modified clicks, downloads and new tabs keep streams",
+      "anchors and non-document protocols keep streams",
+      "native filter submissions release all streams on every navigation",
+      "cancelled, HTMX, dialog and other-window submissions retain streams",
+      "late attribution and reconnect keep both replies, composer and stream owner",
+      "a reconnect backlog keeps an explicit 200-message live window and the composer",
+      "a late body read cannot remove preserved steps after a cancel or navigation",
+      "an actual SSE disconnect reconciles and preserves an unfinished note and disclosure",
+      "a waiting parent refreshes a child badge on the child wakeup without reconnecting",
+      "board: two window reads completing out of order show the later choice",
+      "board: opening a run while a filter read is in flight keeps the chosen filters",
+      "list: a wake-up during a filter read reads the new filter instead of undoing it",
+      "board: a filter change while a wake-up read is in flight wins",
+      "board: a burst of run events reads at most once per two seconds and shows the final state",
+      "board: constant change still reads every two seconds and never starves",
+      "phone: a stream-driven or polled pane reload leaves the reader on the list; opening a run still moves them",
+      "board: reads slower than the interval never overlap and keep landing under constant change",
+      "board: a run change during a filter read is read again after it, on the new leaf",
+      "board: two quick filter changes do not leave the coalescer waiting for ever",
+      "sample progress, failed request recovery and late navigation response use the requesting form",
+      "actual sample textarea template preserves leading newlines for every raw JSON field"
+    ]
+  },
+  "checks": [
+    "sqlx-migrations-main-02",
+    "sqlx-migrations-test-02",
+    "sqlx-prepare-01",
+    "sqlx-check-01",
+    "compile-final-01",
+    "clippy-01",
+    "graft-build-02",
+    "clippy-final-02",
+    "fmt-check-final-01",
+    "sqlx-prepare-corrections-02",
+    "sqlx-check-corrections-02",
+    "fmt-check-corrections-02",
+    "graft-corrections-03",
+    "clippy-corrections-04",
+    "fmt-check-corrections-03",
+    "migrations-main-04",
+    "migrations-test-04",
+    "sqlx-prepare-nested-03",
+    "sqlx-check-nested-03",
+    "clippy-nested-05",
+    "fmt-check-nested-04",
+    "graft-nested-04"
+  ],
+  "pending": [],
+  "limitations": [
+    "Standalone live workflow-authoring-browser.cjs requires an app server at port3001; no such server was started. Existing HTTP authoring and the actual new form browser protocol provide affected coverage.",
+    "Only individual passing browser cases from protocols02 are reused; the aggregate command was not a pass.",
+    "Historical failures are retained in logs, not erased.",
+    "A final test-helper let-and-return lint was corrected without SQL/behavior changes after the five-case runtime pass; current all-target offline Clippy and fmt pass."
+  ],
+  "review_status": "F2 nested reconciliation corrected; R3 independent recheck pending",
+  "correction_findings": [
+    "CHS-P06-B1-F1",
+    "CHS-P06-B1-F2",
+    "CHS-P06-B1-F3"
+  ],
+  "red_evidence": "later-question-regression-red-02 reproduced stale original prompt on actual question2 path before correction",
+  "red_evidence_nested": "nested-review-regression-red-01 real root-child-grandchild park emitted no root wake before migration correction",
+  "retained_failed_migrations": "migrations-main/test03 and nested-green01 failed because workflow_decisions has no state column; actual closure is workflow_waits.state, corrected migrations04 and runtime checks PASS."
+}

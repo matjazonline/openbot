@@ -1,0 +1,46 @@
+[
+  {
+    "name": "reviewed-email-list-02",
+    "exit_code": 0
+  },
+  {
+    "name": "reviewed-email-runtime-02",
+    "exit_code": 0
+  },
+  {
+    "name": "message-delivery-list-01",
+    "exit_code": 0
+  },
+  {
+    "name": "message-delivery-runtime-01",
+    "exit_code": 0
+  },
+  {
+    "name": "source-modules-01",
+    "exit_code": 0
+  },
+  {
+    "name": "sqlx-prepare-final-01",
+    "exit_code": 0
+  },
+  {
+    "name": "sqlx-check-final-01",
+    "exit_code": 0
+  },
+  {
+    "name": "clippy-final-01",
+    "exit_code": 0
+  },
+  {
+    "name": "fmt-final-01",
+    "exit_code": 0
+  },
+  {
+    "name": "diff-final-02",
+    "exit_code": 0
+  },
+  {
+    "name": "graph-final-02",
+    "exit_code": 0
+  }
+]

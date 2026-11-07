@@ -88,6 +88,7 @@ pub struct RunView {
     pub channel_name: Option<String>,
     /// The inbound message whose admission started the run, if a message did.
     pub trigger_message: Option<Uuid>,
+    pub response: Option<super::channel_reply::ChannelResponseOutcome>,
     pub input: Value,
     pub params: Value,
     pub lineage: Option<Lineage>,
@@ -260,6 +261,7 @@ impl RunView {
             return;
         }
         self.payload_restricted = true;
+        self.response = None;
         self.dependencies = None;
         for child in &mut self.children {
             child.dependency = None;

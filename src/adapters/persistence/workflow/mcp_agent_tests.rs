@@ -352,7 +352,7 @@ async fn autonomous_agent_samples_mcp_without_slots_never_opens_the_server() {
         .into_iter()
         .map(|method| (method, server.count(method)))
         .collect();
-    let request=SampleRequest { agents:vec![],input:json!({}),params:json!({}),scripts:serde_json::from_value(json!([{
+    let request=SampleRequest { response_contract: None, response_approval_policy: None, agents:vec![],input:json!({}),params:json!({}),scripts:serde_json::from_value(json!([{
         "workflow_id":fixture.target.workflow,"step":"start","responses":[{
             "output":"Sample answer","tools":[{"name":TOOL,"input":{"customer_id":"c-42"},"output":{"content":[],"isError":false,"structuredContent":{"name":"Ada"}}}]
         }]
