@@ -65,6 +65,7 @@ tokenizers = { version = "=0.23.2", default-features = false, features = ["onig"
 libc = "0.2"
 
 [dev-dependencies]
+syn = { version = "=2.0.119", features = ["full", "visit"] }
 # `#[tokio::test(start_paused = true)]`, so lease-heartbeat tests run in virtual time instead of
 # sleeping through a real 15-minute lease term.
 tokio = { version = "1", features = ["full", "test-util"] }

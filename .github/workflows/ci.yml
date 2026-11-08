@@ -66,6 +66,12 @@ jobs:
           python3 scripts/workflow-sample-boundary.py
       - name: Fetch locked Rust dependencies
         run: cargo fetch --locked
+      - name: Workflow evidence retention
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: |
+          python3 scripts/tests/workflow-evidence.py
+          python3 scripts/check-workflow-evidence.py --tracked-manifests --require-tracked
       - name: Offline compilation
         run: cargo check --locked --offline --all-targets
       - name: Clippy
@@ -108,6 +114,8 @@ jobs:
         run: cargo sqlx prepare --check -- --all-targets
       - name: Compile tests before denying network access
         run: cargo test --locked --offline --all-targets --no-run
+      - name: Rust source module reachability
+        run: cargo test --locked --offline --test source_modules
       - name: HTML rendering and team autocomplete browser protocol
         env:
           HTML_INJECTION_BROWSER_FIXTURES: /tmp/html-injection-browser
