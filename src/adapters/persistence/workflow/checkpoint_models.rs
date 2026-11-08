@@ -25,12 +25,23 @@ pub(super) async fn reserve_on(
     if !lock_owner(tx, write.fence, bound).await? {
         return Ok(End::Rollback(Admission::OwnershipLost));
     }
+    agent_history::audience_on(
+        tx,
+        ActionScope {
+            company: write.fence.scope.company,
+            run: write.fence.scope.run,
+            execution: write.fence.scope.execution,
+        },
+    )
+    .await?;
     let saved = load_on(tx, write.fence).await?.ok_or_else(missing)?;
     let current = decode(saved.id, saved.checkpoint.clone())?;
     live(tx, write.fence, bound).await?;
     if let Some(result) = admission_replay(&saved, &current, write, &request.reservation)? {
         return Ok(End::Rollback(result));
     }
+    agent_history::require_active_on(tx, write.fence, &saved.workflow_prepared, current.run_id.0)
+        .await?;
     if let Some(decision) = saved.model_blocked_decision {
         decisions::tokens::approved_request(tx, write.fence.scope, decision, request).await?;
     }
@@ -168,6 +179,7 @@ pub(super) async fn settle_on(
     token_budget::lock_on(tx, write.fence).await?;
     super::super::super::model_usage::persist_checkpoint_usage_on(tx, &current, &next).await?;
     persist_on(tx, write.fence, &next, CheckpointOwnership::Model(None)).await?;
+    agent_history::accepted_on(tx, write.fence, &saved.workflow_prepared, &next).await?;
     let root = token_budget::lock_on(tx, write.fence).await?;
     live(tx, write.fence, bound).await?;
     if root.refusal.is_some() {

@@ -1,0 +1,18 @@
+{
+  "at": "2026-11-08T03:15:37.532938+00:00",
+  "status": "PASS root final identity and complete independent review audit",
+  "source": "0703abfbae6408df334bf4deccdf736f73c6acf667b9784a54da24577e91be2f",
+  "archive": "098010f9d3c9d32d82754985290f714e2d0ac79a1cdc311216e84bd6c6a7d0c1",
+  "owned": 216,
+  "preserved": 77,
+  "all_seven_acceptances_verified": true,
+  "code_delta_from_accepted07": 0,
+  "phase_records": 1391,
+  "path_coverage": 216,
+  "native_cases": 31,
+  "phase_cases": 883,
+  "reviewer_entry_exit": true,
+  "staged_entries_unchanged": true,
+  "coordination_checked": 34,
+  "full_notes_findings_proofs_read": true
+}

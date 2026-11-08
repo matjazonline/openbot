@@ -1,0 +1,13 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+   Compiling open_bots v0.1.0 (/private/tmp/openbot-agent-history-h_82_5pw/worktree)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 48.77s
+     Running unittests src/lib.rs (/private/tmp/openbot-chs-p06-3f43t2k7/worktree/target/debug/deps/open_bots-8b80d02f0b6cf2e6)
+
+running 4 tests
+test adapters::http::pages::workflow_decision::tests::decision_browser_markup_and_closed_draft_recovery ... ok
+test adapters::http::routes::ui::stream_tests::message_source_tests::source_message_outside_window_is_exact_and_authorized ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::origin_schema::autonomous_agent_storage_action_origin_populated_collector_and_company_cascade ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::capacity_tests::workflow_capacity_count_prunes_retained_terminal_history ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 3379 filtered out; finished in 8.01s
+

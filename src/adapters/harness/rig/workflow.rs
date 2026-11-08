@@ -63,17 +63,12 @@ impl WorkflowBinding<'_> {
 
     pub(super) fn definitions(&self) -> Vec<ToolDefinition> {
         self.prepared
-            .tools()
-            .iter()
+            .declarations()
+            .into_iter()
             .map(|tool| ToolDefinition {
-                name: tool.declared.as_str().to_owned(),
-                description: match tool.target {
-                    crate::application::workflow::agent::AgentToolTarget::Knowledge => {
-                        crate::application::workflow::knowledge::KNOWLEDGE_TOOL_DESCRIPTION.into()
-                    }
-                    _ => format!("Workflow tool {}", tool.name),
-                },
-                parameters: tool.input_schema.clone(),
+                name: tool.name.as_str().to_owned(),
+                description: tool.description,
+                parameters: tool.parameters,
             })
             .collect()
     }
@@ -90,6 +85,15 @@ impl WorkflowBinding<'_> {
         &mut self,
         computed: ModelReservation,
     ) -> AppResult<ModelReservation> {
+        let policy = self.prepared.policy()?;
+        if self.prepared.history_exchange().is_some()
+            && computed
+                .input_tokens
+                .checked_add(computed.output_tokens)
+                .is_none_or(|total| total > policy.request_input_tokens)
+        {
+            return Err(AppError::Execution(ExecutionFailure::Budget));
+        }
         let Some(saved) = self.blocked.take() else {
             return Ok(computed);
         };
@@ -275,12 +279,50 @@ where
         }
     }
 
-    async fn run(&self, claim: &ClaimedWorkflow) -> AppResult<Driven> {
+    async fn run(&self, claim: &ClaimedWorkflow) -> AppResult<WorkflowHandlerOutcome> {
         let deadline = claim
             .window
             .run_deadline
             .min(tokio::time::Instant::now() + std::time::Duration::from_millis(MAX_CLAIM_MS));
-        let launch = self.store.prepare_agent(claim).await?;
+        use crate::application::workflow::agent::AgentPreparationResult;
+        let launch = match self.store.prepare_agent(claim, self.lease).await? {
+            AgentPreparationResult::Ready(launch) => launch,
+            AgentPreparationResult::Parked(wait) => {
+                return Ok(WorkflowHandlerOutcome::Suspended(SuspendedWorkflow {
+                    wait,
+                }));
+            }
+            AgentPreparationResult::AtCapacity => {
+                return Ok(WorkflowHandlerOutcome::Completed(Err(WorkflowFailure {
+                    failure: StepFailure::new(
+                        FailureClass::Terminal,
+                        FailureCode::parse("agent.history_queue_full")
+                            .expect("static failure code"),
+                        None,
+                    )
+                    .expect("bounded queue refusal"),
+                    safety: RetrySafety::SafeToRetry,
+                })));
+            }
+        };
+        Ok(
+            match Box::pin(self.run_ready(claim, &launch, deadline)).await? {
+                Driven::Completed(output) => WorkflowHandlerOutcome::Completed(
+                    structured(&output).map_err(|error| failure(&error)),
+                ),
+                Driven::Suspended(wait) => {
+                    WorkflowHandlerOutcome::Suspended(SuspendedWorkflow { wait })
+                }
+            },
+        )
+    }
+
+    async fn run_ready(
+        &self,
+        claim: &ClaimedWorkflow,
+        launch: &crate::application::workflow::agent::AgentLaunch,
+        deadline: tokio::time::Instant,
+    ) -> AppResult<Driven> {
         let spec = launch.prepared.spec(claim.fence)?;
         JsonResponseValidator.validate_contract(
             spec.identity
@@ -339,7 +381,7 @@ where
             .map_err(|_| invalid("Rig model configuration unavailable"))?;
         let secret = launch.secret.expose_secret();
         let mut execution = Execution {
-            inputs: InputCounts::prompt(&spec.initial_prompt),
+            inputs: InputCounts::prepared(&spec.initial_prompt, &spec.seed)?,
             binding: Box::new(binding),
             checkpoint,
             model,
@@ -380,16 +422,9 @@ where
         _kind: &WorkflowStepKind,
         claim: &ClaimedWorkflow,
     ) -> WorkflowHandlerOutcome {
-        match Box::pin(self.run(claim)).await {
-            Ok(Driven::Completed(output)) => match structured(&output) {
-                Ok(value) => WorkflowHandlerOutcome::Completed(Ok(value)),
-                Err(error) => WorkflowHandlerOutcome::Completed(Err(failure(&error))),
-            },
-            Ok(Driven::Suspended(wait)) => {
-                WorkflowHandlerOutcome::Suspended(SuspendedWorkflow { wait })
-            }
-            Err(error) => WorkflowHandlerOutcome::Completed(Err(failure(&error))),
-        }
+        Box::pin(self.run(claim))
+            .await
+            .unwrap_or_else(|error| WorkflowHandlerOutcome::Completed(Err(failure(&error))))
     }
 }
 
@@ -407,6 +442,21 @@ fn structured(output: &AgentExecutionOutput) -> AppResult<serde_json::Value> {
 /// predicate (not this label) decides whether an earlier effect makes retry unsafe.
 fn failure(error: &AppError) -> WorkflowFailure {
     use FailureClass::{Retryable, Terminal};
+    if let AppError::KnowledgeRelease {
+        content,
+        destination,
+    } = error
+    {
+        return WorkflowFailure {
+            failure: StepFailure::from_knowledge_refusal(
+                crate::domain::workflow::KnowledgeRefusal {
+                    content: *content,
+                    destination: *destination,
+                },
+            ),
+            safety: RetrySafety::SafeToRetry,
+        };
+    }
     if let AppError::WorkflowGuard(violation) = error {
         return crate::application::workflow::actions::guard_step_failure("agent", violation);
     }

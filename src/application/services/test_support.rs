@@ -172,7 +172,8 @@ pub const SCRIPTED_PROVIDER: &str = "openai";
 pub(crate) mod provider;
 mod scenario;
 pub use scenario::{
-    ScriptedExchange, ScriptedLlm, ScriptedRequest, ScriptedResponse, scripted_scenario,
+    InheritedScriptedListener, ScriptedExchange, ScriptedLlm, ScriptedRequest, ScriptedResponse,
+    scripted_scenario,
 };
 
 /// Simple Chat Completions shorthand over the same supervised scenario server.

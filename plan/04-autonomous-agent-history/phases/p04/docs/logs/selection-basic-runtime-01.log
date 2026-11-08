@@ -1,0 +1,31 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+   Compiling open_bots v0.1.0 (/private/tmp/openbot-agent-history-h_82_5pw/worktree)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2m 11s
+     Running unittests src/lib.rs (/private/tmp/openbot-chs-p06-3f43t2k7/worktree/target/debug/deps/open_bots-8b80d02f0b6cf2e6)
+
+running 3 tests
+test application::workflow::publication::tests::agent_tests::history_preparation::agent_history_preparation_current_content_and_reserved_output_precede_history ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::agent_history_selection_second_real_call_sees_complete_pair_and_current_input_last ... FAILED
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::agent_history_ordering_competing_preparations_park_without_checkpoint_or_retry_and_resume_once ... FAILED
+
+failures:
+
+---- adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::agent_history_selection_second_real_call_sees_complete_pair_and_current_input_last stdout ----
+
+thread 'adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::agent_history_selection_second_real_call_sees_complete_pair_and_current_input_last' (35805459) panicked at src/adapters/persistence/workflow/agent_history_selection_tests.rs:27:14:
+called `Result::unwrap()` on an `Err` value: WorkflowFailure { failure: StepFailure { knowledge_refusal: None, class: Retryable, code: FailureCode("agent.unresolved"), diagnostic: None }, safety: SafeToRetry }
+
+---- adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::agent_history_ordering_competing_preparations_park_without_checkpoint_or_retry_and_resume_once stdout ----
+
+thread 'adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::agent_history_ordering_competing_preparations_park_without_checkpoint_or_retry_and_resume_once' (35805458) panicked at src/adapters/persistence/workflow/agent_history_ordering_tests.rs:54:45:
+called `Result::unwrap()` on an `Err` value: Database("error returned from database: invalid input syntax for type json")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::agent_history_ordering_competing_preparations_park_without_checkpoint_or_retry_and_resume_once
+    adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::agent_history_selection_second_real_call_sees_complete_pair_and_current_input_last
+
+test result: FAILED. 1 passed; 2 failed; 0 ignored; 0 measured; 3315 filtered out; finished in 1.32s
+
+error: test failed, to rerun pass `--lib`

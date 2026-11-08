@@ -1,0 +1,30 @@
+{
+  "command": [
+    "scripts/test-network-isolation.sh",
+    "cargo",
+    "test",
+    "--locked",
+    "--offline",
+    "--lib",
+    "--",
+    "agent_history_callers_",
+    "agent_history_children_",
+    "agent_history_level_lower_private_session",
+    "agent_history_level_child_branch",
+    "agent_history_samples_"
+  ],
+  "cwd": "/private/tmp/openbot-agent-history-h_82_5pw/worktree",
+  "environment": {
+    "DATABASE_URL": "postgres://mac02@127.0.0.1:65037/openbot_ah_p05",
+    "TEST_DATABASE_URL": "postgres://mac02@127.0.0.1:65037/openbot_ah_p05_test",
+    "SQLX_OFFLINE": "true",
+    "CARGO_INCREMENTAL": "1",
+    "CARGO_TARGET_DIR": "/private/tmp/openbot-chs-p06-3f43t2k7/worktree/target",
+    "CARGO_BUILD_JOBS": "4",
+    "RUST_MIN_STACK": "2097152"
+  },
+  "started": "2026-11-07T20:05:08.168360+00:00",
+  "seconds": 57.047,
+  "exit_code": 101,
+  "log": "/private/tmp/openbot-agent-history-h_82_5pw/worktree/plan/04-autonomous-agent-history/phases/p05/docs/logs/callers-children-runtime-01.log"
+}

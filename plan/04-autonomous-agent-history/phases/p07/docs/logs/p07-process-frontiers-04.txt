@@ -1,0 +1,55 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+   Compiling open_bots v0.1.0 (/private/tmp/openbot-agent-history-h_82_5pw/worktree)
+warning: unused import: `completion::WorkflowCompletion`
+ --> src/adapters/persistence/workflow/agent_history_e2e_tests.rs:5:5
+  |
+5 |     completion::WorkflowCompletion,
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: method `proceed` is never used
+  --> src/adapters/persistence/workflow/agent_history_process_fixture.rs:84:19
+   |
+28 | impl WorkerProcess {
+   | ------------------ method in this implementation
+...
+84 |     pub(super) fn proceed(&mut self) {
+   |                   ^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `open_bots` (lib test) generated 2 warnings (run `cargo fix --lib -p open_bots --tests` to apply 1 suggestion)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1m 34s
+     Running unittests src/lib.rs (/private/tmp/openbot-chs-p06-3f43t2k7/worktree/target/debug/deps/open_bots-8b80d02f0b6cf2e6)
+
+running 12 tests
+test application::services::test_support::scenario::inheritance::tests::inherited_listener_refuses_external_origin_before_connection_or_registration ... ok
+test application::services::test_support::scenario::lifecycle_tests::registration_is_scoped_and_missing_external_endpoints_fail_locally ... ok
+test application::services::test_support::scenario::lifecycle_tests::malformed_framing_fails_completion_without_capturing_authentication ... ok
+test application::services::test_support::scenario::inheritance::tests::inherited_listener_forged_proof_registers_no_agent_and_fails_the_actual_owner ... ok
+test application::services::test_support::scenario::inheritance::tests::inherited_listener_capability_is_one_use_and_rejects_a_second_registration ... ok
+test application::services::test_support::scenario::lifecycle_tests::dropping_a_fixture_cancels_its_listener_and_removes_registration ... ok
+test application::services::test_support::scenario::tests::a_listener_remains_active_to_detect_extra_requests ... ok
+test application::services::test_support::scenario::tests::unused_and_mismatched_exchanges_fail_explicit_completion ... ok
+test application::services::test_support::scenario::lifecycle_tests::shutdown_cancels_a_blocked_response_and_awaits_its_connection ... ok
+test application::services::test_support::scenario::lifecycle_tests::declared_disconnect_and_retry_are_counted_without_a_fallback_response ... ok
+test application::services::test_support::scenario::inheritance::tests::inherited_listener_proof_does_not_consume_or_capture_a_model_exchange ... ok
+
+thread 'adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::e2e::driver::history_crash_child_entry' (36294015) panicked at src/adapters/persistence/workflow/agent_history_process_driver.rs:97:62:
+called `Result::unwrap()` on an `Err` value: BadRequest("Invalid workflow poll policy")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+thread 'adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::e2e::crashes::agent_history_e2e_process_crashes_reconstruct_durable_frontiers_without_duplicate_calls' (36293975) panicked at src/adapters/persistence/workflow/agent_history_process_fixture.rs:79:13:
+worker exited before AH_PROCESS_CLAIM: ["", "running 1 test", "test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::e2e::driver::history_crash_child_entry ... FAILED", "", "failures:", "", "failures:", "    adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::e2e::driver::history_crash_child_entry", "", "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 3392 filtered out; finished in 0.06s", ""]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::e2e::crashes::agent_history_e2e_process_crashes_reconstruct_durable_frontiers_without_duplicate_calls ... FAILED
+
+failures:
+
+failures:
+    adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::e2e::crashes::agent_history_e2e_process_crashes_reconstruct_durable_frontiers_without_duplicate_calls
+
+test result: FAILED. 11 passed; 1 failed; 0 ignored; 0 measured; 3381 filtered out; finished in 1.14s
+
+error: test failed, to rerun pass `--lib`

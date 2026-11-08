@@ -1,0 +1,14 @@
+{
+  "owner": "/root plan04 p07",
+  "root": "/private/tmp/openbot-chs-xb34mvy9",
+  "pgdata": "/private/tmp/openbot-chs-xb34mvy9/pgdata",
+  "port": 65037,
+  "database": "openbot_ah_p07_7a85ca",
+  "test_database": "openbot_ah_p07_7a85ca_test",
+  "target": "/private/tmp/openbot-chs-p06-3f43t2k7/worktree/target",
+  "pid": 85060,
+  "postgres_version": "18.6",
+  "status": "fresh P07 pair created/migrated p07-create-01/p07-migrate-01; earlier phase pairs untouched",
+  "build": "shared target serialized, jobs4, stockRUST_MIN_STACK2097152",
+  "producer_source": "f36a749426ec84d0dc5755380bb05312c34677bb49d1101316b2c66094d3ad20"
+}

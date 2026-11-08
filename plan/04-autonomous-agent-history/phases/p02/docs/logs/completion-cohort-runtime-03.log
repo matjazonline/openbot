@@ -1,0 +1,28 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+   Compiling open_bots v0.1.0 (/private/tmp/openbot-agent-history-h_82_5pw/worktree)
+error[E0433]: cannot find `checkpoint_updates` in `workflow`
+  --> src/adapters/persistence/workflow/agent_history_completion_tests.rs:71:58
+   |
+71 |     let result = crate::adapters::persistence::workflow::checkpoint_updates::update_on(&mut tx,f.write,accepted(&f),&bound).await.un...
+   |                                                          ^^^^^^^^^^^^^^^^^^ could not find `checkpoint_updates` in `workflow`
+
+error[E0382]: use of moved value: `outcome`
+   --> src/adapters/persistence/workflow/agent_history_storage_tests.rs:129:48
+    |
+125 |     let outcome = Box::pin(agent_runtime(&setup).execute(&WorkflowStepKind("agent.run".into()), &setup.claim)).await;
+    |         ------- move occurs because `outcome` has type `application::workflow::lease::WorkflowHandlerOutcome`, which does not implement the `Copy` trait
+126 |     assert!(outcome.completed_result().is_err());
+    |                     ------------------ `outcome` moved due to this method call
+...
+129 |     assert_eq!(rows[0].state, "failed", "{:?}",outcome.completed_result());
+    |                                                ^^^^^^^ value used here after move
+    |
+note: `action_outcome_support::CompletedOutcome::completed_result` takes ownership of the receiver `self`, which moves `outcome`
+   --> src/adapters/persistence/workflow/action_outcome_support.rs:89:25
+    |
+ 89 |     fn completed_result(self) -> crate::application::workflow::lease::WorkflowHandlerResult;
+    |                         ^^^^
+
+Some errors have detailed explanations: E0382, E0433.
+For more information about an error, try `rustc --explain E0382`.
+error: could not compile `open_bots` (lib test) due to 2 previous errors

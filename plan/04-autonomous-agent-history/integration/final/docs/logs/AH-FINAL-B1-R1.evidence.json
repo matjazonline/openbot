@@ -1,0 +1,433 @@
+{
+  "version": 1,
+  "round": "AH-FINAL-B1-R1",
+  "artifact": "0703abfbae6408df334bf4deccdf736f73c6acf667b9784a54da24577e91be2f",
+  "checks": [
+    {
+      "criteria": [
+        "FI2"
+      ],
+      "command": "cargo sqlx migrate run",
+      "fixture": "Final primary main4ab45555 with exact accepted216 source/77 preserved inputs, freshowned PG18.6 localhost65037 finalpair, stock2MiB/networkguard, counted strict providers and actual native HTML/installedChrome",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/final-migrate-main-01.json",
+          "sha256": "28cb5a8eb2c9bc2f2b614721ccbb838d77fb7aa7cad58a92bec9caf6791371d1"
+        },
+        {
+          "path": "logs/final-migrate-main-01.txt",
+          "sha256": "e8a1c6900b24c9ff07328751cb6e121af67e0b308ef39f0d3d279039beb0eb27"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "FI2"
+      ],
+      "command": "env DATABASE_URL=postgres://mac02@127.0.0.1:65037/openbot_ah_final_60139a_test cargo sqlx migrate run",
+      "fixture": "Final primary main4ab45555 with exact accepted216 source/77 preserved inputs, freshowned PG18.6 localhost65037 finalpair, stock2MiB/networkguard, counted strict providers and actual native HTML/installedChrome",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/final-migrate-test-01.json",
+          "sha256": "d261559393dfa4835b6f4d9714858b53143e637cb888d3d28b23d712bce67c7d"
+        },
+        {
+          "path": "logs/final-migrate-test-01.txt",
+          "sha256": "63eb75dbe5c409a89381778276026795e46e17295b0c225d43db25f5512202bb"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "FI4"
+      ],
+      "command": "npm run build:css",
+      "fixture": "Final primary main4ab45555 with exact accepted216 source/77 preserved inputs, freshowned PG18.6 localhost65037 finalpair, stock2MiB/networkguard, counted strict providers and actual native HTML/installedChrome",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/final-css-build-01.json",
+          "sha256": "44e71f5eae5ecbc088b1ce3e1c159e411c085a9d0a898265b3a0b5071f58f8f7"
+        },
+        {
+          "path": "logs/final-css-build-01.txt",
+          "sha256": "870a5f26010192effacdcf0676833fde749d45414ca20a3caabcea9553583be4"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "FI4"
+      ],
+      "command": "npm run check:css",
+      "fixture": "Final primary main4ab45555 with exact accepted216 source/77 preserved inputs, freshowned PG18.6 localhost65037 finalpair, stock2MiB/networkguard, counted strict providers and actual native HTML/installedChrome",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/final-css-check-01.json",
+          "sha256": "673acc6668616f5860eea6a58fa2fbad64d9e055eac2d335ed7314071d973bcf"
+        },
+        {
+          "path": "logs/final-css-check-01.txt",
+          "sha256": "8d4619638eab261ff61a0bf329abf980f269945221158d2d6eaedaee2096885d"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "FI3"
+      ],
+      "command": "scripts/test-network-isolation.sh cargo test --locked --offline --lib -- --list agent_history_e2e_ agent_history_children_same_agent_private_branch_completes_without_parent_transcript agent_history_continuation_two_real_approval_rounds_and_competing_reviewers_preserve_one_exchange agent_history_continuation_real_thread_reply_reaches_child_before_parent_owned_turn_queue agent_history_level_lower_private_session_reuse_filters_hidden_pairs_without_raising_ceiling agent_history_retention_actual_preparation_owner_skips_competing_cleanup_and_replays_exact_copy agent_history_retention_actual_expiry_owner_precedes_blocked_fresh_selection_without_mixed_seed agent_history_level_later_real_knowledge_then_human_wait_refuses_downgraded_resume_before_provider agent_history_recovery_revoked_wait_head_reaches_normal_terminal_owner_and_frees_successor agent_history_views_maximum_page_reaches_last_source_outside_page_and_keeps_exact_frozen_copy_after_expiry agent_history_channel_projection_is_not_the_saved_output_or_next_seed agent_history_channel_no_reply_and_explicit_send_retain_agent_output_independently agent_history_channel_delivery_retry_keeps_one_exchange_output_and_model_call agent_history_channel_terminal_delivery_failure_preserves_business_success_and_accepted_exchange agent_history_protocol_new_revision_provider_and_schema_keep_prior_pairs_as_data application::services::test_support::",
+      "fixture": "Final primary main4ab45555 with exact accepted216 source/77 preserved inputs, freshowned PG18.6 localhost65037 finalpair, stock2MiB/networkguard, counted strict providers and actual native HTML/installedChrome",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/final-discovery-01.json",
+          "sha256": "4e1be11c89922c74375a81c2b3150fbe689697bd7231e3d254004b01f995710f"
+        },
+        {
+          "path": "logs/final-discovery-01.txt",
+          "sha256": "9cc00918232e59d90744bd69d5fe8a18c9cbf76e95ec9878b0e28b3a06d3ec25"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "FI3"
+      ],
+      "command": "env AGENT_HISTORY_BROWSER_FIXTURES=/Users/mac02/dev/openbot/plan/04-autonomous-agent-history/integration/final/docs/logs/browser-fixtures-01 scripts/test-network-isolation.sh cargo test --locked --offline --lib -- agent_history_e2e_ agent_history_children_same_agent_private_branch_completes_without_parent_transcript agent_history_continuation_two_real_approval_rounds_and_competing_reviewers_preserve_one_exchange agent_history_continuation_real_thread_reply_reaches_child_before_parent_owned_turn_queue agent_history_level_lower_private_session_reuse_filters_hidden_pairs_without_raising_ceiling agent_history_retention_actual_preparation_owner_skips_competing_cleanup_and_replays_exact_copy agent_history_retention_actual_expiry_owner_precedes_blocked_fresh_selection_without_mixed_seed agent_history_level_later_real_knowledge_then_human_wait_refuses_downgraded_resume_before_provider agent_history_recovery_revoked_wait_head_reaches_normal_terminal_owner_and_frees_successor agent_history_views_maximum_page_reaches_last_source_outside_page_and_keeps_exact_frozen_copy_after_expiry agent_history_channel_projection_is_not_the_saved_output_or_next_seed agent_history_channel_no_reply_and_explicit_send_retain_agent_output_independently agent_history_channel_delivery_retry_keeps_one_exchange_output_and_model_call agent_history_channel_terminal_delivery_failure_preserves_business_success_and_accepted_exchange agent_history_protocol_new_revision_provider_and_schema_keep_prior_pairs_as_data application::services::test_support:: --nocapture",
+      "fixture": "Final primary main4ab45555 with exact accepted216 source/77 preserved inputs, freshowned PG18.6 localhost65037 finalpair, stock2MiB/networkguard, counted strict providers and actual native HTML/installedChrome",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/final-runtime-01.json",
+          "sha256": "da4485e087160647a20ebe6508e4defee3b7476ce0547123375e09079aa28028"
+        },
+        {
+          "path": "logs/final-runtime-01.txt",
+          "sha256": "a87263ba5da3daecdbb71ce37f760fedbe69c9079a121e7611f14c1f4c0ab2a2"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "FI2"
+      ],
+      "command": "cargo test --locked --offline --test source_modules",
+      "fixture": "Final primary main4ab45555 with exact accepted216 source/77 preserved inputs, freshowned PG18.6 localhost65037 finalpair, stock2MiB/networkguard, counted strict providers and actual native HTML/installedChrome",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/final-source-modules-01.json",
+          "sha256": "12ab57e785e7ea8ef6965dbf858242cd771a2fa3dca685d0b692214455fa676f"
+        },
+        {
+          "path": "logs/final-source-modules-01.txt",
+          "sha256": "e852e01a01c1d868d2e3bafe7a8aaf04b900aa6c159321bb0a9596af0d266833"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "FI2"
+      ],
+      "command": "cargo sqlx prepare -- --all-targets",
+      "fixture": "Final primary main4ab45555 with exact accepted216 source/77 preserved inputs, freshowned PG18.6 localhost65037 finalpair, stock2MiB/networkguard, counted strict providers and actual native HTML/installedChrome",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/final-sqlx-prepare-01.json",
+          "sha256": "21d09c6e2b4e0e265d15be443d961c86ee177dabdc7400d7d61bd120d1125b36"
+        },
+        {
+          "path": "logs/final-sqlx-prepare-01.txt",
+          "sha256": "434af0d0f3238314a9114fccd6f2e635d7c4c900d073fa28410cd0be3e8a8eab"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "FI2"
+      ],
+      "command": "cargo sqlx prepare --check -- --all-targets",
+      "fixture": "Final primary main4ab45555 with exact accepted216 source/77 preserved inputs, freshowned PG18.6 localhost65037 finalpair, stock2MiB/networkguard, counted strict providers and actual native HTML/installedChrome",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/final-sqlx-check-01.json",
+          "sha256": "54e4ea53a95e010de885a7d85df2a9b213ba0ab3151ade4e50c81957fddcd3e5"
+        },
+        {
+          "path": "logs/final-sqlx-check-01.txt",
+          "sha256": "4e1dea3a74a936149c7f698f62ba8ab35eff8f7ba793aed17832928a99dd558c"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "FI2"
+      ],
+      "command": "cargo check --locked --offline --all-targets",
+      "fixture": "Final primary main4ab45555 with exact accepted216 source/77 preserved inputs, freshowned PG18.6 localhost65037 finalpair, stock2MiB/networkguard, counted strict providers and actual native HTML/installedChrome",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/final-offline-01.json",
+          "sha256": "f56f4a975a7bd7cd2e6d31aed769da2ace7b94948a8bfe511c37ba44b2a5717b"
+        },
+        {
+          "path": "logs/final-offline-01.txt",
+          "sha256": "2bc683fb4e4f4f21ee9ee39e2b8ecce2efe20d3b1be57bda5316aa519ab3d30a"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "FI2"
+      ],
+      "command": "cargo clippy --locked --offline --all-targets -- -D warnings",
+      "fixture": "Final primary main4ab45555 with exact accepted216 source/77 preserved inputs, freshowned PG18.6 localhost65037 finalpair, stock2MiB/networkguard, counted strict providers and actual native HTML/installedChrome",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/final-clippy-01.json",
+          "sha256": "3fde2db2ec5dc316701e0858b2516613359e8a100ad2f960249d752f1f3d8f3c"
+        },
+        {
+          "path": "logs/final-clippy-01.txt",
+          "sha256": "14f89b4712be40deeba867a79e056ed4481211e9302ef68de5fcba99fec64a7c"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "FI2"
+      ],
+      "command": "cargo fmt --all -- --check",
+      "fixture": "Final primary main4ab45555 with exact accepted216 source/77 preserved inputs, freshowned PG18.6 localhost65037 finalpair, stock2MiB/networkguard, counted strict providers and actual native HTML/installedChrome",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/final-fmt-01.json",
+          "sha256": "a41f7033f108484e9c74cbf0a2344b34db67ac89269fdd3ece9edb713dc8d725"
+        },
+        {
+          "path": "logs/final-fmt-01.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "FI2"
+      ],
+      "command": "git diff --check",
+      "fixture": "Final primary main4ab45555 with exact accepted216 source/77 preserved inputs, freshowned PG18.6 localhost65037 finalpair, stock2MiB/networkguard, counted strict providers and actual native HTML/installedChrome",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/final-diff-01.json",
+          "sha256": "9e7cf3354e6724ed73c77a0280c5fbc43511ec75931710dc7573ed1ed363768d"
+        },
+        {
+          "path": "logs/final-diff-01.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "FI2"
+      ],
+      "command": "graft build",
+      "fixture": "Final primary main4ab45555 with exact accepted216 source/77 preserved inputs, freshowned PG18.6 localhost65037 finalpair, stock2MiB/networkguard, counted strict providers and actual native HTML/installedChrome",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/final-graft-01.json",
+          "sha256": "652fb2a2f665018634da2737bb73489621e9d56f7d7d4a5078a8084526914c19"
+        },
+        {
+          "path": "logs/final-graft-01.txt",
+          "sha256": "eab3fadd6eb91e8796ab3e6a0a8dd9893b1af0a2bd29a26aae96fbdc6e3fa609"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "FI2"
+      ],
+      "command": "python3 plan/04-autonomous-agent-history/integration/final/docs/logs/query-statistics.py",
+      "fixture": "Final primary main4ab45555 with exact accepted216 source/77 preserved inputs, freshowned PG18.6 localhost65037 finalpair, stock2MiB/networkguard, counted strict providers and actual native HTML/installedChrome",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/final-query-statistics-01.json",
+          "sha256": "30c31a582ff0f8ef691da79ae1661836f2838379d1ebe85d6e8443bdf4769b4c"
+        },
+        {
+          "path": "logs/final-query-statistics-01.txt",
+          "sha256": "8e50746ceeb7dd68ebbb1e2fb427b50e8903c50e57bc8ba26049f193028be93f"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "FI2"
+      ],
+      "command": "python3 scripts/workflow-sample-boundary.py",
+      "fixture": "Final primary main4ab45555 with exact accepted216 source/77 preserved inputs, freshowned PG18.6 localhost65037 finalpair, stock2MiB/networkguard, counted strict providers and actual native HTML/installedChrome",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/final-sample-boundary-01.json",
+          "sha256": "d0d6dd222ef5c3453ab94c6ed0eea6a704477a66b9ecc9b46156231b46303fb4"
+        },
+        {
+          "path": "logs/final-sample-boundary-01.txt",
+          "sha256": "228c0f0f23407594379b257a3e3684550f2f3eb1741d27acbc9be312e22e6d2d"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "FI2"
+      ],
+      "command": "python3 scripts/tests/workflow-sample-boundary.py",
+      "fixture": "Final primary main4ab45555 with exact accepted216 source/77 preserved inputs, freshowned PG18.6 localhost65037 finalpair, stock2MiB/networkguard, counted strict providers and actual native HTML/installedChrome",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/final-sample-boundary-fixtures-01.json",
+          "sha256": "cd5908860cd0268cd5bb1d3d6c41d23a4821808482e4ab72a6db001a27cceb8d"
+        },
+        {
+          "path": "logs/final-sample-boundary-fixtures-01.txt",
+          "sha256": "821b8b41e3acd2b621d9cfe84b03c30cbfa24e9857eb74084e48ad8284fc8b7e"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "FI4"
+      ],
+      "command": "env CHROME_PATH=/Applications/Google Chrome.app/Contents/MacOS/Google Chrome AGENT_HISTORY_BROWSER_FIXTURES=plan/04-autonomous-agent-history/integration/final/docs/logs/browser-fixtures-01 node --test scripts/tests/agent-history-browser.mjs",
+      "fixture": "Final primary main4ab45555 with exact accepted216 source/77 preserved inputs, freshowned PG18.6 localhost65037 finalpair, stock2MiB/networkguard, counted strict providers and actual native HTML/installedChrome",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/final-browser-01.json",
+          "sha256": "1e1d5a75e0f6522849f0c48cf3f70e689277d3dcd8984ee8ce87c91cbb9e0259"
+        },
+        {
+          "path": "logs/final-browser-01.txt",
+          "sha256": "dd71c0221016459f8df4768cf37948f0ecd42f826f3620910341797f5f0e78c2"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "FI1",
+        "FI3",
+        "FI5"
+      ],
+      "command": "python3 plan/04-autonomous-agent-history/integration/final/docs/logs/verify-final-evidence.py",
+      "fixture": "Final primary main4ab45555 with exact accepted216 source/77 preserved inputs, freshowned PG18.6 localhost65037 finalpair, stock2MiB/networkguard, counted strict providers and actual native HTML/installedChrome",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/final-case-evidence-01.json",
+          "sha256": "12aa7673c216a8748945c4a123ea2c980fbb00db01ce089ccbdd20f96a4d85d2"
+        },
+        {
+          "path": "logs/final-case-evidence-01.txt",
+          "sha256": "dce46b413ce82730047bd8a9bce54404ff052ae2f6d6dae8f44556b222425cb4"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "FI1",
+        "FI3",
+        "FI4",
+        "FI5"
+      ],
+      "command": "exact source/dependency equality plus original wholephase883/protocol17/CI parse receipt audit",
+      "fixture": "Accepted07 code/schema/dependencies/CSS are byteidentical after final generation; all883 original phase cases have current original observations and31 subset rerun on primary. Preserve explicit original ambiguity/transport/browser/hostedCI limitations.",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/verification-final-inventory.json",
+          "sha256": "f1f3afbc490c0871e73013c9c8491b0fc4d424cf0abda378d11e87ed5f274082"
+        },
+        {
+          "path": "logs/reused-p07/verification-case-inventory.json",
+          "sha256": "d6539e9efc3bc550c95470307ed5ac020303dde46ae62c06c4f1b3d8572be0c9"
+        },
+        {
+          "path": "logs/reused-p07/verification-final-map.md",
+          "sha256": "21784a12061b396b95403f991f57f310989d5bbf40ca7916686730c23f7eb470"
+        },
+        {
+          "path": "logs/reused-p07/p07-final-runtime-01.json",
+          "sha256": "684df8c1314a6fb5224944c08d4a012e843ef26d4b8e2d5ca83bd5b91db3f2ba"
+        },
+        {
+          "path": "logs/reused-p07/p07-final-runtime-01.txt",
+          "sha256": "107c61d866363bc9733f05218f6af81f1fa23f558f5b873bf8803d80d6b41495"
+        },
+        {
+          "path": "logs/reused-p07/p07-e2e-completion-01.json",
+          "sha256": "d2bd48b4cd9f294014571b2aecd2a7f0eb47dd7ebc7d1ad05d528412493d29e9"
+        },
+        {
+          "path": "logs/reused-p07/p07-e2e-completion-01.txt",
+          "sha256": "6c194ba349069bed4997768893825dda3dd3fe98478d52115f061ecaef4edf06"
+        },
+        {
+          "path": "logs/reused-p07/p07-inheritance-current-01.json",
+          "sha256": "602aad1b461df413603dded3cd8f66a93cd0f1a121602b4f7cca82310693b93a"
+        },
+        {
+          "path": "logs/reused-p07/p07-inheritance-current-01.txt",
+          "sha256": "c186b3380b258fad95098048b718edd32265ab9711b0e248d51c3ecffa5d73c6"
+        },
+        {
+          "path": "logs/reused-p07/p07-process-current-01.json",
+          "sha256": "ae2fd4c241a8b369d075cd73067d10fde4ff3db81fb1cc2557941b735216c8ff"
+        },
+        {
+          "path": "logs/reused-p07/p07-process-current-01.txt",
+          "sha256": "b87f391c771c0392e78892885a57eb6c5adbc77ed160fc3078430e499e36a53d"
+        },
+        {
+          "path": "logs/reused-p07/p07-protocols-01.json",
+          "sha256": "251fc5edbe308e8a6ff7727cfd3125e94e7b807e3dfe8cd045aedb89bf2a1caa"
+        },
+        {
+          "path": "logs/reused-p07/p07-protocols-01.txt",
+          "sha256": "84164886d4b9784280a0e0850d6b21ba28949e8a620af06f873ad640bfdf5c0a"
+        },
+        {
+          "path": "logs/reused-p07/p07-ci-yaml-02.json",
+          "sha256": "ce03de2654e570beea69b19164bee799cb81b2ad38b1188db622a5efcd46d0c1"
+        },
+        {
+          "path": "logs/reused-p07/p07-ci-yaml-02.txt",
+          "sha256": "e8508065073d32662275366feca844847637e25bd3695c367eaeb384e32ca5da"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "FI5"
+      ],
+      "command": "fullruntime/stack/lease/hostedCI/liveprovider/deployment",
+      "fixture": "Usertargeted-only scope and local uncommitted integration",
+      "status": "NOT EXERCISED",
+      "reason": "Full runtime/stack/lease suites explicitly excluded by user; remoteCI/liveprovider/deployment outside authorized local completion. No such pass inferred."
+    }
+  ]
+}

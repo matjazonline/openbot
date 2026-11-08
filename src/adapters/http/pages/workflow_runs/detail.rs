@@ -502,19 +502,7 @@ fn timeline(view: &RunPaneView<'_>) -> String {
         });
     }
     for event in &run.events {
-        entries.push(Entry {
-            at: event.created_at,
-            text: format!(
-                "{}{} by {}",
-                event.kind.replace('_', " "),
-                event
-                    .terminal_state
-                    .as_deref()
-                    .map(|state| format!(" ({state})"))
-                    .unwrap_or_default(),
-                person(view.people, event.actor)
-            ),
-        });
+        entries.push(event_entry(event, view.people));
     }
     entries.sort_by_key(|entry| entry.at);
     let rows: String = entries
@@ -780,4 +768,27 @@ fn children(view: &RunPaneView<'_>) -> String {
             ""
         },
     )
+}
+
+fn event_entry(
+    event: &crate::application::workflow::run_views::RunEvent,
+    people: &HashMap<Uuid, String>,
+) -> Entry {
+    Entry {
+        at: event.created_at,
+        text: format!(
+            "{}{} by {}",
+            if event.kind.contains('.') {
+                event.kind.clone()
+            } else {
+                event.kind.replace('_', " ")
+            },
+            event
+                .terminal_state
+                .as_deref()
+                .map(|state| format!(" ({state})"))
+                .unwrap_or_default(),
+            person(people, event.actor)
+        ),
+    }
 }

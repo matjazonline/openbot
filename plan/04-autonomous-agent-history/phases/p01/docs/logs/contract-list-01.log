@@ -1,0 +1,14 @@
+   Compiling open_bots v0.1.0 (/private/tmp/openbot-agent-history-h_82_5pw/worktree)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2m 28s
+     Running unittests src/lib.rs (/private/tmp/openbot-chs-p06-3f43t2k7/worktree/target/debug/deps/open_bots-8b80d02f0b6cf2e6)
+application::workflow::agent_history::tests::agent_history_contract_accepted_null_is_distinct_from_failure_and_cancellation: test
+application::workflow::agent_history::tests::agent_history_contract_exact_structured_values_roundtrip_without_prompt_expansion: test
+application::workflow::agent_history::tests::agent_history_contract_only_agent_run_is_eligible: test
+application::workflow::agent_history::tests::agent_history_contract_schema_and_revision_remain_original_provenance: test
+application::workflow::agent_history::tests::agent_history_contract_terminal_states_do_not_follow_workflow_or_delivery_state: test
+application::workflow::agent_history::tests::agent_history_contract_value_budget_is_enforced_at_construction_and_decode: test
+application::workflow::agent_history::tests::agent_history_identity_activation_is_stable_across_attempts_and_distinct_for_repeats: test
+application::workflow::agent_history::tests::agent_history_level_visibility_changes_without_forking_or_hidden_pair_markers: test
+application::workflow::publication::tests::agent_tests::history_preparation::agent_history_contract_preparation_retains_original_json_and_one_untrusted_prompt: test
+
+9 tests, 0 benchmarks

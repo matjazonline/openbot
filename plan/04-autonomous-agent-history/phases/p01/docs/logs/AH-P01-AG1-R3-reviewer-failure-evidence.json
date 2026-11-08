@@ -1,0 +1,14 @@
+{
+  "passed": 161,
+  "failed": [
+    "adapters::persistence::workflow::tests::admission_tests::activation_tests::action_tests::workflow_action_authority_revocation_contender_blocks_then_rechecks",
+    "adapters::persistence::workflow::tests::admission_tests::activation_tests::action_tests::workflow_action_authority_sql_scope_actor_and_current_membership",
+    "adapters::persistence::workflow::tests::admission_tests::admission_authority_tests::workflow_admit_sql_actor_revocation_blocks_new_replay_and_alias"
+  ],
+  "history_passed": 28,
+  "result": [
+    "test result: FAILED. 161 passed; 3 failed; 0 ignored; 0 measured; 3103 filtered out; finished in 59.79s"
+  ],
+  "foreign_key_failure_count": 3,
+  "no_runtime_executed_by_reviewer": true
+}

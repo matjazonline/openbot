@@ -1,0 +1,229 @@
+Diff in /private/tmp/openbot-agent-history-h_82_5pw/worktree/src/adapters/persistence/workflow/agent_history/mod.rs:126:
+     let Some(context) = authorized_on(tx, fence, bound).await? else {
+         return Ok(None);
+     };
+-    let id = conversation_on(tx, &context).await?.ok_or_else(|| {
+-        AppError::Conflict("Agent conversation storage is full".into())
+-    })?;
++    let id = conversation_on(tx, &context)
++        .await?
++        .ok_or_else(|| AppError::Conflict("Agent conversation storage is full".into()))?;
+     if lease::live_window(tx, fence, bound.started())
+         .await?
+         .is_none()
+Diff in /private/tmp/openbot-agent-history-h_82_5pw/worktree/src/adapters/persistence/workflow/agent_history/mod.rs:143:
+         return Ok(Some(id));
+     }
+     let available: bool = sqlx::query_scalar("SELECT agent_history_conversation_available($1)")
+-        .bind(context.company.as_uuid()).fetch_one(&mut *tx).await?;
++        .bind(context.company.as_uuid())
++        .fetch_one(&mut *tx)
++        .await?;
+     if !available {
+         return Ok(None);
+     }
+Diff in /private/tmp/openbot-agent-history-h_82_5pw/worktree/src/adapters/persistence/workflow/agent_history/storage.rs:70:
+     if let Some(saved) = matching_on(db, fence, conversation, prepared).await? {
+         return Ok(Some(saved));
+     }
+-    let available: bool = sqlx::query_scalar("SELECT agent_history_storage_available($1,$2) AND agent_history_admit($1,$2)")
+-        .bind(fence.scope.company.as_uuid())
+-        .bind(conversation)
+-        .fetch_one(&mut *db)
+-        .await?;
++    let available: bool = sqlx::query_scalar(
++        "SELECT agent_history_storage_available($1,$2) AND agent_history_admit($1,$2)",
++    )
++    .bind(fence.scope.company.as_uuid())
++    .bind(conversation)
++    .fetch_one(&mut *db)
++    .await?;
+     if !available {
+         return Ok(None);
+     }
+Diff in /private/tmp/openbot-agent-history-h_82_5pw/worktree/src/adapters/persistence/workflow/agent_history_retention.rs:37:
+     .await?;
+     tx.commit().await?;
+     Ok(HistoryPage {
+-        candidates: rows.into_iter().map(|row| HistoryCandidate {
+-            company: CompanyId::new(row.company_id),
+-            finished_at: row.finished_at,
+-            exchange: AgentExchangeId::new(row.id),
+-        }).collect(),
++        candidates: rows
++            .into_iter()
++            .map(|row| HistoryCandidate {
++                company: CompanyId::new(row.company_id),
++                finished_at: row.finished_at,
++                exchange: AgentExchangeId::new(row.id),
++            })
++            .collect(),
+     })
+ }
+ 
+Diff in /private/tmp/openbot-agent-history-h_82_5pw/worktree/src/adapters/persistence/workflow/agent_history_retention.rs:64:
+             }
+             Ok(expired)
+         }
+-        Err(AppError::Database(error)) if error.as_database_error().is_some_and(|error| error.code().as_deref()==Some("55P03")) => {
++        Err(AppError::Database(error))
++            if error
++                .as_database_error()
++                .is_some_and(|error| error.code().as_deref() == Some("55P03")) =>
++        {
+             tx.rollback().await?;
+             Ok(false)
+         }
+Diff in /private/tmp/openbot-agent-history-h_82_5pw/worktree/src/adapters/persistence/workflow/agent_history_retention.rs:74:
+ 
+ async fn expire_on(db: &mut PgConnection, candidate: HistoryCandidate) -> AppResult<bool> {
+     let company = candidate.company.as_uuid();
+-    if sqlx::query_scalar::<_,Uuid>("SELECT id FROM companies WHERE id=$1 FOR NO KEY UPDATE SKIP LOCKED")
+-        .bind(company).fetch_optional(&mut *db).await?.is_none() {
++    if sqlx::query_scalar::<_, Uuid>(
++        "SELECT id FROM companies WHERE id=$1 FOR NO KEY UPDATE SKIP LOCKED",
++    )
++    .bind(company)
++    .fetch_optional(&mut *db)
++    .await?
++    .is_none()
++    {
+         return Ok(false);
+     }
+     let source: Option<Source> = sqlx::query_as(
+Diff in /private/tmp/openbot-agent-history-h_82_5pw/worktree/src/adapters/persistence/workflow/agent_history_retention.rs:82:
+         "SELECT run_id,execution_id,job_id FROM agent_history_exchanges
+         WHERE company_id=$1 AND id=$2 AND payload_retained AND state IN ('completed','failed','cancelled')",
+     ).bind(company).bind(candidate.exchange.as_uuid()).fetch_optional(&mut *db).await?;
+-    let Some(source) = source else { return Ok(false); };
++    let Some(source) = source else {
++        return Ok(false);
++    };
+     sqlx::query("SELECT id FROM workflow_runs WHERE company_id=$1 AND id=$2 FOR SHARE NOWAIT")
+-        .bind(company).bind(source.run_id).execute(&mut *db).await?;
+-    sqlx::query("SELECT id FROM workflow_executions WHERE company_id=$1 AND id=$2 FOR SHARE NOWAIT")
+-        .bind(company).bind(source.execution_id).execute(&mut *db).await?;
++        .bind(company)
++        .bind(source.run_id)
++        .execute(&mut *db)
++        .await?;
++    sqlx::query(
++        "SELECT id FROM workflow_executions WHERE company_id=$1 AND id=$2 FOR SHARE NOWAIT",
++    )
++    .bind(company)
++    .bind(source.execution_id)
++    .execute(&mut *db)
++    .await?;
+     sqlx::query("SELECT id FROM background_tasks WHERE company_id=$1 AND id=$2 FOR SHARE NOWAIT")
+-        .bind(company).bind(source.job_id).execute(&mut *db).await?;
++        .bind(company)
++        .bind(source.job_id)
++        .execute(&mut *db)
++        .await?;
+     let count = sqlx::query(
+         "UPDATE agent_history_exchanges AS exchange SET payload_retained=false,
+             payload_expired_at=clock_timestamp(),output=NULL,frozen_preparation=NULL
+Diff in /private/tmp/openbot-agent-history-h_82_5pw/worktree/src/adapters/persistence/workflow/agent_history_retention.rs:97:
+     Ok(count == 1)
+ }
+ 
+-pub(super) async fn scope_page(pool: &sqlx::PgPool, after: Option<CompanyId>) -> AppResult<Vec<CompanyId>> {
++pub(super) async fn scope_page(
++    pool: &sqlx::PgPool,
++    after: Option<CompanyId>,
++) -> AppResult<Vec<CompanyId>> {
+     let mut tx = super::storage::begin(pool).await?;
+     let companies: Vec<Uuid> = sqlx::query_scalar(
+         "SELECT company_id FROM (
+Diff in /private/tmp/openbot-agent-history-h_82_5pw/worktree/src/adapters/persistence/workflow/agent_history_retention.rs:112:
+ 
+ pub(super) async fn prune(pool: &sqlx::PgPool, company: CompanyId, limit: u16) -> AppResult<u64> {
+     if !(1..=STORAGE_SWEEP_LIMIT).contains(&limit) {
+-        return Err(AppError::BadRequest("Invalid agent history cleanup limit".into()));
++        return Err(AppError::BadRequest(
++            "Invalid agent history cleanup limit".into(),
++        ));
+     }
+     let company = company.as_uuid();
+     let mut tx = super::storage::begin(pool).await?;
+Diff in /private/tmp/openbot-agent-history-h_82_5pw/worktree/src/adapters/persistence/workflow/agent_history_retention.rs:119:
+-    if sqlx::query_scalar::<_,Uuid>("SELECT id FROM companies WHERE id=$1 FOR NO KEY UPDATE SKIP LOCKED")
+-        .bind(company).fetch_optional(&mut *tx).await?.is_none() {
++    if sqlx::query_scalar::<_, Uuid>(
++        "SELECT id FROM companies WHERE id=$1 FOR NO KEY UPDATE SKIP LOCKED",
++    )
++    .bind(company)
++    .fetch_optional(&mut *tx)
++    .await?
++    .is_none()
++    {
+         return Ok(0);
+     }
+     let conversations = sqlx::query(
+Diff in /private/tmp/openbot-agent-history-h_82_5pw/worktree/src/adapters/persistence/workflow/agent_history_retention.rs:127:
+           ORDER BY conversation.id LIMIT $2 FOR UPDATE OF conversation SKIP LOCKED)
+         DELETE FROM agent_history_conversations AS conversation USING unused
+         WHERE conversation.company_id=$1 AND conversation.id=unused.id",
+-    ).bind(company).bind(i64::from(limit)).execute(&mut *tx).await?.rows_affected();
++    )
++    .bind(company)
++    .bind(i64::from(limit))
++    .execute(&mut *tx)
++    .await?
++    .rows_affected();
+     let sessions = sqlx::query(
+         "WITH unused AS MATERIALIZED (
+           SELECT session.id FROM agent_history_sessions AS session WHERE session.company_id=$1
+Diff in /private/tmp/openbot-agent-history-h_82_5pw/worktree/src/adapters/persistence/workflow/mod.rs:155:
+ 
+ mod jev_runtime;
+ 
++mod agent_history_retention;
+ mod storage;
+ mod storage_retention;
+-mod agent_history_retention;
+ 
+ mod sample_capture;
+ pub use sample_capture::SampleCapture;
+Diff in /private/tmp/openbot-agent-history-h_82_5pw/worktree/src/adapters/persistence/workflow/storage_retention.rs:7:
+ ) -> AppResult<Option<RetiredTree>> {
+     let company = root.company.as_uuid();
+     let root_id = root.run.as_uuid();
+-    if sqlx::query_scalar::<_, Uuid>("SELECT id FROM companies WHERE id=$1 FOR NO KEY UPDATE SKIP LOCKED")
+-        .bind(company)
+-        .fetch_optional(&mut *db)
+-        .await?
+-        .is_none()
++    if sqlx::query_scalar::<_, Uuid>(
++        "SELECT id FROM companies WHERE id=$1 FOR NO KEY UPDATE SKIP LOCKED",
++    )
++    .bind(company)
++    .fetch_optional(&mut *db)
++    .await?
++    .is_none()
+     {
+         return Ok(None);
+     }
+Diff in /private/tmp/openbot-agent-history-h_82_5pw/worktree/src/application/workflow/storage.rs:153:
+             // Advance before mutation, including a busy/protected/error candidate.
+             cursor.history = Some(candidate);
+             match bounded(port.expire_history(candidate), monitoring).await {
+-                Ok(true) => monitoring.increment_counter("agent_history_payloads_expired_total", 1, &[]),
+-                Ok(false) => monitoring.increment_counter("agent_history_payloads_protected_total", 1, &[]),
++                Ok(true) => {
++                    monitoring.increment_counter("agent_history_payloads_expired_total", 1, &[])
++                }
++                Ok(false) => {
++                    monitoring.increment_counter("agent_history_payloads_protected_total", 1, &[])
++                }
+                 Err(_) => {}
+             }
+         }
+Diff in /private/tmp/openbot-agent-history-h_82_5pw/worktree/src/application/workflow/storage.rs:161:
+     }
+-    if let Ok(companies) = bounded(port.history_scope_page(cursor.history_scope), monitoring).await {
++    if let Ok(companies) = bounded(port.history_scope_page(cursor.history_scope), monitoring).await
++    {
+         if companies.is_empty() {
+             cursor.history_scope = None;
+         }

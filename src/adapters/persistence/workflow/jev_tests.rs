@@ -220,6 +220,7 @@ pub(super) async fn admit(
     let p = &f.persistence;
     WorkflowService::new(p.clone(), p.clone(), p.clone(), p.clone(), Preflight)
         .admit(AdmitWorkflowRequest {
+            history_session: None,
             company_id: target.company,
             actor: target.actor,
             association: RelatedAssociation::Company,

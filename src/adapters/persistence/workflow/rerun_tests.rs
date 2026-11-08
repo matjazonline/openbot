@@ -11,6 +11,7 @@ fn rerun(f: &AdmissionFixture, key: &str, original: RunId) -> AdmitWorkflowReque
 /// `request` again under its key, trigger and input, naming `rerun_of` instead.
 fn relinked(request: &AdmitWorkflowRequest, rerun_of: Option<RunId>) -> AdmitWorkflowRequest {
     AdmitWorkflowRequest {
+        history_session: None,
         company_id: request.company_id,
         actor: request.actor,
         association: request.association,

@@ -12,6 +12,12 @@ struct Port {
     pending: bool,
     entered: tokio::sync::Notify,
     dropped: AtomicBool,
+    history_records: Vec<HistoryCandidate>,
+    history_cursors: Mutex<Vec<Option<HistoryCandidate>>>,
+    history_visits: Mutex<Vec<Uuid>>,
+    scope_companies: Vec<CompanyId>,
+    scope_cursors: Mutex<Vec<Option<CompanyId>>>,
+    scope_limits: Mutex<Vec<u16>>,
 }
 impl Port {
     fn new(pending: bool) -> Self {
@@ -21,6 +27,12 @@ impl Port {
             pending,
             entered: Default::default(),
             dropped: AtomicBool::new(false),
+            history_records: vec![],
+            history_cursors: Mutex::new(vec![]),
+            history_visits: Mutex::new(vec![]),
+            scope_companies: vec![],
+            scope_cursors: Mutex::new(vec![]),
+            scope_limits: Mutex::new(vec![]),
         }
     }
 }
@@ -41,6 +53,49 @@ impl Drop for PendingWrite<'_> {
 impl WorkflowStorageMaintenance for Port {
     async fn sweep_obsolete_witnesses(&self, _: u16) -> AppResult<u64> {
         Ok(0)
+    }
+    async fn history_page(&self, after: Option<HistoryCandidate>) -> AppResult<HistoryPage> {
+        self.history_cursors.lock().unwrap().push(after);
+        Ok(HistoryPage {
+            candidates: self
+                .history_records
+                .iter()
+                .filter(|candidate| {
+                    after
+                        .is_none_or(|after| candidate.exchange.as_uuid() > after.exchange.as_uuid())
+                })
+                .take(usize::from(HISTORY_EXPIRY_SWEEP_LIMIT))
+                .copied()
+                .collect(),
+        })
+    }
+    async fn expire_history(&self, candidate: HistoryCandidate) -> AppResult<bool> {
+        self.history_visits
+            .lock()
+            .unwrap()
+            .push(candidate.exchange.as_uuid());
+        match candidate.exchange.as_uuid().as_u128() {
+            1 => Err(AppError::DatabaseTimeout("busy history record".into())),
+            2..=128 => Ok(false),
+            _ => Ok(true),
+        }
+    }
+    async fn history_scope_page(&self, after: Option<CompanyId>) -> AppResult<Vec<CompanyId>> {
+        self.scope_cursors.lock().unwrap().push(after);
+        Ok(self
+            .scope_companies
+            .iter()
+            .filter(|company| after.is_none_or(|after| company.as_uuid() > after.as_uuid()))
+            .take(RETENTION_PAGE_SIZE)
+            .copied()
+            .collect())
+    }
+    async fn prune_history(&self, company: CompanyId, limit: u16) -> AppResult<u64> {
+        self.scope_limits.lock().unwrap().push(limit);
+        if company.as_uuid().as_u128() == 1 {
+            return Err(AppError::DatabaseTimeout("busy history scope".into()));
+        }
+        Ok(1)
     }
     async fn retention_page(&self, after: Option<RetentionRoot>) -> AppResult<RetentionPage> {
         self.cursors.lock().unwrap().push(after);
@@ -87,11 +142,11 @@ async fn workflow_storage_cursor_advances_past_full_error_and_protected_page_wit
 {
     let port = Port::new(false);
     let monitor = InMemoryMonitor::new();
-    let mut cursor = None;
+    let mut cursor = SweepCursor::default();
     sweep(&port, &monitor, &mut cursor).await;
-    assert_eq!(cursor, Some(root(4)));
+    assert_eq!(cursor.root, Some(root(4)));
     sweep(&port, &monitor, &mut cursor).await;
-    assert_eq!(cursor, None);
+    assert_eq!(cursor.root, None);
     assert_eq!(*port.cursors.lock().unwrap(), vec![None, Some(root(4))]);
     assert_eq!(port.visits.load(Ordering::SeqCst), 5);
 }
@@ -128,4 +183,63 @@ async fn workflow_storage_full_error_page_still_has_positive_worker_delay() {
     })
     .await
     .unwrap();
+}
+
+#[tokio::test]
+async fn workflow_storage_history_cursors_advance_past_error_and_protected_prefix_and_share_the_record_budget()
+ {
+    let mut port = Port::new(false);
+    port.history_records = (1..=129)
+        .map(|id| HistoryCandidate {
+            company: CompanyId::new(Uuid::from_u128(1)),
+            finished_at: DateTime::from_timestamp(100, 0).unwrap(),
+            exchange: crate::application::workflow::agent_history::AgentExchangeId::new(
+                Uuid::from_u128(id),
+            ),
+        })
+        .collect();
+    port.scope_companies = (1..=5)
+        .map(|id| CompanyId::new(Uuid::from_u128(id)))
+        .collect();
+    let monitor = InMemoryMonitor::new();
+    let mut cursor = SweepCursor::default();
+    sweep(&port, &monitor, &mut cursor).await;
+    assert_eq!(cursor.history, Some(port.history_records[127]));
+    assert_eq!(cursor.history_scope, Some(port.scope_companies[3]));
+    assert_eq!(port.history_visits.lock().unwrap().len(), 128);
+    assert_eq!(
+        port.scope_limits
+            .lock()
+            .unwrap()
+            .iter()
+            .copied()
+            .sum::<u16>()
+            + HISTORY_EXPIRY_SWEEP_LIMIT,
+        STORAGE_SWEEP_LIMIT
+    );
+    sweep(&port, &monitor, &mut cursor).await;
+    assert_eq!(cursor.history, Some(port.history_records[128]));
+    assert_eq!(cursor.history_scope, Some(port.scope_companies[4]));
+    sweep(&port, &monitor, &mut cursor).await;
+    assert!(cursor.history.is_none() && cursor.history_scope.is_none());
+    assert_eq!(
+        *port.history_cursors.lock().unwrap(),
+        vec![
+            None,
+            Some(port.history_records[127]),
+            Some(port.history_records[128])
+        ]
+    );
+    assert_eq!(
+        *port.scope_cursors.lock().unwrap(),
+        vec![
+            None,
+            Some(port.scope_companies[3]),
+            Some(port.scope_companies[4])
+        ]
+    );
+    assert_eq!(
+        *port.history_visits.lock().unwrap(),
+        (1..=129).map(Uuid::from_u128).collect::<Vec<_>>()
+    );
 }

@@ -1,0 +1,6 @@
+NOTICE:  database "openbot_ah_p05" does not exist, skipping
+DROP DATABASE
+CREATE DATABASE
+NOTICE:  database "openbot_ah_p05_test" does not exist, skipping
+DROP DATABASE
+CREATE DATABASE

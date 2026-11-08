@@ -695,6 +695,7 @@ mod tests {
             .services()
             .service()
             .admit(AdmitWorkflowRequest {
+                history_session: None,
                 company_id: target.company,
                 actor: target.actor,
                 association: RelatedAssociation::Company,

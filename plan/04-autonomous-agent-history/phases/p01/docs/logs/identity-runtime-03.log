@@ -1,0 +1,34 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+   Compiling open_bots v0.1.0 (/private/tmp/openbot-agent-history-h_82_5pw/worktree)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2m 13s
+     Running unittests src/lib.rs (/private/tmp/openbot-chs-p06-3f43t2k7/worktree/target/debug/deps/open_bots-8b80d02f0b6cf2e6)
+
+running 25 tests
+test adapters::persistence::workflow::tests::admission_tests::agent_history_sessions::agent_history_identity_automatic_producer_cannot_supply_private_session_reference ... ok
+test application::workflow::agent_history::tests::agent_history_contract_accepted_null_is_distinct_from_failure_and_cancellation ... ok
+test application::workflow::agent_history::tests::agent_history_contract_exact_structured_values_roundtrip_without_prompt_expansion ... ok
+test application::workflow::agent_history::tests::agent_history_contract_only_agent_run_is_eligible ... ok
+test application::workflow::agent_history::tests::agent_history_contract_order_is_positive_bounded_and_survives_decode ... ok
+test application::workflow::agent_history::tests::agent_history_contract_schema_and_revision_remain_original_provenance ... ok
+test application::workflow::agent_history::tests::agent_history_contract_terminal_states_do_not_follow_workflow_or_delivery_state ... ok
+test adapters::persistence::workflow::tests::admission_tests::agent_history_sessions::agent_history_identity_native_mapping_and_creator_are_immutable ... ok
+test application::workflow::agent_history::tests::agent_history_identity_activation_is_stable_across_attempts_and_distinct_for_repeats ... ok
+test application::workflow::agent_history::tests::agent_history_level_visibility_changes_without_forking_or_hidden_pair_markers ... ok
+test application::workflow::agent_history::tests::agent_history_contract_value_budget_is_enforced_at_construction_and_decode ... ok
+test application::workflow::fixtures::tests::agent_history::agent_history_identity_provenance_rejects_unknown_and_over_budget_execution_sets ... ok
+test application::workflow::fixtures::tests::agent_history::agent_history_identity_private_params_and_transitive_inputs_never_use_thread_stream ... ok
+test application::workflow::fixtures::tests::agent_history::agent_history_identity_public_lineage_is_closed_and_does_not_include_future_reviews ... ok
+test application::workflow::publication::tests::agent_tests::history_preparation::agent_history_contract_preparation_retains_original_json_and_one_untrusted_prompt ... ok
+test adapters::persistence::workflow::tests::admission_tests::agent_history_sessions::agent_history_identity_private_fresh_reuse_and_replay_are_admission_owned ... ok
+test adapters::persistence::workflow::tests::admission_tests::agent_history_sessions::agent_history_identity_competing_admissions_allocate_one_private_session ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::agent_history_identity_manual_thread_attachment_is_private_and_scope_updates_refuse ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_graph::descendants::history_identity::agent_history_identity_same_agent_child_has_private_branch_and_keeps_actual_actor ... ok
+test adapters::persistence::workflow::tests::admission_tests::agent_history_sessions::agent_history_identity_manual_starter_owns_session_and_ceiling_not_binding_actor ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::history_identity::agent_history_identity_current_agent_revocation_refuses_existing_conversation ... ok
+test adapters::persistence::workflow::tests::admission_tests::agent_history_sessions::agent_history_identity_foreign_and_changed_association_reuse_refuse_without_writes ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::history_identity::agent_history_identity_competing_fenced_resolvers_converge_and_stale_fence_refuses ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::agent_history_identity_real_message_roots_share_thread_across_agent_revisions ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::history_identity::agent_history_identity_model_only_steps_allocate_no_conversation ... ok
+
+test result: ok. 25 passed; 0 failed; 0 ignored; 0 measured; 3239 filtered out; finished in 5.74s
+

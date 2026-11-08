@@ -68,6 +68,7 @@ impl TransportSender for Provider {
 pub(super) enum ProviderCase {
     Accept,
     Retry,
+    Terminal,
     Unknown,
     LostReceipt,
 }
@@ -86,6 +87,10 @@ impl Delivery {
                 retry_after: Duration::ZERO,
                 class: FailureClass::Timeout,
                 detail: FailureDetail::parse("Definitely refused; retry allowed").unwrap(),
+            }]),
+            ProviderCase::Terminal => VecDeque::from([ProviderSendOutcome::Terminal {
+                class: FailureClass::InvalidPayload,
+                detail: FailureDetail::parse("Definitively rejected").unwrap(),
             }]),
             ProviderCase::Unknown => VecDeque::from([ProviderSendOutcome::OutcomeUnknown {
                 class: FailureClass::Timeout,

@@ -77,7 +77,7 @@ async fn native_for(f: AdmissionFixture, scope: ActivationRequest) -> NativeFixt
 
 /// The selection fields the store's current-authority check reads.
 fn prepared(agent: uuid::Uuid) -> Value {
-    json!({"selection":{"agent":{"agent_id":agent,"tools":[],"skills":[],
+    json!({"history":null,"selection":{"agent":{"agent_id":agent,"tools":[],"skills":[],
         "model":{"provider":"openai","model":"fixture","max_output_tokens":512}},"skills":[]}})
 }
 

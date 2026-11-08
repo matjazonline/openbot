@@ -1,0 +1,29 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+   Compiling open_bots v0.1.0 (/private/tmp/openbot-agent-history-h_82_5pw/worktree)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 59.34s
+     Running unittests src/lib.rs (/private/tmp/openbot-chs-p06-3f43t2k7/worktree/target/debug/deps/open_bots-8b80d02f0b6cf2e6)
+
+running 14 tests
+test application::services::test_support::scenario::inheritance::tests::inherited_listener_refuses_external_origin_before_connection_or_registration ... ok
+test application::services::test_support::scenario::lifecycle_tests::registration_is_scoped_and_missing_external_endpoints_fail_locally ... ok
+test application::services::test_support::scenario::lifecycle_tests::malformed_framing_fails_completion_without_capturing_authentication ... ok
+test application::services::test_support::scenario::inheritance::tests::inherited_listener_forged_proof_registers_no_agent_and_fails_the_actual_owner ... ok
+test application::services::test_support::scenario::inheritance::tests::inherited_listener_capability_is_one_use_and_rejects_a_second_registration ... ok
+test application::services::test_support::scenario::lifecycle_tests::dropping_a_fixture_cancels_its_listener_and_removes_registration ... ok
+test application::services::test_support::scenario::tests::a_listener_remains_active_to_detect_extra_requests ... ok
+test application::services::test_support::scenario::tests::unused_and_mismatched_exchanges_fail_explicit_completion ... ok
+test application::services::test_support::scenario::lifecycle_tests::shutdown_cancels_a_blocked_response_and_awaits_its_connection ... ok
+test application::services::test_support::scenario::lifecycle_tests::declared_disconnect_and_retry_are_counted_without_a_fallback_response ... ok
+test application::services::test_support::scenario::inheritance::tests::inherited_listener_proof_does_not_consume_or_capture_a_model_exchange ... ok
+AH-P07 genuine_process_crash point=Enqueued cancelled_middle=true same_identity=true provider_calls=3
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::e2e::queue_crashes::agent_history_e2e_process_crash_after_durable_enqueue_and_cancelled_middle_turn_recovers_in_order ... ok
+AH-P07 genuine_process_crash point=Acquisition durable_identity=true exact_context=true provider_calls=2
+AH-P07 genuine_process_crash point=BeforeWake polled=true successor_owned=true provider_calls=3
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::e2e::queue_crashes::agent_history_e2e_process_crash_before_successor_wakeup_recovers_by_poll_without_releasing_successor ... ok
+AH-P07 genuine_process_crash point=Frozen durable_identity=true exact_context=true provider_calls=2
+AH-P07 genuine_process_crash point=ModelSettled durable_identity=true exact_context=true provider_calls=2
+AH-P07 genuine_process_crash point=FinalCheckpoint durable_identity=true exact_context=true provider_calls=2
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::e2e::crashes::agent_history_e2e_process_crashes_reconstruct_durable_frontiers_without_duplicate_calls ... ok
+
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 3381 filtered out; finished in 25.43s
+

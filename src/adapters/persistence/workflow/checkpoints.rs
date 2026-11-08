@@ -44,11 +44,25 @@ impl WorkflowCheckpointStore for PostgresPersistence {
             }))
             .await;
         match attempt {
-            Attempt::Done(result) => Ok(result),
+            Attempt::Done(result) => {
+                if let WriteOutcome::Applied(checkpoint)
+                | WriteOutcome::AlreadyApplied(checkpoint) = &result
+                {
+                    tracing::info!(company_id=%write.fence.scope.company.as_uuid(),run_id=%write.fence.scope.run.as_uuid(),
+                        execution_id=%write.fence.scope.execution.as_uuid(), state=?checkpoint.state,
+                        durability="verified", event="workflow.checkpoint_verified", "Workflow checkpoint durably verified");
+                }
+                Ok(result)
+            }
             Attempt::Failed(error) => Err(error),
             // Exact replay can resolve a saved mutation on the next live read;
             // an ambiguous acknowledgment never authorizes the next phase.
-            Attempt::Ambiguous => Err(bound.unresolved()),
+            Attempt::Ambiguous => {
+                tracing::warn!(company_id=%write.fence.scope.company.as_uuid(),run_id=%write.fence.scope.run.as_uuid(),
+                    execution_id=%write.fence.scope.execution.as_uuid(),durability="unknown",
+                    event="workflow.checkpoint_ack_unknown", "Workflow checkpoint acknowledgment is unresolved");
+                Err(bound.unresolved())
+            }
         }
     }
 
@@ -63,7 +77,8 @@ impl WorkflowCheckpointStore for PostgresPersistence {
             spec.identity.clone(),
             spec.initial_prompt.clone(),
             spec.policy,
-        )?;
+        )?
+        .with_seed(spec.seed.clone())?;
         let bound = WriteBound::start("checkpoint.open", policy);
         let attempt = bound
             .attempt(Box::pin(async {
@@ -89,6 +104,16 @@ impl WorkflowCheckpointStore for PostgresPersistence {
                                 return Ok(Evidence::NotApplied);
                             };
                             let run = matching(saved, spec)?;
+                            if !agent_history::linked_on(
+                                &mut tx,
+                                fence,
+                                &spec.prepared,
+                                run.run_id.0,
+                            )
+                            .await?
+                            {
+                                return Ok(Evidence::NotApplied);
+                            }
                             Ok(Evidence::Applied(WriteOutcome::AlreadyApplied(run)))
                         }
                         .await;
@@ -265,7 +290,7 @@ fn validate_spec(fence: WorkflowFence, spec: &WorkflowCheckpointSpec) -> AppResu
     Ok(())
 }
 
-async fn lock_owner(
+pub(super) async fn lock_owner(
     tx: &mut Transaction<'_, Postgres>,
     fence: WorkflowFence,
     bound: &WriteBound,
@@ -356,6 +381,7 @@ fn matching(saved: Saved, spec: &WorkflowCheckpointSpec) -> AppResult<RunCheckpo
     if run.identity != spec.identity
         || run.policy != spec.policy
         || saved.workflow_prepared != spec.prepared
+        || run.seed != spec.seed
         || run.messages.first()
             != Some(&crate::services::harness::runs::ConversationMessage::User {
                 text: spec.initial_prompt.clone(),
@@ -380,6 +406,15 @@ async fn open_on(
     if !lock_owner(tx, fence, bound).await? {
         return Ok(End::Rollback(WriteOutcome::OwnershipLost));
     }
+    agent_history::audience_on(
+        tx,
+        ActionScope {
+            company: fence.scope.company,
+            run: fence.scope.run,
+            execution: fence.scope.execution,
+        },
+    )
+    .await?;
     let owned: bool =
         sqlx::query_scalar("SELECT EXISTS (SELECT 1 FROM agents WHERE company_id=$1 AND id=$2)")
             .bind(fence.scope.company.as_uuid())
@@ -391,8 +426,14 @@ async fn open_on(
     }
     if let Some(saved) = load_on(tx, fence).await? {
         let run = matching(saved, spec)?;
+        let linked = agent_history::attach_on(tx, fence, &spec.prepared, run.run_id.0).await?;
         live(tx, fence, bound).await?;
-        return Ok(End::Rollback(WriteOutcome::AlreadyApplied(run)));
+        return Ok(match linked {
+            agent_history::LinkChange::Linked => End::Commit(WriteOutcome::AlreadyApplied(run)),
+            agent_history::LinkChange::Unchanged => {
+                End::Rollback(WriteOutcome::AlreadyApplied(run))
+            }
+        });
     }
     sqlx::query("INSERT INTO task_harness_runs
         (id, company_id, task_id, agent_id, workflow_run_id, workflow_execution_id, workflow_generation, workflow_worker_id, workflow_attempt, workflow_prepared, schema_version, revision, state, checkpoint)
@@ -401,6 +442,7 @@ async fn open_on(
         .bind(fence.scope.run.as_uuid()).bind(fence.scope.execution.as_uuid()).bind(fence.generation.0)
         .bind(fence.worker.0).bind(fence.attempt.0).bind(&spec.prepared).bind(serde_json::to_value(proposed).map_err(|_| invalid())?)
         .execute(&mut **tx).await?;
+    agent_history::attach_on(tx, fence, &spec.prepared, proposed.run_id.0).await?;
     live(tx, fence, bound).await?;
     Ok(End::Commit(WriteOutcome::Applied(proposed.clone())))
 }
@@ -414,6 +456,15 @@ async fn execution_on(
     if !lock_owner(tx, write.fence, bound).await? {
         return Ok(End::Rollback(WriteOutcome::OwnershipLost));
     }
+    agent_history::audience_on(
+        tx,
+        ActionScope {
+            company: write.fence.scope.company,
+            run: write.fence.scope.run,
+            execution: write.fence.scope.execution,
+        },
+    )
+    .await?;
     let saved = load_on(tx, write.fence).await?.ok_or_else(missing)?;
     let current = decode(saved.id, saved.checkpoint)?;
     live(tx, write.fence, bound).await?;
@@ -435,6 +486,8 @@ async fn execution_on(
     if !changed {
         return Ok(End::Rollback(WriteOutcome::AlreadyApplied(next)));
     }
+    agent_history::require_active_on(tx, write.fence, &saved.workflow_prepared, current.run_id.0)
+        .await?;
     persist_on(tx, write.fence, &next, CheckpointOwnership::Execution).await?;
     live(tx, write.fence, bound).await?;
     Ok(End::Commit(WriteOutcome::Applied(next)))

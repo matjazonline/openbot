@@ -27,6 +27,13 @@ PURE = {
 }
 EXTERNAL = {'serde', 'serde_json', 'uuid', 'chrono', 'sha2'}
 SAMPLE = 'crate::application::workflow::sample'
+# Only inert cross-execution values and their fixed bounds, never the live harness.
+SEED_TYPES = {
+    'crate::application::services::harness::runs::LogicalSeed',
+    'crate::application::services::harness::runs::LogicalSeedPair',
+    'crate::application::services::harness::runs::MAX_LOGICAL_SEED_BYTES',
+    'crate::application::services::harness::runs::MAX_LOGICAL_SEED_PAIRS',
+}
 
 
 def code_only(source):
@@ -66,6 +73,7 @@ def normalize(path, module):
 
 
 def permitted(path):
+    if path in SEED_TYPES:return True
     if path==SAMPLE or path.startswith(SAMPLE+'::'):return True
     if path.startswith('crate::application::agent::dependency::'):return True
     if path in ('crate::application::agent::MAX_AGENT_DEPENDENCIES','crate::application::agent::MAX_AGENT_DEPENDENCY_DEPTH','crate::application::agent::MAX_AGENT_MANIFEST_BYTES','crate::entities::agent_capability::AgentBindingSource::Workflow','std::mem::take'):return True
@@ -79,7 +87,7 @@ def permitted(path):
     prefix='crate::application::workflow::'
     if path.startswith(prefix):return path[len(prefix):] in PURE
     if path.split('::')[0] in EXTERNAL:return True
-    if path.startswith('std::collections::') or path in ('std::sync::Arc','std::fmt::Display','u64::from'):return True
+    if path.startswith('std::collections::') or path in ('std::sync::Arc','std::fmt::Display','u64::from','usize::from'):return True
     return False
 
 

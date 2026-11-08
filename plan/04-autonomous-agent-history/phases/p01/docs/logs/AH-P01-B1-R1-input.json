@@ -1,0 +1,89 @@
+{
+  "id": "AH-P01-B1-R1",
+  "phase": "p01",
+  "stage": "whole phase01 code review; no accepted code yet",
+  "head": "4ab45555f8316ec7a8b1b64e8c05b77ff7d9a29d",
+  "phase_start_commit": "4ab45555f8316ec7a8b1b64e8c05b77ff7d9a29d",
+  "review_base": "4ab45555f8316ec7a8b1b64e8c05b77ff7d9a29d",
+  "worktree": "/private/tmp/openbot-agent-history-h_82_5pw/worktree",
+  "branch": "codex/autonomous-agent-history-h_82_5pw",
+  "digest": "e62ebc6c7dac3ec2e34ca3ddce727df87b3d70f780154eb5b581b710a394aa91",
+  "exclusions": [
+    "plan/04-autonomous-agent-history/COORDINATION.md",
+    "plan/04-autonomous-agent-history/phases/p01/docs",
+    "plan/04-autonomous-agent-history/phases/p02/docs",
+    "plan/04-autonomous-agent-history/phases/p03/docs",
+    "plan/04-autonomous-agent-history/phases/p04/docs",
+    "plan/04-autonomous-agent-history/phases/p05/docs",
+    "plan/04-autonomous-agent-history/phases/p06/docs",
+    "plan/04-autonomous-agent-history/phases/p07/docs",
+    "plan/04-autonomous-agent-history/integration/final/docs"
+  ],
+  "decision": "AH-P01-D1/r3",
+  "decision_path": "/private/tmp/openbot-agent-history-h_82_5pw/worktree/plan/04-autonomous-agent-history/phases/p01/docs/logs/AH-P01-D1-r3.md",
+  "decision_sha256": "ccdc36a566d74d5703c7c6e6d506b11167185a2c4a4882810ea018fb36a4a170",
+  "coordination_authority": "/Users/mac02/dev/openbot/plan/04-autonomous-agent-history/COORDINATION.md",
+  "coordination_revision": 3,
+  "coordination_pin": "/private/tmp/openbot-agent-history-h_82_5pw/worktree/plan/04-autonomous-agent-history/phases/p01/docs/logs/coordination-r3.md",
+  "coordination_sha256": "4761b3ac2317d6d227e9cdd764625c6ebbaccd0fe36d32787a8157eb9661e21c",
+  "preserved_external_setup": "/private/tmp/openbot-agent-history-h_82_5pw/worktree/plan/04-autonomous-agent-history/phases/p01/docs/logs/setup.json",
+  "full_suite": false,
+  "source_frozen": true,
+  "checks_pending": [],
+  "recheck_findings": [
+    "AH-P01-AG1-F2"
+  ],
+  "prior_decision_sha256": "2a2001b0889b9d586a077ebd69ea5aa4728ccfdc62005ceef3c69add824fdc3a",
+  "changed_decision_scope": "creator historical principal snapshot plus nullable live principal FK, preserving native revocation/deletion and retained identities",
+  "at": "2026-11-07T12:18:46.205030+00:00",
+  "evidence_receipts": [
+    "history-and-affected-runtime-05.json",
+    "focused-selection-05.json"
+  ],
+  "original_requirements": "plan/04-autonomous-agent-history/01-contracts-and-conversation-identity.md",
+  "accepted_architecture": [
+    {
+      "id": "D1/r2",
+      "path": "/private/tmp/openbot-agent-history-h_82_5pw/worktree/plan/04-autonomous-agent-history/phases/p01/docs/logs/AH-P01-D1-r2.md",
+      "sha256": "2a2001b0889b9d586a077ebd69ea5aa4728ccfdc62005ceef3c69add824fdc3a"
+    },
+    {
+      "id": "D1/r3",
+      "path": "/private/tmp/openbot-agent-history-h_82_5pw/worktree/plan/04-autonomous-agent-history/phases/p01/docs/logs/AH-P01-D1-r3.md",
+      "sha256": "ccdc36a566d74d5703c7c6e6d506b11167185a2c4a4882810ea018fb36a4a170"
+    }
+  ],
+  "owned_scope": "/private/tmp/openbot-agent-history-h_82_5pw/worktree/plan/04-autonomous-agent-history/phases/p01/docs/logs/author-scope-lifecycle-02.json",
+  "owned_paths": 59,
+  "owned_archive": "/private/tmp/openbot-agent-history-h_82_5pw/worktree/plan/04-autonomous-agent-history/phases/p01/docs/logs/AH-P01-B1-R1-owned-source.tar.gz",
+  "owned_archive_sha256": "4ba0fd3c1cf929754c4ac463bd9699bb8bd5fea7d33bb15e8fe21640b2b75822",
+  "check_receipts": [
+    "reset-principal-lifecycle-02.json",
+    "migrations-main-lifecycle-02.json",
+    "migrations-test-lifecycle-02.json",
+    "sqlx-prepare-lifecycle-01.json",
+    "sqlx-check-lifecycle-01.json",
+    "history-and-affected-list-04.json",
+    "history-and-affected-runtime-06.json",
+    "offline-all-targets-lifecycle-01.json",
+    "identity-clippy-02.json",
+    "identity-fmt-check-01.json",
+    "graph-implementation-03.json",
+    "identity-diff-check-01.json"
+  ],
+  "selection_receipt": "focused-selection-06.json",
+  "targeted_tests_passed": 165,
+  "history_tests": {
+    "agent_history_identity_": 19,
+    "agent_history_level_": 2,
+    "agent_history_contract_": 8
+  },
+  "failed_evidence_retained": [
+    "history-and-affected-runtime-05.json",
+    "identity-runtime-02.json",
+    "history-runtime-04.json",
+    "admission-compile-01.json",
+    "contracts-compile-01.json"
+  ],
+  "current_code_claim": "Phase01 identity/contracts/session admission only; exchange persistence/turn ordering/provider history belong02+ and not implemented"
+}

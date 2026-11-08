@@ -209,6 +209,7 @@ impl Journey {
         identity: &AdmissionIdentity,
     ) -> AdmitWorkflowRequest {
         AdmitWorkflowRequest {
+            history_session: None,
             company_id: self.scope.company,
             actor: self.scope.actor,
             association: RelatedAssociation::Company,

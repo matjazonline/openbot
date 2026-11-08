@@ -76,6 +76,15 @@ pub struct SampleStep {
     pub kind: crate::domain::workflow::TypeName,
     pub inputs: Value,
     pub output: Value,
+    pub history: Option<SampleAgentHistory>,
+}
+
+/// Scripted, sample-local context. It never names a production conversation.
+#[derive(Debug, Clone, Serialize)]
+pub struct SampleAgentHistory {
+    pub agent: crate::entities::agent_capability::AgentId,
+    pub seed: crate::application::services::harness::runs::LogicalSeed,
+    pub omitted_pairs: usize,
 }
 #[derive(Debug, Clone, Copy, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]

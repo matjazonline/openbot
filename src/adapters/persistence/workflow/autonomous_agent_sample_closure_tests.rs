@@ -5,6 +5,9 @@ use crate::application::workflow::sample_capture::SampleDefinitionCapture;
 #[path = "autonomous_agent_sample_bounds_tests.rs"]
 mod bounds;
 
+#[path = "agent_history_sample_tests.rs"]
+mod history;
+
 fn capture_service(setup: &AgentSetup) -> crate::adapters::persistence::workflow::SampleCapture {
     crate::adapters::persistence::workflow::SampleCapture {
         persistence: setup.fixture.persistence.clone(),

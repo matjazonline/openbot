@@ -1,0 +1,219 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+   Compiling open_bots v0.1.0 (/private/tmp/openbot-agent-history-h_82_5pw/worktree)
+error[E0308]: mismatched types
+   --> src/adapters/persistence/workflow/storage_checkpoint_tests.rs:110:9
+    |
+108 |     crate::adapters::persistence::workflow::agent_history_retention_fixture::expire(
+    |     ------------------------------------------------------------------------------- arguments to this function are incorrect
+109 |         p,
+110 |         f.native.fence.scope,
+    |         ^^^^^^^^^^^^^^^^^^^^ expected `ActionScope`, found `ActivationRequest`
+    |
+note: function defined here
+   --> src/adapters/persistence/workflow/agent_history_retention_fixture.rs:62:21
+    |
+ 62 | pub(super) async fn expire(p: &PostgresPersistence, scope: ActionScope) {
+    |                     ^^^^^^                          ------------------
+
+error[E0308]: mismatched types
+  --> src/adapters/persistence/workflow/agent_history_retry_deletion_tests.rs:83:9
+   |
+81 |     crate::adapters::persistence::workflow::agent_history_retention_fixture::expire(
+   |     ------------------------------------------------------------------------------- arguments to this function are incorrect
+82 |         p,
+83 |         f.write.fence.scope,
+   |         ^^^^^^^^^^^^^^^^^^^ expected `ActionScope`, found `ActivationRequest`
+   |
+note: function defined here
+  --> src/adapters/persistence/workflow/agent_history_retention_fixture.rs:62:21
+   |
+62 | pub(super) async fn expire(p: &PostgresPersistence, scope: ActionScope) {
+   |                     ^^^^^^                          ------------------
+
+error[E0308]: mismatched types
+   --> src/adapters/persistence/workflow/agent_history_retry_deletion_tests.rs:110:9
+    |
+108 |     crate::adapters::persistence::workflow::agent_history_retention_fixture::retire_source(
+    |     -------------------------------------------------------------------------------------- arguments to this function are incorrect
+109 |         p,
+110 |         f.write.fence.scope,
+    |         ^^^^^^^^^^^^^^^^^^^ expected `ActionScope`, found `ActivationRequest`
+    |
+note: function defined here
+   --> src/adapters/persistence/workflow/agent_history_retention_fixture.rs:72:21
+    |
+ 72 | pub(super) async fn retire_source(p: &PostgresPersistence, scope: ActionScope) {
+    |                     ^^^^^^^^^^^^^                          ------------------
+
+error[E0308]: mismatched types
+   --> src/adapters/persistence/workflow/agent_history_retry_deletion_tests.rs:151:9
+    |
+149 |     crate::adapters::persistence::workflow::agent_history_retention_fixture::retire(
+    |     ------------------------------------------------------------------------------- arguments to this function are incorrect
+150 |         p,
+151 |         f.write.fence.scope,
+    |         ^^^^^^^^^^^^^^^^^^^ expected `ActionScope`, found `ActivationRequest`
+    |
+note: function defined here
+   --> src/adapters/persistence/workflow/agent_history_retention_fixture.rs:67:21
+    |
+ 67 | pub(super) async fn retire(p: &PostgresPersistence, scope: ActionScope) {
+    |                     ^^^^^^                          ------------------
+
+error[E0308]: mismatched types
+   --> src/adapters/persistence/workflow/agent_history_freeze_guard_tests.rs:154:13
+    |
+152 |         crate::adapters::persistence::workflow::agent_history_retention_fixture::retire(
+    |         ------------------------------------------------------------------------------- arguments to this function are incorrect
+153 |             case.f.s.p(),
+154 |             source.fence.scope,
+    |             ^^^^^^^^^^^^^^^^^^ expected `ActionScope`, found `ActivationRequest`
+    |
+note: function defined here
+   --> src/adapters/persistence/workflow/agent_history_retention_fixture.rs:67:21
+    |
+ 67 | pub(super) async fn retire(p: &PostgresPersistence, scope: ActionScope) {
+    |                     ^^^^^^                          ------------------
+
+error[E0308]: mismatched types
+  --> src/adapters/persistence/workflow/agent_history_retention_tests.rs:34:37
+   |
+34 |     let fresh = clock::candidate(p, claim.fence.scope).await;
+   |                 ----------------    ^^^^^^^^^^^^^^^^^ expected `ActionScope`, found `ActivationRequest`
+   |                 |
+   |                 arguments to this function are incorrect
+   |
+note: function defined here
+  --> src/adapters/persistence/workflow/agent_history_retention_fixture.rs:46:21
+   |
+46 | pub(super) async fn candidate(p: &PostgresPersistence, scope: ActionScope) -> HistoryCandidate {
+   |                     ^^^^^^^^^                          ------------------
+
+error[E0308]: mismatched types
+  --> src/adapters/persistence/workflow/agent_history_retention_tests.rs:44:19
+   |
+44 |     clock::age(p, claim.fence.scope).await;
+   |     ----------    ^^^^^^^^^^^^^^^^^ expected `ActionScope`, found `ActivationRequest`
+   |     |
+   |     arguments to this function are incorrect
+   |
+note: function defined here
+  --> src/adapters/persistence/workflow/agent_history_retention_fixture.rs:6:21
+   |
+ 6 | pub(super) async fn age(p: &PostgresPersistence, scope: ActionScope) {
+   |                     ^^^                          ------------------
+
+error[E0308]: mismatched types
+  --> src/adapters/persistence/workflow/agent_history_retention_tests.rs:49:41
+   |
+49 |     let candidate = clock::candidate(p, claim.fence.scope).await;
+   |                     ----------------    ^^^^^^^^^^^^^^^^^ expected `ActionScope`, found `ActivationRequest`
+   |                     |
+   |                     arguments to this function are incorrect
+   |
+note: function defined here
+  --> src/adapters/persistence/workflow/agent_history_retention_fixture.rs:46:21
+   |
+46 | pub(super) async fn candidate(p: &PostgresPersistence, scope: ActionScope) -> HistoryCandidate {
+   |                     ^^^^^^^^^                          ------------------
+
+error[E0308]: mismatched types
+   --> src/adapters/persistence/workflow/agent_history_retention_tests.rs:120:22
+    |
+120 |     clock::expire(p, claims[1].fence.scope).await;
+    |     -------------    ^^^^^^^^^^^^^^^^^^^^^ expected `ActionScope`, found `ActivationRequest`
+    |     |
+    |     arguments to this function are incorrect
+    |
+note: function defined here
+   --> src/adapters/persistence/workflow/agent_history_retention_fixture.rs:62:21
+    |
+ 62 | pub(super) async fn expire(p: &PostgresPersistence, scope: ActionScope) {
+    |                     ^^^^^^                          ------------------
+
+error[E0308]: mismatched types
+   --> src/adapters/persistence/workflow/agent_history_retention_tests.rs:125:22
+    |
+125 |     clock::expire(p, claims[0].fence.scope).await;
+    |     -------------    ^^^^^^^^^^^^^^^^^^^^^ expected `ActionScope`, found `ActivationRequest`
+    |     |
+    |     arguments to this function are incorrect
+    |
+note: function defined here
+   --> src/adapters/persistence/workflow/agent_history_retention_fixture.rs:62:21
+    |
+ 62 | pub(super) async fn expire(p: &PostgresPersistence, scope: ActionScope) {
+    |                     ^^^^^^                          ------------------
+
+error[E0308]: mismatched types
+   --> src/adapters/persistence/workflow/agent_history_retention_tests.rs:130:29
+    |
+130 |     clock::retire_source(p, claims[0].fence.scope).await;
+    |     --------------------    ^^^^^^^^^^^^^^^^^^^^^ expected `ActionScope`, found `ActivationRequest`
+    |     |
+    |     arguments to this function are incorrect
+    |
+note: function defined here
+   --> src/adapters/persistence/workflow/agent_history_retention_fixture.rs:72:21
+    |
+ 72 | pub(super) async fn retire_source(p: &PostgresPersistence, scope: ActionScope) {
+    |                     ^^^^^^^^^^^^^                          ------------------
+
+error[E0308]: mismatched types
+   --> src/adapters/persistence/workflow/agent_history_retention_tests.rs:150:22
+    |
+150 |     clock::expire(p, claims[2].fence.scope).await;
+    |     -------------    ^^^^^^^^^^^^^^^^^^^^^ expected `ActionScope`, found `ActivationRequest`
+    |     |
+    |     arguments to this function are incorrect
+    |
+note: function defined here
+   --> src/adapters/persistence/workflow/agent_history_retention_fixture.rs:62:21
+    |
+ 62 | pub(super) async fn expire(p: &PostgresPersistence, scope: ActionScope) {
+    |                     ^^^^^^                          ------------------
+
+error[E0308]: mismatched types
+   --> src/adapters/persistence/workflow/agent_history_retention_tests.rs:166:19
+    |
+166 |     clock::age(p, claim.fence.scope).await;
+    |     ----------    ^^^^^^^^^^^^^^^^^ expected `ActionScope`, found `ActivationRequest`
+    |     |
+    |     arguments to this function are incorrect
+    |
+note: function defined here
+   --> src/adapters/persistence/workflow/agent_history_retention_fixture.rs:6:21
+    |
+  6 | pub(super) async fn age(p: &PostgresPersistence, scope: ActionScope) {
+    |                     ^^^                          ------------------
+
+error[E0308]: mismatched types
+   --> src/adapters/persistence/workflow/agent_history_retention_tests.rs:185:46
+    |
+185 |         p.expire_history(clock::candidate(p, claim.fence.scope).await)
+    |                          ----------------    ^^^^^^^^^^^^^^^^^ expected `ActionScope`, found `ActivationRequest`
+    |                          |
+    |                          arguments to this function are incorrect
+    |
+note: function defined here
+   --> src/adapters/persistence/workflow/agent_history_retention_fixture.rs:46:21
+    |
+ 46 | pub(super) async fn candidate(p: &PostgresPersistence, scope: ActionScope) -> HistoryCandidate {
+    |                     ^^^^^^^^^                          ------------------
+
+error[E0308]: mismatched types
+   --> src/adapters/persistence/workflow/agent_history_retention_tests.rs:198:46
+    |
+198 |         p.expire_history(clock::candidate(p, claim.fence.scope).await)
+    |                          ----------------    ^^^^^^^^^^^^^^^^^ expected `ActionScope`, found `ActivationRequest`
+    |                          |
+    |                          arguments to this function are incorrect
+    |
+note: function defined here
+   --> src/adapters/persistence/workflow/agent_history_retention_fixture.rs:46:21
+    |
+ 46 | pub(super) async fn candidate(p: &PostgresPersistence, scope: ActionScope) -> HistoryCandidate {
+    |                     ^^^^^^^^^                          ------------------
+
+For more information about this error, try `rustc --explain E0308`.
+error: could not compile `open_bots` (lib test) due to 15 previous errors

@@ -22,7 +22,17 @@ async fn autonomous_agent_admission_descendant_keeps_the_parent_selection_after_
         panic!("parent admitted")
     };
     let parent_claim = claim_run(&setup, run).await;
-    let initial = p.prepare_agent(&parent_claim).await.unwrap();
+    let initial = p
+        .prepare_agent(
+            &parent_claim,
+            crate::application::workflow::lease::LeasePolicy::new(std::time::Duration::from_secs(
+                60,
+            ))
+            .unwrap(),
+        )
+        .await
+        .unwrap()
+        .expect_ready();
     let manifest = initial.prepared.selection().manifest_id();
     let classified = run_model(&setup, &parent_claim, ModelStep::Classify, "billing").await;
     let next = p
@@ -59,7 +69,17 @@ async fn autonomous_agent_admission_descendant_keeps_the_parent_selection_after_
     let child:Uuid=sqlx::query_scalar("SELECT id FROM workflow_runs WHERE company_id=$1 AND parent_run_id=$2 AND parent_execution_id=$3")
         .bind(scope.company.as_uuid()).bind(run.as_uuid()).bind(next.execution.as_uuid()).fetch_one(p.pool()).await.unwrap();
     let claim = claim_run(&setup, RunId::new(child)).await;
-    let child = p.prepare_agent(&claim).await.unwrap();
+    let child = p
+        .prepare_agent(
+            &claim,
+            crate::application::workflow::lease::LeasePolicy::new(std::time::Duration::from_secs(
+                60,
+            ))
+            .unwrap(),
+        )
+        .await
+        .unwrap()
+        .expect_ready();
     assert_eq!(child.prepared.selection().manifest_id(), manifest);
     assert_eq!(child.prepared.selection().revision().id, original.id);
     assert_eq!(
@@ -135,3 +155,12 @@ async fn run_model(
     assert_eq!(llm.finish().await.unwrap(), 1);
     output
 }
+
+#[path = "agent_history_child_tests.rs"]
+mod history_identity;
+
+#[path = "agent_history_children_integration_tests.rs"]
+mod history_integration;
+
+#[path = "agent_history_continuation_tests.rs"]
+mod history_continuation;

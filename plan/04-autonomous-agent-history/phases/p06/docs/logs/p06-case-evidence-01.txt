@@ -1,0 +1,54 @@
+{
+  "status": "PASS",
+  "selected": 862,
+  "distinct_latest_passes": 862,
+  "ignored": 0,
+  "required_families": {
+    "agent_history_views_": 3,
+    "agent_history_retention_": 10,
+    "agent_history_controls_": 2,
+    "agent_history_level_": 17
+  },
+  "accepted_p05_names_preserved": 769,
+  "observations": [
+    {
+      "run": "p06-final-history-01",
+      "exit_code": 101,
+      "counts": {
+        "ok": 192,
+        "FAILED": 1
+      },
+      "receipt_sha256": "3fc39c0b7f36b559abaf1b9f24591c01dc263e9a7bcddca0e6faa723d0bb69c0",
+      "log_sha256": "fdfd95b497559a19beace232af9eca9f6e44ab0ac21951eac5da10ff6756589c"
+    },
+    {
+      "run": "p06-final-inspector-01",
+      "exit_code": 0,
+      "counts": {
+        "ok": 26
+      },
+      "receipt_sha256": "410fca24aacb2e662b50fbccb8d1ae8f0bbbc89fff0f2f4d1f5c2fe3d7276bf2",
+      "log_sha256": "61982b3a348d65b5f663dec2e8da5d0d15cdc7483e54010b65d1846cb05becfd"
+    },
+    {
+      "run": "p06-final-focused-runtime-01",
+      "exit_code": 101,
+      "counts": {
+        "ok": 811,
+        "FAILED": 1
+      },
+      "receipt_sha256": "e469945fc53ea0f8ada0cf6f5155407f088deb080ec1297c851475ca44377450",
+      "log_sha256": "b3e21e02c7aeb27febdd3cca1b3b39d51e9a6fa2a4a9309d502eec786b0e4945"
+    },
+    {
+      "run": "p06-decision-fixtures-01",
+      "exit_code": 0,
+      "counts": {
+        "ok": 4
+      },
+      "receipt_sha256": "d8f84323926a2e3c2ab19e68333fa3dd69496a932990525d95f976ce24f83a01",
+      "log_sha256": "9761dad33cd24e3fb9b4456168eda043d64b6bf8fa8f7a3d879b41fdbccfc6d2"
+    }
+  ],
+  "reuse_disposition": "Current affected812 runtime supplies811 successful observations. Its only failure was old origin collector fixture assuming retained history did not pin source; only that test fixture changed after launch, and decision-fixtures01 reruns it with genuine native expiry and all original collector/action/revision/company assertions plus pin refusal. All product contracts, PG/schema/env/other test fixtures unchanged during this run. final-inspector01 covers final view/provenance/timing/source actions and lifecycle/pins. Additional source-retention/registry/logical-seed names reuse successful per-case observations from final-history01: subsequent production changes were safe frozen inspection, read projection/HTML, narrow agent-delete FK mapping and bounded staged/verified logs; they did not change native expiry/source-retirement/registry/logical-seed behavior or fixtures. Failed whole commands remain FAIL; this is latest successful per-case evidence, not a claim that either failed command passed."
+}

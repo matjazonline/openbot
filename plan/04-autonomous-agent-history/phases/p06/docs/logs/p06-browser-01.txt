@@ -1,0 +1,27 @@
+✔ actual history HTML: dark keyboard pagination reaches last exchange, detail is escaped, reads replace and failures recover (2316.838083ms)
+✖ actual history HTML: light keyboard pagination reaches last exchange, detail is escaped, reads replace and failures recover (6444.587458ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 1
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 8995.341291
+
+✖ failing tests:
+
+test at scripts/tests/agent-history-browser.mjs:41:37
+✖ actual history HTML: light keyboard pagination reaches last exchange, detail is escaped, reads replace and failures recover (6444.587458ms)
+  Error: expect(received).toBeGreaterThan(expected)
+  
+  Expected: > 0
+  Received:   0
+  
+  Call Log:
+  - Timeout 5000ms exceeded while waiting on the predicate
+      at pollMatcher (/Users/mac02/dev/openbot/node_modules/playwright/lib/matchers/expect.js:312:11)
+      at async take (file:///private/tmp/openbot-agent-history-h_82_5pw/worktree/scripts/tests/agent-history-browser.mjs:33:25)
+      at async TestContext.<anonymous> (file:///private/tmp/openbot-agent-history-h_82_5pw/worktree/scripts/tests/agent-history-browser.mjs:46:42)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7)

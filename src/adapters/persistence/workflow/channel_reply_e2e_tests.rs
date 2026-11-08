@@ -10,6 +10,9 @@ mod hitl;
 #[path = "channel_reply_e2e_recovery_tests.rs"]
 mod recovery;
 
+#[path = "agent_history_channel_tests.rs"]
+mod history;
+
 #[tokio::test]
 async fn channel_reply_e2e_selected_binding_manual_and_schedule_runs_never_inherit_destination() {
     use crate::adapters::persistence::workflow::schedule_test_support::schedule_use_cases;
@@ -26,6 +29,7 @@ async fn channel_reply_e2e_selected_binding_manual_and_schedule_runs_never_inher
     manual::start(
         &d.engine.services().service(),
         StartRun {
+            history_session: None,
             company_id: d.fixture.target.company,
             actor: d.fixture.target.actor,
             binding_id: binding.binding,

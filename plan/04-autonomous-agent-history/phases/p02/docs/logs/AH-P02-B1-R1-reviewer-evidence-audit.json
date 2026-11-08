@@ -1,0 +1,246 @@
+{
+  "review": "AH-P02-B1-R1",
+  "reviewer_runtime_execution": false,
+  "runtime_audit": [
+    {
+      "name": "history-and-affected-runtime-09",
+      "distinct_passed": 239,
+      "record_names_match_raw": true,
+      "failed": [
+        "adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::acceptance_tests::revision_tests::workflow_control_revision_overflow_refuses_without_partial_writes",
+        "adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::storage_checkpoint_tests::run_retention_native_checkpoint_and_model_usage_delete_with_only_owned_jobs",
+        "adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::storage_checkpoint_tests::run_retention_native_checkpoint_model_usage_and_tree_rollback_then_retry",
+        "adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::tokens::refusal::workflow_harness_token_approved_request_reparks_when_usage_itself_exceeds_allowance",
+        "adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::tokens::refusal::workflow_harness_token_inflight_settlement_retains_truth_after_sibling_denial",
+        "adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::tokens::refusal::workflow_harness_token_sibling_usage_reparks_exact_request_without_debit",
+        "adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::tokens::updates::workflow_harness_update_retains_result_after_refusal_but_cannot_prepare_next"
+      ],
+      "ignored": [
+        "adapters::http::routes::workflows::ui::authoring::tests::agent_picker_tests::dump_autonomous_workflow_agent_picker_browser_fixtures"
+      ],
+      "log_sha_matches": true
+    },
+    {
+      "name": "history-and-affected-runtime-10",
+      "distinct_passed": 227,
+      "record_names_match_raw": true,
+      "failed": [],
+      "ignored": [],
+      "log_sha_matches": true
+    },
+    {
+      "name": "history-runtime-11",
+      "distinct_passed": 49,
+      "record_names_match_raw": true,
+      "failed": [],
+      "ignored": [],
+      "log_sha_matches": true
+    }
+  ],
+  "distinct_passing_union": 248,
+  "current_cohort_distinct": 229,
+  "reused_prior_only": [
+    "adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::eligibility_tests::claim_sql_tests::storage_reconciliation_tests::run_retention_consumed_old_proof_cannot_close_a_later_remote_entry",
+    "adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::eligibility_tests::claim_sql_tests::storage_reconciliation_tests::run_retention_evidence_conflict_keeps_terminal_tree_even_with_exact_receipt",
+    "adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::eligibility_tests::claim_sql_tests::storage_reconciliation_tests::run_retention_historical_not_applied_closure_survives_retry_grant_expiry",
+    "adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::eligibility_tests::claim_sql_tests::storage_reconciliation_tests::run_retention_unknown_effect_is_protected_while_complete_not_applied_proof_closes_it",
+    "adapters::persistence::workflow::tests::admission_tests::storage_tests::boundary_tests::run_retention_native_schema_100001_members_reaches_delete_without_activation_cutoff",
+    "adapters::persistence::workflow::tests::admission_tests::storage_tests::protection_tests::run_retention_deferred_job_provenance_still_rejects_native_commit",
+    "adapters::persistence::workflow::tests::admission_tests::storage_tests::protection_tests::run_retention_external_rerun_blocks_referent_until_independent_root_is_removed",
+    "adapters::persistence::workflow::tests::admission_tests::storage_tests::protection_tests::run_retention_protects_open_decision_until_its_wait_closes",
+    "adapters::persistence::workflow::tests::admission_tests::storage_tests::protection_tests::run_retention_shutdown_rolls_back_the_actual_inflight_archive_and_delete",
+    "adapters::persistence::workflow::tests::admission_tests::storage_tests::report_tests::run_retention_report_global_scan_cap_applies_before_filters_across_sources",
+    "adapters::persistence::workflow::tests::admission_tests::storage_tests::report_tests::run_retention_reports_preserve_categories_filters_time_prices_and_live_union",
+    "adapters::persistence::workflow::tests::admission_tests::storage_tests::retry_tests::run_retention_first_fences_waiting_production_retry_without_partial_archive",
+    "adapters::persistence::workflow::tests::admission_tests::storage_tests::retry_tests::run_retention_retry_first_revival_owns_and_preserves_live_work",
+    "adapters::persistence::workflow::tests::admission_tests::storage_tests::run_retention_archive_guards_refuse_forgery_duplicates_and_mutation",
+    "adapters::persistence::workflow::tests::admission_tests::storage_tests::run_retention_competing_collectors_delete_exactly_once",
+    "adapters::persistence::workflow::tests::admission_tests::storage_tests::run_retention_complete_tree_jobs_usage_and_idempotent_retry",
+    "adapters::persistence::workflow::tests::admission_tests::storage_tests::run_retention_global_cursor_skips_protected_prefix_and_keeps_young_live",
+    "adapters::persistence::workflow::tests::admission_tests::storage_tests::run_retention_rollback_after_runs_before_jobs_preserves_every_owner",
+    "adapters::persistence::workflow::tests::message_tests::storage_message_tests::run_retention_pending_message_consumption_keeps_terminal_tree"
+  ],
+  "earlier_failures_missing_current_pass": [],
+  "list_audit": {
+    "history-and-affected-list-09": {
+      "listed": 247,
+      "missing_from_union": [
+        "adapters::http::routes::workflows::ui::authoring::tests::agent_picker_tests::dump_autonomous_workflow_agent_picker_browser_fixtures"
+      ]
+    },
+    "history-list-11": {
+      "listed": 49,
+      "missing_from_union": []
+    }
+  },
+  "check_audit": [
+    {
+      "name": "migrations-main-exchange-01",
+      "exit_code": 0,
+      "command": [
+        "cargo",
+        "sqlx",
+        "migrate",
+        "run"
+      ],
+      "receipt_matches": true,
+      "log_matches": true
+    },
+    {
+      "name": "migrations-test-exchange-01",
+      "exit_code": 0,
+      "command": [
+        "env",
+        "DATABASE_URL=postgres://mac02@127.0.0.1:65037/openbot_ah_p02_test",
+        "cargo",
+        "sqlx",
+        "migrate",
+        "run"
+      ],
+      "receipt_matches": true,
+      "log_matches": true
+    },
+    {
+      "name": "history-and-affected-runtime-10",
+      "exit_code": 0,
+      "command": [
+        "scripts/test-network-isolation.sh",
+        "cargo",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "--",
+        "agent_history_",
+        "workflow_harness_",
+        "workflow_agent_",
+        "autonomous_agent_authority_",
+        "knowledge_search_",
+        "run_retention_native_checkpoint",
+        "workflow_control_",
+        "workflow_recovery_",
+        "model_steps::",
+        "channel_reply_e2e_",
+        "autonomous_agent_samples_",
+        "--skip",
+        "dump_autonomous_workflow_agent_picker_browser_fixtures"
+      ],
+      "receipt_matches": true,
+      "log_matches": true
+    },
+    {
+      "name": "history-runtime-11",
+      "exit_code": 0,
+      "command": [
+        "scripts/test-network-isolation.sh",
+        "cargo",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "agent_history_"
+      ],
+      "receipt_matches": true,
+      "log_matches": true
+    },
+    {
+      "name": "sqlx-prepare-exchanges-01",
+      "exit_code": 0,
+      "command": [
+        "cargo",
+        "sqlx",
+        "prepare",
+        "--",
+        "--locked",
+        "--offline",
+        "--all-targets"
+      ],
+      "receipt_matches": true,
+      "log_matches": true
+    },
+    {
+      "name": "sqlx-check-exchanges-01",
+      "exit_code": 0,
+      "command": [
+        "cargo",
+        "sqlx",
+        "prepare",
+        "--check",
+        "--",
+        "--locked",
+        "--offline",
+        "--all-targets"
+      ],
+      "receipt_matches": true,
+      "log_matches": true
+    },
+    {
+      "name": "offline-all-targets-exchanges-01",
+      "exit_code": 0,
+      "command": [
+        "cargo",
+        "check",
+        "--locked",
+        "--offline",
+        "--all-targets"
+      ],
+      "receipt_matches": true,
+      "log_matches": true
+    },
+    {
+      "name": "clippy-exchanges-01",
+      "exit_code": 0,
+      "command": [
+        "cargo",
+        "clippy",
+        "--locked",
+        "--offline",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "receipt_matches": true,
+      "log_matches": true
+    },
+    {
+      "name": "fmt-exchanges-01",
+      "exit_code": 0,
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "receipt_matches": true,
+      "log_matches": true
+    },
+    {
+      "name": "diff-exchanges-01",
+      "exit_code": 0,
+      "command": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "receipt_matches": true,
+      "log_matches": true
+    },
+    {
+      "name": "graft-exchanges-01",
+      "exit_code": 0,
+      "command": [
+        "graft",
+        "build"
+      ],
+      "receipt_matches": true,
+      "log_matches": true
+    }
+  ],
+  "limitations": [
+    "Lost-ack-named history completion test proves duplicate durable replay, not injected ambiguous COMMIT. See B1-F2.",
+    "No runtime diagnostic executed by B; source counterexamples independently traced and author confirmed.",
+    "No full suite/live-provider or phase03+ claim."
+  ]
+}

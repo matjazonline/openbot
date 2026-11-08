@@ -1,0 +1,17 @@
+#!/usr/bin/env python3
+"""Supply GNU realpath's two snapshot options on the macOS verification host."""
+import os
+import sys
+
+base = None
+paths = []
+for argument in sys.argv[1:]:
+    if argument == "-m" or argument == "--":
+        continue
+    if argument.startswith("--relative-to="):
+        base = argument.split("=", 1)[1]
+    else:
+        paths.append(argument)
+for path in paths:
+    resolved = os.path.realpath(path)
+    print(os.path.relpath(resolved, base) if base else resolved)

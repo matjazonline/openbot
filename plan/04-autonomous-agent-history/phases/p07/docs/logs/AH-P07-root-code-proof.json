@@ -1,0 +1,14 @@
+{
+  "status": "PASS",
+  "at": "2026-11-08T03:03:20.245181+00:00",
+  "source": "f1b34ff7555d888bdb14a4ec9209a06c481a1a56013dd6b2895fea9af4f8f2b7",
+  "owned": 216,
+  "external": 36,
+  "archive": "a5f88decc79e5ab8237bab3e7eeec9bca1f288f322bd6bc41436c20e3eaa2c23",
+  "coordination": 32,
+  "review_records_read_complete": true,
+  "reviewer_entry_exit_verified": true,
+  "reviewer_cases": 883,
+  "evidence_retention_verified": true,
+  "code_review": "AH-P07-B1-R1 PASS, no findings"
+}

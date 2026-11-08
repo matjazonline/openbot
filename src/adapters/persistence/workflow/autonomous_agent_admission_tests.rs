@@ -39,6 +39,7 @@ pub(super) async fn request(setup: &AgentSetup, key: &str, trigger: Uuid) -> Adm
             .await
             .unwrap();
     AdmitWorkflowRequest {
+        history_session: None,
         company_id: company,
         actor: setup.fixture.target.actor,
         association: RelatedAssociation::Company,
@@ -107,7 +108,17 @@ async fn autonomous_agent_admission_revisions_are_selected_at_admission_and_repl
         new.version, old.version,
         "publishing an agent leaves the workflow version intact"
     );
-    let launch = p.prepare_agent(&setup.claim).await.unwrap();
+    let launch = p
+        .prepare_agent(
+            &setup.claim,
+            crate::application::workflow::lease::LeasePolicy::new(std::time::Duration::from_secs(
+                60,
+            ))
+            .unwrap(),
+        )
+        .await
+        .unwrap()
+        .expect_ready();
     assert!(
         !launch
             .prepared
@@ -263,10 +274,15 @@ async fn autonomous_agent_workflow_reference_rename_cannot_redirect_an_existing_
 async fn autonomous_agent_authority_checkpoint_requires_the_exact_selected_agent_identity() {
     let setup = Box::pin(agent_setup("http://127.0.0.1:1")).await;
     let p = &setup.fixture.persistence;
-    let launch =
-        crate::application::workflow::agent::AgentPreparation::prepare_agent(p, &setup.claim)
-            .await
-            .unwrap();
+    let launch = crate::application::workflow::agent::AgentPreparation::prepare_agent(
+        p,
+        &setup.claim,
+        crate::application::workflow::lease::LeasePolicy::new(std::time::Duration::from_secs(60))
+            .unwrap(),
+    )
+    .await
+    .unwrap()
+    .expect_ready();
     let mut prepared = launch.prepared.spec(setup.claim.fence).unwrap().prepared;
     let scope = crate::application::workflow::actions::ActionScope {
         company: setup.claim.fence.scope.company,

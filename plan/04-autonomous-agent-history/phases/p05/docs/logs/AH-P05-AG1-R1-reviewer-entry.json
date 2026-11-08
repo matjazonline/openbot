@@ -1,0 +1,16 @@
+{
+  "digest": true,
+  "head": true,
+  "branch": true,
+  "decision": true,
+  "scope": true,
+  "owned_archive": true,
+  "producer_archive": true,
+  "evidence": true,
+  "reproduction_receipt": true,
+  "reproduction_log": true,
+  "coordination": true,
+  "owned_mismatch": [],
+  "external_mismatch": [],
+  "archive_content": true
+}

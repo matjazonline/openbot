@@ -98,7 +98,8 @@ fn values(name: &str) -> Value {
             json!({"agent":"assistant","context":{"message":"hello"},"output_schema":{"type":"string","enum":["support","sales"]}})
         }
         "agent.run" => {
-            json!({"agent":"assistant","context":{"message":"hello"},"output_schema":schema})
+            // Supply the current task only. Native history is selected independently of business JSON.
+            json!({"agent":"assistant","context":{"message":"hello","task":"Answer the current request using the retained conversation context"},"output_schema":schema})
         }
         "decision.rule" => json!({"data":"review","data_schema":schema}),
         "decision.human" => {

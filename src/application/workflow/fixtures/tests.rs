@@ -626,3 +626,6 @@ fn workflow_fixtures_nested_defaults_and_allof_keep_compile_work_bounded() {
         }
     }
 }
+
+#[path = "agent_history_tests.rs"]
+mod agent_history;

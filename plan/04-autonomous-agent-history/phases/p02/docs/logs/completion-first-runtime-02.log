@@ -1,0 +1,27 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+   Compiling open_bots v0.1.0 (/private/tmp/openbot-agent-history-h_82_5pw/worktree)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1m 58s
+     Running unittests src/lib.rs (/private/tmp/openbot-chs-p06-3f43t2k7/worktree/target/debug/deps/open_bots-8b80d02f0b6cf2e6)
+
+running 3 tests
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::history_storage::agent_history_completion_driver_keeps_exact_json_and_replays_without_provider ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::history_storage::agent_history_completion_repair_accepts_only_the_repaired_value ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::history_storage::agent_history_completion_invalid_candidates_never_become_an_answer ... FAILED
+
+failures:
+
+---- adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::history_storage::agent_history_completion_invalid_candidates_never_become_an_answer stdout ----
+
+thread 'adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::history_storage::agent_history_completion_invalid_candidates_never_become_an_answer' (35452264) panicked at src/adapters/persistence/workflow/agent_history_storage_tests.rs:129:5:
+assertion `left == right` failed
+  left: "active"
+ right: "failed"
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::history_storage::agent_history_completion_invalid_candidates_never_become_an_answer
+
+test result: FAILED. 2 passed; 1 failed; 0 ignored; 0 measured; 3269 filtered out; finished in 1.68s
+
+error: test failed, to rerun pass `--lib`

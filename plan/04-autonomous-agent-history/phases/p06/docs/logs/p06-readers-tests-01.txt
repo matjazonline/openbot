@@ -1,0 +1,34 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+   Compiling open_bots v0.1.0 (/private/tmp/openbot-agent-history-h_82_5pw/worktree)
+error[E0277]: `?` couldn't convert the error to `application::app_error::AppError`
+  --> src/adapters/persistence/workflow/agent_history_views/projection.rs:85:6
+   |
+74 |   pub(super) fn frozen(value: Value) -> AppResult<FrozenHistoryInspection> {
+   |                                         ---------------------------------- expected `application::app_error::AppError` because of this
+...
+82 |       let contract = ResponseContract::parse(
+   |  ____________________-
+83 | |         &serde_json::json!({"version":1,"format":"json_schema","schema":stored.output_schema})
+84 | |             .to_string(),
+85 | |     )?;
+   | |     -^ the trait `std::convert::From<&str>` is not implemented for `application::app_error::AppError`
+   | |_____|
+   |       this can't be annotated with `?` because it has type `Result<_, &'static str>`
+   |
+note: `application::app_error::AppError` needs to implement `From<&str>`
+  --> src/application/app_error.rs:6:1
+   |
+ 6 | pub enum AppError {
+   | ^^^^^^^^^^^^^^^^^
+   = note: the question mark operation (`?`) implicitly performs a conversion on the error value using the `From` trait
+   = help: the following other types implement trait `std::convert::From<T>`:
+             `application::app_error::AppError` implements `std::convert::From<UnknownRecipientRole>`
+             `application::app_error::AppError` implements `std::convert::From<anyhow::Error>`
+             `application::app_error::AppError` implements `std::convert::From<application::transport::bounded::BoundsError>`
+             `application::app_error::AppError` implements `std::convert::From<domain::entities::message::ExternalMessageCollision>`
+             `application::app_error::AppError` implements `std::convert::From<envelope::EnvelopeError>`
+             `application::app_error::AppError` implements `std::convert::From<protocols::email::ingress::EmailIngressError>`
+             `application::app_error::AppError` implements `std::convert::From<sqlx::Error>`
+
+For more information about this error, try `rustc --explain E0277`.
+error: could not compile `open_bots` (lib test) due to 1 previous error

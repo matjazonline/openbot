@@ -79,6 +79,7 @@ pub struct RunCheckpoint {
     pub revision: CheckpointRevision,
     pub state: RunState,
     pub policy: RigExecutionPolicy,
+    pub seed: LogicalSeed,
     pub messages: Vec<ConversationMessage>,
     /// Unknown requests remain here and remain charged across recovery.
     pub reservations: Vec<ModelReservation>,
@@ -126,6 +127,7 @@ impl RunCheckpoint {
             revision: CheckpointRevision(0),
             state: RunState::Active,
             policy,
+            seed: LogicalSeed::default(),
             messages: vec![ConversationMessage::User { text: prompt }],
             reservations: vec![],
             turns: vec![],
@@ -140,6 +142,7 @@ impl RunCheckpoint {
 
     pub fn validate(&self) -> AppResult<()> {
         self.policy.validate()?;
+        self.seed.validate()?;
         if self.contract_fingerprint
             != self
                 .identity
@@ -196,6 +199,16 @@ impl RunCheckpoint {
         self.validate_ledger()?;
         self.validate_conversation()?;
         Ok(())
+    }
+
+    /// Only initial checkpoint construction installs cross-execution data.
+    pub fn with_seed(mut self, seed: LogicalSeed) -> AppResult<Self> {
+        if self.revision.0 != 0 || !self.reservations.is_empty() || !self.turns.is_empty() {
+            return Err(invalid("Logical seed changed after execution began"));
+        }
+        self.seed = seed;
+        self.validate()?;
+        Ok(self)
     }
 
     fn validate_response_ledger(&self) -> AppResult<()> {

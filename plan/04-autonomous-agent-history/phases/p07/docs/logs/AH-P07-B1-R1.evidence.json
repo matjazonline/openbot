@@ -1,0 +1,664 @@
+{
+  "version": 1,
+  "round": "AH-P07-B1-R1",
+  "artifact": "f1b34ff7555d888bdb14a4ec9209a06c481a1a56013dd6b2895fea9af4f8f2b7",
+  "checks": [
+    {
+      "criteria": [
+        "AC1",
+        "AC2",
+        "AC3",
+        "AC4",
+        "AC5",
+        "AC6",
+        "AC7",
+        "AC8",
+        "AC9",
+        "AC10",
+        "AC11",
+        "AC12",
+        "AC13"
+      ],
+      "command": "env AGENT_HISTORY_BROWSER_FIXTURES=/private/tmp/openbot-agent-history-h_82_5pw/worktree/plan/04-autonomous-agent-history/phases/p07/docs/logs/browser-fixtures-01 scripts/test-network-isolation.sh cargo test --locked --offline --lib -- agent_history_ workflow_agent_ workflow_model_steps_ workflow_classify_ workflow_decision_ workflow_harness_ workflow_wait_ workflow_poll_ workflow_control_ workflow_tool_ channel_reply_ adapters::harness::rig:: application::services::harness::runs::tests:: message_tests::ingress_tests:: application::workflow::sample::tests:: workflow_failure_ workflow_pending_ workflow_action_approval_ workflow_action_uncertainty_ workflow_http_crash_before_marker workflow_http_remote_failure workflow_message_recovery_ workflow_mcp_cancellation_ knowledge_search_ knowledge_run_level_ knowledge_view_ knowledge_message_ workflow_storage_ storage_sweep_ autonomous_agent_storage_ workflow_run_view_ workflow_step_view_ run_retention_ workflow_registry_ logical_seed_ workflow_capacity_count_prunes_retained_terminal_history application::services::test_support:: --skip dump_autonomous_workflow_agent_picker_browser_fixtures --skip history_crash_child_entry --skip workflow_capacity_count_prunes_retained_terminal_history --nocapture",
+      "fixture": "P07 fresh owned PG18.6 loopback65037; stock2MiB/network guard; counted strict scripted providers; installed Chrome; exact per-case map and shared-contract impact in verification-final-map.md",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/p07-final-runtime-01.json",
+          "sha256": "684df8c1314a6fb5224944c08d4a012e843ef26d4b8e2d5ca83bd5b91db3f2ba"
+        },
+        {
+          "path": "logs/p07-final-runtime-01.txt",
+          "sha256": "107c61d866363bc9733f05218f6af81f1fa23f558f5b873bf8803d80d6b41495"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC1",
+        "AC2",
+        "AC3",
+        "AC4",
+        "AC5",
+        "AC6",
+        "AC7",
+        "AC8",
+        "AC9",
+        "AC10",
+        "AC11",
+        "AC12",
+        "AC13"
+      ],
+      "command": "scripts/test-network-isolation.sh cargo test --locked --offline --lib -- agent_history_e2e_ application::services::test_support:: workflow_capacity_count_prunes_retained_terminal_history --nocapture",
+      "fixture": "P07 fresh owned PG18.6 loopback65037; stock2MiB/network guard; counted strict scripted providers; installed Chrome; exact per-case map and shared-contract impact in verification-final-map.md",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/p07-e2e-completion-01.json",
+          "sha256": "d2bd48b4cd9f294014571b2aecd2a7f0eb47dd7ebc7d1ad05d528412493d29e9"
+        },
+        {
+          "path": "logs/p07-e2e-completion-01.txt",
+          "sha256": "6c194ba349069bed4997768893825dda3dd3fe98478d52115f061ecaef4edf06"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC13"
+      ],
+      "command": "scripts/test-network-isolation.sh cargo test --locked --offline --lib -- --list agent_history_ workflow_agent_ workflow_model_steps_ workflow_classify_ workflow_decision_ workflow_harness_ workflow_wait_ workflow_poll_ workflow_control_ workflow_tool_ channel_reply_ adapters::harness::rig:: application::services::harness::runs::tests:: message_tests::ingress_tests:: application::workflow::sample::tests:: workflow_failure_ workflow_pending_ workflow_action_approval_ workflow_action_uncertainty_ workflow_http_crash_before_marker workflow_http_remote_failure workflow_message_recovery_ workflow_mcp_cancellation_ knowledge_search_ knowledge_run_level_ knowledge_view_ knowledge_message_ workflow_storage_ storage_sweep_ autonomous_agent_storage_ workflow_run_view_ workflow_step_view_ run_retention_ workflow_registry_ logical_seed_ workflow_capacity_count_prunes_retained_terminal_history application::services::test_support:: --skip dump_autonomous_workflow_agent_picker_browser_fixtures --skip history_crash_child_entry",
+      "fixture": "P07 fresh owned PG18.6 loopback65037; stock2MiB/network guard; counted strict scripted providers; installed Chrome; exact per-case map and shared-contract impact in verification-final-map.md",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/p07-discovery-02.json",
+          "sha256": "4e443be84af728a9ab60f3c640f04d69a443fc299a949d96f1f2cebe7bec1dca"
+        },
+        {
+          "path": "logs/p07-discovery-02.txt",
+          "sha256": "a049b59a218736c6a45ebc02083a90f94832bcc7fae30085a3e287f7446f2225"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC13"
+      ],
+      "command": "cargo test --locked --offline --test source_modules",
+      "fixture": "P07 fresh owned PG18.6 loopback65037; stock2MiB/network guard; counted strict scripted providers; installed Chrome; exact per-case map and shared-contract impact in verification-final-map.md",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/p07-source-modules-01.json",
+          "sha256": "2f189f806db1e307db9cfca10ab3778918db2445a0363798a81a2e77df77d69f"
+        },
+        {
+          "path": "logs/p07-source-modules-01.txt",
+          "sha256": "9469edf302a1d4bd069a311864bdf161d3a90f727e12c2487508439d6205d41d"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC13"
+      ],
+      "command": "cargo sqlx migrate run",
+      "fixture": "P07 fresh owned PG18.6 loopback65037; stock2MiB/network guard; counted strict scripted providers; installed Chrome; exact per-case map and shared-contract impact in verification-final-map.md",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/p07-migrate-validate-01.json",
+          "sha256": "e194ae2fe5ce325b02f43ff6d8da79dacee6f16aff2f425ea03c5322dd963329"
+        },
+        {
+          "path": "logs/p07-migrate-validate-01.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC13"
+      ],
+      "command": "cargo sqlx prepare -- --all-targets",
+      "fixture": "P07 fresh owned PG18.6 loopback65037; stock2MiB/network guard; counted strict scripted providers; installed Chrome; exact per-case map and shared-contract impact in verification-final-map.md",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/p07-sqlx-prepare-01.json",
+          "sha256": "8054089e3a0726cdeb32031d9156be345e541a2e45c92faa16994590374ca35c"
+        },
+        {
+          "path": "logs/p07-sqlx-prepare-01.txt",
+          "sha256": "130a3b43e230a04bfbf928e8e1cea5ae3adafa3285fbaad1f606ac73b9ae4d18"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC13"
+      ],
+      "command": "cargo sqlx prepare --check -- --all-targets",
+      "fixture": "P07 fresh owned PG18.6 loopback65037; stock2MiB/network guard; counted strict scripted providers; installed Chrome; exact per-case map and shared-contract impact in verification-final-map.md",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/p07-sqlx-check-01.json",
+          "sha256": "3db4ed74876ea783d6b7f7f0fad0be86f7fa0e101330ae56ab539527f490fa1a"
+        },
+        {
+          "path": "logs/p07-sqlx-check-01.txt",
+          "sha256": "7ca9e0793921e7171fc0c57aff62f9960ac09d9020fdf402f2e82e76258bda7c"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC13"
+      ],
+      "command": "cargo sqlx prepare --check -- --all-targets",
+      "fixture": "P07 fresh owned PG18.6 loopback65037; stock2MiB/network guard; counted strict scripted providers; installed Chrome; exact per-case map and shared-contract impact in verification-final-map.md",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/p07-sqlx-check-02.json",
+          "sha256": "f271227c30b9c75f8567cc368f32c5b0ead4d1b397f943009b8d06e38dc982af"
+        },
+        {
+          "path": "logs/p07-sqlx-check-02.txt",
+          "sha256": "b528a167e9d802c045a511725f63683f072f9759db9b67e40b96e3c2e8bebde9"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC13"
+      ],
+      "command": "scripts/test-network-isolation.sh cargo test --locked --offline --lib inherited_listener_rejects_a_reflecting_listener_without_disclosing_its_secret",
+      "fixture": "P07 fresh owned PG18.6 loopback65037; stock2MiB/network guard; counted strict scripted providers; installed Chrome; exact per-case map and shared-contract impact in verification-final-map.md",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/p07-inheritance-current-01.json",
+          "sha256": "602aad1b461df413603dded3cd8f66a93cd0f1a121602b4f7cca82310693b93a"
+        },
+        {
+          "path": "logs/p07-inheritance-current-01.txt",
+          "sha256": "c186b3380b258fad95098048b718edd32265ab9711b0e248d51c3ecffa5d73c6"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC13"
+      ],
+      "command": "scripts/test-network-isolation.sh cargo test --locked --offline --lib agent_history_e2e_process_ -- --nocapture",
+      "fixture": "P07 fresh owned PG18.6 loopback65037; stock2MiB/network guard; counted strict scripted providers; installed Chrome; exact per-case map and shared-contract impact in verification-final-map.md",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/p07-process-current-01.json",
+          "sha256": "ae2fd4c241a8b369d075cd73067d10fde4ff3db81fb1cc2557941b735216c8ff"
+        },
+        {
+          "path": "logs/p07-process-current-01.txt",
+          "sha256": "b87f391c771c0392e78892885a57eb6c5adbc77ed160fc3078430e499e36a53d"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC13"
+      ],
+      "command": "cargo check --locked --offline --all-targets",
+      "fixture": "P07 fresh owned PG18.6 loopback65037; stock2MiB/network guard; counted strict scripted providers; installed Chrome; exact per-case map and shared-contract impact in verification-final-map.md",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/p07-offline-03.json",
+          "sha256": "b990c59a005c9886c03975431c61c976f119c4ab432ed34db8390e3aba426ac8"
+        },
+        {
+          "path": "logs/p07-offline-03.txt",
+          "sha256": "b31f06a0c3257a677f80c0e56089209d562af56b27a15f4935d56d3d02cada7a"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC13"
+      ],
+      "command": "cargo clippy --locked --offline --all-targets -- -D warnings",
+      "fixture": "P07 fresh owned PG18.6 loopback65037; stock2MiB/network guard; counted strict scripted providers; installed Chrome; exact per-case map and shared-contract impact in verification-final-map.md",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/p07-clippy-03.json",
+          "sha256": "44592c9989b19a3b7ed8b0ea365f1268bb030ac1b1cd964784a15473c9172a52"
+        },
+        {
+          "path": "logs/p07-clippy-03.txt",
+          "sha256": "47ab0277310984859ad305df211390b11e882d4ab23d02f5a8a81cdf737e20e3"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC13"
+      ],
+      "command": "cargo fmt --all -- --check",
+      "fixture": "P07 fresh owned PG18.6 loopback65037; stock2MiB/network guard; counted strict scripted providers; installed Chrome; exact per-case map and shared-contract impact in verification-final-map.md",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/p07-fmt-03.json",
+          "sha256": "94feffcf40cde6b38f7eec10136b93022c002da92c497f92ec1d0361b06860e8"
+        },
+        {
+          "path": "logs/p07-fmt-03.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC13"
+      ],
+      "command": "git diff --check",
+      "fixture": "P07 fresh owned PG18.6 loopback65037; stock2MiB/network guard; counted strict scripted providers; installed Chrome; exact per-case map and shared-contract impact in verification-final-map.md",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/p07-diff-03.json",
+          "sha256": "9269703824edd8c8db9dd214f74a2be4331c23640543f78c1ac29891458eb5ae"
+        },
+        {
+          "path": "logs/p07-diff-03.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC13"
+      ],
+      "command": "graft build",
+      "fixture": "P07 fresh owned PG18.6 loopback65037; stock2MiB/network guard; counted strict scripted providers; installed Chrome; exact per-case map and shared-contract impact in verification-final-map.md",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/p07-graft-03.json",
+          "sha256": "2c037ab716bf7b58d91e801ca6e85a366c1a3fde5a08f0f180242ca58ede9a79"
+        },
+        {
+          "path": "logs/p07-graft-03.txt",
+          "sha256": "abf9f2e6af1d094170b06f92d0243cb293a8ccc6429b8252dc24583d0821e31c"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC13"
+      ],
+      "command": "env CHROME_PATH=/Applications/Google Chrome.app/Contents/MacOS/Google Chrome AGENT_HISTORY_BROWSER_FIXTURES=plan/04-autonomous-agent-history/phases/p07/docs/logs/browser-fixtures-01 node --test scripts/tests/agent-history-browser.mjs",
+      "fixture": "P07 fresh owned PG18.6 loopback65037; stock2MiB/network guard; counted strict scripted providers; installed Chrome; exact per-case map and shared-contract impact in verification-final-map.md",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/p07-browser-01.json",
+          "sha256": "93a77c9d80d899fc92453c1d0f45add7a41b8f70ca4030874122a12158a52f1f"
+        },
+        {
+          "path": "logs/p07-browser-01.txt",
+          "sha256": "c679db8ffb8deac537e52443fa592e938d3993f6de9300cbc4e19e5fd91b2b9e"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC13"
+      ],
+      "command": "env CHROME_PATH=/Applications/Google Chrome.app/Contents/MacOS/Google Chrome node --test scripts/tests/workflow-runs.mjs scripts/tests/workflow-samples.mjs scripts/tests/workflow-conversations.mjs",
+      "fixture": "P07 fresh owned PG18.6 loopback65037; stock2MiB/network guard; counted strict scripted providers; installed Chrome; exact per-case map and shared-contract impact in verification-final-map.md",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/p07-protocols-01.json",
+          "sha256": "251fc5edbe308e8a6ff7727cfd3125e94e7b807e3dfe8cd045aedb89bf2a1caa"
+        },
+        {
+          "path": "logs/p07-protocols-01.txt",
+          "sha256": "84164886d4b9784280a0e0850d6b21ba28949e8a620af06f873ad640bfdf5c0a"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC13"
+      ],
+      "command": "python3 plan/04-autonomous-agent-history/phases/p07/docs/logs/query-statistics.py",
+      "fixture": "P07 fresh owned PG18.6 loopback65037; stock2MiB/network guard; counted strict scripted providers; installed Chrome; exact per-case map and shared-contract impact in verification-final-map.md",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/p07-query-statistics-02.json",
+          "sha256": "c0fc35a79e41b7674ecfea04402bc30388fff6b8df35399b3e0d6baaaca44bac"
+        },
+        {
+          "path": "logs/p07-query-statistics-02.txt",
+          "sha256": "8e50746ceeb7dd68ebbb1e2fb427b50e8903c50e57bc8ba26049f193028be93f"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC13"
+      ],
+      "command": "python3 scripts/workflow-sample-boundary.py",
+      "fixture": "P07 fresh owned PG18.6 loopback65037; stock2MiB/network guard; counted strict scripted providers; installed Chrome; exact per-case map and shared-contract impact in verification-final-map.md",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/p07-sample-boundary-01.json",
+          "sha256": "4299b64a4b76f539f671058302064ae697ff43eeca5a77a5f366ba0865cb83d5"
+        },
+        {
+          "path": "logs/p07-sample-boundary-01.txt",
+          "sha256": "228c0f0f23407594379b257a3e3684550f2f3eb1741d27acbc9be312e22e6d2d"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC13"
+      ],
+      "command": "python3 scripts/tests/workflow-sample-boundary.py",
+      "fixture": "P07 fresh owned PG18.6 loopback65037; stock2MiB/network guard; counted strict scripted providers; installed Chrome; exact per-case map and shared-contract impact in verification-final-map.md",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/p07-sample-boundary-fixtures-01.json",
+          "sha256": "dcdd5796f8271af7489d89f257eac4e942dd1f8eaf52e11baf3bbed11311274e"
+        },
+        {
+          "path": "logs/p07-sample-boundary-fixtures-01.txt",
+          "sha256": "173723c51405459d7776f373751eefb956edf91c4da71db14fd901bfc7e979b3"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC13"
+      ],
+      "command": "npm run check:css",
+      "fixture": "P07 fresh owned PG18.6 loopback65037; stock2MiB/network guard; counted strict scripted providers; installed Chrome; exact per-case map and shared-contract impact in verification-final-map.md",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/p07-css-check-02.json",
+          "sha256": "8878746a7091f52a1302dc33b99b9a492d9b0d4a705738062786e3c03c2cfae4"
+        },
+        {
+          "path": "logs/p07-css-check-02.txt",
+          "sha256": "735d633864decef2dbe24db642eadafac6e1d92a4c1482a564e3b58c5da8878f"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC13"
+      ],
+      "command": "ruby -e require \"yaml\"; d=YAML.load_file(\".github/workflows/agent-history.yml\"); j=d.fetch(\"jobs\").fetch(\"history\"); abort \"postgres version\" unless j.fetch(\"services\").fetch(\"postgres\").fetch(\"image\")==\"postgres:18.6-bookworm\"; abort \"stack\" unless j.fetch(\"env\").fetch(\"RUST_MIN_STACK\")==\"2097152\"; steps=j.fetch(\"steps\").map { |s| s[\"run\"] }.compact.join(\"\\n\"); [\"agent_history_e2e_\", \"agent-history-browser.mjs\", \"history_ci_query_probe\", \"pg_stat_statements.track_utility\"].each { |s| abort s unless steps.include?(s) }; puts \"PASS parsed workflow: native journey, actual markup/browser, query-id/settings and stock stack\"",
+      "fixture": "P07 fresh owned PG18.6 loopback65037; stock2MiB/network guard; counted strict scripted providers; installed Chrome; exact per-case map and shared-contract impact in verification-final-map.md",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/p07-ci-yaml-02.json",
+          "sha256": "ce03de2654e570beea69b19164bee799cb81b2ad38b1188db622a5efcd46d0c1"
+        },
+        {
+          "path": "logs/p07-ci-yaml-02.txt",
+          "sha256": "e8508065073d32662275366feca844847637e25bd3695c367eaeb384e32ca5da"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC13"
+      ],
+      "command": "python3 /private/tmp/openbot-agent-history-h_82_5pw/worktree/plan/04-autonomous-agent-history/phases/p07/docs/logs/verify-case-evidence.py",
+      "fixture": "P07 fresh owned PG18.6 loopback65037; stock2MiB/network guard; counted strict scripted providers; installed Chrome; exact per-case map and shared-contract impact in verification-final-map.md",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/p07-case-evidence-02.json",
+          "sha256": "623715f20631716d80e3b21c67e3cfef6cb70b648313f35f7ef3a62773e24876"
+        },
+        {
+          "path": "logs/p07-case-evidence-02.txt",
+          "sha256": "a7fddecda5209fe00c87519ab23320bdd3a5b57f2b6ed47256e8b46b638c4da9"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC1",
+        "AC2",
+        "AC3",
+        "AC4",
+        "AC5",
+        "AC6",
+        "AC7",
+        "AC8",
+        "AC9",
+        "AC10",
+        "AC11",
+        "AC12",
+        "AC13"
+      ],
+      "command": "audit actual current discovery against per-case successful observations",
+      "fixture": "all accepted866 names retained; native883 current latestPASS, helper excluded standalone but invoked/killed by6 required frontier cases; no old runtime reuse",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/verification-case-inventory.json",
+          "sha256": "d6539e9efc3bc550c95470307ed5ac020303dde46ae62c06c4f1b3d8572be0c9"
+        },
+        {
+          "path": "logs/verification-final-map.md",
+          "sha256": "21784a12061b396b95403f991f57f310989d5bbf40ca7916686730c23f7eb470"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC13"
+      ],
+      "command": "scripts/test-network-isolation.sh cargo test --locked --offline --lib agent_history_e2e_process_crashes_reconstruct_durable_frontiers_without_duplicate_calls -- --nocapture",
+      "fixture": "URL validator incorrectly parsed valid fixture trailing slash; replaced with real Url parser",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/p07-process-frontiers-01.json",
+          "sha256": "041d252d572c8de3e3051642f09c0e2bdb6d482ca4df52e74aa2b1f2116e046b"
+        },
+        {
+          "path": "logs/p07-process-frontiers-01.txt",
+          "sha256": "9b1b011bfed2e2edf7e820a0bb22a3e3117a78bb16f43d531ac7eb4b6cff8ddd"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC13"
+      ],
+      "command": "scripts/test-network-isolation.sh cargo test --locked --offline --lib agent_history_e2e_process_crashes_reconstruct_durable_frontiers_without_duplicate_calls -- --nocapture",
+      "fixture": "child claim marker unavailable before inherited fixture registry was implemented; stderr visibility fixed",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/p07-process-frontiers-02.json",
+          "sha256": "726dfc82a0eca1830043778cab6cb046e0e27da8b4912d8f0d3ff3efb900e050"
+        },
+        {
+          "path": "logs/p07-process-frontiers-02.txt",
+          "sha256": "7a23b07ee50591f7671e86211ea88f512e86bb056267f1983b7bce0731129f2e"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC13"
+      ],
+      "command": "scripts/test-network-isolation.sh cargo test --locked --offline --lib agent_history_e2e_process_crashes_reconstruct_durable_frontiers_without_duplicate_calls -- --nocapture",
+      "fixture": "real child process ordinary endpoint guard correctly refused unregistered parent; one-use mutually authenticated cfgtest inheritance implemented",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/p07-process-frontiers-03.json",
+          "sha256": "6f0c3d5f42bcc69a69908c1b99a5a54dff60d4811d39664abd55cc09a045f9e4"
+        },
+        {
+          "path": "logs/p07-process-frontiers-03.txt",
+          "sha256": "74a2403eeafad80e84b8f447a4cbeee9841e5fe0b051923fd3eeb915259f7d23"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC13"
+      ],
+      "command": "scripts/test-network-isolation.sh cargo test --locked --offline --lib -- agent_history_e2e_process_crashes_reconstruct_durable_frontiers_without_duplicate_calls application::services::test_support:: --nocapture",
+      "fixture": "author fixture used invalid5ms poll; kept native50ms minimum",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/p07-process-frontiers-04.json",
+          "sha256": "437447670f341d10d9f7f55f1f93f959e155d0396da76950edef1febbd33de5c"
+        },
+        {
+          "path": "logs/p07-process-frontiers-04.txt",
+          "sha256": "2b6ba94eddc8df5e4f5b2b1374bb1fb674394ebea5d85e71637667628bf27c3c"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC13"
+      ],
+      "command": "scripts/test-network-isolation.sh cargo test --locked --offline --lib -- agent_history_e2e_process_crashes_reconstruct_durable_frontiers_without_duplicate_calls application::services::test_support:: --nocapture",
+      "fixture": "native durable Frozen is queued+active pointer before checkpoint; exact native frontier assertion fixed",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/p07-process-frontiers-05.json",
+          "sha256": "165abc15dd12b68eaed370d9e6132a9a3106b73ff01ed2405c8a6ec6f634c8fc"
+        },
+        {
+          "path": "logs/p07-process-frontiers-05.txt",
+          "sha256": "0e45241386c9d6d163559ac196371534b927904e89c42ccf2da2710218041d2c"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC13"
+      ],
+      "command": "scripts/test-network-isolation.sh cargo test --locked --offline --lib agent_history_e2e_real_knowledge -- --nocapture",
+      "fixture": "compile-only invalid observation field on Deployment",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/p07-knowledge-journey-01.json",
+          "sha256": "b5712b168276bf918d8fb188dea2ed4149b49ab6ca5e6320b2390fdee8f103eb"
+        },
+        {
+          "path": "logs/p07-knowledge-journey-01.txt",
+          "sha256": "34fc215e54a558b35ee3e2a13c95c3acdded075797c71f04c3acb0df33f4dd54"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC13"
+      ],
+      "command": "scripts/test-network-isolation.sh cargo test --locked --offline --lib agent_history_e2e_real_knowledge -- --nocapture",
+      "fixture": "author read query referenced nonexistent input column; native execution frozen_inputs.context is actual digest source",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/p07-knowledge-journey-02.json",
+          "sha256": "7d8a8beec5591287e43370084c5075d9eee8c3aec50dea3095ea9cd56dd7cfa0"
+        },
+        {
+          "path": "logs/p07-knowledge-journey-02.txt",
+          "sha256": "7dc042c7c99f304ab1d3c267df015f3f9fd1e58ae1ba9a281f67ac1c908d6c57"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC13"
+      ],
+      "command": "npm run check:css",
+      "fixture": "generated CSS stale; actual build refreshed and check02 PASS",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/p07-css-check-01.json",
+          "sha256": "9fd97e925efe75612e48ab852999c356638834d0bd7e259ead9867c6c784c8a5"
+        },
+        {
+          "path": "logs/p07-css-check-01.txt",
+          "sha256": "ca1d3c9c59a2685b8bd0ea4c2f7c1712598661ba00722e34157706c6bc400ef2"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC13"
+      ],
+      "command": "python3 plan/04-autonomous-agent-history/phases/p07/docs/logs/query-statistics.py",
+      "fixture": "overstrict spelling on versus auto; actual nonnull queryid is activation requirement and probe02 proves it without shared-server configuration changes",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/p07-query-statistics-01.json",
+          "sha256": "522e64d0631e68877400187af620dc51672bd5bbb570966d14b063745852edb2"
+        },
+        {
+          "path": "logs/p07-query-statistics-01.txt",
+          "sha256": "9f7c154d298148f257e124f25c33d8922689f1d6d13d500b10ba9a01f930f353"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC13"
+      ],
+      "command": "ruby -e require \"yaml\"; d=YAML.load_file(\".github/workflows/agent-history.yml\"); j=d.fetch(\"jobs\").fetch(\"history\"); abort \"postgres version\" unless j.fetch(\"services\").fetch(\"postgres\").fetch(\"image\")==\"postgres:18.6-bookworm\"; abort \"stack\" unless j.fetch(\"env\").fetch(\"RUST_MIN_STACK\")==\"2097152\"; steps=j.fetch(\"steps\").filter_map { |s| s[\"run\"] }.join(\"\\n\"); [\"agent_history_e2e_\", \"agent-history-browser.mjs\", \"history_ci_query_probe\", \"pg_stat_statements.track_utility\"].each { |s| abort s unless steps.include?(s) }; puts \"PASS parsed workflow: native journey, actual markup/browser, query-id/settings and stock stack\"",
+      "fixture": "local Ruby version lacks filter_map; compatible map.compact parse02 PASS",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/p07-ci-yaml-01.json",
+          "sha256": "8e7b92f145f09e7094fcea718d6b5aacceebd27d3dda0915eb3dbfd15769df5b"
+        },
+        {
+          "path": "logs/p07-ci-yaml-01.txt",
+          "sha256": "3a2eb72c5fc9cb42a2dae258092caa6f008789fe5591a4bf0420d4dff17af1a3"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC13"
+      ],
+      "command": "GitHub hosted workflow execution and actionlint",
+      "fixture": "new owned CI workflow parsed; actual native/browser/query-stat commands exercised locally",
+      "status": "NOT EXERCISED",
+      "reason": "Remote CI was not triggered from this uncommitted branch; local actionlint executable unavailable. Neither substitutes for or blocks the required independently reviewed local checks."
+    }
+  ]
+}

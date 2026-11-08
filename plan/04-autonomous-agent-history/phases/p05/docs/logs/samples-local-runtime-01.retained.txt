@@ -1,0 +1,30 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+   Compiling open_bots v0.1.0 (/private/tmp/openbot-agent-history-h_82_5pw/worktree)
+error[E0432]: unresolved import `crate::entities::agent_capability::AgentKey`
+ --> src/application/workflow/sample/history.rs:6:50
+  |
+6 | use crate::entities::agent_capability::{AgentId, AgentKey};
+  |                                                  ^^^^^^^^ no `AgentKey` in `domain::entities::agent_capability`
+  |
+  = help: consider importing this struct instead:
+          crate::agent::AgentKey
+
+error[E0433]: cannot find `AgentKey` in `agent_capability`
+   --> src/application/workflow/sample/history_tests.rs:132:52
+    |
+132 |     other.key = crate::entities::agent_capability::AgentKey::parse("other").unwrap();
+    |                                                    ^^^^^^^^ could not find `AgentKey` in `agent_capability`
+    |
+help: consider importing this struct
+    |
+  1 + use crate::agent::AgentKey;
+    |
+help: if you import `AgentKey`, refer to it directly
+    |
+132 -     other.key = crate::entities::agent_capability::AgentKey::parse("other").unwrap();
+132 +     other.key = AgentKey::parse("other").unwrap();
+    |
+
+Some errors have detailed explanations: E0432, E0433.
+For more information about an error, try `rustc --explain E0432`.
+error: could not compile `open_bots` (lib test) due to 2 previous errors

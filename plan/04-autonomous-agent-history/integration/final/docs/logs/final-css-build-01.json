@@ -1,0 +1,21 @@
+{
+  "command": [
+    "npm",
+    "run",
+    "build:css"
+  ],
+  "cwd": "/Users/mac02/dev/openbot",
+  "environment": {
+    "DATABASE_URL": "postgres://mac02@127.0.0.1:65037/openbot_ah_final_60139a",
+    "TEST_DATABASE_URL": "postgres://mac02@127.0.0.1:65037/openbot_ah_final_60139a_test",
+    "SQLX_OFFLINE": "true",
+    "CARGO_INCREMENTAL": "1",
+    "CARGO_TARGET_DIR": "/private/tmp/openbot-chs-p06-3f43t2k7/worktree/target",
+    "CARGO_BUILD_JOBS": "4",
+    "RUST_MIN_STACK": "2097152"
+  },
+  "started": "2026-11-08T03:05:28.028886+00:00",
+  "seconds": 0.475,
+  "exit_code": 0,
+  "log": "/Users/mac02/dev/openbot/plan/04-autonomous-agent-history/integration/final/docs/logs/final-css-build-01.txt"
+}

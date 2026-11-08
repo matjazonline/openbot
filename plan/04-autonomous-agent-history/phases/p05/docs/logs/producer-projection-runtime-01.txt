@@ -1,0 +1,24 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+   Compiling open_bots v0.1.0 (/private/tmp/openbot-agent-history-h_82_5pw/worktree)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 53.36s
+     Running unittests src/lib.rs (/private/tmp/openbot-chs-p06-3f43t2k7/worktree/target/debug/deps/open_bots-8b80d02f0b6cf2e6)
+
+running 2 tests
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::autonomous_entrypoints::history::agent_history_callers_schedule_uses_current_configured_actor_and_manual_starter_keeps_own_level ... FAILED
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::channel_reply_e2e::history::agent_history_channel_projection_is_not_the_saved_output_or_next_seed ... ok
+
+failures:
+
+---- adapters::persistence::workflow::tests::message_tests::ingress_tests::autonomous_entrypoints::history::agent_history_callers_schedule_uses_current_configured_actor_and_manual_starter_keeps_own_level stdout ----
+
+thread 'adapters::persistence::workflow::tests::message_tests::ingress_tests::autonomous_entrypoints::history::agent_history_callers_schedule_uses_current_configured_actor_and_manual_starter_keeps_own_level' (35961767) panicked at src/adapters/persistence/workflow/agent_history_entrypoint_tests.rs:31:10:
+called `Result::unwrap()` on an `Err` value: Application(BadRequest("The binding's run-as must be a current owner or admin who can see its channel"))
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    adapters::persistence::workflow::tests::message_tests::ingress_tests::autonomous_entrypoints::history::agent_history_callers_schedule_uses_current_configured_actor_and_manual_starter_keeps_own_level
+
+test result: FAILED. 1 passed; 1 failed; 0 ignored; 0 measured; 3352 filtered out; finished in 4.34s
+
+error: test failed, to rerun pass `--lib`

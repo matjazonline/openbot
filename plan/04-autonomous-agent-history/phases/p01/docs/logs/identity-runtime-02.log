@@ -1,0 +1,24 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+   Compiling open_bots v0.1.0 (/private/tmp/openbot-agent-history-h_82_5pw/worktree)
+error[E0433]: cannot find type `CorrelationId` in this scope
+  --> src/adapters/persistence/workflow/agent_history_thread_tests.rs:86:24
+   |
+86 |         correlation_id:CorrelationId::new(),idempotency_key:IdempotencyKey::parse("manual-thread").unwrap(),
+   |                        ^^^^^^^^^^^^^ use of undeclared type `CorrelationId`
+   |
+help: consider importing this struct
+   |
+ 1 + use crate::entities::correlation::CorrelationId;
+   |
+
+warning: unused import: `lease::*`
+ --> src/adapters/persistence/workflow/agent_history_thread_tests.rs:2:53
+  |
+2 | use crate::application::workflow::{agent_history::*,lease::*};
+  |                                                     ^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+For more information about this error, try `rustc --explain E0433`.
+warning: `open_bots` (lib test) generated 1 warning
+error: could not compile `open_bots` (lib test) due to 1 previous error; 1 warning emitted

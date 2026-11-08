@@ -1,0 +1,21 @@
+{
+  "command": [
+    "ruby",
+    "-e",
+    "require \"yaml\"; d=YAML.load_file(\".github/workflows/agent-history.yml\"); j=d.fetch(\"jobs\").fetch(\"history\"); abort \"postgres version\" unless j.fetch(\"services\").fetch(\"postgres\").fetch(\"image\")==\"postgres:18.6-bookworm\"; abort \"stack\" unless j.fetch(\"env\").fetch(\"RUST_MIN_STACK\")==\"2097152\"; steps=j.fetch(\"steps\").filter_map { |s| s[\"run\"] }.join(\"\\n\"); [\"agent_history_e2e_\", \"agent-history-browser.mjs\", \"history_ci_query_probe\", \"pg_stat_statements.track_utility\"].each { |s| abort s unless steps.include?(s) }; puts \"PASS parsed workflow: native journey, actual markup/browser, query-id/settings and stock stack\""
+  ],
+  "cwd": "/private/tmp/openbot-agent-history-h_82_5pw/worktree",
+  "environment": {
+    "DATABASE_URL": "postgres://mac02@127.0.0.1:65037/openbot_ah_p07_7a85ca",
+    "TEST_DATABASE_URL": "postgres://mac02@127.0.0.1:65037/openbot_ah_p07_7a85ca_test",
+    "SQLX_OFFLINE": "true",
+    "CARGO_INCREMENTAL": "1",
+    "CARGO_TARGET_DIR": "/private/tmp/openbot-chs-p06-3f43t2k7/worktree/target",
+    "CARGO_BUILD_JOBS": "4",
+    "RUST_MIN_STACK": "2097152"
+  },
+  "started": "2026-11-08T02:42:18.272943+00:00",
+  "seconds": 0.071,
+  "exit_code": 1,
+  "log": "/private/tmp/openbot-agent-history-h_82_5pw/worktree/plan/04-autonomous-agent-history/phases/p07/docs/logs/p07-ci-yaml-01.txt"
+}

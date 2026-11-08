@@ -1,0 +1,52 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+   Compiling open_bots v0.1.0 (/private/tmp/openbot-agent-history-h_82_5pw/worktree)
+error[E0433]: cannot find `AuthVerdict` in `entities`
+  --> src/adapters/persistence/workflow/agent_history_channel_release_tests.rs:62:34
+   |
+62 |     email.spf = crate::entities::AuthVerdict::Pass;
+   |                                  ^^^^^^^^^^^ could not find `AuthVerdict` in `entities`
+   |
+help: consider importing this enum
+   |
+ 1 + use crate::entities::auth::AuthVerdict;
+   |
+help: if you import `AuthVerdict`, refer to it directly
+   |
+62 -     email.spf = crate::entities::AuthVerdict::Pass;
+62 +     email.spf = AuthVerdict::Pass;
+   |
+
+error[E0433]: cannot find `AuthVerdict` in `entities`
+  --> src/adapters/persistence/workflow/agent_history_channel_release_tests.rs:63:35
+   |
+63 |     email.dkim = crate::entities::AuthVerdict::Pass;
+   |                                   ^^^^^^^^^^^ could not find `AuthVerdict` in `entities`
+   |
+help: consider importing this enum
+   |
+ 1 + use crate::entities::auth::AuthVerdict;
+   |
+help: if you import `AuthVerdict`, refer to it directly
+   |
+63 -     email.dkim = crate::entities::AuthVerdict::Pass;
+63 +     email.dkim = AuthVerdict::Pass;
+   |
+
+error[E0433]: cannot find `AuthVerdict` in `entities`
+  --> src/adapters/persistence/workflow/agent_history_channel_release_tests.rs:64:36
+   |
+64 |     email.dmarc = crate::entities::AuthVerdict::Pass;
+   |                                    ^^^^^^^^^^^ could not find `AuthVerdict` in `entities`
+   |
+help: consider importing this enum
+   |
+ 1 + use crate::entities::auth::AuthVerdict;
+   |
+help: if you import `AuthVerdict`, refer to it directly
+   |
+64 -     email.dmarc = crate::entities::AuthVerdict::Pass;
+64 +     email.dmarc = AuthVerdict::Pass;
+   |
+
+For more information about this error, try `rustc --explain E0433`.
+error: could not compile `open_bots` (lib test) due to 3 previous errors

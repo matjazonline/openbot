@@ -1,0 +1,16 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+   Compiling open_bots v0.1.0 (/private/tmp/openbot-agent-history-h_82_5pw/worktree)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 52.04s
+     Running unittests src/lib.rs (/private/tmp/openbot-chs-p06-3f43t2k7/worktree/target/debug/deps/open_bots-8b80d02f0b6cf2e6)
+
+running 7 tests
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::guards::agent_history_ordering_native_pointer_cannot_reference_another_tenants_exchange ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::guards::agent_history_recovery_queued_deadline_vs_resume_settles_once_without_releasing_another_owner ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::guards::agent_history_recovery_invalid_model_settlement_releases_without_accepting_an_answer ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::guards::agent_history_recovery_replacement_before_checkpoint_keeps_turn_and_fences_old_preparation ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::guards::agent_history_recovery_revoked_wait_head_reaches_normal_terminal_owner_and_frees_successor ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::guards::agent_history_ordering_native_guards_refuse_pointer_theft_nonowner_activation_and_wait_retag ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::guards::agent_history_recovery_company_teardown_removes_turn_and_parked_companion_proofs ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 3306 filtered out; finished in 3.40s
+

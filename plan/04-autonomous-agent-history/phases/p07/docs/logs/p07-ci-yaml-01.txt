@@ -1,0 +1,2 @@
+-e:1:in `<main>': undefined method `filter_map' for #<Array:0x000000013906cbd0> (NoMethodError)
+Did you mean?  filter

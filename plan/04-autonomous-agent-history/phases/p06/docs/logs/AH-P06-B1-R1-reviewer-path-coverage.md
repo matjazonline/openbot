@@ -1,0 +1,65 @@
+# AH-P06-B1-R1 changed-path coverage
+
+All 61 producer-delta paths independently derived from the accepted P05 archive plus HEAD fallback; exact set matches the frozen scope. Changed hunks reviewed, with full new production definitions and affected native callers traced. Unchanged accepted P01–P05 implementations are reused except affected consumers listed in the round note.
+
+- `docs/workflow-operations.md` — Operational controls, fixed bounds, source versus payload lifetime, current authorization and executable help/example inspected.
+- `docs/workflow-verification.md` — Operational controls, fixed bounds, source versus payload lifetime, current authorization and executable help/example inspected.
+- `migrations/20260817000000_init_schema.sql` — Native schema/guards, expiry eligibility, capacity, digests, source cascades, deferred agreement, boundaries; F1.
+- `scripts/tests/agent-history-browser.mjs` — Fixture/assertion and discovery review; historical prefix/clock stand-ins distinguished from actual production-owner races; F2 where relevant.
+- `src/adapters/http/pages/workflow_runs/history.rs` — Reader/port/route/HTML integration, current authorization, scope/level/payload projection and exact frozen inspection reviewed.
+- `src/adapters/http/pages/workflow_runs/mod.rs` — Reader/port/route/HTML integration, current authorization, scope/level/payload projection and exact frozen inspection reviewed.
+- `src/adapters/http/routes/workflows/history.rs` — Reader/port/route/HTML integration, current authorization, scope/level/payload projection and exact frozen inspection reviewed.
+- `src/adapters/http/routes/workflows/mod.rs` — Reader/port/route/HTML integration, current authorization, scope/level/payload projection and exact frozen inspection reviewed.
+- `src/adapters/http/routes/workflows/ui/runs/history.rs` — Reader/port/route/HTML integration, current authorization, scope/level/payload projection and exact frozen inspection reviewed.
+- `src/adapters/http/routes/workflows/ui/runs/mod.rs` — Reader/port/route/HTML integration, current authorization, scope/level/payload projection and exact frozen inspection reviewed.
+- `src/adapters/persistence/agent.rs` — Producer delta and affected contracts/callers reviewed; unchanged preceding-phase behavior reused proportionately.
+- `src/adapters/persistence/workflow/agent_history/checkpoint.rs` — Producer delta and affected contracts/callers reviewed; unchanged preceding-phase behavior reused proportionately.
+- `src/adapters/persistence/workflow/agent_history/frozen.rs` — Producer delta and affected contracts/callers reviewed; unchanged preceding-phase behavior reused proportionately.
+- `src/adapters/persistence/workflow/agent_history/mod.rs` — Producer delta and affected contracts/callers reviewed; unchanged preceding-phase behavior reused proportionately.
+- `src/adapters/persistence/workflow/agent_history/preparation.rs` — Producer delta and affected contracts/callers reviewed; unchanged preceding-phase behavior reused proportionately.
+- `src/adapters/persistence/workflow/agent_history/selection.rs` — Producer delta and affected contracts/callers reviewed; unchanged preceding-phase behavior reused proportionately.
+- `src/adapters/persistence/workflow/agent_history/selection_candidates.sql` — Producer delta and affected contracts/callers reviewed; unchanged preceding-phase behavior reused proportionately.
+- `src/adapters/persistence/workflow/agent_history/selection_count.sql` — Producer delta and affected contracts/callers reviewed; unchanged preceding-phase behavior reused proportionately.
+- `src/adapters/persistence/workflow/agent_history/selection_payload.sql` — Producer delta and affected contracts/callers reviewed; unchanged preceding-phase behavior reused proportionately.
+- `src/adapters/persistence/workflow/agent_history/storage.rs` — Supervised owner, company-before-local locking, cleanup cursor/budget, source eligibility and required port wiring reviewed.
+- `src/adapters/persistence/workflow/agent_history/turns.rs` — Producer delta and affected contracts/callers reviewed; unchanged preceding-phase behavior reused proportionately.
+- `src/adapters/persistence/workflow/agent_history_browser_fixture.rs` — Fixture/assertion and discovery review; historical prefix/clock stand-ins distinguished from actual production-owner races; F2 where relevant.
+- `src/adapters/persistence/workflow/agent_history_capacity_prefix.sql` — Fixture/assertion and discovery review; historical prefix/clock stand-ins distinguished from actual production-owner races; F2 where relevant.
+- `src/adapters/persistence/workflow/agent_history_capacity_prefix_fixture.rs` — Fixture/assertion and discovery review; historical prefix/clock stand-ins distinguished from actual production-owner races; F2 where relevant.
+- `src/adapters/persistence/workflow/agent_history_channel_retention_tests.rs` — Fixture/assertion and discovery review; historical prefix/clock stand-ins distinguished from actual production-owner races; F2 where relevant.
+- `src/adapters/persistence/workflow/agent_history_channel_tests.rs` — Fixture/assertion and discovery review; historical prefix/clock stand-ins distinguished from actual production-owner races; F2 where relevant.
+- `src/adapters/persistence/workflow/agent_history_continuation_tests.rs` — Fixture/assertion and discovery review; historical prefix/clock stand-ins distinguished from actual production-owner races; F2 where relevant.
+- `src/adapters/persistence/workflow/agent_history_controls_tests.rs` — Fixture/assertion and discovery review; historical prefix/clock stand-ins distinguished from actual production-owner races; F2 where relevant.
+- `src/adapters/persistence/workflow/agent_history_freeze_guard_tests.rs` — Fixture/assertion and discovery review; historical prefix/clock stand-ins distinguished from actual production-owner races; F2 where relevant.
+- `src/adapters/persistence/workflow/agent_history_metadata_capacity_tests.rs` — Fixture/assertion and discovery review; historical prefix/clock stand-ins distinguished from actual production-owner races; F2 where relevant.
+- `src/adapters/persistence/workflow/agent_history_private_context_tests.rs` — Fixture/assertion and discovery review; historical prefix/clock stand-ins distinguished from actual production-owner races; F2 where relevant.
+- `src/adapters/persistence/workflow/agent_history_retention.rs` — Supervised owner, company-before-local locking, cleanup cursor/budget, source eligibility and required port wiring reviewed.
+- `src/adapters/persistence/workflow/agent_history_retention_capacity_tests.rs` — Fixture/assertion and discovery review; historical prefix/clock stand-ins distinguished from actual production-owner races; F2 where relevant.
+- `src/adapters/persistence/workflow/agent_history_retention_fixture.rs` — Fixture/assertion and discovery review; historical prefix/clock stand-ins distinguished from actual production-owner races; F2 where relevant.
+- `src/adapters/persistence/workflow/agent_history_retention_tests.rs` — Fixture/assertion and discovery review; historical prefix/clock stand-ins distinguished from actual production-owner races; F2 where relevant.
+- `src/adapters/persistence/workflow/agent_history_retry_deletion_tests.rs` — Fixture/assertion and discovery review; historical prefix/clock stand-ins distinguished from actual production-owner races; F2 where relevant.
+- `src/adapters/persistence/workflow/agent_history_storage_tests.rs` — Fixture/assertion and discovery review; historical prefix/clock stand-ins distinguished from actual production-owner races; F2 where relevant.
+- `src/adapters/persistence/workflow/agent_history_turn_guard_tests.rs` — Fixture/assertion and discovery review; historical prefix/clock stand-ins distinguished from actual production-owner races; F2 where relevant.
+- `src/adapters/persistence/workflow/agent_history_views/mod.rs` — Reader/port/route/HTML integration, current authorization, scope/level/payload projection and exact frozen inspection reviewed.
+- `src/adapters/persistence/workflow/agent_history_views/projection.rs` — Reader/port/route/HTML integration, current authorization, scope/level/payload projection and exact frozen inspection reviewed.
+- `src/adapters/persistence/workflow/agent_history_views/rows.rs` — Reader/port/route/HTML integration, current authorization, scope/level/payload projection and exact frozen inspection reviewed.
+- `src/adapters/persistence/workflow/agent_history_views/testing.rs` — Reader/port/route/HTML integration, current authorization, scope/level/payload projection and exact frozen inspection reviewed.
+- `src/adapters/persistence/workflow/agent_history_views_authority_tests.rs` — Fixture/assertion and discovery review; historical prefix/clock stand-ins distinguished from actual production-owner races; F2 where relevant.
+- `src/adapters/persistence/workflow/agent_history_views_tests.rs` — Fixture/assertion and discovery review; historical prefix/clock stand-ins distinguished from actual production-owner races; F2 where relevant.
+- `src/adapters/persistence/workflow/autonomous_agent_origin_schema_tests.rs` — Fixture/assertion and discovery review; historical prefix/clock stand-ins distinguished from actual production-owner races; F2 where relevant.
+- `src/adapters/persistence/workflow/checkpoints.rs` — Producer delta and affected contracts/callers reviewed; unchanged preceding-phase behavior reused proportionately.
+- `src/adapters/persistence/workflow/controls.rs` — Producer delta and affected contracts/callers reviewed; unchanged preceding-phase behavior reused proportionately.
+- `src/adapters/persistence/workflow/mod.rs` — Producer delta and affected contracts/callers reviewed; unchanged preceding-phase behavior reused proportionately.
+- `src/adapters/persistence/workflow/run_views.rs` — Reader/port/route/HTML integration, current authorization, scope/level/payload projection and exact frozen inspection reviewed.
+- `src/adapters/persistence/workflow/storage.rs` — Supervised owner, company-before-local locking, cleanup cursor/budget, source eligibility and required port wiring reviewed.
+- `src/adapters/persistence/workflow/storage_checkpoint_tests.rs` — Fixture/assertion and discovery review; historical prefix/clock stand-ins distinguished from actual production-owner races; F2 where relevant.
+- `src/adapters/persistence/workflow/storage_retention.rs` — Supervised owner, company-before-local locking, cleanup cursor/budget, source eligibility and required port wiring reviewed.
+- `src/adapters/persistence/workflow/storage_retention_eligible.sql` — Supervised owner, company-before-local locking, cleanup cursor/budget, source eligibility and required port wiring reviewed.
+- `src/application/workflow/agent_context.rs` — Producer delta and affected contracts/callers reviewed; unchanged preceding-phase behavior reused proportionately.
+- `src/application/workflow/agent_history_views.rs` — Reader/port/route/HTML integration, current authorization, scope/level/payload projection and exact frozen inspection reviewed.
+- `src/application/workflow/mod.rs` — Producer delta and affected contracts/callers reviewed; unchanged preceding-phase behavior reused proportionately.
+- `src/application/workflow/registry/examples.rs` — Operational controls, fixed bounds, source versus payload lifetime, current authorization and executable help/example inspected.
+- `src/application/workflow/registry/help.rs` — Operational controls, fixed bounds, source versus payload lifetime, current authorization and executable help/example inspected.
+- `src/application/workflow/run_views.rs` — Reader/port/route/HTML integration, current authorization, scope/level/payload projection and exact frozen inspection reviewed.
+- `src/application/workflow/storage.rs` — Supervised owner, company-before-local locking, cleanup cursor/budget, source eligibility and required port wiring reviewed.
+- `src/application/workflow/storage_tests.rs` — Fixture/assertion and discovery review; historical prefix/clock stand-ins distinguished from actual production-owner races; F2 where relevant.

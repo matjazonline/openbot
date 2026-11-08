@@ -232,3 +232,89 @@ failed, retry, lease_lost, error. Existing delivery unknown/dead/retry and overd
 continues to apply. Never add message text, recipient lists or approval tokens to logs or labels.
 These changes require a fresh database using the sole initialization migration; no old rows are
 rewritten and there is no compatibility rollout.
+
+## Agent history and retention
+
+`agent.run` automatically stores its exact supplied context and accepted logical JSON output. A
+trusted message thread shares one stream for each actual agent. Manual/scheduled work uses its
+authenticated private session; an explicit authenticated session reference can reuse it. Business
+JSON cannot select a conversation. Each child branch has its own private history, even when it
+uses the same agent as its parent. Classifiers and agent decisions do not create logical exchanges.
+Human questions, tool approval, delivery continuation and safe retries resume the same exchange.
+A genuinely new task receives a new ordered exchange.
+
+The run step's **Agent history** disclosure lists at most 16 metadata entries per page and can
+inspect one bounded payload at a time. It uses current owner/admin Inspect permission, association
+visibility and current access level, including for private and child runs. An otherwise authorized
+admin can inspect a private run; ordinary membership or customer thread access alone is insufficient.
+A lower authorized viewer sees only restricted order/state/timing. Each cursor, source and detail
+request authorizes again. Completed accepted pairs use their immutable exchange classification;
+in-flight input also observes the current source run classification. Source links separately check
+the source's current permission and level. Retirement of an agent does not erase retained history.
+
+The authenticated API is
+`GET /api/companies/{company_id}/workflow-runs/{run_id}/steps/{execution_id}/history`.
+`limit` is 1..16 (default 16); pass its opaque `next` value as `after` to read older entries.
+`exchange={exchange_id}` inspects one exchange of that derived stream and takes no page parameters.
+The run/execution anchor must be genuine. A sample ID, another stream's cursor or an unrelated
+source handle grants no access. Reads neither dispatch work nor call a model.
+
+**Produced** means the agent accepted a logical output, including JSON `null`. Workflow, channel
+response and delivery status appear separately. A later workflow failure, cancellation or permanent
+delivery failure does not erase Produced. Queued, waiting for an agent turn, active, waiting for
+human input, and failed/cancelled before output are distinct states.
+
+The next call selects only completed retained pairs within its current ceiling: at most 16 pairs
+and 64 KiB of logical seed, with mandatory current input/output reservation taking priority in the
+request budget. The frozen view shows the exact selected pairs, eligible-budget omissions and
+request budget. Hidden or expired pairs are not presented as eligible omissions. Preparation stays
+frozen through retry/resume: it is never silently refreshed. If an old selected source expires,
+a retained owning preparation still shows its exact copied seed and labels the old source expired.
+If the owning payload expires, the inspector says so and does not reconstruct it. It never exposes
+a raw checkpoint, provider continuation or dispatch credential configuration.
+
+These initial history limits are code-owned, with no new configuration keys:
+
+| Resource | Limit |
+| --- | --- |
+| Retained payload records, including queued/active | 128 per conversation; 2048 per company |
+| Recent terminal payload target | 64 per conversation; eligible payloads also expire after 90 days |
+| Company pressure | Above 1536 retained payloads, expire oldest eligible copies toward 1536; sparse streams have no guaranteed minimum |
+| Metadata, including expired rows | 4096 per conversation; 32768 per company |
+| Conversations | 2048 per company |
+| Pending work | Existing 32 per conversation; 256 per company |
+| Individual stored input/output, frozen preparation, provenance | 1 MiB/1 MiB, 2 MiB, 256 KiB |
+
+The existing supervised storage worker runs every 60 seconds, uses at most 4 company candidates
+per discovery page and a 256-record cleanup budget split between payload expiry and unused scopes.
+Each operation has the existing 6-second application budget and native statement/lock bounds. Its
+cursors advance past protected/busy/error prefixes and wrap. A terminal history copy can expire
+after its own execution/job has retired even when later workflow steps are still running. Active
+turns, live human/tool continuations, failed exchanges or failed own jobs before their original source deadline (including produced output
+needed for same-execution retry), unresolved
+effects and required delivery/audit pins stay protected. At a hard bound, preparation backs off
+without creating another history record/checkpoint or entering the provider. Existing activation
+replay reuses its stored slot. There is no history reset control.
+
+Expiry clears only history's output/preparation copies. Immutable digests, original identity,
+classification, timing and Produced proof remain. `expired_count` includes deleted old metadata;
+`expired_through_order` is the contiguous expired prefix rather than the largest hole. Source
+workflow/checkpoint/audit copies remain under the existing90-day whole-root policy and its effect,
+usage and external-rerun pins. They are not silently rewritten to satisfy history-copy limits.
+Only safely expired metadata cascades with eligible source retirement. Empty scopes are pruned
+only without live scoped work or native references; a later recreated stream has a new window ID.
+
+Use the existing cancel, safe retry and reconciliation controls when a turn is stuck. Resolve
+unknown effects/delivery through their existing owners; never erase fencing or issue SQL repairs
+to make space. Safe retry keeps its logical exchange and recorded effects. A new task is separate
+work. A separate workflow-conversation product and replacement-conversation controls remain future
+support, not an available recovery action.
+
+Structured `agent_history.*` events contain identifiers, counts, states and numeric levels.
+`durability=staged` describes work inside an uncommitted transaction, including terminal output
+and turn release; it is not evidence of commit. Public preparation/checkpoint verification, committed cancellation and
+expiry/pruning report verified outcomes; an unresolved checkpoint acknowledgment is explicitly
+unknown. Correlate the exact source execution/checkpoint with its durable state before recovery.
+Fixed counters include `agent_history_payloads_expired_total`, `agent_history_payloads_skipped_total`
+and `agent_history_scopes_pruned_total`; these in-process counts complement durable state and are
+not a multi-instance audit ledger. Bodies, credentials and approval tokens are excluded.

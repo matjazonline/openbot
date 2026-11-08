@@ -1,0 +1,25 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+   Compiling open_bots v0.1.0 (/private/tmp/openbot-agent-history-h_82_5pw/worktree)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 49.77s
+     Running unittests src/lib.rs (/private/tmp/openbot-chs-p06-3f43t2k7/worktree/target/debug/deps/open_bots-8b80d02f0b6cf2e6)
+
+running 1 test
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::agent_history_level_private_thread_anchor_checks_current_acting_member_on_resume ... FAILED
+
+failures:
+
+---- adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::agent_history_level_private_thread_anchor_checks_current_acting_member_on_resume stdout ----
+
+thread 'adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::agent_history_level_private_thread_anchor_checks_current_acting_member_on_resume' (35860909) panicked at src/adapters/persistence/workflow/agent_history_private_context_tests.rs:471:5:
+assertion `left == right` failed
+  left: "agent.unresolved"
+ right: "knowledge.audience_below_content"
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::agent_history_level_private_thread_anchor_checks_current_acting_member_on_resume
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 3336 filtered out; finished in 0.98s
+
+error: test failed, to rerun pass `--lib`

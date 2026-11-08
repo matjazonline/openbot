@@ -1,0 +1,15 @@
+   Compiling open_bots v0.1.0 (/private/tmp/openbot-agent-history-h_82_5pw/worktree)
+error[E0614]: type `store::ModelFixture` cannot be dereferenced
+  --> src/adapters/persistence/workflow/agent_history_reopen_ambiguity_tests.rs:74:18
+   |
+74 |         fixture: *f,
+   |                  ^^ can't be dereferenced
+
+error[E0614]: type `agent_runtime_tests::AgentSetup` cannot be dereferenced
+  --> src/adapters/persistence/workflow/agent_history_commit_ack_tests.rs:51:16
+   |
+51 |         setup: *setup,
+   |                ^^^^^^ can't be dereferenced
+
+For more information about this error, try `rustc --explain E0614`.
+error: could not compile `open_bots` (lib test) due to 2 previous errors

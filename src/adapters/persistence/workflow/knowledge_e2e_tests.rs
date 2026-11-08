@@ -16,6 +16,12 @@ mod uploads;
 #[path = "knowledge_e2e_mcp_tests.rs"]
 mod mcp;
 
+#[path = "agent_history_knowledge_e2e_tests.rs"]
+mod agent_history;
+
+#[path = "agent_history_human_cc_e2e_tests.rs"]
+mod agent_history_human_cc;
+
 #[tokio::test]
 async fn knowledge_e2e_outside_contact_cannot_observe_private_sales_and_gets_missing_information_reply()
  {

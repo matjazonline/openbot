@@ -152,6 +152,7 @@ async fn claim_without_slots(fixture: &Fixture) -> ClaimedWorkflow {
     let target = bind_without_slots(fixture, publication.version).await;
     let admission = WorkflowService::new(p.clone(), p.clone(), p.clone(), p.clone(), Preflight)
         .admit(AdmitWorkflowRequest {
+            history_session: None,
             company_id: company,
             actor: fixture.target.actor,
             association: RelatedAssociation::Company,
@@ -256,7 +257,18 @@ async fn refused_agent_calls(
     use crate::entities::agent_capability::{
         AgentBindingId, AgentId, AgentRevisionId, DependencyManifestId,
     };
-    let prepared = p.prepare_agent(claim).await.unwrap().prepared;
+    let prepared = p
+        .prepare_agent(
+            claim,
+            crate::application::workflow::lease::LeasePolicy::new(std::time::Duration::from_secs(
+                60,
+            ))
+            .unwrap(),
+        )
+        .await
+        .unwrap()
+        .expect_ready()
+        .prepared;
     let original = prepared.tools()[0].origin;
     let connection = match prepared.tools()[0].target {
         crate::application::workflow::agent::AgentToolTarget::Mcp { connection } => connection,

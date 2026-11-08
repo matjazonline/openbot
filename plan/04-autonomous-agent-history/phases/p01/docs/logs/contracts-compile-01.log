@@ -1,0 +1,79 @@
+    Checking tokio v1.50.0
+    Checking tokio-util v0.7.19
+    Checking tower v0.5.2
+    Checking tokio-rustls v0.26.4
+    Checking tokio-rustls v0.24.1
+    Checking hickory-proto v0.24.4
+    Checking lettre v0.11.23
+    Checking tower-http v0.6.11
+    Checking h2 v0.4.15
+    Checking tokio-stream v0.1.17
+    Checking sqlx-core v0.8.6
+    Checking hickory-resolver v0.24.4
+    Checking sqlx-postgres v0.8.6
+    Checking hyper v1.7.0
+    Checking mail-auth v0.6.1
+    Checking hyper-util v0.1.16
+    Checking hyper-rustls v0.27.9
+    Checking axum v0.8.4
+    Checking sqlx v0.8.6
+    Checking reqwest v0.13.4
+    Checking rig-core v0.42.0
+    Checking rmcp v1.8.0
+    Checking axum-extra v0.10.1
+    Checking rig-agent v0.42.0
+    Checking open_bots v0.1.0 (/private/tmp/openbot-agent-history-h_82_5pw/worktree)
+error[E0432]: unresolved imports `crate::domain::workflow::RelatedChannelId`, `crate::domain::workflow::RelatedThreadId`
+ --> src/application/workflow/agent_history/identity.rs:6:44
+  |
+6 | use crate::domain::workflow::{ExecutionId, RelatedChannelId, RelatedThreadId, RunId};
+  |                                            ^^^^^^^^^^^^^^^^  ^^^^^^^^^^^^^^^ no `RelatedThreadId` in `domain::workflow`
+  |                                            |
+  |                                            no `RelatedChannelId` in `domain::workflow`
+  |
+  = help: consider importing this struct through its public re-export instead:
+          crate::application::workflow::RelatedChannelId
+  = help: consider importing this struct through its public re-export instead:
+          crate::application::workflow::RelatedThreadId
+
+error[E0277]: the trait bound `application::workflow::authorization::WorkflowActor: serde::Serialize` is not satisfied
+    --> src/application/workflow/agent_history/identity.rs:65:39
+     |
+  65 | #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+     |                                       ^^^^^^^^^ unsatisfied trait bound
+...
+  71 |     /// Actual persisted execution actor, not a mutable binding's run-as setting.
+     |     ----------------------------------------------------------------------------- required by a bound introduced by this call
+     |
+help: the trait `application::agent::_::_serde::Serialize` is not implemented for `application::workflow::authorization::WorkflowActor`
+    --> src/application/workflow/authorization.rs:14:1
+     |
+  14 | pub struct WorkflowActor {
+     | ^^^^^^^^^^^^^^^^^^^^^^^^
+     = note: for local types consider adding `#[derive(serde::Serialize)]` to your `application::workflow::authorization::WorkflowActor` type
+     = note: for types from other crates check whether the crate offers a `serde` feature flag
+     = help: the following other types implement trait `application::agent::_::_serde::Serialize`:
+               &'a T
+               &'a mut T
+               ()
+               (T,)
+               (T0, T1)
+               (T0, T1, T2)
+               (T0, T1, T2, T3)
+               (T0, T1, T2, T3, T4)
+             and 1313 others
+note: required by a bound in `application::agent::_::_serde::ser::SerializeStruct::serialize_field`
+    --> /Users/mac02/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde_core-1.0.229/src/ser/mod.rs:1917:21
+     |
+1915 |     fn serialize_field<T>(&mut self, key: &'static str, value: &T) -> Result<(), Self::Error>
+     |        --------------- required by a bound in this associated function
+1916 |     where
+1917 |         T: ?Sized + Serialize;
+     |                     ^^^^^^^^^ required by this bound in `SerializeStruct::serialize_field`
+     = note: the full name for the type has been written to '/private/tmp/openbot-chs-p06-3f43t2k7/worktree/target/debug/deps/open_bots-e6d130c9567a1785.long-type-17023940435220235718.txt'
+     = note: consider using `--verbose` to print the full type name to the console
+     = note: this error originates in the derive macro `Serialize` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+Some errors have detailed explanations: E0277, E0432.
+For more information about an error, try `rustc --explain E0277`.
+error: could not compile `open_bots` (lib) due to 2 previous errors

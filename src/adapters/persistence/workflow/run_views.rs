@@ -589,6 +589,22 @@ impl RunViews for PostgresPersistence {
         Ok(Some(view))
     }
 
+    async fn agent_history_page(
+        &self,
+        scope: RunReadScope,
+        execution: Uuid,
+        request: crate::application::workflow::agent_history_views::HistoryPageRequest,
+    ) -> AppResult<Option<crate::application::workflow::agent_history_views::HistoryPage>> {
+        super::agent_history_views::page(self, scope, execution, request).await
+    }
+    async fn agent_history_exchange(
+        &self,
+        scope: RunReadScope,
+        execution: Uuid,
+        exchange: crate::application::workflow::agent_history::AgentExchangeId,
+    ) -> AppResult<Option<crate::application::workflow::agent_history_views::HistoryDetail>> {
+        super::agent_history_views::detail(self, scope, execution, exchange).await
+    }
     async fn workflow_titles(
         &self,
         company: CompanyId,

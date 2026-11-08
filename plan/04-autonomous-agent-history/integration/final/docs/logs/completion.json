@@ -1,0 +1,13 @@
+{
+  "at": "2026-11-08T03:17:51.614391+00:00",
+  "task": "COMPLETE",
+  "source": "0703abfbae6408df334bf4deccdf736f73c6acf667b9784a54da24577e91be2f",
+  "all216_source_bytes_unchanged": true,
+  "all77_preexisting_paths_preserved": true,
+  "staged_entries_unchanged": true,
+  "head_unchanged": true,
+  "coordination": 35,
+  "owned_pg_stopped": true,
+  "data_and_unmerged_work_retained": true,
+  "remaining_required_work": []
+}

@@ -32,6 +32,7 @@ mod board;
 mod channel_replies;
 mod decisions;
 mod definitions;
+mod history;
 mod jev;
 mod reconciliations;
 mod tools;
@@ -137,6 +138,10 @@ where
         .route(runs, get(bindings::runs))
         .route(&format!("{runs}/board"), get(board::board))
         .route(&format!("{runs}/{{run_id}}"), get(bindings::run))
+        .route(
+            &format!("{runs}/{{run_id}}/steps/{{execution_id}}/history"),
+            get(history::read),
+        )
         .route(&format!("{runs}/{{run_id}}/cancel"), post(bindings::cancel))
         .route(&format!("{runs}/{{run_id}}/retry"), post(bindings::retry))
         .route(
@@ -330,3 +335,28 @@ pub type Engine = Arc<WorkflowServices>;
 #[cfg(test)]
 #[path = "tests.rs"]
 mod tests;
+
+/// Test the actual query extractor, API handler, native reader and response encoding together.
+#[cfg(test)]
+pub(crate) async fn history_test_request(
+    engine: Engine,
+    scope: crate::application::workflow::run_views::RunReadScope,
+    execution: Uuid,
+    query: &str,
+) -> Response {
+    let uri = format!("/history?{query}").parse().unwrap();
+    let query = match axum::extract::Query::<history::HistoryQuery>::try_from_uri(&uri) {
+        Ok(query) => query,
+        Err(error) => return error.into_response(),
+    };
+    history::read(
+        axum::extract::State(engine),
+        AuthenticatedUser {
+            id: scope.viewer.user_id(),
+        },
+        axum::extract::Path((scope.company.as_uuid(), scope.run.as_uuid(), execution)),
+        query,
+    )
+    .await
+    .into_response()
+}

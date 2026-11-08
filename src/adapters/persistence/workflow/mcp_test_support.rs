@@ -487,6 +487,7 @@ pub(super) async fn admitted(setup: &McpSetup, key: &str) -> ActivationRequest {
     let company = setup.company();
     let admission = WorkflowService::new(p.clone(), p.clone(), p.clone(), p.clone(), Preflight)
         .admit(AdmitWorkflowRequest {
+            history_session: None,
             company_id: company,
             actor: setup.actor(),
             association: RelatedAssociation::Company,

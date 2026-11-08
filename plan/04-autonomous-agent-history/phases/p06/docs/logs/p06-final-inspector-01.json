@@ -1,0 +1,34 @@
+{
+  "command": [
+    "env",
+    "AGENT_HISTORY_BROWSER_FIXTURES=plan/04-autonomous-agent-history/phases/p06/docs/logs/browser-fixtures-03",
+    "scripts/test-network-isolation.sh",
+    "cargo",
+    "test",
+    "--locked",
+    "--offline",
+    "--lib",
+    "--",
+    "agent_history_views_",
+    "agent_history_level_history_reader",
+    "agent_history_controls_",
+    "agent_history_retention_",
+    "agent_history_continuation_two_real",
+    "agent_history_channel_terminal_delivery",
+    "agent_history_ordering_"
+  ],
+  "cwd": "/private/tmp/openbot-agent-history-h_82_5pw/worktree",
+  "environment": {
+    "DATABASE_URL": "postgres://mac02@127.0.0.1:65037/openbot_ah_p06",
+    "TEST_DATABASE_URL": "postgres://mac02@127.0.0.1:65037/openbot_ah_p06_test",
+    "SQLX_OFFLINE": "true",
+    "CARGO_INCREMENTAL": "1",
+    "CARGO_TARGET_DIR": "/private/tmp/openbot-chs-p06-3f43t2k7/worktree/target",
+    "CARGO_BUILD_JOBS": "4",
+    "RUST_MIN_STACK": "2097152"
+  },
+  "started": "2026-11-08T00:30:49.366131+00:00",
+  "seconds": 153.252,
+  "exit_code": 0,
+  "log": "/private/tmp/openbot-agent-history-h_82_5pw/worktree/plan/04-autonomous-agent-history/phases/p06/docs/logs/p06-final-inspector-01.txt"
+}

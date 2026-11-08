@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "round": "AH-P05-AG1-R1",
+  "artifact": "fe3570f5b3ed1bc73158bdc98a155f73f1a3fb9c820d20ffebc17b61f3266837",
+  "checks": [
+    {
+      "criteria": [
+        "AC6",
+        "AC8-reproduction"
+      ],
+      "command": "scripts/test-network-isolation.sh cargo test --locked --offline --lib -- agent_history_channel_customer_cc",
+      "fixture": "owned loopback PG18.6/P05 fixtures; scripted providers; stock2MiB stack",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/AH-P05-AG1-R1-current-repro.txt",
+          "sha256": "c4696fdfdfd84a7c762e4ab119c7e4d79113e91d9b60e51738460fccd17b08ef"
+        },
+        {
+          "path": "logs/AH-P05-AG1-R1-current-repro.json",
+          "sha256": "d6b00f219ea70b3e46c8a88ffdda0da2358b3d00753bf0ae36a7ffeaf56118de"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC8-correction-owner-matrix"
+      ],
+      "command": "planned focused native final-response owner/refusal correction checks",
+      "fixture": "P05 owned databases",
+      "status": "NOT EXERCISED",
+      "reason": "architecture gate precedes dependent native implementation"
+    }
+  ]
+}

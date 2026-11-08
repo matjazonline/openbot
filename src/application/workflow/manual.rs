@@ -31,6 +31,7 @@ pub struct StartRun {
     /// client key can never claim an automatic admission's key.
     pub idempotency_key: String,
     pub rerun_of: Option<RunId>,
+    pub history_session: Option<super::agent_history::AgentHistorySessionRef>,
 }
 
 pub const MAX_CLIENT_KEY_BYTES: usize = super::MAX_IDEMPOTENCY_KEY_BYTES - 2;
@@ -52,6 +53,7 @@ pub async fn start(
     for _ in 0..MAX_STALE_RETRIES {
         let result = admitter
             .admit(AdmitWorkflowRequest {
+                history_session: command.history_session,
                 company_id: command.company_id,
                 actor: command.actor,
                 association: command.association,

@@ -23,6 +23,9 @@ mod admission_replay;
 mod admission_source;
 mod admission_write;
 mod agent_authority;
+mod agent_history;
+mod agent_history_sessions;
+pub(crate) mod agent_history_views;
 mod agent_manifest;
 mod agent_origin;
 mod agent_preparation;
@@ -153,6 +156,11 @@ mod token_budget;
 
 mod jev_runtime;
 
+#[cfg(test)]
+mod agent_history_race_fixture;
+mod agent_history_retention;
+#[cfg(test)]
+mod agent_history_retention_fixture;
 mod storage;
 mod storage_retention;
 

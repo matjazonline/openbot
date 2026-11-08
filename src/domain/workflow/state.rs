@@ -12,6 +12,7 @@ pub enum WaitingReason {
     ChildRun,
     Effect,
     Reconciliation,
+    AgentTurn,
 }
 
 /// Authoritative logical run state. `Running` includes queued successors and
@@ -235,6 +236,7 @@ mod tests {
             WaitingReason::ChildRun,
             WaitingReason::Effect,
             WaitingReason::Reconciliation,
+            WaitingReason::AgentTurn,
         ] {
             let request = wait(reason, now);
             assert_eq!(request.reason(), reason);

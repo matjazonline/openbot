@@ -17,6 +17,8 @@ use support::*;
 
 #[path = "http_authority_tests.rs"]
 mod authority_tests;
+#[path = "channel_reply_knowledge_uncertainty_tests.rs"]
+mod final_knowledge;
 #[path = "metrics_tests.rs"]
 mod metrics_tests;
 #[path = "reconciliation_fixture.rs"]

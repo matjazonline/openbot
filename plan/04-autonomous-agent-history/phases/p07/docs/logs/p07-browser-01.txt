@@ -1,0 +1,10 @@
+✔ actual history HTML: dark keyboard pagination reaches last exchange, detail is escaped, reads replace and failures recover (2414.209208ms)
+✔ actual history HTML: light keyboard pagination reaches last exchange, detail is escaped, reads replace and failures recover (2283.603625ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 2
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 4888.151459

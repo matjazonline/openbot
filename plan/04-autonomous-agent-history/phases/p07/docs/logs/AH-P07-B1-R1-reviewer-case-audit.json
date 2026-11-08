@@ -1,0 +1,74 @@
+{
+  "checked_at": "2026-11-08T03:00:08.192044+00:00",
+  "selected": 883,
+  "prior866_preserved": 866,
+  "latest_passes": 883,
+  "required_families": {
+    "agent_history_identity_": 19,
+    "agent_history_contract_": 8,
+    "agent_history_storage_": 11,
+    "agent_history_completion_": 14,
+    "agent_history_ordering_": 8,
+    "agent_history_recovery_": 11,
+    "agent_history_selection_": 4,
+    "agent_history_preparation_": 6,
+    "agent_history_protocol_": 4,
+    "agent_history_callers_": 4,
+    "agent_history_children_": 1,
+    "agent_history_samples_": 7,
+    "agent_history_continuation_": 2,
+    "agent_history_channel_": 5,
+    "agent_history_views_": 3,
+    "agent_history_retention_": 14,
+    "agent_history_controls_": 2,
+    "agent_history_level_": 17,
+    "agent_history_e2e_": 5
+  },
+  "runs": [
+    {
+      "run": "p07-final-runtime-01",
+      "cases": 880,
+      "stock_stack": "2097152",
+      "guarded": true
+    },
+    {
+      "run": "p07-e2e-completion-01",
+      "cases": 18,
+      "stock_stack": "2097152",
+      "guarded": true
+    },
+    {
+      "run": "p07-inheritance-current-01",
+      "cases": 1,
+      "stock_stack": "2097152",
+      "guarded": true
+    },
+    {
+      "run": "p07-process-current-01",
+      "cases": 3,
+      "stock_stack": "2097152",
+      "guarded": true
+    }
+  ],
+  "extra_observations": [],
+  "new_selected_names": [
+    "adapters::persistence::workflow::tests::message_tests::ingress_tests::knowledge_e2e::agent_history::agent_history_e2e_real_knowledge_cc_removal_restores_private_seed_and_restricts_inspection",
+    "adapters::persistence::workflow::tests::message_tests::ingress_tests::knowledge_e2e::agent_history_human_cc::agent_history_e2e_real_search_human_wait_and_customer_cc_refuse_resume_without_provider",
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::e2e::crashes::agent_history_e2e_process_crashes_reconstruct_durable_frontiers_without_duplicate_calls",
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::e2e::queue_crashes::agent_history_e2e_process_crash_after_durable_enqueue_and_cancelled_middle_turn_recovers_in_order",
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::e2e::queue_crashes::agent_history_e2e_process_crash_before_successor_wakeup_recovers_by_poll_without_releasing_successor",
+    "application::services::test_support::scenario::inheritance::tests::inherited_listener_capability_is_one_use_and_rejects_a_second_registration",
+    "application::services::test_support::scenario::inheritance::tests::inherited_listener_forged_proof_registers_no_agent_and_fails_the_actual_owner",
+    "application::services::test_support::scenario::inheritance::tests::inherited_listener_proof_does_not_consume_or_capture_a_model_exchange",
+    "application::services::test_support::scenario::inheritance::tests::inherited_listener_refuses_external_origin_before_connection_or_registration",
+    "application::services::test_support::scenario::inheritance::tests::inherited_listener_rejects_a_reflecting_listener_without_disclosing_its_secret",
+    "application::services::test_support::scenario::lifecycle_tests::declared_disconnect_and_retry_are_counted_without_a_fallback_response",
+    "application::services::test_support::scenario::lifecycle_tests::dropping_a_fixture_cancels_its_listener_and_removes_registration",
+    "application::services::test_support::scenario::lifecycle_tests::malformed_framing_fails_completion_without_capturing_authentication",
+    "application::services::test_support::scenario::lifecycle_tests::registration_is_scoped_and_missing_external_endpoints_fail_locally",
+    "application::services::test_support::scenario::lifecycle_tests::shutdown_cancels_a_blocked_response_and_awaits_its_connection",
+    "application::services::test_support::scenario::tests::a_listener_remains_active_to_detect_extra_requests",
+    "application::services::test_support::scenario::tests::unused_and_mismatched_exchanges_fail_explicit_completion"
+  ],
+  "reviewer_runtime_execution": false
+}

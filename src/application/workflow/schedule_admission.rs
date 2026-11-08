@@ -347,6 +347,7 @@ fn admission_request(
 ) -> AppResult<AdmitWorkflowRequest> {
     let company = CompanyId::new(occurrence.company_id);
     Ok(AdmitWorkflowRequest {
+        history_session: None,
         company_id: company,
         actor: binding.run_as,
         association: RelatedAssociation::Channel(RelatedChannelId::new(occurrence.channel_id)),

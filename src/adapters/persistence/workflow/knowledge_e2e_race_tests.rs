@@ -73,11 +73,13 @@ async fn assert_typed_attention(j: &SalesJourney) {
 #[tokio::test]
 async fn knowledge_e2e_cc_and_member_demotion_mid_reply_refuse_delivery_and_show_typed_attention() {
     for change in [AudienceChange::CustomerCc, AudienceChange::MemberDemotion] {
-        let mut j = Box::pin(SalesJourney::new(
-            turns("sales.md: PRIVATE FLOOR 60"),
-            Audience::Team,
-        ))
-        .await;
+        // Only the initial search call is allowed. The scripted server rejects any
+        // second request, independently of the recorded request-content assertions.
+        let expected = turns("sales.md: PRIVATE FLOOR 60")
+            .into_iter()
+            .take(1)
+            .collect();
+        let mut j = Box::pin(SalesJourney::new(expected, Audience::Team)).await;
         let member = j.member(AccessLevel::L5).await;
         j.d.bind(answering_source(), Some(MessageTrigger::Direct))
             .await;
@@ -128,9 +130,18 @@ async fn knowledge_e2e_cc_and_member_demotion_mid_reply_refuse_delivery_and_show
         assert_eq!(facts["reply_levels"], json!([]));
         assert_eq!(facts["delivered"], 0);
         assert_eq!(j.transport.calls.load(Ordering::SeqCst), 0);
-        assert!(observed_private(&mut j));
+        // The current audience is rechecked before another model entry, after the
+        // genuine search committed its classified observation. No private tool result
+        // may reach a second provider call after CC/demotion changes the audience.
+        let requests = j.d.llm.observed();
+        assert_eq!(requests.len(), 1);
+        assert!(
+            requests
+                .iter()
+                .all(|request| !request.to_string().contains(PRIVATE))
+        );
         assert_typed_attention(&j).await;
         j.d.knowledge.shutdown().await.unwrap();
-        assert_eq!(j.d.llm.finish().await.unwrap(), 2);
+        assert_eq!(j.d.llm.finish().await.unwrap(), 1);
     }
 }

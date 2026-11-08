@@ -1,0 +1,24 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+   Compiling open_bots v0.1.0 (/private/tmp/openbot-agent-history-h_82_5pw/worktree)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 49.46s
+     Running unittests src/lib.rs (/private/tmp/openbot-chs-p06-3f43t2k7/worktree/target/debug/deps/open_bots-8b80d02f0b6cf2e6)
+
+running 1 test
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::knowledge_e2e::races::knowledge_e2e_cc_and_member_demotion_mid_reply_refuse_delivery_and_show_typed_attention ... FAILED
+
+failures:
+
+---- adapters::persistence::workflow::tests::message_tests::ingress_tests::knowledge_e2e::races::knowledge_e2e_cc_and_member_demotion_mid_reply_refuse_delivery_and_show_typed_attention stdout ----
+observed gated transaction pids=[85643] blocker=85651 elapsed_ms=401
+
+thread 'adapters::persistence::workflow::tests::message_tests::ingress_tests::knowledge_e2e::races::knowledge_e2e_cc_and_member_demotion_mid_reply_refuse_delivery_and_show_typed_attention' (36046190) panicked at src/adapters/persistence/workflow/knowledge_e2e_race_tests.rs:143:43:
+called `Result::unwrap()` on an `Err` value: "unused required exchanges: completed 1 of 2"
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    adapters::persistence::workflow::tests::message_tests::ingress_tests::knowledge_e2e::races::knowledge_e2e_cc_and_member_demotion_mid_reply_refuse_delivery_and_show_typed_attention
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 3365 filtered out; finished in 1.66s
+
+error: test failed, to rerun pass `--lib`

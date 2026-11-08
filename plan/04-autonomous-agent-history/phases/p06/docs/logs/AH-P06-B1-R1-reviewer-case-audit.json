@@ -1,0 +1,35 @@
+{
+  "selected": 862,
+  "latest_successful": 862,
+  "observations": [
+    [
+      "p06-final-history-01",
+      193,
+      [
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::views::authority::agent_history_views_private_admin_positive_restricted_member_customer_foreign_scope_cursor_and_sample_denials"
+      ]
+    ],
+    [
+      "p06-final-inspector-01",
+      26,
+      []
+    ],
+    [
+      "p06-final-focused-runtime-01",
+      812,
+      [
+        "adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::origin_schema::autonomous_agent_storage_action_origin_populated_collector_and_company_cascade"
+      ]
+    ],
+    [
+      "p06-decision-fixtures-01",
+      4,
+      []
+    ]
+  ],
+  "runtime_execution_by_reviewer": false,
+  "inventory_exactly_matches_reparsed_latest": true,
+  "accepted_p05_names_preserved": 769,
+  "missing_prior_names": [],
+  "interpretation": "862 latest successful distinct targeted observations; two historical whole Rust commands remain FAIL. No reviewer runtime execution."
+}

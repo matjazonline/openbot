@@ -19,6 +19,7 @@ use std::collections::{BTreeMap, HashMap};
 
 mod controls;
 mod events;
+mod history;
 
 use controls::*;
 
@@ -38,6 +39,10 @@ pub(super) fn router() -> Router<AppState> {
         .route("/ui/workflow-runs/events", get(events::stream))
         .route("/ui/workflow-runs/{run_id}", get(pane))
         .route("/ui/workflow-runs/{run_id}/steps/{execution_id}", get(step))
+        .route(
+            "/ui/workflow-runs/{run_id}/steps/{execution_id}/history",
+            get(history::history),
+        )
         .route(CANCEL_ROUTE, post(cancel))
         .route(RETRY_ROUTE, post(retry))
         .route(RERUN_ROUTE, post(rerun))
@@ -709,10 +714,18 @@ async fn step(
         )
         .await?
         .ok_or_else(|| AppError::NotFound("Workflow step not found".into()))?;
-    Ok(Html(pages::run_step_body(&pages::StepBodyView {
+    let mut body = pages::run_step_body(&pages::StepBodyView {
         company_id: company,
         step: &step,
-    })))
+    });
+    if step.agent.is_some() || step.payload_restricted {
+        body.push_str(&pages::agent_history_loader(pages::HistoryAnchor {
+            company,
+            run,
+            execution,
+        }));
+    }
+    Ok(Html(body))
 }
 
 #[cfg(test)]

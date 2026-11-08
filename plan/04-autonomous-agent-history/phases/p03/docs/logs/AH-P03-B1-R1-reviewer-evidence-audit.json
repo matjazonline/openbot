@@ -1,0 +1,407 @@
+{
+  "at": "2026-11-07T17:32:38.555721+00:00",
+  "runtime_executed_by_reviewer": false,
+  "checks": {
+    "migrations-main-04": {
+      "receipt_hash_matches": true,
+      "log_hash_matches": true,
+      "exit_code": 0,
+      "command": [
+        "cargo",
+        "sqlx",
+        "migrate",
+        "run",
+        "--database-url",
+        "postgres://mac02@127.0.0.1:65037/openbot_ah_p03"
+      ],
+      "environment": {
+        "DATABASE_URL": "postgres://mac02@127.0.0.1:65037/openbot_ah_p03",
+        "TEST_DATABASE_URL": "postgres://mac02@127.0.0.1:65037/openbot_ah_p03_test",
+        "SQLX_OFFLINE": "false",
+        "CARGO_INCREMENTAL": "1",
+        "CARGO_TARGET_DIR": "/private/tmp/openbot-chs-p06-3f43t2k7/worktree/target",
+        "CARGO_BUILD_JOBS": "4",
+        "RUST_MIN_STACK": "2097152"
+      },
+      "summaries": [],
+      "log_tail": "Applied 20260817000000/migrate init schema (295.464292ms)\n"
+    },
+    "migrations-test-04": {
+      "receipt_hash_matches": true,
+      "log_hash_matches": true,
+      "exit_code": 0,
+      "command": [
+        "cargo",
+        "sqlx",
+        "migrate",
+        "run",
+        "--database-url",
+        "postgres://mac02@127.0.0.1:65037/openbot_ah_p03_test"
+      ],
+      "environment": {
+        "DATABASE_URL": "postgres://mac02@127.0.0.1:65037/openbot_ah_p03",
+        "TEST_DATABASE_URL": "postgres://mac02@127.0.0.1:65037/openbot_ah_p03_test",
+        "SQLX_OFFLINE": "false",
+        "CARGO_INCREMENTAL": "1",
+        "CARGO_TARGET_DIR": "/private/tmp/openbot-chs-p06-3f43t2k7/worktree/target",
+        "CARGO_BUILD_JOBS": "4",
+        "RUST_MIN_STACK": "2097152"
+      },
+      "summaries": [],
+      "log_tail": "Applied 20260817000000/migrate init schema (285.22925ms)\n"
+    },
+    "final-focused-list-01": {
+      "receipt_hash_matches": true,
+      "log_hash_matches": true,
+      "exit_code": 0,
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "--",
+        "--list",
+        "agent_history_",
+        "workflow_wait_",
+        "workflow_poll_",
+        "workflow_control_",
+        "workflow_fairness_",
+        "workflow_capacity_",
+        "workflow_tool_",
+        "workflow_agent_run_",
+        "workflow_harness_checkpoint_",
+        "workflow_harness_model_",
+        "channel_reply_",
+        "autonomous_agent_admission_cycle"
+      ],
+      "environment": {
+        "DATABASE_URL": "postgres://mac02@127.0.0.1:65037/openbot_ah_p03",
+        "TEST_DATABASE_URL": "postgres://mac02@127.0.0.1:65037/openbot_ah_p03_test",
+        "SQLX_OFFLINE": "true",
+        "CARGO_INCREMENTAL": "1",
+        "CARGO_TARGET_DIR": "/private/tmp/openbot-chs-p06-3f43t2k7/worktree/target",
+        "CARGO_BUILD_JOBS": "4",
+        "RUST_MIN_STACK": "2097152"
+      },
+      "summaries": [],
+      "log_tail": "ection_for_valid_empty_values: test\napplication::workflow::sample::tests::channel_reply_terminal_tests::channel_reply_terminal_sample_returns_business_value_without_a_script: test\napplication::workflow::sample::tests::tools_tests::protected_step_workflow_tool_needs_approval_and_executes_child: test\napplication::workflow::templates::agent_workflow::tests::channel_reply_authoring_custom_end_requires_terminal_no_reply: test\n\n426 tests, 0 benchmarks\n"
+    },
+    "final-focused-runtime-01": {
+      "receipt_hash_matches": true,
+      "log_hash_matches": true,
+      "exit_code": 0,
+      "command": [
+        "scripts/test-network-isolation.sh",
+        "cargo",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "--",
+        "agent_history_",
+        "workflow_wait_",
+        "workflow_poll_",
+        "workflow_control_",
+        "workflow_fairness_",
+        "workflow_capacity_",
+        "workflow_tool_",
+        "workflow_agent_run_",
+        "workflow_harness_checkpoint_",
+        "workflow_harness_model_",
+        "channel_reply_",
+        "autonomous_agent_admission_cycle"
+      ],
+      "environment": {
+        "DATABASE_URL": "postgres://mac02@127.0.0.1:65037/openbot_ah_p03",
+        "TEST_DATABASE_URL": "postgres://mac02@127.0.0.1:65037/openbot_ah_p03_test",
+        "SQLX_OFFLINE": "true",
+        "CARGO_INCREMENTAL": "1",
+        "CARGO_TARGET_DIR": "/private/tmp/openbot-chs-p06-3f43t2k7/worktree/target",
+        "CARGO_BUILD_JOBS": "4",
+        "RUST_MIN_STACK": "2097152"
+      },
+      "summaries": [
+        "test result: ok. 426 passed; 0 failed; 0 ignored; 0 measured; 2890 filtered out; finished in 150.75s"
+      ],
+      "log_tail": "ds_stuck_known_settlement ... ok\ntest adapters::persistence::workflow::tests::message_tests::workflow_tool_tests::workflow_tool_typed_errors_reach_the_model_without_fabricated_success ... ok\ntest adapters::persistence::workflow::tests::message_tests::workflow_tool_tests::workflow_tool_child_failure_limit_and_result_bound_are_typed_errors ... ok\n\ntest result: ok. 426 passed; 0 failed; 0 ignored; 0 measured; 2890 filtered out; finished in 150.75s\n\n"
+    },
+    "checkpoint-supplement-list-01": {
+      "receipt_hash_matches": true,
+      "log_hash_matches": true,
+      "exit_code": 0,
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "--",
+        "--list",
+        "workflow_harness_",
+        "every_wait_reason_survives_request_and_park"
+      ],
+      "environment": {
+        "DATABASE_URL": "postgres://mac02@127.0.0.1:65037/openbot_ah_p03",
+        "TEST_DATABASE_URL": "postgres://mac02@127.0.0.1:65037/openbot_ah_p03_test",
+        "SQLX_OFFLINE": "true",
+        "CARGO_INCREMENTAL": "1",
+        "CARGO_TARGET_DIR": "/private/tmp/openbot-chs-p06-3f43t2k7/worktree/target",
+        "CARGO_BUILD_JOBS": "4",
+        "RUST_MIN_STACK": "2097152"
+      },
+      "summaries": [],
+      "log_tail": "workflow_owner_only: test\nadapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::workflow_harness_owner_existing_foreign_agent_is_not_a_valid_owner: test\nadapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::workflow_harness_owner_mutation_and_expired_fence_refuse: test\ndomain::workflow::state::tests::every_wait_reason_survives_request_and_park: test\n\n40 tests, 0 benchmarks\n"
+    },
+    "checkpoint-supplement-runtime-01": {
+      "receipt_hash_matches": true,
+      "log_hash_matches": true,
+      "exit_code": 0,
+      "command": [
+        "scripts/test-network-isolation.sh",
+        "cargo",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "--",
+        "workflow_harness_",
+        "every_wait_reason_survives_request_and_park"
+      ],
+      "environment": {
+        "DATABASE_URL": "postgres://mac02@127.0.0.1:65037/openbot_ah_p03",
+        "TEST_DATABASE_URL": "postgres://mac02@127.0.0.1:65037/openbot_ah_p03_test",
+        "SQLX_OFFLINE": "true",
+        "CARGO_INCREMENTAL": "1",
+        "CARGO_TARGET_DIR": "/private/tmp/openbot-chs-p06-3f43t2k7/worktree/target",
+        "CARGO_BUILD_JOBS": "4",
+        "RUST_MIN_STACK": "2097152"
+      },
+      "summaries": [
+        "test result: ok. 40 passed; 0 failed; 0 ignored; 0 measured; 3276 filtered out; finished in 13.87s"
+      ],
+      "log_tail": "_owner_only ... ok\ntest adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::workflow_harness_owner_existing_foreign_agent_is_not_a_valid_owner ... ok\ntest adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::workflow_harness_owner_mutation_and_expired_fence_refuse ... ok\n\ntest result: ok. 40 passed; 0 failed; 0 ignored; 0 measured; 3276 filtered out; finished in 13.87s\n\n"
+    },
+    "sqlx-prepare-01": {
+      "receipt_hash_matches": true,
+      "log_hash_matches": true,
+      "exit_code": 0,
+      "command": [
+        "cargo",
+        "sqlx",
+        "prepare",
+        "--",
+        "--locked",
+        "--offline",
+        "--all-targets"
+      ],
+      "environment": {
+        "DATABASE_URL": "postgres://mac02@127.0.0.1:65037/openbot_ah_p03",
+        "TEST_DATABASE_URL": "postgres://mac02@127.0.0.1:65037/openbot_ah_p03_test",
+        "SQLX_OFFLINE": "false",
+        "CARGO_INCREMENTAL": "1",
+        "CARGO_TARGET_DIR": "/private/tmp/openbot-chs-p06-3f43t2k7/worktree/target",
+        "CARGO_BUILD_JOBS": "4",
+        "RUST_MIN_STACK": "2097152"
+      },
+      "summaries": [],
+      "log_tail": "    Checking open_bots v0.1.0 (/private/tmp/openbot-agent-history-h_82_5pw/worktree)\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 27.94s\nquery data written to .sqlx in the current directory; please check this into version control\n"
+    },
+    "sqlx-check-01": {
+      "receipt_hash_matches": true,
+      "log_hash_matches": true,
+      "exit_code": 0,
+      "command": [
+        "cargo",
+        "sqlx",
+        "prepare",
+        "--check",
+        "--",
+        "--locked",
+        "--offline",
+        "--all-targets"
+      ],
+      "environment": {
+        "DATABASE_URL": "postgres://mac02@127.0.0.1:65037/openbot_ah_p03",
+        "TEST_DATABASE_URL": "postgres://mac02@127.0.0.1:65037/openbot_ah_p03_test",
+        "SQLX_OFFLINE": "false",
+        "CARGO_INCREMENTAL": "1",
+        "CARGO_TARGET_DIR": "/private/tmp/openbot-chs-p06-3f43t2k7/worktree/target",
+        "CARGO_BUILD_JOBS": "4",
+        "RUST_MIN_STACK": "2097152"
+      },
+      "summaries": [],
+      "log_tail": "    Checking open_bots v0.1.0 (/private/tmp/openbot-agent-history-h_82_5pw/worktree)\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 11.82s\n"
+    },
+    "offline-alltargets-01": {
+      "receipt_hash_matches": true,
+      "log_hash_matches": true,
+      "exit_code": 0,
+      "command": [
+        "cargo",
+        "check",
+        "--locked",
+        "--offline",
+        "--all-targets"
+      ],
+      "environment": {
+        "DATABASE_URL": "postgres://mac02@127.0.0.1:65037/openbot_ah_p03",
+        "TEST_DATABASE_URL": "postgres://mac02@127.0.0.1:65037/openbot_ah_p03_test",
+        "SQLX_OFFLINE": "true",
+        "CARGO_INCREMENTAL": "1",
+        "CARGO_TARGET_DIR": "/private/tmp/openbot-chs-p06-3f43t2k7/worktree/target",
+        "CARGO_BUILD_JOBS": "4",
+        "RUST_MIN_STACK": "2097152"
+      },
+      "summaries": [],
+      "log_tail": "    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.21s\n"
+    },
+    "clippy-01": {
+      "receipt_hash_matches": true,
+      "log_hash_matches": true,
+      "exit_code": 0,
+      "command": [
+        "cargo",
+        "clippy",
+        "--locked",
+        "--offline",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "environment": {
+        "DATABASE_URL": "postgres://mac02@127.0.0.1:65037/openbot_ah_p03",
+        "TEST_DATABASE_URL": "postgres://mac02@127.0.0.1:65037/openbot_ah_p03_test",
+        "SQLX_OFFLINE": "true",
+        "CARGO_INCREMENTAL": "1",
+        "CARGO_TARGET_DIR": "/private/tmp/openbot-chs-p06-3f43t2k7/worktree/target",
+        "CARGO_BUILD_JOBS": "4",
+        "RUST_MIN_STACK": "2097152"
+      },
+      "summaries": [],
+      "log_tail": "    Checking open_bots v0.1.0 (/private/tmp/openbot-agent-history-h_82_5pw/worktree)\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1m 04s\n"
+    },
+    "fmt-check-01": {
+      "receipt_hash_matches": true,
+      "log_hash_matches": true,
+      "exit_code": 0,
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "environment": {
+        "DATABASE_URL": "postgres://mac02@127.0.0.1:65037/openbot_ah_p03",
+        "TEST_DATABASE_URL": "postgres://mac02@127.0.0.1:65037/openbot_ah_p03_test",
+        "SQLX_OFFLINE": "true",
+        "CARGO_INCREMENTAL": "1",
+        "CARGO_TARGET_DIR": "/private/tmp/openbot-chs-p06-3f43t2k7/worktree/target",
+        "CARGO_BUILD_JOBS": "4",
+        "RUST_MIN_STACK": "2097152"
+      },
+      "summaries": [],
+      "log_tail": ""
+    },
+    "diff-check-01": {
+      "receipt_hash_matches": true,
+      "log_hash_matches": true,
+      "exit_code": 0,
+      "command": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "environment": {
+        "DATABASE_URL": "postgres://mac02@127.0.0.1:65037/openbot_ah_p03",
+        "TEST_DATABASE_URL": "postgres://mac02@127.0.0.1:65037/openbot_ah_p03_test",
+        "SQLX_OFFLINE": "true",
+        "CARGO_INCREMENTAL": "1",
+        "CARGO_TARGET_DIR": "/private/tmp/openbot-chs-p06-3f43t2k7/worktree/target",
+        "CARGO_BUILD_JOBS": "4",
+        "RUST_MIN_STACK": "2097152"
+      },
+      "summaries": [],
+      "log_tail": ""
+    },
+    "graft-build-01": {
+      "receipt_hash_matches": true,
+      "log_hash_matches": true,
+      "exit_code": 0,
+      "command": [
+        "graft",
+        "build"
+      ],
+      "environment": {
+        "DATABASE_URL": "postgres://mac02@127.0.0.1:65037/openbot_ah_p03",
+        "TEST_DATABASE_URL": "postgres://mac02@127.0.0.1:65037/openbot_ah_p03_test",
+        "SQLX_OFFLINE": "true",
+        "CARGO_INCREMENTAL": "1",
+        "CARGO_TARGET_DIR": "/private/tmp/openbot-chs-p06-3f43t2k7/worktree/target",
+        "CARGO_BUILD_JOBS": "4",
+        "RUST_MIN_STACK": "2097152"
+      },
+      "summaries": [],
+      "log_tail": "                            \n\u2713 wiring: 21929 nodes (14747 function, 2238 struct, 1581 file, 1563 module, 940 constant, 533 enum, 155 interface, 128 type, 40 method, 4 class), 34179 edges, 1581 cards [javascript, python, rust]\n  parsed: 0 of 1581 files (1581 replayed from cache)\n  \u2192 /private/tmp/openbot-agent-history-h_82_5pw/worktree/graft\n  graft/ is git-ignored (added automatically), a local cache; teammates run `graft build` to get their own.\n"
+    }
+  },
+  "counts": {
+    "main": 426,
+    "supplement": 40,
+    "overlap": 6,
+    "unique": 460,
+    "history": 77,
+    "names_match_claimed": true,
+    "main_list_matches": true,
+    "supplement_list_matches": true,
+    "ordering": 8,
+    "recovery": 11
+  },
+  "source_scope": {
+    "snapshot_path_count": 136,
+    "matches_owned_plus_external": true
+  },
+  "historical_runtime_failures": {
+    "contention-runtime-02.log": {
+      "names": [
+        "adapters::persistence::workflow::tests::message_tests::workflow_tool_tests::history_cascade::agent_history_recovery_parent_cancel_private_child_and_other_root_admission_do_not_deadlock"
+      ],
+      "all_pass_in_current": true
+    },
+    "cascade-supervision-runtime-02.log": {
+      "names": [
+        "adapters::persistence::workflow::tests::message_tests::workflow_tool_tests::history_cascade::agent_history_recovery_parent_cancel_private_child_and_other_root_admission_do_not_deadlock"
+      ],
+      "all_pass_in_current": true
+    },
+    "history-runtime-01.log": {
+      "names": [
+        "adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::history_completion::lifecycle::deletion::agent_history_storage_failed_exchange_delete_and_actual_control_retry_do_not_deadlock"
+      ],
+      "all_pass_in_current": true
+    },
+    "ordering-recovery-runtime-02.log": {
+      "names": [
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::agent_history_ordering_competing_preparations_park_without_checkpoint_or_retry_and_resume_once",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::agent_history_recovery_final_commit_releases_before_workflow_finish_and_poll_recovers_lost_wake"
+      ],
+      "all_pass_in_current": true
+    },
+    "turn-guard-recovery-runtime-01.log": {
+      "names": [
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::guards::agent_history_recovery_company_teardown_removes_turn_and_parked_companion_proofs",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::guards::agent_history_recovery_replacement_before_checkpoint_keeps_turn_and_fences_old_preparation",
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::guards::agent_history_recovery_revoked_wait_head_reaches_normal_terminal_owner_and_frees_successor"
+      ],
+      "all_pass_in_current": true
+    },
+    "park-ack-runtime-02.log": {
+      "names": [
+        "adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::acknowledgement::agent_history_recovery_park_commit_ack_loss_proves_retired_attempt_and_survives_fast_wake"
+      ],
+      "all_pass_in_current": true
+    }
+  }
+}

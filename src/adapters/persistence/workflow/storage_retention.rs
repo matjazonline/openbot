@@ -7,11 +7,13 @@ pub(super) async fn retire_on(
 ) -> AppResult<Option<RetiredTree>> {
     let company = root.company.as_uuid();
     let root_id = root.run.as_uuid();
-    if sqlx::query_scalar::<_, Uuid>("SELECT id FROM companies WHERE id=$1 FOR KEY SHARE")
-        .bind(company)
-        .fetch_optional(&mut *db)
-        .await?
-        .is_none()
+    if sqlx::query_scalar::<_, Uuid>(
+        "SELECT id FROM companies WHERE id=$1 FOR NO KEY UPDATE SKIP LOCKED",
+    )
+    .bind(company)
+    .fetch_optional(&mut *db)
+    .await?
+    .is_none()
     {
         return Ok(None);
     }

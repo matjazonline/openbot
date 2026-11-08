@@ -8,6 +8,8 @@ use serde_json::json;
 mod channel_reply_preview_tests;
 #[path = "channel_reply_terminal_tests.rs"]
 mod channel_reply_terminal_tests;
+#[path = "history_tests.rs"]
+mod history_tests;
 #[path = "tools_tests.rs"]
 mod tools_tests;
 fn company() -> CompanyId {

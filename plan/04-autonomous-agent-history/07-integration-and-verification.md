@@ -197,3 +197,32 @@ the new limit is exhausted; preserve stack and lease budget checks.
 - No agent history implementation or schema reset was performed. Runtime, compilation,
   database-backed, and browser suites were not run for this documentation/path-list change;
   the implementation gates above remain future requirements.
+
+
+## Implementation verification record — 2026-11-08
+
+The user selected targeted tests only, including the final integration gate; the full runtime,
+stack-budget and lease-budget commands above are retained planning defaults and were not run.
+All current implementation evidence and independent acceptance are recorded under
+`phases/p07/docs/` and `integration/final/docs/`; this narrative is not their sign-off.
+
+- The focused current cohort contains 883 discovered tests, preserving all 866 names accepted
+  in phase06. It includes the new `agent_history_e2e_` journeys and affected existing native
+  workflow, Rig/provider, knowledge, sample, channel and inspection contracts. The process driver
+  is invoked explicitly by its parents and excluded from standalone discovery.
+- Six genuine process-kill/reconstruct frontiers are exercised: durable enqueue, in-flight
+  acquisition, frozen preparation, settled model response, final checkpoint and before wakeup.
+  Native replacement workers retain the exact exchange, seed and accepted output. These known
+  frontiers do not assert exactly-once external provider effects under an unknown outcome;
+  existing native lost-acknowledgement and unknown-effect cases preserve reconciliation.
+- Actual uploaded sales documents/search, private-to-public CC filtering, participant removal,
+  restored private context, real human token approval after a CC, counted publication/delivery
+  and restricted native inspection are exercised. Existing real approval/child/private-session
+  and channel transformation/suppression/retry cases remain required regressions.
+- The new `.github/workflows/agent-history.yml` registers the native journey and actual rendered
+  history browser protocol. Local browser checks cover both themes; a local pass does not claim
+  execution of the hosted GitHub workflow or delivery to an external mailbox.
+
+Exact commands, original failures and corrected observations, fixture limitations, source
+identities and acceptance status are in the immutable review evidence rather than inferred from
+this list. No production database reset, live-provider run or deployment is claimed.

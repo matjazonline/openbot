@@ -1,0 +1,50 @@
+# AH-P07 current criterion and contract audit
+
+This maps final requirements to actual assertions, including existing native integration cases,
+without renaming them or claiming they were all authored in07. New07 tests combine process
+frontiers and knowledge/current audience/inspection; the exact final discovered names and latest
+observations are in verification-case-inventory.json. Final runtime01 PASS880; completion01 PASS18 including genuine human+CC and all process/frontier consumers; reflection-current01 PASS1 after guaranteed server cleanup. Final build rechecks03 and all required local checks PASS after bounded/joined process-output fixture cleanup. No07 or combined acceptance yet.
+
+| Criterion | Actual source and decisive assertion | Evidence |
+| --- | --- | --- |
+| AC1 /07A1 | agent_history_process_tests.rs: two distinct native roots, actual prior/current markers once in actual HTTP request; native frozen_inputs never absorbs seed. agent_history_knowledge_e2e_tests.rs: three same-thread roots, exact stored context/output pairs restored without recursive input. | process-frontiers06 PASS; knowledge-journey03 PASS; current runtime01/completion01 PASS |
+| AC2 /A2 | agent_history_identity_tests.rs, agent_history_session_tests.rs, agent_history_caller_tests.rs, agent_history_entrypoint_tests.rs: native tenant/agent/thread/private identities, trusted admission reuse, copied JSON cannot join; actual schedule configured actor/fresh source; dynamic A/B/A separation. agent_history_sample_tests.rs and sample/history_tests.rs: sealed capture and generated frame/agent scopes with no production effects. | accepted01/05 case assertions retained and selected for current final regression; samples intentionally scripted, not provider/token certification |
+| AC3 /A3 | agent_history_ordering_tests.rs: actual competing preparers/native durable positions; separate stream progresses, successor selects predecessor. agent_history_queue_crash_tests.rs: actual cancelled middle at positions3 between2/4; enqueue and lost wake recover by real poll, old completed replay cannot release newer owner. | new process-frontiers06 PASS, existing competitors selected current |
+| AC4 /A4 | process_driver/fixture/tests and queue_crash_tests: separate current libtest worker, authentic counted parent listener, actual SQL gate/company owner witness, Unix SIGKILL9, fresh persistence + competing real replacement workers after native lease3s. Exact same exchange/order/frozen selection/output; committed model settlement and finalCP unchanged billing/provider2, enqueue/wake provider3. | process-frontiers06 and completion01 PASS all6 frontiers; actual final regression PASS |
+| AC4 uncertainty limit | Acquisition gate holds uncommitted enqueue/acquisition transaction (abort); ModelSettled gate holds uncommitted final-output tx after committed model response. These have known distinct frontiers, not remote exactly-once proof. Existing agent_history_commit_ack_tests.rs / turn_ack / reopen_ambiguity plus native model/action unknown paths test lost COMMIT acknowledgement/reconciliation. | current regression selects those actual proxy/native cases; no provider ambiguity silently relabelled safe |
+| AC5 /A5 | agent_history_continuation_tests.rs: two actual protected HTTP approvals/competing authorized respondents, same exchange and frozen prior seed, HTTP2/model4. agent_history_children_integration_tests.rs: actual same-agent private child finishes with independent seed/no parent transcript. agent_history_thread_continuation_tests.rs: actual message.ask child while parent owns turn, correlated real reply creates no new root/history and parent completes. | accepted05 actual assertions, rerun current; no synthetic wait-event stand-in |
+| AC6 /A6 | agent_history_storage_tests.rs repair and invalid-candidate cases: only valid repaired JSON saved, terminal invalid has no answer; lifecycle/repeated-step cases keep accepted output after later failure. identity/model-only native tests allocate no conversation/seed. | current regression exact existing names preserved |
+| AC7 /A7 | agent_history_private_context_tests.rs new_revision_provider_and_schema: later real Anthropic revision/model/schema authoritative; old pairs remain data; old frozen source remains unchanged; native retry cases separately prove exact replay. Rig logical_seed_tests.rs: actual all-provider wire messages preserve live call/result/repair metadata while historical pairs have none; historical IDs cannot execute effects. Native current authority and safe retry cases retain accounting/selection. | current regression, accepted04 provenance contract unchanged |
+| AC8 /A8 | private_context pair/window/oversize and mandatory-budget refusal; native retention_capacity/metadata/capacity; owner_race and retry_retention actual cleanup/preparation/human owners. Fixed16pairs/64KiB/metadata17, actual127 complete_io near128,65 genuine provider calls near64, payload company2048/soft1536, metadata4096/32768/scopes2048 count fixtures. | all history families current; large historical prefixes explicitly native count/pressure stand-ins, no claim of thousands of genuine provider/audit journeys |
+| AC9 /A9 | agent_history_channel_tests.rs and release tests: transformed final publication differs from saved output and next seed; no_reply/explicit send, actual retry and permanent rejection preserve exchange/output/model count. New knowledge journey checks real public channel message and counted delivery after CC, retained logical private output reappears only for authorized later call. | current final existing channel cases; knowledge-journey03 PASS |
+| AC10 /A10 | controls/lifecycle/retry_deletion/cascade/native guards: current revocation/cancel/deadline/retirement, immutable scoped source pins; private current actor demotion refuses resume. Views final-payload read races recheck authority/content before projecting. | current native regressions; native100001-member source-retirement case also selected for the current run |
+| AC11 /A11 | knowledge_e2e_tests child agent_history_knowledge_e2e_tests: actual0_sales.md/5_sales.md uploaded, actual search2, private5 then real CC0 native request excludes high input/output/no marker and public delivery, removal canonical participant before thirdcall restores exact private pair; actual current native Inspect lower admin renders Restricted exchange. New human_cc test: actual search, token decisions, real CC ingress before approved resume; no provider2/answer/newroot. Earlier level private reuse/child inherited ceilings still required. | journey03/completion01 PASS for3call/inspection and real humanCC; earlier lower reuse/child selected current. No classification-raising stand-in for actual acquisition in new journeys; earlier isolated classification fixtures retain their explicit limit |
+| AC12 /competitors | Native creation/admission, prep/order, finalizer, cancel-complete, replacementlease, human respondents, cleanup-selection bothorderings/human, observationcommit versus stamp all involve actual competing owners (accepted native cases). New recovery starts two real WorkflowWorkers per pollcandidate. | current native regressions plus six-point process evidence |
+| AC13 /07B | New .github/workflows/agent-history.yml actual native+fixture/browser job; CSS generated; existing externalCI/check.sh unchanged. Current fresh pair, SQLxprepare/check/offlinealltargets/Clippy/fmt/diff/source_modules/Graft, browser2/protocol17/sample boundary/Python5, actual queryID/top/utilityoff/parameterlength0. | current gate receipts PASS. No full/stack/lease run peruser. Remote GitHub CI not executed locally; actionlint unavailable, real YAML parse PASS. Final combined primary review/integration still required |
+
+## Changed contracts and shared consumers
+
+Production01–06 ownership/schema/authorization/replay semantics unchanged in07. New code is
+cfgtest drivers/fixtures/journeys plus CI/docs/generatedCSS. ScriptedLlm/ScriptedScenario foundation
+consumers traced (p07-scripted-scenario-callers.txt). Inheritance is opaque nonce/PID/loopback
+origin issued by actual live fixture, one-use mutually authenticated HMAC-SHA256 challenge (different request/response domains, secret never sent to the unproved listener) before private local
+registration; failure registers no agent, refuses external origin before connection, cannot consume
+or capture a model exchange. Existing ordinary endpoint guard, strict actual request/frame/count,
+64exchange,10sIO,60slifetime bounds unchanged. Foundation12/Rig/protocol/providers/MCP/current
+workflow call consumers are selected for final checks; no production test bypass/environment flag.
+
+The technical history_crash_child_entry is ignored as a standalone function and explicitly
+invoked by required parents with --ignored/--exact. Discovery excludes it, avoiding an unconfigured
+helper being miscounted as a required skipped assertion. No existing tests moved/deleted.
+
+The current final runtime selection includes the genuine100001-member native source-retirement
+fixture. It excludes workflow_capacity_count_prunes_retained_terminal_history for a separate
+focused invocation alongside the newly added human/CC case; both remain required in final
+discovery. All selected cases must have an actual current successful observation, with no
+unchanged-case reuse planned for the final883-name cohort. Failed historical commands remain
+FAIL; successful per-case observations do not change their command result.
+
+Remaining combined-primary integration uses its own records and independent review after07
+acceptance; no inference from this matrix or a validator PASS, and no04 commit/push inferred.
+
+Process output now has explicit8192-byte lines/128total lines/32queued lines and a joined owned OS reader thread. Success/Drop close its receiver, kill/reap only the owned child, then join the reader; no detached spawn_blocking task or unbounded output queue. Current six-frontier process-current01 recheck PASS3 after this fixture-only cleanup; no production protocol or ordinary shared provider server change.

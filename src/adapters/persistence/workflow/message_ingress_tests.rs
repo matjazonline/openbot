@@ -25,6 +25,10 @@ use std::collections::BTreeMap;
 use std::time::Duration;
 use tokio_util::sync::CancellationToken;
 
+#[path = "message_ingress_binding_support.rs"]
+mod binding_support;
+use binding_support::SourceBinding;
+
 #[path = "schedule_runtime_tests.rs"]
 mod schedule_runtime_tests;
 
@@ -187,58 +191,17 @@ impl Deployment {
     }
 
     /// Publish `source` through the production composition and bind it to the channel.
-    async fn bind(&self, mut source: Value, trigger: Option<MessageTrigger>) -> BindingTarget {
-        let workflow = WorkflowId::new(Uuid::new_v4());
-        source["workflow_id"] = json!(workflow.to_string());
-        let definitions = self
-            .engine
-            .services()
-            .definitions(Vec::new(), self.mcp_selections.clone());
-        let definition = DefinitionTarget {
-            workflow,
-            ..self.fixture.target
-        };
-        let mut draft = self.fixture.save(None);
-        draft.target = definition;
-        draft.content.source = source.to_string();
-        definitions.save(draft).await.unwrap();
-        let mut publication = self.fixture.publish();
-        publication.target = definition;
-        publication.key =
-            IdempotencyKey::parse(format!("publication-{}", workflow.as_uuid().simple())).unwrap();
-        let version = publication.version;
-        definitions.publish(publication).await.unwrap();
-        let target = BindingTarget {
-            company: self.fixture.target.company,
-            actor: self.fixture.target.actor,
-            binding: WorkflowBindingId::new(Uuid::new_v4()),
-        };
-        let state = self
-            .engine
-            .services()
-            .bindings()
-            .configure(ConfigureBinding {
-                target,
-                expected: None,
-                association: RelatedAssociation::Channel(RelatedChannelId::new(self.channel)),
-                version,
-                params: json!({}),
-                resources: self.resources.clone(),
-                run_as: None,
-                message_trigger: trigger,
-            })
-            .await
-            .unwrap();
-        self.engine
-            .services()
-            .bindings()
-            .activate(SetBindingActivity {
-                target,
-                expected: state.revision,
-            })
-            .await
-            .unwrap();
-        target
+    fn bind(
+        &self,
+        source: Value,
+        trigger: Option<MessageTrigger>,
+    ) -> impl std::future::Future<Output = BindingTarget> {
+        // Return the shared future directly; this fixture wrapper adds no async frame.
+        self.bind_source(SourceBinding {
+            source,
+            params: json!({}),
+            trigger,
+        })
     }
 
     async fn email(

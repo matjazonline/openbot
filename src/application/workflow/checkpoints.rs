@@ -7,8 +7,8 @@ use crate::domain::workflow::WaitId;
 use crate::{
     app_error::AppResult,
     services::harness::runs::{
-        CheckpointRevision, InvocationId, ModelReservation, RigExecutionPolicy, RunCheckpoint,
-        RunId, RunIdentity, SavedModelTurn, WriteOutcome,
+        CheckpointRevision, InvocationId, LogicalSeed, ModelReservation, RigExecutionPolicy,
+        RunCheckpoint, RunId, RunIdentity, SavedModelTurn, WriteOutcome,
     },
 };
 use async_trait::async_trait;
@@ -19,6 +19,7 @@ use serde_json::Value;
 pub struct WorkflowCheckpointSpec {
     pub identity: RunIdentity,
     pub initial_prompt: String,
+    pub seed: LogicalSeed,
     pub policy: RigExecutionPolicy,
     pub prepared: Value,
 }

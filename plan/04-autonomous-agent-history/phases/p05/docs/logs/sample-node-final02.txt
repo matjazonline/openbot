@@ -1,0 +1,11 @@
+✔ response form supports keyboard navigation and submit and shows request progress without dropping form fields (2215.534ms)
+✔ sample progress, failed request recovery and late navigation response use the requesting form (2516.19475ms)
+✔ actual sample textarea template preserves leading newlines for every raw JSON field (1511.8945ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 4212.270625

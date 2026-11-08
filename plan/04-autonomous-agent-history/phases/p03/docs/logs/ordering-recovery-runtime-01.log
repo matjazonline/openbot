@@ -1,0 +1,6 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+error: unexpected argument 'agent_history_recovery_' found
+
+Usage: cargo test [OPTIONS] [TESTNAME] [-- [ARGS]...]
+
+For more information, try '--help'.

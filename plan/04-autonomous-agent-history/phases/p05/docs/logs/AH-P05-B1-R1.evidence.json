@@ -1,0 +1,351 @@
+{
+  "version": 1,
+  "round": "AH-P05-B1-R1",
+  "artifact": "998dd158c6878b33e0fccb06405452843fbfc0ba257ef747efeb84a653cd4c9c",
+  "checks": [
+    {
+      "criteria": [
+        "knowledge-cc-final02"
+      ],
+      "command": "scripts/test-network-isolation.sh cargo test --locked --offline --lib -- knowledge_e2e_cc_and_member_demotion_mid_reply_refuse_delivery_and_show_typed_attention",
+      "fixture": "owned loopback PG18.6/P05; stock2MiB; scripted providers; Chrome explicit where named",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/knowledge-cc-final02.json",
+          "sha256": "0419f78c53c25b739403513fc44276fde7dbddf050e24f94525bbba24a90d91f"
+        },
+        {
+          "path": "logs/knowledge-cc-final02.txt",
+          "sha256": "82820fed2af31c6cf003b360ed6224e00c3a8a88273f2ae4ba03e9787141e031"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "cc-owner-final01"
+      ],
+      "command": "scripts/test-network-isolation.sh cargo test --locked --offline --lib -- agent_history_channel_customer_cc_after_output",
+      "fixture": "owned loopback PG18.6/P05; stock2MiB; scripted providers; Chrome explicit where named",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/cc-owner-final01.json",
+          "sha256": "56bc10aeaf3c57137f579e25bdd74d27dcbdffe0deea10119fef83ff02326ef2"
+        },
+        {
+          "path": "logs/cc-owner-final01.txt",
+          "sha256": "d885fe0596e088a1739a146f7829afec062c1469b8240f498e52f21430292795"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "fmt-check-final02"
+      ],
+      "command": "cargo fmt --all -- --check",
+      "fixture": "owned loopback PG18.6/P05; stock2MiB; scripted providers; Chrome explicit where named",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/fmt-check-final02.json",
+          "sha256": "d0edac4505917ca7ba7798b0de3977fd25a49e4d757df26ae7c6ddd12342b67a"
+        },
+        {
+          "path": "logs/fmt-check-final02.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "diff-check-final02"
+      ],
+      "command": "git diff HEAD --check",
+      "fixture": "owned loopback PG18.6/P05; stock2MiB; scripted providers; Chrome explicit where named",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/diff-check-final02.json",
+          "sha256": "0f2302ed78d6ae5e8edd9b86a7e7d5f5fcc334ae1289624eb94c73ecc3a7dddb"
+        },
+        {
+          "path": "logs/diff-check-final02.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "source-modules-final01"
+      ],
+      "command": "cargo test --locked --offline --test source_modules",
+      "fixture": "owned loopback PG18.6/P05; stock2MiB; scripted providers; Chrome explicit where named",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/source-modules-final01.json",
+          "sha256": "561ca935496bab1986ffccc02265bf2cbcd41345e074040db08a5137e4724f4c"
+        },
+        {
+          "path": "logs/source-modules-final01.txt",
+          "sha256": "80a93e7937ea99410b8540177ed2a2aea2f4fb8f3236412e87c01c06c675d58d"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "sqlx-prepare-final02"
+      ],
+      "command": "cargo sqlx prepare -- --all-targets",
+      "fixture": "owned loopback PG18.6/P05; stock2MiB; scripted providers; Chrome explicit where named",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/sqlx-prepare-final02.json",
+          "sha256": "5d174bb87d88a3c667a4947f5a99c7bfe01c991354163bbc61d055b59b650b93"
+        },
+        {
+          "path": "logs/sqlx-prepare-final02.txt",
+          "sha256": "e385790ec70d12d7e6e63c410d9d5cbaa3e147ef32250411f3e084d1f3b08391"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "sqlx-check-final02"
+      ],
+      "command": "cargo sqlx prepare --check -- --all-targets",
+      "fixture": "owned loopback PG18.6/P05; stock2MiB; scripted providers; Chrome explicit where named",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/sqlx-check-final02.json",
+          "sha256": "9b42ceef3f3e38fc66eab978806181314b4a6ad0a1e6bfa8364774440df9cbfe"
+        },
+        {
+          "path": "logs/sqlx-check-final02.txt",
+          "sha256": "0396eb413d88e947fc17e100873f8333fa3dcdafceca251eeda6703e68323b96"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "offline-final02"
+      ],
+      "command": "cargo check --locked --offline --all-targets",
+      "fixture": "owned loopback PG18.6/P05; stock2MiB; scripted providers; Chrome explicit where named",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/offline-final02.json",
+          "sha256": "a9d8faedc7bc278f37a28ad35f5a12b9f7cfe5ce09c415634d04353bf9621d70"
+        },
+        {
+          "path": "logs/offline-final02.txt",
+          "sha256": "2bc683fb4e4f4f21ee9ee39e2b8ecce2efe20d3b1be57bda5316aa519ab3d30a"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "clippy-final02"
+      ],
+      "command": "cargo clippy --locked --offline --all-targets -- -D warnings",
+      "fixture": "owned loopback PG18.6/P05; stock2MiB; scripted providers; Chrome explicit where named",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/clippy-final02.json",
+          "sha256": "2dbc589c63236179452fc65888f4720ee41f0a6159135cb9e5e7ec69a037d54b"
+        },
+        {
+          "path": "logs/clippy-final02.txt",
+          "sha256": "8dbc34146e5edeeaef0b233813e5589b42008892509f1f4b2e6c4a5e9b6a325b"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC1\u2013AC8"
+      ],
+      "command": "scripts/test-network-isolation.sh cargo test --locked --offline --lib -- --list agent_history_ workflow_agent_ workflow_model_steps_ workflow_classify_ workflow_decision_ workflow_harness_ workflow_wait_ workflow_poll_ workflow_control_ workflow_tool_ channel_reply_ adapters::harness::rig:: application::services::harness::runs::tests:: message_tests::ingress_tests:: application::workflow::sample::tests:: workflow_failure_ workflow_pending_ workflow_action_approval_ workflow_action_uncertainty_ workflow_http_crash_before_marker workflow_http_remote_failure workflow_message_recovery_ workflow_mcp_cancellation_ knowledge_search_ knowledge_run_level_ knowledge_view_ knowledge_message_ --skip dump_autonomous_workflow_agent_picker_browser_fixtures",
+      "fixture": "owned loopback PG18.6/P05; stock2MiB; scripted providers; Chrome explicit where named",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/final-focused-list-02.json",
+          "sha256": "d2ccf71641966ab8ae5201234d88e4f821ac22c161cd8bacb48795bdb8d9e914"
+        },
+        {
+          "path": "logs/final-focused-list-02.txt",
+          "sha256": "b3edc2d74d9e92e9b0b7e3122bed12a50b7353e4daa921d36103de2c620d3b11"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "sample-structural01"
+      ],
+      "command": "python3 scripts/workflow-sample-boundary.py",
+      "fixture": "owned loopback PG18.6/P05; stock2MiB; scripted providers; Chrome explicit where named",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/sample-structural01.json",
+          "sha256": "f8815b2b5c745cb828ac9e56fd2c770a7a22f08ba4ff3249310edb85f6120637"
+        },
+        {
+          "path": "logs/sample-structural01.txt",
+          "sha256": "228c0f0f23407594379b257a3e3684550f2f3eb1741d27acbc9be312e22e6d2d"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "sample-boundary-fixtures-final01"
+      ],
+      "command": "python3 scripts/tests/workflow-sample-boundary.py",
+      "fixture": "owned loopback PG18.6/P05; stock2MiB; scripted providers; Chrome explicit where named",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/sample-boundary-fixtures-final01.json",
+          "sha256": "f94f7be2bf3679725354e14b369578b048d8bdab2d5edccb5d1ed611faa8a92b"
+        },
+        {
+          "path": "logs/sample-boundary-fixtures-final01.txt",
+          "sha256": "0f40ff8f52499628ea6f0f59e75b43e13de6b7ef770873fd29d1e625a27308a5"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "sample-node-final02"
+      ],
+      "command": "env CHROME_PATH=/Applications/Google Chrome.app/Contents/MacOS/Google Chrome node --test scripts/tests/workflow-samples.mjs scripts/tests/channel-response-authoring.mjs",
+      "fixture": "owned loopback PG18.6/P05; stock2MiB; scripted providers; Chrome explicit where named",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/sample-node-final02.json",
+          "sha256": "203ffa35f180c3fb61b7eec936098a154c019c4bc184bd785fd54c71100ccc74"
+        },
+        {
+          "path": "logs/sample-node-final02.txt",
+          "sha256": "1ad70ec751fec0db6101674e6382ef8fe45406333c9c5a701be848ac06f2943e"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "migrations-main-correction01"
+      ],
+      "command": "cargo sqlx migrate run",
+      "fixture": "owned loopback PG18.6/P05; stock2MiB; scripted providers; Chrome explicit where named",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/migrations-main-correction01.json",
+          "sha256": "9db919888cefa6ead199363d3dd8259a7738541bfeea256081b76dbb26cff56e"
+        },
+        {
+          "path": "logs/migrations-main-correction01.txt",
+          "sha256": "69ac2415fac0d078b5de077fd4190ff080f58be6b376918ad1f5d3bd9005384d"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "migrations-test-correction01"
+      ],
+      "command": "cargo sqlx migrate run --database-url postgres://mac02@127.0.0.1:65037/openbot_ah_p05_test",
+      "fixture": "owned loopback PG18.6/P05; stock2MiB; scripted providers; Chrome explicit where named",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/migrations-test-correction01.json",
+          "sha256": "39ae32bbf5eb49f433116144c9f5a8d419310ce8b1139b9a5d3dc2a2b44820dd"
+        },
+        {
+          "path": "logs/migrations-test-correction01.txt",
+          "sha256": "c906cb21234bc3b676aa89d23f329473e0b3190fbbd035946b52cd6e8aa99736"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "graft-build-final03"
+      ],
+      "command": "graft build",
+      "fixture": "owned loopback PG18.6/P05; stock2MiB; scripted providers; Chrome explicit where named",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/graft-build-final03.json",
+          "sha256": "583571970ee3f0eb1583280ca6ea8cac47736a6a4ab49b9fb22a4b653ef113e7"
+        },
+        {
+          "path": "logs/graft-build-final03.txt",
+          "sha256": "fe70ce1680543751ef5bb9dee662e45ab2eacee3b80ce710c782a0a5a0a89867"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC1",
+        "AC2",
+        "AC3",
+        "AC4",
+        "AC5",
+        "AC6",
+        "AC8"
+      ],
+      "command": "python3 plan/04-autonomous-agent-history/phases/p05/docs/logs/verify-case-evidence.py",
+      "fixture": "same P05 owned PG/schema; current selected names and retained latest successful case observations; see reuse dispositions",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/verification-case-inventory.json",
+          "sha256": "4e9384961fe319299ea9e308d91d62af2b72e4dcb1a497284c6ac0d569eada56"
+        },
+        {
+          "path": "logs/case-evidence-final01.txt",
+          "sha256": "4f4c3c0ac68a08d97effa69306a1cf10bf0b9fc860e85cf38e97c8bec8574e9c"
+        },
+        {
+          "path": "logs/final-focused-runtime-02.json",
+          "sha256": "4be548945c1f659aa7c2327c2f3b6aaed138c51fcfd9b5dbd22e9d17905c85c3"
+        },
+        {
+          "path": "logs/final-focused-runtime-02.txt",
+          "sha256": "754581c043846badc1d679bc739244368ae6824bfe9603b1684c686cd3e8f845"
+        },
+        {
+          "path": "logs/final-affected-recheck01.json",
+          "sha256": "ec5682d3edec1f40d6285be18cde27ac87d2dd4937aef0f23430209689a21e92"
+        },
+        {
+          "path": "logs/final-affected-recheck01.txt",
+          "sha256": "c570790f4ef18789c684d2001ab1f273858b6dbee70d4c07a8af605594825901"
+        },
+        {
+          "path": "logs/knowledge-cc-final02.json",
+          "sha256": "0419f78c53c25b739403513fc44276fde7dbddf050e24f94525bbba24a90d91f"
+        },
+        {
+          "path": "logs/knowledge-cc-final02.txt",
+          "sha256": "82820fed2af31c6cf003b360ed6224e00c3a8a88273f2ae4ba03e9787141e031"
+        },
+        {
+          "path": "logs/cc-owner-final01.json",
+          "sha256": "56bc10aeaf3c57137f579e25bdd74d27dcbdffe0deea10119fef83ff02326ef2"
+        },
+        {
+          "path": "logs/cc-owner-final01.txt",
+          "sha256": "d885fe0596e088a1739a146f7829afec062c1469b8240f498e52f21430292795"
+        }
+      ]
+    }
+  ]
+}

@@ -891,3 +891,9 @@ mod origin_schema;
 
 #[path = "autonomous_agent_view_tests.rs"]
 mod autonomous_views;
+
+#[path = "agent_history_identity_tests.rs"]
+mod history_identity;
+
+#[path = "agent_history_storage_tests.rs"]
+mod history_storage;
