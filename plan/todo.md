@@ -3,6 +3,14 @@
 - main /ui dashboard uses server-side db polling for every SSE stream - use db events hybrid
 - convert to HTMX 4
 
+## Execution backends
+
+- **Tenant-owned backends:** Run company Python/JavaScript tools in its own cloud account
+  (initially Fly.io), with versioned scripts, scoped credentials, bounded jobs, replay-safe
+  results, and durable cancellation/cleanup.
+- **MicroVM sandbox:** Run whole OpenCode sessions in ephemeral isolated cloud VMs, with
+  bounded execution and durable teardown; separate from Cloudroom's shared local OS account.
+
 ## Workflow foundation follow-ups
 
 Left open when [workflow-foundation](.archived/workflow-foundation/README.md) was completed
