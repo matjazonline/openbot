@@ -36,3 +36,8 @@ Frozen VG-PUB67-B1-R1 b0ae9af5c07980a42dac601855f7998facb8c431e8b978f8df8980dd78
 ## Root technical acceptance
 
 Original B VG-PUB67-B1-R1 PASS exact b0ae9af5c07980a42dac601855f7998facb8c431e8b978f8df8980dd7823f02a; no actionable findings. Root independently rehashed source and pinned coordination25; evidence validated and all affected gates passed. Runtime/migration/SQLx1683 files independently byte-compared unchanged by B, and8 source-module cases independently passed. Status-only coordination26 preserves requirements and redirects final authority to root archived checkout. Commit/push/remote verification next, not yet claimed performed.
+
+
+## Publication performed
+
+Ordinary git push origin HEAD:main succeeded for b8e6b32ebcaa01c3bda659b3a6464c518e92ac06; git ls-remote returned that exact main ID. PUB4 exercised PASS, new immutable release evidence manifest/receipts retained. This records-only status commit preserves protected source tree fingerprint 6d5daf5a9ce546606c4c0854600cdbabcd6881dfd8aef2f8f274832253f4400f; no runtime/doc deliverable changes after independent PASS. Root checkout synchronized to final published tip, only owned disposable publication tree removed; no shared/foreign resources altered. Scope COMPLETE.

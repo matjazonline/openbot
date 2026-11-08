@@ -1,0 +1,9 @@
+{
+  "command": [
+    "git",
+    "push",
+    "origin",
+    "HEAD:main"
+  ],
+  "exit": 0
+}

@@ -2,7 +2,7 @@
 
 - Authority: /Users/mac02/.codex/worktrees/1133/openbot/plan/.archive/vault-google/COORDINATION.md
 - Writer: /root, worktree /Users/mac02/.codex/worktrees/1133/openbot
-- Revision: 26
+- Revision: 27
 
 ## Plan-wide instructions
 
@@ -204,3 +204,10 @@
 
 - Status-only addendum. VG-PUB67-B1-R1 PASS of b0ae9af5c07980a42dac601855f7998facb8c431e8b978f8df8980dd7823f02a and root exact recomputation accept currentmain reconciliation/archive. No open actionable findings; original06/07 code and all phase evidence preserved. Requirements I01/r6,I02/r1,I03/r3,C001–C006 unchanged.
 - Canonical authority now names the archived path in the final root checkout; the isolated publication worktree remains the write location until the root fast-forward. Authorized ordinary commit/push and remote verification are root's next release actions; no force push/deployment/live provider actions.
+
+
+### Accepted06–07 publication complete (revision27)
+
+- Authorized main publication succeeded: b8e6b32ebcaa01c3bda659b3a6464c518e92ac06, remote main identity independently read back. It contains accepted source83b493e2 and currentmain22c94cf6, final phase06/07 implementation and plan/.archive/vault-google. Ordinary fast-forward push; no forced history rewrite, deployment or live-provider action.
+- VG-PUB67-B1-R1 independent integration/archive PASS, root source identity preserved. A following records-only commit retains publication receipts and this status without changing reviewed runtime/source. Original phase evidence and all historical files preserved.
+- Publication scope complete. Final root checkout uses this archived coordination path. Only own disposable publication worktree is removed after synchronization; root build cache retained, shared PostgreSQL/foreign worktrees/stashes untouched.
