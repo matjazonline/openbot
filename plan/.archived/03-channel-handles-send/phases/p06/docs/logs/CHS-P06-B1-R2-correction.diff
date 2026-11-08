@@ -1,0 +1,688 @@
+--- a/src/adapters/persistence/onboarding/tests.rs
++++ b/src/adapters/persistence/onboarding/tests.rs
+@@ -341,7 +341,29 @@
+     )
+     .unwrap();
+     // A channel with workflow configuration is intentionally retained. This private fixture has
+-    // no runs; remove its unused binding before exercising channel deletion.
++    // no runs; explicitly clear its selected response, then remove the unused binding.
++    use crate::application::workflow::channel_reply::{ChannelReplies, ConfigureChannelReply};
++    let actor = crate::application::workflow::WorkflowActor::authenticated(f.owner).unwrap();
++    let company = crate::domain::workflow::CompanyId::new(f.company);
++    let response_channel = crate::application::workflow::RelatedChannelId::new(channel);
++    let selected = f
++        .persistence
++        .channel_reply_settings(company, response_channel, actor)
++        .await
++        .unwrap()
++        .unwrap();
++    assert!(selected.responder.is_some());
++    f.persistence
++        .configure_channel_reply(ConfigureChannelReply {
++            company,
++            channel: response_channel,
++            actor,
++            expected: Some(selected.revision),
++            responder: None,
++            approval_policy: None,
++        })
++        .await
++        .unwrap();
+     let removed =
+         sqlx::query("DELETE FROM workflow_bindings WHERE company_id = $1 AND channel_id = $2")
+             .bind(f.company)
+--- a/src/adapters/persistence/workflow/channel_reply_continuation_views_support.rs
++++ b/src/adapters/persistence/workflow/channel_reply_continuation_views_support.rs
+@@ -0,0 +1,281 @@
++//! Genuine admissions, question publication/replies and child parking for outcome regressions.
++use super::*;
++
++struct Prompt {
++    pub(super) scope: ActivationRequest,
++    pub(super) message: CanonicalMessageId,
++    pub(super) wait: crate::domain::workflow::WaitId,
++    pub(super) respondent: Uuid,
++    pub(super) delivery: crate::entities::transport::DeliveryId,
++}
++
++#[derive(sqlx::FromRow)]
++struct PromptRow {
++    pub(super) message_id: Uuid,
++    pub(super) wait_id: Uuid,
++    pub(super) respondent_id: Uuid,
++    pub(super) delivery_id: Uuid,
++}
++
++async fn ask(f: &FinalFixture, scope: ActivationRequest) -> Prompt {
++    let claim =
++        f.p.claim_io(scope, WorkflowWorkerId(Uuid::new_v4()), lease())
++            .await
++            .unwrap()
++            .unwrap();
++    let result = runtime(&f.p)
++        .execute(&WorkflowStepKind("message.ask".into()), &claim)
++        .await;
++    let WorkflowHandlerOutcome::Suspended(parked) = result else {
++        panic!("{result:?}");
++    };
++    assert!(
++        f.p.confirm_suspension(claim.fence, parked.wait)
++            .await
++            .unwrap()
++    );
++    let row: PromptRow = sqlx::query_as("SELECT question.message_id,question.wait_id,question.respondent_id,destination.delivery_id FROM workflow_channel_questions AS question JOIN workflow_message_destinations AS destination ON destination.company_id=question.company_id AND destination.invocation_id=question.invocation_id WHERE question.company_id=$1 AND question.execution_id=$2")
++        .bind(scope.company.as_uuid()).bind(scope.execution.as_uuid()).fetch_one(f.p.pool()).await.unwrap();
++    Prompt {
++        scope,
++        message: CanonicalMessageId::new(row.message_id),
++        wait: crate::domain::workflow::WaitId::new(row.wait_id),
++        respondent: row.respondent_id,
++        delivery: crate::entities::transport::DeliveryId::new(row.delivery_id),
++    }
++}
++
++struct Answer {
++    pub(super) message: CanonicalMessageId,
++    pub(super) next: ActivationRequest,
++}
++
++async fn answer(f: &FinalFixture, prompt: &Prompt) -> Answer {
++    let incoming =
++        f.p.create_message(&inbound(
++            f.s.thread,
++            &format!("<outcome-answer-{}@partner.test>", Uuid::new_v4()),
++            &[],
++            "Human answer",
++        ))
++        .await
++        .unwrap()
++        .canonical_id;
++    assert_eq!(
++        f.p.deliver_reply(IngressReply {
++            company: f.scope.company,
++            thread: f.s.thread,
++            answers: prompt.message,
++            responder: Some(prompt.respondent),
++            in_app: false,
++            event: WorkflowEventId(Uuid::new_v4()),
++            payload: MessageTriggerInput::new(
++                incoming,
++                "Human answer",
++                "Question",
++                "customer@partner.test"
++            )
++            .to_value(),
++            park_grace_until: Utc::now() + chrono::Duration::minutes(5),
++        })
++        .await
++        .unwrap(),
++        ReplyIngress::Recorded(prompt.scope.run)
++    );
++    let WaitProgress::Completed(done) = f.p.resume_wait(prompt.scope).await.unwrap() else {
++        panic!("Actual answer resumes the question")
++    };
++    Answer {
++        message: incoming,
++        next: done.successor.unwrap(),
++    }
++}
++
++fn question_source() -> Value {
++    let mut source = final_source("message.ask");
++    let inputs = json!({"source_message":{"ref":"/input/source_message"},
++        "content":{"literal":{"body":"First question"}},
++        "deadline":{"ref":"/run/deadline"},"payload_schema":{"literal":MessageTriggerInput::schema()}});
++    source["steps"]["start"]["with"] = inputs.clone();
++    source["steps"]["start"]["routes"] = json!({"success":"again"});
++    source["steps"]["again"] =
++        json!({"type":"message.ask","with":inputs,"routes":{"success":"finish"}});
++    source["steps"]["again"]["with"]["source_message"] =
++        json!({"ref":"/steps/start/output/source_message"});
++    source["steps"]["finish"] = json!({"type":"channel.no_reply","with":{
++        "value":{"literal":{"body":"Done"}},"output_schema":{"literal":true}},"routes":{"success":"$end"}});
++    source
++}
++
++pub(super) async fn questions() -> FinalFixture {
++    let source = question_source();
++    Box::pin(FinalFixture::from_case(
++        Box::pin(classified_intents()).await,
++        FinalCase {
++            source,
++            contract: literal_contract("Final"),
++            policy: None,
++            run_as: None,
++            publication: FinalPublication::Messaging,
++            delivery_policy: DeliveryPolicy::Deliver,
++        },
++    ))
++    .await
++}
++
++async fn uncertain_prompt(f: &FinalFixture, delivery: crate::entities::transport::DeliveryId) {
++    let claim =
++        f.p.claim_deliveries(
++            crate::transport::WorkerId::random(),
++            Duration::from_secs(120),
++            64,
++        )
++        .await
++        .unwrap()
++        .into_iter()
++        .find(|claim| claim.record.id == delivery)
++        .unwrap();
++    assert!(
++        f.p.claim_deliveries(
++            crate::transport::WorkerId::random(),
++            Duration::from_secs(120),
++            64
++        )
++        .await
++        .unwrap()
++        .is_empty(),
++        "The closed first prompt is no longer deliverable"
++    );
++    f.p.begin_part(&claim.lease, claim.parts[0].id)
++        .await
++        .unwrap();
++    let uncertain = ProviderSendOutcome::OutcomeUnknown {
++        class: FailureClass::Timeout,
++        detail: FailureDetail::parse("unconfirmed").unwrap(),
++    };
++    assert_eq!(
++        f.p.complete_part(PartResult {
++            fence: &claim.lease,
++            part_id: claim.parts[0].id,
++            outcome: &uncertain
++        })
++        .await
++        .unwrap(),
++        DeliveryOutcome::Applied(DeliveryStatus::OutcomeUnknown)
++    );
++}
++
++pub(super) async fn two_questions(f: &FinalFixture, scope: ActivationRequest) -> ActivationRequest {
++    let first = Box::pin(ask(f, scope)).await;
++    let initial = outcome(f).await;
++    assert_eq!(initial.prompt.unwrap().message, first.message);
++    let answered = Box::pin(answer(f, &first)).await;
++    let second = Box::pin(ask(f, answered.next)).await;
++    let actual_source: Uuid = sqlx::query_scalar("SELECT source_message_id FROM workflow_channel_questions WHERE company_id=$1 AND wait_id=$2")
++        .bind(f.scope.company.as_uuid()).bind(second.wait.as_uuid()).fetch_one(f.p.pool()).await.unwrap();
++    assert_eq!(actual_source, answered.message.as_uuid());
++    let current = outcome(f).await;
++    assert_eq!(current.source, initial.source);
++    let prompt = current.prompt.as_ref().unwrap();
++    assert_eq!(
++        prompt.message, second.message,
++        "The active second question must replace the closed first question"
++    );
++    assert_eq!(prompt.wait, second.wait);
++    assert!(prompt.waiting && !prompt.awaiting_viewer);
++    let respondent: Uuid =
++        sqlx::query_scalar("SELECT user_id FROM principals WHERE company_id=$1 AND id=$2")
++            .bind(f.scope.company.as_uuid())
++            .bind(second.respondent)
++            .fetch_one(f.p.pool())
++            .await
++            .unwrap();
++    let viewer = WorkflowActor::authenticated(respondent).unwrap();
++    let own = channel_reply_views::read(&f.p, f.scope.company, viewer, &[f.scope.run.as_uuid()])
++        .await
++        .unwrap();
++    assert!(own[0].prompt.as_ref().unwrap().awaiting_viewer);
++    assert_eq!(own[0].label(), "Waiting for your response");
++    Box::pin(uncertain_prompt(f, second.delivery)).await;
++    let attention = outcome(f).await;
++    assert_eq!(
++        attention
++            .prompt
++            .as_ref()
++            .unwrap()
++            .delivery
++            .as_ref()
++            .unwrap()
++            .state,
++        DeliveryStatus::OutcomeUnknown
++    );
++    assert!(attention.label().contains("attention"));
++    let final_answer = Box::pin(answer(f, &second)).await;
++    final_answer.next
++}
++
++async fn parked_child(fixture: &FinalFixture) -> ActivationRequest {
++    use crate::application::workflow::children::WorkflowChildren;
++    fixture.p.park_child(fixture.scope).await.unwrap().unwrap();
++    let row: ScopeRow=sqlx::query_as("SELECT child.id AS run_id,execution.id AS execution_id,job.id AS job_id FROM workflow_runs AS child JOIN workflow_executions AS execution ON execution.company_id=child.company_id AND execution.run_id=child.id JOIN background_tasks AS job ON job.company_id=execution.company_id AND job.workflow_execution_id=execution.id WHERE child.company_id=$1 AND child.parent_run_id=$2")
++        .bind(fixture.scope.company.as_uuid()).bind(fixture.scope.run.as_uuid()).fetch_one(fixture.p.pool()).await.unwrap();
++    ActivationRequest {
++        company: fixture.scope.company,
++        run: RunId::new(row.run_id),
++        execution: ExecutionId::new(row.execution_id),
++        job: WorkflowJobId(row.job_id),
++    }
++}
++
++pub(super) struct ChildReview {
++    pub(super) fixture: FinalFixture,
++    pub(super) child: ActivationRequest,
++}
++
++pub(super) async fn child_review(s: Intents, deadline: chrono::DateTime<Utc>) -> ChildReview {
++    let workflow = WorkflowId::new(Uuid::new_v4());
++    let mut child: Value =
++        serde_json::from_str(&registry::example("decision.human").unwrap().source).unwrap();
++    child["steps"]["start"]["with"]["reviewers"] =
++        json!({"literal":[{"kind":"user","id":s.owner().user_id()}]});
++    child["steps"]["start"]["with"]["deadline"] = json!({"literal":deadline.to_rfc3339()});
++    let version = Box::pin(s.fixture.publish_workflow(workflow, child)).await;
++    let mut parent = final_source("workflow.call");
++    parent["steps"]["start"] = json!({"type":"workflow.call","child_workflow_id":workflow,
++        "child_version_id":version,"with":{"input":{"literal":{}}},"routes":{"success":"$end"}});
++    let fixture = Box::pin(FinalFixture::configured(
++        s,
++        parent,
++        literal_contract("Reviewed final"),
++        false,
++    ))
++    .await;
++    let child = Box::pin(parked_child(&fixture)).await;
++    ChildReview { fixture, child }
++}
++
++pub(super) async fn child_questions() -> ChildReview {
++    let mut s = Box::pin(classified_intents()).await;
++    s.fixture.target.workflow = WorkflowId::new(Uuid::new_v4());
++    let mut source = question_source();
++    source["workflow_id"] = json!(s.fixture.target.workflow);
++    let child_workflow = s.fixture.target.workflow;
++    let version = Box::pin(publish_root(&s, source, FinalPublication::Messaging)).await;
++    let mut parent = final_source("workflow.call");
++    parent["steps"]["start"] = json!({"type":"workflow.call","child_workflow_id":child_workflow,
++        "child_version_id":version,"with":{"input":{"ref":"/input"}},"routes":{"success":"$end"}});
++    let fixture = Box::pin(FinalFixture::from_case(
++        s,
++        FinalCase {
++            source: parent,
++            contract: literal_contract("Child answered"),
++            policy: None,
++            run_as: None,
++            publication: FinalPublication::Standard,
++            delivery_policy: DeliveryPolicy::Deliver,
++        },
++    ))
++    .await;
++    let child = Box::pin(parked_child(&fixture)).await;
++    ChildReview { fixture, child }
++}
+--- a/src/adapters/persistence/workflow/channel_reply_continuation_views_tests.rs
++++ b/src/adapters/persistence/workflow/channel_reply_continuation_views_tests.rs
+@@ -0,0 +1,207 @@
++use super::*;
++#[path = "channel_reply_continuation_views_support.rs"]
++mod support;
++use crate::adapters::persistence::workflow::tests::message_tests::support::{lease, runtime};
++use crate::application::workflow::{
++    polling::WorkflowStepKind,
++    triggers::MessageTriggerInput,
++    waits::{IngressReply, ReplyIngress, WaitProgress, WorkflowEventId, WorkflowWaits},
++    worker::WorkflowHandler,
++};
++use crate::entities::message::CanonicalMessageId;
++use chrono::Utc;
++use support::*;
++
++#[tokio::test]
++async fn channel_reply_views_later_question_uses_actual_answer_and_keeps_original_source() {
++    let f = Box::pin(questions()).await;
++    let next = Box::pin(two_questions(&f, f.scope)).await;
++    f.p.advance_pure(
++        next,
++        BatchBudget::new(4, Duration::from_millis(100)).unwrap(),
++    )
++    .await
++    .unwrap();
++    let completed = outcome(&f).await;
++    assert!(!completed.prompt.as_ref().unwrap().waiting);
++    assert_eq!(completed.label(), "Completed without automatic reply");
++}
++
++#[tokio::test]
++async fn channel_reply_views_child_review_wakes_and_reconciles_the_unchanged_parent() {
++    for choice in ["continue", "revise"] {
++        let case = Box::pin(child_review(
++            Box::pin(Intents::new()).await,
++            Utc::now() + chrono::Duration::minutes(10),
++        ))
++        .await;
++        let f = &case.fixture;
++        assert_eq!(outcome(f).await.label(), "Processing");
++        let mut events = listener(f).await;
++        let _opened =
++            f.p.park_decision(case.child, &approval_test_support::notices(&f.p))
++                .await
++                .unwrap()
++                .unwrap();
++        let wakes = notifications(&mut events).await;
++        assert!(
++            wakes
++                .iter()
++                .any(|(kind, payload)| kind == "workflow_run_changed"
++                    && payload["run_id"] == json!(case.child.run.as_uuid()))
++        );
++        assert!(wakes.iter().any(|(kind, payload)| kind == "thread_activity"
++            && payload["thread_id"] == json!(f.s.thread)));
++        let parent_reason: String = sqlx::query_scalar(
++            "SELECT waiting_reason FROM workflow_runs WHERE company_id=$1 AND id=$2",
++        )
++        .bind(f.scope.company.as_uuid())
++        .bind(f.scope.run.as_uuid())
++        .fetch_one(f.p.pool())
++        .await
++        .unwrap();
++        assert_eq!(
++            parent_reason, "child_run",
++            "The parent does not change state when its child parks"
++        );
++        let waiting = outcome(f).await;
++        assert!(waiting.waiting_for_review);
++        assert_eq!(waiting.label(), "Waiting for reviewer");
++        let html = crate::adapters::http::pages::channel_response_panel(
++            &waiting,
++            f.scope.company.as_uuid(),
++            crate::adapters::http::pages::RunLinkAccess::Inspect,
++        );
++        assert!(html.contains("Waiting for reviewer"));
++        let decision: Uuid = sqlx::query_scalar(
++            "SELECT id FROM workflow_decisions WHERE company_id=$1 AND execution_id=$2",
++        )
++        .bind(f.scope.company.as_uuid())
++        .bind(case.child.execution.as_uuid())
++        .fetch_one(f.p.pool())
++        .await
++        .unwrap();
++        let view =
++            f.p.read_decision(f.scope.company, f.s.owner(), DecisionId(decision))
++                .await
++                .unwrap();
++        assert!(
++            !html.contains(&view.decision.0.to_string()) && !html.contains(&view.artifact_digest)
++        );
++        let foreign = channel_reply_views::read(
++            &f.p,
++            CompanyId::new(Uuid::new_v4()),
++            f.s.owner(),
++            &[f.scope.run.as_uuid()],
++        )
++        .await
++        .unwrap();
++        assert!(foreign.is_empty());
++        f.p.submit_decision(SubmitDecision {
++            company: f.scope.company,
++            actor: f.s.owner(),
++            decision: view.decision,
++            command_key: DecisionCommandKey::parse(choice).unwrap(),
++            expected_revision: view.revision,
++            expected_artifact: view.artifact_digest,
++            choice: choice.into(),
++            feedback: "Private feedback".into(),
++            data: json!("edited"),
++        })
++        .await
++        .unwrap();
++        assert!(matches!(
++            f.p.resume_wait(f.scope).await.unwrap(),
++            WaitProgress::Completed(_)
++        ));
++        assert!(!outcome(f).await.waiting_for_review);
++        assert_eq!(outcome(f).await.label(), "Work completed; reply pending");
++    }
++}
++
++#[tokio::test]
++async fn channel_reply_views_child_review_classification_does_not_reveal_private_wait_metadata() {
++    let case = Box::pin(child_review(
++        Box::pin(classified_intents()).await,
++        Utc::now() + chrono::Duration::minutes(10),
++    ))
++    .await;
++    let f = &case.fixture;
++    f.p.park_decision(case.child, &approval_test_support::notices(&f.p))
++        .await
++        .unwrap()
++        .unwrap();
++    let viewer = WorkflowActor::authenticated(member(&f.s.fixture, "member").await).unwrap();
++    let mut tx = f.p.pool().begin().await.unwrap();
++    crate::adapters::persistence::workflow::knowledge::raise_content_level_on(
++        &mut tx,
++        f.scope.company,
++        case.child.run,
++        crate::entities::access_level::AccessLevel::L5,
++    )
++    .await
++    .unwrap();
++    tx.commit().await.unwrap();
++    let visible =
++        channel_reply_views::read(&f.p, f.scope.company, viewer, &[f.scope.run.as_uuid()])
++            .await
++            .unwrap();
++    assert_eq!(
++        visible.len(),
++        1,
++        "The public owning response remains visible"
++    );
++    assert!(
++        !visible[0].waiting_for_review,
++        "Restricted child metadata must stay private"
++    );
++    assert!(
++        outcome(f).await.waiting_for_review,
++        "The authorized owner sees its actual child wait"
++    );
++}
++
++#[tokio::test]
++async fn channel_reply_views_expired_child_review_advances_parent_without_stale_wait_label() {
++    let s = Box::pin(Intents::new()).await;
++    let deadline = Utc::now() + chrono::Duration::seconds(3);
++    let case = Box::pin(child_review(s, deadline)).await;
++    let f = &case.fixture;
++    f.p.park_decision(case.child, &approval_test_support::notices(&f.p))
++        .await
++        .unwrap()
++        .unwrap();
++    assert!(outcome(f).await.waiting_for_review);
++    let remaining = (deadline - Utc::now()).to_std().unwrap_or_default();
++    tokio::time::sleep(remaining + Duration::from_millis(20)).await;
++    assert!(matches!(
++        f.p.resume_wait(case.child).await.unwrap(),
++        WaitProgress::Expired(_) | WaitProgress::Failed { .. }
++    ));
++    let resumed = f.p.resume_wait(f.scope).await.unwrap();
++    assert_eq!(f.state().await["run"], "failed", "{resumed:?}");
++    let done = outcome(f).await;
++    assert!(!done.waiting_for_review);
++    assert!(done.label().starts_with("Failed"));
++}
++
++#[tokio::test]
++async fn channel_reply_views_child_later_question_preserves_owning_root_and_continues() {
++    let case = Box::pin(child_questions()).await;
++    let f = &case.fixture;
++    let next = Box::pin(two_questions(f, case.child)).await;
++    f.p.advance_pure(
++        next,
++        BatchBudget::new(4, Duration::from_millis(100)).unwrap(),
++    )
++    .await
++    .unwrap();
++    assert!(matches!(
++        f.p.resume_wait(f.scope).await.unwrap(),
++        WaitProgress::Completed(_)
++    ));
++    let done = outcome(f).await;
++    assert_eq!(done.run, f.scope.run);
++    assert!(!done.prompt.as_ref().unwrap().waiting);
++    assert_eq!(done.label(), "Work completed; reply pending");
++}
+--- a/src/adapters/persistence/workflow/channel_reply_views.rs
++++ b/src/adapters/persistence/workflow/channel_reply_views.rs
+@@ -12,7 +12,7 @@
+ struct Row {
+     run_id: Uuid,
+     state: String,
+-    waiting_reason: Option<String>,
++    review_run: Option<Uuid>,
+     source_message: Uuid,
+     channel_id: Uuid,
+     thread_id: Uuid,
+@@ -42,8 +42,13 @@
+         _ => Err(invalid()),
+     }
+ }
++struct ObservedOutcome {
++    outcome: ChannelResponseOutcome,
++    review_run: Option<Uuid>,
++}
++
+ impl Row {
+-    fn outcome(self) -> AppResult<ChannelResponseOutcome> {
++    fn outcome(self) -> AppResult<ObservedOutcome> {
+         let final_response = self
+             .publication_state
+             .map(|state| {
+@@ -68,16 +73,19 @@
+                 })
+             })
+             .transpose()?;
+-        Ok(ChannelResponseOutcome {
++        let outcome = ChannelResponseOutcome {
+             run: RunId::new(self.run_id),
+             source: CanonicalMessageId::new(self.source_message),
+             channel: self.channel_id,
+             thread: self.thread_id,
+             execution: RunStateName::parse(&self.state).ok_or_else(invalid)?,
+-            waiting_for_review: self.state == "waiting"
+-                && self.waiting_reason.as_deref() == Some("decision"),
++            waiting_for_review: false,
+             final_response,
+             prompt,
++        };
++        Ok(ObservedOutcome {
++            outcome,
++            review_run: self.review_run,
+         })
+     }
+ }
+@@ -109,18 +117,21 @@
+     persistence: &PostgresPersistence,
+     company: CompanyId,
+     viewer: WorkflowActor,
+-    outcomes: Vec<ChannelResponseOutcome>,
++    outcomes: Vec<ObservedOutcome>,
+ ) -> AppResult<Vec<ChannelResponseOutcome>> {
+     let runs: Vec<_> = outcomes
+         .iter()
+-        .flat_map(|outcome| {
++        .flat_map(|observed| {
++            let outcome = &observed.outcome;
+             std::iter::once(outcome.run.as_uuid())
+                 .chain(outcome.prompt.as_ref().map(|prompt| prompt.run.as_uuid()))
++                .chain(observed.review_run)
+         })
+         .collect();
+     let messages: Vec<_> = outcomes
+         .iter()
+-        .flat_map(|outcome| {
++        .flat_map(|observed| {
++            let outcome = &observed.outcome;
+             std::iter::once(outcome.source.as_uuid())
+                 .chain(
+                     outcome
+@@ -151,7 +162,9 @@
+     let visible_message = |id| messages.get(&id).is_some_and(|level| level.is_visible());
+     Ok(outcomes
+         .into_iter()
+-        .filter_map(|mut outcome| {
++        .filter_map(|observed| {
++            let mut outcome = observed.outcome;
++            outcome.waiting_for_review = observed.review_run.is_some_and(visible_run);
+             if !visible_run(outcome.run.as_uuid()) || !visible_message(outcome.source.as_uuid()) {
+                 return None;
+             }
+--- a/src/adapters/persistence/workflow/channel_reply_views.sql
++++ b/src/adapters/persistence/workflow/channel_reply_views.sql
+@@ -1,5 +1,5 @@
+ -- Only the actual admitted owner grants a response identity; passive snapshots are excluded.
+-SELECT run.id AS run_id, run.state, run.waiting_reason,
++SELECT run.id AS run_id, run.state, review.run_id AS review_run,
+        context.message_id AS source_message, context.channel_id, context.thread_id,
+        decision.state AS publication_state, decision.message_id AS final_message,
+        decision.delivery_id AS final_delivery, delivery.status AS final_delivery_state,
+@@ -13,6 +13,16 @@
+ JOIN workflow_run_budgets AS budget ON budget.company_id=run.company_id AND budget.run_id=run.id
+ LEFT JOIN channel_reply_decisions AS decision ON decision.company_id=run.company_id AND decision.run_id=run.id
+ LEFT JOIN message_deliveries AS delivery ON delivery.company_id=decision.company_id AND delivery.id=decision.delivery_id
++LEFT JOIN LATERAL (
++    SELECT candidate.id AS run_id
++    FROM workflow_run_budgets AS review_budget
++    JOIN workflow_runs AS candidate ON candidate.company_id=review_budget.company_id
++        AND candidate.id=review_budget.run_id
++    WHERE review_budget.company_id=run.company_id AND review_budget.root_run_id=budget.root_run_id
++        AND candidate.channel_id=context.channel_id AND candidate.thread_id=context.thread_id
++        AND run.state='waiting' AND candidate.state='waiting' AND candidate.waiting_reason='decision'
++    ORDER BY candidate.created_at DESC,candidate.id DESC LIMIT 1
++) AS review ON true
+ LEFT JOIN LATERAL (
+     SELECT question.run_id, question.wait_id, question.message_id, question.deadline,
+            wait.state='waiting' AND question.deadline>clock_timestamp() AS waiting,
+@@ -28,9 +38,11 @@
+         AND destination.channel_id=context.channel_id AND destination.thread_id=context.thread_id
+     LEFT JOIN message_deliveries AS prompt_delivery ON prompt_delivery.company_id=destination.company_id
+         AND prompt_delivery.id=destination.delivery_id
+-    WHERE question.company_id=run.company_id AND question.source_message_id=context.message_id
++    -- Later questions may target a previous human answer. Ownership and the exact
++    -- destination above retain the original admitted response without fixing every turn to M0.
++    WHERE question.company_id=run.company_id
+     ORDER BY (wait.state='waiting' AND question.deadline>clock_timestamp()) DESC,
+-        question.deadline DESC, question.wait_id DESC
++        wait.created_at DESC, question.wait_id DESC
+     LIMIT 1
+ ) AS prompt ON true
+ WHERE run.company_id=$1 AND run.id=ANY($2)
+--- a/src/adapters/persistence/workflow/channel_reply_views_tests.rs
++++ b/src/adapters/persistence/workflow/channel_reply_views_tests.rs
+@@ -7,6 +7,9 @@
+ use crate::transport::{
+     DeliveryOutcome, DeliveryQueue, FailureDetail, PartResult, ProviderSendOutcome,
+ };
++
++#[path = "channel_reply_continuation_views_tests.rs"]
++mod continuations;
+ 
+ async fn outcome(f: &FinalFixture) -> ChannelResponseOutcome {
+     channel_reply_views::read(&f.p, f.scope.company, f.s.owner(), &[f.scope.run.as_uuid()])
+@@ -198,7 +201,7 @@
+     assert!(view.response.is_none());
+ }
+ 
+-async fn classified_fixture() -> FinalFixture {
++async fn classified_intents() -> Intents {
+     let s = Box::pin(Intents::new()).await;
+     let company = s.fixture.target.company.as_uuid();
+     let principal:Uuid=sqlx::query_scalar("SELECT principal.id FROM thread_principals AS party JOIN principals AS principal ON principal.company_id=party.company_id AND principal.id=party.principal_id WHERE party.company_id=$1 AND party.thread_id=$2 AND principal.kind='external' ORDER BY principal.id LIMIT 1")
+@@ -231,9 +234,13 @@
+     sqlx::query("UPDATE participant_identities SET status='verified',provenance='account',claim_metadata='{\"version\":1,\"kind\":\"account\"}'::jsonb WHERE company_id=$1 AND principal_id=$2")
+         .bind(company).bind(principal).execute(&mut *tx).await.unwrap();
+     tx.commit().await.unwrap();
++    s
++}
++
++async fn classified_fixture() -> FinalFixture {
+     // Genuine ingress freezes the real L5 audience; never rewrite an immutable run ceiling.
+     Box::pin(FinalFixture::configured(
+-        s,
++        Box::pin(classified_intents()).await,
+         final_source("data.map"),
+         literal_contract("Done"),
+         false,

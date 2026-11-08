@@ -1,0 +1,21 @@
+{
+  "source_check": "PASS",
+  "command": [
+    "git",
+    "diff",
+    "--cached",
+    "--check",
+    "--",
+    ".",
+    ":(top,exclude,literal)plan/04-autonomous-agent-history/COORDINATION.md",
+    ":(top,exclude,literal)plan/04-autonomous-agent-history/phases/p01/docs",
+    ":(top,exclude,literal)plan/04-autonomous-agent-history/phases/p02/docs",
+    ":(top,exclude,literal)plan/04-autonomous-agent-history/phases/p03/docs",
+    ":(top,exclude,literal)plan/04-autonomous-agent-history/phases/p04/docs",
+    ":(top,exclude,literal)plan/04-autonomous-agent-history/phases/p05/docs",
+    ":(top,exclude,literal)plan/04-autonomous-agent-history/phases/p06/docs",
+    ":(top,exclude,literal)plan/04-autonomous-agent-history/phases/p07/docs",
+    ":(top,exclude,literal)plan/04-autonomous-agent-history/integration/final/docs"
+  ],
+  "historical_workflow_records": "Original terminal captures/diffs and notes retained byteexact; whitespace differences in workflow evidence do not alter implementation source"
+}
