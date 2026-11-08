@@ -96,7 +96,7 @@ fn request(root: &PublishedBundle, children: &[Arc<PublishedBundle>]) -> SampleR
             }
         })
         .collect();
-    SampleRequest {
+    SampleRequest { response_contract: None, response_approval_policy: None,
         input:json!({}),params:json!({}),
         agents:vec![ResolvedAgentDefinition { company_id:root.company_id(),agent_id:reference.agent_id,key:reference.key.clone(),instructions:"Bounded sample".into(),
             model:ModelSettings {provider:name("test"),model:"sample".into(),max_output_tokens:1000},tools,skills:vec![] }],

@@ -1,0 +1,78 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+   Compiling open_bots v0.1.0 (/private/tmp/openbot-agent-history-h_82_5pw/worktree)
+error[E0364]: `CANDIDATES_SQL` is private, and cannot be re-exported
+  --> src/adapters/persistence/workflow/agent_history/mod.rs:15:5
+   |
+15 |     CANDIDATES_SQL as SELECTION_CANDIDATES_SQL, COUNT_SQL as SELECTION_COUNT_SQL,
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+note: consider marking `CANDIDATES_SQL` as `pub` in the imported module
+  --> src/adapters/persistence/workflow/agent_history/mod.rs:15:5
+   |
+15 |     CANDIDATES_SQL as SELECTION_CANDIDATES_SQL, COUNT_SQL as SELECTION_COUNT_SQL,
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error[E0364]: `COUNT_SQL` is private, and cannot be re-exported
+  --> src/adapters/persistence/workflow/agent_history/mod.rs:15:49
+   |
+15 |     CANDIDATES_SQL as SELECTION_CANDIDATES_SQL, COUNT_SQL as SELECTION_COUNT_SQL,
+   |                                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+note: consider marking `COUNT_SQL` as `pub` in the imported module
+  --> src/adapters/persistence/workflow/agent_history/mod.rs:15:49
+   |
+15 |     CANDIDATES_SQL as SELECTION_CANDIDATES_SQL, COUNT_SQL as SELECTION_COUNT_SQL,
+   |                                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error[E0603]: constant import `SELECTION_CANDIDATES_SQL` is private
+   --> src/adapters/persistence/workflow/agent_history_freeze_guard_tests.rs:307:9
+    |
+307 |         SELECTION_CANDIDATES_SQL, SELECTION_COUNT_SQL,
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^ private constant import
+    |
+note: the constant import `SELECTION_CANDIDATES_SQL` is defined here...
+   --> src/adapters/persistence/workflow/agent_history/mod.rs:15:5
+    |
+ 15 |     CANDIDATES_SQL as SELECTION_CANDIDATES_SQL, COUNT_SQL as SELECTION_COUNT_SQL,
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+note: ...and refers to the constant `CANDIDATES_SQL` which is defined here
+   --> src/adapters/persistence/workflow/agent_history/selection.rs:10:1
+    |
+ 10 | pub(super) const CANDIDATES_SQL: &str = include_str!("selection_candidates.sql");
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error[E0603]: constant import `SELECTION_COUNT_SQL` is private
+   --> src/adapters/persistence/workflow/agent_history_freeze_guard_tests.rs:307:35
+    |
+307 |         SELECTION_CANDIDATES_SQL, SELECTION_COUNT_SQL,
+    |                                   ^^^^^^^^^^^^^^^^^^^ private constant import
+    |
+note: the constant import `SELECTION_COUNT_SQL` is defined here...
+   --> src/adapters/persistence/workflow/agent_history/mod.rs:15:49
+    |
+ 15 |     CANDIDATES_SQL as SELECTION_CANDIDATES_SQL, COUNT_SQL as SELECTION_COUNT_SQL,
+    |                                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+note: ...and refers to the constant `COUNT_SQL` which is defined here
+   --> src/adapters/persistence/workflow/agent_history/selection.rs:11:1
+    |
+ 11 | pub(super) const COUNT_SQL: &str = include_str!("selection_count.sql");
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `checkpoints::WorkflowCheckpointStore`
+ --> src/adapters/persistence/workflow/agent_history_freeze_fixture.rs:5:5
+  |
+5 |     checkpoints::WorkflowCheckpointStore,
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused imports: `LogicalSeedPair` and `LogicalSeed`
+ --> src/adapters/persistence/workflow/agent_history_freeze_fixture.rs:8:38
+  |
+8 | use crate::services::harness::runs::{LogicalSeed, LogicalSeedPair};
+  |                                      ^^^^^^^^^^^  ^^^^^^^^^^^^^^^
+
+Some errors have detailed explanations: E0364, E0603.
+For more information about an error, try `rustc --explain E0364`.
+warning: `open_bots` (lib test) generated 2 warnings
+error: could not compile `open_bots` (lib test) due to 4 previous errors; 2 warnings emitted

@@ -1,0 +1,21 @@
+{
+  "baseline": "97e5d60dc538e26c7cb976a8d63772eed80baff2",
+  "worktree": "/private/tmp/vault-vf2-baseline-6e7e44ec34be/worktree",
+  "database": "vault_vf2_1133_f3da63908e68",
+  "database_url": "postgresql://localhost/vault_vf2_1133_f3da63908e68",
+  "cargo_target": "/Users/mac02/.codex/worktrees/1133/openbot/target",
+  "pid": 71996,
+  "ownership": "created exclusively by this phase for one baseline reproduction",
+  "command": [
+    "bash",
+    "scripts/test-network-isolation.sh",
+    "cargo",
+    "test",
+    "--locked",
+    "--offline",
+    "--lib",
+    "workflow_control_revision_overflow_refuses_without_partial_writes",
+    "--",
+    "--nocapture"
+  ]
+}

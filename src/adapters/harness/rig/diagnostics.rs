@@ -11,12 +11,11 @@ pub(super) struct InputCounts {
     history_message_count: usize,
 }
 impl InputCounts {
-    /// A workflow run's only input is its delimited context prompt; it has no history.
-    pub(super) fn prompt(text: &str) -> Self {
-        Self {
-            prompt_characters: text.chars().count(),
-            history_message_count: 0,
-        }
+    pub(super) fn prepared(text: &str, seed: &LogicalSeed) -> crate::app_error::AppResult<Self> {
+        Ok(Self {
+            prompt_characters: text.chars().count() + seed.characters()?,
+            history_message_count: seed.pairs().len() * 2,
+        })
     }
 }
 

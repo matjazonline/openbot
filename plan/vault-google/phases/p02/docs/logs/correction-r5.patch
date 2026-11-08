@@ -1,0 +1,571 @@
+--- a/migrations/20260817000000_init_schema.sql
++++ b/migrations/20260817000000_init_schema.sql
+@@ -12514,7 +12514,7 @@
+     credential_generation bigint NOT NULL DEFAULT 1 CHECK (credential_generation > 0),
+     status text NOT NULL CHECK (status IN ('ready', 'reconnect_required', 'disconnected')),
+     metadata text NOT NULL CHECK (octet_length(metadata) <= 4096 AND jsonb_typeof(metadata::jsonb) = 'object'
+-        AND jsonb_typeof(metadata::jsonb->'label') = 'string'
++        AND (metadata::jsonb ? 'label') AND jsonb_typeof(metadata::jsonb->'label') = 'string'
+         AND octet_length(metadata::jsonb->>'label') BETWEEN 1 AND 256
+         AND btrim(metadata::jsonb->>'label') <> ''
+         AND metadata::jsonb - ARRAY['label','description'] = '{}'::jsonb
+@@ -12531,6 +12531,7 @@
+         AND external_identity::jsonb - ARRAY['kind','subject','authorization_key'] = '{}'::jsonb
+         AND jsonb_typeof(external_identity::jsonb->'kind') = 'string'
+         AND jsonb_typeof(external_identity::jsonb->'subject') = 'string'
++        AND jsonb_typeof(external_identity::jsonb->'authorization_key') = 'string'
+         AND octet_length(external_identity::jsonb->>'kind') BETWEEN 1 AND 128
+         AND octet_length(external_identity::jsonb->>'subject') BETWEEN 1 AND 256
+         AND external_identity::jsonb->>'authorization_key' = authorization_key)),
+--- a/plan/vault-google/README.md
++++ b/plan/vault-google/README.md
+@@ -154,5 +154,5 @@
+ stages are integrated, following [07](07-integration-verification-and-operations.md). The final
+ gate includes formatting, offline compilation, migrations, and the database-backed suite.
+ 
+-Every Markdown file in this directory carries the reset policy above and must appear in
++The README and numbered plan files carry the reset policy above and appear in
+ NO_BACKWARD_COMPATIBILITY_NOTES in src/main.rs.
+--- a/src/adapters/http/routes/ui_vault.rs
++++ b/src/adapters/http/routes/ui_vault.rs
+@@ -60,7 +60,7 @@
+ }
+ #[derive(Deserialize)]
+ #[serde(deny_unknown_fields)]
+-pub(super) struct RevisionForm {
++pub(super) struct RevisionInput {
+     expected_revision: i64,
+ }
+ #[derive(Deserialize)]
+@@ -142,7 +142,7 @@
+     State(gateway): State<Arc<dyn IntegrationGateway>>,
+     user: AuthenticatedUser,
+     Path(id): Path<Uuid>,
+-    Form(form): Form<RevisionForm>,
++    Query(form): Query<RevisionInput>,
+ ) -> AppResult<Html<String>> {
+     let owner = verified_owner(&user);
+     gateway
+@@ -158,7 +158,7 @@
+     State(gateway): State<Arc<dyn IntegrationGateway>>,
+     user: AuthenticatedUser,
+     Path(id): Path<Uuid>,
+-    Form(form): Form<RevisionForm>,
++    Form(form): Form<RevisionInput>,
+ ) -> AppResult<Html<String>> {
+     let owner = verified_owner(&user);
+     gateway
+--- a/src/adapters/http/routes/vault_management_tests.rs
++++ b/src/adapters/http/routes/vault_management_tests.rs
+@@ -132,7 +132,7 @@
+         State(f.gateway.clone()),
+         f.auth(),
+         Path(account.id.as_uuid()),
+-        Form(RevisionForm {
++        Query(RevisionInput {
+             expected_revision: 2,
+         }),
+     )
+@@ -220,6 +220,7 @@
+         StatusCode::PAYLOAD_TOO_LARGE
+     );
+     let saved = app
++        .clone()
+         .oneshot(request(
+             body,
+             Some("http://localhost:3000"),
+@@ -237,15 +238,7 @@
+     .unwrap();
+     assert!(!saved.contains("submitted-secret"));
+     let owner = VerifiedOwner::from_verified_client(owner_for_user(browser.user));
+-    assert_eq!(
+-        f.gateway
+-            .list_accounts(&owner, PageRequest::new(None, 50).unwrap())
+-            .await
+-            .unwrap()
+-            .accounts
+-            .len(),
+-        1
+-    );
++    remove_over_http(&f, app, &browser.cookie, &owner).await;
+ }
+ 
+ async fn deny_foreign(f: &Fixture, id: AccountId) {
+@@ -323,3 +316,31 @@
+     }
+     builder.body(Body::from(body.to_owned())).unwrap()
+ }
++
++async fn remove_over_http(f: &Fixture, app: Router, cookie: &str, owner: &VerifiedOwner) {
++    let account = f
++        .gateway
++        .list_accounts(owner, PageRequest::new(None, 50).unwrap())
++        .await
++        .unwrap()
++        .accounts
++        .remove(0);
++    let removal = Request::builder()
++        .method("DELETE")
++        .uri(format!(
++            "/ui/profile/vault/{}?expected_revision={}",
++            account.id.as_uuid(),
++            account.revision.get()
++        ))
++        .header("host", "localhost:3000")
++        .header("origin", "http://localhost:3000")
++        .header("cookie", cookie)
++        .body(Body::empty())
++        .unwrap();
++    let removed = app.oneshot(removal).await.unwrap();
++    assert_eq!(removed.status(), StatusCode::OK);
++    assert!(matches!(
++        f.gateway.get_account(owner, account.id).await,
++        Err(IntegrationError::NotFound)
++    ));
++}
+--- a/src/adapters/integrations/google_credentials.rs
++++ b/src/adapters/integrations/google_credentials.rs
+@@ -1,6 +1,8 @@
+ //! Current Google credential schema. No login, consent, or network behavior.
+ use crate::{
+-    application::integrations::private::{CredentialAdapter, InjectionMethod, TypedInjection},
++    application::integrations::private::{
++        CredentialAdapter, CredentialCacheUpdate, InjectionMethod, TypedInjection,
++    },
+     domain::integrations::*,
+ };
+ use chrono::{DateTime, Utc};
+@@ -61,6 +63,20 @@
+             authorization_key: AuthorizationKey::parse(format!("{:x}", digest.finalize()))?,
+         }))
+     }
++    fn validate_cache_update(&self, update: CredentialCacheUpdate<'_>) -> IntegrationResult<()> {
++        let previous = self.decode(update.previous)?;
++        let replacement = self.decode(update.replacement)?;
++        let previous_scopes: std::collections::BTreeSet<_> = previous.scopes.into_iter().collect();
++        let replacement_scopes: std::collections::BTreeSet<_> =
++            replacement.scopes.into_iter().collect();
++        if previous.subject != replacement.subject
++            || previous.client != replacement.client
++            || previous_scopes != replacement_scopes
++        {
++            return Err(IntegrationError::Denied);
++        }
++        Ok(())
++    }
+     fn injection(&self, raw: &SecretString) -> IntegrationResult<TypedInjection> {
+         let payload = self.decode(raw)?;
+         Ok(TypedInjection {
+--- a/src/adapters/persistence/integrations/accounts.rs
++++ b/src/adapters/persistence/integrations/accounts.rs
+@@ -7,7 +7,7 @@
+ use crate::{
+     application::integrations::{
+         management::{AccountRepository, AccountWrite},
+-        private::{CredentialRecord, CredentialStore},
++        private::{CredentialCacheUpdate, CredentialRecord, CredentialStore},
+     },
+     domain::integrations::*,
+ };
+@@ -95,33 +95,12 @@
+         };
+         Ok((account, versions))
+     }
+-    /// Private adapter-only cache write; not a gateway operation and no provider call.
+-    #[cfg_attr(
+-        not(test),
+-        expect(
+-            dead_code,
+-            reason = "The private provider renewal writer is used from phase05"
+-        )
+-    )]
+-    pub(crate) async fn write_managed(
+-        &self,
+-        owner: &AccountOwner,
+-        id: AccountId,
+-        expected: AccountRevision,
+-        payload: SecretString,
+-    ) -> IntegrationResult<ConnectedAccount> {
+-        let mut tx = self
+-            .persistence
+-            .pool()
+-            .begin()
+-            .await
+-            .map_err(storage_error)?;
+-        let (account, versions) = self.locked_account(&mut tx, owner, id, expected).await?;
+-        if account.auth_method != AuthMethod::OAuthAuthorizationCode
+-            || account.status != AccountStatus::Ready
+-        {
+-            return Err(IntegrationError::Denied);
+-        }
++    fn seal_managed_cache_update(
++        &self,
++        account: &ConnectedAccount,
++        stored: &str,
++        payload: &SecretString,
++    ) -> IntegrationResult<String> {
+         let entry = self.registration(
+             &account.provider_id,
+             &account.auth_config_id,
+@@ -132,18 +111,62 @@
+             &entry.app.id,
+             account.auth_method,
+             &account.credential_schema,
+-            &payload,
++            payload,
+         )?;
+         if identity != account.external_identity {
+             return Err(IntegrationError::Denied);
+         }
++        if stored.len() > 23000 {
++            return Err(IntegrationError::Credential);
++        }
++        let cipher = self
++            .persistence
++            .credential_cipher()
++            .map_err(|_| IntegrationError::Credential)?;
++        let context = CredentialContext::integration_account(account);
++        let previous = cipher
++            .open_envelope(&context, stored)
++            .map_err(|_| IntegrationError::Credential)?;
++        entry.adapter.validate_cache_update(CredentialCacheUpdate {
++            previous: &previous,
++            replacement: payload,
++        })?;
++        cipher
++            .seal_envelope(&context, payload)
++            .map_err(|_| IntegrationError::Credential)
++    }
++    /// Private adapter-only cache write; not a gateway operation and no provider call.
++    #[cfg_attr(
++        not(test),
++        expect(
++            dead_code,
++            reason = "The private provider renewal writer is used from phase05"
++        )
++    )]
++    pub(crate) async fn write_managed(
++        &self,
++        owner: &AccountOwner,
++        id: AccountId,
++        expected: AccountRevision,
++        payload: SecretString,
++    ) -> IntegrationResult<ConnectedAccount> {
++        let mut tx = self
++            .persistence
++            .pool()
++            .begin()
++            .await
++            .map_err(storage_error)?;
++        let (account, versions) = self.locked_account(&mut tx, owner, id, expected).await?;
++        if account.auth_method != AuthMethod::OAuthAuthorizationCode
++            || account.status != AccountStatus::Ready
++        {
++            return Err(IntegrationError::Denied);
++        }
++        let stored = sqlx::query_scalar::<_,Option<String>>("SELECT envelope FROM integration_accounts WHERE owner_namespace=$1 AND owner_subject=$2 AND id=$3")
++            .bind(owner.namespace.as_str()).bind(owner.subject.as_str()).bind(id.as_uuid())
++            .fetch_one(&mut *tx).await.map_err(storage_error)?.ok_or(IntegrationError::Credential)?;
++        let envelope = self.seal_managed_cache_update(&account, &stored, &payload)?;
+         let next = versions.changed(CredentialChange::Refresh)?;
+-        let envelope = self
+-            .persistence
+-            .credential_cipher()
+-            .map_err(|_| IntegrationError::Credential)?
+-            .seal_envelope(&CredentialContext::integration_account(&account), &payload)
+-            .map_err(|_| IntegrationError::Credential)?;
+         save_payload(
+             &mut tx,
+             &account,
+--- a/src/adapters/persistence/integrations/cache_update_tests.rs
++++ b/src/adapters/persistence/integrations/cache_update_tests.rs
+@@ -0,0 +1,127 @@
++use super::*;
++
++#[tokio::test]
++async fn vault_storage_cache_updates_preserve_each_providers_authorization_facts() {
++    for app in ["workspace-a", "google-fixture"] {
++        let mut f = Fixture::shared().await;
++        f.vault.registry = if app == "google-fixture" {
++            google_registry()
++        } else {
++            managed_registry()
++        };
++        let registration = f.vault.registry.get(&AppId::parse(app).unwrap()).unwrap();
++        let mut original = if app == "google-fixture" {
++            json!({"subject":"google-account","client":"google-client-fixture","scopes":["mail.read","mail.send"],"refresh_token":"fixture-refresh","access_token":"fixture-access","expires_at":"2030-01-01T00:00:00Z","generation":1,"refresh_retry_at":null})
++        } else {
++            json!({"workspace":"workspace-without-email","client":"same-client","permissions":["resource.read","resource.write"],"token":"fixture-managed-secret","generation":1})
++        };
++        let permission = if app == "google-fixture" {
++            "scopes"
++        } else {
++            "permissions"
++        };
++        let payload = SecretString::from(original.to_string());
++        let write = registered_write(registration, "authorization-facts", payload);
++        let account = f.vault.create(&f.owner, write).await.unwrap();
++        let mut changed = original.clone();
++        changed[permission] = json!(["broader.permission"]);
++        changed["generation"] = json!(2);
++        let before = f.vault.read_usable(&f.owner, account.id).await.unwrap();
++        let ciphertext: String =
++            sqlx::query_scalar("SELECT envelope FROM integration_accounts WHERE id=$1")
++                .bind(account.id.as_uuid())
++                .fetch_one(f.pool())
++                .await
++                .unwrap();
++
++        assert!(matches!(
++            f.vault
++                .write_managed(
++                    &f.owner,
++                    account.id,
++                    account.revision,
++                    SecretString::from(changed.to_string())
++                )
++                .await,
++            Err(IntegrationError::Denied)
++        ));
++        let retained = f.vault.read_usable(&f.owner, account.id).await.unwrap();
++        assert_eq!(retained.versions, before.versions);
++        let retained_ciphertext: String =
++            sqlx::query_scalar("SELECT envelope FROM integration_accounts WHERE id=$1")
++                .bind(account.id.as_uuid())
++                .fetch_one(f.pool())
++                .await
++                .unwrap();
++        assert!(retained_ciphertext == ciphertext);
++
++        assert!(retained.payload.expose_secret() == before.payload.expose_secret());
++        original[permission].as_array_mut().unwrap().reverse();
++        original["generation"] = json!(2);
++        original[if app == "google-fixture" {
++            "access_token"
++        } else {
++            "token"
++        }] = json!("refreshed-cache");
++        let updated = f
++            .vault
++            .write_managed(
++                &f.owner,
++                account.id,
++                account.revision,
++                SecretString::from(original.to_string()),
++            )
++            .await
++            .unwrap();
++        assert_eq!(
++            updated.authorization_revision,
++            account.authorization_revision
++        );
++        assert_eq!(updated.revision.get(), 2);
++    }
++}
++#[tokio::test]
++async fn vault_storage_sql_required_json_fields_cannot_evaluate_to_null() {
++    let mut f = Fixture::shared().await;
++    let account = f.create("required-json").await;
++    for metadata in [
++        "{}",
++        r#"{"description":null}"#,
++        r#"{"label":null,"description":null}"#,
++    ] {
++        let mut tx = f.pool().begin().await.unwrap();
++        let result = sqlx::query("UPDATE integration_accounts SET metadata=$2 WHERE id=$1")
++            .bind(account.id.as_uuid())
++            .bind(metadata)
++            .execute(&mut *tx)
++            .await;
++        tx.rollback().await.unwrap();
++        assert!(result.is_err());
++        assert!(
++            result
++                .unwrap_err()
++                .as_database_error()
++                .is_some_and(|error| error.code().as_deref() == Some("23514"))
++        );
++    }
++    f.vault.registry = managed_registry();
++    let managed = f
++        .vault
++        .create(
++            &f.owner,
++            managed_write(&f.vault.registry, "managed-required-json", "workspace-a"),
++        )
++        .await
++        .unwrap();
++    let mut tx = f.pool().begin().await.unwrap();
++    let result=sqlx::query("INSERT INTO integration_accounts(id,owner_namespace,owner_subject,key,provider_id,auth_config_id,auth_method,credential_schema,external_identity,authorization_key,envelope,status,metadata) SELECT $1,owner_namespace,owner_subject,$2,provider_id,auth_config_id,auth_method,credential_schema,jsonb_set(external_identity::jsonb,'{authorization_key}','null'::jsonb)::text,$3,envelope,status,metadata FROM integration_accounts WHERE id=$4")
++        .bind(Uuid::new_v4()).bind("invalid-canonical-key").bind(Uuid::new_v4().to_string()).bind(managed.id.as_uuid()).execute(&mut *tx).await;
++    tx.rollback().await.unwrap();
++    assert!(result.is_err());
++    assert!(
++        result
++            .unwrap_err()
++            .as_database_error()
++            .is_some_and(|error| error.code().as_deref() == Some("23514"))
++    );
++}
+--- a/src/adapters/persistence/integrations/tests.rs
++++ b/src/adapters/persistence/integrations/tests.rs
+@@ -88,18 +88,28 @@
+     client: ExternalSubject,
+     token: SecretString,
+     generation: CredentialGeneration,
++    permissions: Vec<Scope>,
++}
++impl WorkspaceAdapter {
++    fn decode(&self, raw: &SecretString) -> IntegrationResult<WorkspacePayload> {
++        if raw.expose_secret().len() > MAX_CREDENTIAL_BYTES {
++            return Err(IntegrationError::Invalid);
++        }
++        let payload: WorkspacePayload =
++            serde_json::from_str(raw.expose_secret()).map_err(|_| IntegrationError::Credential)?;
++        if payload.client.as_str() != self.client
++            || payload.token.expose_secret().is_empty()
++            || payload.permissions.len() > MAX_SCOPES
++        {
++            return Err(IntegrationError::Credential);
++        }
++        let _ = payload.generation;
++        Ok(payload)
++    }
+ }
+ impl CredentialAdapter for WorkspaceAdapter {
+     fn validate(&self, raw: &SecretString) -> IntegrationResult<Option<ExternalIdentity>> {
+-        if raw.expose_secret().len() > MAX_CREDENTIAL_BYTES {
+-            return Err(IntegrationError::Invalid);
+-        }
+-        let payload: WorkspacePayload =
+-            serde_json::from_str(raw.expose_secret()).map_err(|_| IntegrationError::Credential)?;
+-        if payload.client.as_str() != self.client || payload.token.expose_secret().is_empty() {
+-            return Err(IntegrationError::Credential);
+-        }
+-        let _ = payload.generation;
++        let payload = self.decode(raw)?;
+         let key = format!(
+             "{:x}",
+             Sha256::digest(
+@@ -112,13 +122,23 @@
+             authorization_key: AuthorizationKey::parse(key)?,
+         }))
+     }
++    fn validate_cache_update(&self, update: CredentialCacheUpdate<'_>) -> IntegrationResult<()> {
++        let previous = self.decode(update.previous)?;
++        let replacement = self.decode(update.replacement)?;
++        let old: std::collections::BTreeSet<_> = previous.permissions.into_iter().collect();
++        let new: std::collections::BTreeSet<_> = replacement.permissions.into_iter().collect();
++        if previous.workspace != replacement.workspace
++            || previous.client != replacement.client
++            || old != new
++        {
++            return Err(IntegrationError::Denied);
++        }
++        Ok(())
++    }
+     fn injection(&self, raw: &SecretString) -> IntegrationResult<TypedInjection> {
+-        self.validate(raw)?;
+-        let p: WorkspacePayload =
+-            serde_json::from_str(raw.expose_secret()).map_err(|_| IntegrationError::Credential)?;
+         Ok(TypedInjection {
+             method: InjectionMethod::Bearer,
+-            value: p.token,
++            value: self.decode(raw)?.token,
+         })
+     }
+ }
+@@ -160,11 +180,14 @@
+     Arc::new(registry)
+ }
+ fn managed_payload(client: &str, generation: i64) -> SecretString {
+-    SecretString::from(json!({"workspace":"workspace-without-email","client":client,"token":"fixture-managed-secret","generation":generation}).to_string())
++    SecretString::from(json!({"workspace":"workspace-without-email","client":client,"token":"fixture-managed-secret","generation":generation,"permissions":["resource.read"]}).to_string())
+ }
+ fn managed_write(registry: &CodeOwnedRegistry, key: &str, app: &str) -> AccountWrite {
+     let registration = registry.get(&AppId::parse(app).unwrap()).unwrap();
+     let payload = managed_payload(registration.config.client_identity.as_str(), 1);
++    registered_write(registration, key, payload)
++}
++fn registered_write(registration: &Registration, key: &str, payload: SecretString) -> AccountWrite {
+     AccountWrite {
+         key: AccountKey::parse(key).unwrap(),
+         provider: registration.provider.id.clone(),
+@@ -182,3 +205,41 @@
+ mod rotation_tests;
+ #[path = "storage_tests.rs"]
+ mod storage_tests;
++
++fn google_registry() -> Arc<CodeOwnedRegistry> {
++    let mut registry = static_registry();
++    let provider = ProviderId::parse("google").unwrap();
++    let config = AuthConfigId::parse("google-fixture").unwrap();
++    let client = ExternalSubject::parse("google-client-fixture").unwrap();
++    registry
++        .register(Registration {
++            provider: AuthProvider {
++                id: provider.clone(),
++                method: AuthMethod::OAuthAuthorizationCode,
++                schema: CredentialSchema::parse("google-v1").unwrap(),
++            },
++            config: AuthConfig {
++                id: config.clone(),
++                provider: provider.clone(),
++                client_identity: client.clone(),
++                client_secret_reference: None,
++            },
++            app: AppDefinition {
++                id: AppId::parse("google-fixture").unwrap(),
++                provider,
++                config,
++                destinations: vec![],
++                capabilities: vec![],
++            },
++            adapter: Arc::new(
++                crate::adapters::integrations::google_credentials::GoogleCredentialAdapter {
++                    client,
++                },
++            ),
++        })
++        .unwrap();
++    Arc::new(registry)
++}
++
++#[path = "cache_update_tests.rs"]
++mod cache_update_tests;
+--- a/src/application/integrations/private.rs
++++ b/src/application/integrations/private.rs
+@@ -48,7 +48,15 @@
+     pub method: InjectionMethod,
+     pub value: SecretString,
+ }
++pub(crate) struct CredentialCacheUpdate<'a> {
++    pub previous: &'a SecretString,
++    pub replacement: &'a SecretString,
++}
++
+ pub(crate) trait CredentialAdapter: Send + Sync {
+     fn validate(&self, payload: &SecretString) -> IntegrationResult<Option<ExternalIdentity>>;
++    /// Routine renewal must preserve the provider's consent identity and permission facts.
++    /// Token/cache changes are permitted; owner consent changes require reconnect.
++    fn validate_cache_update(&self, update: CredentialCacheUpdate<'_>) -> IntegrationResult<()>;
+     fn injection(&self, payload: &SecretString) -> IntegrationResult<TypedInjection>;
+ }
+--- a/src/application/integrations/registry.rs
++++ b/src/application/integrations/registry.rs
+@@ -1,4 +1,4 @@
+-use super::private::{CredentialAdapter, InjectionMethod, TypedInjection};
++use super::private::{CredentialAdapter, CredentialCacheUpdate, InjectionMethod, TypedInjection};
+ use crate::domain::integrations::{authority::ApprovedDestination, *};
+ use secrecy::{ExposeSecret, SecretString};
+ use std::{collections::BTreeMap, sync::Arc};
+@@ -154,6 +154,9 @@
+     fn validate(&self, payload: &SecretString) -> IntegrationResult<Option<ExternalIdentity>> {
+         self.secret(payload)?;
+         Ok(None)
++    }
++    fn validate_cache_update(&self, _update: CredentialCacheUpdate<'_>) -> IntegrationResult<()> {
++        Err(IntegrationError::Denied)
+     }
+     fn injection(&self, payload: &SecretString) -> IntegrationResult<TypedInjection> {
+         Ok(TypedInjection {

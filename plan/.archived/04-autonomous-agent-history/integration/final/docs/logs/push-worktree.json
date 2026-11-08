@@ -1,0 +1,13 @@
+{
+  "primary": "/Users/mac02/dev/openbot",
+  "root": "/var/folders/qc/f8s9x42x5sz6vbh79sb0cfth0000gn/T/openbot-history-publication-pc5qkluy",
+  "worktree": "/var/folders/qc/f8s9x42x5sz6vbh79sb0cfth0000gn/T/openbot-history-publication-pc5qkluy/worktree",
+  "branch": "codex/history-publication-pc5qkluy",
+  "history_commit": "48461f665c827addd176a6e4cad436406ea4a0cb",
+  "vault_commit": "0d32a33d385796b493313aba8455c110402e8e2a",
+  "merge_exit": 1,
+  "conflicts": [
+    "migrations/20260817000000_init_schema.sql"
+  ],
+  "records": "/var/folders/qc/f8s9x42x5sz6vbh79sb0cfth0000gn/T/openbot-history-publication-pc5qkluy/worktree/plan/04-autonomous-agent-history/integration/publication/docs"
+}

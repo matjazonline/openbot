@@ -13,7 +13,11 @@ input_schema:
   required: [message, source_message]
   additionalProperties: false
 parameter_schema: {type: object, additionalProperties: false}
-output_schema: true
+output_schema:
+  type: object
+  properties: {body: {type: string, maxLength: 16384}}
+  required: [body]
+  additionalProperties: false
 resources: []
 entry: context
 steps:
@@ -39,9 +43,14 @@ steps:
           additionalProperties: false
     routes: {success: reply}
   reply:
-    type: message.reply
+    type: data.map
     with:
-      source_message: {ref: /input/source_message}
-      content: {ref: /steps/draft/output}
+      value: {ref: /steps/draft/output}
+      output_schema:
+        literal:
+          type: object
+          properties: {body: {type: string, maxLength: 16384}}
+          required: [body]
+          additionalProperties: false
     routes: {success: $end}
 limits: {max_steps: 10, max_context_bytes: 65536}

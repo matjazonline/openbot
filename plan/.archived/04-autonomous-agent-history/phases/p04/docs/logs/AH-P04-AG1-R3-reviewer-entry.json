@@ -1,0 +1,14 @@
+{
+  "at": "2026-11-07T19:20:23.502454+00:00",
+  "digest": true,
+  "head": true,
+  "branch": true,
+  "decision": true,
+  "archive": true,
+  "producer_archive": true,
+  "scope": true,
+  "coordination": true,
+  "owned_mismatches": [],
+  "external_mismatches": [],
+  "archive_content_mismatches": []
+}

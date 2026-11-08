@@ -1,0 +1,197 @@
+{
+  "migrations/20260817000000_init_schema.sql": [
+    14460,
+    14460,
+    11
+  ],
+  "scripts/tests/workflow-sample-boundary.py": [
+    66,
+    74,
+    17
+  ],
+  "scripts/workflow-sample-boundary.py": [
+    140,
+    148,
+    33
+  ],
+  "src/adapters/http/pages/workflow_authoring/sample.rs": [
+    175,
+    176,
+    10
+  ],
+  "src/adapters/http/pages/workflow_runs/detail.rs": [
+    783,
+    794,
+    50
+  ],
+  "src/adapters/persistence/workflow/agent_history_caller_tests.rs": [
+    0,
+    138,
+    141
+  ],
+  "src/adapters/persistence/workflow/agent_history_channel_release_tests.rs": [
+    0,
+    146,
+    149
+  ],
+  "src/adapters/persistence/workflow/agent_history_channel_tests.rs": [
+    0,
+    199,
+    202
+  ],
+  "src/adapters/persistence/workflow/agent_history_children_integration_tests.rs": [
+    0,
+    357,
+    360
+  ],
+  "src/adapters/persistence/workflow/agent_history_continuation_tests.rs": [
+    0,
+    203,
+    206
+  ],
+  "src/adapters/persistence/workflow/agent_history_entrypoint_tests.rs": [
+    0,
+    293,
+    296
+  ],
+  "src/adapters/persistence/workflow/agent_history_private_context_tests.rs": [
+    437,
+    440,
+    12
+  ],
+  "src/adapters/persistence/workflow/agent_history_sample_tests.rs": [
+    0,
+    74,
+    77
+  ],
+  "src/adapters/persistence/workflow/agent_history_thread_continuation_tests.rs": [
+    0,
+    168,
+    171
+  ],
+  "src/adapters/persistence/workflow/autonomous_agent_child_selection_tests.rs": [
+    160,
+    166,
+    12
+  ],
+  "src/adapters/persistence/workflow/autonomous_agent_entrypoint_tests.rs": [
+    225,
+    228,
+    12
+  ],
+  "src/adapters/persistence/workflow/autonomous_agent_sample_closure_tests.rs": [
+    369,
+    372,
+    12
+  ],
+  "src/adapters/persistence/workflow/channel_reply_completion_tests.rs": [
+    489,
+    491,
+    11
+  ],
+  "src/adapters/persistence/workflow/channel_reply_e2e_support.rs": [
+    224,
+    229,
+    21
+  ],
+  "src/adapters/persistence/workflow/channel_reply_e2e_tests.rs": [
+    313,
+    316,
+    12
+  ],
+  "src/adapters/persistence/workflow/channel_reply_knowledge_tests.rs": [
+    0,
+    337,
+    340
+  ],
+  "src/adapters/persistence/workflow/channel_reply_knowledge_token_tests.rs": [
+    0,
+    66,
+    69
+  ],
+  "src/adapters/persistence/workflow/channel_reply_knowledge_uncertainty_tests.rs": [
+    0,
+    80,
+    83
+  ],
+  "src/adapters/persistence/workflow/channel_reply_publication_integrity_tests.rs": [
+    315,
+    365,
+    70
+  ],
+  "src/adapters/persistence/workflow/channel_reply_refusal.rs": [
+    75,
+    101,
+    100
+  ],
+  "src/adapters/persistence/workflow/channel_reply_resume.rs": [
+    159,
+    181,
+    67
+  ],
+  "src/adapters/persistence/workflow/harness_token_scheduling_tests.rs": [
+    464,
+    466,
+    9
+  ],
+  "src/adapters/persistence/workflow/http_tests.rs": [
+    513,
+    515,
+    11
+  ],
+  "src/adapters/persistence/workflow/knowledge_e2e_race_tests.rs": [
+    136,
+    147,
+    42
+  ],
+  "src/adapters/persistence/workflow/message_ingress_binding_support.rs": [
+    0,
+    68,
+    71
+  ],
+  "src/adapters/persistence/workflow/message_ingress_tests.rs": [
+    615,
+    578,
+    83
+  ],
+  "src/adapters/persistence/workflow/pending_recovery.rs": [
+    208,
+    214,
+    37
+  ],
+  "src/adapters/persistence/workflow/recovery.rs": [
+    376,
+    421,
+    54
+  ],
+  "src/application/workflow/channel_reply/publication.rs": [
+    85,
+    86,
+    19
+  ],
+  "src/application/workflow/sample/history.rs": [
+    0,
+    116,
+    119
+  ],
+  "src/application/workflow/sample/history_tests.rs": [
+    0,
+    231,
+    234
+  ],
+  "src/application/workflow/sample/mod.rs": [
+    297,
+    303,
+    50
+  ],
+  "src/application/workflow/sample/tests.rs": [
+    396,
+    398,
+    11
+  ],
+  "src/application/workflow/sample/types.rs": [
+    155,
+    164,
+    18
+  ]
+}

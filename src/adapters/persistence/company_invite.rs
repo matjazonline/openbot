@@ -548,6 +548,19 @@ impl CompanyInvitePersistence for PostgresPersistence {
     /// later finds an external principal and no member, and composes nothing.
     async fn remove_member(&self, company_id: Uuid, user_id: Uuid) -> AppResult<()> {
         let mut transaction = self.pool.begin().await.map_err(AppError::from)?;
+        // Match dispatch and consent: account, then company, then membership and
+        // principal. Never acquire a principal before a competing host owner.
+        sqlx::query("SET LOCAL lock_timeout='5s'")
+            .execute(&mut *transaction)
+            .await?;
+        sqlx::query("SELECT id FROM users WHERE id=$1 FOR SHARE")
+            .bind(user_id)
+            .fetch_optional(&mut *transaction)
+            .await?;
+        sqlx::query("SELECT id FROM companies WHERE id=$1 FOR NO KEY UPDATE")
+            .bind(company_id)
+            .fetch_optional(&mut *transaction)
+            .await?;
         sqlx::query!(
             r#"UPDATE principals
                SET kind = 'external', user_id = NULL, updated_at = CURRENT_TIMESTAMP
@@ -584,6 +597,13 @@ impl CompanyInvitePersistence for PostgresPersistence {
             user_id,
         )
         .await?;
+        super::integrations::lifecycle::revoke_membership_on(
+            &mut transaction,
+            &crate::adapters::integrations::owner::owner_for_user(user_id),
+            &crate::adapters::integrations::owner::company_binding(company_id),
+        )
+        .await
+        .map_err(AppError::from)?;
         sqlx::query!(
             "DELETE FROM company_members
              WHERE company_id = $1 AND user_id = $2 AND role <> 'owner'",

@@ -69,15 +69,13 @@ async fn open_protected(f: &ModelFixture) -> RunCheckpoint {
         .await
         .unwrap()
         .unwrap();
-    let spec = WorkflowCheckpointSpec {
-        identity: RunIdentity {
-            task_id: scope.job.0,
-            ..f.run.identity.clone()
-        },
-        initial_prompt: "protected context".into(),
-        policy: f.run.policy,
-        prepared: f.native.row["workflow_prepared"].clone(),
-    };
+    let prepared =
+        crate::application::workflow::agent::AgentPreparation::prepare_agent(p, &claim, policy)
+            .await
+            .unwrap()
+            .expect_ready()
+            .prepared;
+    let spec = prepared.spec(claim.fence).unwrap();
     let WriteOutcome::Applied(run) = p
         .open_workflow_checkpoint(claim.fence, &spec, policy)
         .await
@@ -98,6 +96,22 @@ async fn open_protected(f: &ModelFixture) -> RunCheckpoint {
     run
 }
 
+async fn release_history_pin(f: &ModelFixture, candidate: RetentionRoot) {
+    let p = f.native.fixture.persistence();
+    let before = snapshot(p).await;
+    assert!(
+        p.retire_tree(candidate).await.unwrap().is_none(),
+        "independently retained input must pin its source"
+    );
+    assert_eq!(snapshot(p).await, before);
+    // Only the history payload expires here; source metadata remains until retire_tree.
+    crate::adapters::persistence::workflow::agent_history_retention_fixture::expire(
+        p,
+        f.native.fence.scope,
+    )
+    .await;
+}
+
 async fn case(fault: bool) {
     let f = Box::pin(opened()).await;
     let p = f.native.fixture.persistence();
@@ -114,6 +128,7 @@ async fn case(fault: bool) {
     // An unrelated live root/checkpoint in the SAME company and owned database.
     let protected = open_protected(&f).await;
     let candidate = retire_candidate(&f).await;
+    release_history_pin(&f, candidate).await;
     let before = snapshot(p).await;
     assert_eq!(before["checkpoints"].as_array().unwrap().len(), 2);
     assert_eq!(before["calls"].as_array().unwrap().len(), 1);

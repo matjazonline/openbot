@@ -34,8 +34,12 @@ async fn open_native(native: NativeFixture) -> ModelFixture {
     let initial: RunCheckpoint = serde_json::from_value(native.row["checkpoint"].clone()).unwrap();
     let spec = WorkflowCheckpointSpec {
         identity: initial.identity,
-        initial_prompt: "untrusted context".into(),
+        initial_prompt: match &initial.messages[0] {
+            crate::services::harness::runs::ConversationMessage::User { text } => text.clone(),
+            _ => panic!("missing initial input"),
+        },
         policy: initial.policy,
+        seed: initial.seed,
         prepared: native.row["workflow_prepared"].clone(),
     };
     let policy = LeasePolicy::new(Duration::from_secs(60)).unwrap();
@@ -220,3 +224,6 @@ async fn workflow_harness_model_store_lost_request_stays_charged_and_cannot_reen
             .all(|r| r["settled_at"].is_null())
     );
 }
+
+#[path = "agent_history_completion_tests.rs"]
+mod history_completion;

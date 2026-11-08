@@ -1,0 +1,4 @@
+Traceback (most recent call last):
+  File "/private/var/folders/qc/f8s9x42x5sz6vbh79sb0cfth0000gn/T/openbot-history-publication-pc5qkluy/worktree/plan/04-autonomous-agent-history/integration/publication/docs/logs/verify-cases.py", line 8, in <module>
+    selectors=json.loads((l/'selectors.json').read_text());counts={s:sum(s in n for n in found) for s in selectors};assert all(counts.values())
+AssertionError

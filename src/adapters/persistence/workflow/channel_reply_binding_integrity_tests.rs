@@ -149,6 +149,7 @@ async fn channel_reply_binding_manual_root_has_no_automatic_response_authority()
     select(&s, binding).await;
     let intent = s.intent(TO).await;
     let request = AdmitWorkflowRequest {
+        history_session: None,
         company_id: s.fixture.target.company,
         actor: s.owner(),
         association: RelatedAssociation::Thread {

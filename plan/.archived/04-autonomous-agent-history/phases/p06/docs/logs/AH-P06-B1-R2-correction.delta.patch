@@ -1,0 +1,748 @@
+--- a/docs/workflow-operations.md
++++ b/docs/workflow-operations.md
+@@ -290,7 +290,8 @@
+ Each operation has the existing 6-second application budget and native statement/lock bounds. Its
+ cursors advance past protected/busy/error prefixes and wrap. A terminal history copy can expire
+ after its own execution/job has retired even when later workflow steps are still running. Active
+-turns, live human/tool continuations, failed exchanges before their source deadline, unresolved
++turns, live human/tool continuations, failed exchanges or failed own jobs before their original source deadline (including produced output
++needed for same-execution retry), unresolved
+ effects and required delivery/audit pins stay protected. At a hard bound, preparation backs off
+ without creating another history record/checkpoint or entering the provider. Existing activation
+ replay reuses its stored slot. There is no history reset control.
+--- a/docs/workflow-verification.md
++++ b/docs/workflow-verification.md
+@@ -119,6 +119,12 @@
+   These are count/pressure fixtures, not a claim of 32768 live end-to-end model journeys. Sparse
+   streams exercise pressure expiry down to the real 1536 soft ceiling. Empty identity fixtures
+   use real native agents/scopes with all guards enabled and protect live resolved identities.
++- Native owner-race checks pause actual preparation, expiry, retry and human submission transactions
++  inside their OwnDatabase. Advisory-gate arrival and a conflicting company NOWAIT claim prove
++  the production owner holds the shared mutex. They exercise both selection orderings and exact
++  human replay after a selected source expires. A counted65-call recent-window case verifies that
++  produced output in a failed own job remains pinned before its original deadline, native safe
++  retry changes no preparation/output/order/charged call, and real job completion removes the pin.
+ - Existing history continuation/retry/channel/source-retention tests retain their discovered names.
+   Direct history deletion is now refused: old pruning fixtures use native payload expiry followed
+   by eligible source-tree retirement, preserving the original replay and rollback assertions.
+--- a/migrations/20260817000000_init_schema.sql
++++ b/migrations/20260817000000_init_schema.sql
+@@ -13935,7 +13935,7 @@
+ CREATE FUNCTION public.agent_history_payload_expirable(exchange public.agent_history_exchanges)
+ RETURNS boolean LANGUAGE sql VOLATILE AS $$
+     SELECT exchange.payload_retained AND exchange.state IN ('completed','failed','cancelled')
+-      AND (exchange.state<>'failed' OR run.deadline<=clock_timestamp())
++      AND ((exchange.state<>'failed' AND job.status<>'failed') OR run.deadline<=clock_timestamp())
+       AND job.status IN ('completed','failed')
+       AND (execution.completed_at IS NOT NULL OR run.state IN ('succeeded','failed','cancelled'))
+       AND NOT EXISTS(SELECT 1 FROM public.agent_history_conversations AS conversation
+--- a/src/adapters/persistence/workflow/agent_history_capacity_prefix_fixture.rs
++++ b/src/adapters/persistence/workflow/agent_history_capacity_prefix_fixture.rs
+@@ -57,6 +57,8 @@
+     .unwrap();
+     if matches!(mode, PayloadPrefix::Expired) {
+         clock::expire(f.f.s.p(), scope).await;
++    } else {
++        clock::close_retry_window(f.f.s.p(), scope).await;
+     }
+     let snapshot = SeedSnapshot {
+         scope,
+--- a/src/adapters/persistence/workflow/agent_history_continuation_tests.rs
++++ b/src/adapters/persistence/workflow/agent_history_continuation_tests.rs
+@@ -176,7 +176,7 @@
+  {
+     let (origin, server) = servers(2).await;
+     let mut reviewers = Box::pin(reviewed(&origin)).await;
+-    let mut llm = scripted_llm(vec![
++    let llm = scripted_llm(vec![
+         LlmTurn::text("\"prior accepted\""),
+         LlmTurn::tool_call(
+             "registered__request",
+@@ -202,6 +202,28 @@
+         json!([{"input":"prior task","output":"prior accepted"}])
+     );
+     competing_approval(&reviewers).await;
++    finish_approval_rounds(&reviewers, before, server, llm).await;
++}
++
++async fn assert_history_counts(setup: &AgentSetup) {
++    let scope = setup.claim.fence.scope;
++    let p = &setup.fixture.persistence;
++    let facts:Value=sqlx::query_scalar("SELECT jsonb_build_object('exchanges',(SELECT count(*) FROM agent_history_exchanges WHERE company_id=$1 AND run_id=$2),'completed',(SELECT count(*) FROM agent_history_exchanges WHERE company_id=$1 AND run_id=$2 AND state='completed'),'decisions',(SELECT count(*) FROM workflow_decisions WHERE company_id=$1 AND execution_id=$3 AND submitted_at IS NOT NULL),'dispatches',(SELECT count(*) FROM workflow_action_dispatches WHERE company_id=$1 AND execution_id=$3))")
++        .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(scope.execution.as_uuid())
++        .fetch_one(p.pool()).await.unwrap();
++    assert_eq!(
++        facts,
++        json!({"exchanges":2,"completed":2,"decisions":2,"dispatches":2})
++    );
++}
++
++async fn finish_approval_rounds(
++    reviewers: &Reviewers,
++    before: Value,
++    server: tokio::task::JoinHandle<Vec<String>>,
++    mut llm: crate::services::test_support::ScriptedLlm,
++) {
++    let kind = WorkflowStepKind("agent.run".into());
+     let second = reclaim(&reviewers.setup).await;
+     assert_eq!(
+         second.fence.scope.execution,
+@@ -234,14 +256,72 @@
+     assert_eq!(llm.finish().await.unwrap(), 4);
+ }
+ 
+-async fn assert_history_counts(setup: &AgentSetup) {
+-    let scope = setup.claim.fence.scope;
++#[tokio::test]
++async fn agent_history_retention_actual_human_submission_owner_competes_with_cleanup_and_replays_expired_selected_source()
++ {
++    use crate::adapters::persistence::workflow::{
++        agent_history_race_fixture::{OwnerGate, Target},
++        agent_history_retention_fixture as clock,
++    };
++    use crate::application::workflow::storage::WorkflowStorageMaintenance;
++    let (origin, server) = servers(2).await;
++    let mut reviewers = Box::pin(reviewed(&origin)).await;
++    let llm = scripted_llm(vec![
++        LlmTurn::text("\"prior accepted\""),
++        LlmTurn::tool_call(
++            "registered__request",
++            json!({"method":"POST","path":"/first"}),
++        ),
++        LlmTurn::tool_call(
++            "registered__request",
++            json!({"method":"POST","path":"/second"}),
++        ),
++        LlmTurn::text("\"both accepted\""),
++    ])
++    .await;
++    register_scripted_agent_base_url(reviewers.setup.agent, &llm.base_url);
++    let prior = reviewers.setup.claim.fence.scope;
++    start_task(&mut reviewers.setup).await;
++    let setup = &reviewers.setup;
+     let p = &setup.fixture.persistence;
+-    let facts:Value=sqlx::query_scalar("SELECT jsonb_build_object('exchanges',(SELECT count(*) FROM agent_history_exchanges WHERE company_id=$1 AND run_id=$2),'completed',(SELECT count(*) FROM agent_history_exchanges WHERE company_id=$1 AND run_id=$2 AND state='completed'),'decisions',(SELECT count(*) FROM workflow_decisions WHERE company_id=$1 AND execution_id=$3 AND submitted_at IS NOT NULL),'dispatches',(SELECT count(*) FROM workflow_action_dispatches WHERE company_id=$1 AND execution_id=$3))")
+-        .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(scope.execution.as_uuid())
+-        .fetch_one(p.pool()).await.unwrap();
+-    assert_eq!(
+-        facts,
+-        json!({"exchanges":2,"completed":2,"decisions":2,"dispatches":2})
+-    );
+-}
++    // This fixture clock changes only the completed source copy; the genuine human deadline stays live.
++    clock::age_completed_copy(p, prior).await;
++    let candidate = clock::candidate(p, prior).await;
++    let kind = WorkflowStepKind("agent.run".into());
++    assert!(matches!(
++        Box::pin(agent_runtime(setup).execute(&kind, &setup.claim)).await,
++        WorkflowHandlerOutcome::Suspended(_)
++    ));
++    inspect_waiting_history(setup).await;
++    let before = frozen(setup).await;
++    assert_eq!(
++        before["history"]["seed"],
++        json!([{"input":"prior task","output":"prior accepted"}])
++    );
++    let command = pending_command(
++        setup,
++        setup.fixture.target.actor,
++        "history-cleanup-race-choice",
++    )
++    .await;
++    let gate = OwnerGate::install(p.pool(), Target::Decision(command.decision.0)).await;
++    let human_owner = p.submit_decision(command);
++    let cleanup = async {
++        gate.arrived(prior.company.as_uuid()).await;
++        assert!(!p.expire_history(candidate).await.unwrap());
++        gate.release().await;
++    };
++    let (submitted, ()) = tokio::join!(human_owner, cleanup);
++    submitted.unwrap();
++    assert_eq!(frozen(setup).await, before);
++    assert!(
++        p.expire_history(candidate).await.unwrap(),
++        "ordinary completed own job may expire while its root has a live continuation"
++    );
++    assert_eq!(
++        frozen(setup).await,
++        before,
++        "active human preparation keeps its exact copied pair"
++    );
++    finish_approval_rounds(&reviewers, before, server, llm).await;
++}
+--- a/src/adapters/persistence/workflow/agent_history_owner_race_tests.rs
++++ b/src/adapters/persistence/workflow/agent_history_owner_race_tests.rs
+@@ -0,0 +1,101 @@
++use super::*;
++use crate::adapters::persistence::workflow::{
++    agent_history_race_fixture::{OwnerGate, Target},
++    agent_history_retention_fixture as clock,
++};
++use crate::application::workflow::storage::WorkflowStorageMaintenance;
++
++async fn snapshot(f: &ManualHistory, claim: &ClaimedWorkflow) -> Value {
++    sqlx::query_scalar(
++        "SELECT frozen_preparation FROM agent_history_exchanges WHERE company_id=$1 AND id=$2",
++    )
++    .bind(claim.fence.scope.company.as_uuid())
++    .bind(claim.fence.scope.execution.as_uuid())
++    .fetch_one(f.f.s.pool())
++    .await
++    .unwrap()
++}
++
++#[tokio::test]
++async fn agent_history_retention_actual_preparation_owner_skips_competing_cleanup_and_replays_exact_copy()
++ {
++    let mut f = Box::pin(ManualHistory::new()).await;
++    let llm = scripted_llm(vec![LlmTurn::text("\"prior accepted\"")]).await;
++    register_scripted_agent_base_url(f.f.agent, &llm.base_url);
++    let prior = f
++        .complete(json!("prior input"), json!("prior accepted"))
++        .await;
++    clock::age(f.f.s.p(), prior.fence.scope).await;
++    let candidate = clock::candidate(f.f.s.p(), prior.fence.scope).await;
++    let current = f.start(json!("current input")).await;
++    let p = f.f.s.p();
++    let gate = OwnerGate::install(
++        p.pool(),
++        Target::Preparation(current.fence.scope.execution.as_uuid()),
++    )
++    .await;
++    let producer = p.prepare_agent(&current, policy());
++    let competing_cleanup = async {
++        gate.arrived(current.fence.scope.company.as_uuid()).await;
++        assert!(!p.expire_history(candidate).await.unwrap());
++        gate.release().await;
++    };
++    let (prepared, ()) = tokio::join!(producer, competing_cleanup);
++    let prepared = prepared.unwrap().expect_ready().prepared;
++    let frozen = snapshot(&f, &current).await;
++    assert_eq!(
++        frozen["history"]["seed"],
++        json!([{"input":"prior input","output":"prior accepted"}])
++    );
++    assert!(p.expire_history(candidate).await.unwrap());
++    let replay = p
++        .prepare_agent(&current, policy())
++        .await
++        .unwrap()
++        .expect_ready()
++        .prepared;
++    assert_eq!(replay.frozen_history(), prepared.frozen_history());
++    assert_eq!(snapshot(&f, &current).await, frozen);
++    assert_eq!(llm.finish().await.unwrap(), 1);
++}
++
++#[tokio::test]
++async fn agent_history_retention_actual_expiry_owner_precedes_blocked_fresh_selection_without_mixed_seed()
++ {
++    let mut f = Box::pin(ManualHistory::new()).await;
++    let llm = scripted_llm(vec![LlmTurn::text("\"expired answer\"")]).await;
++    register_scripted_agent_base_url(f.f.agent, &llm.base_url);
++    let prior = f
++        .complete(json!("expired input"), json!("expired answer"))
++        .await;
++    clock::age(f.f.s.p(), prior.fence.scope).await;
++    let candidate = clock::candidate(f.f.s.p(), prior.fence.scope).await;
++    let current = f.start(json!("fresh input")).await;
++    let p = f.f.s.p();
++    let gate = OwnerGate::install(
++        p.pool(),
++        Target::Expiry(prior.fence.scope.execution.as_uuid()),
++    )
++    .await;
++    let producer = p.expire_history(candidate);
++    let competing_preparation = async {
++        let expiry_owner = gate.arrived(current.fence.scope.company.as_uuid()).await;
++        let preparation = p.prepare_agent(&current, policy());
++        let release = async {
++            OwnerGate::blocked_by(p.pool(), expiry_owner).await;
++            gate.release().await;
++        };
++        let (prepared, ()) = tokio::join!(preparation, release);
++        prepared.unwrap().expect_ready()
++    };
++    let (expired, _prepared) = tokio::join!(producer, competing_preparation);
++    assert!(expired.unwrap());
++    let frozen = snapshot(&f, &current).await;
++    assert_eq!(frozen["history"]["seed"], json!([]));
++    assert_eq!(frozen["history"]["selected"], json!([]));
++    let facts: Value = sqlx::query_scalar("SELECT jsonb_build_object('last',last_exchange_order,'expired',expired_count,'through',expired_through_order) FROM agent_history_conversations WHERE company_id=$1")
++        .bind(current.fence.scope.company.as_uuid()).fetch_one(p.pool()).await.unwrap();
++    assert_eq!(facts, json!({"last":2,"expired":1,"through":1}));
++    assert_eq!(snapshot(&f, &current).await, frozen);
++    assert_eq!(llm.finish().await.unwrap(), 1);
++}
+--- a/src/adapters/persistence/workflow/agent_history_private_context_tests.rs
++++ b/src/adapters/persistence/workflow/agent_history_private_context_tests.rs
+@@ -453,3 +453,9 @@
+ 
+ #[path = "agent_history_controls_tests.rs"]
+ mod controls;
++
++#[path = "agent_history_owner_race_tests.rs"]
++mod owner_races;
++
++#[path = "agent_history_retry_retention_tests.rs"]
++mod retry_retention;
+--- a/src/adapters/persistence/workflow/agent_history_private_fixture.rs
++++ b/src/adapters/persistence/workflow/agent_history_private_fixture.rs
+@@ -68,6 +68,30 @@
+         claim_run(&self.f, run).await
+     }
+ 
++    pub(super) async fn complete_ordinary(
++        &mut self,
++        input: Value,
++        output: Value,
++    ) -> ClaimedWorkflow {
++        use crate::application::workflow::completion::WorkflowCompletion;
++        let claim = self.start(input).await;
++        let result =
++            Box::pin(runtime(&self.f).execute(&WorkflowStepKind("agent.run".into()), &claim)).await;
++        assert_eq!(result.completed_result().unwrap(), output);
++        self.f
++            .s
++            .p()
++            .complete_io(crate::application::workflow::lease::FencedWorkflowResult {
++                fence: claim.fence,
++                output,
++                policy: policy(),
++            })
++            .await
++            .unwrap()
++            .expect("ordinary completed job, not cancellation");
++        claim
++    }
++
+     pub(super) async fn complete(&mut self, input: Value, output: Value) -> ClaimedWorkflow {
+         let claim = self.start(input).await;
+         let result =
+--- a/src/adapters/persistence/workflow/agent_history_race_fixture.rs
++++ b/src/adapters/persistence/workflow/agent_history_race_fixture.rs
+@@ -0,0 +1,129 @@
++//! OwnDatabase-only gates inside actual production transactions, never synthetic owner locks.
++use sqlx::{PgPool, Postgres, Transaction};
++use uuid::Uuid;
++
++pub(super) enum Target {
++    Preparation(Uuid),
++    Expiry(Uuid),
++    Retry(Uuid),
++    Decision(Uuid),
++}
++
++struct GateStatement {
++    table: &'static str,
++    event: &'static str,
++    predicate: String,
++}
++
++pub(super) struct OwnerGate {
++    transaction: Transaction<'static, Postgres>,
++    pool: PgPool,
++    blocker: i32,
++    table: &'static str,
++}
++
++impl OwnerGate {
++    pub(super) async fn install(pool: &PgPool, target: Target) -> Self {
++        let statement = match target {
++            Target::Preparation(id) => GateStatement {
++                table: "agent_history_exchanges",
++                event: "INSERT",
++                predicate: format!("NEW.id='{id}'::uuid"),
++            },
++            Target::Expiry(id) => GateStatement {
++                table: "agent_history_exchanges",
++                event: "UPDATE",
++                predicate: format!(
++                    "NEW.id='{id}'::uuid AND OLD.payload_retained AND NOT NEW.payload_retained"
++                ),
++            },
++            Target::Retry(id) => GateStatement {
++                table: "background_tasks",
++                event: "UPDATE",
++                predicate: format!(
++                    "NEW.id='{id}'::uuid AND OLD.status='failed' AND NEW.status='pending'"
++                ),
++            },
++            Target::Decision(id) => GateStatement {
++                table: "workflow_decisions",
++                event: "UPDATE",
++                predicate: format!(
++                    "NEW.id='{id}'::uuid AND OLD.submitted_at IS NULL AND NEW.submitted_at IS NOT NULL"
++                ),
++            },
++        };
++        let GateStatement {
++            table,
++            event,
++            predicate,
++        } = statement;
++        let mut transaction = pool.begin().await.unwrap();
++        let blocker = sqlx::query_scalar("SELECT pg_backend_pid()")
++            .fetch_one(&mut *transaction)
++            .await
++            .unwrap();
++        sqlx::query("SELECT pg_advisory_xact_lock(735103)")
++            .execute(&mut *transaction)
++            .await
++            .unwrap();
++        sqlx::raw_sql(&format!(
++            "CREATE FUNCTION history_test_owner_gate() RETURNS trigger LANGUAGE plpgsql AS $$
++             BEGIN IF {predicate} THEN PERFORM pg_advisory_xact_lock(735103); END IF; RETURN NEW; END $$;
++             CREATE TRIGGER history_test_owner_gate BEFORE {event} ON {table}
++             FOR EACH ROW EXECUTE FUNCTION history_test_owner_gate()"
++        )).execute(pool).await.unwrap();
++        Self {
++            transaction,
++            pool: pool.clone(),
++            blocker,
++            table,
++        }
++    }
++
++    pub(super) async fn arrived(&self, company: Uuid) -> i32 {
++        let owner = Self::blocked_by(&self.pool, self.blocker).await;
++        // This lock is held by the actual paused native operation, not by the fixture gate.
++        let error = sqlx::query("SELECT id FROM companies WHERE id=$1 FOR NO KEY UPDATE NOWAIT")
++            .bind(company)
++            .execute(&self.pool)
++            .await
++            .unwrap_err();
++        assert_eq!(
++            error.as_database_error().unwrap().code().as_deref(),
++            Some("55P03")
++        );
++        owner
++    }
++
++    pub(super) async fn blocked_by(pool: &PgPool, blocker: i32) -> i32 {
++        tokio::time::timeout(std::time::Duration::from_secs(1), async {
++            loop {
++                let pid = sqlx::query_scalar::<_, i32>(
++                    "SELECT pid FROM pg_stat_activity WHERE datname=current_database()
++                     AND $1=ANY(pg_blocking_pids(pid)) LIMIT 1",
++                )
++                .bind(blocker)
++                .fetch_optional(pool)
++                .await
++                .unwrap();
++                if let Some(pid) = pid {
++                    return pid;
++                }
++                tokio::time::sleep(std::time::Duration::from_millis(5)).await;
++            }
++        })
++        .await
++        .expect("the actual production owner must reach the fixture gate")
++    }
++
++    pub(super) async fn release(self) {
++        self.transaction.rollback().await.unwrap();
++        sqlx::raw_sql(&format!(
++            "DROP TRIGGER history_test_owner_gate ON {}; DROP FUNCTION history_test_owner_gate()",
++            self.table
++        ))
++        .execute(&self.pool)
++        .await
++        .unwrap();
++    }
++}
+--- a/src/adapters/persistence/workflow/agent_history_retention_capacity_tests.rs
++++ b/src/adapters/persistence/workflow/agent_history_retention_capacity_tests.rs
+@@ -19,7 +19,7 @@
+         .await;
+         register_scripted_agent_base_url(f.f.agent, &llm.base_url);
+         for index in start..end {
+-            f.complete(json!(index), json!(index)).await;
++            f.complete_ordinary(json!(index), json!(index)).await;
+         }
+         actual_calls += llm.finish().await.unwrap();
+     }
+--- a/src/adapters/persistence/workflow/agent_history_retention_fixture.rs
++++ b/src/adapters/persistence/workflow/agent_history_retention_fixture.rs
+@@ -102,3 +102,71 @@
+     .unwrap();
+     assert_eq!(count, 0, "source cascade removes only expired metadata");
+ }
++
++/// Backdate only an already completed history copy; the live root/continuation deadline is intact.
++pub(super) async fn age_completed_copy(p: &PostgresPersistence, scope: ActivationRequest) {
++    let before: chrono::DateTime<chrono::Utc> =
++        sqlx::query_scalar("SELECT deadline FROM workflow_runs WHERE company_id=$1 AND id=$2")
++            .bind(scope.company.as_uuid())
++            .bind(scope.run.as_uuid())
++            .fetch_one(p.pool())
++            .await
++            .unwrap();
++    let mut tx = p.pool().begin().await.unwrap();
++    sqlx::raw_sql(
++        "ALTER TABLE agent_history_exchanges DISABLE TRIGGER agent_history_exchange_change",
++    )
++    .execute(&mut *tx)
++    .await
++    .unwrap();
++    let changed = sqlx::query("UPDATE agent_history_exchanges SET created_at=created_at-interval '100 days',activated_at=activated_at-interval '100 days',finished_at=finished_at-interval '100 days' WHERE company_id=$1 AND id=$2 AND state='completed' AND payload_retained")
++        .bind(scope.company.as_uuid()).bind(scope.execution.as_uuid()).execute(&mut *tx).await.unwrap().rows_affected();
++    assert_eq!(changed, 1);
++    sqlx::raw_sql("SET CONSTRAINTS ALL IMMEDIATE; ALTER TABLE agent_history_exchanges ENABLE TRIGGER agent_history_exchange_change")
++        .execute(&mut *tx).await.unwrap();
++    tx.commit().await.unwrap();
++    let after: chrono::DateTime<chrono::Utc> =
++        sqlx::query_scalar("SELECT deadline FROM workflow_runs WHERE company_id=$1 AND id=$2")
++            .bind(scope.company.as_uuid())
++            .bind(scope.run.as_uuid())
++            .fetch_one(p.pool())
++            .await
++            .unwrap();
++    assert_eq!(before, after);
++    assert!(
++        after > chrono::Utc::now(),
++        "genuine human continuation remains before original deadline"
++    );
++}
++
++/// A cancelled count-prefix's original retry window has elapsed, but its copies are younger than90days.
++pub(super) async fn close_retry_window(p: &PostgresPersistence, scope: ActivationRequest) {
++    let mut tx = p.pool().begin().await.unwrap();
++    sqlx::raw_sql(
++        "ALTER TABLE workflow_runs DISABLE TRIGGER workflow_run_snapshot_immutable;
++        ALTER TABLE agent_history_exchanges DISABLE TRIGGER agent_history_exchange_change",
++    )
++    .execute(&mut *tx)
++    .await
++    .unwrap();
++    sqlx::query("UPDATE workflow_runs SET created_at=created_at-interval '1 day',deadline=deadline-interval '1 day',finished_at=finished_at-interval '1 day' WHERE company_id=$1 AND id=$2")
++        .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).execute(&mut *tx).await.unwrap();
++    sqlx::query("UPDATE agent_history_exchanges SET created_at=created_at-interval '1 day',activated_at=activated_at-interval '1 day',finished_at=finished_at-interval '1 day' WHERE company_id=$1 AND id=$2 AND state='cancelled'")
++        .bind(scope.company.as_uuid()).bind(scope.execution.as_uuid()).execute(&mut *tx).await.unwrap();
++    sqlx::raw_sql(
++        "SET CONSTRAINTS ALL IMMEDIATE;
++        ALTER TABLE workflow_runs ENABLE TRIGGER workflow_run_snapshot_immutable;
++        ALTER TABLE agent_history_exchanges ENABLE TRIGGER agent_history_exchange_change",
++    )
++    .execute(&mut *tx)
++    .await
++    .unwrap();
++    tx.commit().await.unwrap();
++    let elapsed_but_recent: bool = sqlx::query_scalar("SELECT run.deadline<clock_timestamp() AND exchange.finished_at>clock_timestamp()-interval '90 days' FROM workflow_runs AS run JOIN agent_history_exchanges AS exchange ON exchange.company_id=run.company_id AND exchange.run_id=run.id WHERE run.company_id=$1 AND run.id=$2 AND exchange.id=$3")
++        .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(scope.execution.as_uuid())
++        .fetch_one(p.pool()).await.unwrap();
++    assert!(
++        elapsed_but_recent,
++        "pressure, not90day age, must decide expiry of this cancelled prefix"
++    );
++}
+--- a/src/adapters/persistence/workflow/agent_history_retry_retention_tests.rs
++++ b/src/adapters/persistence/workflow/agent_history_retry_retention_tests.rs
+@@ -0,0 +1,196 @@
++use super::*;
++use crate::adapters::persistence::workflow::{
++    agent_history_race_fixture::{OwnerGate, Target},
++    agent_history_retention_fixture as clock,
++};
++use crate::application::workflow::{
++    completion::WorkflowCompletion, storage::WorkflowStorageMaintenance,
++};
++use crate::domain::workflow::{FailureClass, FailureCode, RetrySafety, StepFailure};
++use crate::services::test_support::ScriptedLlm;
++
++async fn accepted(f: &ManualHistory, claim: &ClaimedWorkflow) -> Value {
++    sqlx::query_scalar("SELECT to_jsonb(exchange) FROM agent_history_exchanges AS exchange WHERE company_id=$1 AND id=$2")
++        .bind(claim.fence.scope.company.as_uuid()).bind(claim.fence.scope.execution.as_uuid())
++        .fetch_one(f.f.s.pool()).await.unwrap()
++}
++
++async fn execute(f: &ManualHistory, claim: &ClaimedWorkflow, expected: Value) {
++    let result =
++        Box::pin(runtime(&f.f).execute(&WorkflowStepKind("agent.run".into()), claim)).await;
++    assert_eq!(result.completed_result().unwrap(), expected);
++}
++
++async fn complete_job(f: &ManualHistory, claim: &ClaimedWorkflow, output: Value) {
++    f.f.s
++        .p()
++        .complete_io(FencedWorkflowResult {
++            fence: claim.fence,
++            output,
++            policy: policy(),
++        })
++        .await
++        .unwrap()
++        .expect("genuine completed source job");
++}
++
++async fn fail_job(f: &ManualHistory, claim: &ClaimedWorkflow) {
++    let cause = LeaseReleaseCause::Classified(WorkflowFailure {
++        failure: StepFailure::new(
++            FailureClass::Terminal,
++            FailureCode::parse("provider.rejected").unwrap(),
++            None,
++        )
++        .unwrap(),
++        safety: RetrySafety::SafeToRetry,
++    });
++    assert!(
++        f.f.s
++            .p()
++            .release_io(claim.fence, policy(), cause)
++            .await
++            .unwrap()
++    );
++}
++
++async fn newer_completed_jobs(f: &mut ManualHistory) -> ScriptedLlm {
++    let recent: i64 = sqlx::query_scalar("SELECT recent_payloads FROM agent_history_limits()")
++        .fetch_one(f.f.s.pool())
++        .await
++        .unwrap();
++    assert_eq!(
++        recent, 64,
++        "keep the actual recent-window pressure boundary"
++    );
++    for batch in 0..4 {
++        let llm = scripted_llm(
++            (0..16)
++                .map(|_| LlmTurn::text("\"newer accepted\""))
++                .collect(),
++        )
++        .await;
++        register_scripted_agent_base_url(f.f.agent, &llm.base_url);
++        for item in 0..16 {
++            let claim = f.start(json!({"batch":batch,"item":item})).await;
++            execute(f, &claim, json!("newer accepted")).await;
++            complete_job(f, &claim, json!("newer accepted")).await;
++        }
++        if batch == 3 {
++            return llm;
++        }
++        assert_eq!(llm.finish().await.unwrap(), 16);
++    }
++    unreachable!("four fixed batches fill the native64 recent bound")
++}
++
++async fn retry_command(f: &ManualHistory, claim: &ClaimedWorkflow) -> RetryCommand {
++    let scope = claim.fence.scope;
++    RetryCommand {
++        company_id: scope.company,
++        run_id: scope.run,
++        actor: f.actor,
++        command_key: IdempotencyKey::parse("accepted-history-pressure-retry").unwrap(),
++        expected_revision: f
++            .f
++            .s
++            .p()
++            .head(scope.company, scope.run)
++            .await
++            .unwrap()
++            .unwrap()
++            .revision,
++    }
++}
++
++async fn assert_native_pin(f: &ManualHistory, first: &ClaimedWorkflow) {
++    let p = f.f.s.p();
++    let error = sqlx::query("UPDATE agent_history_exchanges SET payload_retained=false,payload_expired_at=clock_timestamp(),output=NULL,frozen_preparation=NULL WHERE company_id=$1 AND id=$2")
++        .bind(first.fence.scope.company.as_uuid()).bind(first.fence.scope.execution.as_uuid())
++        .execute(p.pool()).await.unwrap_err();
++    let database = error.as_database_error().unwrap();
++    assert_eq!(database.code().as_deref(), Some("23514"));
++    assert_eq!(
++        database.message(),
++        "agent payload is pinned or expiry changed metadata"
++    );
++}
++
++async fn billed_calls(f: &ManualHistory) -> Value {
++    sqlx::query_scalar("SELECT COALESCE(jsonb_agg(to_jsonb(call) ORDER BY request_id),'[]'::jsonb) FROM model_usage_calls AS call WHERE company_id=$1")
++        .bind(f.f.s.fixture.target.company.as_uuid()).fetch_one(f.f.s.pool()).await.unwrap()
++}
++
++#[tokio::test]
++async fn agent_history_retention_completed_output_failed_job_pressure_competes_with_native_retry_without_model_reentry()
++ {
++    let mut f = Box::pin(ManualHistory::new()).await;
++    let initial = scripted_llm(vec![LlmTurn::text("\"original accepted\"")]).await;
++    register_scripted_agent_base_url(f.f.agent, &initial.base_url);
++    let first = f.start(json!("original input")).await;
++    execute(&f, &first, json!("original accepted")).await;
++    let saved = accepted(&f, &first).await;
++    fail_job(&f, &first).await;
++    assert_eq!(initial.finish().await.unwrap(), 1);
++    let last_provider = newer_completed_jobs(&mut f).await;
++    let p = f.f.s.p();
++    let candidate = clock::candidate(p, first.fence.scope).await;
++    assert!(
++        !p.expire_history(candidate).await.unwrap(),
++        "eligibility itself must preserve completed replay before deadline"
++    );
++    assert_native_pin(&f, &first).await;
++    assert_eq!(accepted(&f, &first).await, saved);
++    let usage_before = billed_calls(&f).await;
++    let command = retry_command(&f, &first).await;
++    let gate = OwnerGate::install(p.pool(), Target::Retry(first.fence.scope.job.0)).await;
++    let owner = p.retry(command);
++    let cleanup = async {
++        gate.arrived(first.fence.scope.company.as_uuid()).await;
++        assert!(!p.expire_history(candidate).await.unwrap());
++        gate.release().await;
++    };
++    let (retried, ()) = tokio::join!(owner, cleanup);
++    assert!(matches!(retried.unwrap(), RetryResult::Applied { .. }));
++    let replacement = p
++        .claim_io(
++            first.fence.scope,
++            WorkflowWorkerId(Uuid::new_v4()),
++            policy(),
++        )
++        .await
++        .unwrap()
++        .unwrap();
++    execute(&f, &replacement, json!("original accepted")).await;
++    assert_eq!(
++        accepted(&f, &first).await,
++        saved,
++        "accepted exchange/order/preparation/output stay immutable"
++    );
++    let calls: i64 =
++        sqlx::query_scalar("SELECT count(*) FROM model_usage_calls WHERE company_id=$1")
++            .bind(first.fence.scope.company.as_uuid())
++            .fetch_one(p.pool())
++            .await
++            .unwrap();
++    assert_eq!(calls, 65);
++    assert_eq!(
++        billed_calls(&f).await,
++        usage_before,
++        "native replay changes no charged-call identity or accounting"
++    );
++    assert_eq!(
++        last_provider.finish().await.unwrap(),
++        16,
++        "replay must not enter the strict live provider"
++    );
++    complete_job(&f, &replacement, json!("original accepted")).await;
++    assert!(
++        p.expire_history(candidate).await.unwrap(),
++        "real job completion removes replay pin under unchanged64-newer pressure"
++    );
++    let expired = accepted(&f, &first).await;
++    assert_eq!(expired["state"], "completed");
++    assert_eq!(expired["position"], saved["position"]);
++    assert_eq!(expired["output_digest"], saved["output_digest"]);
++    assert_eq!(expired["payload_retained"], false);
++}
+--- a/src/adapters/persistence/workflow/mod.rs
++++ b/src/adapters/persistence/workflow/mod.rs
+@@ -156,6 +156,8 @@
+ 
+ mod jev_runtime;
+ 
++#[cfg(test)]
++mod agent_history_race_fixture;
+ mod agent_history_retention;
+ #[cfg(test)]
+ mod agent_history_retention_fixture;

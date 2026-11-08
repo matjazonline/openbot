@@ -13,6 +13,8 @@ use tokio_util::sync::CancellationToken;
 
 pub const RETENTION_PAGE_SIZE: usize = 4;
 pub const STORAGE_SWEEP_LIMIT: u16 = 256;
+// Reserve work for both payloads and unused scopes so either protected prefix cannot starve the other.
+pub const HISTORY_EXPIRY_SWEEP_LIMIT: u16 = STORAGE_SWEEP_LIMIT / 2;
 const OPERATION_BUDGET: Duration = Duration::from_secs(6);
 const SWEEP_INTERVAL: Duration = Duration::from_secs(60);
 
@@ -34,9 +36,34 @@ pub struct RetiredTree {
     pub calls: u64,
 }
 
+/// Discovery cursor, never authority to expire a record.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct HistoryCandidate {
+    pub company: CompanyId,
+    pub finished_at: DateTime<Utc>,
+    pub exchange: crate::application::workflow::agent_history::AgentExchangeId,
+}
+
+#[derive(Debug)]
+pub struct HistoryPage {
+    pub candidates: Vec<HistoryCandidate>,
+}
+
+#[derive(Default)]
+struct SweepCursor {
+    root: Option<RetentionRoot>,
+    history: Option<HistoryCandidate>,
+    history_scope: Option<CompanyId>,
+}
+
 #[async_trait]
 pub trait WorkflowStorageMaintenance: Send + Sync {
     async fn sweep_obsolete_witnesses(&self, limit: u16) -> AppResult<u64>;
+    async fn history_page(&self, after: Option<HistoryCandidate>) -> AppResult<HistoryPage>;
+    /// Lock current source ownership and recheck every pin before clearing history copies.
+    async fn expire_history(&self, candidate: HistoryCandidate) -> AppResult<bool>;
+    async fn history_scope_page(&self, after: Option<CompanyId>) -> AppResult<Vec<CompanyId>>;
+    async fn prune_history(&self, company: CompanyId, limit: u16) -> AppResult<u64>;
     async fn retention_page(&self, after: Option<RetentionRoot>) -> AppResult<RetentionPage>;
     /// Recheck and lock the complete tree; archive usage and remove runs/jobs atomically.
     async fn retire_tree(&self, root: RetentionRoot) -> AppResult<Option<RetiredTree>>;
@@ -65,7 +92,7 @@ async fn bounded<T>(
 async fn sweep(
     port: &dyn WorkflowStorageMaintenance,
     monitoring: &dyn MonitoringService,
-    after: &mut Option<RetentionRoot>,
+    cursor: &mut SweepCursor,
 ) {
     if let Ok(count) = bounded(
         port.sweep_obsolete_witnesses(STORAGE_SWEEP_LIMIT),
@@ -75,9 +102,10 @@ async fn sweep(
     {
         monitoring.increment_counter("workflow_storage_witnesses_deleted_total", count, &[]);
     }
-    if let Ok(page) = bounded(port.retention_page(*after), monitoring).await {
+    sweep_history(port, monitoring, cursor).await;
+    if let Ok(page) = bounded(port.retention_page(cursor.root), monitoring).await {
         // Advance past every candidate, including protected or failed trees. Wrap on exhaustion.
-        *after = page.next;
+        cursor.root = page.next;
         for root in page.roots {
             match bounded(port.retire_tree(root), monitoring).await {
                 Ok(Some(deleted)) => {
@@ -114,18 +142,57 @@ async fn sweep(
     }
 }
 
+async fn sweep_history(
+    port: &dyn WorkflowStorageMaintenance,
+    monitoring: &dyn MonitoringService,
+    cursor: &mut SweepCursor,
+) {
+    if let Ok(page) = bounded(port.history_page(cursor.history), monitoring).await {
+        if page.candidates.is_empty() {
+            cursor.history = None;
+        }
+        for candidate in page.candidates {
+            // Advance before mutation, including a busy/protected/error candidate.
+            cursor.history = Some(candidate);
+            match bounded(port.expire_history(candidate), monitoring).await {
+                Ok(true) => {
+                    monitoring.increment_counter("agent_history_payloads_expired_total", 1, &[])
+                }
+                Ok(false) => {
+                    monitoring.increment_counter("agent_history_payloads_skipped_total", 1, &[])
+                }
+                Err(_) => {}
+            }
+        }
+    }
+    if let Ok(companies) = bounded(port.history_scope_page(cursor.history_scope), monitoring).await
+    {
+        if companies.is_empty() {
+            cursor.history_scope = None;
+        }
+        for company in companies {
+            cursor.history_scope = Some(company);
+            let limit =
+                (STORAGE_SWEEP_LIMIT - HISTORY_EXPIRY_SWEEP_LIMIT) / RETENTION_PAGE_SIZE as u16;
+            if let Ok(count) = bounded(port.prune_history(company, limit), monitoring).await {
+                monitoring.increment_counter("agent_history_scopes_pruned_total", count, &[]);
+            }
+        }
+    }
+}
+
 /// The host owns and joins this future. Cancellation drops the actual in-flight transaction.
 pub async fn run(
     port: &dyn WorkflowStorageMaintenance,
     monitoring: &dyn MonitoringService,
     shutdown: &CancellationToken,
 ) {
-    let mut after = None;
+    let mut cursor = SweepCursor::default();
     loop {
         tokio::select! {
             biased;
             _ = shutdown.cancelled() => return,
-            _ = sweep(port, monitoring, &mut after) => {}
+            _ = sweep(port, monitoring, &mut cursor) => {}
         }
         // A full page or an error never turns cleanup into a busy polling loop.
         tokio::select! {

@@ -23,6 +23,11 @@ pub(super) struct SearchFixture {
 
 impl SearchFixture {
     pub(super) async fn new(level: AccessLevel) -> Self {
+        // Keep the shared fixture's substantial setup behind a boxed test seam.
+        Box::pin(Self::with_budget(level, None)).await
+    }
+
+    pub(super) async fn with_budget(level: AccessLevel, budget: Option<u32>) -> Self {
         let mut fixture = Fixture::new().await;
         fixture.persistence = PostgresPersistence::with_credential_cipher(
             fixture.persistence.pool().clone(),
@@ -46,7 +51,7 @@ impl SearchFixture {
         .await
         .unwrap();
         let agent = configure_agent(&fixture).await;
-        let version = publish(&fixture).await;
+        let version = publish(&fixture, budget).await;
         let binding = BindingFixture::from_version(fixture, version);
         let configured = binding
             .service()
@@ -230,7 +235,7 @@ async fn configure_agent(f: &Fixture) -> Uuid {
     agent.id
 }
 
-async fn publish(f: &Fixture) -> VersionId {
+async fn publish(f: &Fixture, budget: Option<u32>) -> VersionId {
     let directory = AgentPublicationDirectory {
         persistence: f.persistence.clone(),
         inner: Preflight,
@@ -244,6 +249,10 @@ async fn publish(f: &Fixture) -> VersionId {
     let mut source: Value =
         serde_json::from_str(&registry::example("agent.run").unwrap().source).unwrap();
     source["workflow_id"] = json!(f.target.workflow.to_string());
+    if let Some(max_tokens) = budget {
+        source["limits"]["root_budget"] = json!({"activations":10,"model_calls":10,"repetitions":10,
+            "tokens":{"max_tokens":max_tokens,"reviewers":[{"kind":"user","id":f.target.actor.user_id()}]}});
+    }
     let version = VersionId::new(Uuid::new_v4());
     f.publish_source(&service, f.target.workflow, source.to_string(), version)
         .await
@@ -256,6 +265,7 @@ async fn admit(binding: &BindingFixture, actor: WorkflowActor) -> ClaimedWorkflo
     let p = &f.persistence;
     let result = WorkflowService::new(p.clone(), p.clone(), p.clone(), p.clone(), Preflight)
         .admit(AdmitWorkflowRequest {
+            history_session: None,
             company_id: f.target.company,
             actor,
             association: RelatedAssociation::Company,

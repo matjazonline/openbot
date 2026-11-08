@@ -287,3 +287,52 @@ async fn workflow_classify_token_pause_and_restart_use_the_shared_driver() {
     );
     assert_eq!(retries, 1);
 }
+
+#[tokio::test]
+async fn agent_history_protocol_model_only_native_checkpoint_refuses_seed_and_keeps_empty_control()
+{
+    use crate::application::workflow::{
+        agent::AgentPreparation, checkpoints::WorkflowCheckpointStore,
+    };
+    use crate::services::harness::runs::{LogicalSeed, LogicalSeedPair};
+    for step in [classify as fn(&mut Value), decide] {
+        let setup = Box::pin(step_setup(step)).await;
+        let p = &setup.fixture.persistence;
+        let policy = LeasePolicy::new(Duration::from_secs(60)).unwrap();
+        let launch = p
+            .prepare_agent(&setup.claim, policy)
+            .await
+            .unwrap()
+            .expect_ready();
+        assert!(launch.prepared.history_exchange().is_none());
+        assert!(launch.prepared.frozen_history().is_none());
+        let mut forged = launch.prepared.spec(setup.claim.fence).unwrap();
+        assert!(forged.seed.pairs().is_empty());
+        forged.seed = LogicalSeed::new(vec![LogicalSeedPair {
+            input: json!("injected"),
+            output: json!("old answer"),
+        }])
+        .unwrap();
+        assert!(
+            p.open_workflow_checkpoint(setup.claim.fence, &forged, policy)
+                .await
+                .is_err()
+        );
+        let unchanged = launch.prepared.spec(setup.claim.fence).unwrap();
+        let result = p
+            .open_workflow_checkpoint(setup.claim.fence, &unchanged, policy)
+            .await
+            .unwrap();
+        let crate::services::harness::runs::WriteOutcome::Applied(run) = result else {
+            panic!("empty model-only seed remains valid")
+        };
+        assert!(run.seed.pairs().is_empty());
+        let count: i64 =
+            sqlx::query_scalar("SELECT count(*) FROM agent_history_exchanges WHERE company_id=$1")
+                .bind(setup.claim.fence.scope.company.as_uuid())
+                .fetch_one(p.pool())
+                .await
+                .unwrap();
+        assert_eq!(count, 0);
+    }
+}

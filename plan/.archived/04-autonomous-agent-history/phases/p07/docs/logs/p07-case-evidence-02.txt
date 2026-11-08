@@ -1,0 +1,68 @@
+{
+  "status": "PASS",
+  "selected": 883,
+  "distinct_latest_passes": 883,
+  "ignored": 0,
+  "required_families": {
+    "agent_history_identity_": 19,
+    "agent_history_contract_": 8,
+    "agent_history_storage_": 11,
+    "agent_history_completion_": 14,
+    "agent_history_ordering_": 8,
+    "agent_history_recovery_": 11,
+    "agent_history_selection_": 4,
+    "agent_history_preparation_": 6,
+    "agent_history_protocol_": 4,
+    "agent_history_callers_": 4,
+    "agent_history_children_": 1,
+    "agent_history_samples_": 7,
+    "agent_history_continuation_": 2,
+    "agent_history_channel_": 5,
+    "agent_history_views_": 3,
+    "agent_history_retention_": 14,
+    "agent_history_controls_": 2,
+    "agent_history_level_": 17,
+    "agent_history_e2e_": 5
+  },
+  "accepted_p06_names_preserved": 866,
+  "new_selection_names": 17,
+  "observations": [
+    {
+      "run": "p07-final-runtime-01",
+      "exit_code": 0,
+      "counts": {
+        "ok": 880
+      },
+      "receipt_sha256": "684df8c1314a6fb5224944c08d4a012e843ef26d4b8e2d5ca83bd5b91db3f2ba",
+      "log_sha256": "107c61d866363bc9733f05218f6af81f1fa23f558f5b873bf8803d80d6b41495"
+    },
+    {
+      "run": "p07-e2e-completion-01",
+      "exit_code": 0,
+      "counts": {
+        "ok": 18
+      },
+      "receipt_sha256": "d2bd48b4cd9f294014571b2aecd2a7f0eb47dd7ebc7d1ad05d528412493d29e9",
+      "log_sha256": "6c194ba349069bed4997768893825dda3dd3fe98478d52115f061ecaef4edf06"
+    },
+    {
+      "run": "p07-inheritance-current-01",
+      "exit_code": 0,
+      "counts": {
+        "ok": 1
+      },
+      "receipt_sha256": "602aad1b461df413603dded3cd8f66a93cd0f1a121602b4f7cca82310693b93a",
+      "log_sha256": "c186b3380b258fad95098048b718edd32265ab9711b0e248d51c3ecffa5d73c6"
+    },
+    {
+      "run": "p07-process-current-01",
+      "exit_code": 0,
+      "counts": {
+        "ok": 3
+      },
+      "receipt_sha256": "ae2fd4c241a8b369d075cd73067d10fde4ff3db81fb1cc2557941b735216c8ff",
+      "log_sha256": "b87f391c771c0392e78892885a57eb6c5adbc77ed160fc3078430e499e36a53d"
+    }
+  ],
+  "reuse_disposition": "All current discovered names have actual current observations, no earlier-phase runtime reuse. Final-runtime01 exercised880 including actual100001-member source-retirement and four new journey parents; completion01 reruns direct changed inherited-listener consumers (all process/e2e parents plus foundation), adds genuine human+CC/reflection guard, and runs the separately selected capacity collector. Only inheritance MAC, bounded joined process-output fixture, and testmodule/new test changed after880: no ordinary model server/Rig/production path or earlier assertions changed; same native schema/SQL/currentreader/render/protocol. Technical ignored child helper is excluded from standalone discovery and genuinely invoked/killed six times by required process parents. No earlier tests moved/deleted; all866 P06 names retained."
+}

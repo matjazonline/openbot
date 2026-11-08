@@ -81,7 +81,7 @@ async fn workflow_control_revision_overflow_refuses_without_partial_writes() {
     let (f, scope) = fixture().await;
     // Isolated fixture setup reaches the otherwise impractical bigint boundary.
     // Restore the trigger before any operation being tested.
-    sqlx::raw_sql("ALTER TABLE workflow_runs DISABLE TRIGGER workflow_run_revision; UPDATE workflow_runs SET revision=9223372036854775807; ALTER TABLE workflow_runs ENABLE TRIGGER workflow_run_revision")
+    sqlx::raw_sql("ALTER TABLE workflow_runs DISABLE TRIGGER workflow_run_revision; UPDATE workflow_runs SET revision=9223372036854775807; SET CONSTRAINTS ALL IMMEDIATE; ALTER TABLE workflow_runs ENABLE TRIGGER workflow_run_revision")
         .execute(f.persistence().pool()).await.unwrap();
     let before = control_state(&f).await;
     let cmd = command(&f, scope, "cancel").await;

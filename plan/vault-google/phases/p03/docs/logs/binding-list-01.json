@@ -1,0 +1,17 @@
+{
+  "command": [
+    "cargo",
+    "test",
+    "--locked",
+    "--offline",
+    "--lib",
+    "vault_binding_",
+    "--",
+    "--list"
+  ],
+  "cwd": "/Users/mac02/.codex/worktrees/1133/openbot",
+  "database": "vault_google_1133_41402e4b8104_test",
+  "exit": 101,
+  "seconds": 82.13,
+  "log": "/Users/mac02/.codex/worktrees/1133/openbot/plan/vault-google/phases/p03/docs/logs/binding-list-01.log"
+}

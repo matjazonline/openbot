@@ -1,0 +1,7 @@
+Auto-merging migrations/20260817000000_init_schema.sql
+CONFLICT (content): Merge conflict in migrations/20260817000000_init_schema.sql
+Auto-merging src/adapters/persistence/workflow/http_tests.rs
+Auto-merging src/adapters/persistence/workflow/mcp_test_support.rs
+Auto-merging src/adapters/persistence/workflow/mod.rs
+Auto-merging src/infra/workflow.rs
+Automatic merge failed; fix conflicts and then commit the result.

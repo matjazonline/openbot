@@ -1,0 +1,13 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+   Compiling open_bots v0.1.0 (/private/tmp/openbot-agent-history-h_82_5pw/worktree)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 49.20s
+     Running unittests src/lib.rs (/private/tmp/openbot-chs-p06-3f43t2k7/worktree/target/debug/deps/open_bots-8b80d02f0b6cf2e6)
+
+running 4 tests
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::acknowledgement::agent_history_recovery_aborted_park_commit_has_no_receipt_and_retries_same_frozen_activation ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::acknowledgement::agent_history_recovery_park_commit_ack_loss_proves_retired_attempt_and_survives_fast_wake ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::history_storage::acknowledgement::agent_history_storage_ambiguous_enqueue_committed_reuses_one_position_before_checkpoint ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::history_storage::acknowledgement::agent_history_storage_ambiguous_enqueue_aborted_keeps_counter_available_for_recovery ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 3301 filtered out; finished in 3.94s
+

@@ -1,0 +1,40 @@
+{
+  "phase": "p06",
+  "status": "accepted in phase; combined integration pending",
+  "at": "2026-11-07T09:39:34.236602+00:00",
+  "root": "/root",
+  "reviewer": "/root/channel_reply_review_recovery",
+  "review": "CHS-P06-B1-R3",
+  "digest": "90f382b9e60fff25ef5f6f304a413eb395d95b8e447d5b944ebe7b9d0895073e",
+  "head": "97e5d60dc538e26c7cb976a8d63772eed80baff2",
+  "source_paths_verified": 74,
+  "exclusions": [
+    "plan/03-channel-handles-send/COORDINATION.md",
+    "plan/03-channel-handles-send/phases/p01/docs",
+    "plan/03-channel-handles-send/phases/p02/docs",
+    "plan/03-channel-handles-send/phases/p03/docs",
+    "plan/03-channel-handles-send/phases/p04/docs",
+    "plan/03-channel-handles-send/phases/p05/docs",
+    "plan/03-channel-handles-send/phases/p06/docs",
+    "plan/03-channel-handles-send/phases/p07/docs",
+    "plan/03-channel-handles-send/integration/final/docs"
+  ],
+  "coordination_revision": 22,
+  "findings": "F1/F2/F3 FIXED by independent latest dispositions",
+  "targeted_rust_distinct_passed": 232,
+  "existing_ignored": 1,
+  "full_suite": false,
+  "limitations": [
+    "Standalone live authoring journey requires a server and was not executed; focused real routes/rendering/browser protocols passed.",
+    "Scripted delivery checks do not establish live provider readiness."
+  ],
+  "prerequisites": {
+    "p01": "0995151e",
+    "p02": "aa7cd3e8",
+    "p03": "849e88b7",
+    "p04": "f26c909a",
+    "p05": "6153d305"
+  },
+  "user_checkpoint_push": "97e5d60d completed incl authorized deletion",
+  "next": "p07 e2e/combined integration, then all plan04 history"
+}

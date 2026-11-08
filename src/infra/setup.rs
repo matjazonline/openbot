@@ -107,7 +107,10 @@ struct HttpComponents {
 }
 fn http_state(f: foundation::Foundation, c: HttpComponents) -> anyhow::Result<AppState> {
     let p = f.persistence;
+    let (integrations, integration_bindings) = super::integrations::gateway(&p, &f.config)?;
     Ok(AppState {
+        integrations,
+        integration_bindings,
         knowledge: f.knowledge,
         auth_admission: Arc::new(crate::adapters::http::auth_admission::AuthAdmission::from_env()?),
         workflow: c.workflow,

@@ -1,0 +1,347 @@
+{
+  "filters_listed": {
+    "integration_connect_": 14,
+    "integration_contract_": 6,
+    "google_oauth_": 13,
+    "google_vault_callback_": 13,
+    "vault_rotation_": 5
+  },
+  "distinct_focused_pass": 130,
+  "tests": [
+    "adapters::http::routes::model_usage::tests::model_usage_cookie_price_mutation_requires_same_origin",
+    "adapters::http::routes::ui_agents::authoring::security_tests::autonomous_agent_authoring_every_publication_write_refuses_cross_origin_cookie_posts",
+    "adapters::http::routes::ui_team::trace_tests::security_trace_redaction_team_query_is_not_a_handler_span_field",
+    "adapters::http::routes::ui_vault::tests::vault_management_errors_and_html_escape_labels_and_keep_secret_inputs_blank",
+    "adapters::http::routes::ui_vault::tests::vault_management_owner_crud_stale_revision_foreign_ids_and_no_readback",
+    "adapters::http::routes::ui_vault::tests::vault_management_real_session_origin_body_limit_and_owner_override_rejection",
+    "adapters::http::routes::ui_vault_bindings::tests::vault_binding_browser_consent_is_authenticated_csrf_protected_bounded_and_one_shot",
+    "adapters::http::routes::ui_vault_connect::tests::integration_connect_browser_auth_csrf_form_limits_and_switched_session_deny",
+    "adapters::http::routes::ui_vault_connect::tests::integration_connect_browser_rejects_a_different_authenticated_user",
+    "adapters::http::routes::ui_vault_connect::tests::integration_connect_browser_start_callback_status_and_replay_are_sanitized",
+    "adapters::http::routes::ui_vault_connect::tests::integration_connect_browser_unauthenticated_callback_does_not_forward_secrets",
+    "adapters::http::routes::user::tests::google_buttons_are_only_rendered_when_google_is_configured",
+    "adapters::http::routes::workflows::ui::authoring::tests::access_tests::every_workspace_write_refuses_a_cross_origin_cookie_post",
+    "adapters::http::routes::workflows::ui::runs::tests::every_runs_write_refuses_a_cross_origin_cookie_post",
+    "adapters::http::security::tests::cookie_mutations_require_an_exact_origin",
+    "adapters::persistence::agent_publication::tests::http::vault_binding_agent_publication_refuses_an_integration_http_source",
+    "adapters::persistence::agent_publication::tests::mcp::vault_binding_agent_publication_refuses_an_integration_mcp_source",
+    "adapters::persistence::credential_rotation::tests::a_late_old_writer_is_found_by_the_next_complete_pass",
+    "adapters::persistence::credential_rotation::tests::a_tampered_integration_envelope_blocks_convergence",
+    "adapters::persistence::credential_rotation::tests::batches_are_bounded_and_a_second_rotation_is_idempotent",
+    "adapters::persistence::credential_rotation::tests::http_tests::workflow_http_rotation_inventory_preserves_context_and_is_idempotent",
+    "adapters::persistence::credential_rotation::tests::http_tests::workflow_http_rotation_stale_ciphertext_cannot_overwrite_normal_writer",
+    "adapters::persistence::credential_rotation::tests::rotation_covers_both_resend_api_columns_of_one_row",
+    "adapters::persistence::credential_rotation::tests::rotation_covers_company_mcp_credentials_with_tenant_bound_envelopes",
+    "adapters::persistence::credential_rotation::tests::rotation_covers_integration_credentials_and_only_rewraps_them",
+    "adapters::persistence::credential_rotation::tests::stale_rotation_ciphertext_cannot_clobber_a_normal_write",
+    "adapters::persistence::credential_rotation::tests::status_and_rotation_reject_malformed_and_unavailable_rows",
+    "adapters::persistence::credential_rotation::tests::the_resend_api_keyset_walks_both_columns_of_every_row",
+    "adapters::persistence::credential_rotation::tests::two_competing_rotation_commands_have_exactly_one_owner",
+    "adapters::persistence::integrations::connect_tests::bounds::integration_connect_cap_has_real_competing_creators",
+    "adapters::persistence::integrations::connect_tests::bounds::integration_connect_ciphertext_context_substitution_fails_and_consumes_material",
+    "adapters::persistence::integrations::connect_tests::bounds::integration_connect_expiry_erases_verifier_and_cannot_complete",
+    "adapters::persistence::integrations::connect_tests::bounds::integration_connect_required_host_cannot_skip_atomic_finalizer",
+    "adapters::persistence::integrations::connect_tests::bounds::integration_connect_retains_only_bounded_terminal_outcomes",
+    "adapters::persistence::integrations::connect_tests::bounds::integration_connect_static_api_key_uses_registered_account_lifecycle_without_redirect",
+    "adapters::persistence::integrations::connect_tests::bounds::integration_connect_unavailable_key_cannot_exchange_or_restore_verifier",
+    "adapters::persistence::integrations::connect_tests::bounds::integration_connect_verifier_context_binds_owner_provider_config_app_and_purpose",
+    "adapters::persistence::integrations::connect_tests::bounds::integration_connect_wrong_browser_provider_purpose_signature_and_apps_deny",
+    "adapters::persistence::integrations::connect_tests::bounds::vault_rotation_connect_attempt_competes_with_consumption_without_resurrecting_pkce",
+    "adapters::persistence::integrations::connect_tests::lifecycle::google_vault_callback_broader_consent_requires_reconnect_and_invalidates_old_grants",
+    "adapters::persistence::integrations::connect_tests::lifecycle::google_vault_callback_competing_distinct_attempts_never_overwrite_authorization",
+    "adapters::persistence::integrations::connect_tests::lifecycle::google_vault_callback_competing_same_attempt_exchanges_once",
+    "adapters::persistence::integrations::connect_tests::lifecycle::google_vault_callback_deletion_wins_delayed_reconnect",
+    "adapters::persistence::integrations::connect_tests::lifecycle::google_vault_callback_disconnect_wins_delayed_reconnect",
+    "adapters::persistence::integrations::connect_tests::lifecycle::google_vault_callback_logout_wins_delayed_reconnect",
+    "adapters::persistence::integrations::connect_tests::lifecycle::google_vault_callback_owner_retirement_erases_pending_verifiers",
+    "adapters::persistence::integrations::connect_tests::lifecycle::google_vault_callback_reconnect_preserves_missing_refresh_only_for_intended_identity",
+    "adapters::persistence::integrations::connect_tests::lifecycle::google_vault_callback_user_deletion_wins_delayed_reconnect",
+    "adapters::persistence::integrations::connect_tests::provider::google_oauth_cancellation_reaches_active_request_and_never_writes_account",
+    "adapters::persistence::integrations::connect_tests::provider::google_oauth_invalid_client_distinct",
+    "adapters::persistence::integrations::connect_tests::provider::google_oauth_malformed_response_sanitized",
+    "adapters::persistence::integrations::connect_tests::provider::google_oauth_missing_refresh_refused",
+    "adapters::persistence::integrations::connect_tests::provider::google_oauth_oversized_response_refused",
+    "adapters::persistence::integrations::connect_tests::provider::google_oauth_partial_permissions_refused",
+    "adapters::persistence::integrations::connect_tests::provider::google_oauth_personal_and_workspace_identities_supported",
+    "adapters::persistence::integrations::connect_tests::provider::google_oauth_registered_url_state_pkce_and_private_metadata",
+    "adapters::persistence::integrations::connect_tests::provider::google_oauth_short_lifetime_refused",
+    "adapters::persistence::integrations::connect_tests::provider::google_oauth_unverified_mailbox_refused",
+    "adapters::persistence::integrations::connect_tests::provider::google_oauth_user_denial_distinct",
+    "adapters::persistence::integrations::connect_tests::provider::google_oauth_workspace_admin_block_distinct",
+    "adapters::persistence::integrations::connect_tests::provider::google_oauth_wrong_token_type_refused",
+    "adapters::persistence::integrations::connect_tests::provider::google_vault_callback_verified_mailbox_differs_from_login_and_replay_denies",
+    "adapters::persistence::integrations::connect_tests::temporal::google_vault_callback_expiry_cancels_account_write_wait_without_partial_account",
+    "adapters::persistence::integrations::connect_tests::temporal::google_vault_callback_session_expiry_during_module_lock_denies",
+    "adapters::persistence::integrations::connect_tests::temporal::google_vault_callback_session_valid_during_module_lock_succeeds",
+    "adapters::persistence::integrations::connect_tests::workspace::integration_connect_workspace_identity_needs_neither_email_nor_refresh_token",
+    "adapters::persistence::integrations::tests::cache_update_tests::vault_storage_cache_updates_preserve_each_providers_authorization_facts",
+    "adapters::persistence::integrations::tests::cache_update_tests::vault_storage_sql_required_json_fields_cannot_evaluate_to_null",
+    "adapters::persistence::integrations::tests::lifecycle_tests::vault_storage_durable_owner_teardown_restart_competitors_and_no_resurrection",
+    "adapters::persistence::integrations::tests::lifecycle_tests::vault_storage_host_company_membership_and_user_deletion_preserve_other_accounts",
+    "adapters::persistence::integrations::tests::lifecycle_tests::vault_storage_supervised_teardown_shutdown_cancels_actual_database_work",
+    "adapters::persistence::integrations::tests::lifecycle_tests::vault_storage_supervised_teardown_shutdown_cancels_pool_acquisition",
+    "adapters::persistence::integrations::tests::lifecycle_tests::vault_storage_teardown_poison_full_batch_backoff_restart_and_terminal_failure",
+    "adapters::persistence::integrations::tests::rotation_tests::vault_rotation_inventory_keysets_reconnect_rows_and_retirement",
+    "adapters::persistence::integrations::tests::rotation_tests::vault_rotation_real_managed_cache_write_defeats_waiting_stale_cas",
+    "adapters::persistence::integrations::tests::rotation_tests::vault_rotation_real_owner_replacement_defeats_waiting_stale_cas",
+    "adapters::persistence::integrations::tests::rotation_tests::vault_rotation_unavailable_key_blocks_convergence_without_plaintext_fallback",
+    "adapters::persistence::integrations::tests::storage_tests::vault_storage_cap_serializes_real_same_owner_creators",
+    "adapters::persistence::integrations::tests::storage_tests::vault_storage_constraints_substitution_and_malformed_encrypted_json_fail_closed",
+    "adapters::persistence::integrations::tests::storage_tests::vault_storage_envelope_identity_and_context_specific_bounds",
+    "adapters::persistence::integrations::tests::storage_tests::vault_storage_host_consumers_do_not_read_module_tables",
+    "adapters::persistence::integrations::tests::storage_tests::vault_storage_managed_identity_ignores_config_aliases_and_static_edits_deny",
+    "adapters::persistence::integrations::tests::storage_tests::vault_storage_owner_namespaces_keys_and_competing_replacements",
+    "adapters::persistence::integrations::tests::storage_tests::vault_storage_roundtrip_replace_disconnect_delete_and_redaction",
+    "adapters::persistence::workflow::tests::http_tests::approval_tests::vault_approval_tests::vault_dispatch_authority_approval_is_required_and_cannot_authorize_a_rebound_account",
+    "adapters::persistence::workflow::tests::http_tests::vault_tests::authority::vault_dispatch_authority_host_cannot_skip_or_substitute_the_module_callback",
+    "adapters::persistence::workflow::tests::http_tests::vault_tests::authority::vault_dispatch_authority_real_persisted_fence_and_exact_invocation_are_required",
+    "adapters::persistence::workflow::tests::http_tests::vault_tests::authority::vault_dispatch_authority_replacement_and_rebind_cannot_reuse_frozen_action",
+    "adapters::persistence::workflow::tests::http_tests::vault_tests::authority::vault_dispatch_authority_replacement_competes_before_the_final_check_and_sends_nothing",
+    "adapters::persistence::workflow::tests::http_tests::vault_tests::authority::vault_dispatch_authority_revoke_competes_before_the_final_check_and_sends_nothing",
+    "adapters::persistence::workflow::tests::http_tests::vault_tests::bindings::vault_binding_cap_competing_creators_reconfirmation_and_pagination",
+    "adapters::persistence::workflow::tests::http_tests::vault_tests::bindings::vault_binding_company_teardown_preserves_other_real_company_grants_and_private_account",
+    "adapters::persistence::workflow::tests::http_tests::vault_tests::bindings::vault_binding_database_rejects_partial_sources_and_cross_owner_references",
+    "adapters::persistence::workflow::tests::http_tests::vault_tests::bindings::vault_binding_member_removal_readdition_repeated_teardown_and_owner_unbind",
+    "adapters::persistence::workflow::tests::http_tests::vault_tests::bindings::vault_binding_missing_consent_destination_and_shape_denials_are_non_mutating",
+    "adapters::persistence::workflow::tests::http_tests::vault_tests::bindings::vault_binding_owner_confirmation_and_admin_cannot_use_another_owners_account",
+    "adapters::persistence::workflow::tests::http_tests::vault_tests::bindings::vault_binding_proposal_cap_competing_creators_and_expiry_pruning",
+    "adapters::persistence::workflow::tests::http_tests::vault_tests::bindings::vault_binding_same_private_account_has_separate_http_and_mcp_grants",
+    "adapters::persistence::workflow::tests::http_tests::vault_tests::membership_race::vault_binding_membership_revocation_covers_consent_created_while_delete_waits",
+    "adapters::persistence::workflow::tests::http_tests::vault_tests::policies::vault_binding_old_proposal_cannot_confirm_changed_app_policy_or_destination",
+    "adapters::persistence::workflow::tests::http_tests::vault_tests::policies::vault_dispatch_authority_direct_http_tools_and_foreign_binding_cannot_mint_context",
+    "adapters::persistence::workflow::tests::http_tests::vault_tests::policies::vault_dispatch_authority_policy_changes_require_fresh_owner_consent",
+    "adapters::persistence::workflow::tests::http_tests::vault_tests::temporal::vault_dispatch_authority_cancellation_during_module_wait_denies",
+    "adapters::persistence::workflow::tests::http_tests::vault_tests::temporal::vault_dispatch_authority_invocation_expiring_during_module_wait_denies",
+    "adapters::persistence::workflow::tests::http_tests::vault_tests::temporal::vault_dispatch_authority_lease_expiring_during_module_wait_denies",
+    "adapters::persistence::workflow::tests::http_tests::vault_tests::temporal::vault_dispatch_authority_run_expiring_during_module_wait_denies",
+    "adapters::persistence::workflow::tests::http_tests::vault_tests::temporal::vault_dispatch_authority_unexpired_contested_gate_still_succeeds",
+    "adapters::persistence::workflow::tests::mcp_tests::vault_authority_tests::vault_binding_mcp_definition_edits_preserve_the_confirmed_source_and_refuse_substitution",
+    "adapters::persistence::workflow::tests::mcp_tests::vault_authority_tests::vault_dispatch_authority_generic_mcp_tool_cannot_borrow_a_workflow_run",
+    "adapters::persistence::workflow::tests::mcp_tests::vault_authority_tests::vault_dispatch_authority_mcp_uses_the_real_step_and_fence_without_exposing_a_token",
+    "adapters::resend_api::inbound::tests::security_trace_redaction_provider_refusal_keeps_class_without_signed_url",
+    "application::integrations::tests::authority_tests::vault_authority_deterministic_and_scheduled_steps_require_explicit_grant",
+    "application::integrations::tests::authority_tests::vault_authority_host_port_denial_propagates",
+    "application::integrations::tests::authority_tests::vault_authority_matrix_requires_owner_confirmation_and_current_company_authority",
+    "application::integrations::tests::authority_tests::vault_authority_stale_status_binding_namespace_and_versions_deny",
+    "application::integrations::tests::integration_contract_gateway_arguments_and_safe_return_are_bounded",
+    "application::integrations::tests::integration_contract_managed_google_is_typed_and_shared_between_apps",
+    "application::integrations::tests::integration_contract_operation_headers_cannot_override_adapter_credentials",
+    "application::integrations::tests::integration_contract_static_json_whitespace_cannot_bypass_shape_validation",
+    "application::integrations::tests::integration_contract_static_payloads_require_registered_shape_and_injection",
+    "application::integrations::tests::integration_contract_unknown_registry_and_method_schema_mismatch_fail_closed",
+    "application::integrations::tests::vault_contract_identifier_and_page_bounds_survive_deserialization",
+    "application::integrations::tests::vault_contract_managed_scope_and_aggregate_bounds",
+    "application::integrations::tests::vault_contract_metadata_is_bounded_and_has_no_credential_fields",
+    "application::integrations::tests::vault_contract_revision_table_separates_refresh_rewrap_and_authorization",
+    "application::integrations::tests::vault_contract_static_credential_bound_is_aggregate_and_inclusive",
+    "application::use_cases::user::tests::security_email_identity_application_rejects_unverified_oauth_claims",
+    "infra::app::tests::security_trace_redaction_middleware_keeps_status_without_callback_or_webhook_secret",
+    "infra::app::tests::security_trace_redaction_production_filter_keeps_routes_without_secret_markers",
+    "infra::app::tests::security_trace_redaction_request_span_has_no_raw_target_fallback"
+  ],
+  "checks": {
+    "connect-tests-05": {
+      "receipt": "plan/vault-google/phases/p04/docs/logs/connect-tests-05.json",
+      "passed": 37
+    },
+    "connect-browser-04": {
+      "receipt": "plan/vault-google/phases/p04/docs/logs/connect-browser-04.json",
+      "passed": 4
+    },
+    "vault-tests-03": {
+      "receipt": "plan/vault-google/phases/p04/docs/logs/vault-tests-03.json",
+      "passed": 77
+    },
+    "rotation-tests-02": {
+      "receipt": "plan/vault-google/phases/p04/docs/logs/rotation-tests-02.json",
+      "passed": 12
+    },
+    "contracts-01": {
+      "receipt": "plan/vault-google/phases/p04/docs/logs/contracts-01.json",
+      "passed": 6
+    },
+    "google-login-01": {
+      "receipt": "plan/vault-google/phases/p04/docs/logs/google-login-01.json",
+      "passed": 1
+    },
+    "google-login-02": {
+      "receipt": "plan/vault-google/phases/p04/docs/logs/google-login-02.json",
+      "passed": 1
+    },
+    "security-final-01": {
+      "receipt": "plan/vault-google/phases/p04/docs/logs/security-final-01.json",
+      "passed": 1
+    },
+    "security-final-02": {
+      "receipt": "plan/vault-google/phases/p04/docs/logs/security-final-02.json",
+      "passed": 5
+    },
+    "security-final-03": {
+      "receipt": "plan/vault-google/phases/p04/docs/logs/security-final-03.json",
+      "passed": 1
+    },
+    "security-final-04": {
+      "receipt": "plan/vault-google/phases/p04/docs/logs/security-final-04.json",
+      "passed": 1
+    },
+    "security-final-05": {
+      "receipt": "plan/vault-google/phases/p04/docs/logs/security-final-05.json",
+      "passed": 1
+    },
+    "security-final-06": {
+      "receipt": "plan/vault-google/phases/p04/docs/logs/security-final-06.json",
+      "passed": 1
+    },
+    "migrate-01": {
+      "command": [
+        "cargo",
+        "sqlx",
+        "migrate",
+        "run"
+      ],
+      "cwd": "/Users/mac02/.codex/worktrees/1133/openbot",
+      "database": "vault_google_1133_41402e4b8104_test",
+      "exit": 0,
+      "seconds": 0.42,
+      "log": "/Users/mac02/.codex/worktrees/1133/openbot/plan/vault-google/phases/p04/docs/logs/migrate-01.log"
+    },
+    "clippy-02": {
+      "command": [
+        "cargo",
+        "clippy",
+        "--locked",
+        "--offline",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "cwd": "/Users/mac02/.codex/worktrees/1133/openbot",
+      "database": "vault_google_1133_41402e4b8104_test",
+      "exit": 0,
+      "seconds": 40.17,
+      "log": "/Users/mac02/.codex/worktrees/1133/openbot/plan/vault-google/phases/p04/docs/logs/clippy-02.log"
+    },
+    "sqlx-prepare-02": {
+      "command": [
+        "env",
+        "SQLX_OFFLINE=false",
+        "cargo",
+        "sqlx",
+        "prepare",
+        "--",
+        "--all-targets"
+      ],
+      "cwd": "/Users/mac02/.codex/worktrees/1133/openbot",
+      "database": "vault_google_1133_41402e4b8104_test",
+      "exit": 0,
+      "seconds": 16.83,
+      "log": "/Users/mac02/.codex/worktrees/1133/openbot/plan/vault-google/phases/p04/docs/logs/sqlx-prepare-02.log"
+    },
+    "sqlx-check-02": {
+      "command": [
+        "env",
+        "SQLX_OFFLINE=false",
+        "cargo",
+        "sqlx",
+        "prepare",
+        "--check",
+        "--",
+        "--all-targets"
+      ],
+      "cwd": "/Users/mac02/.codex/worktrees/1133/openbot",
+      "database": "vault_google_1133_41402e4b8104_test",
+      "exit": 0,
+      "seconds": 12.57,
+      "log": "/Users/mac02/.codex/worktrees/1133/openbot/plan/vault-google/phases/p04/docs/logs/sqlx-check-02.log"
+    },
+    "offline-check-02": {
+      "command": [
+        "cargo",
+        "check",
+        "--locked",
+        "--offline",
+        "--all-targets"
+      ],
+      "cwd": "/Users/mac02/.codex/worktrees/1133/openbot",
+      "database": "vault_google_1133_41402e4b8104_test",
+      "exit": 0,
+      "seconds": 0.25,
+      "log": "/Users/mac02/.codex/worktrees/1133/openbot/plan/vault-google/phases/p04/docs/logs/offline-check-02.log"
+    },
+    "format-02": {
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "cwd": "/Users/mac02/.codex/worktrees/1133/openbot",
+      "database": "vault_google_1133_41402e4b8104_test",
+      "exit": 0,
+      "seconds": 2.33,
+      "log": "/Users/mac02/.codex/worktrees/1133/openbot/plan/vault-google/phases/p04/docs/logs/format-02.log"
+    },
+    "diff-check-02": {
+      "command": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "cwd": "/Users/mac02/.codex/worktrees/1133/openbot",
+      "database": "vault_google_1133_41402e4b8104_test",
+      "exit": 0,
+      "seconds": 0.06,
+      "log": "/Users/mac02/.codex/worktrees/1133/openbot/plan/vault-google/phases/p04/docs/logs/diff-check-02.log"
+    },
+    "css-02": {
+      "command": [
+        "npm",
+        "run",
+        "check:css"
+      ],
+      "cwd": "/Users/mac02/.codex/worktrees/1133/openbot",
+      "database": "vault_google_1133_41402e4b8104_test",
+      "exit": 0,
+      "seconds": 0.43,
+      "log": "/Users/mac02/.codex/worktrees/1133/openbot/plan/vault-google/phases/p04/docs/logs/css-02.log"
+    },
+    "transport-boundary-02": {
+      "command": [
+        "bash",
+        "scripts/transport-boundary-check.sh"
+      ],
+      "cwd": "/Users/mac02/.codex/worktrees/1133/openbot",
+      "database": "vault_google_1133_41402e4b8104_test",
+      "exit": 0,
+      "seconds": 3.57,
+      "log": "/Users/mac02/.codex/worktrees/1133/openbot/plan/vault-google/phases/p04/docs/logs/transport-boundary-02.log"
+    },
+    "sample-boundary-02": {
+      "command": [
+        "python3",
+        "scripts/workflow-sample-boundary.py"
+      ],
+      "cwd": "/Users/mac02/.codex/worktrees/1133/openbot",
+      "database": "vault_google_1133_41402e4b8104_test",
+      "exit": 0,
+      "seconds": 0.03,
+      "log": "/Users/mac02/.codex/worktrees/1133/openbot/plan/vault-google/phases/p04/docs/logs/sample-boundary-02.log"
+    },
+    "graph-02": {
+      "command": [
+        "graft",
+        "build"
+      ],
+      "cwd": "/Users/mac02/.codex/worktrees/1133/openbot",
+      "database": "vault_google_1133_41402e4b8104_test",
+      "exit": 0,
+      "seconds": 2.22,
+      "log": "/Users/mac02/.codex/worktrees/1133/openbot/plan/vault-google/phases/p04/docs/logs/graph-02.log"
+    }
+  },
+  "full_suite": "pending after05 per I03/r2; no full-suite claim",
+  "unavailable": "live Google credentials/consent/Workspace policy not exercised; scripted real HTTP/SQL only",
+  "failures_retained": "early-check01, connect-tests01/02, browser01, clippy01; corrected evidence retained"
+}

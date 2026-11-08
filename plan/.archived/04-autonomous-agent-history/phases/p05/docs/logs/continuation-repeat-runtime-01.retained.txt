@@ -1,0 +1,11 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+   Compiling open_bots v0.1.0 (/private/tmp/openbot-agent-history-h_82_5pw/worktree)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 51.73s
+     Running unittests src/lib.rs (/private/tmp/openbot-chs-p06-3f43t2k7/worktree/target/debug/deps/open_bots-8b80d02f0b6cf2e6)
+
+running 2 tests
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_graph::descendants::history_integration::agent_history_callers_repeated_activation_replay_keeps_outputs_after_later_workflow_failure ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_graph::descendants::history_continuation::agent_history_continuation_two_real_approval_rounds_and_competing_reviewers_preserve_one_exchange ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 3348 filtered out; finished in 1.86s
+

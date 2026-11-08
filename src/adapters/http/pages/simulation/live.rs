@@ -177,6 +177,7 @@ fn run_state_label(state: RunState) -> String {
                 WaitingReason::ChildRun => "a child run",
                 WaitingReason::Effect => "an effect",
                 WaitingReason::Reconciliation => "reconciliation",
+                WaitingReason::AgentTurn => "an agent turn",
             }
         ),
         RunState::Succeeded => "Succeeded".to_string(),

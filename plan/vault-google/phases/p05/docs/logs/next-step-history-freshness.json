@@ -1,0 +1,30 @@
+{
+  "plan/03-channel-handles-send/COORDINATION.md": {
+    "headers": [
+      "# Plan coordination: 03-channel-handles-send",
+      "- Revision: 28",
+      "## Plan-wide instructions",
+      "## Phase directory",
+      "## Cross-phase notices",
+      "### CHS-C001 / r1",
+      "### CHS-C002 / r1",
+      "### CHS-C003 / r1 \u2014 proposed final-effect policy and staging",
+      "### CHS-C003 / r2 \u2014 proposed final-effect policy and staging",
+      "### CHS-C003 / r2 \u2014 accepted producer addendum (coordination revision8)",
+      "### CHS-C004 / r1 \u2014 proposed canonical final publication",
+      "### CHS-C004 / r2 \u2014 amended canonical final publication",
+      "### CHS-C004 / r2 \u2014 activation (coordination revision11)",
+      "### CHS-C004 / r2 \u2014 accepted producer (coordination revision12)",
+      "### CHS-C005 / r1 \u2014 proposed declared conversational question",
+      "### CHS-I007 / r1 \u2014 push after p05 acceptance"
+    ]
+  },
+  "external_worktree": "/private/tmp/openbot-chs-p06-3f43t2k7/worktree",
+  "external_head": "97e5d60dc538e26c7cb976a8d63772eed80baff2",
+  "currently_dirty_shared_source_paths": [
+    "migrations/20260817000000_init_schema.sql",
+    "src/adapters/persistence/workflow/channel_reply_completion.rs",
+    "src/adapters/persistence/workflow/mod.rs",
+    "src/adapters/persistence/workflow/provisioning_dispatch_tests.rs"
+  ]
+}

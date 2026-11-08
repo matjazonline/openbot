@@ -1,0 +1,17 @@
+{
+  "authority": "/Users/mac02/dev/openbot/plan/04-autonomous-agent-history/COORDINATION.md",
+  "coordination_revision": 6,
+  "worktree": "/private/tmp/openbot-agent-history-h_82_5pw/worktree",
+  "accepted_history_phases": [
+    "p01 AH-P01-B1-R1 e62ebc6c",
+    "p02 AH-P02-B1-R2 c24664b2"
+  ],
+  "method": "Read-only path intersection; no history source imported. Recheck before any merge.",
+  "head": "4ab45555f8316ec7a8b1b64e8c05b77ff7d9a29d",
+  "currently_shared_changed_source_paths": [
+    "migrations/20260817000000_init_schema.sql",
+    "src/adapters/persistence/workflow/mcp_test_support.rs",
+    "src/adapters/persistence/workflow/mod.rs",
+    "src/infra/workflow.rs"
+  ]
+}

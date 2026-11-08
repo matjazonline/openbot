@@ -1,4 +1,6 @@
 use super::*;
+#[path = "channel_reply_knowledge_token_tests.rs"]
+mod final_knowledge;
 
 pub(super) async fn exceed(f: &TokenFixture) {
     let model = &f.model;

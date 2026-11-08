@@ -1,0 +1,15 @@
+# Vault + channel phase 05 integration
+
+Root/A /root, user-confirmed gpt-6.1-sol/xhigh. B /root/reviewer, independent gpt-6-astra/high. Workflow implement-astra-reviewed-2-2.
+
+User authorizes reconciliation of pushed channel p05 and vault p03–p05, then logging next steps. No commits, push, deployment, production reset, or p06 implementation authorized here. Existing vault p01–p02 changes and records preserved; source backup stash c6cf2a088ef25fe678a8458e5db190eb6bffd73f retained. Original HEAD769a23aa; integration HEAD/review base97e5d60d (origin/main channel-through05 checkpoint). Accepted vault p02 source e74fd0b7bb6eeec83c21a0da777a92f8f51f2f102894b517b312b10fd87fe601. Channel accepted p05 source6153d305 and root receipt under plan/03-channel-handles-send/phases/p05/docs/logs/CHS-P05-root-acceptance.json. Channel coordination committed revision17 is immutable dependency evidence; authority remains other session /Users/mac02/dev/openbot; do not edit its records.
+
+Conflicts: initial SQL appended disjoint channel and vault definitions; retain both without edits to their contents. WorkflowEngine supervises both final publisher and integration teardown, capacity slots+6 and shutdown count7 for one slot. Other common paths docs/deploy.md and persistence/mod.rs auto-merged. Preserve upstream fixture fixes and removed plan file. Integration checks: fresh schema, vault_storage_/vault_lifecycle_/vault_management_/vault_rotation_/contracts, supervised worker shutdown and representative channel publication/HITL affected interfaces, SQLx prepare/check, offline alltargets, formatting/boundaries. Full scripts/check.sh remains pending per VG-I03 and selected workflow.
+
+Snapshots exclude only plan/vault-google/COORDINATION.md, phases/p01/docs, phases/p02/docs, phases/p03/docs, phases/p04/docs, phases/p05/docs, integration/channel-p05/docs (all under plan/vault-google). Exact list reused throughout continuation; no implementation/deliverable exclusions. Durable context target75% unavailable from host; continue default compaction with checkpoints.
+
+Status: reconciliation implemented; focused verification pending, then independent integration review. Owned disposable DB and target recorded in logs/resources.json; use only owned DB/children. No other stream resources may be altered.
+
+Integration verification: 82 distinct focused tests PASS; fresh migration, SQLx prepare/check, offline alltargets, fmt/diff and transport/sample boundaries PASS. Full suite not run. logs/checks-summary.json retains names and exact receipts; runtime HITL and final approvals included after B requested stronger selection. Source frozen at34d6a2e7933a26523842f46e10a29afe5b97bfac9ab334c7eb06accf63cb3558. Await B exact-artifact PASS.
+
+Root acceptance: independently recomputed exact digest34d6a2e... unchanged, B VG-INT-CH05-R1 PASS, coordination revision3 current,82 distinct focused passes/all required integration checks passed. Inputs integrated into this baseline; no full-suite claim. See logs/root-acceptance.json.

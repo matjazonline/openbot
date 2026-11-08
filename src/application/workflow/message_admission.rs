@@ -479,6 +479,7 @@ fn admission_request(
 ) -> AppResult<AdmitWorkflowRequest> {
     let company = intent.claim.company;
     Ok(AdmitWorkflowRequest {
+        history_session: None,
         company_id: company,
         actor: binding.run_as,
         association: RelatedAssociation::Thread {

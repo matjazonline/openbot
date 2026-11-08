@@ -3,10 +3,18 @@ use crate::application::workflow::checkpoints::WorkflowCheckpointUpdate as Updat
 use crate::services::harness::AgentExecutionOutput;
 use crate::services::harness::runs::{InvocationId, SavedToolCall};
 
-fn output() -> AgentExecutionOutput {
+fn output(model: &ModelFixture) -> AgentExecutionOutput {
+    let structured = crate::services::response_contract::StructuredResponse::validate(
+        model.run.identity.response_contract.as_ref().unwrap(),
+        "\"saved\"",
+        None,
+        &crate::adapters::response_schema::JsonResponseValidator,
+    )
+    .unwrap()
+    .unwrap();
     AgentExecutionOutput {
-        content: "saved".into(),
-        structured: None,
+        content: structured.body().into(),
+        structured: Some(structured),
         metadata: None,
         token_usage: Default::default(),
     }
@@ -22,7 +30,7 @@ async fn workflow_harness_update_settlement_approval_finishes_without_new_model_
         .await
         .unwrap();
     let write = resumed(&f.model, &paused).await;
-    let update = Update::FinalOutput(Box::new(output()));
+    let update = Update::FinalOutput(Box::new(output(&f.model)));
     let (left, right) = tokio::join!(
         p.update_workflow_checkpoint(write, update.clone()),
         p.update_workflow_checkpoint(write, update.clone())
@@ -44,7 +52,7 @@ async fn workflow_harness_update_settlement_approval_finishes_without_new_model_
     );
     let saved = stored(&f.model.native.fixture, f.model.run.run_id.0).await;
     assert!(saved["model_blocked_decision"].is_null());
-    assert_eq!(saved["checkpoint"]["final_output"]["content"], "saved");
+    assert_eq!(saved["checkpoint"]["final_output"]["content"], "\"saved\"");
     assert_eq!(accounting(&f.model).await["calls"], 1);
     assert!(matches!(
         p.update_workflow_checkpoint(write, update).await.unwrap(),

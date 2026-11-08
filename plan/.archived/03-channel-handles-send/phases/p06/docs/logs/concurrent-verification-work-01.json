@@ -1,0 +1,15 @@
+{
+  "kind": "preserved concurrent external work, not authored by root/B in this phase",
+  "first_observed_head": "97e5d60dc538e26c7cb976a8d63772eed80baff2",
+  "files": {
+    ".github/workflows/ci.yml": "875e1e55213f9ec2b0707a6993d1c9de226e41fe76d68760ea181c361d5739f5",
+    "Cargo.toml": "5481a604271f5e87240611fafbff9c5007b765d20d8def40789e27ce53797a30",
+    "Cargo.lock": "25dabaf49c1397a65e9f1cf2620d32a39b30bc731becccef9feee09f2dcb8ba5",
+    "scripts/check.sh": "2c512f86450d897e03f6f6525c2d665787872562412ba37288dfb6b1b18ba61a",
+    "scripts/check-workflow-evidence.py": "06e942bf1b17ef04821ae22007b740827ffc353b92b33ca4c39cd7bcb89c3bdb",
+    "scripts/tests/workflow-evidence.py": "d05e797527a685d532576e783eae3ff7d8224eef28c0e4d460bb057cd35d6708",
+    "tests/source_modules.rs": "ace9b7a36c5a93992941fd09dac217be773ac8021b21fb3d7dedc5b185679379"
+  },
+  "impact": "Pinned syn dev dependency/full+visit features changes compilation fingerprints. CI/check scripts gain workflow evidence and source reachability checks. Preserve these edits; do not reset/stage/commit as p06 authorship. Same9 snapshot exclusions remain unchanged; include these source bytes in frozen identities and report out-of-phase coverage separately.",
+  "source_scope": "Root p06 source edits remain isolated to the recorded UI/read models/notification changes; no write to these external files."
+}

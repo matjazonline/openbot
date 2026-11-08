@@ -57,7 +57,7 @@ pub struct HttpConnection {
     pub id: Uuid,
     pub origin: HttpOrigin,
     pub enabled: bool,
-    pub bearer: bool,
+    pub credential_source: crate::domain::integrations::authority::CredentialSource,
     pub secret_set: bool,
     pub revision: i64,
     pub access_level: crate::entities::access_level::AccessLevel,
@@ -273,4 +273,29 @@ pub fn safe_request_header(name: &str) -> bool {
 }
 pub fn invalid() -> AppError {
     AppError::BadRequest("Invalid HTTP action configuration or input".into())
+}
+
+impl HttpConnection {
+    pub fn uses_owned_bearer(&self) -> bool {
+        matches!(
+            self.credential_source,
+            crate::domain::integrations::authority::CredentialSource::ConnectionBearer
+        )
+    }
+}
+
+/// Explicit source split: integrations return only nonsecret authority metadata.
+pub enum PreparedAuthentication {
+    ConnectionOwned(Option<SecretString>),
+    Integration(Box<crate::domain::integrations::authority::AuthorizationSnapshot>),
+}
+impl PreparedAuthentication {
+    pub fn into_owned(self) -> AppResult<Option<SecretString>> {
+        match self {
+            Self::ConnectionOwned(secret) => Ok(secret),
+            Self::Integration(_) => Err(AppError::ServiceUnavailable(
+                "Integration execution is not available yet".into(),
+            )),
+        }
+    }
 }

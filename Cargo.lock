@@ -2667,6 +2667,7 @@ dependencies = [
  "sha2",
  "sqlx",
  "sse-stream",
+ "syn 2.0.119",
  "thiserror 2.0.20",
  "time",
  "tokenizers",

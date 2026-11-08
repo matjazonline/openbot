@@ -1,0 +1,11 @@
+{
+  "command": [
+    "graft",
+    "build"
+  ],
+  "cwd": "/Users/mac02/.codex/worktrees/1133/openbot",
+  "database": "vault_google_1133_41402e4b8104_test",
+  "exit": 0,
+  "seconds": 2.22,
+  "log": "/Users/mac02/.codex/worktrees/1133/openbot/plan/vault-google/phases/p04/docs/logs/graph-02.log"
+}

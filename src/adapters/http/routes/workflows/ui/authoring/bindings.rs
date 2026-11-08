@@ -748,18 +748,9 @@ pub(super) async fn channel_bindings(
     {
         return Err(AppError::NotFound("Channel not found".into()));
     }
-    let usage = ui
-        .engine
-        .authoring_reads()
-        .channel_usage(company_id, channel)
-        .await?;
-    Ok(Html(pages::channel_bindings_card(
-        &pages::ChannelBindingsCard {
-            company_id: company,
-            bindings: &usage.bindings,
-            truncated: usage.truncated,
-        },
-    )))
+    Ok(Html(
+        super::channel_response::card(&ui, company, channel, None, None).await?,
+    ))
 }
 
 /// Resolve an attention item to the binding's workflow without trusting an incoming workflow id.

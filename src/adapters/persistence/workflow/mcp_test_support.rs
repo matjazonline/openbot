@@ -487,6 +487,7 @@ pub(super) async fn admitted(setup: &McpSetup, key: &str) -> ActivationRequest {
     let company = setup.company();
     let admission = WorkflowService::new(p.clone(), p.clone(), p.clone(), p.clone(), Preflight)
         .admit(AdmitWorkflowRequest {
+            history_session: None,
             company_id: company,
             actor: setup.actor(),
             association: RelatedAssociation::Company,
@@ -583,3 +584,6 @@ pub(super) fn counts(dispatches: i64, entries: i64, receipts: i64) -> ActionCoun
         receipts,
     }
 }
+
+#[path = "mcp_renewal_support.rs"]
+pub(in crate::adapters::persistence::workflow) mod renewal;

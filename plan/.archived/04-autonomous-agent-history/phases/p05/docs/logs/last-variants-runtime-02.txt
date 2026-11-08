@@ -1,0 +1,26 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+   Compiling open_bots v0.1.0 (/private/tmp/openbot-agent-history-h_82_5pw/worktree)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 52.97s
+     Running unittests src/lib.rs (/private/tmp/openbot-chs-p06-3f43t2k7/worktree/target/debug/deps/open_bots-8b80d02f0b6cf2e6)
+
+running 3 tests
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_graph::samples::history::agent_history_samples_sealed_capture_cannot_load_production_history_or_advance_turns ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::autonomous_entrypoints::history::agent_history_callers_dynamic_selection_uses_actual_agent_and_returns_to_its_own_thread_stream ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::channel_reply_e2e::history::release::agent_history_channel_customer_cc_after_output_refuses_release_and_retains_classified_exchange ... FAILED
+
+failures:
+
+---- adapters::persistence::workflow::tests::message_tests::ingress_tests::channel_reply_e2e::history::release::agent_history_channel_customer_cc_after_output_refuses_release_and_retains_classified_exchange stdout ----
+2026-11-07T20:41:17.282649Z  WARN open_bots::adapters::persistence::workflow::knowledge_release: Workflow release refused company_id=57ae9869-af54-4863-8db3-125fd6f5a685 run_id=3d7d3769-9927-4fd1-aacc-b26acf004abd execution_id=a8d091de-e619-4dae-8ffb-9692114e02b8 step_id=start content_level=5 destination_level=0 code="knowledge.audience_below_content"
+
+thread 'adapters::persistence::workflow::tests::message_tests::ingress_tests::channel_reply_e2e::history::release::agent_history_channel_customer_cc_after_output_refuses_release_and_retains_classified_exchange' (35974635) panicked at src/adapters/persistence/workflow/agent_history_channel_release_tests.rs:138:5:
+assertion failed: refused > 0
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    adapters::persistence::workflow::tests::message_tests::ingress_tests::channel_reply_e2e::history::release::agent_history_channel_customer_cc_after_output_refuses_release_and_retains_classified_exchange
+
+test result: FAILED. 2 passed; 1 failed; 0 ignored; 0 measured; 3354 filtered out; finished in 8.36s
+
+error: test failed, to rerun pass `--lib`

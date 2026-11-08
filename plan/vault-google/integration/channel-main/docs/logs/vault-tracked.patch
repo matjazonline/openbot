@@ -1,0 +1,1893 @@
+diff --git a/docs/deploy.md b/docs/deploy.md
+index 3cc9fdcb..3a8c86e4 100644
+--- a/docs/deploy.md
++++ b/docs/deploy.md
+@@ -399,6 +399,55 @@ legitimately request the plaintext in order to call the provider. Moving the KEK
+ change to two functions in `src/adapters/persistence/credentials/envelope.rs` and does not change the
+ stored format; revisit it when the deployment holds credentials for workspaces it does not own.
+ 
++### Private vault and deletion recovery
++
++The profile's **Vault / Connected apps** page stores reusable static bearer tokens and API keys
++for the code-registered `X-API-Key` header. Values are encrypted on the server with the existing
++credential key ring; this is not end-to-end encryption. Forms offer replacement, never readback.
++Company attachment uses an administrator's proposal followed by the credential owner's explicit
++confirmation of the company, connection, app and exact destination. Only deterministic workflow
++operations may use these grants; generic model tools cannot. Separate Google mailbox consent and
++private credential renewal are implemented. Business integration execution follows in phase 06.
++Google sign-in remains a separate login flow.
++
++`integration_accounts.envelope` participates in the same `credentials status` and
++`credentials rotate` commands below, including keyset batches, unavailable-key reporting and
++convergence checks. Ready and reconnect-required rows with envelopes are inventoried; disconnected
++rows have none. The vault uses its own owner/account/provider/config/type-bound encryption context
++and a 16 KiB decrypted limit. Existing credential contexts keep their existing limits. Rewrapping
++uses ciphertext compare-and-swap and preserves account/authorization revisions and credential
++generation, so it cannot overwrite a concurrent logical credential write.
++
++Host user/company/membership deletion records idempotent teardown intent before removing host
++state. Owner retirement clears usable credentials immediately; cleanup retries do not restore them.
++Company and membership cleanup invalidate only their grants and preserve private accounts.
++Pending or failed teardown blocks those grants immediately, and bounded cleanup uses the actual
++revocation timestamp so removal/readdition cannot restore old consent. The local user-deletion
++adapter implements this lifecycle port; no new browser user-deletion route is exposed.
++
++The existing supervised worker group drains at most 16 intents per iteration. Company/member
++cleanup processes at most 64 accounts per intent transaction and immediately continues only after
++making durable progress. Cleanup errors roll
++back to a per-intent savepoint, persist retry eligibility and back off 64, 128, then 256 seconds; after
++8 failures the intent remains observable as `failed`. Cancellation rolls back in-progress cleanup;
++a restart resumes retained pending intents. Database outages use an additional 5-second worker
++backoff. Diagnose counts without selecting credentials:
++
++```sql
++SELECT kind, state, count(*), min(available_at), max(attempts)
++FROM integration_teardown_intents
++GROUP BY kind, state;
++```
++
++After resolving a failed cleanup's database/locking cause, an operator may retry that intent
++idempotently (bind `intent_id` through psql's `-v` option):
++
++```sql
++UPDATE integration_teardown_intents
++SET state = 'pending', attempts = 0, available_at = clock_timestamp()
++WHERE id = :'intent_id'::uuid AND state = 'failed';
++```
++
+ ### Multi-Machine credential-key rotation
+ 
+ Never replace bytes under an existing version number: authenticated decryption of data written with
+@@ -669,3 +718,75 @@ Use isolated scripted samples before a controlled live evaluation and inspect
+ run history and company model usage. Provider usage is billed by TypeSafe; local
+ estimates and configured prices are not invoices. Operational failure/recovery and
+ revocation semantics are in the [Jev runbook](workflow-operations.md#typesafe-jev-evaluation).
++
++### Google connected apps
++
++Google mailbox consent uses the existing `GOOGLE_OAUTH_CLIENT_ID` and
++`GOOGLE_OAUTH_CLIENT_SECRET` pair. It has a separate callback and credential store
++from Openbot sign-in. Register both the existing sign-in redirect and
++`<public-base>/auth/integrations/google/callback` on that web OAuth client; the public
++base comes from the application's `APP_DOMAIN_NAME` configuration. Use HTTPS for
++public deployments. The integration authorization flow requests offline access,
++PKCE, `openid`, `email`, `gmail.readonly`, and `gmail.send`. Connecting is an explicit
++owner action; ordinary workflow runs do not prompt for consent. See Google's
++[web-server authorization guide](https://developers.google.com/identity/protocols/oauth2/web-server).
++
++Enable `gmail.googleapis.com` in the client project's API library, following
++[Google's API enablement instructions](https://developers.google.com/workspace/guides/enable-apis).
++Choose an audience that includes the accounts you intend to connect: personal
++Gmail accounts need an External audience. In Testing, add the intended accounts
++as test users. Google's [audience guide](https://support.google.com/cloud/answer/15549945?hl=en)
++explains the available audiences and testing restrictions. External Testing
++refresh grants with Gmail scopes ordinarily expire after seven days; see
++[Google's token expiration rules](https://developers.google.com/identity/protocols/oauth2).
++
++`gmail.send` is sensitive and `gmail.readonly` is restricted. Public use can require
++OAuth verification, and storing or transmitting restricted-scope data can require
++a security assessment. Draft management is not included. Check Google's
++[current Gmail scope requirements](https://developers.google.com/workspace/gmail/api/auth/scopes)
++for your deployment. Workspace administrators may additionally restrict or block
++the app through [API controls](https://knowledge.workspace.google.com/admin/apps/control-which-third-party-and-internal-apps-access-google-workspace-data).
++Credential configuration alone does not establish Google verification or Workspace
++approval; startup does not contact Google to validate those approvals.
++
++A connected mailbox may differ from the owner's Openbot login address. Consent
++saves a private account; each company connection still needs the owner's explicit
++binding confirmation. Reconnecting changes authorization identity and requires
++fresh confirmation for existing company grants. Disconnecting locally erases usable
++local credentials and denies those grants; it does not revoke Google's combined
++project grant. Removing one company binding also does not revoke that provider grant.
++
++Connect attempts expire after ten minutes, with at most eight active attempts and
++32 retained outcomes per owner. PKCE verifiers are encrypted in the credential key
++inventory, erased when consumed or when bounded owner maintenance observes expiry,
++and removed on owner retirement. Keep encryption keys available until the existing
++rotation/status commands report convergence. Scripted provider tests do not establish
++live-project readiness. Business Gmail HTTP/MCP transport is delivered by vault
++phase 06, after authorization and private renewal are integrated.
++
++### Private credential renewal
++
++Vault phase 05 supplies the private resolver for the authenticated transports planned in phase 06.
++Workflow handlers and the public gateway do not receive credential bytes. Google renewal uses
++one account lock across its bounded token request and credential write, shared by every permitted
++app and HTTP/MCP connection using that account. A cached access token needs at least 60 seconds
++remaining. Entry-lock waits are limited to 5 seconds and provider work to 10 seconds, capped by the
++caller deadline; total resolution is capped at 30 seconds. These are code limits, not additional
++environment settings. Resolver transactions use a local 12-second idle allowance; general pool
++and workflow transaction limits are unchanged.
++
++Temporary Google failures persist a shared bounded retry time, normally 30 seconds, while keeping
++the owner's consent identity. An invalid grant clears usable local credentials and requires
++reconnect. Invalid client configuration reports an operator error without marking every user's
++grant revoked. Disconnect and removal check the consent revision, so an ordinary cache refresh
++cannot defeat the owner's pending local action. Reconnect advances that revision; existing
++company grants need fresh owner confirmation and old business approvals remain stale.
++
++Reusable Google refresh is distinct from the strict rotating-token fixture protocol. A strict
++provider records a durable pending attempt before contacting the endpoint; an unresolved expired
++attempt requires reconnect. Cancellation and ambiguous responses preserve that marker. Database
++commit errors trigger a durable reread before another decision. This does not promise exactly-once
++provider requests across crashes. Tests use real PostgreSQL transactions, separate pools and
++scripted loopback endpoints, including lost commit acknowledgements; they do not establish live
++Google project readiness. Local disconnect never automatically revokes the project's combined
++Google authorization.
+diff --git a/migrations/20260817000000_init_schema.sql b/migrations/20260817000000_init_schema.sql
+index d93d1990..95ec86a9 100644
+--- a/migrations/20260817000000_init_schema.sql
++++ b/migrations/20260817000000_init_schema.sql
+@@ -3017,10 +3017,15 @@ CREATE FUNCTION public.workflow_http_identity_immutable() RETURNS trigger
+     LANGUAGE plpgsql
+     AS $$
+ BEGIN
+-    IF (NEW.company_id, NEW.id, NEW.origin, NEW.bearer, NEW.created_at)
+-        IS DISTINCT FROM (OLD.company_id, OLD.id, OLD.origin, OLD.bearer, OLD.created_at) THEN
++    IF (NEW.company_id, NEW.id, NEW.origin, NEW.created_at)
++        IS DISTINCT FROM (OLD.company_id, OLD.id, OLD.origin, OLD.created_at) THEN
+         RAISE EXCEPTION 'HTTP connection identity is immutable' USING CONSTRAINT='workflow_guard:workflow_http_identity_immutable';
+     END IF;
++    IF (NEW.bearer,NEW.integration_account_id,NEW.integration_grant_id,NEW.integration_authorization,NEW.integration_grant_revision)
++        IS DISTINCT FROM (OLD.bearer,OLD.integration_account_id,OLD.integration_grant_id,OLD.integration_authorization,OLD.integration_grant_revision)
++        AND NEW.revision<>OLD.revision+1 THEN
++        RAISE EXCEPTION 'HTTP authentication change requires a new revision' USING CONSTRAINT='workflow_guard:workflow_http_identity_immutable';
++    END IF;
+     RETURN NEW;
+ END;
+ $$;
+@@ -13518,3 +13523,239 @@ CREATE CONSTRAINT TRIGGER workflow_question_provider_entry_guard AFTER UPDATE ON
+     DEFERRABLE INITIALLY DEFERRED FOR EACH ROW
+     WHEN (NEW.status='sending' AND OLD.status IN ('prepared','retryable'))
+     EXECUTE FUNCTION public.workflow_question_provider_entry_guard();
++-- Private connected accounts. Owners are stable client references, never host-table FKs.
++CREATE TABLE public.integration_owner_states (
++    owner_namespace text NOT NULL CHECK (octet_length(owner_namespace) BETWEEN 1 AND 256),
++    owner_subject text NOT NULL CHECK (octet_length(owner_subject) BETWEEN 1 AND 256),
++    retired boolean NOT NULL DEFAULT false,
++    PRIMARY KEY (owner_namespace, owner_subject)
++);
++CREATE TABLE public.integration_accounts (
++    id uuid PRIMARY KEY,
++    owner_namespace text NOT NULL,
++    owner_subject text NOT NULL,
++    key text NOT NULL CHECK (octet_length(key) BETWEEN 1 AND 128 AND key = btrim(key)),
++    provider_id text NOT NULL CHECK (octet_length(provider_id) BETWEEN 1 AND 128),
++    auth_config_id text NOT NULL CHECK (octet_length(auth_config_id) BETWEEN 1 AND 128),
++    auth_method text NOT NULL,
++    credential_schema text NOT NULL,
++    external_identity text CHECK (octet_length(external_identity) <= 2048 AND jsonb_typeof(external_identity::jsonb) = 'object'),
++    authorization_key text CHECK (octet_length(authorization_key) BETWEEN 1 AND 256),
++    envelope text CHECK (octet_length(envelope) <= 23000 AND envelope LIKE 'enc:v2:%'),
++    revision bigint NOT NULL DEFAULT 1 CHECK (revision > 0),
++    authorization_revision bigint NOT NULL DEFAULT 1 CHECK (authorization_revision > 0),
++    credential_generation bigint NOT NULL DEFAULT 1 CHECK (credential_generation > 0),
++    renewal_attempt_id uuid,
++    renewal_generation bigint,
++    renewal_started_at timestamptz,
++    renewal_deadline timestamptz,
++    status text NOT NULL CHECK (status IN ('ready', 'reconnect_required', 'disconnected')),
++    metadata text NOT NULL CHECK (octet_length(metadata) <= 4096 AND jsonb_typeof(metadata::jsonb) = 'object'
++        AND (metadata::jsonb ? 'label') AND jsonb_typeof(metadata::jsonb->'label') = 'string'
++        AND octet_length(metadata::jsonb->>'label') BETWEEN 1 AND 256
++        AND btrim(metadata::jsonb->>'label') <> ''
++        AND metadata::jsonb - ARRAY['label','description'] = '{}'::jsonb
++        AND (NOT (metadata::jsonb ? 'description') OR jsonb_typeof(metadata::jsonb->'description') IN ('string','null'))),
++    created_at timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
++    updated_at timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
++    UNIQUE (owner_namespace, owner_subject, key),
++    UNIQUE (owner_namespace, owner_subject, provider_id, authorization_key),
++    FOREIGN KEY (owner_namespace, owner_subject) REFERENCES public.integration_owner_states(owner_namespace, owner_subject),
++    CHECK ((auth_method = 'static_secret' AND credential_schema = 'static-v1' AND external_identity IS NULL AND authorization_key IS NULL)
++        OR (auth_method = 'oauth_authorization_code' AND credential_schema IN ('google-v1', 'workspace-fixture-v1', 'workspace-rotating-fixture-v1')
++            AND external_identity IS NOT NULL AND authorization_key IS NOT NULL)),
++    CHECK (external_identity IS NULL OR (external_identity::jsonb ?& ARRAY['kind','subject','authorization_key']
++        AND external_identity::jsonb - ARRAY['kind','subject','authorization_key'] = '{}'::jsonb
++        AND jsonb_typeof(external_identity::jsonb->'kind') = 'string'
++        AND jsonb_typeof(external_identity::jsonb->'subject') = 'string'
++        AND jsonb_typeof(external_identity::jsonb->'authorization_key') = 'string'
++        AND octet_length(external_identity::jsonb->>'kind') BETWEEN 1 AND 128
++        AND octet_length(external_identity::jsonb->>'subject') BETWEEN 1 AND 256
++        AND external_identity::jsonb->>'authorization_key' = authorization_key)),
++    CHECK ((renewal_attempt_id IS NULL AND renewal_generation IS NULL AND renewal_started_at IS NULL AND renewal_deadline IS NULL)
++        OR (renewal_attempt_id IS NOT NULL AND renewal_generation IS NOT NULL AND renewal_started_at IS NOT NULL AND renewal_deadline IS NOT NULL
++            AND auth_method = 'oauth_authorization_code' AND status = 'ready' AND envelope IS NOT NULL
++            AND renewal_generation = credential_generation AND renewal_deadline > renewal_started_at
++            AND renewal_deadline <= renewal_started_at + interval '10 seconds')),
++    CHECK ((status <> 'ready' OR envelope IS NOT NULL) AND (status <> 'disconnected' OR envelope IS NULL))
++);
++-- workspace-fixture-v1 is a contract-test schema, never enabled in the production registry.
++CREATE FUNCTION public.guard_integration_account() RETURNS trigger LANGUAGE plpgsql AS $$
++DECLARE owner_retired boolean;
++BEGIN
++    IF TG_OP = 'UPDATE' THEN
++        IF ROW(NEW.id, NEW.owner_namespace, NEW.owner_subject, NEW.key, NEW.provider_id,
++            NEW.auth_config_id, NEW.auth_method, NEW.credential_schema, NEW.external_identity, NEW.authorization_key)
++            IS DISTINCT FROM ROW(OLD.id, OLD.owner_namespace, OLD.owner_subject, OLD.key, OLD.provider_id,
++            OLD.auth_config_id, OLD.auth_method, OLD.credential_schema, OLD.external_identity, OLD.authorization_key) THEN
++            RAISE EXCEPTION USING ERRCODE = '23514', CONSTRAINT = 'integration_account_immutable_identity', MESSAGE = 'Immutable integration identity';
++        END IF;
++        RETURN NEW;
++    END IF;
++    INSERT INTO public.integration_owner_states(owner_namespace, owner_subject)
++        VALUES(NEW.owner_namespace, NEW.owner_subject) ON CONFLICT DO NOTHING;
++    SELECT retired INTO owner_retired FROM public.integration_owner_states
++        WHERE owner_namespace = NEW.owner_namespace AND owner_subject = NEW.owner_subject FOR UPDATE;
++    IF owner_retired THEN
++        RAISE EXCEPTION USING ERRCODE = '23514', CONSTRAINT = 'integration_owner_retired', MESSAGE = 'Integration owner retired';
++    END IF;
++    IF (SELECT count(*) FROM public.integration_accounts
++        WHERE owner_namespace = NEW.owner_namespace AND owner_subject = NEW.owner_subject) >= 128 THEN
++        RAISE EXCEPTION USING ERRCODE = '23514', CONSTRAINT = 'integration_account_owner_cap', MESSAGE = 'Integration account limit';
++    END IF;
++    RETURN NEW;
++END $$;
++CREATE TRIGGER integration_account_guard BEFORE INSERT OR UPDATE ON public.integration_accounts
++    FOR EACH ROW EXECUTE FUNCTION public.guard_integration_account();
++
++CREATE TABLE public.integration_teardown_intents (
++    id uuid PRIMARY KEY,
++    kind text NOT NULL CHECK (kind IN ('owner', 'company', 'membership')),
++    owner_namespace text NOT NULL CHECK (octet_length(owner_namespace) BETWEEN 1 AND 256),
++    owner_subject text NOT NULL CHECK (octet_length(owner_subject) <= 256),
++    host_binding text NOT NULL CHECK (octet_length(host_binding) <= 256),
++    state text NOT NULL DEFAULT 'pending' CHECK (state IN ('pending', 'completed', 'failed')),
++    attempts integer NOT NULL DEFAULT 0 CHECK (attempts BETWEEN 0 AND 8),
++    available_at timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
++    created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
++    completed_at timestamptz,
++    UNIQUE (kind, owner_namespace, owner_subject, host_binding),
++    CHECK ((kind = 'owner' AND owner_subject <> '' AND host_binding = '')
++        OR (kind = 'company' AND owner_subject = '' AND host_binding <> '')
++        OR (kind = 'membership' AND owner_subject <> '' AND host_binding <> ''))
++);
++CREATE INDEX integration_teardown_due ON public.integration_teardown_intents(available_at, id) WHERE state = 'pending';
++
++-- Owner consent is module-owned. Host identities remain opaque, with no host FK.
++ALTER TABLE public.integration_accounts ADD UNIQUE (owner_namespace,owner_subject,id);
++CREATE TABLE public.integration_use_grants (
++    id uuid PRIMARY KEY,
++    account_id uuid NOT NULL,
++    owner_namespace text NOT NULL,
++    owner_subject text NOT NULL,
++    host_scope text NOT NULL CHECK (octet_length(host_scope) BETWEEN 1 AND 256),
++    host_binding text NOT NULL CHECK (octet_length(host_binding) BETWEEN 1 AND 256),
++    app_id text NOT NULL CHECK (octet_length(app_id) BETWEEN 1 AND 128),
++    app_policy text NOT NULL CHECK (app_policy ~ '^[0-9a-f]{64}$'),
++    destination text NOT NULL CHECK (octet_length(destination) BETWEEN 8 AND 2048),
++    purpose text NOT NULL CHECK (purpose IN ('http','mcp')),
++    account_authorization bigint NOT NULL CHECK (account_authorization>0),
++    revision bigint NOT NULL CHECK (revision>0),
++    enabled boolean NOT NULL,
++    confirmed_at timestamptz NOT NULL DEFAULT clock_timestamp(),
++    FOREIGN KEY (owner_namespace,owner_subject,account_id)
++        REFERENCES public.integration_accounts(owner_namespace,owner_subject,id) ON DELETE CASCADE,
++    UNIQUE (account_id,host_binding)
++);
++CREATE FUNCTION public.guard_integration_grant() RETURNS trigger LANGUAGE plpgsql AS $$
++BEGIN
++    PERFORM id FROM public.integration_accounts WHERE id=NEW.account_id FOR UPDATE;
++    IF TG_OP='INSERT' THEN
++        IF NOT EXISTS(SELECT 1 FROM public.integration_use_grants WHERE account_id=NEW.account_id AND host_binding=NEW.host_binding)
++            AND (SELECT count(*) FROM public.integration_use_grants WHERE account_id=NEW.account_id)>=128 THEN
++            RAISE EXCEPTION USING ERRCODE='23514',CONSTRAINT='integration_grant_cap',MESSAGE='Integration grant limit';
++        END IF;
++    ELSIF ROW(NEW.id,NEW.account_id,NEW.owner_namespace,NEW.owner_subject,NEW.host_scope,NEW.host_binding)
++            IS DISTINCT FROM ROW(OLD.id,OLD.account_id,OLD.owner_namespace,OLD.owner_subject,OLD.host_scope,OLD.host_binding)
++        OR NEW.revision<>OLD.revision+1 THEN
++        RAISE EXCEPTION USING ERRCODE='23514',CONSTRAINT='integration_grant_revision',MESSAGE='Invalid grant transition';
++    END IF;
++    RETURN NEW;
++END $$;
++CREATE TRIGGER integration_grant_guard BEFORE INSERT OR UPDATE ON public.integration_use_grants
++    FOR EACH ROW EXECUTE FUNCTION public.guard_integration_grant();
++
++ALTER TABLE public.workflow_http_connections
++    ADD COLUMN integration_account_id uuid,
++    ADD COLUMN integration_grant_id uuid,
++    ADD COLUMN integration_authorization bigint,
++    ADD COLUMN integration_grant_revision bigint,
++    ADD CONSTRAINT workflow_http_credential_source CHECK (
++        (num_nonnulls(integration_account_id,integration_grant_id,integration_authorization,integration_grant_revision)=0)
++        OR (NOT bearer AND num_nonnulls(integration_account_id,integration_grant_id,integration_authorization,integration_grant_revision)=4
++            AND integration_authorization>0 AND integration_grant_revision>0));
++ALTER TABLE public.company_mcp_connections DROP CONSTRAINT company_mcp_connections_auth_type_check;
++ALTER TABLE public.company_mcp_connections
++    ADD COLUMN integration_account_id uuid,
++    ADD COLUMN integration_grant_id uuid,
++    ADD COLUMN integration_authorization bigint,
++    ADD COLUMN integration_grant_revision bigint,
++    ADD CONSTRAINT company_mcp_credential_source CHECK (
++        (auth_type IN ('none','bearer') AND num_nonnulls(integration_account_id,integration_grant_id,integration_authorization,integration_grant_revision)=0)
++        OR (auth_type='integration' AND num_nonnulls(integration_account_id,integration_grant_id,integration_authorization,integration_grant_revision)=4
++            AND integration_authorization>0 AND integration_grant_revision>0));
++CREATE TABLE public.integration_binding_proposals (
++    id uuid PRIMARY KEY,
++    company_id uuid NOT NULL REFERENCES public.companies(id) ON DELETE CASCADE,
++    connection_id uuid NOT NULL,
++    kind text NOT NULL CHECK (kind IN ('http','mcp')),
++    administrator_id uuid NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
++    connection_revision bigint NOT NULL CHECK (connection_revision>0),
++    app_id text NOT NULL CHECK (octet_length(app_id) BETWEEN 1 AND 128),
++    app_policy text NOT NULL CHECK (app_policy ~ '^[0-9a-f]{64}$'),
++    destination text NOT NULL CHECK (octet_length(destination) BETWEEN 8 AND 2048),
++    expires_at timestamptz NOT NULL,
++    consumed boolean NOT NULL DEFAULT false
++);
++
++-- Bounded private external-app consent; never Openbot sign-in state.
++CREATE TABLE integration_connect_attempts (
++    id UUID PRIMARY KEY,
++    owner_namespace TEXT NOT NULL,
++    owner_subject TEXT NOT NULL,
++    facts TEXT NOT NULL CHECK(octet_length(facts)<=4096 AND jsonb_typeof(facts::jsonb)='object'),
++    status TEXT NOT NULL CHECK(status IN ('pending','processing','connected','denied','expired','cancelled','missing_permissions','missing_refresh','identity_mismatch','conflict','provider_error','configuration','admin_blocked')),
++    envelope TEXT CHECK(octet_length(envelope)<=23000),
++    account_id UUID,
++    created_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
++    expires_at TIMESTAMPTZ NOT NULL,
++    FOREIGN KEY(owner_namespace,owner_subject) REFERENCES integration_owner_states(owner_namespace,owner_subject),
++    FOREIGN KEY(owner_namespace,owner_subject,account_id) REFERENCES integration_accounts(owner_namespace,owner_subject,id) ON DELETE SET NULL(account_id),
++    CHECK(expires_at>created_at AND expires_at<=created_at+interval '10 minutes'),
++    CHECK((status='pending')=(envelope IS NOT NULL)),
++    CHECK(account_id IS NULL OR status='connected')
++);
++CREATE INDEX integration_connect_owner ON integration_connect_attempts(owner_namespace,owner_subject,created_at,id);
++CREATE FUNCTION integration_connect_guard() RETURNS TRIGGER LANGUAGE plpgsql AS $$
++DECLARE retired_owner BOOLEAN; active_count BIGINT; terminal_count BIGINT; total_count BIGINT;
++BEGIN
++    IF TG_OP='UPDATE' THEN
++        IF (NEW.id,NEW.owner_namespace,NEW.owner_subject,NEW.facts,NEW.created_at,NEW.expires_at)
++           IS DISTINCT FROM (OLD.id,OLD.owner_namespace,OLD.owner_subject,OLD.facts,OLD.created_at,OLD.expires_at) THEN
++            RAISE EXCEPTION 'immutable connect facts' USING ERRCODE='23514';
++        END IF;
++        IF NEW.status IS DISTINCT FROM OLD.status AND
++           NOT ((OLD.status='pending' AND NEW.status IN ('processing','expired','cancelled')) OR
++                (OLD.status='processing' AND NEW.status NOT IN ('pending','processing'))) THEN
++            RAISE EXCEPTION 'invalid connect transition' USING ERRCODE='23514';
++        END IF;
++        IF NEW.account_id IS DISTINCT FROM OLD.account_id AND
++           NOT ((OLD.status='processing' AND NEW.status='connected') OR NEW.account_id IS NULL) THEN
++            RAISE EXCEPTION 'invalid connect account' USING ERRCODE='23514';
++        END IF;
++        -- Rewrapping takes only this row. Never invert owner -> attempt locking.
++        IF NEW.status=OLD.status THEN RETURN NEW; END IF;
++    ELSE
++        INSERT INTO integration_owner_states(owner_namespace,owner_subject,retired)
++            VALUES(NEW.owner_namespace,NEW.owner_subject,FALSE) ON CONFLICT DO NOTHING;
++        IF NEW.status<>'pending' OR NEW.account_id IS NOT NULL THEN
++            RAISE EXCEPTION 'invalid initial connect state' USING ERRCODE='23514';
++        END IF;
++    END IF;
++    SELECT retired INTO retired_owner FROM integration_owner_states
++        WHERE owner_namespace=NEW.owner_namespace AND owner_subject=NEW.owner_subject FOR UPDATE;
++    IF retired_owner IS DISTINCT FROM FALSE THEN
++        RAISE EXCEPTION 'owner retired' USING ERRCODE='23514',CONSTRAINT='integration_owner_retired';
++    END IF;
++    SELECT count(*),count(*) FILTER(WHERE status IN ('pending','processing') AND expires_at>clock_timestamp()),
++           count(*) FILTER(WHERE status NOT IN ('pending','processing'))
++      INTO total_count,active_count,terminal_count FROM integration_connect_attempts
++      WHERE owner_namespace=NEW.owner_namespace AND owner_subject=NEW.owner_subject AND id<>NEW.id;
++    IF total_count>=40 OR (NEW.status IN ('pending','processing') AND active_count>=8) OR
++       (NEW.status NOT IN ('pending','processing') AND terminal_count>=32) THEN
++        RAISE EXCEPTION 'connect cap reached' USING ERRCODE='23514',CONSTRAINT='integration_connect_cap';
++    END IF;
++    RETURN NEW;
++END $$;
++CREATE TRIGGER integration_connect_guard BEFORE INSERT OR UPDATE ON integration_connect_attempts
++    FOR EACH ROW EXECUTE FUNCTION integration_connect_guard();
+diff --git a/plan/vault-google/README.md b/plan/vault-google/README.md
+index 2225384e..236b9498 100644
+--- a/plan/vault-google/README.md
++++ b/plan/vault-google/README.md
+@@ -6,8 +6,12 @@
+ 
+ ## Outcome and status
+ 
+-Status: proposed implementation, revised on 2026-11-06. None of the stages below is implemented by
+-this plan. The existing directory name is retained; the shared architecture covers multiple apps
++Status: stages 01–05 implemented; independent review and acceptance status are recorded in each phase's docs.
++The vault supports static bearer and registered `X-API-Key` credentials, separate Google mailbox
++consent, and explicit owner grants for company HTTP/MCP bindings. Private resolution serializes
++provider renewal and management on the shared account; business integration execution follows in
++phase 06. Workflow handlers do not receive vault credentials. The existing directory name is
++retained; the shared architecture covers multiple apps
+ and authentication methods, with Google/Gmail as the first production OAuth integration.
+ 
+ A user can save reusable private credentials, connect external accounts, and authorize selected
+@@ -39,6 +43,25 @@ this implementation.
+ Implement these stages in order. Each stage has cohesive batches, focused checks, and acceptance
+ criteria. Finish the shared contract before changing transport implementations.
+ 
++## Next steps after stage 05
++
++The current implementation stops after 05. Continue with 06 only in a separately authorized task:
++connect the private resolver to authenticated HTTP/MCP execution, rebuild sessions when the
++provider requires it, and apply the genuine host/module authority gate immediately before each
++business dispatch. Preserve caller deadlines, provenance, approvals and the separation between
++consent revision and credential generation. Stage 07 then exercises the non-Google adapter
++through the transports and completes portability, operator guidance and live-project readiness
++checks. Scripted OAuth tests do not establish Google project approval.
++
++Before combining with other remaining work, recheck branch and coordination freshness. Channel
++handles through phase 05 are integrated here; that separate workstream subsequently pushed its
++06–07 implementation at `4ab45555f8316ec7a8b1b64e8c05b77ff7d9a29d` and started history work.
++Review their actual final changes before merging. Shared areas include the initial schema,
++workflow infrastructure and action contracts, HTTP/MCP runtime and publication authority,
++provisioning, source-kind boundaries, and their test fixtures. Keep history changes in their own
++worktree until those interfaces are reconciled. The phase records retain acceptance and
++verification evidence; this checkpoint authorizes no further implementation or merge.
++
+ ## Module and future service boundary
+ 
+     Openbot owner UI / deterministic workflow step
+@@ -153,5 +176,5 @@ metadata. Use focused tests during implementation; run the complete CI inventory
+ stages are integrated, following [07](07-integration-verification-and-operations.md). The final
+ gate includes formatting, offline compilation, migrations, and the database-backed suite.
+ 
+-Every Markdown file in this directory carries the reset policy above and must appear in
++The README and numbered plan files carry the reset policy above and appear in
+ NO_BACKWARD_COMPATIBILITY_NOTES in src/main.rs.
+diff --git a/src/adapters/http/app_state.rs b/src/adapters/http/app_state.rs
+index d5bcf70e..18816a4d 100644
+--- a/src/adapters/http/app_state.rs
++++ b/src/adapters/http/app_state.rs
+@@ -34,6 +34,9 @@ use crate::{
+ 
+ #[derive(Clone)]
+ pub struct AppState {
++    pub integration_bindings:
++        Arc<dyn crate::application::use_cases::integration_binding::IntegrationBindings>,
++    pub integrations: Arc<dyn crate::application::integrations::IntegrationGateway>,
+     pub knowledge: Arc<crate::application::knowledge::KnowledgeLibrary>,
+     pub auth_admission: Arc<AuthAdmission>,
+     /// Workflow commands and read models, without worker handlers or spawn capability.
+@@ -243,3 +246,17 @@ impl FromRef<AppState> for Arc<crate::use_cases::onboarding::OnboardingUseCases>
+         state.onboarding_use_cases.clone()
+     }
+ }
++
++impl FromRef<AppState> for Arc<dyn crate::application::integrations::IntegrationGateway> {
++    fn from_ref(state: &AppState) -> Self {
++        state.integrations.clone()
++    }
++}
++
++impl FromRef<AppState>
++    for Arc<dyn crate::application::use_cases::integration_binding::IntegrationBindings>
++{
++    fn from_ref(state: &AppState) -> Self {
++        state.integration_bindings.clone()
++    }
++}
+diff --git a/src/adapters/http/auth_admission.rs b/src/adapters/http/auth_admission.rs
+index f11c6260..741c6b5e 100644
+--- a/src/adapters/http/auth_admission.rs
++++ b/src/adapters/http/auth_admission.rs
+@@ -110,7 +110,9 @@ fn kind(method: &Method, path: &str) -> Option<Kind> {
+             | "/auth/google/callback",
+         )
+         | (&Method::GET, "/auth/apple/register" | "/auth/apple/login" | "/auth/apple/connect")
+-        | (&Method::POST, "/auth/apple/callback") => Some(Kind::Oauth),
++        | (&Method::POST, "/auth/apple/callback")
++        | (&Method::POST, "/ui/profile/vault/apps/{app}/connect")
++        | (&Method::GET, "/auth/integrations/{provider}/callback") => Some(Kind::Oauth),
+         (&Method::PUT, "/ui/profile" | "/ui/profile/password" | "/ui/profile/password/setup")
+         | (&Method::POST | &Method::DELETE, "/ui/profile/changes/{kind}") => Some(Kind::Credential),
+         _ => None,
+@@ -597,6 +599,21 @@ mod tests {
+             (Method::GET, "/auth/apple/login", Kind::Oauth),
+             (Method::GET, "/auth/apple/connect", Kind::Oauth),
+             (Method::POST, "/auth/apple/callback", Kind::Oauth),
++            (
++                Method::POST,
++                "/ui/profile/vault/apps/{app}/connect",
++                Kind::Oauth,
++            ),
++            (
++                Method::GET,
++                "/auth/integrations/{provider}/callback",
++                Kind::Oauth,
++            ),
++            (
++                Method::HEAD,
++                "/auth/integrations/{provider}/callback",
++                Kind::Oauth,
++            ),
+         ] {
+             assert_eq!(kind(&method, path), Some(expected), "{method} {path}");
+         }
+diff --git a/src/adapters/http/pages/mcp.rs b/src/adapters/http/pages/mcp.rs
+index 6ab6b80e..52c01279 100644
+--- a/src/adapters/http/pages/mcp.rs
++++ b/src/adapters/http/pages/mcp.rs
+@@ -71,9 +71,18 @@ pub fn detail(company: Uuid, connection: &CompanyMcpConnection, draft: &Definiti
+     } else {
+         String::new()
+     };
++    let refresh = if matches!(connection.auth, McpAuth::Integration(_)) {
++        "<p>Vault catalogue discovery requires its credential owner's authorization.</p>"
++            .to_string()
++    } else {
++        format!(
++            r#"<form data-submit="busy-once" data-pending-label="Working…" method="post" action="/ui/companies/{company}/mcp-connections/{id}/refresh"><input type="hidden" name="expected_revision" value="{revision}">{button}</form>"#,
++            button = button("Test connection / Refresh tools")
++        )
++    };
+     format!(
+-        r#"<a class="link" href="/ui/companies/{company}/mcp-connections">All MCP servers</a><p>Endpoint changes clear the token and discovery.</p>{fields}{credentials}<form data-submit="busy-once" data-pending-label="Working…" method="post" action="/ui/companies/{company}/mcp-connections/{id}/refresh"><input type="hidden" name="expected_revision" value="{revision}">{refresh}</form><p>Refresh removes grants for missing or changed schemas. Review tools before granting them again.</p><form data-submit="busy-once" data-pending-label="Working…" method="post" action="/ui/companies/{company}/mcp-connections/{id}/delete"><input type="hidden" name="expected_revision" value="{revision}">{delete}</form>"#,
+-        refresh = button("Test connection / Refresh tools"),
++        r#"<a class="link" href="/ui/companies/{company}/mcp-connections">All MCP servers</a><p>Endpoint identity is immutable; authentication changes require a fresh review.</p>{fields}{credentials}{refresh}<p>Refresh removes grants for missing or changed schemas. Review tools before granting them again.</p><form data-submit="busy-once" data-pending-label="Working…" method="post" action="/ui/companies/{company}/mcp-connections/{id}/delete"><input type="hidden" name="expected_revision" value="{revision}">{delete}</form>"#,
++        refresh = refresh,
+         delete = button("Delete server")
+     )
+ }
+@@ -90,7 +99,19 @@ fn definition_form(
+         format!("<label class=\"flex gap-2\"><input class=\"checkbox\" type=\"checkbox\" name=\"grants\" value=\"{}\"{checked}>{}</label><p>{}</p><details><summary>Input schema</summary><pre class=\"overflow-auto\">{}</pre></details>",esc(tool.name.as_str()),escape_html_text(tool.name.as_str()),escape_html_text(&tool.description),escape_html_text(&tool.input_schema.to_string()))
+     }).collect::<String>()).unwrap_or_default();
+     format!(
+-        r#"<form data-submit="busy-once" data-pending-label="Working…" method="post" action="{action}" class="space-y-3"><input type="hidden" name="expected_revision" value="{revision}"><label class="block">Name<input class="input w-full" name="slug" required maxlength="100" value="{slug}"></label><label class="block">Endpoint URL<input class="input w-full" type="url" name="endpoint_url" required maxlength="2048" value="{endpoint}"></label><label class="block">Authentication<select class="select" name="auth_type"><option value="none">None</option><option value="bearer"{bearer}>Bearer token</option></select></label><label class="flex gap-2"><input class="checkbox" type="checkbox" name="enabled"{enabled}>Enabled</label><fieldset class="space-y-2"><legend>Granted tools</legend>{grants}</fieldset>{button}</form>"#,
++        r#"<form data-submit="busy-once" data-pending-label="Working…" method="post" action="{action}" class="space-y-3"><input type="hidden" name="expected_revision" value="{revision}"><label class="block">Name<input class="input w-full" name="slug" required maxlength="100" value="{slug}"></label><label class="block">Endpoint URL<input class="input w-full" type="url" name="endpoint_url" required maxlength="2048" value="{endpoint}"></label><label class="block">Authentication<select class="select" name="auth_type"><option value="none">None</option><option value="bearer"{bearer}>Bearer token</option>{integration}</select></label><label class="flex gap-2"><input class="checkbox" type="checkbox" name="enabled"{enabled}>Enabled</label><fieldset class="space-y-2"><legend>Granted tools</legend>{grants}</fieldset>{button}</form>"#,
++        integration = if connection.is_some_and(|c| matches!(c.auth, McpAuth::Integration(_))) {
++            format!(
++                "<option value=\"integration\"{}>Vault (owner approved)</option>",
++                if draft.auth_type == "integration" {
++                    " selected"
++                } else {
++                    ""
++                }
++            )
++        } else {
++            String::new()
++        },
+         revision = draft.expected_revision,
+         slug = esc(&draft.slug),
+         endpoint = esc(&draft.endpoint_url),
+diff --git a/src/adapters/http/pages/mod.rs b/src/adapters/http/pages/mod.rs
+index ee6a1262..eea388a6 100644
+--- a/src/adapters/http/pages/mod.rs
++++ b/src/adapters/http/pages/mod.rs
+@@ -203,3 +203,5 @@ pub mod company_typesafe;
+ mod team_level_tests;
+ 
+ pub(crate) mod connection_levels;
++
++pub mod vault;
+diff --git a/src/adapters/http/pages/profile.rs b/src/adapters/http/pages/profile.rs
+index 2731fed2..30fe1919 100644
+--- a/src/adapters/http/pages/profile.rs
++++ b/src/adapters/http/pages/profile.rs
+@@ -133,6 +133,7 @@ pub fn profile_pane(pane: &ProfilePane<'_>) -> String {
+             {identity}
+             {login_methods}
+             {notifications}
++            <section class="mb-6 rounded-box border border-base-300 p-5"><h2 class="text-lg font-semibold">Vault / Connected apps</h2><a class="link" href="/ui/profile/vault">Manage private credentials</a></section>
+             {password}
+         </div>
+         "##,
+diff --git a/src/adapters/http/routes/mod.rs b/src/adapters/http/routes/mod.rs
+index da089fe1..3a4089bc 100644
+--- a/src/adapters/http/routes/mod.rs
++++ b/src/adapters/http/routes/mod.rs
+@@ -37,6 +37,7 @@ mod ui_run_counts;
+ pub mod ui_schedules;
+ pub mod ui_team;
+ pub mod ui_uploads;
++pub mod ui_vault;
+ pub mod user;
+ pub mod webhooks;
+ pub mod workflows;
+@@ -111,6 +112,7 @@ pub fn router(sessions: Arc<SessionAuthority>) -> Router<AppState> {
+         .merge(ui_invites::router())
+         .merge(ui_deliveries::router())
+         .merge(ui_profile::router())
++        .merge(ui_vault::router())
+         .merge(ui_run_counts::router())
+         .merge(ui_team::router())
+         .merge(ui_uploads::router())
+@@ -271,3 +273,7 @@ mod tests {
+         assert_eq!(body_of(page).await, "the dashboard");
+     }
+ }
++
++mod ui_vault_bindings;
++
++mod ui_vault_connect;
+diff --git a/src/adapters/http/routes/ui_mcp.rs b/src/adapters/http/routes/ui_mcp.rs
+index 30d4ee55..86a608ee 100644
+--- a/src/adapters/http/routes/ui_mcp.rs
++++ b/src/adapters/http/routes/ui_mcp.rs
+@@ -54,6 +54,10 @@ fn write(
+     let auth = match draft.auth_type.as_str() {
+         "none" => McpAuth::None,
+         "bearer" => McpAuth::Bearer,
++        "integration" => current
++            .filter(|c| matches!(c.auth, McpAuth::Integration(_)))
++            .map(|c| c.auth.clone())
++            .ok_or_else(|| AppError::BadRequest("Confirm a Vault binding with its owner".into()))?,
+         _ => {
+             return Err(AppError::BadRequest(
+                 "Unsupported MCP authentication".into(),
+diff --git a/src/adapters/http/security.rs b/src/adapters/http/security.rs
+index b4f82a1e..6d1220c3 100644
+--- a/src/adapters/http/security.rs
++++ b/src/adapters/http/security.rs
+@@ -17,11 +17,32 @@ pub async fn browser_security(
+     next: Next,
+ ) -> Result<Response, StatusCode> {
+     validate_same_origin(&request, config.secure_cookies)?;
++    let sensitive_callback =
++        request.uri().path().starts_with("/auth/") && request.uri().path().ends_with("/callback");
+     let mut response = next.run(request).await;
+     let headers = response.headers_mut();
+     headers.insert(header::CONTENT_SECURITY_POLICY, CSP.parse().unwrap());
+     headers.insert(header::X_CONTENT_TYPE_OPTIONS, "nosniff".parse().unwrap());
+-    headers.insert(header::REFERRER_POLICY, "same-origin".parse().unwrap());
++    let referrer_policy = if sensitive_callback
++        || headers
++            .get(header::REFERRER_POLICY)
++            .is_some_and(|v| v == "no-referrer")
++    {
++        "no-referrer"
++    } else {
++        "same-origin"
++    };
++    // Preserve a stricter callback policy while retaining the global privacy floor.
++    headers.insert(
++        header::REFERRER_POLICY,
++        axum::http::HeaderValue::from_static(referrer_policy),
++    );
++    if sensitive_callback {
++        headers.insert(
++            header::CACHE_CONTROL,
++            axum::http::HeaderValue::from_static("no-store"),
++        );
++    }
+     headers.insert(
+         "permissions-policy",
+         "camera=(), microphone=(), geolocation=()".parse().unwrap(),
+diff --git a/src/adapters/mod.rs b/src/adapters/mod.rs
+index 6f27d518..c09cea18 100644
+--- a/src/adapters/mod.rs
++++ b/src/adapters/mod.rs
+@@ -21,4 +21,5 @@ pub mod workflow_message;
+ pub mod workflow_provisioning;
+ pub mod workflow_source;
+ 
++pub(crate) mod integrations;
+ pub mod workflow_jev;
+diff --git a/src/adapters/persistence/agent_publication/tests/http.rs b/src/adapters/persistence/agent_publication/tests/http.rs
+index 909e0712..7fd58247 100644
+--- a/src/adapters/persistence/agent_publication/tests/http.rs
++++ b/src/adapters/persistence/agent_publication/tests/http.rs
+@@ -25,13 +25,16 @@ fn operation(company: CompanyId) -> HttpOperation {
+     }
+ }
+ 
+-async fn source(f: &Fixture, bearer: bool) -> HttpConnection {
++fn source(f: &Fixture, bearer: bool) -> impl std::future::Future<Output = HttpConnection> + '_ {
++    source_at(f, bearer, "http://127.0.0.1:9")
++}
++async fn source_at(f: &Fixture, bearer: bool, origin: &str) -> HttpConnection {
+     let connection =
+         f.p.create_http(
+             f.scope.company,
+             f.scope.actor,
+             HttpConnectionWrite {
+-                origin: HttpOrigin::parse("http://127.0.0.1:9").unwrap(),
++                origin: HttpOrigin::parse(origin).unwrap(),
+                 bearer,
+             },
+         )
+@@ -169,3 +172,24 @@ async fn autonomous_agent_resolution_http_requires_current_secret_and_enabled_co
+         }
+     );
+ }
++
++#[tokio::test]
++async fn vault_binding_agent_publication_refuses_an_integration_http_source() {
++    let f = Fixture::new().await;
++    let connection = source_at(&f, false, "https://api.example.test").await;
++    f.p.publish_agent(f.request("before-vault").await)
++        .await
++        .unwrap();
++    attach_vault(
++        &f,
++        connection.id,
++        connection.revision,
++        crate::application::use_cases::integration_binding::BindingKind::Http,
++    )
++    .await;
++    assert!(
++        f.p.publish_agent(f.request("after-vault").await)
++            .await
++            .is_err()
++    );
++}
+diff --git a/src/adapters/persistence/agent_publication/tests/mcp.rs b/src/adapters/persistence/agent_publication/tests/mcp.rs
+index e53b59ad..7db1a179 100644
+--- a/src/adapters/persistence/agent_publication/tests/mcp.rs
++++ b/src/adapters/persistence/agent_publication/tests/mcp.rs
+@@ -47,10 +47,15 @@ fn connection_write(operation: &McpOperation) -> McpConnectionWrite {
+     }
+ }
+ 
+-async fn source(f: &Fixture) -> McpSource {
++fn source(f: &Fixture) -> impl std::future::Future<Output = McpSource> + '_ {
++    source_at(f, "http://127.0.0.1:9")
++}
++async fn source_at(f: &Fixture, endpoint: &str) -> McpSource {
+     let operation = operation(f.scope.company);
++    let mut definition = connection_write(&operation);
++    definition.endpoint = endpoint.to_string().try_into().unwrap();
+     let connection =
+-        f.p.create_mcp_connection(f.scope.company.as_uuid(), connection_write(&operation))
++        f.p.create_mcp_connection(f.scope.company.as_uuid(), definition)
+             .await
+             .unwrap();
+     let version =
+@@ -347,3 +352,24 @@ async fn autonomous_agent_resolution_malformed_stored_catalog_is_an_error_not_an
+         }
+     );
+ }
++
++#[tokio::test]
++async fn vault_binding_agent_publication_refuses_an_integration_mcp_source() {
++    let f = Fixture::new().await;
++    let source = source_at(&f, "https://mcp.example.test/rpc").await;
++    f.p.publish_agent(f.request("before-vault").await)
++        .await
++        .unwrap();
++    attach_vault(
++        &f,
++        source.connection.id,
++        source.connection.revision,
++        crate::application::use_cases::integration_binding::BindingKind::Mcp,
++    )
++    .await;
++    assert!(
++        f.p.publish_agent(f.request("after-vault").await)
++            .await
++            .is_err()
++    );
++}
+diff --git a/src/adapters/persistence/agent_publication/tests/support.rs b/src/adapters/persistence/agent_publication/tests/support.rs
+index 2c80cd7a..61c225d7 100644
+--- a/src/adapters/persistence/agent_publication/tests/support.rs
++++ b/src/adapters/persistence/agent_publication/tests/support.rs
+@@ -150,3 +150,70 @@ pub(super) fn write() -> AgentWrite {
+         ..Default::default()
+     }
+ }
++
++pub(super) async fn attach_vault(
++    f: &Fixture,
++    connection: Uuid,
++    revision: i64,
++    kind: crate::application::use_cases::integration_binding::BindingKind,
++) {
++    use crate::{
++        adapters::{
++            integrations::owner::owner_for_user,
++            persistence::{
++                integration_bindings::PostgresIntegrationBindings, integrations::PostgresVault,
++            },
++        },
++        application::{
++            integrations::{
++                VerifiedOwner,
++                management::{AccountRepository, AccountWrite},
++            },
++            use_cases::integration_binding::*,
++        },
++        domain::integrations::*,
++    };
++    let owner = owner_for_user(f.scope.actor.user_id());
++    let vault = PostgresVault::new(f.p.clone());
++    let account = vault
++        .create(
++            &owner,
++            AccountWrite {
++                key: AccountKey::parse("agent-private").unwrap(),
++                provider: ProviderId::parse("static-bearer").unwrap(),
++                config: AuthConfigId::parse("static-bearer").unwrap(),
++                method: AuthMethod::StaticSecret,
++                schema: CredentialSchema::parse("static-v1").unwrap(),
++                identity: None,
++                metadata: AccountMetadata::new("Agent private".into(), None).unwrap(),
++                payload: secrecy::SecretString::from("private-agent-token"),
++            },
++        )
++        .await
++        .unwrap();
++    let host = PostgresIntegrationBindings {
++        persistence: f.p.clone(),
++        vault,
++    };
++    let proposal = host
++        .propose(
++            f.scope.actor.user_id(),
++            ProposeBinding {
++                company: f.scope.company.as_uuid(),
++                connection,
++                kind,
++                app: AppId::parse("static-bearer").unwrap(),
++                expected_revision: revision,
++            },
++        )
++        .await
++        .unwrap();
++    host.confirm(
++        VerifiedOwner::from_verified_client(owner),
++        proposal.id,
++        account.id,
++        account.authorization_revision,
++    )
++    .await
++    .unwrap();
++}
+diff --git a/src/adapters/persistence/agent_publication/tools.rs b/src/adapters/persistence/agent_publication/tools.rs
+index 3010d675..f3313d5f 100644
+--- a/src/adapters/persistence/agent_publication/tools.rs
++++ b/src/adapters/persistence/agent_publication/tools.rs
+@@ -225,7 +225,13 @@ async fn http_tool(
+             "Selected HTTP connection is unavailable".into(),
+         ));
+     }
+-    if current.bearer {
++    if matches!(
++        current.credential_source,
++        crate::domain::integrations::authority::CredentialSource::Integration(_)
++    ) {
++        return Err(unavailable());
++    }
++    if current.uses_owned_bearer() {
+         credential_ready(tx, company, connection, CredentialOwner::Http).await?;
+     }
+     let (snapshot, approval_required): (serde_json::Value, bool) = sqlx::query_as(
+@@ -275,6 +281,9 @@ async fn mcp_tool(
+             "Selected MCP connection is unavailable".into(),
+         ));
+     }
++    if matches!(current.auth, McpAuth::Integration(_)) {
++        return Err(unavailable());
++    }
+     if current.auth == McpAuth::Bearer {
+         credential_ready(tx, company, connection, CredentialOwner::Mcp).await?;
+     }
+diff --git a/src/adapters/persistence/company.rs b/src/adapters/persistence/company.rs
+index 677669a0..3cefb83e 100644
+--- a/src/adapters/persistence/company.rs
++++ b/src/adapters/persistence/company.rs
+@@ -125,6 +125,13 @@ async fn delete_company_with_cleanup(
+     if !company_exists {
+         return Ok(false);
+     }
++    super::integrations::lifecycle::revoke_company_on(
++        &mut transaction,
++        &crate::adapters::integrations::owner::client_namespace(),
++        &crate::adapters::integrations::owner::company_binding(id),
++    )
++    .await
++    .map_err(AppError::from)?;
+     sqlx::query("DELETE FROM companies WHERE id = $1")
+         .bind(id)
+         .execute(&mut *transaction)
+diff --git a/src/adapters/persistence/company_invite.rs b/src/adapters/persistence/company_invite.rs
+index f95f298d..7b3da14a 100644
+--- a/src/adapters/persistence/company_invite.rs
++++ b/src/adapters/persistence/company_invite.rs
+@@ -548,6 +548,19 @@ impl CompanyInvitePersistence for PostgresPersistence {
+     /// later finds an external principal and no member, and composes nothing.
+     async fn remove_member(&self, company_id: Uuid, user_id: Uuid) -> AppResult<()> {
+         let mut transaction = self.pool.begin().await.map_err(AppError::from)?;
++        // Match dispatch and consent: account, then company, then membership and
++        // principal. Never acquire a principal before a competing host owner.
++        sqlx::query("SET LOCAL lock_timeout='5s'")
++            .execute(&mut *transaction)
++            .await?;
++        sqlx::query("SELECT id FROM users WHERE id=$1 FOR SHARE")
++            .bind(user_id)
++            .fetch_optional(&mut *transaction)
++            .await?;
++        sqlx::query("SELECT id FROM companies WHERE id=$1 FOR NO KEY UPDATE")
++            .bind(company_id)
++            .fetch_optional(&mut *transaction)
++            .await?;
+         sqlx::query!(
+             r#"UPDATE principals
+                SET kind = 'external', user_id = NULL, updated_at = CURRENT_TIMESTAMP
+@@ -584,6 +597,13 @@ impl CompanyInvitePersistence for PostgresPersistence {
+             user_id,
+         )
+         .await?;
++        super::integrations::lifecycle::revoke_membership_on(
++            &mut transaction,
++            &crate::adapters::integrations::owner::owner_for_user(user_id),
++            &crate::adapters::integrations::owner::company_binding(company_id),
++        )
++        .await
++        .map_err(AppError::from)?;
+         sqlx::query!(
+             "DELETE FROM company_members
+              WHERE company_id = $1 AND user_id = $2 AND role <> 'owner'",
+diff --git a/src/adapters/persistence/credential_rotation.rs b/src/adapters/persistence/credential_rotation.rs
+index 3ab3d85c..330b3d8a 100644
+--- a/src/adapters/persistence/credential_rotation.rs
++++ b/src/adapters/persistence/credential_rotation.rs
+@@ -68,6 +68,8 @@ pub struct CredentialRotationReport {
+ /// whose rows never rotate, and nothing else in the system would notice.
+ #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+ enum CredentialTable {
++    IntegrationAccounts,
++    ConnectAttempts,
+     TypeSafeCredentials,
+     WorkflowHttpCredentials,
+     CompanyMcpCredentials,
+@@ -82,6 +84,8 @@ enum CredentialTable {
+ 
+ impl CredentialTable {
+     const ALL: &'static [Self] = &[
++        Self::IntegrationAccounts,
++        Self::ConnectAttempts,
+         Self::TypeSafeCredentials,
+         Self::WorkflowHttpCredentials,
+         Self::CompanyMcpCredentials,
+@@ -97,6 +101,12 @@ impl CredentialTable {
+ /// key of a batch is exactly where the next batch starts.
+ #[derive(Debug, Clone, PartialEq, Eq)]
+ enum CredentialKey {
++    ConnectAttempt {
++        id: Uuid,
++    },
++    IntegrationAccount {
++        id: Uuid,
++    },
+     TypeSafeCredential {
+         company_id: Uuid,
+         connection_id: Uuid,
+@@ -438,6 +448,11 @@ async fn store_rotated_credential(
+     rotated: &str,
+ ) -> AppResult<bool> {
+     let changed = match &row.key {
++        CredentialKey::ConnectAttempt {id} => super::integrations::connect::inventory::rewrap(transaction,*id,&row.stored,rotated).await,
++        CredentialKey::IntegrationAccount { id } => {
++            super::integrations::inventory::rewrap(transaction,*id,&row.stored,rotated).await
++        }
++
+         CredentialKey::TypeSafeCredential { company_id, connection_id } => {
+             sqlx::query("UPDATE company_typesafe_connections SET envelope=$3 WHERE company_id=$1 AND id=$2 AND envelope=$4")
+                 .bind(company_id).bind(connection_id).bind(rotated).bind(&row.stored).execute(&mut **transaction).await
+@@ -581,6 +596,44 @@ async fn fetch_credential_batch(
+     cursor: Option<&CredentialKey>,
+ ) -> AppResult<Vec<InventoryRow>> {
+     match table {
++        CredentialTable::ConnectAttempts => {
++            let after = match cursor {
++                Some(CredentialKey::ConnectAttempt { id }) => Some(*id),
++                None => None,
++                _ => return Err(AppError::Internal("Invalid connect rotation cursor".into())),
++            };
++            Ok(super::integrations::connect::inventory::page(
++                connection,
++                after,
++                CREDENTIAL_BATCH_SIZE,
++            )
++            .await?
++            .into_iter()
++            .map(|r| InventoryRow {
++                key: CredentialKey::ConnectAttempt { id: r.id },
++                format: CredentialFormat::Envelope(r.context),
++                stored: r.envelope,
++            })
++            .collect())
++        }
++        CredentialTable::IntegrationAccounts => {
++            let after = match cursor {
++                Some(CredentialKey::IntegrationAccount { id }) => Some(*id),
++                None => None,
++                _ => return Err(AppError::Internal("Invalid vault rotation cursor".into())),
++            };
++            Ok(
++                super::integrations::inventory::page(connection, after, CREDENTIAL_BATCH_SIZE)
++                    .await?
++                    .into_iter()
++                    .map(|row| InventoryRow {
++                        key: CredentialKey::IntegrationAccount { id: row.id },
++                        format: CredentialFormat::Envelope(row.context),
++                        stored: row.envelope,
++                    })
++                    .collect(),
++            )
++        }
+         CredentialTable::TypeSafeCredentials => {
+             fetch_typesafe_credential_batch(connection, cursor).await
+         }
+diff --git a/src/adapters/persistence/credential_rotation_tests.rs b/src/adapters/persistence/credential_rotation_tests.rs
+index 8ec91ee8..74a4812d 100644
+--- a/src/adapters/persistence/credential_rotation_tests.rs
++++ b/src/adapters/persistence/credential_rotation_tests.rs
+@@ -21,6 +21,8 @@ async fn isolated_connection() -> Option<PgConnection> {
+     // tables by design, so a real-table fixture would rotate rows belonging to a test running
+     // beside it.
+     for statement in [
++        crate::adapters::persistence::integrations::inventory::ISOLATED_TABLE_SQL,
++        crate::adapters::persistence::integrations::connect::inventory::ISOLATED_TABLE_SQL,
+         r#"CREATE TEMPORARY TABLE company_typesafe_connections (
+                company_id UUID NOT NULL, id UUID NOT NULL, envelope TEXT NOT NULL,
+                PRIMARY KEY (company_id, id)
+diff --git a/src/adapters/persistence/credentials/envelope.rs b/src/adapters/persistence/credentials/envelope.rs
+index 58c5b5b2..e5dd7049 100644
+--- a/src/adapters/persistence/credentials/envelope.rs
++++ b/src/adapters/persistence/credentials/envelope.rs
+@@ -128,8 +128,44 @@ impl CredentialContext {
+         }
+     }
+ 
++    pub(crate) fn integration_account(
++        account: &crate::domain::integrations::ConnectedAccount,
++    ) -> Self {
++        Self {
++            scope: "integration_account",
++            fields: vec![
++                account.owner.namespace.as_str().as_bytes().to_vec(),
++                account.owner.subject.as_str().as_bytes().to_vec(),
++                account.id.as_uuid().as_bytes().to_vec(),
++                account.provider_id.as_str().as_bytes().to_vec(),
++                account.auth_config_id.as_str().as_bytes().to_vec(),
++                account.auth_method.as_str().as_bytes().to_vec(),
++                account.credential_schema.as_str().as_bytes().to_vec(),
++            ],
++        }
++    }
++
++    pub(crate) fn integration_connect(
++        f: &crate::application::integrations::connect::AttemptFacts,
++    ) -> Self {
++        Self {
++            scope: "integration_connect_attempt",
++            fields: vec![
++                f.owner.namespace.as_str().as_bytes().to_vec(),
++                f.owner.subject.as_str().as_bytes().to_vec(),
++                f.id.as_uuid().as_bytes().to_vec(),
++                f.provider.as_str().as_bytes().to_vec(),
++                f.config.as_str().as_bytes().to_vec(),
++                f.app.as_str().as_bytes().to_vec(),
++                f.purpose().as_bytes().to_vec(),
++            ],
++        }
++    }
++
+     fn max_secret_bytes(&self) -> usize {
+-        if self.scope == "company_mcp_credential" {
++        if self.scope == "integration_account" {
++            crate::domain::integrations::MAX_CREDENTIAL_BYTES
++        } else if self.scope == "company_mcp_credential" {
+             crate::entities::mcp::MAX_MCP_SECRET_BYTES
+         } else {
+             MAX_CREDENTIAL_BYTES
+diff --git a/src/adapters/persistence/mcp.rs b/src/adapters/persistence/mcp.rs
+index f8de386f..6011f99b 100644
+--- a/src/adapters/persistence/mcp.rs
++++ b/src/adapters/persistence/mcp.rs
+@@ -20,6 +20,7 @@ struct ConnectionRow {
+     endpoint_url: String,
+     enabled: bool,
+     auth_type: String,
++    integration: Option<serde_json::Value>,
+     revision: i64,
+     credential_revision: i64,
+     discovery_json: serde_json::Value,
+@@ -27,7 +28,8 @@ struct ConnectionRow {
+     tool_grants: Vec<String>,
+ }
+ const CONNECTION_SELECT: &str = "SELECT connection.company_id, connection.id, connection.access_level::smallint AS access_level, connection.slug,
+-    connection.endpoint_url, connection.enabled, connection.auth_type, connection.revision,
++    connection.endpoint_url, connection.enabled, connection.auth_type,
++    CASE WHEN connection.integration_grant_id IS NOT NULL THEN jsonb_build_object('account',connection.integration_account_id,'grant',connection.integration_grant_id,'authorization',connection.integration_authorization,'grant_revision',connection.integration_grant_revision) END AS integration, connection.revision,
+     connection.credential_revision, connection.discovery_json,
+     EXISTS(SELECT 1 FROM company_mcp_credentials AS credential WHERE credential.company_id = connection.company_id AND credential.connection_id = connection.id) AS secret_set,
+     ARRAY(SELECT grant_row.tool_name FROM company_mcp_tool_grants AS grant_row WHERE grant_row.company_id = connection.company_id AND grant_row.connection_id = connection.id AND grant_row.revoked_at IS NULL ORDER BY grant_row.tool_name) AS tool_grants
+@@ -38,13 +40,24 @@ impl TryFrom<ConnectionRow> for CompanyMcpConnection {
+         let auth = match row.auth_type.as_str() {
+             "none" => McpAuth::None,
+             "bearer" => McpAuth::Bearer,
++            "integration" => McpAuth::Integration(
++                serde_json::from_value(
++                    row.integration
++                        .ok_or_else(|| invalid("Missing integration reference"))?,
++                )
++                .map_err(|_| invalid("Invalid integration reference"))?,
++            ),
+             _ => return Err(invalid("Stored MCP auth is invalid")),
+         };
+         let mut write = McpConnectionWrite {
+             slug: row.slug.into(),
+             endpoint: row.endpoint_url.try_into().map_err(AppError::BadRequest)?,
+             enabled: row.enabled,
+-            auth: auth.clone(),
++            auth: if matches!(auth, McpAuth::Integration(_)) {
++                McpAuth::None
++            } else {
++                auth.clone()
++            },
+             discovered_tools: Vec::new(),
+             tool_grants: Vec::new(),
+         };
+@@ -206,6 +219,9 @@ impl McpPersistence for PostgresPersistence {
+         write: McpConnectionWrite,
+     ) -> AppResult<CompanyMcpConnection> {
+         write.validate()?;
++        if matches!(write.auth, McpAuth::Integration(_)) {
++            return Err(invalid("Confirm an integration binding through its owner"));
++        }
+         let mut tx = self.pool.begin().await?;
+         lock_company(&mut tx, company_id).await?;
+         let count: i64 = sqlx::query_scalar("SELECT count(*) FROM company_mcp_connections WHERE company_id = $1 AND deleted_at IS NULL")
+@@ -235,6 +251,9 @@ impl McpPersistence for PostgresPersistence {
+         let mut tx = self.pool.begin().await?;
+         lock_company(&mut tx, company_id).await?;
+         let old = get_connection(&mut tx, company_id, id).await?;
++        if matches!(write.auth, McpAuth::Integration(_)) && write.auth != old.auth {
++            return Err(invalid("Confirm an integration binding through its owner"));
++        }
+         if old.revision != expected_revision {
+             return Err(conflict());
+         }
+@@ -251,7 +270,7 @@ impl McpPersistence for PostgresPersistence {
+             .execute(&mut *tx)
+             .await?;
+         }
+-        sqlx::query("UPDATE company_mcp_connections SET slug = $3, endpoint_url = $4, enabled = $5, auth_type = $6, discovery_json = $7, revision = revision + 1, credential_revision = credential_revision + $8 WHERE company_id = $1 AND id = $2")
++        sqlx::query("UPDATE company_mcp_connections SET slug = $3, endpoint_url = $4, enabled = $5, auth_type = $6, integration_account_id=CASE WHEN $6='integration' THEN integration_account_id ELSE NULL END,integration_grant_id=CASE WHEN $6='integration' THEN integration_grant_id ELSE NULL END,integration_authorization=CASE WHEN $6='integration' THEN integration_authorization ELSE NULL END,integration_grant_revision=CASE WHEN $6='integration' THEN integration_grant_revision ELSE NULL END, discovery_json = $7, revision = revision + 1, credential_revision = credential_revision + $8 WHERE company_id = $1 AND id = $2")
+             .bind(company_id).bind(id).bind(write.slug.as_str()).bind(write.endpoint.as_str()).bind(write.enabled).bind(write.auth.as_str())
+             .bind(serde_json::to_value(&write.discovered_tools).map_err(|_| invalid("Invalid discovery"))?).bind(i64::from(rebind)).execute(&mut *tx).await?;
+         replace_grants(&mut tx, company_id, id, &write.tool_grants).await?;
+@@ -351,6 +370,11 @@ impl McpCredentialPersistence for PostgresPersistence {
+         if connection.revision != expected_revision {
+             return Err(conflict());
+         }
++        if matches!(connection.auth, McpAuth::Integration(_)) {
++            return Err(AppError::ServiceUnavailable(
++                "Integration discovery requires its owner configuration context".into(),
++            ));
++        }
+         let envelope: Option<String> = sqlx::query_scalar("SELECT envelope FROM company_mcp_credentials WHERE company_id = $1 AND connection_id = $2")
+             .bind(company_id).bind(id).fetch_optional(&mut *tx).await?;
+         let token = envelope
+diff --git a/src/adapters/persistence/mod.rs b/src/adapters/persistence/mod.rs
+index 95630285..ba08280f 100644
+--- a/src/adapters/persistence/mod.rs
++++ b/src/adapters/persistence/mod.rs
+@@ -24,6 +24,7 @@ pub mod database_query_health;
+ pub mod delivery;
+ pub mod inbound_event;
+ pub mod integration;
++pub(crate) mod integrations;
+ pub mod knowledge;
+ pub(crate) mod model_usage;
+ pub mod notification;
+@@ -489,3 +490,8 @@ mod auth_key_rotation_tests;
+ 
+ #[cfg(test)]
+ mod jsonb_test_support;
++mod user_lifecycle;
++
++pub(crate) mod integration_bindings;
++
++pub(crate) mod integration_connect_authority;
+diff --git a/src/adapters/persistence/workflow/action_approval_http_tests.rs b/src/adapters/persistence/workflow/action_approval_http_tests.rs
+index 08ffd7ba..010ea2ed 100644
+--- a/src/adapters/persistence/workflow/action_approval_http_tests.rs
++++ b/src/adapters/persistence/workflow/action_approval_http_tests.rs
+@@ -523,3 +523,6 @@ mod continuation_tests;
+ 
+ #[path = "action_approval_review_tests.rs"]
+ mod review_tests;
++
++#[path = "vault_tests/approval.rs"]
++mod vault_approval_tests;
+diff --git a/src/adapters/persistence/workflow/agent_origin.rs b/src/adapters/persistence/workflow/agent_origin.rs
+index 92130347..29672442 100644
+--- a/src/adapters/persistence/workflow/agent_origin.rs
++++ b/src/adapters/persistence/workflow/agent_origin.rs
+@@ -105,6 +105,7 @@ pub(super) async fn request_on(
+         contract,
+         arguments,
+         context: ActionPolicyContext {
++            integration: None,
+             origin: ToolCallOrigin::Agent(origin),
+             actor: facts.actor.user_id(),
+             capability_ceiling: selection
+diff --git a/src/adapters/persistence/workflow/channel_reply_completion.rs b/src/adapters/persistence/workflow/channel_reply_completion.rs
+index 23382b50..30b7d3e6 100644
+--- a/src/adapters/persistence/workflow/channel_reply_completion.rs
++++ b/src/adapters/persistence/workflow/channel_reply_completion.rs
+@@ -354,6 +354,7 @@ fn final_action(
+         contract: builtin_message_snapshot(scope.company, MessageKind::Reply)?,
+         arguments: json!({"source_message":root.message_id,"content":content}),
+         context: ActionPolicyContext {
++            integration: None,
+             actor: root.actor_id,
+             capability_ceiling: vec![TypeName::parse("message.reply").map_err(|_| invalid())?],
+             approval_required: root.approval_policy.is_some(),
+diff --git a/src/adapters/persistence/workflow/decision_authority_tests.rs b/src/adapters/persistence/workflow/decision_authority_tests.rs
+index 88d6446c..8790e3e1 100644
+--- a/src/adapters/persistence/workflow/decision_authority_tests.rs
++++ b/src/adapters/persistence/workflow/decision_authority_tests.rs
+@@ -301,7 +301,9 @@ async fn workflow_decision_production_removal_preserves_open_and_settled_history
+ async fn await_blocked_removal(pool: &sqlx::PgPool) {
+     tokio::time::timeout(std::time::Duration::from_millis(800), async {
+         loop {
+-            let blocked: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM pg_stat_activity WHERE datname=current_database() AND query LIKE 'UPDATE principals%' AND cardinality(pg_blocking_pids(pid))>0)")
++            // Removal now locks the company before its principal. Observe either
++            // real removal statement, depending on which held decision lock it meets.
++            let blocked: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM pg_stat_activity WHERE datname=current_database() AND (query LIKE 'UPDATE principals%' OR query='SELECT id FROM companies WHERE id=$1 FOR NO KEY UPDATE') AND cardinality(pg_blocking_pids(pid))>0)")
+                 .fetch_one(pool).await.unwrap();
+             if blocked { break; }
+             tokio::time::sleep(std::time::Duration::from_millis(5)).await;
+diff --git a/src/adapters/persistence/workflow/http.rs b/src/adapters/persistence/workflow/http.rs
+index a625f814..63f05fb0 100644
+--- a/src/adapters/persistence/workflow/http.rs
++++ b/src/adapters/persistence/workflow/http.rs
+@@ -59,6 +59,7 @@ struct ConnectionRow {
+     origin: String,
+     enabled: bool,
+     bearer: bool,
++    integration: Option<Value>,
+     secret_set: bool,
+     revision: i64,
+     access_level: i16,
+@@ -70,7 +71,17 @@ impl ConnectionRow {
+             id: self.id,
+             origin: HttpOrigin::parse(&self.origin)?,
+             enabled: self.enabled,
+-            bearer: self.bearer,
++            credential_source: match self.integration {
++                Some(value) => {
++                    crate::domain::integrations::authority::CredentialSource::Integration(
++                        serde_json::from_value(value).map_err(|_| invalid())?,
++                    )
++                }
++                None if self.bearer => {
++                    crate::domain::integrations::authority::CredentialSource::ConnectionBearer
++                }
++                None => crate::domain::integrations::authority::CredentialSource::None,
++            },
+             secret_set: self.secret_set,
+             revision: self.revision,
+             access_level: crate::entities::access_level::AccessLevel::try_from(self.access_level)
+@@ -83,7 +94,7 @@ pub(in crate::adapters::persistence) async fn connection_on(
+     company: CompanyId,
+     id: Uuid,
+ ) -> AppResult<Option<HttpConnection>> {
+-    sqlx::query_as::<_, ConnectionRow>("SELECT connection.company_id, connection.id, connection.origin, connection.enabled, connection.bearer, connection.revision, connection.access_level::smallint AS access_level, EXISTS(SELECT 1 FROM workflow_http_credentials AS credential WHERE credential.company_id=connection.company_id AND credential.connection_id=connection.id) AS secret_set FROM workflow_http_connections AS connection WHERE connection.company_id=$1 AND connection.id=$2 FOR SHARE OF connection")
++    sqlx::query_as::<_, ConnectionRow>("SELECT connection.company_id, connection.id, connection.origin, connection.enabled, connection.bearer,CASE WHEN connection.integration_grant_id IS NOT NULL THEN jsonb_build_object('account',connection.integration_account_id,'grant',connection.integration_grant_id,'authorization',connection.integration_authorization,'grant_revision',connection.integration_grant_revision) END AS integration, connection.revision, connection.access_level::smallint AS access_level, EXISTS(SELECT 1 FROM workflow_http_credentials AS credential WHERE credential.company_id=connection.company_id AND credential.connection_id=connection.id) AS secret_set FROM workflow_http_connections AS connection WHERE connection.company_id=$1 AND connection.id=$2 FOR SHARE OF connection")
+         .bind(company.as_uuid()).bind(id).fetch_optional(&mut *tx).await?.map(ConnectionRow::decode).transpose()
+ }
+ async fn edit_on(
+@@ -134,7 +145,7 @@ impl HttpConnections for PostgresPersistence {
+     ) -> AppResult<Vec<HttpConnection>> {
+         let mut tx = begin_http(self).await?;
+         authority::authorize_company(&mut tx, company, actor).await?;
+-        let rows=sqlx::query_as::<_,ConnectionRow>("SELECT connection.company_id,connection.id,connection.origin,connection.enabled,connection.bearer,connection.revision,connection.access_level::smallint AS access_level, EXISTS(SELECT 1 FROM workflow_http_credentials AS credential WHERE credential.company_id=connection.company_id AND credential.connection_id=connection.id) AS secret_set FROM workflow_http_connections AS connection WHERE connection.company_id=$1 ORDER BY connection.id LIMIT 257")
++        let rows=sqlx::query_as::<_,ConnectionRow>("SELECT connection.company_id,connection.id,connection.origin,connection.enabled,connection.bearer,CASE WHEN connection.integration_grant_id IS NOT NULL THEN jsonb_build_object('account',connection.integration_account_id,'grant',connection.integration_grant_id,'authorization',connection.integration_authorization,'grant_revision',connection.integration_grant_revision) END AS integration,connection.revision,connection.access_level::smallint AS access_level, EXISTS(SELECT 1 FROM workflow_http_credentials AS credential WHERE credential.company_id=connection.company_id AND credential.connection_id=connection.id) AS secret_set FROM workflow_http_connections AS connection WHERE connection.company_id=$1 ORDER BY connection.id LIMIT 257")
+             .bind(company.as_uuid()).fetch_all(&mut *tx).await?;
+         if rows.len() > 256 {
+             return Err(AppError::BadRequest(
+@@ -237,7 +248,7 @@ impl HttpConnections for PostgresPersistence {
+         }
+         let mut tx = begin_http(self).await?;
+         let connection = edit_on(&mut tx, company, actor, id, revision).await?;
+-        if secret.is_some() && !connection.bearer {
++        if secret.is_some() && !connection.uses_owned_bearer() {
+             return Err(invalid());
+         }
+         if let Some(secret) = secret {
+@@ -317,7 +328,7 @@ pub(super) async fn status_on(
+         authorized: true,
+         readiness: if !connection.enabled {
+             ResourceReadiness::Revoked
+-        } else if connection.bearer && !connection.secret_set {
++        } else if connection.uses_owned_bearer() && !connection.secret_set {
+             ResourceReadiness::Unavailable
+         } else {
+             ResourceReadiness::Ready
+@@ -366,6 +377,8 @@ impl action_dispatch::SqlActionAuthority for HttpActionAuthority {
+         let connection = connection_on(tx, request.scope.company, id)
+             .await?
+             .ok_or_else(missing)?;
++        let current = super::integration_authority::http_snapshot(tx, &connection).await?;
++        super::integration_authority::check_snapshot(request, current)?;
+         Ok(action_dispatch::LockedActionAuthority {
+             resource: status_on(tx, &connection).await?,
+             policy: policy_on(tx, request.scope.company, id, &request.contract).await?,
+@@ -390,7 +403,7 @@ impl PostgresPersistence {
+     pub(crate) async fn http_for_action(
+         &self,
+         action: &FrozenAction,
+-    ) -> AppResult<(HttpConnection, Option<SecretString>)> {
++    ) -> AppResult<(HttpConnection, PreparedAuthentication)> {
+         let request = action.request();
+         let company = request.scope.company;
+         let id = http_target(&request.target)?;
+@@ -415,6 +428,15 @@ impl PostgresPersistence {
+         {
+             return Err(missing());
+         }
++        let current = super::integration_authority::http_snapshot(&mut tx, &connection).await?;
++        super::integration_authority::check_snapshot(request, current.clone())?;
++        if let Some(snapshot) = current {
++            tx.commit().await?;
++            return Ok((
++                connection,
++                PreparedAuthentication::Integration(Box::new(snapshot)),
++            ));
++        }
+         let envelope: Option<String> = sqlx::query_scalar("SELECT envelope FROM workflow_http_credentials WHERE company_id=$1 AND connection_id=$2").bind(company.as_uuid()).bind(id).fetch_optional(&mut *tx).await?;
+         let secret = envelope
+             .map(|envelope| {
+@@ -424,11 +446,11 @@ impl PostgresPersistence {
+                 )
+             })
+             .transpose()?;
+-        if connection.bearer != secret.is_some() {
++        if connection.uses_owned_bearer() != secret.is_some() {
+             return Err(missing());
+         }
+         tx.commit().await?;
+-        Ok((connection, secret))
++        Ok((connection, PreparedAuthentication::ConnectionOwned(secret)))
+     }
+ }
+ 
+diff --git a/src/adapters/persistence/workflow/http_publication.rs b/src/adapters/persistence/workflow/http_publication.rs
+index 8773160c..bbf48b6a 100644
+--- a/src/adapters/persistence/workflow/http_publication.rs
++++ b/src/adapters/persistence/workflow/http_publication.rs
+@@ -49,7 +49,7 @@ pub(in crate::adapters::persistence::workflow) async fn capture_on(
+         let connection = connection_on(tx, company, selection.connection)
+             .await?
+             .ok_or_else(missing)?;
+-        if !connection.enabled || (connection.bearer && !connection.secret_set) {
++        if !connection.enabled || (connection.uses_owned_bearer() && !connection.secret_set) {
+             return Err(missing());
+         }
+         let snapshot: Value = sqlx::query_scalar("SELECT snapshot FROM workflow_http_operations WHERE revoked_at IS NULL AND company_id=$1 AND connection_id=$2 AND name=$3")
+diff --git a/src/adapters/persistence/workflow/http_runtime.rs b/src/adapters/persistence/workflow/http_runtime.rs
+index c6bebe38..3e3e9746 100644
+--- a/src/adapters/persistence/workflow/http_runtime.rs
++++ b/src/adapters/persistence/workflow/http_runtime.rs
+@@ -61,6 +61,7 @@ fn request(
+ /// The run's actor and the frozen bundle's capability ceiling.
+ pub(in crate::adapters::persistence::workflow) fn context(facts: &RunFacts) -> ActionPolicyContext {
+     ActionPolicyContext {
++        integration: None,
+         origin: crate::application::agent::ToolCallOrigin::Workflow,
+         actor: facts.actor.user_id(),
+         capability_ceiling: facts
+@@ -165,7 +166,19 @@ impl HttpActionPreparation for PostgresPersistence {
+             None => registered_on(&mut tx, scope.company, &tool).await?,
+         };
+         policy_on(&mut tx, scope.company, id, &tool).await?;
+-        let result = request(scope, &facts, id, tool, arguments)?;
++        let mut result = request(scope, &facts, id, tool, arguments)?;
++        let connection = connection_on(&mut tx, scope.company, id)
++            .await?
++            .ok_or_else(missing)?;
++        let current =
++            super::super::integration_authority::http_snapshot(&mut tx, &connection).await?;
++        result.context.integration = super::super::integration_authority::frozen_snapshot_on(
++            &mut tx,
++            &result,
++            current.clone(),
++        )
++        .await?;
++        super::super::integration_authority::check_snapshot(&result, current)?;
+         ready_on(&mut tx, &result).await?;
+         tx.commit().await?;
+         Ok(result)
+@@ -198,6 +211,15 @@ impl HttpActionPreparation for PostgresPersistence {
+             {
+                 return Err(missing());
+             }
++            if matches!(
++                connection_on(&mut tx, scope.company, call.connection)
++                    .await?
++                    .ok_or_else(missing)?
++                    .credential_source,
++                crate::domain::integrations::authority::CredentialSource::Integration(_)
++            ) {
++                return Err(missing());
++            }
+             ready_on(&mut tx, &result).await?;
+             tx.commit().await?;
+             return Ok(result);
+@@ -214,6 +236,15 @@ impl HttpActionPreparation for PostgresPersistence {
+         if registered_on(&mut tx, scope.company, &tool).await? != call.connection {
+             return Err(missing());
+         }
++        if matches!(
++            connection_on(&mut tx, scope.company, call.connection)
++                .await?
++                .ok_or_else(missing)?
++                .credential_source,
++            crate::domain::integrations::authority::CredentialSource::Integration(_)
++        ) {
++            return Err(missing());
++        }
+         let result = request(scope, &facts, call.connection, tool, call.arguments.clone())?;
+         ready_on(&mut tx, &result).await?;
+         tx.commit().await?;
+diff --git a/src/adapters/persistence/workflow/http_tests.rs b/src/adapters/persistence/workflow/http_tests.rs
+index 0d01ed18..dc14eb5f 100644
+--- a/src/adapters/persistence/workflow/http_tests.rs
++++ b/src/adapters/persistence/workflow/http_tests.rs
+@@ -511,3 +511,6 @@ mod agent_runtime_tests;
+ 
+ #[path = "knowledge_http_tests.rs"]
+ mod knowledge_http_tests;
++
++#[path = "vault_tests/mod.rs"]
++mod vault_tests;
+diff --git a/src/adapters/persistence/workflow/knowledge_history_race_tests.rs b/src/adapters/persistence/workflow/knowledge_history_race_tests.rs
+index 0431d23b..479d9cac 100644
+--- a/src/adapters/persistence/workflow/knowledge_history_race_tests.rs
++++ b/src/adapters/persistence/workflow/knowledge_history_race_tests.rs
+@@ -62,6 +62,7 @@ fn request(
+         },
+         arguments: json!({"content":{"subject":"Racing branch","body":body},"destinations":[{"kind":kind,"id":destination.to_string()}]}),
+         context: ActionPolicyContext {
++            integration: None,
+             origin: crate::application::agent::ToolCallOrigin::Workflow,
+             actor: f.binding.target.actor.user_id(),
+             capability_ceiling: vec![contract.policy.capability.clone()],
+diff --git a/src/adapters/persistence/workflow/mcp.rs b/src/adapters/persistence/workflow/mcp.rs
+index 286dadf9..a2eefac4 100644
+--- a/src/adapters/persistence/workflow/mcp.rs
++++ b/src/adapters/persistence/workflow/mcp.rs
+@@ -177,6 +177,8 @@ impl action_dispatch::SqlActionAuthority for McpActionAuthority {
+         let connection = connection_on(tx, request.scope.company, mcp_target(&request.target)?)
+             .await?
+             .ok_or_else(missing)?;
++        let current = super::integration_authority::mcp_snapshot(tx, &connection).await?;
++        super::integration_authority::check_snapshot(request, current)?;
+         Ok(action_dispatch::LockedActionAuthority {
+             resource: status_on(tx, &connection).await?,
+             policy: policy_on(tx, &connection, &request.contract).await?,
+@@ -306,6 +308,21 @@ impl McpActionUse for PostgresPersistence {
+         live_run_on(&mut tx, request).await?;
+         super::agent_origin::current_on(&mut tx, request).await?;
+         let (connection, decision) = current_on(&mut tx, request).await?;
++        let current = super::integration_authority::mcp_snapshot(&mut tx, &connection).await?;
++        super::integration_authority::check_snapshot(request, current.clone())?;
++        let approved = decisions::approvals::approved_request(&mut tx, request).await?;
++        if let Some(snapshot) = current {
++            tx.commit().await?;
++            return Ok(McpUse {
++                endpoint: connection.endpoint,
++                authentication:
++                    crate::application::workflow::http::PreparedAuthentication::Integration(
++                        Box::new(snapshot),
++                    ),
++                credential_revision: connection.credential_revision,
++                approval_required: decision == ActionAccessDecision::ApprovalRequired && !approved,
++            });
++        }
+         let envelope: Option<String> = sqlx::query_scalar(
+             "SELECT envelope FROM company_mcp_credentials WHERE company_id=$1 AND connection_id=$2",
+         )
+@@ -328,7 +345,8 @@ impl McpActionUse for PostgresPersistence {
+         tx.commit().await?;
+         Ok(McpUse {
+             endpoint: connection.endpoint,
+-            token,
++            authentication:
++                crate::application::workflow::http::PreparedAuthentication::ConnectionOwned(token),
+             credential_revision: connection.credential_revision,
+             approval_required: decision == ActionAccessDecision::ApprovalRequired && !approved,
+         })
+diff --git a/src/adapters/persistence/workflow/mcp_runtime.rs b/src/adapters/persistence/workflow/mcp_runtime.rs
+index 12bc5c75..07536e8d 100644
+--- a/src/adapters/persistence/workflow/mcp_runtime.rs
++++ b/src/adapters/persistence/workflow/mcp_runtime.rs
+@@ -70,7 +70,19 @@ impl McpActionPreparation for PostgresPersistence {
+         let tool = field("tool")?
+             .as_str()
+             .ok_or_else(crate::application::workflow::mcp::invalid)?;
+-        let result = request(scope, &facts, &slot, tool, field("arguments")?.clone())?;
++        let mut result = request(scope, &facts, &slot, tool, field("arguments")?.clone())?;
++        let connection = connection_on(&mut tx, scope.company, mcp_target(&result.target)?)
++            .await?
++            .ok_or_else(missing)?;
++        let current =
++            super::super::integration_authority::mcp_snapshot(&mut tx, &connection).await?;
++        result.context.integration = super::super::integration_authority::frozen_snapshot_on(
++            &mut tx,
++            &result,
++            current.clone(),
++        )
++        .await?;
++        super::super::integration_authority::check_snapshot(&result, current)?;
+         current_on(&mut tx, &result).await?;
+         tx.commit().await?;
+         Ok(result)
+@@ -110,6 +122,15 @@ impl McpActionPreparation for PostgresPersistence {
+                 result
+             }
+         };
++        if matches!(
++            connection_on(&mut tx, scope.company, mcp_target(&result.target)?)
++                .await?
++                .ok_or_else(missing)?
++                .auth,
++            crate::entities::mcp::McpAuth::Integration(_)
++        ) {
++            return Err(missing());
++        }
+         current_on(&mut tx, &result).await?;
+         tx.commit().await?;
+         Ok(result)
+diff --git a/src/adapters/persistence/workflow/mcp_test_support.rs b/src/adapters/persistence/workflow/mcp_test_support.rs
+index 525fe3b3..5e492df1 100644
+--- a/src/adapters/persistence/workflow/mcp_test_support.rs
++++ b/src/adapters/persistence/workflow/mcp_test_support.rs
+@@ -583,3 +583,6 @@ pub(super) fn counts(dispatches: i64, entries: i64, receipts: i64) -> ActionCoun
+         receipts,
+     }
+ }
++
++#[path = "mcp_renewal_support.rs"]
++pub(in crate::adapters::persistence::workflow) mod renewal;
+diff --git a/src/adapters/persistence/workflow/mcp_tests.rs b/src/adapters/persistence/workflow/mcp_tests.rs
+index 4f3427b7..72ed2e9a 100644
+--- a/src/adapters/persistence/workflow/mcp_tests.rs
++++ b/src/adapters/persistence/workflow/mcp_tests.rs
+@@ -499,3 +499,6 @@ mod approval_tests;
+ 
+ #[path = "knowledge_mcp_tests.rs"]
+ mod knowledge_mcp_tests;
++
++#[path = "vault_tests/mcp.rs"]
++mod vault_authority_tests;
+diff --git a/src/adapters/persistence/workflow/mod.rs b/src/adapters/persistence/workflow/mod.rs
+index 0225eb91..9af7cae6 100644
+--- a/src/adapters/persistence/workflow/mod.rs
++++ b/src/adapters/persistence/workflow/mod.rs
+@@ -157,3 +157,9 @@ mod storage_retention;
+ 
+ mod sample_capture;
+ pub use sample_capture::SampleCapture;
++
++#[cfg_attr(
++    not(test),
++    expect(dead_code, reason = "Final business dispatch is wired in phase06")
++)]
++pub(crate) mod integration_authority;
+diff --git a/src/adapters/persistence/workflow/provisioning_dispatch_tests.rs b/src/adapters/persistence/workflow/provisioning_dispatch_tests.rs
+index 8e6bb0a7..32060983 100644
+--- a/src/adapters/persistence/workflow/provisioning_dispatch_tests.rs
++++ b/src/adapters/persistence/workflow/provisioning_dispatch_tests.rs
+@@ -129,6 +129,7 @@ async fn call(
+         },
+         arguments,
+         context: ActionPolicyContext {
++            integration: None,
+             origin: crate::application::agent::ToolCallOrigin::Workflow,
+             actor: owner(f).user_id(),
+             capability_ceiling: vec![contract.policy.capability.clone()],
+diff --git a/src/adapters/workflow_http/mod.rs b/src/adapters/workflow_http/mod.rs
+index a78564fb..07bf0418 100644
+--- a/src/adapters/workflow_http/mod.rs
++++ b/src/adapters/workflow_http/mod.rs
+@@ -126,11 +126,13 @@ impl RemoteAction for HttpProvider {
+     async fn invoke(&self, action: &FrozenAction, _: &ProviderInvocation) -> AppResult<Value> {
+         let request = HttpRequest::parse(&action.request().arguments)?;
+         tokio::time::timeout(Duration::from_secs(30), async {
+-            let (connection, _) = self.persistence.http_for_action(action).await?;
++            let (connection, authentication) = self.persistence.http_for_action(action).await?;
++            authentication.into_owned()?;
+             let client = client(&self.policy, &connection).await?;
+             // DNS may have waited: reload revocation and rotated credentials after resolution,
+             // immediately before polling the HTTP request. The origin itself is immutable.
+-            let (connection, secret) = self.persistence.http_for_action(action).await?;
++            let (connection, authentication) = self.persistence.http_for_action(action).await?;
++            let secret = authentication.into_owned()?;
+             send(client, &connection, secret.as_ref(), request).await
+         })
+         .await
+diff --git a/src/adapters/workflow_http/tests.rs b/src/adapters/workflow_http/tests.rs
+index 7f67dd8d..54be2c66 100644
+--- a/src/adapters/workflow_http/tests.rs
++++ b/src/adapters/workflow_http/tests.rs
+@@ -10,7 +10,7 @@ fn connection(origin: &str) -> HttpConnection {
+         id: Uuid::new_v4(),
+         origin: HttpOrigin::parse(origin).unwrap(),
+         enabled: true,
+-        bearer: false,
++        credential_source: crate::domain::integrations::authority::CredentialSource::None,
+         secret_set: false,
+         revision: 1,
+     }
+diff --git a/src/application/mod.rs b/src/application/mod.rs
+index 0882d399..7b306544 100644
+--- a/src/application/mod.rs
++++ b/src/application/mod.rs
+@@ -1,6 +1,7 @@
+ pub mod agent;
+ pub mod app_error;
+ pub mod attention;
++pub mod integrations;
+ pub mod knowledge;
+ pub mod message_outcomes;
+ pub mod model_providers;
+diff --git a/src/application/ports/mod.rs b/src/application/ports/mod.rs
+index fb70c96d..40c9fb16 100644
+--- a/src/application/ports/mod.rs
++++ b/src/application/ports/mod.rs
+@@ -1,4 +1,5 @@
+ //! Ports shared across application subsystems. Contracts depend on domain and pure values.
++pub mod account_deletion;
+ pub mod channel;
+ pub mod integration;
+ pub mod participant;
+diff --git a/src/application/use_cases/mcp.rs b/src/application/use_cases/mcp.rs
+index ff601f0e..53cab299 100644
+--- a/src/application/use_cases/mcp.rs
++++ b/src/application/use_cases/mcp.rs
+@@ -243,6 +243,11 @@ impl McpUseCases {
+         current: &CompanyMcpConnection,
+     ) -> AppResult<CompanyMcpConnection> {
+         super::company::managed_company(self.companies.as_ref(), user, current.company_id).await?;
++        if matches!(current.auth, McpAuth::Integration(_)) {
++            return Err(crate::app_error::AppError::ServiceUnavailable(
++                "Integration discovery is not available yet".into(),
++            ));
++        }
+         let token = self
+             .credentials
+             .mcp_token(current.company_id, current.id, current.revision)
+diff --git a/src/application/use_cases/mod.rs b/src/application/use_cases/mod.rs
+index 6a85e30a..70dc5662 100644
+--- a/src/application/use_cases/mod.rs
++++ b/src/application/use_cases/mod.rs
+@@ -17,3 +17,5 @@ pub mod thread;
+ pub mod user;
+ 
+ pub mod mcp;
++
++pub mod integration_binding;
+diff --git a/src/application/workflow/actions/contracts.rs b/src/application/workflow/actions/contracts.rs
+index 6fb192b3..e8300eab 100644
+--- a/src/application/workflow/actions/contracts.rs
++++ b/src/application/workflow/actions/contracts.rs
+@@ -30,6 +30,7 @@ pub enum ActionTarget {
+ #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+ #[serde(deny_unknown_fields)]
+ pub struct ActionPolicyContext {
++    pub integration: Option<crate::domain::integrations::authority::AuthorizationSnapshot>,
+     pub actor: Uuid,
+     pub capability_ceiling: Vec<TypeName>,
+     pub approval_required: bool,
+diff --git a/src/application/workflow/actions/tests.rs b/src/application/workflow/actions/tests.rs
+index 687c7ed6..6a1b9cbd 100644
+--- a/src/application/workflow/actions/tests.rs
++++ b/src/application/workflow/actions/tests.rs
+@@ -32,6 +32,7 @@ pub(crate) fn request(scope: ActionScope) -> ActionRequest {
+         },
+         arguments: json!({"value":1}),
+         context: ActionPolicyContext {
++            integration: None,
+             origin: crate::application::agent::ToolCallOrigin::Workflow,
+             actor: Uuid::new_v4(),
+             capability_ceiling: vec![TypeName::parse("fixture.write").unwrap()],
+diff --git a/src/application/workflow/http.rs b/src/application/workflow/http.rs
+index 57958748..a5757cb3 100644
+--- a/src/application/workflow/http.rs
++++ b/src/application/workflow/http.rs
+@@ -57,7 +57,7 @@ pub struct HttpConnection {
+     pub id: Uuid,
+     pub origin: HttpOrigin,
+     pub enabled: bool,
+-    pub bearer: bool,
++    pub credential_source: crate::domain::integrations::authority::CredentialSource,
+     pub secret_set: bool,
+     pub revision: i64,
+     pub access_level: crate::entities::access_level::AccessLevel,
+@@ -274,3 +274,28 @@ pub fn safe_request_header(name: &str) -> bool {
+ pub fn invalid() -> AppError {
+     AppError::BadRequest("Invalid HTTP action configuration or input".into())
+ }
++
++impl HttpConnection {
++    pub fn uses_owned_bearer(&self) -> bool {
++        matches!(
++            self.credential_source,
++            crate::domain::integrations::authority::CredentialSource::ConnectionBearer
++        )
++    }
++}
++
++/// Explicit source split: integrations return only nonsecret authority metadata.
++pub enum PreparedAuthentication {
++    ConnectionOwned(Option<SecretString>),
++    Integration(Box<crate::domain::integrations::authority::AuthorizationSnapshot>),
++}
++impl PreparedAuthentication {
++    pub fn into_owned(self) -> AppResult<Option<SecretString>> {
++        match self {
++            Self::ConnectionOwned(secret) => Ok(secret),
++            Self::Integration(_) => Err(AppError::ServiceUnavailable(
++                "Integration execution is not available yet".into(),
++            )),
++        }
++    }
++}
+diff --git a/src/application/workflow/mcp_runtime.rs b/src/application/workflow/mcp_runtime.rs
+index 2ffa5d32..f5f1e365 100644
+--- a/src/application/workflow/mcp_runtime.rs
++++ b/src/application/workflow/mcp_runtime.rs
+@@ -5,7 +5,6 @@ use crate::application::{
+ };
+ use crate::domain::workflow::ResourceName;
+ use crate::entities::mcp::McpEndpoint;
+-use secrecy::SecretString;
+ use std::sync::{Arc, Mutex};
+ use tokio_util::sync::CancellationToken;
+ 
+@@ -49,7 +48,7 @@ pub trait McpActionPreparation: Send + Sync {
+ /// grant: reservation re-decides under its locks.
+ pub struct McpUse {
+     pub endpoint: McpEndpoint,
+-    pub token: Option<SecretString>,
++    pub authentication: crate::application::workflow::http::PreparedAuthentication,
+     pub credential_revision: i64,
+     pub approval_required: bool,
+ }
+@@ -288,7 +287,13 @@ async fn connect_checked(
+     request: &ActionRequest,
+ ) -> Result<Opened, Failure> {
+     let session = client
+-        .connect(&usage.endpoint, usage.token)
++        .connect(
++            &usage.endpoint,
++            usage
++                .authentication
++                .into_owned()
++                .map_err(Failure::Preparation)?,
++        )
+         .await
+         .map_err(|_| Failure::Unavailable)?;
+     match session.discover().await {
+diff --git a/src/domain/entities/mcp.rs b/src/domain/entities/mcp.rs
+index 79280528..c1d9eeed 100644
+--- a/src/domain/entities/mcp.rs
++++ b/src/domain/entities/mcp.rs
+@@ -68,12 +68,14 @@ impl From<McpToolName> for String {
+ pub enum McpAuth {
+     None,
+     Bearer,
++    Integration(crate::domain::integrations::authority::IntegrationReference),
+ }
+ impl McpAuth {
+     pub fn as_str(&self) -> &'static str {
+         match self {
+             Self::None => "none",
+             Self::Bearer => "bearer",
++            Self::Integration(_) => "integration",
+         }
+     }
+ }
+diff --git a/src/domain/mod.rs b/src/domain/mod.rs
+index 84b56869..9a02306a 100644
+--- a/src/domain/mod.rs
++++ b/src/domain/mod.rs
+@@ -1,3 +1,4 @@
+ pub mod entities;
++pub mod integrations;
+ pub mod monitoring;
+ pub mod workflow;
+diff --git a/src/infra/mod.rs b/src/infra/mod.rs
+index c3b51996..605ba6ce 100644
+--- a/src/infra/mod.rs
++++ b/src/infra/mod.rs
+@@ -32,3 +32,5 @@ pub async fn postgres_persistence() -> anyhow::Result<PostgresPersistence> {
+ pub fn argon2_password_hasher() -> ArgonPasswordHasher {
+     ArgonPasswordHasher::default()
+ }
++
++mod integrations;
+diff --git a/src/infra/setup.rs b/src/infra/setup.rs
+index 45c4403a..00cd0b5c 100644
+--- a/src/infra/setup.rs
++++ b/src/infra/setup.rs
+@@ -107,7 +107,10 @@ struct HttpComponents {
+ }
+ fn http_state(f: foundation::Foundation, c: HttpComponents) -> anyhow::Result<AppState> {
+     let p = f.persistence;
++    let (integrations, integration_bindings) = super::integrations::gateway(&p, &f.config)?;
+     Ok(AppState {
++        integrations,
++        integration_bindings,
+         knowledge: f.knowledge,
+         auth_admission: Arc::new(crate::adapters::http::auth_admission::AuthAdmission::from_env()?),
+         workflow: c.workflow,
+diff --git a/src/infra/workflow.rs b/src/infra/workflow.rs
+index 9ef8776d..e2db91c6 100644
+--- a/src/infra/workflow.rs
++++ b/src/infra/workflow.rs
+@@ -366,7 +366,18 @@ impl WorkflowEngine {
+     /// Start workflow slots, the intent worker, schedule materializer and metrics sampler
+     /// under `shutdown`. The caller keeps the handles and joins them on shutdown.
+     pub fn spawn(&self, shutdown: &CancellationToken) -> Vec<(&'static str, JoinHandle<()>)> {
+-        let mut handles = Vec::with_capacity(self.slots + 5);
++        let mut handles = Vec::with_capacity(self.slots + 6);
++        let vault = crate::adapters::persistence::integrations::PostgresVault::new(
++            self.services.persistence.clone(),
++        );
++        let vault_stop = shutdown.clone();
++        handles.push((
++            "integration teardown",
++            tokio::spawn(async move {
++                crate::application::integrations::lifecycle::run(&vault, &vault_stop).await;
++            }),
++        ));
++
+         let metric_persistence = self.services.persistence.clone();
+         let monitoring = self.monitoring.clone();
+         let metric_shutdown = shutdown.clone();
+@@ -724,6 +735,11 @@ mod tests {
+         let (_database, engine, _) = composed().await;
+         let shutdown = CancellationToken::new();
+         let handles = engine.spawn(&shutdown);
++        assert!(
++            handles
++                .iter()
++                .any(|(name, _)| *name == "integration teardown")
++        );
+         let task_count = handles.len();
+         engine.intent_wakeups.notify_waiters();
+         engine.worker_wakeups.notify_waiters();
+@@ -736,8 +752,8 @@ mod tests {
+                 .unwrap();
+         }
+         assert_eq!(
+-            task_count, 6,
+-            "one slot, metrics, intent, final publication, schedule and storage workers"
++            task_count, 7,
++            "one slot, metrics, intent, final publication, schedule, storage and integration teardown workers"
+         );
+     }
+ 
+diff --git a/src/lib.rs b/src/lib.rs
+index 620cef20..e84a6340 100644
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -11,6 +11,7 @@ pub mod infra;
+ pub(crate) mod test_support;
+ 
+ // Re-exports for shorter use statements.
++pub use application::integrations;
+ pub use application::*;
+ pub use domain::workflow;
+ pub use domain::*;

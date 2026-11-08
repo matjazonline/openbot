@@ -1,0 +1,4807 @@
+--- accepted-p03/docs/deploy.md
++++ current/docs/deploy.md
+@@ -717,3 +717,48 @@
+ run history and company model usage. Provider usage is billed by TypeSafe; local
+ estimates and configured prices are not invoices. Operational failure/recovery and
+ revocation semantics are in the [Jev runbook](workflow-operations.md#typesafe-jev-evaluation).
++
++### Google connected apps
++
++Google mailbox consent uses the existing `GOOGLE_OAUTH_CLIENT_ID` and
++`GOOGLE_OAUTH_CLIENT_SECRET` pair. It has a separate callback and credential store
++from Openbot sign-in. Register both the existing sign-in redirect and
++`<public-base>/auth/integrations/google/callback` on that web OAuth client; the public
++base comes from the application's `APP_DOMAIN_NAME` configuration. Use HTTPS for
++public deployments. The integration authorization flow requests offline access,
++PKCE, `openid`, `email`, `gmail.readonly`, and `gmail.send`. Connecting is an explicit
++owner action; ordinary workflow runs do not prompt for consent. See Google's
++[web-server authorization guide](https://developers.google.com/identity/protocols/oauth2/web-server).
++
++Enable `gmail.googleapis.com` in the client project's API library, following
++[Google's API enablement instructions](https://developers.google.com/workspace/guides/enable-apis).
++Choose an audience that includes the accounts you intend to connect: personal
++Gmail accounts need an External audience. In Testing, add the intended accounts
++as test users. Google's [audience guide](https://support.google.com/cloud/answer/15549945?hl=en)
++explains the available audiences and testing restrictions. External Testing
++refresh grants with Gmail scopes ordinarily expire after seven days; see
++[Google's token expiration rules](https://developers.google.com/identity/protocols/oauth2).
++
++`gmail.send` is sensitive and `gmail.readonly` is restricted. Public use can require
++OAuth verification, and storing or transmitting restricted-scope data can require
++a security assessment. Draft management is not included. Check Google's
++[current Gmail scope requirements](https://developers.google.com/workspace/gmail/api/auth/scopes)
++for your deployment. Workspace administrators may additionally restrict or block
++the app through [API controls](https://knowledge.workspace.google.com/admin/apps/control-which-third-party-and-internal-apps-access-google-workspace-data).
++Credential configuration alone does not establish Google verification or Workspace
++approval; startup does not contact Google to validate those approvals.
++
++A connected mailbox may differ from the owner's Openbot login address. Consent
++saves a private account; each company connection still needs the owner's explicit
++binding confirmation. Reconnecting changes authorization identity and requires
++fresh confirmation for existing company grants. Disconnecting locally erases usable
++local credentials and denies those grants; it does not revoke Google's combined
++project grant. Removing one company binding also does not revoke that provider grant.
++
++Connect attempts expire after ten minutes, with at most eight active attempts and
++32 retained outcomes per owner. PKCE verifiers are encrypted in the credential key
++inventory, erased when consumed or when bounded owner maintenance observes expiry,
++and removed on owner retirement. Keep encryption keys available until the existing
++rotation/status commands report convergence. Scripted provider tests do not establish
++live-project readiness. Business Gmail HTTP/MCP transport is delivered by vault
++phase06, after authorization and private renewal are integrated.
+--- accepted-p03/migrations/20260817000000_init_schema.sql
++++ current/migrations/20260817000000_init_schema.sql
+@@ -13688,3 +13688,65 @@
+     expires_at timestamptz NOT NULL,
+     consumed boolean NOT NULL DEFAULT false
+ );
++
++-- Bounded private external-app consent; never Openbot sign-in state.
++CREATE TABLE integration_connect_attempts (
++    id UUID PRIMARY KEY,
++    owner_namespace TEXT NOT NULL,
++    owner_subject TEXT NOT NULL,
++    facts TEXT NOT NULL CHECK(octet_length(facts)<=4096 AND jsonb_typeof(facts::jsonb)='object'),
++    status TEXT NOT NULL CHECK(status IN ('pending','processing','connected','denied','expired','cancelled','missing_permissions','missing_refresh','identity_mismatch','conflict','provider_error','configuration','admin_blocked')),
++    envelope TEXT CHECK(octet_length(envelope)<=23000),
++    account_id UUID,
++    created_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
++    expires_at TIMESTAMPTZ NOT NULL,
++    FOREIGN KEY(owner_namespace,owner_subject) REFERENCES integration_owner_states(owner_namespace,owner_subject),
++    FOREIGN KEY(owner_namespace,owner_subject,account_id) REFERENCES integration_accounts(owner_namespace,owner_subject,id) ON DELETE SET NULL(account_id),
++    CHECK(expires_at>created_at AND expires_at<=created_at+interval '10 minutes'),
++    CHECK((status='pending')=(envelope IS NOT NULL)),
++    CHECK(account_id IS NULL OR status='connected')
++);
++CREATE INDEX integration_connect_owner ON integration_connect_attempts(owner_namespace,owner_subject,created_at,id);
++CREATE FUNCTION integration_connect_guard() RETURNS TRIGGER LANGUAGE plpgsql AS $$
++DECLARE retired_owner BOOLEAN; active_count BIGINT; terminal_count BIGINT; total_count BIGINT;
++BEGIN
++    IF TG_OP='UPDATE' THEN
++        IF (NEW.id,NEW.owner_namespace,NEW.owner_subject,NEW.facts,NEW.created_at,NEW.expires_at)
++           IS DISTINCT FROM (OLD.id,OLD.owner_namespace,OLD.owner_subject,OLD.facts,OLD.created_at,OLD.expires_at) THEN
++            RAISE EXCEPTION 'immutable connect facts' USING ERRCODE='23514';
++        END IF;
++        IF NEW.status IS DISTINCT FROM OLD.status AND
++           NOT ((OLD.status='pending' AND NEW.status IN ('processing','expired','cancelled')) OR
++                (OLD.status='processing' AND NEW.status NOT IN ('pending','processing'))) THEN
++            RAISE EXCEPTION 'invalid connect transition' USING ERRCODE='23514';
++        END IF;
++        IF NEW.account_id IS DISTINCT FROM OLD.account_id AND
++           NOT ((OLD.status='processing' AND NEW.status='connected') OR NEW.account_id IS NULL) THEN
++            RAISE EXCEPTION 'invalid connect account' USING ERRCODE='23514';
++        END IF;
++        -- Rewrapping takes only this row. Never invert owner -> attempt locking.
++        IF NEW.status=OLD.status THEN RETURN NEW; END IF;
++    ELSE
++        INSERT INTO integration_owner_states(owner_namespace,owner_subject,retired)
++            VALUES(NEW.owner_namespace,NEW.owner_subject,FALSE) ON CONFLICT DO NOTHING;
++        IF NEW.status<>'pending' OR NEW.account_id IS NOT NULL THEN
++            RAISE EXCEPTION 'invalid initial connect state' USING ERRCODE='23514';
++        END IF;
++    END IF;
++    SELECT retired INTO retired_owner FROM integration_owner_states
++        WHERE owner_namespace=NEW.owner_namespace AND owner_subject=NEW.owner_subject FOR UPDATE;
++    IF retired_owner IS DISTINCT FROM FALSE THEN
++        RAISE EXCEPTION 'owner retired' USING ERRCODE='23514',CONSTRAINT='integration_owner_retired';
++    END IF;
++    SELECT count(*),count(*) FILTER(WHERE status IN ('pending','processing') AND expires_at>clock_timestamp()),
++           count(*) FILTER(WHERE status NOT IN ('pending','processing'))
++      INTO total_count,active_count,terminal_count FROM integration_connect_attempts
++      WHERE owner_namespace=NEW.owner_namespace AND owner_subject=NEW.owner_subject AND id<>NEW.id;
++    IF total_count>=40 OR (NEW.status IN ('pending','processing') AND active_count>=8) OR
++       (NEW.status NOT IN ('pending','processing') AND terminal_count>=32) THEN
++        RAISE EXCEPTION 'connect cap reached' USING ERRCODE='23514',CONSTRAINT='integration_connect_cap';
++    END IF;
++    RETURN NEW;
++END $$;
++CREATE TRIGGER integration_connect_guard BEFORE INSERT OR UPDATE ON integration_connect_attempts
++    FOR EACH ROW EXECUTE FUNCTION integration_connect_guard();
+--- accepted-p03/plan/vault-google/README.md
++++ current/plan/vault-google/README.md
+@@ -6,10 +6,10 @@
+ 
+ ## Outcome and status
+ 
+-Status: stages 01–03 implemented; independent acceptance is recorded in each phase's docs.
+-The vault supports static bearer and registered `X-API-Key` credentials and separate owner consent
+-for company HTTP/MCP bindings. External-app OAuth and business integration execution follow in
+-04–06; this stage does not resolve credentials for workflow handlers. The existing directory name is retained; the shared architecture covers multiple apps
++Status: stages 01–04 implemented; independent review and acceptance status are recorded in each phase's docs.
++The vault supports static bearer and registered `X-API-Key` credentials, separate Google mailbox
++consent, and explicit owner grants for company HTTP/MCP bindings. Private renewal and business
++integration execution follow in 05–06; workflow handlers do not receive vault credentials. The existing directory name is retained; the shared architecture covers multiple apps
+ and authentication methods, with Google/Gmail as the first production OAuth integration.
+ 
+ A user can save reusable private credentials, connect external accounts, and authorize selected
+--- accepted-p03/src/adapters/http/pages/vault.rs
++++ current/src/adapters/http/pages/vault.rs
+@@ -1,7 +1,11 @@
+ use super::{escape_html_attr, escape_html_text};
+ use crate::domain::integrations::*;
+ 
+-pub fn vault_content(page: &AccountPage, message: Option<&str>) -> String {
++pub fn vault_content(
++    page: &AccountPage,
++    message: Option<&str>,
++    apps: &[crate::application::integrations::ConnectApp],
++) -> String {
+     let banner = message
+         .map(|text| {
+             format!(
+@@ -10,7 +14,11 @@
+             )
+         })
+         .unwrap_or_default();
+-    let accounts = page.accounts.iter().map(account_card).collect::<String>();
++    let accounts = page
++        .accounts
++        .iter()
++        .map(|a| account_card(a, apps))
++        .collect::<String>();
+     let next = page
+         .next
+         .map(|id| {
+@@ -24,7 +32,8 @@
+         r##"<div id="vault-content" class="mx-auto max-w-3xl p-6 lg:p-10">
+         <a class="link" href="/ui/profile">Back to profile</a><h1 class="mb-4 text-2xl font-bold">Vault / Connected apps</h1>
+         <p class="mb-4 text-sm">Private, server-encrypted storage. Saved secrets can be replaced and cannot be read back. Company connections require a separate owner confirmation.</p>
+-        {banner}{create}<div class="space-y-4">{accounts}</div>{next}</div>"##,
++        {banner}{connect}{create}<div class="space-y-4">{accounts}</div>{next}</div>"##,
++        connect = connect_apps(apps),
+         create = create_form()
+     )
+ }
+@@ -37,13 +46,16 @@
+         <label class="block">Secret<textarea class="textarea w-full" name="value" maxlength="16384" required autocomplete="off" spellcheck="false"></textarea></label>
+         <p class="text-xs opacity-70">Enter a token or the adapter's typed JSON: token for bearer, api_key for API key.</p><button type="submit" class="btn btn-primary">Save credential</button></form></section>"##.to_string()
+ }
+-fn account_card(account: &ConnectedAccount) -> String {
++fn account_card(
++    account: &ConnectedAccount,
++    apps: &[crate::application::integrations::ConnectApp],
++) -> String {
+     let id = account.id.as_uuid();
+     let revision = account.revision.get();
+     let replace = if account.auth_method == AuthMethod::StaticSecret {
+         replacement_form(account)
+     } else {
+-        String::new()
++        apps.iter().filter(|app|app.config==account.auth_config_id&&app.provider==account.provider_id).map(|app|format!("<form method=\"post\" action=\"/ui/profile/vault/apps/{}/connect\"><input type=\"hidden\" name=\"account\" value=\"{id}\"><input type=\"hidden\" name=\"authorization\" value=\"{}\"><button class=\"btn btn-sm\" type=\"submit\">Reconnect {}</button><p>Company grants require fresh confirmation after reconnecting.</p></form>",escape_html_attr(app.id.as_str()),account.authorization_revision.get(),escape_html_text(app.id.as_str()))).collect()
+     };
+     let configured = match account.status {
+         AccountStatus::Ready => "Configured",
+@@ -51,14 +63,15 @@
+         AccountStatus::Disconnected => "Not configured",
+     };
+     format!(
+-        r##"<section class="rounded-box border border-base-300 p-5"><h2 class="text-lg font-semibold">{label}</h2><p class="font-mono text-xs">{key}</p><p>{configured}</p>
++        r##"<section class="rounded-box border border-base-300 p-5"><h2 class="text-lg font-semibold">{label}</h2><p class="font-mono text-xs">{key}</p><p>{configured}</p><p>{description}</p>
+         <p class="text-xs opacity-70"><a class="link" href="/ui/profile/vault/{id}">Inspect company grants</a></p>{replace}
+         <form hx-post="/ui/profile/vault/{id}/disconnect" hx-target="#vault-content" hx-swap="outerHTML" hx-sync="this:drop">
+-        <input type="hidden" name="expected_revision" value="{revision}"><button class="btn btn-sm" type="submit">Disconnect</button></form>
++        <input type="hidden" name="expected_revision" value="{revision}"><button class="btn btn-sm" type="submit">Disconnect locally</button></form>
+         <form hx-delete="/ui/profile/vault/{id}" hx-target="#vault-content" hx-swap="outerHTML" hx-sync="this:drop">
+         <input type="hidden" name="expected_revision" value="{revision}"><button class="btn btn-sm" type="submit">Remove account</button></form></section>"##,
+         label = escape_html_text(account.metadata.label()),
+-        key = escape_html_text(account.key.as_str())
++        key = escape_html_text(account.key.as_str()),
++        description = escape_html_text(account.metadata.description().unwrap_or(""))
+     )
+ }
+ fn replacement_form(account: &ConnectedAccount) -> String {
+@@ -78,3 +91,10 @@
+         label = escape_html_attr(account.metadata.label())
+     )
+ }
++
++fn connect_apps(apps: &[crate::application::integrations::ConnectApp]) -> String {
++    let forms=apps.iter().map(|app|format!("<form method=\"post\" action=\"/ui/profile/vault/apps/{}/connect\"><button class=\"btn btn-primary\" type=\"submit\">Connect {}</button></form>",escape_html_attr(app.id.as_str()),escape_html_text(app.id.as_str()))).collect::<String>();
++    format!(
++        "<section class=\"mx-auto max-w-3xl p-6\"><h2>Connect an app</h2><p>App consent saves a private account. Company access requires a separate owner confirmation.</p>{forms}</section>"
++    )
++}
+--- accepted-p03/src/adapters/http/routes/mod.rs
++++ current/src/adapters/http/routes/mod.rs
+@@ -275,3 +275,5 @@
+ }
+ 
+ mod ui_vault_bindings;
++
++mod ui_vault_connect;
+--- accepted-p03/src/adapters/http/routes/ui_vault.rs
++++ current/src/adapters/http/routes/ui_vault.rs
+@@ -23,6 +23,7 @@
+ pub fn router() -> Router<AppState> {
+     mutation_router()
+         .merge(super::ui_vault_bindings::router())
++        .merge(super::ui_vault_connect::router())
+         .route("/ui/profile/vault", get(page))
+         .route("/ui/profile/vault/{entry_id}", get(detail))
+ }
+@@ -67,6 +68,7 @@
+ #[derive(Deserialize)]
+ struct ListQuery {
+     after: Option<Uuid>,
++    connect_notice: Option<String>,
+ }
+ async fn fragment(
+     gateway: &dyn IntegrationGateway,
+@@ -76,7 +78,8 @@
+     let page = gateway
+         .list_accounts(owner, PageRequest::new(None, 50)?)
+         .await?;
+-    Ok(Html(pages::vault::vault_content(&page, message)))
++    let html = pages::vault::vault_content(&page, message, &gateway.connectable_apps().await?);
++    Ok(Html(html))
+ }
+ async fn page(
+     State(gateway): State<Arc<dyn IntegrationGateway>>,
+@@ -95,7 +98,13 @@
+     let account = super::ui::load_account(&users, user.id).await?;
+     let email = EmailAddress::from(account.email.as_str());
+     let viewer = super::ui::workspace_user(&account, &email, &config);
+-    let content = pages::vault::vault_content(&entries, None);
++    let notice=query.connect_notice.as_deref().and_then(|n|match n {
++        "invalid_state"=>Some("Authorization could not be completed. Check your current session and start a new attempt."),
++        "account_changed"=>Some("The account changed during authorization. Reload and start a new reconnect attempt."),
++        "unavailable"=>Some("Vault authorization is temporarily unavailable. Try again or contact the operator."),
++        _=>None,
++    });
++    let content = pages::vault::vault_content(&entries, notice, &gateway.connectable_apps().await?);
+     Ok(Html(pages::profile_page(&pages::ProfilePage {
+         user: &viewer,
+         company: None,
+@@ -123,6 +132,7 @@
+             next: None,
+         },
+         None,
++        &gateway.connectable_apps().await?,
+     );
+     html.push_str(&super::ui_vault_bindings::grant_content(
+         AccountId::new(id),
+--- accepted-p03/src/adapters/http/routes/ui_vault_connect.rs
++++ current/src/adapters/http/routes/ui_vault_connect.rs
+@@ -0,0 +1,213 @@
++use crate::{
++    adapters::{
++        http::{pages, session::SessionAuthority},
++        integrations::owner::owner_for_user,
++    },
++    app_error::{AppError, AppResult},
++    application::integrations::{connect::ConnectBrowser, *},
++    domain::integrations::*,
++};
++use axum::{
++    Form, Router,
++    extract::{DefaultBodyLimit, Path, Query, State},
++    http::{HeaderMap, header},
++    response::{Html, IntoResponse, Redirect, Response},
++    routing::{get, post},
++};
++use secrecy::SecretString;
++use serde::Deserialize;
++use std::sync::Arc;
++use uuid::Uuid;
++pub(super) fn router<S>() -> Router<S>
++where
++    S: Clone + Send + Sync + 'static,
++    Arc<dyn IntegrationGateway>: axum::extract::FromRef<S>,
++    Arc<SessionAuthority>: axum::extract::FromRef<S>,
++{
++    Router::new()
++        .route("/ui/profile/vault/apps/{app}/connect", post(start))
++        .route("/auth/integrations/{provider}/callback", get(callback))
++        .route("/ui/profile/vault/connect-attempts/{id}", get(status))
++        .route(
++            "/ui/profile/vault/connect-attempts/{id}/cancel",
++            post(cancel),
++        )
++        .layer(DefaultBodyLimit::max(8192))
++}
++#[derive(Deserialize)]
++#[serde(deny_unknown_fields)]
++struct StartForm {
++    account: Option<Uuid>,
++    authorization: Option<i64>,
++}
++async fn browser(sessions: &SessionAuthority, headers: &HeaderMap) -> AppResult<VerifiedOwner> {
++    use sha2::{Digest, Sha256};
++    let session = sessions
++        .user_from_headers(headers)
++        .await?
++        .ok_or(AppError::InvalidCredentials)?;
++    let reference = session.session_id.0.to_string();
++    Ok(VerifiedOwner::for_browser(
++        owner_for_user(session.user_id),
++        ConnectBrowser {
++            session: ConnectSessionReference::parse(reference.clone())?,
++            binding: BrowserBinding::parse(format!(
++                "{:x}",
++                Sha256::digest(format!("openbot/vault/{reference}").as_bytes())
++            ))?,
++        },
++    ))
++}
++async fn start(
++    State(gateway): State<Arc<dyn IntegrationGateway>>,
++    State(sessions): State<Arc<SessionAuthority>>,
++    headers: HeaderMap,
++    Path(app): Path<String>,
++    Form(form): Form<StartForm>,
++) -> AppResult<Response> {
++    let owner = browser(&sessions, &headers).await?;
++    let app = AppId::parse(app)?;
++    let descriptor = gateway
++        .connectable_apps()
++        .await?
++        .into_iter()
++        .find(|a| a.id == app)
++        .ok_or(IntegrationError::Unavailable)?;
++    let reconnect = match (form.account, form.authorization) {
++        (None, None) => None,
++        (Some(account), Some(auth)) => Some(ReconnectTarget {
++            account: AccountId::new(account),
++            authorization: AuthorizationRevision::new(auth)?,
++        }),
++        _ => return Err(IntegrationError::Invalid.into()),
++    };
++    let connected = gateway
++        .begin_connect(
++            &owner,
++            BeginConnect {
++                app,
++                config: descriptor.config,
++                requested_capabilities: RequestedCapabilities::try_from(descriptor.capabilities)?,
++                return_target: SafeReturnTarget::parse("/ui/profile/vault".into())?,
++                reconnect,
++            },
++        )
++        .await?;
++    Ok(redirect(connected.authorization_url.as_str()))
++}
++#[derive(Deserialize)]
++struct Callback {
++    state: Option<String>,
++    code: Option<SecretString>,
++    error: Option<String>,
++}
++async fn callback(
++    State(gateway): State<Arc<dyn IntegrationGateway>>,
++    State(sessions): State<Arc<SessionAuthority>>,
++    headers: HeaderMap,
++    Path(provider): Path<String>,
++    Query(query): Query<Callback>,
++) -> Response {
++    let result = async {
++        let owner = browser(&sessions, &headers).await?;
++        let callback = ConnectCallback {
++            provider: ProviderId::parse(provider)?,
++            state: query.state.ok_or(IntegrationError::Invalid)?,
++            code: query.code,
++            error: query.error,
++        };
++        let attempt = gateway
++            .finish_connect(
++                &owner,
++                callback,
++                ConnectWork {
++                    deadline: chrono::Utc::now() + chrono::Duration::seconds(30),
++                    cancellation: tokio_util::sync::CancellationToken::new(),
++                },
++            )
++            .await?;
++        Ok::<_, AppError>(attempt)
++    }
++    .await;
++    match result {
++        Ok(attempt) => redirect(&format!(
++            "/ui/profile/vault/connect-attempts/{}",
++            attempt.id.as_uuid()
++        )),
++        Err(AppError::Conflict(_)) => redirect("/ui/profile/vault?connect_notice=account_changed"),
++        Err(AppError::ServiceUnavailable(_)) => {
++            redirect("/ui/profile/vault?connect_notice=unavailable")
++        }
++        Err(_) => redirect("/ui/profile/vault?connect_notice=invalid_state"),
++    }
++}
++async fn status(
++    State(gateway): State<Arc<dyn IntegrationGateway>>,
++    State(sessions): State<Arc<SessionAuthority>>,
++    headers: HeaderMap,
++    Path(id): Path<Uuid>,
++) -> AppResult<Html<String>> {
++    let owner = browser(&sessions, &headers).await?;
++    let attempt = gateway
++        .get_connect_attempt(&owner, ConnectAttemptId::new(id))
++        .await?;
++    let message = match attempt.status {
++        ConnectStatus::Pending => "Waiting for provider consent.",
++        ConnectStatus::Processing => "Completing authorization.",
++        ConnectStatus::Connected => {
++            "Private account connected. Company access requires separate owner confirmation."
++        }
++        ConnectStatus::Denied => "Provider consent was denied.",
++        ConnectStatus::Expired => "Authorization expired; start again.",
++        ConnectStatus::Cancelled => "Authorization cancelled.",
++        ConnectStatus::MissingPermissions => "Required app permissions were not granted.",
++        ConnectStatus::MissingRefresh => {
++            "An offline refresh grant is required. Connect again and approve consent."
++        }
++        ConnectStatus::IdentityMismatch => {
++            "The selected provider identity cannot reconnect this entry. Connect it as a new account."
++        }
++        ConnectStatus::Conflict => {
++            "This authorization is already connected or the account changed."
++        }
++        ConnectStatus::Configuration => {
++            "Provider client configuration is unavailable; contact the operator."
++        }
++        ConnectStatus::AdminBlocked => "Your Workspace administrator blocked this app.",
++        ConnectStatus::ProviderError => "Provider authorization failed. Start a new attempt.",
++    };
++    Ok(Html(pages::base_layout(
++        "Connected app",
++        &format!(
++            "<main class=\"p-6\"><h1>Connected app</h1><p role=\"status\">{message}</p><a class=\"link\" href=\"{}\">Return</a></main>",
++            pages::escape_html_attr(attempt.return_target.as_str())
++        ),
++    )))
++}
++async fn cancel(
++    State(gateway): State<Arc<dyn IntegrationGateway>>,
++    State(sessions): State<Arc<SessionAuthority>>,
++    headers: HeaderMap,
++    Path(id): Path<Uuid>,
++) -> AppResult<Response> {
++    let owner = browser(&sessions, &headers).await?;
++    gateway
++        .cancel_connect(&owner, ConnectAttemptId::new(id))
++        .await?;
++    Ok(redirect("/ui/profile/vault"))
++}
++fn redirect(path: &str) -> Response {
++    let mut response = Redirect::to(path).into_response();
++    response.headers_mut().insert(
++        header::REFERRER_POLICY,
++        header::HeaderValue::from_static("no-referrer"),
++    );
++    response.headers_mut().insert(
++        header::CACHE_CONTROL,
++        header::HeaderValue::from_static("no-store"),
++    );
++    response
++}
++
++#[cfg(test)]
++mod tests;
+--- accepted-p03/src/adapters/http/routes/ui_vault_connect/tests.rs
++++ current/src/adapters/http/routes/ui_vault_connect/tests.rs
+@@ -0,0 +1,269 @@
++use super::*;
++use crate::adapters::{
++    http::{auth, security},
++    persistence::integrations::connect_tests::Fixture,
++};
++use crate::infra::config::AppConfig;
++use axum::{
++    body::{Body, to_bytes},
++    extract::FromRef,
++    http::{Request, StatusCode},
++    middleware,
++};
++use tower::ServiceExt;
++#[derive(Clone)]
++struct TestState {
++    gateway: Arc<dyn IntegrationGateway>,
++    sessions: Arc<SessionAuthority>,
++}
++impl FromRef<TestState> for Arc<dyn IntegrationGateway> {
++    fn from_ref(s: &TestState) -> Self {
++        s.gateway.clone()
++    }
++}
++impl FromRef<TestState> for Arc<SessionAuthority> {
++    fn from_ref(s: &TestState) -> Self {
++        s.sessions.clone()
++    }
++}
++fn app(f: &Fixture) -> Router {
++    let state = TestState {
++        gateway: f.gateway(),
++        sessions: f.sessions.clone(),
++    };
++    let mut config = AppConfig::for_test();
++    config.app_domain_name = "localhost:3000".into();
++    router()
++        .with_state(state)
++        .layer(middleware::from_fn_with_state(
++            f.sessions.clone(),
++            auth::require_auth,
++        ))
++        .layer(middleware::from_fn_with_state(
++            Arc::new(config),
++            security::browser_security,
++        ))
++}
++fn request(
++    method: &str,
++    path: &str,
++    cookie: Option<&str>,
++    body: &str,
++    origin: Option<&str>,
++) -> Request<Body> {
++    let mut b = Request::builder()
++        .method(method)
++        .uri(path)
++        .header("host", "localhost:3000")
++        .header("content-type", "application/x-www-form-urlencoded");
++    if let Some(cookie) = cookie {
++        b = b.header("cookie", format!("session={cookie}"));
++    }
++    if let Some(origin) = origin {
++        b = b.header("origin", origin);
++    }
++    b.body(Body::from(body.to_owned())).unwrap()
++}
++#[tokio::test]
++async fn integration_connect_browser_start_callback_status_and_replay_are_sanitized() {
++    let f = Box::pin(Fixture::new()).await;
++    let app = app(&f);
++    let start = app
++        .clone()
++        .oneshot(request(
++            "POST",
++            "/ui/profile/vault/apps/gmail/connect",
++            Some(&f.cookie),
++            "",
++            Some("http://localhost:3000"),
++        ))
++        .await
++        .unwrap();
++    assert_eq!(start.status(), StatusCode::SEE_OTHER);
++    let url = url::Url::parse(start.headers()["location"].to_str().unwrap()).unwrap();
++    assert_eq!(url.host_str(), Some("accounts.google.com"));
++    let state = url
++        .query_pairs()
++        .find(|(k, _)| k == "state")
++        .unwrap()
++        .1
++        .into_owned();
++    let mut callback =
++        url::Url::parse("http://localhost:3000/auth/integrations/google/callback").unwrap();
++    callback
++        .query_pairs_mut()
++        .append_pair("state", &state)
++        .append_pair("code", "code-sentinel")
++        .append_pair("scope", "openid email");
++    let path = format!("{}?{}", callback.path(), callback.query().unwrap());
++    let response = app
++        .clone()
++        .oneshot(request("GET", &path, Some(&f.cookie), "", None))
++        .await
++        .unwrap();
++    assert_eq!(response.status(), StatusCode::SEE_OTHER);
++    assert_eq!(response.headers()["referrer-policy"], "no-referrer");
++    assert_eq!(response.headers()["cache-control"], "no-store");
++    let location = response.headers()["location"].to_str().unwrap().to_owned();
++    assert!(!location.contains("sentinel") && !location.contains(&state));
++    let response = app
++        .clone()
++        .oneshot(request("GET", &location, Some(&f.cookie), "", None))
++        .await
++        .unwrap();
++    assert_eq!(response.status(), StatusCode::OK);
++    let html = String::from_utf8(
++        to_bytes(response.into_body(), 65536)
++            .await
++            .unwrap()
++            .to_vec(),
++    )
++    .unwrap();
++    assert!(html.contains("Private account connected") && html.contains("Company access"));
++    for secret in [
++        "code-sentinel",
++        "access-sentinel",
++        "refresh-sentinel",
++        "client-secret-sentinel",
++        "enc:v2",
++    ] {
++        assert!(!html.contains(secret));
++    }
++    app.oneshot(request("GET", &path, Some(&f.cookie), "", None))
++        .await
++        .unwrap();
++    assert_eq!(f.script.calls.load(std::sync::atomic::Ordering::SeqCst), 1);
++}
++#[tokio::test]
++async fn integration_connect_browser_auth_csrf_form_limits_and_switched_session_deny() {
++    let f = Box::pin(Fixture::new()).await;
++    let app = app(&f);
++    let path = "/ui/profile/vault/apps/gmail/connect";
++    let denied = app
++        .clone()
++        .oneshot(request(
++            "POST",
++            path,
++            None,
++            "",
++            Some("http://localhost:3000"),
++        ))
++        .await
++        .unwrap();
++    assert_eq!(denied.status(), StatusCode::SEE_OTHER);
++    assert_eq!(denied.headers()["location"], "/login");
++    let denied = app
++        .clone()
++        .oneshot(request(
++            "POST",
++            path,
++            Some(&f.cookie),
++            "",
++            Some("https://foreign.example"),
++        ))
++        .await
++        .unwrap();
++    assert_eq!(denied.status(), StatusCode::FORBIDDEN);
++    let huge = app
++        .clone()
++        .oneshot(request(
++            "POST",
++            path,
++            Some(&f.cookie),
++            &format!("account={}", "x".repeat(9000)),
++            Some("http://localhost:3000"),
++        ))
++        .await
++        .unwrap();
++    assert_eq!(huge.status(), StatusCode::PAYLOAD_TOO_LARGE);
++    let forged = app
++        .clone()
++        .oneshot(request(
++            "POST",
++            path,
++            Some(&f.cookie),
++            "owner_subject=foreign",
++            Some("http://localhost:3000"),
++        ))
++        .await
++        .unwrap();
++    assert_eq!(forged.status(), StatusCode::UNPROCESSABLE_ENTITY);
++    let start = f.begin(None).await;
++    let callback = f.callback(&start);
++    let other = f.new_cookie().await;
++    let mut url =
++        url::Url::parse("http://localhost:3000/auth/integrations/google/callback").unwrap();
++    url.query_pairs_mut()
++        .append_pair("state", &callback.state)
++        .append_pair("code", "code-sentinel");
++    let response = app
++        .oneshot(request(
++            "GET",
++            &format!("{}?{}", url.path(), url.query().unwrap()),
++            Some(&other),
++            "",
++            None,
++        ))
++        .await
++        .unwrap();
++    assert_eq!(response.status(), StatusCode::SEE_OTHER);
++    assert!(
++        response.headers()["location"]
++            .to_str()
++            .unwrap()
++            .contains("invalid_state")
++    );
++    assert_eq!(f.script.calls.load(std::sync::atomic::Ordering::SeqCst), 0);
++}
++
++#[tokio::test]
++async fn integration_connect_browser_rejects_a_different_authenticated_user() {
++    let f = Box::pin(Fixture::new()).await;
++    let app = app(&f);
++    let start = f.begin(None).await;
++    let callback = f.callback(&start);
++    let other = f.other_cookie().await;
++    let mut url =
++        url::Url::parse("http://localhost:3000/auth/integrations/google/callback").unwrap();
++    url.query_pairs_mut()
++        .append_pair("state", &callback.state)
++        .append_pair("code", "code-sentinel");
++    let response = app
++        .oneshot(request(
++            "GET",
++            &format!("{}?{}", url.path(), url.query().unwrap()),
++            Some(&other),
++            "",
++            None,
++        ))
++        .await
++        .unwrap();
++    assert_eq!(response.status(), StatusCode::SEE_OTHER);
++    assert!(
++        response.headers()["location"]
++            .to_str()
++            .unwrap()
++            .contains("invalid_state")
++    );
++    assert_eq!(f.script.calls.load(std::sync::atomic::Ordering::SeqCst), 0);
++}
++
++#[tokio::test]
++async fn integration_connect_browser_unauthenticated_callback_does_not_forward_secrets() {
++    let f = Box::pin(Fixture::new()).await;
++    let response = app(&f)
++        .oneshot(request(
++            "GET",
++            "/auth/integrations/google/callback?code=code-sentinel&state=state-sentinel",
++            None,
++            "",
++            None,
++        ))
++        .await
++        .unwrap();
++    assert_eq!(response.status(), StatusCode::SEE_OTHER);
++    assert_eq!(response.headers()["location"], "/login");
++    assert_eq!(response.headers()["referrer-policy"], "no-referrer");
++    assert_eq!(response.headers()["cache-control"], "no-store");
++    assert_eq!(f.script.calls.load(std::sync::atomic::Ordering::SeqCst), 0);
++}
+--- accepted-p03/src/adapters/http/routes/vault_binding_route_tests.rs
++++ current/src/adapters/http/routes/vault_binding_route_tests.rs
+@@ -115,7 +115,10 @@
+             .await
+             .unwrap();
+         let state = BrowserState {
+-            gateway: vault.gateway(bindings.clone()),
++            gateway: vault.gateway(
++                bindings.clone(),
++                Arc::new(crate::application::integrations::unavailable::UnavailableIntegrations),
++            ),
+             bindings,
+         };
+         let app = router()
+--- accepted-p03/src/adapters/http/routes/vault_management_tests.rs
++++ current/src/adapters/http/routes/vault_management_tests.rs
+@@ -41,7 +41,7 @@
+             crate::adapters::persistence::integration_bindings::PostgresIntegrationBindings::new(
+                 persistence.clone(),
+             ),
+-        ));
++        ),Arc::new(crate::application::integrations::unavailable::UnavailableIntegrations));
+         Self {
+             persistence,
+             _database: database,
+--- accepted-p03/src/adapters/http/security.rs
++++ current/src/adapters/http/security.rs
+@@ -17,11 +17,32 @@
+     next: Next,
+ ) -> Result<Response, StatusCode> {
+     validate_same_origin(&request, config.secure_cookies)?;
++    let sensitive_callback =
++        request.uri().path().starts_with("/auth/") && request.uri().path().ends_with("/callback");
+     let mut response = next.run(request).await;
+     let headers = response.headers_mut();
+     headers.insert(header::CONTENT_SECURITY_POLICY, CSP.parse().unwrap());
+     headers.insert(header::X_CONTENT_TYPE_OPTIONS, "nosniff".parse().unwrap());
+-    headers.insert(header::REFERRER_POLICY, "same-origin".parse().unwrap());
++    let referrer_policy = if sensitive_callback
++        || headers
++            .get(header::REFERRER_POLICY)
++            .is_some_and(|v| v == "no-referrer")
++    {
++        "no-referrer"
++    } else {
++        "same-origin"
++    };
++    // Preserve a stricter callback policy while retaining the global privacy floor.
++    headers.insert(
++        header::REFERRER_POLICY,
++        axum::http::HeaderValue::from_static(referrer_policy),
++    );
++    if sensitive_callback {
++        headers.insert(
++            header::CACHE_CONTROL,
++            axum::http::HeaderValue::from_static("no-store"),
++        );
++    }
+     headers.insert(
+         "permissions-policy",
+         "camera=(), microphone=(), geolocation=()".parse().unwrap(),
+--- accepted-p03/src/adapters/integrations/google_authorization.rs
++++ current/src/adapters/integrations/google_authorization.rs
+@@ -0,0 +1,279 @@
++use super::{
++    google_credentials::{
++        GoogleCredentialAdapter, GooglePayload, VerifiedMailbox, required_scopes,
++    },
++    google_http::{GoogleHttp, failure},
++};
++use crate::{
++    application::integrations::{connect::*, private::CredentialAdapter, *},
++    domain::integrations::*,
++};
++use async_trait::async_trait;
++use chrono::{DateTime, Utc};
++use secrecy::{ExposeSecret, SecretString};
++use serde::Deserialize;
++use std::sync::Arc;
++pub(crate) struct GoogleAuthorization {
++    pub credentials: Arc<GoogleCredentialAdapter>,
++    pub client_secret: SecretString,
++    pub redirect: url::Url,
++    pub http: Arc<GoogleHttp>,
++}
++#[derive(Deserialize)]
++struct Token {
++    access_token: SecretString,
++    refresh_token: Option<SecretString>,
++    token_type: String,
++    expires_in: i64,
++    scope: String,
++}
++#[derive(Deserialize)]
++struct Profile {
++    sub: ExternalSubject,
++    email: VerifiedMailbox,
++    email_verified: bool,
++}
++#[derive(Deserialize)]
++struct Candidate {
++    subject: ExternalSubject,
++    mailbox: VerifiedMailbox,
++    scopes: Vec<Scope>,
++    access_token: SecretString,
++    refresh_token: Option<SecretString>,
++    expires_at: DateTime<Utc>,
++}
++fn opaque_token(token: &SecretString) -> bool {
++    let value = token.expose_secret();
++    !value.is_empty()
++        && value.len() <= MAX_CREDENTIAL_BYTES
++        && value.bytes().all(|b| b.is_ascii_graphic())
++}
++#[async_trait]
++impl AuthorizationProvider for GoogleAuthorization {
++    fn callback_error(&self, error: &str) -> ConnectStatus {
++        match error {
++            "access_denied" => ConnectStatus::Denied,
++            "admin_policy_enforced" | "access_blocked" => ConnectStatus::AdminBlocked,
++            _ => ConnectStatus::ProviderError,
++        }
++    }
++
++    fn authorization_url(
++        &self,
++        r: AuthorizationRequest<'_>,
++    ) -> IntegrationResult<SanitizedConnectUrl> {
++        let mut scopes = vec!["openid", "email"];
++        scopes.extend(required_scopes(r.app)?);
++        let mut url = url::Url::parse("https://accounts.google.com/o/oauth2/v2/auth")
++            .map_err(|_| IntegrationError::Invalid)?;
++        // Both paths are explicit owner consent to obtain a refresh grant.
++        url.query_pairs_mut().extend_pairs([
++            ("client_id", self.credentials.client.as_str()),
++            ("redirect_uri", self.redirect.as_str()),
++            ("response_type", "code"),
++            ("scope", scopes.join(" ").as_str()),
++            ("access_type", "offline"),
++            ("prompt", "consent"),
++            ("state", r.state),
++            ("code_challenge", r.challenge),
++            ("code_challenge_method", "S256"),
++        ]);
++        SanitizedConnectUrl::from_registered_endpoint(
++            url.into(),
++            "https://accounts.google.com/o/oauth2/v2/auth",
++        )
++    }
++    async fn exchange(&self, r: ProviderExchange<'_>) -> Result<SecretString, ConnectStatus> {
++        let started = Utc::now();
++        let reply = self
++            .http
++            .token(
++                &[
++                    ("grant_type", "authorization_code"),
++                    ("client_id", self.credentials.client.as_str()),
++                    ("client_secret", self.client_secret.expose_secret()),
++                    ("redirect_uri", self.redirect.as_str()),
++                    ("code", r.code.expose_secret()),
++                    ("code_verifier", r.verifier.expose_secret()),
++                ],
++                r.deadline,
++                r.cancellation,
++            )
++            .await?;
++        if !(200..300).contains(&reply.status) {
++            return Err(failure(&reply));
++        }
++        let token: Token = serde_json::from_str(reply.body.expose_secret())
++            .map_err(|_| ConnectStatus::ProviderError)?;
++        if !token.token_type.eq_ignore_ascii_case("bearer")
++            || !opaque_token(&token.access_token)
++            || token
++                .refresh_token
++                .as_ref()
++                .is_some_and(|t| !opaque_token(t))
++            || !(61..=86400).contains(&token.expires_in)
++        {
++            return Err(ConnectStatus::ProviderError);
++        }
++        let expires_at = started + chrono::Duration::seconds(token.expires_in);
++        let scopes: Vec<Scope> = token
++            .scope
++            .split_whitespace()
++            .map(Scope::parse)
++            .collect::<IntegrationResult<_>>()
++            .map_err(|_| ConnectStatus::MissingPermissions)?;
++        if scopes.len() > MAX_SCOPES
++            || !scopes.iter().any(|s| s.as_str() == "openid")
++            || !scopes.iter().any(|s| {
++                matches!(
++                    s.as_str(),
++                    "email" | "https://www.googleapis.com/auth/userinfo.email"
++                )
++            })
++            || required_scopes(r.app)
++                .map_err(|_| ConnectStatus::MissingPermissions)?
++                .iter()
++                .any(|s| !scopes.iter().any(|g| g.as_str() == *s))
++        {
++            return Err(ConnectStatus::MissingPermissions);
++        }
++        let reply = self
++            .http
++            .identity(
++                token.access_token.expose_secret(),
++                r.deadline,
++                r.cancellation,
++            )
++            .await?;
++        if !(200..300).contains(&reply.status) {
++            return Err(failure(&reply));
++        }
++        let profile: Profile = serde_json::from_str(reply.body.expose_secret())
++            .map_err(|_| ConnectStatus::IdentityMismatch)?;
++        if !profile.email_verified || expires_at < Utc::now() + chrono::Duration::seconds(60) {
++            return Err(ConnectStatus::IdentityMismatch);
++        }
++        Ok(SecretString::from(serde_json::json!({"subject":profile.sub,"mailbox":profile.email.as_str(),"scopes":scopes,"access_token":token.access_token.expose_secret(),"refresh_token":token.refresh_token.as_ref().map(|s|s.expose_secret()),"expires_at":expires_at}).to_string()))
++    }
++    fn finalize(&self, r: FinalizeAuthorization<'_>) -> Result<AuthorizedAccount, ConnectStatus> {
++        if r.candidate.expose_secret().len() > MAX_CREDENTIAL_BYTES {
++            return Err(ConnectStatus::ProviderError);
++        }
++        let c: Candidate = serde_json::from_str(r.candidate.expose_secret())
++            .map_err(|_| ConnectStatus::ProviderError)?;
++        if r.previous
++            .is_some_and(|p| p.versions.generation.next().ok() != Some(r.generation))
++        {
++            return Err(ConnectStatus::ProviderError);
++        }
++        let previous = r
++            .previous
++            .map(|p| self.credentials.decode(&p.payload))
++            .transpose()
++            .map_err(|_| ConnectStatus::IdentityMismatch)?;
++        if previous
++            .as_ref()
++            .is_some_and(|p| p.subject != c.subject || p.client != self.credentials.client)
++        {
++            return Err(ConnectStatus::IdentityMismatch);
++        }
++        let refresh = match c.refresh_token {
++            Some(value) => value,
++            None => {
++                if r.previous
++                    .is_none_or(|p| p.account.status != AccountStatus::Ready)
++                {
++                    return Err(ConnectStatus::MissingRefresh);
++                }
++                previous.ok_or(ConnectStatus::MissingRefresh)?.refresh_token
++            }
++        };
++        if c.expires_at < Utc::now() + chrono::Duration::seconds(60) {
++            return Err(ConnectStatus::ProviderError);
++        }
++        let p = GooglePayload {
++            subject: c.subject,
++            client: self.credentials.client.clone(),
++            mailbox: c.mailbox,
++            scopes: c.scopes,
++            refresh_token: refresh,
++            access_token: Some(c.access_token),
++            expires_at: Some(c.expires_at),
++            generation: r.generation,
++            refresh_retry_at: None,
++        };
++        let payload = p.encode().map_err(|_| ConnectStatus::ProviderError)?;
++        self.credentials
++            .validate_use(&payload, r.app)
++            .map_err(|_| ConnectStatus::MissingPermissions)?;
++        let identity = self
++            .credentials
++            .validate(&payload)
++            .map_err(|_| ConnectStatus::IdentityMismatch)?
++            .ok_or(ConnectStatus::IdentityMismatch)?;
++        let metadata = AccountMetadata::new(
++            p.mailbox.as_str().into(),
++            Some(format!(
++                "Granted capabilities: {}",
++                r.app
++                    .capabilities
++                    .iter()
++                    .map(|v| v.as_str())
++                    .collect::<Vec<_>>()
++                    .join(", ")
++            )),
++        )
++        .map_err(|_| ConnectStatus::ProviderError)?;
++        Ok(AuthorizedAccount {
++            identity,
++            payload,
++            metadata,
++        })
++    }
++}
++
++pub(crate) fn registration(
++    client: ExternalSubject,
++    secret: SecretString,
++    redirect: url::Url,
++    http: Arc<GoogleHttp>,
++) -> IntegrationResult<crate::application::integrations::registry::Registration> {
++    use crate::application::integrations::registry::Registration;
++    use crate::domain::integrations::authority::ApprovedDestination;
++    let provider = ProviderId::parse("google")?;
++    let config = AuthConfigId::parse("google-personal")?;
++    let credentials = Arc::new(GoogleCredentialAdapter { client });
++    let authorization = Arc::new(GoogleAuthorization {
++        credentials: credentials.clone(),
++        client_secret: secret,
++        redirect,
++        http,
++    });
++    Ok(Registration {
++        provider: AuthProvider {
++            id: provider.clone(),
++            method: AuthMethod::OAuthAuthorizationCode,
++            schema: CredentialSchema::parse("google-v1")?,
++        },
++        config: AuthConfig {
++            id: config.clone(),
++            provider: provider.clone(),
++            client_identity: credentials.client.clone(),
++            client_secret_reference: Some(ClientSecretReference::parse(
++                "google-oauth-client-secret",
++            )?),
++        },
++        app: AppDefinition {
++            id: AppId::parse("gmail")?,
++            provider,
++            config,
++            destinations: vec![ApprovedDestination::parse("https://gmail.googleapis.com")?],
++            capabilities: vec![
++                Capability::parse("gmail.read")?,
++                Capability::parse("gmail.send")?,
++            ],
++        },
++        adapter: credentials,
++        authorization: Some(authorization),
++    })
++}
+--- accepted-p03/src/adapters/integrations/google_credentials.rs
++++ current/src/adapters/integrations/google_credentials.rs
+@@ -12,22 +12,23 @@
+ 
+ #[derive(Deserialize)]
+ #[serde(deny_unknown_fields)]
+-struct GooglePayload {
+-    subject: ExternalSubject,
+-    client: ExternalSubject,
+-    scopes: Vec<Scope>,
+-    refresh_token: SecretString,
+-    access_token: Option<SecretString>,
+-    expires_at: Option<DateTime<Utc>>,
+-    generation: CredentialGeneration,
+-    refresh_retry_at: Option<DateTime<Utc>>,
++pub(super) struct GooglePayload {
++    pub subject: ExternalSubject,
++    pub client: ExternalSubject,
++    pub mailbox: VerifiedMailbox,
++    pub scopes: Vec<Scope>,
++    pub refresh_token: SecretString,
++    pub access_token: Option<SecretString>,
++    pub expires_at: Option<DateTime<Utc>>,
++    pub generation: CredentialGeneration,
++    pub refresh_retry_at: Option<DateTime<Utc>>,
+ }
+ 
+ pub(crate) struct GoogleCredentialAdapter {
+     pub client: ExternalSubject,
+ }
+ impl GoogleCredentialAdapter {
+-    fn decode(&self, raw: &SecretString) -> IntegrationResult<GooglePayload> {
++    pub(super) fn decode(&self, raw: &SecretString) -> IntegrationResult<GooglePayload> {
+         if raw.expose_secret().len() > MAX_CREDENTIAL_BYTES {
+             return Err(IntegrationError::Invalid);
+         }
+@@ -92,6 +93,7 @@
+         if previous.subject != replacement.subject
+             || previous.client != replacement.client
+             || previous_scopes != replacement_scopes
++            || previous.mailbox != replacement.mailbox
+         {
+             return Err(IntegrationError::Denied);
+         }
+@@ -106,7 +108,7 @@
+     }
+ }
+ 
+-fn required_scopes(
++pub(super) fn required_scopes(
+     app: &crate::application::integrations::AppDefinition,
+ ) -> IntegrationResult<Vec<&'static str>> {
+     app.capabilities
+@@ -118,3 +120,33 @@
+         })
+         .collect()
+ }
++
++#[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
++#[serde(try_from = "String")]
++pub(super) struct VerifiedMailbox(String);
++impl VerifiedMailbox {
++    pub fn as_str(&self) -> &str {
++        &self.0
++    }
++}
++impl TryFrom<String> for VerifiedMailbox {
++    type Error = IntegrationError;
++    fn try_from(value: String) -> IntegrationResult<Self> {
++        if value.len() > 256
++            || value.chars().any(char::is_control)
++            || value.parse::<lettre::Address>().is_err()
++        {
++            return Err(IntegrationError::Credential);
++        }
++        Ok(Self(value))
++    }
++}
++impl GooglePayload {
++    pub fn encode(&self) -> IntegrationResult<SecretString> {
++        let raw=serde_json::json!({"subject":self.subject,"client":self.client,"mailbox":self.mailbox.as_str(),"scopes":self.scopes,"refresh_token":self.refresh_token.expose_secret(),"access_token":self.access_token.as_ref().map(|s|s.expose_secret()),"expires_at":self.expires_at,"generation":self.generation,"refresh_retry_at":self.refresh_retry_at}).to_string();
++        if raw.len() > MAX_CREDENTIAL_BYTES {
++            return Err(IntegrationError::Limit);
++        }
++        Ok(SecretString::from(raw))
++    }
++}
+--- accepted-p03/src/adapters/integrations/google_http.rs
++++ current/src/adapters/integrations/google_http.rs
+@@ -0,0 +1,133 @@
++//! Fixed Google credential endpoints. Raw provider errors never escape this adapter.
++use crate::{application::integrations::ConnectStatus, domain::integrations::MAX_CREDENTIAL_BYTES};
++use chrono::{DateTime, Utc};
++use secrecy::SecretString;
++use tokio_util::sync::CancellationToken;
++pub(super) struct GoogleReply {
++    pub status: u16,
++    pub body: SecretString,
++}
++pub(crate) struct GoogleHttp {
++    client: reqwest::Client,
++    #[cfg(test)]
++    endpoints: Option<(String, String)>,
++}
++impl GoogleHttp {
++    pub fn new() -> Result<Self, ConnectStatus> {
++        Ok(Self {
++            client: reqwest::Client::builder()
++                .redirect(reqwest::redirect::Policy::none())
++                .no_proxy()
++                .connect_timeout(std::time::Duration::from_secs(5))
++                .timeout(std::time::Duration::from_secs(10))
++                .build()
++                .map_err(|_| ConnectStatus::Configuration)?,
++            #[cfg(test)]
++            endpoints: None,
++        })
++    }
++    #[cfg(test)]
++    pub fn scripted(token: String, identity: String) -> Self {
++        for endpoint in [&token, &identity] {
++            let url = url::Url::parse(endpoint).unwrap();
++            assert_eq!(url.scheme(), "http");
++            assert_eq!(url.host_str(), Some("127.0.0.1"));
++        }
++        Self {
++            endpoints: Some((token, identity)),
++            ..Self::new().unwrap()
++        }
++    }
++    pub(super) async fn token(
++        &self,
++        form: &[(&str, &str)],
++        deadline: DateTime<Utc>,
++        cancel: &CancellationToken,
++    ) -> Result<GoogleReply, ConnectStatus> {
++        let endpoint = "https://oauth2.googleapis.com/token";
++        #[cfg(test)]
++        let endpoint = self
++            .endpoints
++            .as_ref()
++            .map(|p| p.0.as_str())
++            .unwrap_or(endpoint);
++        self.bounded(self.client.post(endpoint).form(form), deadline, cancel)
++            .await
++    }
++    pub(super) async fn identity(
++        &self,
++        access: &str,
++        deadline: DateTime<Utc>,
++        cancel: &CancellationToken,
++    ) -> Result<GoogleReply, ConnectStatus> {
++        let endpoint = "https://openidconnect.googleapis.com/v1/userinfo";
++        #[cfg(test)]
++        let endpoint = self
++            .endpoints
++            .as_ref()
++            .map(|p| p.1.as_str())
++            .unwrap_or(endpoint);
++        self.bounded(
++            self.client.get(endpoint).bearer_auth(access),
++            deadline,
++            cancel,
++        )
++        .await
++    }
++    async fn bounded(
++        &self,
++        request: reqwest::RequestBuilder,
++        deadline: DateTime<Utc>,
++        cancel: &CancellationToken,
++    ) -> Result<GoogleReply, ConnectStatus> {
++        let remaining = (deadline - Utc::now())
++            .to_std()
++            .map_err(|_| ConnectStatus::ProviderError)?;
++        tokio::select! {biased;
++            _=cancel.cancelled()=>Err(ConnectStatus::Cancelled),
++            _=tokio::time::sleep(remaining)=>Err(ConnectStatus::ProviderError),
++            result=read(request)=>result,
++        }
++    }
++}
++async fn read(request: reqwest::RequestBuilder) -> Result<GoogleReply, ConnectStatus> {
++    let mut response = request
++        .send()
++        .await
++        .map_err(|_| ConnectStatus::ProviderError)?;
++    if response
++        .content_length()
++        .is_some_and(|v| v > MAX_CREDENTIAL_BYTES as u64)
++    {
++        return Err(ConnectStatus::ProviderError);
++    }
++    let status = response.status().as_u16();
++    let mut bytes = Vec::new();
++    while let Some(chunk) = response
++        .chunk()
++        .await
++        .map_err(|_| ConnectStatus::ProviderError)?
++    {
++        if bytes.len() + chunk.len() > MAX_CREDENTIAL_BYTES {
++            return Err(ConnectStatus::ProviderError);
++        }
++        bytes.extend_from_slice(&chunk);
++    }
++    Ok(GoogleReply {
++        status,
++        body: SecretString::from(
++            String::from_utf8(bytes).map_err(|_| ConnectStatus::ProviderError)?,
++        ),
++    })
++}
++pub(super) fn failure(reply: &GoogleReply) -> ConnectStatus {
++    use secrecy::ExposeSecret;
++    let value: serde_json::Value =
++        serde_json::from_str(reply.body.expose_secret()).unwrap_or(serde_json::Value::Null);
++    match value.get("error").and_then(|v| v.as_str()) {
++        Some("invalid_client" | "unauthorized_client") => ConnectStatus::Configuration,
++        Some("admin_policy_enforced" | "access_blocked") => ConnectStatus::AdminBlocked,
++        Some("access_denied") => ConnectStatus::Denied,
++        _ => ConnectStatus::ProviderError,
++    }
++}
+--- accepted-p03/src/adapters/integrations/mod.rs
++++ current/src/adapters/integrations/mod.rs
+@@ -1,7 +1,7 @@
+ //! Provider-specific integration adapters, distinct from login OAuth.
+-#[cfg_attr(
+-    not(test),
+-    allow(dead_code, reason = "External-app OAuth registration ships in phase04")
+-)]
+ pub(crate) mod google_credentials;
+ pub(crate) mod owner;
++
++pub(crate) mod google_authorization;
++pub(crate) mod google_http;
++pub(crate) mod oauth_state;
+--- accepted-p03/src/adapters/integrations/oauth_state.rs
++++ current/src/adapters/integrations/oauth_state.rs
+@@ -0,0 +1,71 @@
++use crate::{
++    application::integrations::connect::{AttemptFacts, ConnectStateCodec},
++    domain::integrations::*,
++};
++use jsonwebtoken::{Algorithm, DecodingKey, EncodingKey, Header, Validation};
++use serde::{Deserialize, Serialize};
++const PURPOSE: &str = "openbot-integration-connect/v1";
++pub(crate) struct SignedConnectState {
++    encoding: EncodingKey,
++    decoding: DecodingKey,
++}
++#[derive(Serialize, Deserialize)]
++#[serde(deny_unknown_fields)]
++struct Claims {
++    iss: String,
++    aud: String,
++    purpose: String,
++    iat: i64,
++    exp: i64,
++    facts: AttemptFacts,
++}
++impl SignedConnectState {
++    pub fn new(secret: &str) -> Self {
++        Self {
++            encoding: EncodingKey::from_secret(secret.as_bytes()),
++            decoding: DecodingKey::from_secret(secret.as_bytes()),
++        }
++    }
++}
++impl ConnectStateCodec for SignedConnectState {
++    fn sign(&self, facts: &AttemptFacts) -> IntegrationResult<String> {
++        let c = Claims {
++            iss: PURPOSE.into(),
++            aud: PURPOSE.into(),
++            purpose: PURPOSE.into(),
++            iat: facts.issued_at.timestamp(),
++            exp: facts.expires_at.timestamp(),
++            facts: facts.clone(),
++        };
++        let value = jsonwebtoken::encode(&Header::new(Algorithm::HS256), &c, &self.encoding)
++            .map_err(|_| IntegrationError::Invalid)?;
++        if value.len() > 4096 {
++            return Err(IntegrationError::Limit);
++        }
++        Ok(value)
++    }
++    fn verify(&self, state: &str) -> IntegrationResult<AttemptFacts> {
++        if state.len() > 4096 {
++            return Err(IntegrationError::Limit);
++        }
++        let mut v = Validation::new(Algorithm::HS256);
++        v.leeway = 0;
++        v.set_audience(&[PURPOSE]);
++        v.set_issuer(&[PURPOSE]);
++        let c = jsonwebtoken::decode::<Claims>(state, &self.decoding, &v)
++            .map_err(|_| IntegrationError::Denied)?
++            .claims;
++        let now = chrono::Utc::now().timestamp();
++        if c.purpose != PURPOSE
++            || c.iat > now
++            || c.exp <= now
++            || c.exp - c.iat > 600
++            || c.exp <= c.iat
++            || c.facts.issued_at.timestamp() != c.iat
++            || c.facts.expires_at.timestamp() != c.exp
++        {
++            return Err(IntegrationError::Denied);
++        }
++        Ok(c.facts)
++    }
++}
+--- accepted-p03/src/adapters/persistence/credential_rotation.rs
++++ current/src/adapters/persistence/credential_rotation.rs
+@@ -69,6 +69,7 @@
+ #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+ enum CredentialTable {
+     IntegrationAccounts,
++    ConnectAttempts,
+     TypeSafeCredentials,
+     WorkflowHttpCredentials,
+     CompanyMcpCredentials,
+@@ -84,6 +85,7 @@
+ impl CredentialTable {
+     const ALL: &'static [Self] = &[
+         Self::IntegrationAccounts,
++        Self::ConnectAttempts,
+         Self::TypeSafeCredentials,
+         Self::WorkflowHttpCredentials,
+         Self::CompanyMcpCredentials,
+@@ -99,6 +101,9 @@
+ /// key of a batch is exactly where the next batch starts.
+ #[derive(Debug, Clone, PartialEq, Eq)]
+ enum CredentialKey {
++    ConnectAttempt {
++        id: Uuid,
++    },
+     IntegrationAccount {
+         id: Uuid,
+     },
+@@ -443,6 +448,7 @@
+     rotated: &str,
+ ) -> AppResult<bool> {
+     let changed = match &row.key {
++        CredentialKey::ConnectAttempt {id} => super::integrations::connect::inventory::rewrap(transaction,*id,&row.stored,rotated).await,
+         CredentialKey::IntegrationAccount { id } => {
+             super::integrations::inventory::rewrap(transaction,*id,&row.stored,rotated).await
+         }
+@@ -590,6 +596,26 @@
+     cursor: Option<&CredentialKey>,
+ ) -> AppResult<Vec<InventoryRow>> {
+     match table {
++        CredentialTable::ConnectAttempts => {
++            let after = match cursor {
++                Some(CredentialKey::ConnectAttempt { id }) => Some(*id),
++                None => None,
++                _ => return Err(AppError::Internal("Invalid connect rotation cursor".into())),
++            };
++            Ok(super::integrations::connect::inventory::page(
++                connection,
++                after,
++                CREDENTIAL_BATCH_SIZE,
++            )
++            .await?
++            .into_iter()
++            .map(|r| InventoryRow {
++                key: CredentialKey::ConnectAttempt { id: r.id },
++                format: CredentialFormat::Envelope(r.context),
++                stored: r.envelope,
++            })
++            .collect())
++        }
+         CredentialTable::IntegrationAccounts => {
+             let after = match cursor {
+                 Some(CredentialKey::IntegrationAccount { id }) => Some(*id),
+--- accepted-p03/src/adapters/persistence/credential_rotation_tests.rs
++++ current/src/adapters/persistence/credential_rotation_tests.rs
+@@ -22,6 +22,7 @@
+     // beside it.
+     for statement in [
+         crate::adapters::persistence::integrations::inventory::ISOLATED_TABLE_SQL,
++        crate::adapters::persistence::integrations::connect::inventory::ISOLATED_TABLE_SQL,
+         r#"CREATE TEMPORARY TABLE company_typesafe_connections (
+                company_id UUID NOT NULL, id UUID NOT NULL, envelope TEXT NOT NULL,
+                PRIMARY KEY (company_id, id)
+--- accepted-p03/src/adapters/persistence/credentials/envelope.rs
++++ current/src/adapters/persistence/credentials/envelope.rs
+@@ -141,6 +141,23 @@
+                 account.auth_config_id.as_str().as_bytes().to_vec(),
+                 account.auth_method.as_str().as_bytes().to_vec(),
+                 account.credential_schema.as_str().as_bytes().to_vec(),
++            ],
++        }
++    }
++
++    pub(crate) fn integration_connect(
++        f: &crate::application::integrations::connect::AttemptFacts,
++    ) -> Self {
++        Self {
++            scope: "integration_connect_attempt",
++            fields: vec![
++                f.owner.namespace.as_str().as_bytes().to_vec(),
++                f.owner.subject.as_str().as_bytes().to_vec(),
++                f.id.as_uuid().as_bytes().to_vec(),
++                f.provider.as_str().as_bytes().to_vec(),
++                f.config.as_str().as_bytes().to_vec(),
++                f.app.as_str().as_bytes().to_vec(),
++                f.purpose().as_bytes().to_vec(),
+             ],
+         }
+     }
+--- accepted-p03/src/adapters/persistence/integration_bindings.rs
++++ current/src/adapters/persistence/integration_bindings.rs
+@@ -22,6 +22,7 @@
+     pub vault: PostgresVault,
+ }
+ impl PostgresIntegrationBindings {
++    #[cfg(test)]
+     pub fn new(persistence: PostgresPersistence) -> Self {
+         Self {
+             vault: PostgresVault::new(persistence.clone()),
+--- accepted-p03/src/adapters/persistence/integration_connect_authority.rs
++++ current/src/adapters/persistence/integration_connect_authority.rs
+@@ -0,0 +1,57 @@
++//! Host-only session authority. Integration persistence never reads session/user tables.
++use super::PostgresPersistence;
++use crate::{
++    adapters::integrations::owner::client_namespace,
++    application::integrations::{
++        VerifiedOwner,
++        connect::{ConnectAuthority, ConnectFinalizer},
++    },
++    domain::integrations::*,
++};
++use async_trait::async_trait;
++use chrono::{DateTime, Utc};
++use uuid::Uuid;
++pub(crate) struct PostgresConnectAuthority {
++    pub persistence: PostgresPersistence,
++}
++#[async_trait]
++impl ConnectAuthority for PostgresConnectAuthority {
++    async fn complete(
++        &self,
++        owner: &VerifiedOwner,
++        finalizer: &dyn ConnectFinalizer,
++    ) -> IntegrationResult<()> {
++        let browser = owner.browser.as_ref().ok_or(IntegrationError::Denied)?;
++        if owner.owner().namespace != client_namespace() {
++            return Err(IntegrationError::Denied);
++        }
++        let user = Uuid::parse_str(owner.owner().subject.as_str())
++            .map_err(|_| IntegrationError::Denied)?;
++        let session =
++            Uuid::parse_str(browser.session.as_str()).map_err(|_| IntegrationError::Denied)?;
++        let mut tx = self
++            .persistence
++            .pool()
++            .begin()
++            .await
++            .map_err(|_| IntegrationError::Storage)?;
++        sqlx::query("SET LOCAL lock_timeout='5s'")
++            .execute(&mut *tx)
++            .await
++            .map_err(|_| IntegrationError::Storage)?;
++        let revision: Option<i64> =
++            sqlx::query_scalar("SELECT auth_revision FROM users WHERE id=$1 FOR SHARE")
++                .bind(user)
++                .fetch_optional(&mut *tx)
++                .await
++                .map_err(|_| IntegrationError::Storage)?;
++        let revision = revision.ok_or(IntegrationError::Denied)?;
++        let expires:Option<DateTime<Utc>>=sqlx::query_scalar("SELECT expires_at FROM user_sessions WHERE id=$1 AND user_id=$2 AND auth_revision=$3 AND revoked_at IS NULL AND expires_at>clock_timestamp() FOR SHARE")
++            .bind(session).bind(user).bind(revision).fetch_optional(&mut *tx).await.map_err(|_|IntegrationError::Storage)?;
++        finalizer
++            .finish(expires.ok_or(IntegrationError::Denied)?)
++            .await?;
++        tx.rollback().await.map_err(|_| IntegrationError::Storage)?;
++        Ok(())
++    }
++}
+--- accepted-p03/src/adapters/persistence/integrations/accounts.rs
++++ current/src/adapters/persistence/integrations/accounts.rs
+@@ -28,11 +28,11 @@
+     }
+     Ok(())
+ }
+-enum AccountRead {
++pub(super) enum AccountRead {
+     Metadata,
+     Locked,
+ }
+-async fn load(
++pub(super) async fn load(
+     connection: &mut PgConnection,
+     owner: &AccountOwner,
+     id: AccountId,
+@@ -45,7 +45,7 @@
+     sqlx::query_as::<_,AccountRow>(&format!("SELECT {COLUMNS} FROM integration_accounts WHERE owner_namespace=$1 AND owner_subject=$2 AND id=$3{suffix}"))
+         .bind(owner.namespace.as_str()).bind(owner.subject.as_str()).bind(id.as_uuid()).fetch_optional(connection).await.map_err(storage_error)?.ok_or(IntegrationError::NotFound)
+ }
+-fn new_account(owner: &AccountOwner, w: &AccountWrite) -> ConnectedAccount {
++pub(super) fn new_account(owner: &AccountOwner, w: &AccountWrite) -> ConnectedAccount {
+     ConnectedAccount {
+         id: AccountId::new(Uuid::new_v4()),
+         owner: owner.clone(),
+@@ -64,7 +64,7 @@
+     }
+ }
+ impl PostgresVault {
+-    fn validate_write(&self, w: &AccountWrite) -> IntegrationResult<()> {
++    pub(super) fn validate_write(&self, w: &AccountWrite) -> IntegrationResult<()> {
+         let entry = self.registration(&w.provider, &w.config, w.method, &w.schema)?;
+         let identity = self
+             .registry
+@@ -183,7 +183,7 @@
+         Ok(result)
+     }
+ }
+-async fn save_payload(
++pub(super) async fn save_payload(
+     tx: &mut Transaction<'_, Postgres>,
+     account: &ConnectedAccount,
+     versions: CredentialVersions,
+@@ -247,36 +247,13 @@
+         owner: &AccountOwner,
+         w: AccountWrite,
+     ) -> IntegrationResult<ConnectedAccount> {
+-        self.validate_write(&w)?;
+-        let account = new_account(owner, &w);
+-        let envelope = self
+-            .persistence
+-            .credential_cipher()
+-            .map_err(|_| IntegrationError::Credential)?
+-            .seal_envelope(
+-                &CredentialContext::integration_account(&account),
+-                &w.payload,
+-            )
+-            .map_err(|_| IntegrationError::Credential)?;
+-        let metadata = serde_json::to_string(&w.metadata).map_err(|_| IntegrationError::Invalid)?;
+-        let identity = w
+-            .identity
+-            .as_ref()
+-            .map(serde_json::to_string)
+-            .transpose()
+-            .map_err(|_| IntegrationError::Invalid)?;
+-        // The BEFORE INSERT guard serializes owner count/retirement with this insert.
+-        let mut tx = self
+-            .persistence
+-            .pool()
+-            .begin()
+-            .await
+-            .map_err(storage_error)?;
+-        let row=sqlx::query_as::<_,AccountRow>(&format!("INSERT INTO integration_accounts(id,owner_namespace,owner_subject,key,provider_id,auth_config_id,auth_method,credential_schema,external_identity,authorization_key,envelope,status,metadata) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,'ready',$12) RETURNING {COLUMNS}"))
+-            .bind(account.id.as_uuid()).bind(owner.namespace.as_str()).bind(owner.subject.as_str()).bind(w.key.as_str()).bind(w.provider.as_str()).bind(w.config.as_str())
+-            .bind(w.method.as_str()).bind(w.schema.as_str()).bind(identity).bind(w.identity.as_ref().map(|i|i.authorization_key.as_str())).bind(envelope).bind(metadata)
+-            .fetch_one(&mut *tx).await.map_err(storage_error)?;
+-        let result = row.decode()?;
++        let mut tx = self
++            .persistence
++            .pool()
++            .begin()
++            .await
++            .map_err(storage_error)?;
++        let result = insert_on(self, &mut tx, owner, w).await?;
+         tx.commit().await.map_err(storage_error)?;
+         Ok(result)
+     }
+@@ -447,3 +424,35 @@
+         })
+     }
+ }
++
++pub(super) async fn insert_on(
++    vault: &PostgresVault,
++    tx: &mut Transaction<'_, Postgres>,
++    owner: &AccountOwner,
++    w: AccountWrite,
++) -> IntegrationResult<ConnectedAccount> {
++    vault.validate_write(&w)?;
++    let account = new_account(owner, &w);
++    let envelope = vault
++        .persistence
++        .credential_cipher()
++        .map_err(|_| IntegrationError::Credential)?
++        .seal_envelope(
++            &CredentialContext::integration_account(&account),
++            &w.payload,
++        )
++        .map_err(|_| IntegrationError::Credential)?;
++    let metadata = serde_json::to_string(&w.metadata).map_err(|_| IntegrationError::Invalid)?;
++    let identity = w
++        .identity
++        .as_ref()
++        .map(serde_json::to_string)
++        .transpose()
++        .map_err(|_| IntegrationError::Invalid)?;
++    let row=sqlx::query_as::<_,AccountRow>(&format!("INSERT INTO integration_accounts(id,owner_namespace,owner_subject,key,provider_id,auth_config_id,auth_method,credential_schema,external_identity,authorization_key,envelope,status,metadata) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,'ready',$12) RETURNING {COLUMNS}"))
++            .bind(account.id.as_uuid()).bind(owner.namespace.as_str()).bind(owner.subject.as_str()).bind(w.key.as_str()).bind(w.provider.as_str()).bind(w.config.as_str())
++            .bind(w.method.as_str()).bind(w.schema.as_str()).bind(identity).bind(w.identity.as_ref().map(|i|i.authorization_key.as_str())).bind(envelope).bind(metadata)
++            .fetch_one(&mut **tx).await.map_err(storage_error)?;
++    let result = row.decode()?;
++    Ok(result)
++}
+--- accepted-p03/src/adapters/persistence/integrations/cache_update_tests.rs
++++ current/src/adapters/persistence/integrations/cache_update_tests.rs
+@@ -11,7 +11,7 @@
+         };
+         let registration = f.vault.registry.get(&AppId::parse(app).unwrap()).unwrap();
+         let mut original = if app == "google-fixture" {
+-            json!({"subject":"google-account","client":"google-client-fixture","scopes":["mail.read","mail.send"],"refresh_token":"fixture-refresh","access_token":"fixture-access","expires_at":"2030-01-01T00:00:00Z","generation":1,"refresh_retry_at":null})
++            json!({"subject":"google-account","mailbox":"mailbox@gmail.com","client":"google-client-fixture","scopes":["mail.read","mail.send"],"refresh_token":"fixture-refresh","access_token":"fixture-access","expires_at":"2030-01-01T00:00:00Z","generation":1,"refresh_retry_at":null})
+         } else {
+             json!({"workspace":"workspace-without-email","client":"same-client","permissions":["resource.read","resource.write"],"token":"fixture-managed-secret","generation":1})
+         };
+--- accepted-p03/src/adapters/persistence/integrations/connect/attempts.rs
++++ current/src/adapters/persistence/integrations/connect/attempts.rs
+@@ -0,0 +1,101 @@
++use super::*;
++use crate::adapters::persistence::credentials::envelope::CredentialContext;
++use secrecy::ExposeSecret;
++async fn ensure_owner(
++    tx: &mut Transaction<'_, Postgres>,
++    owner: &AccountOwner,
++) -> IntegrationResult<()> {
++    sqlx::query("INSERT INTO integration_owner_states(owner_namespace,owner_subject,retired) VALUES($1,$2,FALSE) ON CONFLICT DO NOTHING")
++        .bind(owner.namespace.as_str()).bind(owner.subject.as_str()).execute(&mut **tx).await.map_err(storage_error)?;
++    lock_owner(tx, owner).await
++}
++pub(super) async fn start(
++    vault: &PostgresVault,
++    f: &AttemptFacts,
++    verifier: SecretString,
++) -> IntegrationResult<ConnectAttempt> {
++    if !(43..=128).contains(&verifier.expose_secret().len()) {
++        return Err(IntegrationError::Invalid);
++    }
++    let entry = vault.registry.get(&f.app)?;
++    if entry.config.id != f.config
++        || entry.provider.id != f.provider
++        || vault.registry.policy(&f.app)? != f.policy
++        || entry.authorization.is_none()
++    {
++        return Err(IntegrationError::Denied);
++    }
++    let raw = serde_json::to_string(f).map_err(|_| IntegrationError::Invalid)?;
++    if raw.len() > MAX_METADATA_BYTES {
++        return Err(IntegrationError::Limit);
++    }
++    let envelope = vault
++        .persistence
++        .credential_cipher()
++        .map_err(|_| IntegrationError::Credential)?
++        .seal_envelope(&CredentialContext::integration_connect(f), &verifier)
++        .map_err(|_| IntegrationError::Credential)?;
++    let mut tx = begin(vault).await?;
++    ensure_owner(&mut tx, &f.owner).await?;
++    maintain(&mut tx, &f.owner, 0).await?;
++    if let Some(target) = f.reconnect {
++        let account = accounts::load(&mut tx, &f.owner, target.account, AccountRead::Locked)
++            .await?
++            .decode()?;
++        if account.authorization_revision != target.authorization
++            || account.provider_id != f.provider
++            || account.auth_config_id != f.config
++            || account.auth_method != entry.provider.method
++            || account.credential_schema != entry.provider.schema
++        {
++            return Err(IntegrationError::Conflict);
++        }
++    }
++    sqlx::query("INSERT INTO integration_connect_attempts(id,owner_namespace,owner_subject,facts,status,envelope,expires_at) VALUES($1,$2,$3,$4,'pending',$5,$6)")
++        .bind(f.id.as_uuid()).bind(f.owner.namespace.as_str()).bind(f.owner.subject.as_str()).bind(raw).bind(envelope).bind(f.expires_at).execute(&mut *tx).await.map_err(storage_error)?;
++    tx.commit().await.map_err(storage_error)?;
++    Ok(ConnectAttempt {
++        return_target: f.return_target.clone(),
++        id: f.id,
++        status: ConnectStatus::Pending,
++        account: None,
++    })
++}
++pub(super) async fn consume(
++    vault: &PostgresVault,
++    f: &AttemptFacts,
++) -> IntegrationResult<ConsumedAttempt> {
++    let mut tx = begin(vault).await?;
++    lock_owner(&mut tx, &f.owner).await?;
++    maintain(&mut tx, &f.owner, 0).await?;
++    let r = row(&mut tx, &f.owner, f.id).await?;
++    let stored = r.facts()?;
++    if r.status != "pending" || !stored.same(f)? || f.expires_at <= Utc::now() {
++        return Err(IntegrationError::Denied);
++    }
++    let envelope = r.envelope.ok_or(IntegrationError::Credential)?;
++    if envelope.len() > 23000 {
++        return Err(IntegrationError::Credential);
++    }
++    sqlx::query(
++        "UPDATE integration_connect_attempts SET status='processing',envelope=NULL WHERE id=$1",
++    )
++    .bind(f.id.as_uuid())
++    .execute(&mut *tx)
++    .await
++    .map_err(storage_error)?;
++    tx.commit().await.map_err(storage_error)?;
++    let verifier = vault
++        .persistence
++        .credential_cipher()
++        .map_err(|_| IntegrationError::Credential)?
++        .open_envelope(&CredentialContext::integration_connect(f), &envelope)
++        .map_err(|_| IntegrationError::Credential)?;
++    if !(43..=128).contains(&verifier.expose_secret().len()) {
++        return Err(IntegrationError::Credential);
++    }
++    Ok(ConsumedAttempt {
++        facts: stored,
++        verifier,
++    })
++}
+--- accepted-p03/src/adapters/persistence/integrations/connect/completion.rs
++++ current/src/adapters/persistence/integrations/connect/completion.rs
+@@ -0,0 +1,227 @@
++use super::*;
++use crate::adapters::persistence::credentials::envelope::CredentialContext;
++struct PreviousAuthorization {
++    account: ConnectedAccount,
++    versions: CredentialVersions,
++    record: Option<CredentialRecord>,
++}
++async fn previous(
++    vault: &PostgresVault,
++    tx: &mut Transaction<'_, Postgres>,
++    f: &AttemptFacts,
++) -> IntegrationResult<Option<PreviousAuthorization>> {
++    let Some(target) = f.reconnect else {
++        return Ok(None);
++    };
++    let row = accounts::load(tx, &f.owner, target.account, AccountRead::Locked).await?;
++    let generation = CredentialGeneration::new(row.credential_generation)?;
++    let account = row.decode()?;
++    let entry = vault.registry.get(&f.app)?;
++    if account.authorization_revision != target.authorization
++        || account.provider_id != f.provider
++        || account.auth_config_id != f.config
++        || account.auth_method != entry.provider.method
++        || account.credential_schema != entry.provider.schema
++    {
++        return Err(IntegrationError::Conflict);
++    }
++    let versions = CredentialVersions {
++        revision: account.revision,
++        authorization: account.authorization_revision,
++        generation,
++    };
++    let envelope: Option<String> =
++        sqlx::query_scalar("SELECT envelope FROM integration_accounts WHERE id=$1")
++            .bind(target.account.as_uuid())
++            .fetch_one(&mut **tx)
++            .await
++            .map_err(storage_error)?;
++    let record = if let Some(envelope) = envelope {
++        if envelope.len() > 23000 {
++            return Err(IntegrationError::Credential);
++        }
++        Some(CredentialRecord {
++            account: account.clone(),
++            versions,
++            payload: vault
++                .persistence
++                .credential_cipher()
++                .map_err(|_| IntegrationError::Credential)?
++                .open_envelope(&CredentialContext::integration_account(&account), &envelope)
++                .map_err(|_| IntegrationError::Credential)?,
++        })
++    } else {
++        None
++    };
++    Ok(Some(PreviousAuthorization {
++        account,
++        versions,
++        record,
++    }))
++}
++async fn temporal(
++    tx: &mut Transaction<'_, Postgres>,
++    f: &AttemptFacts,
++    valid_until: DateTime<Utc>,
++) -> IntegrationResult<()> {
++    let live: bool = sqlx::query_scalar("SELECT clock_timestamp()<$1 AND clock_timestamp()<$2")
++        .bind(valid_until)
++        .bind(f.expires_at)
++        .fetch_one(&mut **tx)
++        .await
++        .map_err(storage_error)?;
++    if !live {
++        return Err(IntegrationError::Denied);
++    }
++    Ok(())
++}
++pub(super) async fn finalize(
++    vault: &PostgresVault,
++    f: &AttemptFacts,
++    candidate: &SecretString,
++    valid_until: DateTime<Utc>,
++) -> IntegrationResult<ConnectAttempt> {
++    let mut tx = begin(vault).await?;
++    lock_owner(&mut tx, &f.owner).await?;
++    let previous = previous(vault, &mut tx, f).await?;
++    let r = row(&mut tx, &f.owner, f.id).await?;
++    if r.status != "processing" || !r.facts()?.same(f)? {
++        return Err(IntegrationError::Denied);
++    }
++    let next = previous
++        .as_ref()
++        .map(|p| p.versions.changed(CredentialChange::Replace))
++        .transpose()?
++        .unwrap_or(CredentialVersions::INITIAL);
++    let prepared = prepare(vault, f, candidate, previous.as_ref(), next)?;
++    temporal(&mut tx, f, valid_until).await?;
++    let w = match prepared {
++        Preparation::Ready(write) => *write,
++        Preparation::Refused(status) => {
++            let result = set_terminal(&mut tx, &f.owner, f.id, status, None).await?;
++            tx.commit().await.map_err(storage_error)?;
++            return Ok(result);
++        }
++    };
++    sqlx::query("SAVEPOINT connect_account_write")
++        .execute(&mut *tx)
++        .await
++        .map_err(storage_error)?;
++    let account = write(
++        vault,
++        &mut tx,
++        &f.owner,
++        w,
++        previous.as_ref().map(|p| &p.account),
++        next,
++    )
++    .await;
++    let result = match account {
++        Ok(account) => {
++            let result = set_terminal(
++                &mut tx,
++                &f.owner,
++                f.id,
++                ConnectStatus::Connected,
++                Some(account),
++            )
++            .await?;
++            // Expiry maintenance must never commit an account with a non-connected outcome.
++            if result.status != ConnectStatus::Connected || result.account != Some(account) {
++                return Err(IntegrationError::Denied);
++            }
++            result
++        }
++        Err(IntegrationError::Conflict) => {
++            sqlx::query("ROLLBACK TO SAVEPOINT connect_account_write")
++                .execute(&mut *tx)
++                .await
++                .map_err(storage_error)?;
++            set_terminal(&mut tx, &f.owner, f.id, ConnectStatus::Conflict, None).await?
++        }
++        Err(error) => return Err(error),
++    };
++    tx.commit().await.map_err(storage_error)?;
++    Ok(result)
++}
++async fn write(
++    vault: &PostgresVault,
++    tx: &mut Transaction<'_, Postgres>,
++    owner: &AccountOwner,
++    w: AccountWrite,
++    previous: Option<&ConnectedAccount>,
++    next: CredentialVersions,
++) -> IntegrationResult<AccountId> {
++    if let Some(account) = previous {
++        let envelope = vault
++            .persistence
++            .credential_cipher()
++            .map_err(|_| IntegrationError::Credential)?
++            .seal_envelope(&CredentialContext::integration_account(account), &w.payload)
++            .map_err(|_| IntegrationError::Credential)?;
++        accounts::save_payload(
++            tx,
++            account,
++            next,
++            Some(&envelope),
++            AccountStatus::Ready,
++            &w.metadata,
++        )
++        .await?;
++        super::super::grants::invalidate_account(tx, account.id).await?;
++        Ok(account.id)
++    } else {
++        Ok(accounts::insert_on(vault, tx, owner, w).await?.id)
++    }
++}
++
++enum Preparation {
++    Ready(Box<AccountWrite>),
++    Refused(ConnectStatus),
++}
++fn prepare(
++    vault: &PostgresVault,
++    f: &AttemptFacts,
++    candidate: &SecretString,
++    previous: Option<&PreviousAuthorization>,
++    next: CredentialVersions,
++) -> IntegrationResult<Preparation> {
++    let entry = vault.registry.get(&f.app)?;
++    if entry.provider.id != f.provider
++        || entry.config.id != f.config
++        || vault.registry.policy(&f.app)? != f.policy
++    {
++        return Err(IntegrationError::Denied);
++    }
++    let provider = entry
++        .authorization
++        .as_ref()
++        .ok_or(IntegrationError::Unavailable)?;
++    let prepared = match provider.finalize(FinalizeAuthorization {
++        app: &entry.app,
++        candidate,
++        previous: previous.and_then(|p| p.record.as_ref()),
++        generation: next.generation,
++    }) {
++        Ok(p) => p,
++        Err(status) => return Ok(Preparation::Refused(status)),
++    };
++    if previous.is_some_and(|p| p.account.external_identity.as_ref() != Some(&prepared.identity)) {
++        return Ok(Preparation::Refused(ConnectStatus::IdentityMismatch));
++    }
++    let w = AccountWrite {
++        key: previous
++            .map(|p| p.account.key.clone())
++            .unwrap_or(AccountKey::parse(format!("oauth-{}", f.id.as_uuid()))?),
++        provider: f.provider.clone(),
++        config: f.config.clone(),
++        method: entry.provider.method,
++        schema: entry.provider.schema.clone(),
++        identity: Some(prepared.identity),
++        metadata: prepared.metadata,
++        payload: prepared.payload,
++    };
++    vault.validate_write(&w)?;
++    entry.adapter.validate_use(&w.payload, &entry.app)?;
++    Ok(Preparation::Ready(Box::new(w)))
++}
+--- accepted-p03/src/adapters/persistence/integrations/connect/inventory.rs
++++ current/src/adapters/persistence/integrations/connect/inventory.rs
+@@ -0,0 +1,47 @@
++use super::*;
++use crate::{
++    adapters::persistence::credentials::envelope::CredentialContext,
++    app_error::{AppError, AppResult},
++};
++use sqlx::PgConnection;
++pub(crate) async fn page(
++    db: &mut PgConnection,
++    after: Option<Uuid>,
++    limit: i64,
++) -> AppResult<Vec<super::super::inventory::VaultInventoryEntry>> {
++    if !(1..=100).contains(&limit) {
++        return Err(AppError::Internal("Invalid connect inventory page".into()));
++    }
++    let rows:Vec<(Uuid,String,String)>=sqlx::query_as("SELECT id,facts,envelope FROM integration_connect_attempts WHERE envelope IS NOT NULL AND ($1::uuid IS NULL OR id>$1) ORDER BY id LIMIT $2")
++        .bind(after).bind(limit).fetch_all(db).await?;
++    rows.into_iter()
++        .map(|(id, facts, envelope)| {
++            if facts.len() > MAX_METADATA_BYTES || envelope.len() > 23000 {
++                return Err(AppError::Internal("Invalid connect inventory row".into()));
++            }
++            let facts: AttemptFacts = serde_json::from_str(&facts)
++                .map_err(|_| AppError::Internal("Invalid connect inventory facts".into()))?;
++            if facts.id.as_uuid() != id {
++                return Err(AppError::Internal(
++                    "Invalid connect inventory identity".into(),
++                ));
++            }
++            Ok(super::super::inventory::VaultInventoryEntry {
++                id,
++                context: CredentialContext::integration_connect(&facts),
++                envelope,
++            })
++        })
++        .collect()
++}
++pub(crate) async fn rewrap(
++    tx: &mut Transaction<'_, Postgres>,
++    id: Uuid,
++    old: &str,
++    new: &str,
++) -> Result<sqlx::postgres::PgQueryResult, sqlx::Error> {
++    sqlx::query("UPDATE integration_connect_attempts SET envelope=$2 WHERE id=$1 AND envelope=$3 AND status='pending'").bind(id).bind(new).bind(old).execute(&mut **tx).await
++}
++
++#[cfg(test)]
++pub(crate) const ISOLATED_TABLE_SQL: &str = "CREATE TEMPORARY TABLE integration_connect_attempts (LIKE public.integration_connect_attempts INCLUDING ALL) ON COMMIT PRESERVE ROWS";
+--- accepted-p03/src/adapters/persistence/integrations/connect/mod.rs
++++ current/src/adapters/persistence/integrations/connect/mod.rs
+@@ -0,0 +1,159 @@
++use super::{
++    PostgresVault,
++    accounts::{self, AccountRead, lock_owner},
++    storage_error,
++};
++use crate::{
++    application::integrations::{
++        connect::*, management::AccountWrite, private::CredentialRecord, *,
++    },
++    domain::integrations::*,
++};
++use async_trait::async_trait;
++use chrono::{DateTime, Utc};
++use secrecy::SecretString;
++use sqlx::{Postgres, Transaction};
++use uuid::Uuid;
++mod attempts;
++mod completion;
++pub(crate) mod inventory;
++#[derive(sqlx::FromRow)]
++struct AttemptRow {
++    id: Uuid,
++    facts: String,
++    status: String,
++    account_id: Option<Uuid>,
++    envelope: Option<String>,
++}
++impl AttemptRow {
++    fn facts(&self) -> IntegrationResult<AttemptFacts> {
++        if self.facts.len() > MAX_METADATA_BYTES {
++            return Err(IntegrationError::Storage);
++        }
++        serde_json::from_str(&self.facts).map_err(|_| IntegrationError::Storage)
++    }
++    fn projection(&self) -> IntegrationResult<ConnectAttempt> {
++        Ok(ConnectAttempt {
++            return_target: self.facts()?.return_target,
++            id: ConnectAttemptId::new(self.id),
++            status: serde_json::from_value(serde_json::Value::String(self.status.clone()))
++                .map_err(|_| IntegrationError::Storage)?,
++            account: self.account_id.map(AccountId::new),
++        })
++    }
++}
++async fn begin(vault: &PostgresVault) -> IntegrationResult<Transaction<'_, Postgres>> {
++    let mut tx = vault
++        .persistence
++        .pool()
++        .begin()
++        .await
++        .map_err(storage_error)?;
++    sqlx::query("SET LOCAL lock_timeout='5s'")
++        .execute(&mut *tx)
++        .await
++        .map_err(storage_error)?;
++    Ok(tx)
++}
++async fn row(
++    tx: &mut Transaction<'_, Postgres>,
++    owner: &AccountOwner,
++    id: ConnectAttemptId,
++) -> IntegrationResult<AttemptRow> {
++    sqlx::query_as("SELECT id,facts,status,account_id,envelope FROM integration_connect_attempts WHERE owner_namespace=$1 AND owner_subject=$2 AND id=$3 FOR UPDATE")
++        .bind(owner.namespace.as_str()).bind(owner.subject.as_str()).bind(id.as_uuid()).fetch_optional(&mut **tx).await.map_err(storage_error)?.ok_or(IntegrationError::NotFound)
++}
++async fn maintain(
++    tx: &mut Transaction<'_, Postgres>,
++    owner: &AccountOwner,
++    reserved_terminals: i64,
++) -> IntegrationResult<()> {
++    let expired:i64=sqlx::query_scalar("SELECT count(*) FROM integration_connect_attempts WHERE owner_namespace=$1 AND owner_subject=$2 AND status IN ('pending','processing') AND expires_at<=clock_timestamp()")
++        .bind(owner.namespace.as_str()).bind(owner.subject.as_str()).fetch_one(&mut **tx).await.map_err(storage_error)?;
++    sqlx::query("DELETE FROM integration_connect_attempts WHERE id IN (SELECT id FROM integration_connect_attempts WHERE owner_namespace=$1 AND owner_subject=$2 AND status NOT IN ('pending','processing') ORDER BY created_at DESC,id DESC OFFSET $3 LIMIT 40)")
++        .bind(owner.namespace.as_str()).bind(owner.subject.as_str()).bind((32-reserved_terminals-expired).max(0)).execute(&mut **tx).await.map_err(storage_error)?;
++    sqlx::query("UPDATE integration_connect_attempts SET status='expired',envelope=NULL WHERE owner_namespace=$1 AND owner_subject=$2 AND status IN ('pending','processing') AND expires_at<=clock_timestamp()")
++        .bind(owner.namespace.as_str()).bind(owner.subject.as_str()).execute(&mut **tx).await.map_err(storage_error)?;
++    Ok(())
++}
++async fn set_terminal(
++    tx: &mut Transaction<'_, Postgres>,
++    owner: &AccountOwner,
++    id: ConnectAttemptId,
++    status: ConnectStatus,
++    account: Option<AccountId>,
++) -> IntegrationResult<ConnectAttempt> {
++    maintain(tx, owner, 1).await?;
++    sqlx::query("UPDATE integration_connect_attempts SET status=$4,envelope=NULL,account_id=$5 WHERE owner_namespace=$1 AND owner_subject=$2 AND id=$3 AND status IN ('pending','processing')")
++        .bind(owner.namespace.as_str()).bind(owner.subject.as_str()).bind(id.as_uuid()).bind(status.as_str()).bind(account.map(|a|a.as_uuid())).execute(&mut **tx).await.map_err(storage_error)?;
++    row(tx, owner, id).await?.projection()
++}
++#[async_trait]
++impl ConnectStore for PostgresVault {
++    async fn start(
++        &self,
++        facts: &AttemptFacts,
++        verifier: SecretString,
++    ) -> IntegrationResult<ConnectAttempt> {
++        attempts::start(self, facts, verifier).await
++    }
++    async fn consume(&self, facts: &AttemptFacts) -> IntegrationResult<ConsumedAttempt> {
++        attempts::consume(self, facts).await
++    }
++    async fn status(
++        &self,
++        owner: &AccountOwner,
++        id: ConnectAttemptId,
++    ) -> IntegrationResult<ConnectAttempt> {
++        let mut tx = begin(self).await?;
++        lock_owner(&mut tx, owner).await?;
++        maintain(&mut tx, owner, 0).await?;
++        // Metadata projection never selects the verifier or encrypted candidate.
++        let (status,account,return_target):(String,Option<Uuid>,String)=sqlx::query_as("SELECT status,account_id,facts::jsonb->>'return_target' AS return_target FROM integration_connect_attempts WHERE owner_namespace=$1 AND owner_subject=$2 AND id=$3")
++            .bind(owner.namespace.as_str()).bind(owner.subject.as_str()).bind(id.as_uuid()).fetch_optional(&mut *tx).await.map_err(storage_error)?.ok_or(IntegrationError::NotFound)?;
++        let result = ConnectAttempt {
++            return_target: SafeReturnTarget::parse(return_target)?,
++            id,
++            status: serde_json::from_value(serde_json::Value::String(status))
++                .map_err(|_| IntegrationError::Storage)?,
++            account: account.map(AccountId::new),
++        };
++        tx.commit().await.map_err(storage_error)?;
++        Ok(result)
++    }
++    async fn terminal(
++        &self,
++        owner: &AccountOwner,
++        id: ConnectAttemptId,
++        status: ConnectStatus,
++    ) -> IntegrationResult<ConnectAttempt> {
++        if matches!(
++            status,
++            ConnectStatus::Pending | ConnectStatus::Processing | ConnectStatus::Connected
++        ) {
++            return Err(IntegrationError::Denied);
++        }
++        let mut tx = begin(self).await?;
++        lock_owner(&mut tx, owner).await?;
++        let result = set_terminal(&mut tx, owner, id, status, None).await?;
++        tx.commit().await.map_err(storage_error)?;
++        Ok(result)
++    }
++    async fn finalize(
++        &self,
++        facts: &AttemptFacts,
++        candidate: &SecretString,
++        valid_until: DateTime<Utc>,
++    ) -> IntegrationResult<ConnectAttempt> {
++        let remaining = (valid_until.min(facts.expires_at) - Utc::now())
++            .to_std()
++            .map_err(|_| IntegrationError::Denied)?;
++        // Session expiry is independent of row locks; cancel the actual lock wait.
++        tokio::time::timeout(
++            remaining,
++            completion::finalize(self, facts, candidate, valid_until),
++        )
++        .await
++        .map_err(|_| IntegrationError::Denied)?
++    }
++}
+--- accepted-p03/src/adapters/persistence/integrations/connect_tests/bounds.rs
++++ current/src/adapters/persistence/integrations/connect_tests/bounds.rs
+@@ -0,0 +1,351 @@
++use super::*;
++#[tokio::test]
++async fn integration_connect_cap_has_real_competing_creators() {
++    let f = Box::pin(Fixture::new()).await;
++    let mut tasks = tokio::task::JoinSet::new();
++    for _ in 0..9 {
++        let service = f.service.clone();
++        let owner = f.owner.clone();
++        tasks.spawn(async move { service.begin_connect(&owner, command(None)).await });
++    }
++    let mut accepted = 0;
++    let mut limited = 0;
++    while let Some(result) = tasks.join_next().await {
++        match result.unwrap() {
++            Ok(_) => accepted += 1,
++            Err(IntegrationError::Limit) => limited += 1,
++            Err(error) => panic!("unexpected sanitized error {error:?}"),
++        }
++    }
++    assert_eq!(accepted, 8);
++    assert_eq!(limited, 1);
++    let count: i64 = sqlx::query_scalar("SELECT count(*) FROM integration_connect_attempts")
++        .fetch_one(f.pool())
++        .await
++        .unwrap();
++    assert_eq!(count, 8);
++}
++#[tokio::test]
++async fn integration_connect_retains_only_bounded_terminal_outcomes() {
++    let f = Box::pin(Fixture::new()).await;
++    for _ in 0..40 {
++        let start = f.begin(None).await;
++        let cancelled = f
++            .service
++            .cancel_connect(&f.owner, start.attempt.id)
++            .await
++            .unwrap();
++        assert_eq!(cancelled.status, ConnectStatus::Cancelled);
++    }
++    #[derive(sqlx::FromRow)]
++    struct RetentionCounts {
++        total: i64,
++        material: i64,
++    }
++    let counts: RetentionCounts = sqlx::query_as(
++        "SELECT count(*) AS total,count(envelope) AS material FROM integration_connect_attempts",
++    )
++    .fetch_one(f.pool())
++    .await
++    .unwrap();
++    assert_eq!(counts.total, 32);
++    assert_eq!(counts.material, 0);
++}
++#[tokio::test]
++async fn integration_connect_expiry_erases_verifier_and_cannot_complete() {
++    let f = Box::pin(Fixture::new()).await;
++    let start = f.begin(None).await;
++    let mut facts = f.service.codec.verify(&f.callback(&start).state).unwrap();
++    facts.id = ConnectAttemptId::new(Uuid::new_v4());
++    facts.nonce = ConnectNonce::parse(Uuid::new_v4().to_string()).unwrap();
++    facts.expires_at = Utc::now() + chrono::Duration::milliseconds(400);
++    let attempt = f
++        .vault
++        .start(&facts, SecretString::from("v".repeat(64)))
++        .await
++        .unwrap();
++    await_time(f.pool(), facts.expires_at).await;
++    assert_eq!(
++        f.service
++            .get_connect_attempt(&f.owner, attempt.id)
++            .await
++            .unwrap()
++            .status,
++        ConnectStatus::Expired
++    );
++    let envelope: Option<String> =
++        sqlx::query_scalar("SELECT envelope FROM integration_connect_attempts WHERE id=$1")
++            .bind(attempt.id.as_uuid())
++            .fetch_one(f.pool())
++            .await
++            .unwrap();
++    assert!(envelope.is_none());
++    assert!(f.vault.consume(&facts).await.is_err());
++    assert_eq!(f.script.calls.load(Ordering::SeqCst), 0);
++}
++#[tokio::test]
++async fn integration_connect_wrong_browser_provider_purpose_signature_and_apps_deny() {
++    let f = Box::pin(Fixture::new()).await;
++    let start = f.begin(None).await;
++    let mut c = f.callback(&start);
++    c.provider = ProviderId::parse("foreign").unwrap();
++    assert!(
++        f.service
++            .finish_connect(&f.owner, c, work(CancellationToken::new()))
++            .await
++            .is_err()
++    );
++    let fake = VerifiedOwner::for_browser(
++        f.owner.owner().clone(),
++        ConnectBrowser {
++            session: ConnectSessionReference::parse(Uuid::new_v4().to_string()).unwrap(),
++            binding: BrowserBinding::parse("different-browser").unwrap(),
++        },
++    );
++    assert!(
++        f.service
++            .finish_connect(&fake, f.callback(&start), work(CancellationToken::new()))
++            .await
++            .is_err()
++    );
++    let mut c = f.callback(&start);
++    let state =
++        f.sessions
++            .issue_oauth_state("google", "login", Some(f.session.user_id), "nonce".into());
++    c.state = f.sessions.encode_oauth_state(&state);
++    assert!(
++        f.service
++            .finish_connect(&f.owner, c, work(CancellationToken::new()))
++            .await
++            .is_err()
++    );
++    let mut c = f.callback(&start);
++    c.state.push('x');
++    assert!(
++        f.service
++            .finish_connect(&f.owner, c, work(CancellationToken::new()))
++            .await
++            .is_err()
++    );
++    let mut bad = command(None);
++    bad.app = AppId::parse("unregistered").unwrap();
++    assert!(f.service.begin_connect(&f.owner, bad).await.is_err());
++    let mut bad = command(None);
++    bad.config = AuthConfigId::parse("foreign").unwrap();
++    assert!(f.service.begin_connect(&f.owner, bad).await.is_err());
++    assert_eq!(f.script.calls.load(Ordering::SeqCst), 0);
++}
++#[tokio::test]
++async fn integration_connect_ciphertext_context_substitution_fails_and_consumes_material() {
++    let f = Box::pin(Fixture::new()).await;
++    let a = f.begin(None).await;
++    let b = f.begin(None).await;
++    sqlx::query("UPDATE integration_connect_attempts SET envelope=(SELECT envelope FROM integration_connect_attempts WHERE id=$1) WHERE id=$2").bind(a.attempt.id.as_uuid()).bind(b.attempt.id.as_uuid()).execute(f.pool()).await.unwrap();
++    assert!(
++        f.service
++            .finish_connect(&f.owner, f.callback(&b), work(CancellationToken::new()))
++            .await
++            .is_err()
++    );
++    assert_eq!(f.script.calls.load(Ordering::SeqCst), 0);
++    let envelope: Option<String> =
++        sqlx::query_scalar("SELECT envelope FROM integration_connect_attempts WHERE id=$1")
++            .bind(b.attempt.id.as_uuid())
++            .fetch_one(f.pool())
++            .await
++            .unwrap();
++    assert!(envelope.is_none());
++    assert_eq!(f.finish(&a).await.status, ConnectStatus::Connected);
++}
++pub(super) async fn await_time(pool: &sqlx::PgPool, at: chrono::DateTime<Utc>) {
++    tokio::time::timeout(std::time::Duration::from_secs(3), async {
++        loop {
++            let expired: bool = sqlx::query_scalar("SELECT clock_timestamp()>=$1")
++                .bind(at)
++                .fetch_one(pool)
++                .await
++                .unwrap();
++            if expired {
++                break;
++            }
++            tokio::time::sleep(std::time::Duration::from_millis(10)).await;
++        }
++    })
++    .await
++    .unwrap();
++}
++#[tokio::test]
++async fn vault_rotation_connect_attempt_competes_with_consumption_without_resurrecting_pkce() {
++    let f = Box::pin(Fixture::new()).await;
++    let start = f.begin(None).await;
++    let p = PostgresPersistence::with_credential_cipher(
++        f.pool().clone(),
++        CredentialCipher::for_test_with_keys(&[(1, [7; 32]), (2, [8; 32])], 2),
++    );
++    let vault = PostgresVault::with_registry(p.clone(), f.vault.registry.clone());
++    let service = f.service_on(vault);
++    let mut held = f.pool().begin().await.unwrap();
++    sqlx::query("SELECT id FROM integration_connect_attempts WHERE id=$1 FOR UPDATE")
++        .bind(start.attempt.id.as_uuid())
++        .fetch_one(&mut *held)
++        .await
++        .unwrap();
++    let owner = f.owner.clone();
++    let callback = f.callback(&start);
++    let worker = tokio::spawn(async move {
++        service
++            .finish_connect(&owner, callback, work(CancellationToken::new()))
++            .await
++    });
++    crate::adapters::persistence::test_support::wait_until_backends_are_blocked(f.pool(), 1).await;
++    let rotator = tokio::spawn(async move { p.rotate_credentials().await });
++    crate::adapters::persistence::test_support::wait_until_backends_are_blocked(f.pool(), 2).await;
++    held.rollback().await.unwrap();
++    assert_eq!(
++        worker.await.unwrap().unwrap().status,
++        ConnectStatus::Connected
++    );
++    assert!(rotator.await.unwrap().unwrap().complete);
++    let envelope: Option<String> =
++        sqlx::query_scalar("SELECT envelope FROM integration_connect_attempts WHERE id=$1")
++            .bind(start.attempt.id.as_uuid())
++            .fetch_one(f.pool())
++            .await
++            .unwrap();
++    assert!(envelope.is_none());
++}
++
++#[tokio::test]
++async fn integration_connect_required_host_cannot_skip_atomic_finalizer() {
++    struct Skip;
++    #[async_trait::async_trait]
++    impl ConnectAuthority for Skip {
++        async fn complete(
++            &self,
++            _: &VerifiedOwner,
++            _: &dyn ConnectFinalizer,
++        ) -> IntegrationResult<()> {
++            Ok(())
++        }
++    }
++    let f = Box::pin(Fixture::new()).await;
++    let start = f.begin(None).await;
++    let service = ConnectService {
++        registry: f.service.registry.clone(),
++        store: f.service.store.clone(),
++        codec: f.service.codec.clone(),
++        authority: Arc::new(Skip),
++    };
++    assert!(
++        service
++            .finish_connect(&f.owner, f.callback(&start), work(CancellationToken::new()))
++            .await
++            .is_err()
++    );
++    assert!(
++        f.vault
++            .list(f.owner.owner(), PageRequest::new(None, 50).unwrap())
++            .await
++            .unwrap()
++            .accounts
++            .is_empty()
++    );
++    assert_eq!(
++        f.service
++            .get_connect_attempt(&f.owner, start.attempt.id)
++            .await
++            .unwrap()
++            .status,
++        ConnectStatus::Processing
++    );
++}
++#[tokio::test]
++async fn integration_connect_static_api_key_uses_registered_account_lifecycle_without_redirect() {
++    let f = Box::pin(Fixture::new()).await;
++    let account = f
++        .gateway()
++        .create_static_account(
++            &f.owner,
++            StaticAccountInput {
++                key: AccountKey::parse("api-key").unwrap(),
++                app: AppId::parse("static-api-key").unwrap(),
++                metadata: AccountMetadata::new("Static API key".into(), None).unwrap(),
++                value: SecretString::from(r#"{"api_key":"static-sentinel"}"#),
++            },
++        )
++        .await
++        .unwrap();
++    assert_eq!(account.auth_method, AuthMethod::StaticSecret);
++    assert_eq!(account.status, AccountStatus::Ready);
++    let mut bad = command(None);
++    bad.app = AppId::parse("static-api-key").unwrap();
++    assert!(f.service.begin_connect(&f.owner, bad).await.is_err());
++    assert_eq!(f.script.calls.load(Ordering::SeqCst), 0);
++}
++#[tokio::test]
++async fn integration_connect_unavailable_key_cannot_exchange_or_restore_verifier() {
++    let f = Box::pin(Fixture::new()).await;
++    let start = f.begin(None).await;
++    let p = PostgresPersistence::with_credential_cipher(
++        f.pool().clone(),
++        CredentialCipher::for_test_with_keys(&[(2, [8; 32])], 2),
++    );
++    let service = f.service_on(PostgresVault::with_registry(p, f.vault.registry.clone()));
++    assert!(
++        service
++            .finish_connect(&f.owner, f.callback(&start), work(CancellationToken::new()))
++            .await
++            .is_err()
++    );
++    assert_eq!(f.script.calls.load(Ordering::SeqCst), 0);
++    let envelope: Option<String> =
++        sqlx::query_scalar("SELECT envelope FROM integration_connect_attempts WHERE id=$1")
++            .bind(start.attempt.id.as_uuid())
++            .fetch_one(f.pool())
++            .await
++            .unwrap();
++    assert!(envelope.is_none());
++}
++
++#[tokio::test]
++async fn integration_connect_verifier_context_binds_owner_provider_config_app_and_purpose() {
++    use crate::adapters::persistence::credentials::envelope::CredentialContext;
++    let f = Box::pin(Fixture::new()).await;
++    let start = f.begin(None).await;
++    let facts = f.service.codec.verify(&f.callback(&start).state).unwrap();
++    let envelope: String =
++        sqlx::query_scalar("SELECT envelope FROM integration_connect_attempts WHERE id=$1")
++            .bind(start.attempt.id.as_uuid())
++            .fetch_one(f.pool())
++            .await
++            .unwrap();
++    let mut substitutions = Vec::new();
++    let mut changed = facts.clone();
++    changed.owner.subject = OwnerSubject::parse("foreign").unwrap();
++    substitutions.push(changed);
++    let mut changed = facts.clone();
++    changed.provider = ProviderId::parse("foreign").unwrap();
++    substitutions.push(changed);
++    let mut changed = facts.clone();
++    changed.config = AuthConfigId::parse("foreign").unwrap();
++    substitutions.push(changed);
++    let mut changed = facts.clone();
++    changed.app = AppId::parse("foreign").unwrap();
++    substitutions.push(changed);
++    let mut changed = facts.clone();
++    changed.reconnect = Some(ReconnectTarget {
++        account: AccountId::new(Uuid::new_v4()),
++        authorization: AuthorizationRevision::INITIAL,
++    });
++    substitutions.push(changed);
++    for changed in substitutions {
++        assert!(
++            f.vault
++                .persistence
++                .credential_cipher()
++                .unwrap()
++                .open_envelope(&CredentialContext::integration_connect(&changed), &envelope)
++                .is_err()
++        );
++    }
++}
+--- accepted-p03/src/adapters/persistence/integrations/connect_tests/lifecycle.rs
++++ current/src/adapters/persistence/integrations/connect_tests/lifecycle.rs
+@@ -0,0 +1,345 @@
++use super::*;
++#[tokio::test]
++async fn google_vault_callback_competing_same_attempt_exchanges_once() {
++    let f = Box::pin(Fixture::new()).await;
++    let start = f.begin(None).await;
++    let permit = f.script.gate.clone().acquire_owned().await.unwrap();
++    let worker = f.spawn_finish(&start, CancellationToken::new());
++    f.script.wait_calls(1).await;
++    assert!(
++        f.service
++            .finish_connect(&f.owner, f.callback(&start), work(CancellationToken::new()))
++            .await
++            .is_err()
++    );
++    drop(permit);
++    assert_eq!(
++        worker.await.unwrap().unwrap().status,
++        ConnectStatus::Connected
++    );
++    assert_eq!(f.script.calls.load(Ordering::SeqCst), 1);
++}
++#[tokio::test]
++async fn google_vault_callback_competing_distinct_attempts_never_overwrite_authorization() {
++    let f = Box::pin(Fixture::new()).await;
++    let a = f.begin(None).await;
++    let b = f.begin(None).await;
++    let (a, b) = tokio::join!(f.finish(&a), f.finish(&b));
++    let statuses = [a.status, b.status];
++    assert!(
++        statuses.contains(&ConnectStatus::Connected) && statuses.contains(&ConnectStatus::Conflict)
++    );
++    assert_eq!(
++        f.vault
++            .list(f.owner.owner(), PageRequest::new(None, 50).unwrap())
++            .await
++            .unwrap()
++            .accounts
++            .len(),
++        1
++    );
++}
++#[tokio::test]
++async fn google_vault_callback_reconnect_preserves_missing_refresh_only_for_intended_identity() {
++    let f = Box::pin(Fixture::new()).await;
++    let done = f.finish(&f.begin(None).await).await;
++    let id = done.account.unwrap();
++    let before = f.vault.get(f.owner.owner(), id).await.unwrap();
++    f.script
++        .token
++        .lock()
++        .unwrap()
++        .as_object_mut()
++        .unwrap()
++        .remove("refresh_token");
++    let reconnect = f
++        .begin(Some(ReconnectTarget {
++            account: id,
++            authorization: before.authorization_revision,
++        }))
++        .await;
++    let done = f.finish(&reconnect).await;
++    assert_eq!(done.account, Some(id));
++    assert_eq!(done.status, ConnectStatus::Connected);
++    let after = f.vault.get(f.owner.owner(), id).await.unwrap();
++    assert_eq!(
++        after.authorization_revision.get(),
++        before.authorization_revision.get() + 1
++    );
++    let payload = f.vault.read_usable(f.owner.owner(), id).await.unwrap();
++    assert!(payload.payload.expose_secret().contains("refresh-sentinel"));
++    assert_eq!(payload.versions.generation.get(), 2);
++    f.script.profile.lock().unwrap()["sub"] = json!("different-subject");
++    let start = f
++        .begin(Some(ReconnectTarget {
++            account: id,
++            authorization: after.authorization_revision,
++        }))
++        .await;
++    assert_eq!(
++        f.finish(&start).await.status,
++        ConnectStatus::IdentityMismatch
++    );
++    assert_eq!(
++        f.vault
++            .get(f.owner.owner(), id)
++            .await
++            .unwrap()
++            .authorization_revision,
++        after.authorization_revision
++    );
++}
++#[derive(Clone, Copy)]
++enum Management {
++    Disconnect,
++    Delete,
++    Logout,
++    HostDelete,
++}
++async fn delayed_callback(change: Management) {
++    use crate::application::{
++        ports::account_deletion::HostAccountDeletion, session::SessionPersistence,
++    };
++    let f = Box::pin(Fixture::new()).await;
++    let initial = f.finish(&f.begin(None).await).await;
++    let account = f
++        .vault
++        .get(f.owner.owner(), initial.account.unwrap())
++        .await
++        .unwrap();
++    let start = f
++        .begin(Some(ReconnectTarget {
++            account: account.id,
++            authorization: account.authorization_revision,
++        }))
++        .await;
++    let permit = f.script.gate.clone().acquire_owned().await.unwrap();
++    let worker = f.spawn_finish(&start, CancellationToken::new());
++    f.script.wait_calls(2).await;
++    match change {
++        Management::Disconnect => {
++            tokio::time::timeout(
++                std::time::Duration::from_secs(1),
++                f.vault
++                    .disconnect(f.owner.owner(), account.id, account.revision),
++            )
++            .await
++            .unwrap()
++            .unwrap();
++        }
++        Management::Delete => {
++            tokio::time::timeout(
++                std::time::Duration::from_secs(1),
++                f.vault
++                    .delete(f.owner.owner(), account.id, account.revision),
++            )
++            .await
++            .unwrap()
++            .unwrap();
++        }
++        Management::HostDelete => f
++            .vault
++            .persistence
++            .delete_user_account(f.session.user_id)
++            .await
++            .unwrap(),
++        Management::Logout => f.vault.persistence.revoke_session(f.session).await.unwrap(),
++    }
++    drop(permit);
++    assert!(worker.await.unwrap().is_err());
++    match change {
++        Management::Disconnect => assert_eq!(
++            f.vault
++                .get(f.owner.owner(), account.id)
++                .await
++                .unwrap()
++                .status,
++            AccountStatus::Disconnected
++        ),
++        Management::Delete => {
++            assert!(f.vault.get(f.owner.owner(), account.id).await.is_err())
++        }
++        Management::HostDelete => {
++            assert_eq!(
++                f.vault
++                    .get(f.owner.owner(), account.id)
++                    .await
++                    .unwrap()
++                    .status,
++                AccountStatus::Disconnected
++            );
++            assert!(
++                f.vault
++                    .read_usable(f.owner.owner(), account.id)
++                    .await
++                    .is_err()
++            );
++            assert!(
++                f.vault
++                    .persistence
++                    .get_by_id(f.session.user_id)
++                    .await
++                    .unwrap()
++                    .is_none()
++            );
++        }
++        Management::Logout => assert_eq!(
++            f.vault
++                .get(f.owner.owner(), account.id)
++                .await
++                .unwrap()
++                .authorization_revision,
++            account.authorization_revision
++        ),
++    }
++}
++#[tokio::test]
++async fn google_vault_callback_disconnect_wins_delayed_reconnect() {
++    Box::pin(delayed_callback(Management::Disconnect)).await;
++}
++#[tokio::test]
++async fn google_vault_callback_deletion_wins_delayed_reconnect() {
++    Box::pin(delayed_callback(Management::Delete)).await;
++}
++#[tokio::test]
++async fn google_vault_callback_logout_wins_delayed_reconnect() {
++    Box::pin(delayed_callback(Management::Logout)).await;
++}
++#[tokio::test]
++async fn google_vault_callback_owner_retirement_erases_pending_verifiers() {
++    let f = Box::pin(Fixture::new()).await;
++    let start = f.begin(None).await;
++    let mut tx = f.pool().begin().await.unwrap();
++    super::super::lifecycle::retire_owner_on(&mut tx, f.owner.owner())
++        .await
++        .unwrap();
++    tx.commit().await.unwrap();
++    let count:i64=sqlx::query_scalar("SELECT count(*) FROM integration_connect_attempts WHERE owner_namespace=$1 AND owner_subject=$2").bind(f.owner.owner().namespace.as_str()).bind(f.owner.owner().subject.as_str()).fetch_one(f.pool()).await.unwrap();
++    assert_eq!(count, 0);
++    assert!(
++        f.service
++            .finish_connect(&f.owner, f.callback(&start), work(CancellationToken::new()))
++            .await
++            .is_err()
++    );
++    assert_eq!(f.script.calls.load(Ordering::SeqCst), 0);
++}
++
++#[tokio::test]
++async fn google_vault_callback_user_deletion_wins_delayed_reconnect() {
++    Box::pin(delayed_callback(Management::HostDelete)).await;
++}
++
++fn read_and_full_registry(f: &Fixture) -> Arc<CodeOwnedRegistry> {
++    use crate::application::integrations::registry::Registration;
++    let mut registry = static_registry();
++    let full = f
++        .vault
++        .registry
++        .get(&AppId::parse("gmail").unwrap())
++        .unwrap();
++    for id in ["gmail", "gmail-read"] {
++        let mut app = full.app.clone();
++        app.id = AppId::parse(id).unwrap();
++        if id == "gmail-read" {
++            app.capabilities = vec![Capability::parse("gmail.read").unwrap()];
++        }
++        registry
++            .register(Registration {
++                provider: full.provider.clone(),
++                config: full.config.clone(),
++                app,
++                adapter: full.adapter.clone(),
++                authorization: full.authorization.clone(),
++            })
++            .unwrap();
++    }
++    Arc::new(registry)
++}
++#[tokio::test]
++async fn google_vault_callback_broader_consent_requires_reconnect_and_invalidates_old_grants() {
++    use crate::{
++        application::integrations::grants::GrantWriter, domain::integrations::authority::*,
++    };
++    let f = Box::pin(Fixture::new()).await;
++    let vault =
++        PostgresVault::with_registry(f.vault.persistence.clone(), read_and_full_registry(&f));
++    let service = f.service_on(vault.clone());
++    f.script.token.lock().unwrap()["scope"] =
++        json!("openid email https://www.googleapis.com/auth/gmail.readonly");
++    let mut read = command(None);
++    read.app = AppId::parse("gmail-read").unwrap();
++    read.requested_capabilities =
++        RequestedCapabilities::try_from(vec![Capability::parse("gmail.read").unwrap()]).unwrap();
++    let start = service.begin_connect(&f.owner, read).await.unwrap();
++    let done = service
++        .finish_connect(&f.owner, f.callback(&start), work(CancellationToken::new()))
++        .await
++        .unwrap();
++    let id = done.account.unwrap();
++    let before = vault.get(f.owner.owner(), id).await.unwrap();
++    let payload = vault.read_usable(f.owner.owner(), id).await.unwrap();
++    let full = vault.registry.get(&AppId::parse("gmail").unwrap()).unwrap();
++    assert!(
++        full.adapter
++            .validate_use(&payload.payload, &full.app)
++            .is_err()
++    );
++    let company = Uuid::new_v4();
++    let confirmation = OwnerConfirmation {
++        owner: f.owner.clone(),
++        account: id,
++        host_scope: HostBinding::parse(format!("company/{company}")).unwrap(),
++        binding: HostBinding::parse(format!("http/{company}/{}", Uuid::new_v4())).unwrap(),
++        app: AppId::parse("gmail-read").unwrap(),
++        destination: ApprovedDestination::parse("https://gmail.googleapis.com").unwrap(),
++        purpose: InvocationKind::DeterministicHttp,
++        expected_authorization: before.authorization_revision,
++        host_authority: HostAuthorityReference::parse(Uuid::new_v4().to_string()).unwrap(),
++    };
++    // Module storage fixture supplies trusted host consent facts; actual host enforcement is covered by03.
++    let grant = vault
++        .create_confirmed(
++            &confirmation,
++            GrantAuthorityFacts {
++                owner_is_member: true,
++                administrator_can_edit: true,
++                owner_confirmed: true,
++            },
++        )
++        .await
++        .unwrap();
++    f.script.token.lock().unwrap()["scope"] = json!(
++        "openid email https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.send"
++    );
++    let start = service
++        .begin_connect(
++            &f.owner,
++            command(Some(ReconnectTarget {
++                account: id,
++                authorization: before.authorization_revision,
++            })),
++        )
++        .await
++        .unwrap();
++    let done = service
++        .finish_connect(&f.owner, f.callback(&start), work(CancellationToken::new()))
++        .await
++        .unwrap();
++    assert_eq!(done.status, ConnectStatus::Connected);
++    let after = vault.get(f.owner.owner(), id).await.unwrap();
++    assert_eq!(
++        after.authorization_revision.get(),
++        before.authorization_revision.get() + 1
++    );
++    let inspection = vault.grants(f.owner.owner(), id, None).await.unwrap();
++    let stale = inspection.grants.iter().find(|g| g.id == grant.id).unwrap();
++    assert!(!stale.enabled);
++    assert_ne!(stale.account_authorization, after.authorization_revision);
++    let payload = vault.read_usable(f.owner.owner(), id).await.unwrap();
++    assert!(
++        full.adapter
++            .validate_use(&payload.payload, &full.app)
++            .is_ok()
++    );
++}
+--- accepted-p03/src/adapters/persistence/integrations/connect_tests/mod.rs
++++ current/src/adapters/persistence/integrations/connect_tests/mod.rs
+@@ -0,0 +1,354 @@
++use super::*;
++use crate::{
++    adapters::{
++        http::session::SessionAuthority,
++        integrations::{
++            google_authorization::registration, google_http::GoogleHttp,
++            oauth_state::SignedConnectState, owner::owner_for_user,
++        },
++        persistence::{
++            credentials::CredentialCipher,
++            integration_connect_authority::PostgresConnectAuthority,
++            test_support::{OwnDatabase, own_database},
++        },
++    },
++    application::{
++        integrations::{
++            connect::*, management::AccountRepository, private::CredentialStore,
++            registry::static_registry,
++        },
++        session::VerifiedSession,
++    },
++    infra::config::AppConfig,
++    use_cases::user::UserPersistence,
++};
++use axum::{
++    Json, Router,
++    extract::State,
++    http::StatusCode,
++    response::IntoResponse,
++    routing::{get, post},
++};
++use chrono::Utc;
++use secrecy::{ExposeSecret, SecretString};
++use serde_json::{Value, json};
++use sha2::{Digest, Sha256};
++use std::sync::{
++    Arc, Mutex,
++    atomic::{AtomicUsize, Ordering},
++};
++use tokio_util::sync::CancellationToken;
++use uuid::Uuid;
++mod bounds;
++mod lifecycle;
++mod provider;
++mod temporal;
++mod workspace;
++pub(crate) struct FormObservation {
++    pub challenge: String,
++    pub code_digest: [u8; 32],
++    pub client_valid: bool,
++    pub grant_type: String,
++}
++pub(crate) struct Script {
++    pub token: Mutex<Value>,
++    pub profile: Mutex<Value>,
++    pub status: Mutex<u16>,
++    pub calls: AtomicUsize,
++    pub identities: AtomicUsize,
++    pub entered: tokio::sync::Notify,
++    pub gate: Arc<tokio::sync::Semaphore>,
++    pub observed: Mutex<Option<FormObservation>>,
++}
++impl Script {
++    async fn wait_calls(&self, expected: usize) {
++        tokio::time::timeout(std::time::Duration::from_secs(3), async {
++            loop {
++                let event = self.entered.notified();
++                if self.calls.load(Ordering::SeqCst) >= expected {
++                    break;
++                }
++                event.await;
++            }
++        })
++        .await
++        .unwrap();
++    }
++    fn new() -> Self {
++        Self {
++            token: Mutex::new(
++                json!({"access_token":"access-sentinel","refresh_token":"refresh-sentinel","token_type":"Bearer","expires_in":3600,"scope":"openid email https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.send"}),
++            ),
++            profile: Mutex::new(
++                json!({"sub":"provider-subject","email":"different-mailbox@gmail.com","email_verified":true}),
++            ),
++            status: Mutex::new(200),
++            calls: AtomicUsize::new(0),
++            identities: AtomicUsize::new(0),
++            entered: tokio::sync::Notify::new(),
++            gate: Arc::new(tokio::sync::Semaphore::new(1)),
++            observed: Mutex::new(None),
++        }
++    }
++}
++async fn token(
++    State(script): State<Arc<Script>>,
++    axum::Form(form): axum::Form<std::collections::BTreeMap<String, String>>,
++) -> impl IntoResponse {
++    use base64::Engine;
++    let challenge = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(Sha256::digest(
++        form.get("code_verifier")
++            .map(String::as_bytes)
++            .unwrap_or_default(),
++    ));
++    *script.observed.lock().unwrap() = Some(FormObservation {
++        challenge,
++        code_digest: Sha256::digest(form.get("code").map(String::as_bytes).unwrap_or_default())
++            .into(),
++        client_valid: form
++            .get("client_id")
++            .is_some_and(|v| v == "google-client-fixture")
++            && form
++                .get("client_secret")
++                .is_some_and(|v| v == "client-secret-sentinel"),
++        grant_type: form.get("grant_type").cloned().unwrap_or_default(),
++    });
++    script.calls.fetch_add(1, Ordering::SeqCst);
++    script.entered.notify_one();
++    let permit = script.gate.acquire().await.unwrap();
++    drop(permit);
++    let status = StatusCode::from_u16(*script.status.lock().unwrap()).unwrap();
++    (status, Json(script.token.lock().unwrap().clone()))
++}
++async fn identity(State(script): State<Arc<Script>>) -> Json<Value> {
++    script.identities.fetch_add(1, Ordering::SeqCst);
++    Json(script.profile.lock().unwrap().clone())
++}
++pub(crate) struct Fixture {
++    pub vault: PostgresVault,
++    pub service: Arc<ConnectService>,
++    pub owner: VerifiedOwner,
++    pub sessions: Arc<SessionAuthority>,
++    pub session: VerifiedSession,
++    pub cookie: String,
++    pub script: Arc<Script>,
++    server: tokio::task::JoinHandle<()>,
++    _database: OwnDatabase,
++}
++impl Drop for Fixture {
++    fn drop(&mut self) {
++        self.server.abort();
++    }
++}
++impl Fixture {
++    pub fn new() -> impl std::future::Future<Output = Self> {
++        Self::with_lifetime(time::Duration::hours(24))
++    }
++    pub async fn with_lifetime(lifetime: time::Duration) -> Self {
++        let database = own_database().await.expect("owned connect database");
++        let p = PostgresPersistence::with_credential_cipher(
++            database.pool.clone(),
++            CredentialCipher::for_test_with_keys(&[(1, [7; 32])], 1),
++        );
++        let id = Uuid::new_v4().simple().to_string();
++        let user = p
++            .create_user(&id, &format!("{id}@login.example"), "hash")
++            .await
++            .unwrap();
++        let config = AppConfig::for_test();
++        // Production configuration keeps its minimum lifetime; seed a valid near-expiry record for temporal tests.
++        let sessions = Arc::new(SessionAuthority::new(&config, Arc::new(p.clone())));
++        let cookie = sessions.cookie(&user).await.unwrap();
++        let mut session = sessions.verify(cookie.value()).await.unwrap().unwrap();
++        if lifetime < time::Duration::days(1) {
++            use crate::application::session::{SessionId, SessionPersistence, SessionRecord};
++            let record = SessionRecord {
++                id: SessionId(Uuid::new_v4()),
++                user_id: user.id,
++                auth_revision: user.auth_revision,
++                issued_at: Utc::now() - chrono::Duration::hours(24),
++                expires_at: Utc::now() + chrono::Duration::seconds(lifetime.whole_seconds()),
++            };
++            p.create_session(&record).await.unwrap();
++            session = VerifiedSession {
++                user_id: user.id,
++                session_id: record.id,
++            };
++        }
++        let script = Arc::new(Script::new());
++        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
++        let base = format!("http://{}", listener.local_addr().unwrap());
++        let app = Router::new()
++            .route("/token", post(token))
++            .route("/identity", get(identity))
++            .with_state(script.clone());
++        let server = tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
++        let mut registry = static_registry();
++        registry
++            .register(
++                registration(
++                    ExternalSubject::parse("google-client-fixture").unwrap(),
++                    SecretString::from("client-secret-sentinel"),
++                    url::Url::parse("https://openbot.example/auth/integrations/google/callback")
++                        .unwrap(),
++                    Arc::new(GoogleHttp::scripted(
++                        format!("{base}/token"),
++                        format!("{base}/identity"),
++                    )),
++                )
++                .unwrap(),
++            )
++            .unwrap();
++        let registry = Arc::new(registry);
++        let vault = PostgresVault::with_registry(p.clone(), registry.clone());
++        let service = Arc::new(ConnectService {
++            registry,
++            store: Arc::new(vault.clone()),
++            codec: Arc::new(SignedConnectState::new(&AppConfig::for_test().jwt_secret)),
++            authority: Arc::new(PostgresConnectAuthority { persistence: p }),
++        });
++        Self {
++            vault,
++            service,
++            owner: verified(session),
++            sessions,
++            session,
++            cookie: cookie.value().to_owned(),
++            script,
++            server,
++            _database: database,
++        }
++    }
++    pub fn gateway(&self) -> Arc<dyn IntegrationGateway> {
++        self.vault.gateway(
++            Arc::new(
++                crate::adapters::persistence::integration_bindings::PostgresIntegrationBindings {
++                    persistence: self.vault.persistence.clone(),
++                    vault: self.vault.clone(),
++                },
++            ),
++            self.service.clone(),
++        )
++    }
++    pub async fn new_cookie(&self) -> String {
++        let user = self
++            .vault
++            .persistence
++            .get_by_id(self.session.user_id)
++            .await
++            .unwrap()
++            .unwrap();
++        self.sessions
++            .cookie(&user)
++            .await
++            .unwrap()
++            .value()
++            .to_owned()
++    }
++    pub async fn other_cookie(&self) -> String {
++        let id = Uuid::new_v4().simple().to_string();
++        let user = self
++            .vault
++            .persistence
++            .create_user(&id, &format!("{id}@other.example"), "hash")
++            .await
++            .unwrap();
++        self.sessions
++            .cookie(&user)
++            .await
++            .unwrap()
++            .value()
++            .to_owned()
++    }
++    fn service_on(&self, vault: PostgresVault) -> Arc<ConnectService> {
++        Arc::new(ConnectService {
++            registry: vault.registry.clone(),
++            codec: self.service.codec.clone(),
++            authority: Arc::new(PostgresConnectAuthority {
++                persistence: vault.persistence.clone(),
++            }),
++            store: Arc::new(vault),
++        })
++    }
++    fn spawn_finish(
++        &self,
++        start: &ConnectStart,
++        cancellation: CancellationToken,
++    ) -> tokio::task::JoinHandle<IntegrationResult<ConnectAttempt>> {
++        let service = self.service.clone();
++        let owner = self.owner.clone();
++        let callback = self.callback(start);
++        tokio::spawn(async move {
++            service
++                .finish_connect(&owner, callback, work(cancellation))
++                .await
++        })
++    }
++    pub async fn begin(&self, reconnect: Option<ReconnectTarget>) -> ConnectStart {
++        self.service
++            .begin_connect(&self.owner, command(reconnect))
++            .await
++            .unwrap()
++    }
++    pub fn callback(&self, start: &ConnectStart) -> ConnectCallback {
++        let url = url::Url::parse(start.authorization_url.as_str()).unwrap();
++        let state = url
++            .query_pairs()
++            .find(|(k, _)| k == "state")
++            .unwrap()
++            .1
++            .into_owned();
++        ConnectCallback {
++            provider: ProviderId::parse("google").unwrap(),
++            state,
++            code: Some(SecretString::from("authorization-code-sentinel")),
++            error: None,
++        }
++    }
++    pub async fn finish(&self, start: &ConnectStart) -> ConnectAttempt {
++        self.service
++            .finish_connect(
++                &self.owner,
++                self.callback(start),
++                work(CancellationToken::new()),
++            )
++            .await
++            .unwrap()
++    }
++    pub fn pool(&self) -> &sqlx::PgPool {
++        self.vault.persistence.pool()
++    }
++}
++pub(crate) fn verified(session: VerifiedSession) -> VerifiedOwner {
++    let reference = session.session_id.0.to_string();
++    VerifiedOwner::for_browser(
++        owner_for_user(session.user_id),
++        ConnectBrowser {
++            session: ConnectSessionReference::parse(reference.clone()).unwrap(),
++            binding: BrowserBinding::parse(format!(
++                "{:x}",
++                Sha256::digest(format!("openbot/vault/{reference}").as_bytes())
++            ))
++            .unwrap(),
++        },
++    )
++}
++fn command(reconnect: Option<ReconnectTarget>) -> BeginConnect {
++    BeginConnect {
++        app: AppId::parse("gmail").unwrap(),
++        config: AuthConfigId::parse("google-personal").unwrap(),
++        requested_capabilities: RequestedCapabilities::try_from(vec![
++            Capability::parse("gmail.read").unwrap(),
++            Capability::parse("gmail.send").unwrap(),
++        ])
++        .unwrap(),
++        return_target: SafeReturnTarget::parse("/ui/profile/vault".into()).unwrap(),
++        reconnect,
++    }
++}
++fn work(cancellation: CancellationToken) -> ConnectWork {
++    ConnectWork {
++        deadline: Utc::now() + chrono::Duration::seconds(20),
++        cancellation,
++    }
++}
+--- accepted-p03/src/adapters/persistence/integrations/connect_tests/provider.rs
++++ current/src/adapters/persistence/integrations/connect_tests/provider.rs
+@@ -0,0 +1,260 @@
++use super::*;
++#[tokio::test]
++async fn google_oauth_registered_url_state_pkce_and_private_metadata() {
++    use base64::Engine;
++    let f = Box::pin(Fixture::new()).await;
++    let start = f.begin(None).await;
++    let url = url::Url::parse(start.authorization_url.as_str()).unwrap();
++    assert_eq!(
++        url.origin().ascii_serialization(),
++        "https://accounts.google.com"
++    );
++    let pairs: std::collections::BTreeMap<_, _> = url.query_pairs().into_owned().collect();
++    assert_eq!(pairs["access_type"], "offline");
++    assert_eq!(pairs["code_challenge_method"], "S256");
++    assert!(pairs["scope"].contains("gmail.readonly") && pairs["scope"].contains("gmail.send"));
++    for key in [
++        "client_secret",
++        "refresh_token",
++        "access_token",
++        "code_verifier",
++    ] {
++        assert!(!pairs.contains_key(key));
++    }
++    let facts = f.service.codec.verify(&pairs["state"]).unwrap();
++    let envelope: String =
++        sqlx::query_scalar("SELECT envelope FROM integration_connect_attempts WHERE id=$1")
++            .bind(start.attempt.id.as_uuid())
++            .fetch_one(f.pool())
++            .await
++            .unwrap();
++    let verifier=f.vault.persistence.credential_cipher().unwrap().open_envelope(&crate::adapters::persistence::credentials::envelope::CredentialContext::integration_connect(&facts),&envelope).unwrap();
++    assert_eq!(
++        pairs["code_challenge"],
++        base64::engine::general_purpose::URL_SAFE_NO_PAD
++            .encode(Sha256::digest(verifier.expose_secret().as_bytes()))
++    );
++    let metadata = serde_json::to_string(
++        &f.service
++            .get_connect_attempt(&f.owner, start.attempt.id)
++            .await
++            .unwrap(),
++    )
++    .unwrap();
++    assert!(!metadata.contains(verifier.expose_secret()) && !metadata.contains("envelope"));
++    assert_eq!(f.finish(&start).await.status, ConnectStatus::Connected);
++    let observation = f.script.observed.lock().unwrap();
++    let observation = observation.as_ref().unwrap();
++    assert!(observation.client_valid);
++    assert_eq!(observation.grant_type, "authorization_code");
++    assert_eq!(observation.challenge, pairs["code_challenge"]);
++    assert_eq!(
++        observation.code_digest,
++        <[u8; 32]>::from(Sha256::digest(b"authorization-code-sentinel"))
++    );
++}
++#[tokio::test]
++async fn google_vault_callback_verified_mailbox_differs_from_login_and_replay_denies() {
++    let f = Box::pin(Fixture::new()).await;
++    let start = f.begin(None).await;
++    let done = f.finish(&start).await;
++    assert_eq!(done.status, ConnectStatus::Connected);
++    let account = f
++        .vault
++        .get(f.owner.owner(), done.account.unwrap())
++        .await
++        .unwrap();
++    assert_eq!(account.metadata.label(), "different-mailbox@gmail.com");
++    assert_eq!(
++        account.external_identity.as_ref().unwrap().subject.as_str(),
++        "provider-subject"
++    );
++    let metadata = serde_json::to_string(&account).unwrap();
++    for secret in [
++        "access-sentinel",
++        "refresh-sentinel",
++        "authorization-code-sentinel",
++        "client-secret-sentinel",
++    ] {
++        assert!(!metadata.contains(secret));
++    }
++    let material: Option<String> =
++        sqlx::query_scalar("SELECT envelope FROM integration_connect_attempts WHERE id=$1")
++            .bind(start.attempt.id.as_uuid())
++            .fetch_one(f.pool())
++            .await
++            .unwrap();
++    assert!(material.is_none());
++    assert!(
++        f.service
++            .finish_connect(&f.owner, f.callback(&start), work(CancellationToken::new()))
++            .await
++            .is_err()
++    );
++    assert_eq!(f.script.calls.load(Ordering::SeqCst), 1);
++}
++#[derive(Clone, Copy)]
++enum Refusal {
++    Partial,
++    MissingRefresh,
++    Unverified,
++    Type,
++    Lifetime,
++    Malformed,
++    Oversized,
++    Admin,
++    Client,
++    Denied,
++}
++async fn refusal(case: Refusal, expected: ConnectStatus) {
++    let f = Box::pin(Fixture::new()).await;
++    match case {
++        Refusal::Partial => {
++            f.script.token.lock().unwrap()["scope"] =
++                json!("openid email https://www.googleapis.com/auth/gmail.readonly")
++        }
++        Refusal::MissingRefresh => {
++            f.script
++                .token
++                .lock()
++                .unwrap()
++                .as_object_mut()
++                .unwrap()
++                .remove("refresh_token");
++        }
++        Refusal::Unverified => f.script.profile.lock().unwrap()["email_verified"] = json!(false),
++        Refusal::Type => f.script.token.lock().unwrap()["token_type"] = json!("Basic"),
++        Refusal::Lifetime => f.script.token.lock().unwrap()["expires_in"] = json!(60),
++        Refusal::Malformed => {
++            *f.script.token.lock().unwrap() = json!("raw-provider-error-sentinel")
++        }
++        Refusal::Oversized => {
++            f.script.token.lock().unwrap()["access_token"] =
++                json!("x".repeat(MAX_CREDENTIAL_BYTES + 1))
++        }
++        Refusal::Admin => {
++            *f.script.status.lock().unwrap() = 403;
++            *f.script.token.lock().unwrap() = json!({"error":"admin_policy_enforced","error_description":"raw-provider-error-sentinel"});
++        }
++        Refusal::Client => {
++            *f.script.status.lock().unwrap() = 401;
++            *f.script.token.lock().unwrap() =
++                json!({"error":"invalid_client","error_description":"client-secret-sentinel"});
++        }
++        Refusal::Denied => {}
++    }
++    let start = f.begin(None).await;
++    let mut callback = f.callback(&start);
++    if matches!(case, Refusal::Denied) {
++        callback.code = None;
++        callback.error = Some("access_denied".into());
++    }
++    let done = f
++        .service
++        .finish_connect(&f.owner, callback, work(CancellationToken::new()))
++        .await
++        .unwrap();
++    assert_eq!(done.status, expected);
++    assert!(
++        f.vault
++            .list(f.owner.owner(), PageRequest::new(None, 50).unwrap())
++            .await
++            .unwrap()
++            .accounts
++            .is_empty()
++    );
++    let encoded = format!("{:?} {}", done, serde_json::to_string(&done).unwrap());
++    for value in [
++        "raw-provider-error-sentinel",
++        "client-secret-sentinel",
++        "access-sentinel",
++        "refresh-sentinel",
++    ] {
++        assert!(!encoded.contains(value));
++    }
++}
++macro_rules! refusal_test {
++    ($name:ident,$case:ident,$status:ident) => {
++        #[tokio::test]
++        async fn $name() {
++            Box::pin(refusal(Refusal::$case, ConnectStatus::$status)).await;
++        }
++    };
++}
++refusal_test!(
++    google_oauth_partial_permissions_refused,
++    Partial,
++    MissingPermissions
++);
++refusal_test!(
++    google_oauth_missing_refresh_refused,
++    MissingRefresh,
++    MissingRefresh
++);
++refusal_test!(
++    google_oauth_unverified_mailbox_refused,
++    Unverified,
++    IdentityMismatch
++);
++refusal_test!(google_oauth_wrong_token_type_refused, Type, ProviderError);
++refusal_test!(google_oauth_short_lifetime_refused, Lifetime, ProviderError);
++refusal_test!(
++    google_oauth_malformed_response_sanitized,
++    Malformed,
++    ProviderError
++);
++refusal_test!(
++    google_oauth_oversized_response_refused,
++    Oversized,
++    ProviderError
++);
++refusal_test!(
++    google_oauth_workspace_admin_block_distinct,
++    Admin,
++    AdminBlocked
++);
++refusal_test!(google_oauth_invalid_client_distinct, Client, Configuration);
++refusal_test!(google_oauth_user_denial_distinct, Denied, Denied);
++#[tokio::test]
++async fn google_oauth_personal_and_workspace_identities_supported() {
++    for email in ["mailbox@gmail.com", "mailbox@workspace.example"] {
++        let f = Box::pin(Fixture::new()).await;
++        f.script.profile.lock().unwrap()["email"] = json!(email);
++        let done = f.finish(&f.begin(None).await).await;
++        assert_eq!(
++            f.vault
++                .get(f.owner.owner(), done.account.unwrap())
++                .await
++                .unwrap()
++                .metadata
++                .label(),
++            email
++        );
++    }
++}
++#[tokio::test]
++async fn google_oauth_cancellation_reaches_active_request_and_never_writes_account() {
++    let f = Box::pin(Fixture::new()).await;
++    let start = f.begin(None).await;
++    let permit = f.script.gate.clone().acquire_owned().await.unwrap();
++    let cancel = CancellationToken::new();
++    let worker = f.spawn_finish(&start, cancel.clone());
++    f.script.wait_calls(1).await;
++    cancel.cancel();
++    let done = tokio::time::timeout(std::time::Duration::from_secs(2), worker)
++        .await
++        .unwrap()
++        .unwrap()
++        .unwrap();
++    assert_eq!(done.status, ConnectStatus::Cancelled);
++    drop(permit);
++    assert!(
++        f.vault
++            .list(f.owner.owner(), PageRequest::new(None, 50).unwrap())
++            .await
++            .unwrap()
++            .accounts
++            .is_empty()
++    );
++    assert_eq!(f.script.calls.load(Ordering::SeqCst), 1);
++}
+--- accepted-p03/src/adapters/persistence/integrations/connect_tests/temporal.rs
++++ current/src/adapters/persistence/integrations/connect_tests/temporal.rs
+@@ -0,0 +1,105 @@
++use super::*;
++#[derive(Clone, Copy)]
++enum SessionBound {
++    Expires,
++    Valid,
++}
++async fn waiting_finalizer(bound: SessionBound) {
++    let lifetime = match bound {
++        SessionBound::Expires => time::Duration::seconds(2),
++        SessionBound::Valid => time::Duration::hours(24),
++    };
++    let f = Box::pin(Fixture::with_lifetime(lifetime)).await;
++    let start = f.begin(None).await;
++    let permit = f.script.gate.clone().acquire_owned().await.unwrap();
++    let worker = f.spawn_finish(&start, CancellationToken::new());
++    f.script.wait_calls(1).await;
++    let expiry: chrono::DateTime<Utc> =
++        sqlx::query_scalar("SELECT expires_at FROM user_sessions WHERE id=$1")
++            .bind(f.session.session_id.0)
++            .fetch_one(f.pool())
++            .await
++            .unwrap();
++    let mut held = f.pool().begin().await.unwrap();
++    sqlx::query("SELECT owner_subject FROM integration_owner_states WHERE owner_namespace=$1 AND owner_subject=$2 FOR UPDATE").bind(f.owner.owner().namespace.as_str()).bind(f.owner.owner().subject.as_str()).fetch_one(&mut *held).await.unwrap();
++    drop(permit);
++    crate::adapters::persistence::test_support::wait_until_backends_are_blocked(f.pool(), 1).await;
++    if matches!(bound, SessionBound::Expires) {
++        super::bounds::await_time(f.pool(), expiry).await;
++    }
++    held.rollback().await.unwrap();
++    let done = worker.await.unwrap();
++    match bound {
++        SessionBound::Expires => {
++            assert!(done.is_err());
++            assert!(
++                f.vault
++                    .list(f.owner.owner(), PageRequest::new(None, 50).unwrap())
++                    .await
++                    .unwrap()
++                    .accounts
++                    .is_empty()
++            );
++        }
++        SessionBound::Valid => assert_eq!(done.unwrap().status, ConnectStatus::Connected),
++    }
++}
++#[tokio::test]
++async fn google_vault_callback_session_expiry_during_module_lock_denies() {
++    Box::pin(waiting_finalizer(SessionBound::Expires)).await;
++}
++#[tokio::test]
++async fn google_vault_callback_session_valid_during_module_lock_succeeds() {
++    Box::pin(waiting_finalizer(SessionBound::Valid)).await;
++}
++
++#[tokio::test]
++async fn google_vault_callback_expiry_cancels_account_write_wait_without_partial_account() {
++    let f = Box::pin(Fixture::new()).await;
++    let original = f.begin(None).await;
++    let mut facts = f
++        .service
++        .codec
++        .verify(&f.callback(&original).state)
++        .unwrap();
++    facts.id = ConnectAttemptId::new(Uuid::new_v4());
++    facts.nonce = ConnectNonce::parse(Uuid::new_v4().to_string()).unwrap();
++    facts.expires_at = Utc::now() + chrono::Duration::seconds(2);
++    f.vault
++        .start(&facts, SecretString::from("v".repeat(64)))
++        .await
++        .unwrap();
++    let callback = ConnectCallback {
++        provider: ProviderId::parse("google").unwrap(),
++        state: f.service.codec.sign(&facts).unwrap(),
++        code: Some(SecretString::from("code-sentinel")),
++        error: None,
++    };
++    let mut held = f.pool().begin().await.unwrap();
++    sqlx::query("LOCK TABLE integration_accounts IN SHARE MODE")
++        .execute(&mut *held)
++        .await
++        .unwrap();
++    let service = f.service.clone();
++    let owner = f.owner.clone();
++    let worker = tokio::spawn(async move {
++        service
++            .finish_connect(&owner, callback, work(CancellationToken::new()))
++            .await
++    });
++    crate::adapters::persistence::test_support::wait_until_backends_are_blocked(f.pool(), 1).await;
++    let result = tokio::time::timeout(std::time::Duration::from_millis(2500), worker)
++        .await
++        .unwrap()
++        .unwrap();
++    assert!(result.is_err());
++    held.rollback().await.unwrap();
++    assert!(
++        f.vault
++            .list(f.owner.owner(), PageRequest::new(None, 50).unwrap())
++            .await
++            .unwrap()
++            .accounts
++            .is_empty()
++    );
++}
+--- accepted-p03/src/adapters/persistence/integrations/connect_tests/workspace.rs
++++ current/src/adapters/persistence/integrations/connect_tests/workspace.rs
+@@ -0,0 +1,113 @@
++use super::*;
++use crate::application::integrations::private::CredentialAdapter;
++struct WorkspaceAuthorization {
++    adapter: Arc<dyn CredentialAdapter>,
++}
++#[async_trait::async_trait]
++impl AuthorizationProvider for WorkspaceAuthorization {
++    fn callback_error(&self, _: &str) -> ConnectStatus {
++        ConnectStatus::Denied
++    }
++    fn authorization_url(
++        &self,
++        r: AuthorizationRequest<'_>,
++    ) -> IntegrationResult<SanitizedConnectUrl> {
++        let mut url = url::Url::parse("https://workspace.example/authorize").unwrap();
++        url.query_pairs_mut()
++            .append_pair("state", r.state)
++            .append_pair("code_challenge", r.challenge);
++        SanitizedConnectUrl::from_registered_endpoint(
++            url.into(),
++            "https://workspace.example/authorize",
++        )
++    }
++    async fn exchange(&self, _: ProviderExchange<'_>) -> Result<SecretString, ConnectStatus> {
++        Ok(SecretString::from(json!({"workspace":"installation-without-email","client":"same-client","token":"workspace-token-sentinel","generation":1,"permissions":["resource.read"]}).to_string()))
++    }
++    fn finalize(&self, r: FinalizeAuthorization<'_>) -> Result<AuthorizedAccount, ConnectStatus> {
++        let mut value: Value = serde_json::from_str(r.candidate.expose_secret()).unwrap();
++        value["generation"] = json!(r.generation.get());
++        let payload = SecretString::from(value.to_string());
++        self.adapter
++            .validate_use(&payload, r.app)
++            .map_err(|_| ConnectStatus::MissingPermissions)?;
++        let identity = self
++            .adapter
++            .validate(&payload)
++            .map_err(|_| ConnectStatus::IdentityMismatch)?
++            .ok_or(ConnectStatus::IdentityMismatch)?;
++        Ok(AuthorizedAccount {
++            identity,
++            payload,
++            metadata: AccountMetadata::new(
++                "Workspace installation".into(),
++                Some("Granted resource.read".into()),
++            )
++            .unwrap(),
++        })
++    }
++}
++#[tokio::test]
++async fn integration_connect_workspace_identity_needs_neither_email_nor_refresh_token() {
++    let f = Box::pin(Fixture::new()).await;
++    let mut registry = static_registry();
++    let mut entry = super::super::tests::workspace_connect_entry();
++    entry.authorization = Some(Arc::new(WorkspaceAuthorization {
++        adapter: entry.adapter.clone(),
++    }));
++    registry.register(entry).unwrap();
++    let vault = PostgresVault::with_registry(f.vault.persistence.clone(), Arc::new(registry));
++    let service = f.service_on(vault.clone());
++    let start = service
++        .begin_connect(
++            &f.owner,
++            BeginConnect {
++                app: AppId::parse("workspace-a").unwrap(),
++                config: AuthConfigId::parse("workspace-a").unwrap(),
++                requested_capabilities: RequestedCapabilities::try_from(vec![
++                    Capability::parse("resource.read").unwrap(),
++                ])
++                .unwrap(),
++                return_target: SafeReturnTarget::parse("/ui/profile/vault".into()).unwrap(),
++                reconnect: None,
++            },
++        )
++        .await
++        .unwrap();
++    let url = url::Url::parse(start.authorization_url.as_str()).unwrap();
++    let state = url
++        .query_pairs()
++        .find(|(k, _)| k == "state")
++        .unwrap()
++        .1
++        .into_owned();
++    let done = service
++        .finish_connect(
++            &f.owner,
++            ConnectCallback {
++                provider: ProviderId::parse("workspace-fixture").unwrap(),
++                state,
++                code: Some(SecretString::from("workspace-code")),
++                error: None,
++            },
++            work(CancellationToken::new()),
++        )
++        .await
++        .unwrap();
++    assert_eq!(done.status, ConnectStatus::Connected);
++    let account = vault
++        .get(f.owner.owner(), done.account.unwrap())
++        .await
++        .unwrap();
++    assert_eq!(
++        account.external_identity.as_ref().unwrap().subject.as_str(),
++        "installation-without-email"
++    );
++    let raw = vault
++        .read_usable(f.owner.owner(), account.id)
++        .await
++        .unwrap();
++    let payload: Value = serde_json::from_str(raw.payload.expose_secret()).unwrap();
++    assert!(payload.get("email").is_none());
++    assert!(payload.get("refresh_token").is_none());
++}
+--- accepted-p03/src/adapters/persistence/integrations/lifecycle.rs
++++ current/src/adapters/persistence/integrations/lifecycle.rs
+@@ -14,6 +14,14 @@
+     sqlx::query("INSERT INTO integration_owner_states(owner_namespace,owner_subject,retired) VALUES($1,$2,true) ON CONFLICT(owner_namespace,owner_subject) DO UPDATE SET retired=true")
+         .bind(owner.namespace.as_str()).bind(owner.subject.as_str()).execute(&mut **tx).await.map_err(storage_error)?;
+     enqueue(tx, "owner", &owner.namespace, owner.subject.as_str(), "").await?;
++    sqlx::query(
++        "DELETE FROM integration_connect_attempts WHERE owner_namespace=$1 AND owner_subject=$2",
++    )
++    .bind(owner.namespace.as_str())
++    .bind(owner.subject.as_str())
++    .execute(&mut **tx)
++    .await
++    .map_err(storage_error)?;
+     sqlx::query("UPDATE integration_accounts SET status='disconnected',envelope=NULL,revision=revision+1,authorization_revision=authorization_revision+1,credential_generation=credential_generation+1,updated_at=clock_timestamp() WHERE owner_namespace=$1 AND owner_subject=$2 AND status<>'disconnected'")
+         .bind(owner.namespace.as_str()).bind(owner.subject.as_str()).execute(&mut **tx).await.map_err(storage_error)?;
+     sqlx::query("UPDATE integration_use_grants SET enabled=false,revision=revision+1 WHERE owner_namespace=$1 AND owner_subject=$2 AND enabled")
+--- accepted-p03/src/adapters/persistence/integrations/mod.rs
++++ current/src/adapters/persistence/integrations/mod.rs
+@@ -1,5 +1,6 @@
+ //! All connected-account and credential SQL belongs to this adapter.
+ mod accounts;
++pub(crate) mod connect;
+ #[cfg_attr(
+     not(test),
+     expect(dead_code, reason = "Final business dispatch is wired in phase06")
+@@ -32,9 +33,19 @@
+             registry: Arc::new(static_registry()),
+         }
+     }
++    pub(crate) fn with_registry(
++        persistence: PostgresPersistence,
++        registry: Arc<CodeOwnedRegistry>,
++    ) -> Self {
++        Self {
++            persistence,
++            registry,
++        }
++    }
+     pub fn gateway(
+         &self,
+         authority: Arc<dyn crate::application::integrations::grants::BindingAuthority>,
++        connect: Arc<dyn ConnectGateway>,
+     ) -> Arc<dyn IntegrationGateway> {
+         let management = Arc::new(management::VaultManagement::new(
+             Arc::new(self.clone()),
+@@ -43,7 +54,7 @@
+         let unavailable = Arc::new(unavailable::UnavailableIntegrations);
+         Arc::new(LocalIntegrationGateway::new(
+             management,
+-            unavailable.clone(),
++            connect,
+             Arc::new(crate::application::integrations::grants::GrantService {
+                 writer: Arc::new(self.clone()),
+                 authority,
+@@ -64,9 +75,11 @@
+ fn storage_error(error: sqlx::Error) -> IntegrationError {
+     if let Some(db) = error.as_database_error() {
+         return match db.constraint() {
+-            Some("integration_account_owner_cap" | "integration_grant_cap") => {
+-                IntegrationError::Limit
+-            }
++            Some(
++                "integration_account_owner_cap"
++                | "integration_grant_cap"
++                | "integration_connect_cap",
++            ) => IntegrationError::Limit,
+             Some("integration_owner_retired") => IntegrationError::Denied,
+             _ => match db.code().as_deref() {
+                 Some("23505") => IntegrationError::Conflict,
+@@ -77,3 +90,6 @@
+     }
+     IntegrationError::Storage
+ }
++
++#[cfg(test)]
++pub(crate) mod connect_tests;
+--- accepted-p03/src/adapters/persistence/integrations/tests.rs
++++ current/src/adapters/persistence/integrations/tests.rs
+@@ -168,6 +168,7 @@
+         let config = AuthConfigId::parse(name).unwrap();
+         registry
+             .register(Registration {
++                authorization: None,
+                 provider: AuthProvider {
+                     id: provider.clone(),
+                     method: AuthMethod::OAuthAuthorizationCode,
+@@ -228,6 +229,7 @@
+     let client = ExternalSubject::parse("google-client-fixture").unwrap();
+     registry
+         .register(Registration {
++            authorization: None,
+             provider: AuthProvider {
+                 id: provider.clone(),
+                 method: AuthMethod::OAuthAuthorizationCode,
+@@ -258,3 +260,32 @@
+ 
+ #[path = "cache_update_tests.rs"]
+ mod cache_update_tests;
++
++pub(super) fn workspace_connect_entry() -> Registration {
++    let provider = ProviderId::parse("workspace-fixture").unwrap();
++    let config = AuthConfigId::parse("workspace-a").unwrap();
++    Registration {
++        provider: AuthProvider {
++            id: provider.clone(),
++            method: AuthMethod::OAuthAuthorizationCode,
++            schema: CredentialSchema::parse("workspace-fixture-v1").unwrap(),
++        },
++        config: AuthConfig {
++            id: config.clone(),
++            provider: provider.clone(),
++            client_identity: ExternalSubject::parse("same-client").unwrap(),
++            client_secret_reference: None,
++        },
++        app: AppDefinition {
++            id: AppId::parse("workspace-a").unwrap(),
++            provider,
++            config,
++            destinations: vec![],
++            capabilities: vec![Capability::parse("resource.read").unwrap()],
++        },
++        adapter: Arc::new(WorkspaceAdapter {
++            client: "same-client".into(),
++        }),
++        authorization: None,
++    }
++}
+--- accepted-p03/src/adapters/persistence/mod.rs
++++ current/src/adapters/persistence/mod.rs
+@@ -493,3 +493,5 @@
+ mod user_lifecycle;
+ 
+ pub(crate) mod integration_bindings;
++
++pub(crate) mod integration_connect_authority;
+--- accepted-p03/src/adapters/persistence/workflow/vault_tests/mod.rs
++++ current/src/adapters/persistence/workflow/vault_tests/mod.rs
+@@ -188,6 +188,7 @@
+     };
+     registry
+         .register(Registration {
++            authorization: None,
+             provider: AuthProvider {
+                 id: integration::ProviderId::parse("static-bearer").unwrap(),
+                 method: integration::AuthMethod::StaticSecret,
+--- accepted-p03/src/application/integrations/connect.rs
++++ current/src/application/integrations/connect.rs
+@@ -0,0 +1,359 @@
++//! Shared connect lifecycle; provider credentials never leave these private ports.
++use super::{registry::CodeOwnedRegistry, *};
++use crate::domain::integrations::*;
++use async_trait::async_trait;
++use chrono::{DateTime, Utc};
++use secrecy::{ExposeSecret, SecretString};
++use serde::{Deserialize, Serialize};
++use std::sync::{
++    Arc,
++    atomic::{AtomicBool, Ordering},
++};
++use tokio_util::sync::CancellationToken;
++
++#[derive(Clone)]
++pub(crate) struct ConnectBrowser {
++    pub session: ConnectSessionReference,
++    pub binding: BrowserBinding,
++}
++impl std::fmt::Debug for ConnectBrowser {
++    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
++        f.write_str("ConnectBrowser([redacted])")
++    }
++}
++#[derive(Clone, Serialize, Deserialize)]
++#[serde(deny_unknown_fields)]
++pub(crate) struct AttemptFacts {
++    pub id: ConnectAttemptId,
++    pub owner: AccountOwner,
++    pub provider: ProviderId,
++    pub config: AuthConfigId,
++    pub app: AppId,
++    pub policy: AppPolicyDigest,
++    pub capabilities: Vec<Capability>,
++    pub browser: BrowserBinding,
++    pub nonce: ConnectNonce,
++    pub return_target: SafeReturnTarget,
++    pub reconnect: Option<ReconnectTarget>,
++    pub issued_at: DateTime<Utc>,
++    pub expires_at: DateTime<Utc>,
++}
++impl AttemptFacts {
++    pub fn same(&self, other: &Self) -> IntegrationResult<bool> {
++        Ok(
++            serde_json::to_value(self).map_err(|_| IntegrationError::Invalid)?
++                == serde_json::to_value(other).map_err(|_| IntegrationError::Invalid)?,
++        )
++    }
++    pub fn purpose(&self) -> &'static str {
++        if self.reconnect.is_some() {
++            "reconnect"
++        } else {
++            "new"
++        }
++    }
++}
++pub(crate) struct ConsumedAttempt {
++    pub facts: AttemptFacts,
++    pub verifier: SecretString,
++}
++pub(crate) struct AuthorizedAccount {
++    pub identity: ExternalIdentity,
++    pub payload: SecretString,
++    pub metadata: AccountMetadata,
++}
++pub(crate) struct AuthorizationRequest<'a> {
++    pub app: &'a AppDefinition,
++    pub state: &'a str,
++    pub challenge: &'a str,
++}
++pub(crate) struct ProviderExchange<'a> {
++    pub app: &'a AppDefinition,
++    pub code: &'a SecretString,
++    pub verifier: &'a SecretString,
++    pub deadline: DateTime<Utc>,
++    pub cancellation: &'a CancellationToken,
++}
++pub(crate) struct FinalizeAuthorization<'a> {
++    pub app: &'a AppDefinition,
++    pub candidate: &'a SecretString,
++    pub previous: Option<&'a super::private::CredentialRecord>,
++    pub generation: CredentialGeneration,
++}
++#[async_trait]
++pub(crate) trait AuthorizationProvider: Send + Sync {
++    fn callback_error(&self, error: &str) -> ConnectStatus;
++    fn authorization_url(
++        &self,
++        request: AuthorizationRequest<'_>,
++    ) -> IntegrationResult<SanitizedConnectUrl>;
++    async fn exchange(&self, request: ProviderExchange<'_>) -> Result<SecretString, ConnectStatus>;
++    fn finalize(
++        &self,
++        request: FinalizeAuthorization<'_>,
++    ) -> Result<AuthorizedAccount, ConnectStatus>;
++}
++pub(crate) trait ConnectStateCodec: Send + Sync {
++    fn sign(&self, facts: &AttemptFacts) -> IntegrationResult<String>;
++    fn verify(&self, state: &str) -> IntegrationResult<AttemptFacts>;
++}
++#[async_trait]
++pub(crate) trait ConnectStore: Send + Sync {
++    async fn start(
++        &self,
++        facts: &AttemptFacts,
++        verifier: SecretString,
++    ) -> IntegrationResult<ConnectAttempt>;
++    async fn consume(&self, facts: &AttemptFacts) -> IntegrationResult<ConsumedAttempt>;
++    async fn status(
++        &self,
++        owner: &AccountOwner,
++        id: ConnectAttemptId,
++    ) -> IntegrationResult<ConnectAttempt>;
++    async fn terminal(
++        &self,
++        owner: &AccountOwner,
++        id: ConnectAttemptId,
++        status: ConnectStatus,
++    ) -> IntegrationResult<ConnectAttempt>;
++    async fn finalize(
++        &self,
++        facts: &AttemptFacts,
++        candidate: &SecretString,
++        valid_until: DateTime<Utc>,
++    ) -> IntegrationResult<ConnectAttempt>;
++}
++#[async_trait]
++pub(crate) trait ConnectFinalizer: Send + Sync {
++    async fn finish(&self, session_valid_until: DateTime<Utc>)
++    -> IntegrationResult<ConnectAttempt>;
++}
++#[async_trait]
++pub(crate) trait ConnectAuthority: Send + Sync {
++    async fn complete(
++        &self,
++        owner: &VerifiedOwner,
++        finalizer: &dyn ConnectFinalizer,
++    ) -> IntegrationResult<()>;
++}
++pub(crate) struct ConnectService {
++    pub registry: Arc<CodeOwnedRegistry>,
++    pub store: Arc<dyn ConnectStore>,
++    pub codec: Arc<dyn ConnectStateCodec>,
++    pub authority: Arc<dyn ConnectAuthority>,
++}
++fn browser(owner: &VerifiedOwner) -> IntegrationResult<&ConnectBrowser> {
++    owner.browser.as_ref().ok_or(IntegrationError::Denied)
++}
++impl ConnectService {
++    fn current(&self, facts: &AttemptFacts) -> IntegrationResult<&registry::Registration> {
++        let entry = self.registry.get(&facts.app)?;
++        if entry.provider.id != facts.provider
++            || entry.config.id != facts.config
++            || self.registry.policy(&facts.app)? != facts.policy
++            || entry.authorization.is_none()
++        {
++            return Err(IntegrationError::Denied);
++        }
++        Ok(entry)
++    }
++    async fn exchange_and_finish(
++        &self,
++        owner: &VerifiedOwner,
++        c: ConnectCallback,
++        w: ConnectWork,
++        facts: AttemptFacts,
++    ) -> IntegrationResult<ConnectAttempt> {
++        let consumed = self.store.consume(&facts).await?;
++        if !consumed.facts.same(&facts)? {
++            return Err(IntegrationError::Denied);
++        }
++        let provider = self
++            .current(&facts)?
++            .authorization
++            .as_ref()
++            .ok_or(IntegrationError::Unavailable)?;
++        if let Some(error) = c.error {
++            let status = provider.callback_error(&error);
++            return self.store.terminal(owner.owner(), facts.id, status).await;
++        }
++        let code = c.code.ok_or(IntegrationError::Invalid)?;
++        let deadline = w
++            .deadline
++            .min(Utc::now() + chrono::Duration::seconds(10))
++            .min(facts.expires_at);
++        let request = ProviderExchange {
++            app: &self.current(&facts)?.app,
++            code: &code,
++            verifier: &consumed.verifier,
++            deadline,
++            cancellation: &w.cancellation,
++        };
++        let remaining = (deadline - Utc::now())
++            .to_std()
++            .map_err(|_| IntegrationError::Denied)?;
++        let candidate = tokio::select! {biased;
++            _=w.cancellation.cancelled()=>Err(ConnectStatus::Cancelled),
++            _=tokio::time::sleep(remaining)=>Err(ConnectStatus::ProviderError),
++            result=provider.exchange(request)=>result,
++        };
++        let candidate = match candidate {
++            Ok(value) => value,
++            Err(status) => return self.store.terminal(owner.owner(), facts.id, status).await,
++        };
++        let finalizer = Completion {
++            service: self,
++            facts: &facts,
++            candidate: &candidate,
++            deadline: w.deadline,
++            called: AtomicBool::new(false),
++        };
++        let remaining = (w.deadline - Utc::now())
++            .to_std()
++            .map_err(|_| IntegrationError::Denied)?;
++        tokio::select! {biased;
++            _=w.cancellation.cancelled()=>return self.store.terminal(owner.owner(),facts.id,ConnectStatus::Cancelled).await,
++            _=tokio::time::sleep(remaining)=>return Err(IntegrationError::Denied),
++            result=self.authority.complete(owner,&finalizer)=>result?,
++        }
++        if !finalizer.called.load(Ordering::Acquire) {
++            return Err(IntegrationError::Denied);
++        }
++        self.store.status(owner.owner(), facts.id).await
++    }
++}
++struct Completion<'a> {
++    service: &'a ConnectService,
++    facts: &'a AttemptFacts,
++    candidate: &'a SecretString,
++    deadline: DateTime<Utc>,
++    called: AtomicBool,
++}
++#[async_trait]
++impl ConnectFinalizer for Completion<'_> {
++    async fn finish(
++        &self,
++        session_valid_until: DateTime<Utc>,
++    ) -> IntegrationResult<ConnectAttempt> {
++        let result = self
++            .service
++            .store
++            .finalize(
++                self.facts,
++                self.candidate,
++                session_valid_until.min(self.deadline),
++            )
++            .await?;
++        self.called.store(true, Ordering::Release);
++        Ok(result)
++    }
++}
++#[async_trait]
++impl ConnectGateway for ConnectService {
++    async fn connectable_apps(&self) -> IntegrationResult<Vec<ConnectApp>> {
++        Ok(self.registry.connectable())
++    }
++    async fn begin_connect(
++        &self,
++        owner: &VerifiedOwner,
++        command: BeginConnect,
++    ) -> IntegrationResult<ConnectStart> {
++        use base64::Engine;
++        use sha2::{Digest, Sha256};
++        let entry = self.registry.get(&command.app)?;
++        let provider = entry
++            .authorization
++            .as_ref()
++            .ok_or(IntegrationError::Unavailable)?;
++        let requested: Vec<Capability> = command.requested_capabilities.into();
++        if command.config != entry.config.id
++            || requested.iter().collect::<std::collections::BTreeSet<_>>()
++                != entry.app.capabilities.iter().collect()
++        {
++            return Err(IntegrationError::Denied);
++        }
++        let now = Utc::now();
++        let facts = AttemptFacts {
++            id: ConnectAttemptId::new(uuid::Uuid::new_v4()),
++            owner: owner.owner().clone(),
++            provider: entry.provider.id.clone(),
++            config: entry.config.id.clone(),
++            app: entry.app.id.clone(),
++            policy: self.registry.policy(&entry.app.id)?,
++            capabilities: requested,
++            browser: browser(owner)?.binding.clone(),
++            nonce: ConnectNonce::parse(uuid::Uuid::new_v4().to_string())?,
++            return_target: command.return_target,
++            reconnect: command.reconnect,
++            issued_at: now,
++            expires_at: now + chrono::Duration::minutes(10),
++        };
++        if serde_json::to_vec(&facts)
++            .map_err(|_| IntegrationError::Invalid)?
++            .len()
++            > MAX_METADATA_BYTES
++        {
++            return Err(IntegrationError::Limit);
++        }
++        let verifier = SecretString::from(format!(
++            "{}{}",
++            uuid::Uuid::new_v4().simple(),
++            uuid::Uuid::new_v4().simple()
++        ));
++        let challenge = base64::engine::general_purpose::URL_SAFE_NO_PAD
++            .encode(Sha256::digest(verifier.expose_secret().as_bytes()));
++        let state = self.codec.sign(&facts)?;
++        let url = provider.authorization_url(AuthorizationRequest {
++            app: &entry.app,
++            state: &state,
++            challenge: &challenge,
++        })?;
++        let attempt = self.store.start(&facts, verifier).await?;
++        Ok(ConnectStart {
++            attempt,
++            authorization_url: url,
++        })
++    }
++    async fn finish_connect(
++        &self,
++        owner: &VerifiedOwner,
++        c: ConnectCallback,
++        w: ConnectWork,
++    ) -> IntegrationResult<ConnectAttempt> {
++        if c.state.len() > 4096
++            || c.code
++                .as_ref()
++                .is_some_and(|v| v.expose_secret().is_empty() || v.expose_secret().len() > 4096)
++            || c.error.as_ref().is_some_and(|v| v.len() > 256)
++            || (c.code.is_some() == c.error.is_some())
++        {
++            return Err(IntegrationError::Invalid);
++        }
++        let facts = self.codec.verify(&c.state)?;
++        if &facts.owner != owner.owner()
++            || facts.browser != browser(owner)?.binding
++            || facts.provider != c.provider
++            || facts.expires_at <= Utc::now()
++        {
++            return Err(IntegrationError::Denied);
++        }
++        self.current(&facts)?;
++        self.exchange_and_finish(owner, c, w, facts).await
++    }
++    async fn get_connect_attempt(
++        &self,
++        owner: &VerifiedOwner,
++        id: ConnectAttemptId,
++    ) -> IntegrationResult<ConnectAttempt> {
++        self.store.status(owner.owner(), id).await
++    }
++    async fn cancel_connect(
++        &self,
++        owner: &VerifiedOwner,
++        id: ConnectAttemptId,
++    ) -> IntegrationResult<ConnectAttempt> {
++        self.store
++            .terminal(owner.owner(), id, ConnectStatus::Cancelled)
++            .await
++    }
++}
+--- accepted-p03/src/application/integrations/gateway.rs
++++ current/src/application/integrations/gateway.rs
+@@ -13,10 +13,23 @@
+ #[derive(Debug, Clone)]
+ pub struct VerifiedOwner {
+     owner: AccountOwner,
++    pub(crate) browser: Option<super::connect::ConnectBrowser>,
+ }
+ impl VerifiedOwner {
+     pub(crate) fn from_verified_client(owner: AccountOwner) -> Self {
+-        Self { owner }
++        Self {
++            owner,
++            browser: None,
++        }
++    }
++    pub(crate) fn for_browser(
++        owner: AccountOwner,
++        browser: super::connect::ConnectBrowser,
++    ) -> Self {
++        Self {
++            owner,
++            browser: Some(browser),
++        }
+     }
+     pub fn owner(&self) -> &AccountOwner {
+         &self.owner
+@@ -87,6 +100,7 @@
+     pub config: AuthConfigId,
+     pub requested_capabilities: RequestedCapabilities,
+     pub return_target: SafeReturnTarget,
++    pub reconnect: Option<ReconnectTarget>,
+ }
+ #[derive(Debug, Clone, Serialize, Deserialize)]
+ #[serde(try_from = "Vec<Capability>", into = "Vec<Capability>")]
+@@ -114,6 +128,9 @@
+             || !value.starts_with("/ui/")
+             || value.contains(['\\', '?', '#', '%'])
+             || value.chars().any(char::is_control)
++            || value
++                .split('/')
++                .any(|segment| matches!(segment, "." | ".."))
+         {
+             return Err(IntegrationError::Invalid);
+         }
+@@ -134,17 +151,69 @@
+         value.0
+     }
+ }
+-#[derive(Debug, Clone, Serialize, Deserialize)]
++#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+ #[serde(rename_all = "snake_case")]
+ pub enum ConnectStatus {
+     Pending,
++    Processing,
+     Connected,
+     Denied,
+     Expired,
++    Cancelled,
++    MissingPermissions,
++    MissingRefresh,
++    IdentityMismatch,
++    Conflict,
++    ProviderError,
++    Configuration,
++    AdminBlocked,
++}
++impl ConnectStatus {
++    pub(crate) fn as_str(self) -> &'static str {
++        match self {
++            Self::Pending => "pending",
++            Self::Processing => "processing",
++            Self::Connected => "connected",
++            Self::Denied => "denied",
++            Self::Expired => "expired",
++            Self::Cancelled => "cancelled",
++            Self::MissingPermissions => "missing_permissions",
++            Self::MissingRefresh => "missing_refresh",
++            Self::IdentityMismatch => "identity_mismatch",
++            Self::Conflict => "conflict",
++            Self::ProviderError => "provider_error",
++            Self::Configuration => "configuration",
++            Self::AdminBlocked => "admin_blocked",
++        }
++    }
++}
++#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
++#[serde(deny_unknown_fields)]
++pub struct ReconnectTarget {
++    pub account: AccountId,
++    pub authorization: AuthorizationRevision,
++}
++#[derive(Debug, Clone, Serialize)]
++pub struct ConnectApp {
++    pub provider: ProviderId,
++    pub id: AppId,
++    pub config: AuthConfigId,
++    pub capabilities: Vec<Capability>,
++}
++pub struct ConnectCallback {
++    pub provider: ProviderId,
++    pub state: String,
++    pub code: Option<SecretString>,
++    pub error: Option<String>,
++}
++pub struct ConnectWork {
++    pub(crate) deadline: chrono::DateTime<chrono::Utc>,
++    pub(crate) cancellation: tokio_util::sync::CancellationToken,
+ }
+ #[derive(Debug, Clone, Serialize, Deserialize)]
+ #[serde(deny_unknown_fields)]
+ pub struct ConnectAttempt {
++    pub return_target: SafeReturnTarget,
+     pub id: ConnectAttemptId,
+     pub status: ConnectStatus,
+     pub account: Option<AccountId>,
+@@ -192,6 +261,19 @@
+ }
+ #[async_trait]
+ pub trait ConnectGateway: Send + Sync {
++    async fn connectable_apps(&self) -> IntegrationResult<Vec<ConnectApp>>;
++    async fn finish_connect(
++        &self,
++        owner: &VerifiedOwner,
++        callback: ConnectCallback,
++        work: ConnectWork,
++    ) -> IntegrationResult<ConnectAttempt>;
++    async fn cancel_connect(
++        &self,
++        owner: &VerifiedOwner,
++        id: ConnectAttemptId,
++    ) -> IntegrationResult<ConnectAttempt>;
++
+     async fn begin_connect(
+         &self,
+         owner: &VerifiedOwner,
+@@ -334,6 +416,25 @@
+ }
+ #[async_trait]
+ impl ConnectGateway for LocalIntegrationGateway {
++    async fn connectable_apps(&self) -> IntegrationResult<Vec<ConnectApp>> {
++        self.connect.connectable_apps().await
++    }
++    async fn finish_connect(
++        &self,
++        o: &VerifiedOwner,
++        c: ConnectCallback,
++        w: ConnectWork,
++    ) -> IntegrationResult<ConnectAttempt> {
++        self.connect.finish_connect(o, c, w).await
++    }
++    async fn cancel_connect(
++        &self,
++        o: &VerifiedOwner,
++        id: ConnectAttemptId,
++    ) -> IntegrationResult<ConnectAttempt> {
++        self.connect.cancel_connect(o, id).await
++    }
++
+     async fn begin_connect(
+         &self,
+         o: &VerifiedOwner,
+--- accepted-p03/src/application/integrations/mod.rs
++++ current/src/application/integrations/mod.rs
+@@ -1,10 +1,6 @@
+ //! Application-owned gateway. Credential-bearing ports are crate-private.
+ pub mod execution;
+ pub mod gateway;
+-#[expect(
+-    dead_code,
+-    reason = "Private provider lifecycle and injection contracts are wired in phases04–06"
+-)]
+ pub(crate) mod private;
+ pub(crate) mod registry;
+ pub use execution::*;
+@@ -36,3 +32,5 @@
+ }
+ 
+ pub(crate) mod grants;
++
++pub(crate) mod connect;
+--- accepted-p03/src/application/integrations/private.rs
++++ current/src/application/integrations/private.rs
+@@ -9,6 +9,13 @@
+     pub versions: CredentialVersions,
+     pub payload: SecretString,
+ }
++#[cfg_attr(
++    not(test),
++    expect(
++        dead_code,
++        reason = "Narrow reader is tested privately; business execution uses the locked resolver in phase05"
++    )
++)]
+ #[async_trait]
+ pub(crate) trait CredentialStore: Send + Sync {
+     async fn read_usable(
+@@ -18,30 +25,18 @@
+     ) -> IntegrationResult<CredentialRecord>;
+ }
+ #[derive(Debug)]
+-pub(crate) struct ProviderAuthorization {
+-    pub identity: ExternalIdentity,
+-    pub payload: SecretString,
+-}
+-#[derive(Debug)]
+-pub(crate) struct ProviderConnectRequest {
+-    pub config: AuthConfigId,
+-    pub scopes: Vec<Scope>,
+-    pub verifier: SecretString,
+-}
+-#[async_trait]
+-pub(crate) trait ProviderLifecycle: Send + Sync {
+-    async fn complete(
+-        &self,
+-        request: ProviderConnectRequest,
+-        code: SecretString,
+-    ) -> IntegrationResult<ProviderAuthorization>;
+-    async fn renew(&self, current: &CredentialRecord) -> IntegrationResult<ProviderAuthorization>;
+-    async fn revoke(&self, current: &CredentialRecord) -> IntegrationResult<()>;
+-}
+-#[derive(Debug)]
+ pub(crate) enum InjectionMethod {
+     Bearer,
+-    ApiKeyHeader(String),
++    ApiKeyHeader(
++        #[cfg_attr(
++            not(test),
++            expect(
++                dead_code,
++                reason = "The fixed header is consumed by authenticated transport in phase06"
++            )
++        )]
++        String,
++    ),
+ }
+ #[derive(Debug)]
+ pub(crate) struct TypedInjection {
+--- accepted-p03/src/application/integrations/registry.rs
++++ current/src/application/integrations/registry.rs
+@@ -14,7 +14,6 @@
+     pub id: AuthConfigId,
+     pub provider: ProviderId,
+     pub client_identity: ExternalSubject,
+-    #[expect(dead_code, reason = "Provider client secrets are consumed in phase04")]
+     pub(crate) client_secret_reference: Option<ClientSecretReference>,
+ }
+ #[derive(Debug, Clone)]
+@@ -30,6 +29,7 @@
+     pub config: AuthConfig,
+     pub app: AppDefinition,
+     pub adapter: Arc<dyn CredentialAdapter>,
++    pub authorization: Option<Arc<dyn super::connect::AuthorizationProvider>>,
+ }
+ #[derive(Default)]
+ pub(crate) struct CodeOwnedRegistry {
+@@ -37,7 +37,9 @@
+ }
+ impl CodeOwnedRegistry {
+     pub fn register(&mut self, entry: Registration) -> IntegrationResult<()> {
+-        if entry.provider.id != entry.config.provider
++        if (entry.provider.method == AuthMethod::StaticSecret
++            && entry.config.client_secret_reference.is_some())
++            || entry.provider.id != entry.config.provider
+             || entry.provider.id != entry.app.provider
+             || entry.config.id != entry.app.config
+             || entry.app.destinations.len() > 16
+@@ -74,6 +76,18 @@
+             return Err(IntegrationError::Limit);
+         }
+         AppPolicyDigest::parse(format!("{:x}", Sha256::digest(bytes)))
++    }
++    pub(crate) fn connectable(&self) -> Vec<super::ConnectApp> {
++        self.entries
++            .values()
++            .filter(|e| e.authorization.is_some())
++            .map(|e| super::ConnectApp {
++                provider: e.provider.id.clone(),
++                id: e.app.id.clone(),
++                config: e.config.id.clone(),
++                capabilities: e.app.capabilities.clone(),
++            })
++            .collect()
+     }
+     pub fn get(&self, app: &AppId) -> IntegrationResult<&Registration> {
+         self.entries.get(app).ok_or(IntegrationError::Unavailable)
+@@ -215,6 +229,7 @@
+         let app = AppId::parse(name).unwrap();
+         registry
+             .register(Registration {
++                authorization: None,
+                 provider: AuthProvider {
+                     id: provider.clone(),
+                     method: AuthMethod::StaticSecret,
+--- accepted-p03/src/application/integrations/tests.rs
++++ current/src/application/integrations/tests.rs
+@@ -180,7 +180,7 @@
+     );
+ }
+ fn google_payload() -> serde_json::Value {
+-    json!({"subject":"google-subject", "client":"client-identity", "scopes":["mail.read"], "refresh_token":"sentinel-refresh", "access_token":"sentinel-access",
++    json!({"subject":"google-subject", "mailbox":"mailbox@gmail.com", "client":"client-identity", "scopes":["mail.read"], "refresh_token":"sentinel-refresh", "access_token":"sentinel-access",
+         "expires_at":"2030-01-01T00:00:00Z", "generation":1, "refresh_retry_at":null})
+ }
+ #[test]
+@@ -195,6 +195,7 @@
+     for app in ["gmail", "calendar-fixture"] {
+         registry
+             .register(Registration {
++                authorization: None,
+                 provider: AuthProvider {
+                     id: ProviderId::parse("google").unwrap(),
+                     method: AuthMethod::OAuthAuthorizationCode,
+--- accepted-p03/src/application/integrations/unavailable.rs
++++ current/src/application/integrations/unavailable.rs
+@@ -1,10 +1,28 @@
+-//! Explicit denial for features shipped by later phases. No successful defaults.
++//! Unconfigured effect ports deny requests; app discovery advertises no available apps.
+ use super::*;
+ use crate::domain::integrations::{authority::UseGrant, *};
+ use async_trait::async_trait;
+ pub(crate) struct UnavailableIntegrations;
+ #[async_trait]
+ impl ConnectGateway for UnavailableIntegrations {
++    async fn connectable_apps(&self) -> IntegrationResult<Vec<ConnectApp>> {
++        Ok(vec![])
++    }
++    async fn finish_connect(
++        &self,
++        _: &VerifiedOwner,
++        _: ConnectCallback,
++        _: ConnectWork,
++    ) -> IntegrationResult<ConnectAttempt> {
++        Err(IntegrationError::Unavailable)
++    }
++    async fn cancel_connect(
++        &self,
++        _: &VerifiedOwner,
++        _: ConnectAttemptId,
++    ) -> IntegrationResult<ConnectAttempt> {
++        Err(IntegrationError::Unavailable)
++    }
+     async fn begin_connect(
+         &self,
+         _: &VerifiedOwner,
+--- accepted-p03/src/domain/integrations/ids.rs
++++ current/src/domain/integrations/ids.rs
+@@ -55,6 +55,9 @@
+ text_id!(OperationId, 128);
+ text_id!(CorrelationId, 128);
+ text_id!(CancellationId, 128);
++text_id!(ConnectSessionReference, 128);
++text_id!(BrowserBinding, 64);
++text_id!(ConnectNonce, 64);
+ 
+ macro_rules! uuid_id {
+     ($name:ident) => {
+--- accepted-p03/src/infra/integrations.rs
++++ current/src/infra/integrations.rs
+@@ -0,0 +1,88 @@
++use crate::{
++    adapters::{
++        integrations::{google_http::GoogleHttp, oauth_state::SignedConnectState},
++        persistence::{
++            PostgresPersistence, integration_bindings::PostgresIntegrationBindings,
++            integration_connect_authority::PostgresConnectAuthority, integrations::PostgresVault,
++        },
++    },
++    application::{
++        integrations::{
++            connect::ConnectService,
++            registry::{CodeOwnedRegistry, static_registry},
++            *,
++        },
++        use_cases::integration_binding::IntegrationBindings,
++    },
++    domain::integrations::*,
++    infra::config::{AppConfig, GoogleOAuthConfig},
++};
++use secrecy::SecretString;
++use std::sync::Arc;
++pub(super) fn gateway(
++    p: &PostgresPersistence,
++    c: &AppConfig,
++) -> anyhow::Result<(Arc<dyn IntegrationGateway>, Arc<dyn IntegrationBindings>)> {
++    let registry = Arc::new(configured_registry(c, GoogleOAuthConfig::from_env())?);
++    let vault = PostgresVault::with_registry(p.clone(), registry.clone());
++    let bindings = Arc::new(PostgresIntegrationBindings {
++        persistence: p.clone(),
++        vault: vault.clone(),
++    });
++    let connect = Arc::new(ConnectService {
++        registry,
++        store: Arc::new(vault.clone()),
++        codec: Arc::new(SignedConnectState::new(&c.jwt_secret)),
++        authority: Arc::new(PostgresConnectAuthority {
++            persistence: p.clone(),
++        }),
++    });
++    Ok((vault.gateway(bindings.clone(), connect), bindings))
++}
++pub(crate) fn configured_registry(
++    c: &AppConfig,
++    google: Option<GoogleOAuthConfig>,
++) -> anyhow::Result<CodeOwnedRegistry> {
++    let mut registry = static_registry();
++    if let Some(google) = google {
++        let domain = c.app_domain_name.trim_end_matches('/');
++        let base = if domain.contains("://") {
++            domain.to_owned()
++        } else {
++            format!(
++                "{}://{domain}",
++                if domain.starts_with("localhost") || domain.starts_with("127.0.0.1") {
++                    "http"
++                } else {
++                    "https"
++                }
++            )
++        };
++        let redirect = url::Url::parse(&format!("{base}/auth/integrations/google/callback"))?;
++        anyhow::ensure!(
++            (redirect.scheme() == "https"
++                || (redirect.scheme() == "http"
++                    && matches!(
++                        redirect.host_str(),
++                        Some("localhost" | "127.0.0.1" | "[::1]")
++                    )))
++                && redirect.username().is_empty()
++                && redirect.password().is_none()
++                && redirect.query().is_none()
++                && redirect.fragment().is_none(),
++            "Invalid integration callback base URL"
++        );
++        registry.register(
++            crate::adapters::integrations::google_authorization::registration(
++                ExternalSubject::parse(google.client_id)?,
++                SecretString::from(google.client_secret),
++                redirect,
++                Arc::new(
++                    GoogleHttp::new()
++                        .map_err(|_| anyhow::anyhow!("Google integration client unavailable"))?,
++                ),
++            )?,
++        )?;
++    }
++    Ok(registry)
++}
+--- accepted-p03/src/infra/mod.rs
++++ current/src/infra/mod.rs
+@@ -32,3 +32,5 @@
+ pub fn argon2_password_hasher() -> ArgonPasswordHasher {
+     ArgonPasswordHasher::default()
+ }
++
++mod integrations;
+--- accepted-p03/src/infra/setup.rs
++++ current/src/infra/setup.rs
+@@ -107,18 +107,10 @@
+ }
+ fn http_state(f: foundation::Foundation, c: HttpComponents) -> anyhow::Result<AppState> {
+     let p = f.persistence;
++    let (integrations, integration_bindings) = super::integrations::gateway(&p, &f.config)?;
+     Ok(AppState {
+-        integration_bindings: Arc::new(
+-            crate::adapters::persistence::integration_bindings::PostgresIntegrationBindings::new(
+-                (*p).clone(),
+-            ),
+-        ),
+-        integrations: crate::adapters::persistence::integrations::PostgresVault::new((*p).clone())
+-            .gateway(Arc::new(
+-            crate::adapters::persistence::integration_bindings::PostgresIntegrationBindings::new(
+-                (*p).clone(),
+-            ),
+-        )),
++        integrations,
++        integration_bindings,
+         knowledge: f.knowledge,
+         auth_admission: Arc::new(crate::adapters::http::auth_admission::AuthAdmission::from_env()?),
+         workflow: c.workflow,

@@ -163,3 +163,158 @@ pixels per side, with at most four assets and the same aggregate 64 KiB wire cap
 Images require Jev 1.13/1.14 and Box 1.14. A missing storage configuration or revoked,
 changed or oversized attachment produces an explicit failure, never an external URL
 fetch. See the exact [image contract](workflow-language-v1.md#experimental-jev-images-and-box).
+
+## Channel responses and human questions
+
+The channel's **Automatic response** card chooses one active message binding and a version1
+subject/body projection from its final business result. Other bindings observe. Selection requires
+current company administration, channel visibility, run-as visibility and resource readiness.
+`GET` and `PUT /api/companies/{company_id}/channels/{channel_id}/response` use the same checks.
+PUT carries `expected_revision` (null for the first save), `responder` (null to clear), and optional
+`approval_policy`. A responder contains `binding_id`, `expected_binding_state_revision`, and
+`contract`, for example:
+
+```json
+{"format_version":1,"subject":{"literal":"Response"},"body":{"ref":"/input/body"}}
+```
+
+References select required string fields of the declared final output. The optional final approval
+policy is `{"reviewers":[{"kind":"user","id":"CURRENT_ADMIN_UUID"}],"review_timeout_seconds":300}`.
+Reviewers must currently be company admins who can see the channel. Re-read after a revision
+conflict; a stale form keeps its typed values and offers an explicit reload. Clearing selection
+persists a new revision. Replaying a native create command never restores a cleared responder.
+Fresh native assistant channels select only their new active binding in the provisioning transaction.
+Native templates return typed `{body}` output, with no explicit final send. Editable business review
+publishes the approved/edited body; rejection closes review and finishes without reply. This differs
+from rejecting protected final publication, which refuses that final effect.
+
+`channel.no_reply` (**Finish without reply**) returns its explicit business value and must route
+success to `$end`. It suppresses only this run's automatic final reply. Business schemas still apply;
+null or empty business output is valid when its schema permits it. Earlier explicit messages remain.
+A child cannot suppress its parent's response. Native custom steps cannot route directly to `$end`
+unless they use this terminal type. Normal AfterReply work returns the saved reply afterward;
+composition refuses paths exceeding the unchanged activation budget.
+
+`message.ask` atomically posts a prompt and registers a human wait. Only a correlated reply from the
+expected source author resumes it; provider acceptance does not resolve the human wait. Formal
+review remains private and separate. The authoring reference includes five runnable response examples.
+Samples accept optional sample-only response mapping/policy, include both in their frozen identity,
+and preview automatic, unmapped, suppressed or waiting outcomes. They create no live run, delivery
+or reviewer notification. Sample results cannot authorize production publication.
+
+Run and conversation response panels link the exact original message even outside the current
+message window. At most 50 response roots are displayed; truncation is explicit. Execution success,
+human/reviewer waiting, canonical publication and provider delivery remain separate facts:
+
+| Display | Meaning |
+| --- | --- |
+| Processing | Business work is active. |
+| Waiting for your response / reviewer | Work is parked; an accepted prompt does not imply a human answer. |
+| Work completed; reply pending | Business success is retained while publication or delivery proceeds. |
+| Completed; reply posted / sent | Local publication or provider acceptance, never a read receipt. |
+| Work completed; reply needs attention | Business result remains completed; inspect the linked delivery. |
+| Completed without reply | Trusted terminal suppression; prior explicit messages remain. |
+| Failed / cancelled | Earlier message history remains authoritative. |
+
+Safe queue retries reuse the same canonical message, delivery and accepted parts. Do not retry a
+completed business run to repair delivery. The delivery page provides inspection/reload, not a
+manual blind resend command. Unknown provider outcomes remain quarantined; inspect saved provider
+identity/evidence. Existing cancellation fences unsent work and never recalls accepted messages.
+Final publication survives a valid successful run's historical deadline but still requires current
+authority, policy, knowledge release and a genuine publication claim. Review payloads and proposal
+identities are absent from public conversation outcomes; restricted source/run content hides the
+corresponding response metadata.
+
+Structured final-response logs contain company/run/execution/intent/proposal/message/delivery IDs
+and bounded status codes. Staged logs precede transaction commit; re-read durable state to establish
+commit. `workflow_channel_reply_publications_total` uses only bounded outcome labels: published,
+failed, retry, lease_lost, error. Existing delivery unknown/dead/retry and overdue-work monitoring
+continues to apply. Never add message text, recipient lists or approval tokens to logs or labels.
+These changes require a fresh database using the sole initialization migration; no old rows are
+rewritten and there is no compatibility rollout.
+
+## Agent history and retention
+
+`agent.run` automatically stores its exact supplied context and accepted logical JSON output. A
+trusted message thread shares one stream for each actual agent. Manual/scheduled work uses its
+authenticated private session; an explicit authenticated session reference can reuse it. Business
+JSON cannot select a conversation. Each child branch has its own private history, even when it
+uses the same agent as its parent. Classifiers and agent decisions do not create logical exchanges.
+Human questions, tool approval, delivery continuation and safe retries resume the same exchange.
+A genuinely new task receives a new ordered exchange.
+
+The run step's **Agent history** disclosure lists at most 16 metadata entries per page and can
+inspect one bounded payload at a time. It uses current owner/admin Inspect permission, association
+visibility and current access level, including for private and child runs. An otherwise authorized
+admin can inspect a private run; ordinary membership or customer thread access alone is insufficient.
+A lower authorized viewer sees only restricted order/state/timing. Each cursor, source and detail
+request authorizes again. Completed accepted pairs use their immutable exchange classification;
+in-flight input also observes the current source run classification. Source links separately check
+the source's current permission and level. Retirement of an agent does not erase retained history.
+
+The authenticated API is
+`GET /api/companies/{company_id}/workflow-runs/{run_id}/steps/{execution_id}/history`.
+`limit` is 1..16 (default 16); pass its opaque `next` value as `after` to read older entries.
+`exchange={exchange_id}` inspects one exchange of that derived stream and takes no page parameters.
+The run/execution anchor must be genuine. A sample ID, another stream's cursor or an unrelated
+source handle grants no access. Reads neither dispatch work nor call a model.
+
+**Produced** means the agent accepted a logical output, including JSON `null`. Workflow, channel
+response and delivery status appear separately. A later workflow failure, cancellation or permanent
+delivery failure does not erase Produced. Queued, waiting for an agent turn, active, waiting for
+human input, and failed/cancelled before output are distinct states.
+
+The next call selects only completed retained pairs within its current ceiling: at most 16 pairs
+and 64 KiB of logical seed, with mandatory current input/output reservation taking priority in the
+request budget. The frozen view shows the exact selected pairs, eligible-budget omissions and
+request budget. Hidden or expired pairs are not presented as eligible omissions. Preparation stays
+frozen through retry/resume: it is never silently refreshed. If an old selected source expires,
+a retained owning preparation still shows its exact copied seed and labels the old source expired.
+If the owning payload expires, the inspector says so and does not reconstruct it. It never exposes
+a raw checkpoint, provider continuation or dispatch credential configuration.
+
+These initial history limits are code-owned, with no new configuration keys:
+
+| Resource | Limit |
+| --- | --- |
+| Retained payload records, including queued/active | 128 per conversation; 2048 per company |
+| Recent terminal payload target | 64 per conversation; eligible payloads also expire after 90 days |
+| Company pressure | Above 1536 retained payloads, expire oldest eligible copies toward 1536; sparse streams have no guaranteed minimum |
+| Metadata, including expired rows | 4096 per conversation; 32768 per company |
+| Conversations | 2048 per company |
+| Pending work | Existing 32 per conversation; 256 per company |
+| Individual stored input/output, frozen preparation, provenance | 1 MiB/1 MiB, 2 MiB, 256 KiB |
+
+The existing supervised storage worker runs every 60 seconds, uses at most 4 company candidates
+per discovery page and a 256-record cleanup budget split between payload expiry and unused scopes.
+Each operation has the existing 6-second application budget and native statement/lock bounds. Its
+cursors advance past protected/busy/error prefixes and wrap. A terminal history copy can expire
+after its own execution/job has retired even when later workflow steps are still running. Active
+turns, live human/tool continuations, failed exchanges or failed own jobs before their original source deadline (including produced output
+needed for same-execution retry), unresolved
+effects and required delivery/audit pins stay protected. At a hard bound, preparation backs off
+without creating another history record/checkpoint or entering the provider. Existing activation
+replay reuses its stored slot. There is no history reset control.
+
+Expiry clears only history's output/preparation copies. Immutable digests, original identity,
+classification, timing and Produced proof remain. `expired_count` includes deleted old metadata;
+`expired_through_order` is the contiguous expired prefix rather than the largest hole. Source
+workflow/checkpoint/audit copies remain under the existing90-day whole-root policy and its effect,
+usage and external-rerun pins. They are not silently rewritten to satisfy history-copy limits.
+Only safely expired metadata cascades with eligible source retirement. Empty scopes are pruned
+only without live scoped work or native references; a later recreated stream has a new window ID.
+
+Use the existing cancel, safe retry and reconciliation controls when a turn is stuck. Resolve
+unknown effects/delivery through their existing owners; never erase fencing or issue SQL repairs
+to make space. Safe retry keeps its logical exchange and recorded effects. A new task is separate
+work. A separate workflow-conversation product and replacement-conversation controls remain future
+support, not an available recovery action.
+
+Structured `agent_history.*` events contain identifiers, counts, states and numeric levels.
+`durability=staged` describes work inside an uncommitted transaction, including terminal output
+and turn release; it is not evidence of commit. Public preparation/checkpoint verification, committed cancellation and
+expiry/pruning report verified outcomes; an unresolved checkpoint acknowledgment is explicitly
+unknown. Correlate the exact source execution/checkpoint with its durable state before recovery.
+Fixed counters include `agent_history_payloads_expired_total`, `agent_history_payloads_skipped_total`
+and `agent_history_scopes_pruned_total`; these in-process counts complement durable state and are
+not a multi-instance audit ledger. Bodies, credentials and approval tokens are excluded.

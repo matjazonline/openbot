@@ -23,6 +23,9 @@ mod admission_replay;
 mod admission_source;
 mod admission_write;
 mod agent_authority;
+mod agent_history;
+mod agent_history_sessions;
+pub(crate) mod agent_history_views;
 mod agent_manifest;
 mod agent_origin;
 mod agent_preparation;
@@ -52,6 +55,7 @@ mod channel_reply_publish_plan;
 mod channel_reply_publish_read;
 mod channel_reply_refusal;
 mod channel_reply_resume;
+pub(crate) mod channel_reply_views;
 mod checkpoints;
 pub mod child_publication;
 mod child_waits;
@@ -152,8 +156,19 @@ mod token_budget;
 
 mod jev_runtime;
 
+#[cfg(test)]
+mod agent_history_race_fixture;
+mod agent_history_retention;
+#[cfg(test)]
+mod agent_history_retention_fixture;
 mod storage;
 mod storage_retention;
 
 mod sample_capture;
 pub use sample_capture::SampleCapture;
+
+#[cfg_attr(
+    not(test),
+    expect(dead_code, reason = "Final business dispatch is wired in phase06")
+)]
+pub(crate) mod integration_authority;

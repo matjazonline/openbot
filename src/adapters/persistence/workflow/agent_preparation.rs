@@ -1,16 +1,21 @@
 //! Native `agent.run` preparation and its current-authority check. The check narrows a
 //! frozen selection to what the agent and company still allow; it never widens it.
-use super::http::runtime;
 use super::*;
 use crate::application::workflow::{
-    agent::{AgentLaunch, AgentPreparation, AgentToolTarget, PreparedAgent, PreparedStep},
-    lease::ClaimedWorkflow,
-    polling::WorkflowStepKind,
-    registry::ModelStep,
+    agent::{AgentLaunch, AgentPreparation, AgentPreparationResult, AgentToolTarget},
+    lease::{ClaimedWorkflow, LeasePolicy},
 };
 use crate::entities::value_objects::ModelProvider;
 use secrecy::SecretString;
 use serde_json::Value;
+
+#[derive(sqlx::FromRow)]
+struct AuthorityFacts {
+    actor_id: Uuid,
+    bundle: Vec<u8>,
+    channel_id: Option<Uuid>,
+    thread_id: Option<Uuid>,
+}
 
 /// Reload the immutable definition named by the checkpoint; mutable draft edits grant nothing.
 pub(in crate::adapters::persistence::workflow) async fn current_on(
@@ -20,13 +25,20 @@ pub(in crate::adapters::persistence::workflow) async fn current_on(
 ) -> AppResult<()> {
     let identity: crate::application::workflow::agent_contract::AgentSelectionIdentity =
         serde_json::from_value(prepared["selection"].clone()).map_err(|_| invalid())?;
-    let (actor, bundle): (Uuid, Vec<u8>) = sqlx::query_as(
-        "SELECT run.actor_id,stored.bundle FROM workflow_runs AS run JOIN workflow_bundles AS stored ON stored.company_id=run.company_id AND stored.digest=run.bundle_digest WHERE run.company_id=$1 AND run.id=$2 AND octet_length(stored.bundle)<=$3"
+    let facts = sqlx::query_as::<_,AuthorityFacts>(
+        "SELECT run.actor_id,stored.bundle,run.channel_id,run.thread_id FROM workflow_runs AS run JOIN workflow_bundles AS stored ON stored.company_id=run.company_id AND stored.digest=run.bundle_digest WHERE run.company_id=$1 AND run.id=$2 AND octet_length(stored.bundle)<=$3"
     ).bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(MAX_BUNDLE_BYTES as i32)
         .fetch_optional(&mut *db).await?.ok_or_else(missing)?;
-    let actor = WorkflowActor::authenticated(actor).map_err(|_| invalid())?;
+    let actor = WorkflowActor::authenticated(facts.actor_id).map_err(|_| invalid())?;
+    association::authorize_association(
+        db,
+        scope.company,
+        actor,
+        binding_rows::association_from_columns(facts.channel_id, facts.thread_id)?,
+    )
+    .await?;
     let bundle = restore_bundle(
-        &bundle,
+        &facts.bundle,
         &crate::adapters::workflow_source::WorkflowSourceDecoder,
     )?;
     let selection =
@@ -39,7 +51,8 @@ pub(in crate::adapters::persistence::workflow) async fn current_on(
     {
         return Err(invalid());
     }
-    super::agent_authority::check_execution_on(db, scope, selection.agent(), identity.mode).await
+    super::agent_authority::check_execution_on(db, scope, selection.agent(), identity.mode).await?;
+    agent_history::check_prepared_on(db, scope, selection.mode(), prepared).await
 }
 
 /// Terminal: retrying cannot restore a revoked grant or connection.
@@ -48,7 +61,7 @@ fn revoked() -> AppError {
 }
 
 /// Concrete dispatch edges for the frozen selection; unsupported bindings fail here.
-fn targets(
+pub(super) fn targets(
     company: CompanyId,
     tools: &[crate::application::agent::ResolvedAgentTool],
 ) -> AppResult<Vec<AgentToolTarget>> {
@@ -90,58 +103,26 @@ fn targets(
 
 #[async_trait]
 impl AgentPreparation for PostgresPersistence {
-    async fn prepare_agent(&self, claim: &ClaimedWorkflow) -> AppResult<AgentLaunch> {
+    async fn prepare_agent(
+        &self,
+        claim: &ClaimedWorkflow,
+        policy: LeasePolicy,
+    ) -> AppResult<AgentPreparationResult> {
         let scope = claim.fence.scope;
         let action = crate::application::workflow::actions::ActionScope {
             company: scope.company,
             run: scope.run,
             execution: scope.execution,
         };
-        let mut tx = super::http::begin_http(self).await?;
-        let facts = runtime::facts(&mut tx, action).await?;
-        let definition = facts
-            .bundle
-            .compiled()
-            .graph()
-            .definition()
-            .steps
-            .get(&claim.activation.step)
-            .ok_or_else(invalid)?;
-        let step = ModelStep::of(definition.step_type.as_str()).ok_or_else(invalid)?;
-        let kind = WorkflowStepKind(step.kind().into());
-        let inputs = runtime::frozen_inputs(&mut tx, &facts, claim, &kind).await?;
-        let selection = super::agent_manifest::execution_selection_on(
-            &mut tx,
-            action,
-            facts.actor,
-            &facts.bundle,
-        )
-        .await?;
-        let prepared = match step {
-            ModelStep::AgentRun => {
-                let targets = targets(scope.company, selection.tools())?;
-                PreparedAgent::new(selection, &inputs, PreparedStep::AgentRun { targets })?
+        let prepared = match Box::pin(super::agent_history::prepare(self, claim, policy)).await? {
+            super::agent_history::Preparation::Ready(prepared) => *prepared,
+            super::agent_history::Preparation::Parked(wait) => {
+                return Ok(AgentPreparationResult::Parked(wait));
             }
-            ModelStep::Classify => {
-                PreparedAgent::new(selection.model_only(), &inputs, PreparedStep::Classify)?
-            }
-            ModelStep::Decide => {
-                let contract = facts
-                    .bundle
-                    .compiled()
-                    .step_output_schema(&claim.activation.step)
-                    .cloned()
-                    .ok_or_else(invalid)?;
-                PreparedAgent::new(
-                    selection.model_only(),
-                    &inputs,
-                    PreparedStep::Decide { contract },
-                )?
+            super::agent_history::Preparation::AtCapacity => {
+                return Ok(AgentPreparationResult::AtCapacity);
             }
         };
-        // Current authority is checked by the store before local locks (06-D5), not here
-        // after the run lock.
-        tx.commit().await?;
         let provider = ModelProvider::from(prepared.selection().agent().model.provider.as_str());
         let secret = crate::application::use_cases::company::CompanyPersistence::model_api_key(
             self,
@@ -157,9 +138,9 @@ impl AgentPreparation for PostgresPersistence {
             )
             .await?);
         };
-        Ok(AgentLaunch {
+        Ok(AgentPreparationResult::Ready(Box::new(AgentLaunch {
             prepared,
             secret: SecretString::from(secret),
-        })
+        })))
     }
 }

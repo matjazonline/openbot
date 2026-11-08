@@ -5,6 +5,7 @@ fn specification(row: &Value) -> crate::application::workflow::checkpoints::Work
     crate::application::workflow::checkpoints::WorkflowCheckpointSpec {
         identity: run.identity,
         initial_prompt: "untrusted context".into(),
+        seed: run.seed,
         policy: run.policy,
         prepared: row["workflow_prepared"].clone(),
     }

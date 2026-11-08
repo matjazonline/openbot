@@ -1,0 +1,2204 @@
+diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml
+index 0e420356..58b367e3 100644
+--- a/.github/workflows/ci.yml
++++ b/.github/workflows/ci.yml
+@@ -43,7 +43,7 @@ jobs:
+       - name: Run counts browser protocol
+         run: npm run test:run-counts
+       - name: SSE navigation lifecycle
+-        run: node --test scripts/tests/sse-navigation.mjs scripts/tests/agent-runtime.mjs scripts/tests/workflow-runs.mjs scripts/tests/workflow-conversations.mjs scripts/tests/workflow-samples.mjs
++        run: node --test scripts/tests/sse-navigation.mjs scripts/tests/agent-runtime.mjs scripts/tests/channel-response-authoring.mjs scripts/tests/workflow-runs.mjs scripts/tests/workflow-conversations.mjs scripts/tests/workflow-samples.mjs
+       - name: Deployment script tests
+         run: |
+           scripts/tests/deploy.sh
+diff --git a/docs/workflow-operations.md b/docs/workflow-operations.md
+index 704979ed..6513b12f 100644
+--- a/docs/workflow-operations.md
++++ b/docs/workflow-operations.md
+@@ -163,3 +163,72 @@ pixels per side, with at most four assets and the same aggregate 64 KiB wire cap
+ Images require Jev 1.13/1.14 and Box 1.14. A missing storage configuration or revoked,
+ changed or oversized attachment produces an explicit failure, never an external URL
+ fetch. See the exact [image contract](workflow-language-v1.md#experimental-jev-images-and-box).
++
++## Channel responses and human questions
++
++The channel's **Automatic response** card chooses one active message binding and a version1
++subject/body projection from its final business result. Other bindings observe. Selection requires
++current company administration, channel visibility, run-as visibility and resource readiness.
++`GET` and `PUT /api/companies/{company_id}/channels/{channel_id}/response` use the same checks.
++PUT carries `expected_revision` (null for the first save), `responder` (null to clear), and optional
++`approval_policy`. A responder contains `binding_id`, `expected_binding_state_revision`, and
++`contract`, for example:
++
++```json
++{"format_version":1,"subject":{"literal":"Response"},"body":{"ref":"/input/body"}}
++```
++
++References select required string fields of the declared final output. The optional final approval
++policy is `{"reviewers":[{"kind":"user","id":"CURRENT_ADMIN_UUID"}],"review_timeout_seconds":300}`.
++Reviewers must currently be company admins who can see the channel. Re-read after a revision
++conflict; a stale form keeps its typed values and offers an explicit reload. Clearing selection
++persists a new revision. Replaying a native create command never restores a cleared responder.
++Fresh native assistant channels select only their new active binding in the provisioning transaction.
++Native templates return typed `{body}` output, with no explicit final send. Editable business review
++publishes the approved/edited body; rejection closes review and finishes without reply. This differs
++from rejecting protected final publication, which refuses that final effect.
++
++`channel.no_reply` (**Finish without reply**) returns its explicit business value and must route
++success to `$end`. It suppresses only this run's automatic final reply. Business schemas still apply;
++null or empty business output is valid when its schema permits it. Earlier explicit messages remain.
++A child cannot suppress its parent's response. Native custom steps cannot route directly to `$end`
++unless they use this terminal type. Normal AfterReply work returns the saved reply afterward;
++composition refuses paths exceeding the unchanged activation budget.
++
++`message.ask` atomically posts a prompt and registers a human wait. Only a correlated reply from the
++expected source author resumes it; provider acceptance does not resolve the human wait. Formal
++review remains private and separate. The authoring reference includes five runnable response examples.
++Samples accept optional sample-only response mapping/policy, include both in their frozen identity,
++and preview automatic, unmapped, suppressed or waiting outcomes. They create no live run, delivery
++or reviewer notification. Sample results cannot authorize production publication.
++
++Run and conversation response panels link the exact original message even outside the current
++message window. At most 50 response roots are displayed; truncation is explicit. Execution success,
++human/reviewer waiting, canonical publication and provider delivery remain separate facts:
++
++| Display | Meaning |
++| --- | --- |
++| Processing | Business work is active. |
++| Waiting for your response / reviewer | Work is parked; an accepted prompt does not imply a human answer. |
++| Work completed; reply pending | Business success is retained while publication or delivery proceeds. |
++| Completed; reply posted / sent | Local publication or provider acceptance, never a read receipt. |
++| Work completed; reply needs attention | Business result remains completed; inspect the linked delivery. |
++| Completed without reply | Trusted terminal suppression; prior explicit messages remain. |
++| Failed / cancelled | Earlier message history remains authoritative. |
++
++Safe queue retries reuse the same canonical message, delivery and accepted parts. Do not retry a
++completed business run to repair delivery. The delivery page provides inspection/reload, not a
++manual blind resend command. Unknown provider outcomes remain quarantined; inspect saved provider
++identity/evidence. Existing cancellation fences unsent work and never recalls accepted messages.
++Final publication survives a valid successful run's historical deadline but still requires current
++authority, policy, knowledge release and a genuine publication claim. Review payloads and proposal
++identities are absent from public conversation outcomes; restricted source/run content hides the
++corresponding response metadata.
++
++Structured final-response logs contain company/run/execution/intent/proposal/message/delivery IDs
++and bounded status codes. Staged logs precede transaction commit; re-read durable state to establish
++commit. `workflow_channel_reply_publications_total` uses only bounded outcome labels: published,
++failed, retry, lease_lost, error. Existing delivery unknown/dead/retry and overdue-work monitoring
++continues to apply. Never add message text, recipient lists or approval tokens to logs or labels.
++These changes require a fresh database using the sole initialization migration; no old rows are
++rewritten and there is no compatibility rollout.
+diff --git a/docs/workflow-verification.md b/docs/workflow-verification.md
+index 54e30b2c..4b481a0a 100644
+--- a/docs/workflow-verification.md
++++ b/docs/workflow-verification.md
+@@ -49,3 +49,33 @@ and pinned git revisions remain in force, and the production container remains n
+ The context graph could not be refreshed in this workspace: `graft`, indexed graph files and a
+ graft connector were unavailable. Phase10 used the scoped source/owner inventory archived with its review records instead;
+ run `graft build` in an environment with the repository's graph tool before relying on graph spans.
++
++
++## Channel response verification
++
++Use disposable PostgreSQL18 databases and the loopback network guard. The focused response groups
++are `channel_reply_authoring_`, `channel_reply_views_` and `channel_reply_controls_`:
++
++```sh
++scripts/test-network-isolation.sh cargo test --locked --offline --lib channel_reply_authoring_
++scripts/test-network-isolation.sh cargo test --locked --offline --lib channel_reply_views_
++scripts/test-network-isolation.sh cargo test --locked --offline --lib channel_reply_controls_
++```
++
++Authoring coverage includes settings authorization/CAS, invalid projection, preserved and escaped
++stale input, native create replay after explicit clear, competing create claimants, rollback of
++invalid custom terminal routes, edited approval/rejection, all five compiling/executing examples,
++and sealed sample response identity. Views cover independent execution/publication/transport states,
++source identity outside the message window, response pagination, current classification/tenant
++visibility and real transaction-only delivery wakeups. Controls retain accepted/unknown truth and
++provide no blind resend or completed-business retry button.
++
++Affected checks also include native provisioning/onboarding, template/fixture composition, registry
++terminal routes, authoring/sample/run/conversation/decision browser protocols, capability-boundary
++checks, `npm run check:css`, formatting, locked offline compilation/Clippy, fresh migrations and
++actual `cargo sqlx prepare` followed by `cargo sqlx prepare --check -- --all-targets`. Set owned
++`DATABASE_URL` and `TEST_DATABASE_URL`; never use a development/production reset for this purpose.
++Keep stock2MiB test stacks for focused runtime evidence. Run only affected tests during this task,
++including final integration, per the explicit targeted-only instruction; do not claim a full-suite
++pass. Exact executed commands, nonzero selected counts, failures and independent review identities
++belong in plan03 phase records. A test name in this map alone is not passing evidence.
+diff --git a/migrations/20260817000000_init_schema.sql b/migrations/20260817000000_init_schema.sql
+index d93d1990..79a32d5e 100644
+--- a/migrations/20260817000000_init_schema.sql
++++ b/migrations/20260817000000_init_schema.sql
+@@ -13518,3 +13518,52 @@ CREATE CONSTRAINT TRIGGER workflow_question_provider_entry_guard AFTER UPDATE ON
+     DEFERRABLE INITIALLY DEFERRED FOR EACH ROW
+     WHEN (NEW.status='sending' AND OLD.status IN ('prepared','retryable'))
+     EXECUTE FUNCTION public.workflow_question_provider_entry_guard();
++
++-- Response/delivery changes wake existing readers; events carry identities, never payloads.
++CREATE FUNCTION public.notify_channel_response_run(tenant uuid, responding_run uuid) RETURNS void
++LANGUAGE plpgsql AS $$
++DECLARE related record;
++BEGIN
++    FOR related IN
++        SELECT run.company_id,run.id,run.channel_id,run.thread_id,run.state,run.waiting_reason
++        FROM public.workflow_runs AS run
++        WHERE run.company_id=tenant AND (run.id=responding_run OR run.id=(
++            SELECT budget.root_run_id FROM public.workflow_run_budgets AS budget
++            WHERE budget.company_id=tenant AND budget.run_id=responding_run))
++        ORDER BY run.id LIMIT 2
++    LOOP
++        PERFORM pg_notify('workflow_run_changed',json_build_object(
++            'company_id',related.company_id,'channel_id',related.channel_id,'thread_id',related.thread_id,
++            'run_id',related.id,'state',related.state,'waiting_reason',related.waiting_reason)::text);
++        IF related.thread_id IS NOT NULL THEN
++            PERFORM pg_notify('thread_activity',json_build_object(
++                'company_id',related.company_id,'channel_id',related.channel_id,'thread_id',related.thread_id)::text);
++        END IF;
++    END LOOP;
++END $$;
++
++CREATE FUNCTION public.notify_channel_reply_decision_changed() RETURNS trigger LANGUAGE plpgsql AS $$
++BEGIN
++    PERFORM public.notify_channel_response_run(NEW.company_id,NEW.run_id);
++    RETURN NULL;
++END $$;
++CREATE TRIGGER channel_reply_decision_notify_inserted AFTER INSERT ON public.channel_reply_decisions
++    FOR EACH ROW EXECUTE FUNCTION public.notify_channel_reply_decision_changed();
++CREATE TRIGGER channel_reply_decision_notify_changed AFTER UPDATE OF state ON public.channel_reply_decisions
++    FOR EACH ROW WHEN (OLD.state IS DISTINCT FROM NEW.state)
++    EXECUTE FUNCTION public.notify_channel_reply_decision_changed();
++
++CREATE FUNCTION public.notify_channel_response_delivery_changed() RETURNS trigger LANGUAGE plpgsql AS $$
++DECLARE owner_run uuid;
++BEGIN
++    SELECT owner.run_id INTO owner_run
++        FROM public.workflow_channel_message_owner(NEW.company_id,NEW.message_id) AS owner
++        WHERE owner.delivery_id=NEW.id LIMIT 1;
++    IF owner_run IS NOT NULL THEN
++        PERFORM public.notify_channel_response_run(NEW.company_id,owner_run);
++    END IF;
++    RETURN NULL;
++END $$;
++CREATE TRIGGER channel_response_delivery_notify_changed AFTER UPDATE OF status ON public.message_deliveries
++    FOR EACH ROW WHEN (OLD.status IS DISTINCT FROM NEW.status)
++    EXECUTE FUNCTION public.notify_channel_response_delivery_changed();
+diff --git a/scripts/check.sh b/scripts/check.sh
+index 6202295c..d72aba0b 100755
+--- a/scripts/check.sh
++++ b/scripts/check.sh
+@@ -112,7 +112,7 @@ create_check_database() {
+ 
+ gate "Generated CSS is current" generated_css_is_current
+ gate "SSE navigation lifecycle" \
+-  node --test scripts/tests/sse-navigation.mjs scripts/tests/agent-runtime.mjs
++  node --test scripts/tests/sse-navigation.mjs scripts/tests/agent-runtime.mjs scripts/tests/channel-response-authoring.mjs
+ gate "Deployment script tests" deployment_script_tests
+ gate "Formatting" cargo fmt --all -- --check
+ gate "Patch whitespace" git diff HEAD --check
+diff --git a/scripts/workflow-sample-boundary.py b/scripts/workflow-sample-boundary.py
+index 87420ab6..3f1a5e5b 100644
+--- a/scripts/workflow-sample-boundary.py
++++ b/scripts/workflow-sample-boundary.py
+@@ -11,6 +11,7 @@ import re
+ import sys
+ 
+ PURE = {
++    'channel_reply::ChannelReplyContract', 'channel_reply::ReplyApprovalPolicy',
+     'WorkflowActor', 'activation::ActivatedExecution', 'activation::prepare_activation',
+     'batch::PureCompletion', 'batch::execute_pure', 'batch::validate_completion',
+     'completion::prepare_io', 'compiler::Diagnostic', 'compiler::Schema', 'compiler::SourceSpan',
+@@ -73,7 +74,8 @@ def permitted(path):
+                 'crate::application::agent::AgentKey','crate::application::agent::ActionEffect',
+                 'crate::entities::agent_capability::AgentBindingSource::Mcp',
+                 'crate::application::agent::ActionEffect::Read','crate::application::agent::ActionEffect::Write'):return True
+-    if path in ('crate::app_error::AppError','crate::app_error::AppResult'):return True
++    if path in ('crate::app_error::AppError','crate::app_error::AppResult',
++                'crate::application::transport::CanonicalContent'):return True
+     prefix='crate::application::workflow::'
+     if path.startswith(prefix):return path[len(prefix):] in PURE
+     if path.split('::')[0] in EXTERNAL:return True
+diff --git a/src/adapters/http/pages/tests.rs b/src/adapters/http/pages/tests.rs
+index 66845e5b..b2ae3d67 100644
+--- a/src/adapters/http/pages/tests.rs
++++ b/src/adapters/http/pages/tests.rs
+@@ -4838,6 +4838,8 @@ fn test_thread_runs(activity: ThreadActivity) -> crate::application::thread_acti
+         }],
+         has_more: false,
+         message_runs: vec![],
++        response_outcomes: vec![],
++        responses_truncated: false,
+     }
+ }
+ 
+diff --git a/src/adapters/http/pages/thread_activity.rs b/src/adapters/http/pages/thread_activity.rs
+index b50c01b4..a93bbe7d 100644
+--- a/src/adapters/http/pages/thread_activity.rs
++++ b/src/adapters/http/pages/thread_activity.rs
+@@ -64,7 +64,7 @@ pub fn thread_activity_strip(
+     company_id: Uuid,
+     access: RunLinkAccess<'_>,
+ ) -> String {
+-    if runs.items.is_empty() {
++    if runs.items.is_empty() && runs.response_outcomes.is_empty() && !runs.responses_truncated {
+         return String::new();
+     }
+     let entries: String = runs.items.iter().map(|run| {
+@@ -81,7 +81,8 @@ pub fn thread_activity_strip(
+         ""
+     };
+     format!(
+-        r#"<ul aria-label="Thread runs" class="space-y-1 border-t border-base-300 px-6 py-2 text-xs">{entries}{more}</ul>"#
++        r#"<ul aria-label="Thread runs" class="space-y-1 border-t border-base-300 px-6 py-2 text-xs">{entries}{more}</ul>{responses}"#,
++        responses = thread_response_outcomes(runs, company_id, access),
+     )
+ }
+ 
+diff --git a/src/adapters/http/pages/workflow_authoring/bindings.rs b/src/adapters/http/pages/workflow_authoring/bindings.rs
+index 19ade37a..00f93243 100644
+--- a/src/adapters/http/pages/workflow_authoring/bindings.rs
++++ b/src/adapters/http/pages/workflow_authoring/bindings.rs
+@@ -647,52 +647,27 @@ pub struct ChannelBindingsCard<'a> {
+     pub company_id: Uuid,
+     pub bindings: &'a [BindingUse],
+     pub truncated: bool,
++    pub response: Option<&'a ChannelResponseSettingsView<'a>>,
+ }
+ 
+ /// "Workflows on this channel": the bindings on the channel (and its threads), and plainly
+ /// whether any active one answers its messages.
+ pub fn channel_bindings_card(card: &ChannelBindingsCard<'_>) -> String {
+     let company_id = card.company_id;
+-    let answering = card.bindings.iter().any(|binding| {
+-        binding.binding.active
+-            && binding.binding.message_trigger.is_some()
+-            && matches!(binding.binding.association, RelatedAssociation::Channel(_))
+-    });
+-    let status = if answering {
+-        r#"<p class="text-sm">An active workflow answers this channel's messages under its trigger.</p>"#
++    let responding = card
++        .response
++        .and_then(|view| view.settings)
++        .and_then(|settings| settings.responder.as_ref())
++        .map(|selected| selected.binding.as_uuid());
++    let status = if responding.is_some() {
++        r#"<p class="text-sm">The selected responding binding owns the automatic final response when active under its message trigger. Other message bindings observe.</p>"#
+     } else {
+-        r#"<div role="status" class="alert alert-warning text-sm">No active workflow answers this channel's messages. Messages are stored and nothing runs until a binding with a message trigger is activated.</div>"#
++        r#"<div role="status" class="alert alert-warning text-sm">No responding workflow is selected. Active message bindings may observe and send explicit messages.</div>"#
+     };
+     let rows: String = card
+         .bindings
+         .iter()
+-        .map(|binding| {
+-            let summary = &binding.binding;
+-            let workflow = summary.workflow.as_uuid();
+-            format!(
+-                r#"<li class="py-2"><div class="flex flex-wrap items-center gap-2">
+-                    <a class="link font-semibold" href="/ui/workflows?company_id={company_id}&amp;workflow_id={workflow}&amp;tab=bindings">{title}</a>{state}</div>
+-                    <p class="text-xs opacity-70">{association} · {trigger}</p></li>"#,
+-                title = escape_html_text(if binding.workflow_title.is_empty() {
+-                    "(untitled workflow)"
+-                } else {
+-                    &binding.workflow_title
+-                }),
+-                state = if summary.active {
+-                    r#"<span class="badge badge-sm badge-success">active</span>"#
+-                } else {
+-                    r#"<span class="badge badge-sm badge-ghost">paused</span>"#
+-                },
+-                association = match summary.association {
+-                    RelatedAssociation::Thread { .. } => "one thread",
+-                    _ => "the whole channel",
+-                },
+-                trigger = match summary.message_trigger {
+-                    Some(trigger) => format!("message trigger {}", trigger.as_str()),
+-                    None => "no message trigger".to_owned(),
+-                },
+-            )
+-        })
++        .map(|binding| channel_binding_row(binding, company_id, responding))
+         .collect();
+     let list = if card.bindings.is_empty() {
+         r#"<p class="text-xs opacity-70">No workflow is bound to this channel.</p>"#.to_owned()
+@@ -703,12 +678,48 @@ pub fn channel_bindings_card(card: &ChannelBindingsCard<'_>) -> String {
+         r#"<section id="channel-workflows-card" class="space-y-3 rounded-box border border-base-300 p-4">
+             <div><h3 class="text-sm font-bold">Workflows on this channel</h3>
+             <p class="text-xs opacity-70">Bind a workflow from its Bindings tab in Workflows.</p></div>
+-            {status}{list}{cut}
++            {status}{list}{cut}{response}
+         </section>"#,
+         cut = if card.truncated {
+             r#"<p class="text-xs text-error">Only the first 200 bindings are listed.</p>"#
+         } else {
+             ""
+         },
++        response = card
++            .response
++            .map(channel_response_settings)
++            .unwrap_or_default(),
++    )
++}
++
++fn channel_binding_row(binding: &BindingUse, company_id: Uuid, responding: Option<Uuid>) -> String {
++    let summary = &binding.binding;
++    let workflow = summary.workflow.as_uuid();
++    format!(
++        r#"<li class="py-2"><div class="flex flex-wrap items-center gap-2">
++        <a class="link font-semibold" href="/ui/workflows?company_id={company_id}&amp;workflow_id={workflow}&amp;tab=bindings">{title}</a>
++        <span class="badge badge-sm">{state}</span><span class="badge badge-sm">{role}</span></div>
++        <p class="text-xs opacity-70">{association} · {trigger}</p></li>"#,
++        title = escape_html_text(if binding.workflow_title.is_empty() {
++            "(untitled workflow)"
++        } else {
++            &binding.workflow_title
++        }),
++        state = if summary.active { "active" } else { "paused" },
++        role = if Some(summary.binding.as_uuid()) == responding {
++            "responding"
++        } else if summary.message_trigger.is_some() {
++            "observing"
++        } else {
++            "no automatic response"
++        },
++        association = match summary.association {
++            RelatedAssociation::Thread { .. } => "one thread",
++            _ => "the whole channel",
++        },
++        trigger = summary
++            .message_trigger
++            .map(|trigger| format!("message trigger {}", trigger.as_str()))
++            .unwrap_or_else(|| "no message trigger".to_owned())
+     )
+ }
+diff --git a/src/adapters/http/pages/workflow_authoring/catalogue.rs b/src/adapters/http/pages/workflow_authoring/catalogue.rs
+index 4b1d266d..c3d8d2d5 100644
+--- a/src/adapters/http/pages/workflow_authoring/catalogue.rs
++++ b/src/adapters/http/pages/workflow_authoring/catalogue.rs
+@@ -43,7 +43,7 @@ pub fn workflow_catalogue(entries: &[CatalogueEntry], agents: &[AgentReference<'
+                 format!(" · runs a {}", entry.control)
+             };
+             format!(
+-                r#"<li class="py-1"><details><summary class="cursor-pointer"><span class="font-mono font-semibold">{name}</span> <span class="text-xs opacity-70">routes: {routes}{control}</span></summary>
++                r#"<li class="py-1"><details><summary class="cursor-pointer"><span class="font-mono font-semibold">{name}</span> {label}<span class="text-xs opacity-70">routes: {routes}{control}</span></summary>
+                     <div class="mt-2 space-y-2 pl-3">
+                         <p>{notes}</p>
+                         <p class="text-xs font-semibold">Inputs (<span class="font-mono">with</span>)</p>{input}
+@@ -51,6 +51,7 @@ pub fn workflow_catalogue(entries: &[CatalogueEntry], agents: &[AgentReference<'
+                         <p class="text-xs font-semibold">Example</p><pre class="max-h-80 overflow-auto rounded-box bg-base-200 p-3 font-mono text-xs">{example}</pre>
+                     </div></details></li>"#,
+                 name = escape_html_text(entry.type_name),
++                label = if entry.type_name == "channel.no_reply" { "<span>Finish without reply · terminal business value</span> " } else { "" },
+                 routes = escape_html_text(&routes),
+                 control = escape_html_text(&control),
+                 notes = escape_html_text(entry.notes),
+@@ -81,11 +82,18 @@ pub fn workflow_catalogue(entries: &[CatalogueEntry], agents: &[AgentReference<'
+             r#"<p class="text-xs opacity-70">Name an agent by its handle in a step's <span class="font-mono">agent</span> input: <span class="font-mono">agent: {{literal: &lt;handle&gt;}}</span>.</p><div class="overflow-x-auto"><table class="table table-xs"><thead class="text-base-content"><tr><th>Agent</th><th>Handle</th><th>Model</th></tr></thead><tbody>{rows}</tbody></table></div>"#
+         )
+     };
++    let examples: String = crate::application::workflow::channel_reply::examples::response_examples()
++        .into_iter().map(|example| format!(
++            "<details><summary class=\"cursor-pointer\">{}</summary><p>Configure the response mapping separately on the channel. Replace the example reviewer with a current company admin.</p>{}{}</details>",
++            escape_html_text(example.title), json_block(&example.source),
++            json_block(&serde_json::json!({"contract":example.contract,"approval_policy":example.approval_policy}))
++        )).collect();
+     // Replaces the loading body whole, so its busy state goes with it.
+     format!(
+         r#"<div id="workflow-reference-body" class="mt-3 space-y-4 text-sm">
+             <section><h4 class="font-semibold">Step types</h4><ul class="divide-y divide-base-300">{types}</ul></section>
+             <section class="space-y-1"><h4 class="font-semibold">Agents</h4>{agents}</section>
++            <section class="space-y-2"><h4 class="font-semibold">Channel response examples</h4>{examples}</section>
+         </div>"#
+     )
+ }
+diff --git a/src/adapters/http/pages/workflow_authoring/graph.rs b/src/adapters/http/pages/workflow_authoring/graph.rs
+index a1d84639..f6ec51c6 100644
+--- a/src/adapters/http/pages/workflow_authoring/graph.rs
++++ b/src/adapters/http/pages/workflow_authoring/graph.rs
+@@ -150,9 +150,9 @@ fn graph_svg(graph: &WorkflowGraph, marks: &BTreeMap<String, NodeMark>) -> Strin
+                 t1 = y - 3,
+                 t2 = y + 13,
+                 id = escape_html_text(&truncated(&node.id, 22)),
+-                kind = escape_html_text(&node.kind),
++                kind = escape_html_text(step_kind_label(&node.kind)),
+                 id_title = escape_html_text(&node.id),
+-                kind_title = escape_html_text(&node.kind),
++                kind_title = escape_html_text(step_kind_label(&node.kind)),
+             )
+         })
+         .collect();
+@@ -201,7 +201,7 @@ fn graph_list(graph: &WorkflowGraph, marks: &BTreeMap<String, NodeMark>) -> Stri
+             format!(
+                 r#"<li class="py-1"><span class="font-semibold">{id}</span> <span class="font-mono text-xs opacity-70">{kind}</span>{entry}{mark}<ul class="ml-4 list-disc text-xs">{routes}</ul></li>"#,
+                 id = escape_html_text(&node.id),
+-                kind = escape_html_text(&node.kind),
++                kind = escape_html_text(step_kind_label(&node.kind)),
+                 entry = if node.entry {
+                     r#" <span class="badge badge-sm badge-ghost">entry</span>"#
+                 } else {
+@@ -214,3 +214,11 @@ fn graph_list(graph: &WorkflowGraph, marks: &BTreeMap<String, NodeMark>) -> Stri
+         r#"<details class="text-sm"><summary class="cursor-pointer">Steps and routes as a list</summary><ol class="mt-2 divide-y divide-base-300">{items}</ol></details>"#
+     )
+ }
++
++fn step_kind_label(kind: &str) -> &str {
++    if kind == "channel.no_reply" {
++        "Finish without reply"
++    } else {
++        kind
++    }
++}
+diff --git a/src/adapters/http/pages/workflow_authoring/mod.rs b/src/adapters/http/pages/workflow_authoring/mod.rs
+index 9876f24f..be3c14ae 100644
+--- a/src/adapters/http/pages/workflow_authoring/mod.rs
++++ b/src/adapters/http/pages/workflow_authoring/mod.rs
+@@ -9,6 +9,7 @@ use crate::application::workflow::templates::WorkflowTemplate;
+ mod agent_picker;
+ mod bindings;
+ mod catalogue;
++mod channel_response;
+ mod editor;
+ mod graph;
+ mod preview;
+@@ -19,6 +20,7 @@ mod versions;
+ pub use agent_picker::*;
+ pub use bindings::*;
+ pub use catalogue::*;
++pub use channel_response::*;
+ pub use editor::*;
+ pub use graph::*;
+ pub use preview::*;
+diff --git a/src/adapters/http/pages/workflow_authoring/sample.rs b/src/adapters/http/pages/workflow_authoring/sample.rs
+index b49f61bc..b01f8351 100644
+--- a/src/adapters/http/pages/workflow_authoring/sample.rs
++++ b/src/adapters/http/pages/workflow_authoring/sample.rs
+@@ -1,11 +1,15 @@
+ use super::*;
+-use crate::application::workflow::sample::{SampleReport, SampleStatus};
++use crate::application::workflow::sample::{
++    SampleReport, SampleResponse, SampleStatus, SampleWaitStage,
++};
+ 
+ /// Raw author input is retained even when JSON or workflow validation fails.
+ pub struct SampleInputs {
+     pub input: String,
+     pub params: String,
+     pub scripts: String,
++    pub response_contract: String,
++    pub response_approval_policy: String,
+ }
+ impl Default for SampleInputs {
+     fn default() -> Self {
+@@ -13,6 +17,8 @@ impl Default for SampleInputs {
+             input: "{}".into(),
+             params: "{}".into(),
+             scripts: "[]".into(),
++            response_contract: "null".into(),
++            response_approval_policy: "null".into(),
+         }
+     }
+ }
+@@ -36,6 +42,16 @@ pub fn workflow_sample(view: &SampleView<'_>) -> String {
+             "Scripted responses (JSON array)",
+             &view.inputs.scripts,
+         ),
++        (
++            "response_contract",
++            "Sample response mapping (JSON or null)",
++            &view.inputs.response_contract,
++        ),
++        (
++            "response_approval_policy",
++            "Sample final approval policy (JSON or null)",
++            &view.inputs.response_approval_policy,
++        ),
+     ] {
+         fields.push_str(&format!(r#"<label class="fieldset"><span class="fieldset-legend">{label}</span>
+             <textarea name="{name}" class="textarea w-full font-mono text-xs" rows="6" required spellcheck="false">
+@@ -53,7 +69,7 @@ pub fn workflow_sample(view: &SampleView<'_>) -> String {
+     format!(
+         r##"<div class="space-y-4">
+         <h3 class="font-semibold">Try the saved draft</h3>
+-        <p class="text-sm">Samples use your scripted responses. Messages and writes are captured here; no provider, external service or production run is called. Durability, retries and real service behavior are not tested. A sample cannot be resumed or promoted into a production run.</p>
++        <p class="text-sm">Samples use your scripted responses. Messages and writes are captured here; no provider, external service or production run is called. Response mappings and final approval policies apply only to this frozen sample. Without a mapping, automatic output is shown as unmapped business output. No human notification is created. Durability, retries and real service behavior are not tested. A sample cannot be resumed or promoted into a production run.</p>
+         <p class="text-xs opacity-70">Draft revision {revision}. Save changes in Editor before sampling.</p>
+         {error}{changed}
+         <form id="workflow-sample-form" class="space-y-3" hx-post="/ui/workflows/{workflow}/sample?company_id={company}"
+@@ -61,7 +77,7 @@ pub fn workflow_sample(view: &SampleView<'_>) -> String {
+             <input type="hidden" name="expected_revision" value="{revision}">
+             {fields}{selections}
+             <details class="rounded-box border border-base-300 p-3"><summary class="cursor-pointer text-sm">Script format and limits</summary>
+-                <p class="mt-2 text-sm">Each external step consumes the next response for its workflow and step. Child workflows use their own workflow ID. Missing or invalid responses stop the sample. Pure steps and workflow children execute directly.</p>
++                <p class="mt-2 text-sm">Each external step consumes the next response for its workflow and step. Child workflows use their own workflow ID. Missing human responses show a waiting preview and stop the sample. Other missing or invalid responses stop the sample. Pure steps and workflow children execute directly.</p>
+                 {example}
+                 <p class="text-xs opacity-70">Replace STEP_ID and output with the step's declared result. Human output needs choice, data and feedback. Agent responses may include tools: [{{"name":"tool_name","input":{{}},"output":{{}}}}]. Omit a workflow tool's output: its pinned child runs inside the sample. Protected requests require approval: true. Token usage is synthetic. Limits: 256 KiB input, 128 activations/responses, 64 direct tools, 8 child levels, 1 MiB report; workflow budgets may be lower.</p>
+             </details>
+@@ -88,11 +104,72 @@ fn sample_report(report: &SampleReport) -> String {
+         r#"<section id="sample-report" class="space-y-3" aria-label="Sample report"><h3 role="status" class="font-semibold">{status}</h3>
+         <p class="text-xs opacity-70">Exact frozen content: <span class="font-mono">{hash}</span></p>
+         <p class="text-xs opacity-70">Frozen configuration: <span class="font-mono">{configuration}</span></p>
+-        {diagnostic}<p class="text-sm">{unused} unused scripted responses. Execution paths below are sample identities.</p>{body}</section>"#,
++        {diagnostic}{response}<p class="text-sm">{unused} unused scripted responses. Execution paths below are sample identities.</p>{body}</section>"#,
+         hash = escape_html_text(report.content_hash.as_str()),
+         configuration = escape_html_text(report.configuration_hash.as_str()),
+         diagnostic = form_error_banner(report.diagnostic.as_deref()),
+         unused = report.unused_responses,
++        response = report
++            .response
++            .as_ref()
++            .map(response_preview)
++            .unwrap_or_default(),
+         body = json_block(&serde_json::to_value(report).expect("sample report is serializable"))
+     )
+ }
++
++fn response_preview(response: &SampleResponse) -> String {
++    let (label, content) = match response {
++        SampleResponse::AutomaticUnmapped => ("Automatic response: mapping required",
++            "<p>Choose an explicit sample response mapping to preview the final text. Business output is shown below.</p>".into()),
++        SampleResponse::Suppressed => ("Finish without reply",
++            "<p>No automatic final reply. Business output and earlier intercepted messages remain in the report.</p>".into()),
++        SampleResponse::Automatic { content, approval_required } => (
++            if *approval_required { "Final response would wait for review" } else { "Automatic final response preview" },
++            format!("<p class=\"font-semibold\">{}</p><pre class=\"whitespace-pre-wrap\">{}</pre>",
++                escape_html_text(&content.subject),escape_html_text(&content.body))),
++        SampleResponse::Waiting {stage,preview} => (match stage {
++            SampleWaitStage::HumanReply => "Waiting for a human reply",
++            SampleWaitStage::FormalReview => "Waiting for a reviewer",
++            SampleWaitStage::QuestionApproval => "Question would wait for approval",
++        },json_block(preview)),
++    };
++    format!(
++        "<section aria-label=\"Intended sample response\" class=\"rounded-box border border-base-300 p-3\"><h4 class=\"font-semibold\">{label}</h4>{content}<p class=\"text-xs opacity-70\">Preview only; no delivery or reviewer notification is created.</p></section>"
++    )
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++    use crate::application::workflow::sample::SampleResponseContent;
++
++    #[test]
++    fn channel_reply_authoring_sample_preview_escapes_content_and_explains_human_waits() {
++        let html = response_preview(&SampleResponse::Automatic {
++            content: SampleResponseContent {
++                subject: "<img src=x onerror=alert(1)>".into(),
++                body: "</pre><script>private text</script>".into(),
++            },
++            approval_required: true,
++        });
++        assert!(html.contains("Final response would wait for review"));
++        assert!(html.contains("&lt;img") && html.contains("&lt;/pre&gt;&lt;script&gt;"));
++        assert!(!html.contains("<script>") && !html.contains("<img"));
++        for (stage, label) in [
++            (SampleWaitStage::HumanReply, "Waiting for a human reply"),
++            (SampleWaitStage::FormalReview, "Waiting for a reviewer"),
++            (
++                SampleWaitStage::QuestionApproval,
++                "Question would wait for approval",
++            ),
++        ] {
++            let html = response_preview(&SampleResponse::Waiting {
++                stage,
++                preview: serde_json::json!({"body":"</pre><img>"}),
++            });
++            assert!(html.contains(label) && !html.contains("<img>"));
++            assert!(html.contains("no delivery or reviewer notification"));
++        }
++    }
++}
+diff --git a/src/adapters/http/pages/workflow_conversation_tests.rs b/src/adapters/http/pages/workflow_conversation_tests.rs
+index e4185cbe..d0e7300e 100644
+--- a/src/adapters/http/pages/workflow_conversation_tests.rs
++++ b/src/adapters/http/pages/workflow_conversation_tests.rs
+@@ -24,6 +24,8 @@ fn conversations_identify_each_run_and_its_own_reply() {
+         ],
+         has_more: true,
+         message_runs: vec![],
++        response_outcomes: vec![],
++        responses_truncated: false,
+     };
+     let mut inbound = mailbox_message(thread.id, "Question");
+     inbound.run_ids = vec![first, second];
+diff --git a/src/adapters/http/pages/workflow_runs/detail.rs b/src/adapters/http/pages/workflow_runs/detail.rs
+index 4ad9686e..394ece2f 100644
+--- a/src/adapters/http/pages/workflow_runs/detail.rs
++++ b/src/adapters/http/pages/workflow_runs/detail.rs
+@@ -167,6 +167,7 @@ pub fn run_body(view: &RunPaneView<'_>) -> String {
+             </div>
+             <div class="flex-1 space-y-6 overflow-y-auto px-4 py-4 sm:px-6">
+                 {facts}
++                {response}
+                 {dependencies}
+                 {controls}
+                 <section class="space-y-2"><h3 class="font-semibold">Graph</h3>{graph}</section>
+@@ -197,6 +198,18 @@ pub fn run_body(view: &RunPaneView<'_>) -> String {
+         deadline = format_date_time(summary.deadline),
+         dependencies = super::provenance::dependencies(run),
+         facts = facts(view),
++        response = run
++            .response
++            .as_ref()
++            .map(|response| {
++                let ids = std::collections::HashSet::from([id]);
++                super::channel_response_panel(
++                    response,
++                    company_id,
++                    super::RunLinkAccess::Authorized(&ids),
++                )
++            })
++            .unwrap_or_default(),
+         controls = controls(view),
+         graph = view.graph_html,
+         timeline = timeline(view),
+diff --git a/src/adapters/http/pages/workflow_runs/mod.rs b/src/adapters/http/pages/workflow_runs/mod.rs
+index c6281777..9153171d 100644
+--- a/src/adapters/http/pages/workflow_runs/mod.rs
++++ b/src/adapters/http/pages/workflow_runs/mod.rs
+@@ -10,7 +10,9 @@ use std::collections::HashMap;
+ mod board;
+ mod detail;
+ mod provenance;
++mod responses;
+ mod step;
++pub use responses::{channel_response_panel, thread_response_outcomes};
+ 
+ pub use board::*;
+ pub use detail::*;
+diff --git a/src/adapters/http/routes/ui_conversation_stream_tests.rs b/src/adapters/http/routes/ui_conversation_stream_tests.rs
+index afec745b..540dc193 100644
+--- a/src/adapters/http/routes/ui_conversation_stream_tests.rs
++++ b/src/adapters/http/routes/ui_conversation_stream_tests.rs
+@@ -31,6 +31,8 @@ async fn both_runs_reconcile_on_connect_wakeup_and_reconnect() {
+                 run_ids: vec![first, second],
+                 direction: crate::entities::message::MessageDirection::Inbound,
+             }],
++            response_outcomes: vec![],
++            responses_truncated: false,
+         },
+     );
+     // This wakeup predates subscription; the first read still recovers both identities.
+diff --git a/src/adapters/http/routes/ui_stream_tests.rs b/src/adapters/http/routes/ui_stream_tests.rs
+index 2136f61a..80d2cbf5 100644
+--- a/src/adapters/http/routes/ui_stream_tests.rs
++++ b/src/adapters/http/routes/ui_stream_tests.rs
+@@ -221,6 +221,8 @@ impl ThreadActivityReader for ScriptedActivity {
+             items,
+             has_more: false,
+             message_runs: vec![],
++            response_outcomes: vec![],
++            responses_truncated: false,
+         })
+     }
+ 
+diff --git a/src/adapters/http/routes/workflows/mod.rs b/src/adapters/http/routes/workflows/mod.rs
+index bf733d99..3f4591ac 100644
+--- a/src/adapters/http/routes/workflows/mod.rs
++++ b/src/adapters/http/routes/workflows/mod.rs
+@@ -29,6 +29,7 @@ use crate::{
+ 
+ mod bindings;
+ mod board;
++mod channel_replies;
+ mod decisions;
+ mod definitions;
+ mod jev;
+@@ -72,6 +73,10 @@ pub fn router() -> Router<AppState> {
+             post(definitions::copy_template),
+         )
+         .route(&format!("{company}/workflow-bindings"), get(bindings::list))
++        .route(
++            &format!("{company}/channels/{{channel_id}}/response"),
++            get(channel_replies::read).put(channel_replies::configure),
++        )
+         .route(
+             &format!("{company}/workflow-bindings/{{binding_id}}"),
+             get(bindings::read).put(bindings::configure),
+diff --git a/src/adapters/http/routes/workflows/ui/authoring/access_tests.rs b/src/adapters/http/routes/workflows/ui/authoring/access_tests.rs
+index b251951c..124971ab 100644
+--- a/src/adapters/http/routes/workflows/ui/authoring/access_tests.rs
++++ b/src/adapters/http/routes/workflows/ui/authoring/access_tests.rs
+@@ -289,6 +289,7 @@ async fn every_workspace_write_refuses_a_cross_origin_cookie_post() {
+         let path = pattern
+             .replace("{workflow_id}", &Uuid::new_v4().to_string())
+             .replace("{company_id}", &Uuid::new_v4().to_string())
++            .replace("{channel_id}", &Uuid::new_v4().to_string())
+             .replace("{id}", &Uuid::new_v4().to_string())
+             .replace("{binding_id}", &Uuid::new_v4().to_string())
+             .replace("{agent_id}", &Uuid::new_v4().to_string())
+diff --git a/src/adapters/http/routes/workflows/ui/authoring/bindings.rs b/src/adapters/http/routes/workflows/ui/authoring/bindings.rs
+index 335cba47..41d02360 100644
+--- a/src/adapters/http/routes/workflows/ui/authoring/bindings.rs
++++ b/src/adapters/http/routes/workflows/ui/authoring/bindings.rs
+@@ -748,18 +748,9 @@ pub(super) async fn channel_bindings(
+     {
+         return Err(AppError::NotFound("Channel not found".into()));
+     }
+-    let usage = ui
+-        .engine
+-        .authoring_reads()
+-        .channel_usage(company_id, channel)
+-        .await?;
+-    Ok(Html(pages::channel_bindings_card(
+-        &pages::ChannelBindingsCard {
+-            company_id: company,
+-            bindings: &usage.bindings,
+-            truncated: usage.truncated,
+-        },
+-    )))
++    Ok(Html(
++        super::channel_response::card(&ui, company, channel, None, None).await?,
++    ))
+ }
+ 
+ /// Resolve an attention item to the binding's workflow without trusting an incoming workflow id.
+diff --git a/src/adapters/http/routes/workflows/ui/authoring/bindings_tests.rs b/src/adapters/http/routes/workflows/ui/authoring/bindings_tests.rs
+index c4cd30c9..a6a09a5a 100644
+--- a/src/adapters/http/routes/workflows/ui/authoring/bindings_tests.rs
++++ b/src/adapters/http/routes/workflows/ui/authoring/bindings_tests.rs
+@@ -348,7 +348,7 @@ async fn channels_an_admin_cannot_see_stay_out_of_the_tab_the_form_and_the_card(
+     ));
+     let quiet = card(f.admin, open).await.unwrap();
+     assert!(
+-        quiet.contains("No active workflow answers this channel's messages"),
++        quiet.contains("No responding workflow is selected"),
+         "{quiet}"
+     );
+     assert!(quiet.contains("No workflow is bound to this channel."));
+@@ -374,7 +374,7 @@ async fn channels_an_admin_cannot_see_stay_out_of_the_tab_the_form_and_the_card(
+     assert!(active.contains("Activated binding"), "{active}");
+     let answering = card(f.admin, open).await.unwrap();
+     assert!(
+-        answering.contains("An active workflow answers"),
++        answering.contains("No responding workflow is selected"),
+         "{answering}"
+     );
+     assert!(answering.contains("message trigger direct") && answering.contains("Support"));
+@@ -764,3 +764,6 @@ async fn params_the_fields_cannot_carry_open_as_json_and_save_unchanged() {
+     assert!(saved.contains("Saved binding"), "{saved}");
+     assert_eq!(f.usage(workflow).await[0].binding.params, stored);
+ }
++
++#[path = "channel_response_tests.rs"]
++mod channel_response_tests;
+diff --git a/src/adapters/http/routes/workflows/ui/authoring/mod.rs b/src/adapters/http/routes/workflows/ui/authoring/mod.rs
+index 0465971e..61566fb9 100644
+--- a/src/adapters/http/routes/workflows/ui/authoring/mod.rs
++++ b/src/adapters/http/routes/workflows/ui/authoring/mod.rs
+@@ -26,6 +26,7 @@ use std::collections::BTreeMap;
+ 
+ mod agent_picker;
+ mod bindings;
++mod channel_response;
+ mod editor;
+ mod library;
+ mod sample;
+@@ -50,9 +51,10 @@ const ACTIVATE_ROUTE: &str = "/ui/workflows/{workflow_id}/bindings/{binding_id}/
+ const DEACTIVATE_ROUTE: &str = "/ui/workflows/{workflow_id}/bindings/{binding_id}/deactivate";
+ const REGISTER_TOOL_ROUTE: &str = "/ui/workflows/{workflow_id}/tools";
+ const REVOKE_TOOL_ROUTE: &str = "/ui/workflows/tools/revoke";
++const RESPONSE_ROUTE: &str = "/ui/workflows/channels/{channel_id}/response";
+ /// Every write this workspace registers; the CSRF test routes these same patterns.
+ #[cfg(test)]
+-const WRITE_ROUTES: [&str; 13] = [
++const WRITE_ROUTES: [&str; 14] = [
+     NEW_ROUTE,
+     COPY_ROUTE,
+     SAVE_ROUTE,
+@@ -64,6 +66,7 @@ const WRITE_ROUTES: [&str; 13] = [
+     DEACTIVATE_ROUTE,
+     REGISTER_TOOL_ROUTE,
+     REVOKE_TOOL_ROUTE,
++    RESPONSE_ROUTE,
+     agent_picker::PICKER_ROUTE,
+     agent_picker::APPLY_ROUTE,
+ ];
+@@ -97,6 +100,7 @@ pub(super) fn router() -> Router<AppState> {
+             "/ui/workflows/channels/{channel_id}/bindings",
+             get(channel_bindings),
+         )
++        .route(RESPONSE_ROUTE, post(channel_response::save_response))
+         .route("/ui/workflows/tools", get(tools_pane))
+         .route(REVOKE_TOOL_ROUTE, post(revoke_tool))
+         .route(REGISTER_TOOL_ROUTE, post(register_tool))
+diff --git a/src/adapters/http/routes/workflows/ui/authoring/sample.rs b/src/adapters/http/routes/workflows/ui/authoring/sample.rs
+index 1c20e89a..adac36d7 100644
+--- a/src/adapters/http/routes/workflows/ui/authoring/sample.rs
++++ b/src/adapters/http/routes/workflows/ui/authoring/sample.rs
+@@ -72,6 +72,8 @@ pub(super) async fn sample(
+         input: form.text("input"),
+         params: form.text("params"),
+         scripts: form.text("scripts"),
++        response_contract: sample_option_field(&form, "response_contract"),
++        response_approval_policy: sample_option_field(&form, "response_approval_policy"),
+     };
+     let result = run_sample(&ui, company, workflow, revision, &inputs, &selections).await;
+     let mut state = SampleState {
+@@ -109,6 +111,11 @@ async fn run_sample(
+             .map_err(|error| AppError::BadRequest(format!("Invalid sample JSON: {error}")))
+     };
+     let request = SampleRequest {
++        response_contract: serde_json::from_str(&inputs.response_contract)
++            .map_err(|error| AppError::BadRequest(format!("Invalid response mapping: {error}")))?,
++        response_approval_policy: serde_json::from_str(&inputs.response_approval_policy).map_err(
++            |error| AppError::BadRequest(format!("Invalid final approval policy: {error}")),
++        )?,
+         agents: vec![],
+         input: parse(&inputs.input)?,
+         params: parse(&inputs.params)?,
+@@ -127,3 +134,12 @@ async fn run_sample(
+     .await?;
+     Ok(ui.engine.sample(prepared)?)
+ }
++
++fn sample_option_field(form: &FormFields, name: &str) -> String {
++    let raw = form.text(name);
++    if raw.trim().is_empty() {
++        "null".into()
++    } else {
++        raw
++    }
++}
+diff --git a/src/adapters/http/routes/workflows/ui/authoring/sample_tests.rs b/src/adapters/http/routes/workflows/ui/authoring/sample_tests.rs
+index 41d46436..314df5ee 100644
+--- a/src/adapters/http/routes/workflows/ui/authoring/sample_tests.rs
++++ b/src/adapters/http/routes/workflows/ui/authoring/sample_tests.rs
+@@ -229,6 +229,8 @@ fn capture_target(
+ }
+ fn capture_request(workflow: Uuid) -> crate::application::workflow::sample::SampleRequest {
+     crate::application::workflow::sample::SampleRequest {
++        response_contract: None,
++        response_approval_policy: None,
+         agents: vec![],
+         input: json!({}),
+         params: json!({}),
+diff --git a/src/adapters/http/routes/workflows/ui/runs/pages_tests.rs b/src/adapters/http/routes/workflows/ui/runs/pages_tests.rs
+index 05597bfc..635996ba 100644
+--- a/src/adapters/http/routes/workflows/ui/runs/pages_tests.rs
++++ b/src/adapters/http/routes/workflows/ui/runs/pages_tests.rs
+@@ -128,6 +128,7 @@ fn sample_view(
+     let now = chrono::Utc::now();
+     RunView {
+         payload_restricted: false,
++        response: None,
+         dependencies: None,
+         calls: Default::default(),
+         detail: RunDetail {
+diff --git a/src/adapters/persistence/thread_activity.rs b/src/adapters/persistence/thread_activity.rs
+index 78b59078..c014e8c1 100644
+--- a/src/adapters/persistence/thread_activity.rs
++++ b/src/adapters/persistence/thread_activity.rs
+@@ -117,12 +117,29 @@ impl ThreadActivityReader for PostgresPersistence {
+                     .flat_map(|row| row.run_ids.iter().copied()),
+             )
+             .collect();
+-        let inspectable = self.inspectable_runs(company_id, viewer, &ids).await?;
++        let mut inspectable = self.inspectable_runs(company_id, viewer, &ids).await?;
++        let (response_ids, responses_truncated) =
++            super::workflow::channel_reply_views::thread_runs(self, company_id, thread_id).await?;
++        // The independent response strip has its own bounded eligibility batch; retain the
++        // existing message-attribution cap rather than increasing it to fit more work.
++        inspectable.extend(
++            self.inspectable_runs(company_id, viewer, &response_ids)
++                .await?,
++        );
++        let response_outcomes = super::workflow::channel_reply_views::read(
++            self,
++            crate::domain::workflow::CompanyId::new(company_id),
++            crate::application::workflow::WorkflowActor::authenticated(viewer)?,
++            &response_ids,
++        )
++        .await?;
+         Ok(ThreadRuns {
+             inspectable,
+             items,
+             has_more,
+             message_runs,
++            response_outcomes,
++            responses_truncated,
+         })
+     }
+ 
+diff --git a/src/adapters/persistence/workflow/autonomous_agent_sample_closure_tests.rs b/src/adapters/persistence/workflow/autonomous_agent_sample_closure_tests.rs
+index c5966c07..6e467b79 100644
+--- a/src/adapters/persistence/workflow/autonomous_agent_sample_closure_tests.rs
++++ b/src/adapters/persistence/workflow/autonomous_agent_sample_closure_tests.rs
+@@ -23,6 +23,8 @@ fn target(setup: &AgentSetup, graph: &GraphWorkflow) -> DefinitionTarget {
+ 
+ fn sample_request(responses: Vec<Value>) -> SampleRequest {
+     SampleRequest {
++        response_contract: None,
++        response_approval_policy: None,
+         input: json!({}),
+         params: json!({}),
+         scripts: serde_json::from_value(Value::Array(responses)).unwrap(),
+diff --git a/src/adapters/persistence/workflow/channel_reply.rs b/src/adapters/persistence/workflow/channel_reply.rs
+index 82ed1247..7d128708 100644
+--- a/src/adapters/persistence/workflow/channel_reply.rs
++++ b/src/adapters/persistence/workflow/channel_reply.rs
+@@ -1,8 +1,8 @@
+ //! Selection and frozen admission ownership. Publication is a later durable owner.
+ use super::*;
+ use crate::application::workflow::channel_reply::{
+-    ChannelReplies, ChannelReplySettings, ConfigureChannelReply, ReplySettingsRevision,
+-    SelectedResponder,
++    ChannelReplies, ChannelReplyContract, ChannelReplySettings, ConfigureChannelReply,
++    ConfigureResponder, ReplySettingsRevision, ReplyText, SelectedResponder,
+ };
+ use serde_json::Value;
+ 
+@@ -61,6 +61,56 @@ async fn settings_on(
+     .transpose()
+ }
+ 
++/// Only the just-created native binding is selected, inside provisioning's savepoint.
++/// Caller authorization and account locks already belong to the provisioning transaction.
++pub(super) async fn bootstrap_native_on(
++    tx: &mut Transaction<'_, Postgres>,
++    company: CompanyId,
++    channel: RelatedChannelId,
++    actor: WorkflowActor,
++    binding: WorkflowBindingId,
++) -> AppResult<()> {
++    authorize_settings(tx, company, channel, actor).await?;
++    if settings_on(tx, company, channel).await?.is_some() {
++        return Err(conflict());
++    }
++    let binding_state = binding_rows::read_binding(tx, company, binding)
++        .await?
++        .ok_or_else(missing)?;
++    if binding_state.configuration.run_as() != actor {
++        return Err(conflict());
++    }
++    let request = ConfigureChannelReply {
++        company,
++        channel,
++        actor,
++        expected: None,
++        responder: Some(ConfigureResponder {
++            binding,
++            expected_binding_revision: binding_state.revision,
++            contract: ChannelReplyContract {
++                format_version: 1,
++                subject: ReplyText::Literal {
++                    literal: "Response".into(),
++                },
++                body: ReplyText::Reference {
++                    r#ref: "/input/body"
++                        .to_owned()
++                        .try_into()
++                        .expect("native response reference"),
++                },
++            },
++        }),
++        approval_policy: None,
++    };
++    let state = ChannelReplySettings {
++        revision: ReplySettingsRevision::try_from(1).expect("initial revision"),
++        responder: selected_on(tx, &request).await?,
++        approval_policy: None,
++    };
++    write_settings(tx, &request, &state).await
++}
++
+ #[async_trait]
+ impl ChannelReplies for PostgresPersistence {
+     async fn channel_reply_settings(
+diff --git a/src/adapters/persistence/workflow/channel_reply_completion.rs b/src/adapters/persistence/workflow/channel_reply_completion.rs
+index 23382b50..5585b6cd 100644
+--- a/src/adapters/persistence/workflow/channel_reply_completion.rs
++++ b/src/adapters/persistence/workflow/channel_reply_completion.rs
+@@ -309,6 +309,9 @@ async fn stage_on(
+             db, scope, proposal, invocation, &action, owner, approval,
+         ))
+         .await?;
++        tracing::info!(company_id=%scope.company.as_uuid(), run_id=%scope.run.as_uuid(),
++            execution_id=%scope.execution.as_uuid(), proposal_id=%proposal,
++            status="waiting_for_review", "Final response wait staged");
+         return Ok(PreparedFinal::Parked);
+     }
+     Ok(PreparedFinal::Automatic {
+@@ -400,5 +403,9 @@ pub(super) async fn commit_on(
+         VALUES($1,$2,$3,$4,$5,$6,$7,CASE WHEN $5='suppressed' THEN 'suppressed' ELSE 'pending' END)")
+         .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(scope.execution.as_uuid()).bind(columns.intent)
+         .bind(columns.disposition.as_str()).bind(columns.proposal).bind(columns.integrity.map(|value| value.as_hex())).execute(db).await?;
++    tracing::info!(company_id=%scope.company.as_uuid(), run_id=%scope.run.as_uuid(),
++        execution_id=%scope.execution.as_uuid(), intent_id=%columns.intent,
++        disposition=columns.disposition.as_str(), proposal_id=?columns.proposal,
++        "Final response disposition staged");
+     Ok(())
+ }
+diff --git a/src/adapters/persistence/workflow/channel_reply_publication_tests.rs b/src/adapters/persistence/workflow/channel_reply_publication_tests.rs
+index 9cdd5385..e4b1f72e 100644
+--- a/src/adapters/persistence/workflow/channel_reply_publication_tests.rs
++++ b/src/adapters/persistence/workflow/channel_reply_publication_tests.rs
+@@ -12,6 +12,8 @@ mod lifecycle;
+ mod membership;
+ #[path = "channel_reply_recovery_tests.rs"]
+ mod recovery;
++#[path = "channel_reply_views_tests.rs"]
++mod views;
+ 
+ pub(super) fn publisher(f: &FinalFixture) -> ChannelReplyPublisher<PostgresPersistence> {
+     ChannelReplyPublisher::new(
+diff --git a/src/adapters/persistence/workflow/mcp_agent_tests.rs b/src/adapters/persistence/workflow/mcp_agent_tests.rs
+index 38dae1e4..e350d5ea 100644
+--- a/src/adapters/persistence/workflow/mcp_agent_tests.rs
++++ b/src/adapters/persistence/workflow/mcp_agent_tests.rs
+@@ -352,7 +352,7 @@ async fn autonomous_agent_samples_mcp_without_slots_never_opens_the_server() {
+         .into_iter()
+         .map(|method| (method, server.count(method)))
+         .collect();
+-    let request=SampleRequest { agents:vec![],input:json!({}),params:json!({}),scripts:serde_json::from_value(json!([{
++    let request=SampleRequest { response_contract: None, response_approval_policy: None, agents:vec![],input:json!({}),params:json!({}),scripts:serde_json::from_value(json!([{
+         "workflow_id":fixture.target.workflow,"step":"start","responses":[{
+             "output":"Sample answer","tools":[{"name":TOOL,"input":{"customer_id":"c-42"},"output":{"content":[],"isError":false,"structuredContent":{"name":"Ada"}}}]
+         }]
+diff --git a/src/adapters/persistence/workflow/mod.rs b/src/adapters/persistence/workflow/mod.rs
+index 0225eb91..9195f89d 100644
+--- a/src/adapters/persistence/workflow/mod.rs
++++ b/src/adapters/persistence/workflow/mod.rs
+@@ -52,6 +52,7 @@ mod channel_reply_publish_plan;
+ mod channel_reply_publish_read;
+ mod channel_reply_refusal;
+ mod channel_reply_resume;
++pub(crate) mod channel_reply_views;
+ mod checkpoints;
+ pub mod child_publication;
+ mod child_waits;
+diff --git a/src/adapters/persistence/workflow/provisioning.rs b/src/adapters/persistence/workflow/provisioning.rs
+index 065a2bba..21197a49 100644
+--- a/src/adapters/persistence/workflow/provisioning.rs
++++ b/src/adapters/persistence/workflow/provisioning.rs
+@@ -8,6 +8,10 @@
+ #[path = "provisioning_agent.rs"]
+ mod agent;
+ use agent::provision_agent_on;
++#[path = "provisioning_native.rs"]
++mod native;
++pub(crate) use native::ProvisionedAssistant;
++use native::provision_on;
+ 
+ use super::action_dispatch::{LockedActionAuthority, SqlActionAuthority, SqlLocalAction};
+ use super::http::begin_http;
+@@ -478,31 +482,6 @@ pub(crate) struct Provisioning {
+     pub key: ProvisioningKey,
+ }
+ 
+-pub(crate) struct ProvisionedAssistant {
+-    agent_id: Uuid,
+-    agent_slug: String,
+-    channel_id: Uuid,
+-    channel_slug: String,
+-    address: String,
+-    workflow: WorkflowId,
+-    version: VersionId,
+-    binding: WorkflowBindingId,
+-    reply_mode: ReplyMode,
+-}
+-impl ProvisionedAssistant {
+-    pub(crate) fn to_json(&self) -> Value {
+-        json!({
+-            "agent": {"id": self.agent_id.to_string(), "slug": self.agent_slug},
+-            "channel": {"id": self.channel_id.to_string(), "slug": self.channel_slug,
+-                "address": self.address},
+-            "workflow_id": self.workflow.as_uuid().to_string(),
+-            "version_id": self.version.as_uuid().to_string(),
+-            "binding_id": self.binding.as_uuid().to_string(),
+-            "reply_mode": self.reply_mode.as_str(),
+-        })
+-    }
+-}
+-
+ /// `provision_on` in a savepoint (D2.2a). A refusal rolls the savepoint back and is returned. On
+ /// an error, the savepoint is rolled back and the slugs are checked again: a slug that another
+ /// creator (one not holding the company lock) took meanwhile is the conflict refusal; anything
+@@ -572,144 +551,6 @@ async fn taken_slug(
+ /// Provision an assistant: the agent (new), a team channel, the reply-mode workflow and its
+ /// active binding, all as the requester, on the caller's transaction (D2.3). The caller holds
+ /// the company lock and has authorized the requester.
+-async fn provision_on(
+-    tx: &mut Transaction<'_, Postgres>,
+-    templates: &ProvisioningDeployment,
+-    provisioning: &Provisioning,
+-) -> AppResult<Provisioned<ProvisionedAssistant>> {
+-    let company = provisioning.company;
+-    let requester = provisioning.requester;
+-    let key = &provisioning.key;
+-    let created_by = CreationProvenance::user(requester.user_id());
+-
+-    // 1. Pre-checks under the company lock.
+-    if let Some(refusal) = taken_slug(tx, provisioning).await? {
+-        return Ok(Err(refusal));
+-    }
+-
+-    let agent = match provision_agent_on(tx, provisioning, &created_by).await? {
+-        Ok(agent) => agent,
+-        Err(refusal) => return Ok(Err(refusal)),
+-    };
+-    let agent_id = agent.id.as_uuid();
+-    let agent_slug = agent.slug.0;
+-
+-    // 3. The team channel.
+-    let mut channel = channel_write(tx, provisioning, &created_by).await?;
+-    if let Err(error) = channel.normalize() {
+-        return Ok(Err(refused(error)));
+-    }
+-    if let Some(refusal) = malformed("channel address", &channel.slug) {
+-        return Ok(Err(refusal));
+-    }
+-    let channel_id = key.id("channel");
+-    let company_slug: String = sqlx::query_scalar("SELECT slug::text FROM companies WHERE id = $1")
+-        .bind(company.as_uuid())
+-        .fetch_one(&mut **tx)
+-        .await?;
+-    insert_channel_row_on(tx, company.as_uuid(), channel_id, &channel).await?;
+-    insert_channel_slugs(
+-        tx,
+-        company.as_uuid(),
+-        channel_id,
+-        &channel.slug,
+-        &channel.alias_slugs,
+-    )
+-    .await?;
+-    write_channel_email_binding(tx, company.as_uuid(), channel_id, &channel).await?;
+-
+-    // 4. The workflow: the reply mode's steps on the agent base, plus the spec's own, published
+-    // as a copy of the reply-mode template.
+-    let workflow = WorkflowId::new(key.id("workflow"));
+-    let version = VersionId::new(key.id("version"));
+-    let decoder = crate::adapters::workflow_source::WorkflowSourceDecoder;
+-    let template_id = match provisioning.reply_mode {
+-        ReplyMode::Autonomous => AUTONOMOUS_RESPONSE,
+-        ReplyMode::Reviewed => REVIEWED_SUPPORT,
+-    };
+-    let template = templates
+-        .catalogue
+-        .template(template_id)
+-        .ok_or_else(|| AppError::Internal(format!("Template {template_id} is not shipped")))?;
+-    let source = provisioning
+-        .reply_mode
+-        .agent_workflow()
+-        .with_steps(provisioning.steps.clone())
+-        .compose(&decoder, AGENT_BASE_SOURCE)
+-        .and_then(|source| decoder.encode(&source))
+-        .and_then(|source| retarget_agent(&decoder, &source, REPLY_AGENT_STEP, &agent_slug))
+-        .and_then(|source| rebase_workflow_id(&decoder, &source, workflow));
+-    let source = match source {
+-        Ok(source) => source,
+-        Err(diagnostic) => {
+-            return Ok(Err(ProvisioningRefusal::Invalid(
+-                diagnostic.message.to_string(),
+-            )));
+-        }
+-    };
+-    let draft = CompanyWorkflowDraft::from_template(company, workflow, template, source);
+-    super::definitions::insert_draft_on(tx, &draft, requester, "copied").await?;
+-    let bundle = match compiled(tx, templates, &decoder, &draft, version).await? {
+-        Ok(bundle) => Arc::new(bundle),
+-        Err(refusal) => return Ok(Err(refusal)),
+-    };
+-    let publication = provisioned_publication(
+-        PublishDraft {
+-            target: DefinitionTarget {
+-                company,
+-                actor: requester,
+-                workflow,
+-            },
+-            expected: draft.revision(),
+-            version,
+-            key: IdempotencyKey::parse(format!("provision:{}", version.as_uuid()))?,
+-        },
+-        draft,
+-        bundle,
+-    )
+-    .map_err(lifecycle_error)?;
+-    let bundle = super::definitions::publish_on(tx, &publication).await?;
+-
+-    // 5. The binding: configured, then activated, as the requester.
+-    let binding = WorkflowBindingId::new(key.id("binding"));
+-    let params = match provisioning.reply_mode {
+-        ReplyMode::Autonomous => json!({}),
+-        ReplyMode::Reviewed => json!({"reviewer": requester.user_id().to_string()}),
+-    };
+-    let changes = provisioned_binding(
+-        BindingTarget {
+-            company,
+-            actor: requester,
+-            binding,
+-        },
+-        RelatedAssociation::Channel(RelatedChannelId::new(channel_id)),
+-        params,
+-        MessageTrigger::Direct,
+-        bundle,
+-    )
+-    .map_err(lifecycle_error)?;
+-    for change in &changes {
+-        super::bindings::save_binding_on(tx, change).await?;
+-    }
+-
+-    Ok(Ok(ProvisionedAssistant {
+-        agent_id,
+-        address: crate::entities::channel::Channel::address_for(
+-            &crate::entities::value_objects::ChannelSlug::new(channel.slug.clone()),
+-            &crate::entities::value_objects::CompanySlug::from(company_slug),
+-            &templates.app_domain,
+-        )
+-        .to_string(),
+-        agent_slug,
+-        channel_id,
+-        channel_slug: channel.slug,
+-        workflow,
+-        version,
+-        binding,
+-        reply_mode: provisioning.reply_mode,
+-    }))
+-}
+-
+ /// The Builder's spec as an agent write: an explicit model the company can run, grantable tools
+ /// and the company's skills by exact slug. Its refusals are the deterministic validations.
+ async fn agent_write(
+diff --git a/src/adapters/persistence/workflow/provisioning_dispatch_tests.rs b/src/adapters/persistence/workflow/provisioning_dispatch_tests.rs
+index 8e6bb0a7..ada5ecec 100644
+--- a/src/adapters/persistence/workflow/provisioning_dispatch_tests.rs
++++ b/src/adapters/persistence/workflow/provisioning_dispatch_tests.rs
+@@ -903,3 +903,6 @@ mod knowledge_provisioning_tests;
+ 
+ #[path = "autonomous_agent_provisioning_atomic_tests.rs"]
+ mod autonomous_provisioning;
++
++#[path = "channel_reply_native_tests.rs"]
++mod channel_reply_native_tests;
+diff --git a/src/adapters/persistence/workflow/provisioning_runtime_tests.rs b/src/adapters/persistence/workflow/provisioning_runtime_tests.rs
+index 43db774c..bfb875fc 100644
+--- a/src/adapters/persistence/workflow/provisioning_runtime_tests.rs
++++ b/src/adapters/persistence/workflow/provisioning_runtime_tests.rs
+@@ -9,6 +9,9 @@ use crate::application::workflow::provisioning::*;
+ #[path = "provisioning_requester_lock_tests.rs"]
+ mod requester_locks;
+ 
++#[path = "channel_reply_native_runtime_tests.rs"]
++mod channel_reply_native_runtime_tests;
++
+ /// The Agent Builder on the scripted model, granted the provisioning tools, answering its team
+ /// channel `builder` through the shipped autonomous template ("Create assistant channel", run
+ /// by the owner). Returns the Builder channel's binding.
+@@ -118,8 +121,10 @@ async fn replied(d: &Deployment, binding: Uuid) -> i64 {
+     d.count(&format!(
+         "SELECT count(*) FROM workflow_runs AS run WHERE run.company_id = $1 \
+          AND run.binding_id = '{binding}' AND run.state <> 'failed' \
+-         AND EXISTS (SELECT 1 FROM workflow_message_destinations AS reply \
+-           WHERE reply.company_id = run.company_id AND reply.run_id = run.id AND reply.kind = 'reply')"
++         AND (EXISTS (SELECT 1 FROM workflow_message_destinations AS reply \
++           WHERE reply.company_id = run.company_id AND reply.run_id = run.id AND reply.kind = 'reply') \
++           OR EXISTS (SELECT 1 FROM channel_reply_decisions AS final \
++           WHERE final.company_id=run.company_id AND final.run_id=run.id AND final.state='published'))"
+     ))
+     .await
+ }
+@@ -167,7 +172,7 @@ async fn builder_provisions_an_assistant_for_a_signed_in_admin() {
+     )
+     .await;
+     d.run_until("the Builder's run finished", async || {
+-        finished_runs(&d, builder).await == 1
++        replied(&d, builder).await == 1
+     })
+     .await;
+ 
+@@ -233,12 +238,12 @@ async fn builder_provisions_an_assistant_for_a_signed_in_admin() {
+     )
+     .await;
+     d.run_until("the helper answered", async || {
+-        finished_runs(&d, binding).await == 1
++        replied(&d, binding).await == 1
+     })
+     .await;
+     assert_eq!(replied(&d, binding).await, 1, "the helper's run replies");
+     assert_eq!(
+-        replies(&d).await.len(),
++        reply_count(&d).await,
+         2,
+         "the Builder's reply and the helper's"
+     );
+@@ -266,10 +271,8 @@ async fn builder_sees_the_conversation_so_far() {
+         format!("Message-ID: <{first}>\n"),
+     )
+     .await;
+-    d.run_until("the first answer", async || {
+-        finished_runs(&d, builder).await == 1
+-    })
+-    .await;
++    d.run_until("the first answer", async || replied(&d, builder).await == 1)
++        .await;
+     write_with(
+         &d,
+         &email,
+@@ -283,7 +286,7 @@ async fn builder_sees_the_conversation_so_far() {
+     )
+     .await;
+     d.run_until("the follow-up answer", async || {
+-        finished_runs(&d, builder).await == 2
++        replied(&d, builder).await == 2
+     })
+     .await;
+ 
+@@ -321,7 +324,7 @@ async fn builder_adds_custom_steps_to_the_new_agents_workflow() {
+             "with": {"data": {"ref": "/steps/topic/output"}, "data_schema": labels},
+             "rule": {"cases": [{"when": {"eq": [{"ref": "/steps/topic/output"},
+                 {"literal": "billing"}]}, "choice": "send"}], "default": "hold"},
+-            "routes": {"choices": {"send": "$next", "hold": "$end"}}}
++            "routes": {"choices": {"send": "$next", "hold": "$next"}}}
+     ]);
+     let mut d = Deployment::new(vec![
+         LlmTurn::tool_call(CREATE_AGENT_CHANNEL, spec),
+@@ -341,7 +344,7 @@ async fn builder_adds_custom_steps_to_the_new_agents_workflow() {
+     )
+     .await;
+     d.run_until("the Builder's run finished", async || {
+-        finished_runs(&d, builder).await == 1
++        replied(&d, builder).await == 1
+     })
+     .await;
+     let created = receipts(&d, builder).await.remove(0);
+@@ -361,7 +364,7 @@ async fn builder_adds_custom_steps_to_the_new_agents_workflow() {
+     )
+     .await;
+     d.run_until("the helper answered", async || {
+-        finished_runs(&d, binding).await == 1
++        replied(&d, binding).await == 1
+     })
+     .await;
+     assert_eq!(replied(&d, binding).await, 1, "billing passes the rule");
+@@ -482,7 +485,7 @@ async fn builder_refuses_members_and_emailed_requests() {
+     )
+     .await;
+     d.run_until("the member's run finished", async || {
+-        finished_runs(&d, builder).await == 1
++        replied(&d, builder).await == 1
+     })
+     .await;
+     let (_, admin) = person(&d, "admin").await;
+@@ -495,7 +498,7 @@ async fn builder_refuses_members_and_emailed_requests() {
+     )
+     .await;
+     d.run_until("the emailed run finished", async || {
+-        finished_runs(&d, builder).await == 2
++        replied(&d, builder).await == 2
+     })
+     .await;
+ 
+@@ -544,7 +547,7 @@ async fn reviewed_assistants_park_their_answer_until_the_run_deadline() {
+     )
+     .await;
+     d.run_until("the Builder's run finished", async || {
+-        finished_runs(&d, builder).await == 1
++        replied(&d, builder).await == 1
+     })
+     .await;
+     let created = receipts(&d, builder).await.remove(0);
+@@ -598,3 +601,9 @@ struct ListingLoopWork {
+     turns: i32,
+     invocations: i32,
+ }
++
++async fn reply_count(d: &Deployment) -> usize {
++    replies(d).await.len() + d.count(
++        "SELECT count(*) FROM channel_reply_decisions WHERE company_id=$1 AND state='published'"
++    ).await as usize
++}
+diff --git a/src/adapters/persistence/workflow/run_views.rs b/src/adapters/persistence/workflow/run_views.rs
+index a03673d1..4c485611 100644
+--- a/src/adapters/persistence/workflow/run_views.rs
++++ b/src/adapters/persistence/workflow/run_views.rs
+@@ -478,6 +478,10 @@ impl RunViews for PostgresPersistence {
+             draft_revision: revision_of(facts.draft_revision)?,
+             channel_name: facts.channel_name,
+             trigger_message: self.trigger_message(company, run).await?,
++            response: super::channel_reply_views::read(self, company, viewer, &[run.as_uuid()])
++                .await?
++                .into_iter()
++                .next(),
+             input: facts.input,
+             params: facts.params,
+             lineage,
+diff --git a/src/adapters/persistence/workflow/sample_capture_bounds_tests.rs b/src/adapters/persistence/workflow/sample_capture_bounds_tests.rs
+index 7946d8aa..bc07e010 100644
+--- a/src/adapters/persistence/workflow/sample_capture_bounds_tests.rs
++++ b/src/adapters/persistence/workflow/sample_capture_bounds_tests.rs
+@@ -96,7 +96,7 @@ fn request(root: &PublishedBundle, children: &[Arc<PublishedBundle>]) -> SampleR
+             }
+         })
+         .collect();
+-    SampleRequest {
++    SampleRequest { response_contract: None, response_approval_policy: None,
+         input:json!({}),params:json!({}),
+         agents:vec![ResolvedAgentDefinition { company_id:root.company_id(),agent_id:reference.agent_id,key:reference.key.clone(),instructions:"Bounded sample".into(),
+             model:ModelSettings {provider:name("test"),model:"sample".into(),max_output_tokens:1000},tools,skills:vec![] }],
+diff --git a/src/application/thread_activity.rs b/src/application/thread_activity.rs
+index de89052b..60fb9b28 100644
+--- a/src/application/thread_activity.rs
++++ b/src/application/thread_activity.rs
+@@ -45,6 +45,8 @@ pub struct ThreadRuns {
+     pub items: Vec<ThreadRunActivity>,
+     pub has_more: bool,
+     pub message_runs: Vec<MessageRuns>,
++    pub response_outcomes: Vec<crate::application::workflow::channel_reply::ChannelResponseOutcome>,
++    pub responses_truncated: bool,
+ }
+ 
+ pub const THREAD_RUN_LIMIT: usize = 50;
+diff --git a/src/application/workflow/authoring/tests.rs b/src/application/workflow/authoring/tests.rs
+index 0a300ffc..8f473444 100644
+--- a/src/application/workflow/authoring/tests.rs
++++ b/src/application/workflow/authoring/tests.rs
+@@ -44,11 +44,11 @@ fn the_graph_layers_every_route_downward_and_ends_below_every_step() {
+         review,
+         [
+             ("approve", "reply", GraphEdgeKind::Choice),
+-            ("reject", END_NODE, GraphEdgeKind::Choice)
++            ("reject", "review_rejected", GraphEdgeKind::Choice)
+         ]
+     );
+     assert_eq!(graph.layers, 5);
+-    assert_eq!(graph.nodes.len(), 5);
++    assert_eq!(graph.nodes.len(), 6);
+ }
+ 
+ #[test]
+diff --git a/src/application/workflow/channel_reply/mod.rs b/src/application/workflow/channel_reply/mod.rs
+index 70dc9234..e98c11ef 100644
+--- a/src/application/workflow/channel_reply/mod.rs
++++ b/src/application/workflow/channel_reply/mod.rs
+@@ -2,11 +2,14 @@
+ //! only its admitted root run owns an automatic final response.
+ mod approval;
+ mod contract;
++pub mod examples;
+ mod finalization;
++mod outcomes;
+ mod publication;
+ mod publication_io;
+ mod publisher;
+ pub use finalization::*;
++pub use outcomes::*;
+ pub use publication::*;
+ pub use publication_io::*;
+ pub use publisher::ChannelReplyPublisher;
+diff --git a/src/application/workflow/fixtures/autonomous-response.yaml b/src/application/workflow/fixtures/autonomous-response.yaml
+index c4f24b9e..d6cd8e4c 100644
+--- a/src/application/workflow/fixtures/autonomous-response.yaml
++++ b/src/application/workflow/fixtures/autonomous-response.yaml
+@@ -13,7 +13,11 @@ input_schema:
+   required: [message, source_message]
+   additionalProperties: false
+ parameter_schema: {type: object, additionalProperties: false}
+-output_schema: true
++output_schema:
++  type: object
++  properties: {body: {type: string, maxLength: 16384}}
++  required: [body]
++  additionalProperties: false
+ resources: []
+ entry: context
+ steps:
+@@ -39,9 +43,14 @@ steps:
+           additionalProperties: false
+     routes: {success: reply}
+   reply:
+-    type: message.reply
++    type: data.map
+     with:
+-      source_message: {ref: /input/source_message}
+-      content: {ref: /steps/draft/output}
++      value: {ref: /steps/draft/output}
++      output_schema:
++        literal:
++          type: object
++          properties: {body: {type: string, maxLength: 16384}}
++          required: [body]
++          additionalProperties: false
+     routes: {success: $end}
+ limits: {max_steps: 10, max_context_bytes: 65536}
+diff --git a/src/application/workflow/fixtures/reviewed-support.yaml b/src/application/workflow/fixtures/reviewed-support.yaml
+index 0d2209ba..14734569 100644
+--- a/src/application/workflow/fixtures/reviewed-support.yaml
++++ b/src/application/workflow/fixtures/reviewed-support.yaml
+@@ -17,7 +17,11 @@ parameter_schema:
+     reviewer: {type: string, maxLength: 128}
+   required: [reviewer]
+   additionalProperties: false
+-output_schema: true
++output_schema:
++  type: object
++  properties: {body: {type: string, maxLength: 16384}, review: {type: object}}
++  required: [body]
++  additionalProperties: false
+ resources: []
+ entry: context
+ steps:
+@@ -55,11 +59,30 @@ steps:
+           required: [body]
+           additionalProperties: false
+       feedback_required: {literal: [reject]}
+-    routes: {choices: {approve: reply, reject: $end}}
++    routes: {choices: {approve: reply, reject: review_rejected}}
+   reply:
+-    type: message.reply
++    type: data.map
++    with:
++      value: {ref: /steps/review/output/data}
++      output_schema:
++        literal:
++          type: object
++          properties: {body: {type: string, maxLength: 16384}}
++          required: [body]
++          additionalProperties: false
++    routes: {success: $end}
++  review_rejected:
++    type: channel.no_reply
+     with:
+-      source_message: {ref: /input/source_message}
+-      content: {ref: /steps/review/output/data}
++      value:
++        object:
++          body: {literal: ""}
++          review: {ref: /steps/review/output}
++      output_schema:
++        literal:
++          type: object
++          properties: {body: {type: string, maxLength: 16384}, review: {type: object}}
++          required: [body]
++          additionalProperties: false
+     routes: {success: $end}
+ limits: {max_steps: 10, max_context_bytes: 65536}
+diff --git a/src/application/workflow/fixtures/tests.rs b/src/application/workflow/fixtures/tests.rs
+index 846b35a5..95cdb77e 100644
+--- a/src/application/workflow/fixtures/tests.rs
++++ b/src/application/workflow/fixtures/tests.rs
+@@ -215,7 +215,7 @@ fn workflow_fixtures_review_routes_human_edits_and_requires_rejection_feedback()
+         .unwrap();
+     outputs.insert(step("review"), edited);
+     assert_eq!(
+-        prepare(&bundle, "reply", &outputs).value()["content"]["body"],
++        prepare(&bundle, "reply", &outputs).value()["value"]["body"],
+         "Edited"
+     );
+     assert_eq!(outputs[&step("draft")]["body"], "Original");
+@@ -231,7 +231,7 @@ fn workflow_fixtures_review_routes_human_edits_and_requires_rejection_feedback()
+     let source: Value = serde_yaml::from_str(Fixture::ReviewedSupport.source()).unwrap();
+     assert_eq!(
+         source["steps"]["review"]["routes"]["choices"]["reject"],
+-        "$end"
++        "review_rejected"
+     );
+ }
+ 
+diff --git a/src/application/workflow/provisioning.rs b/src/application/workflow/provisioning.rs
+index b8603352..be71a0de 100644
+--- a/src/application/workflow/provisioning.rs
++++ b/src/application/workflow/provisioning.rs
+@@ -33,8 +33,13 @@ pub const PROVISIONING_INVALID: &str = "workflow.invalid_input";
+ /// The step types the Agent Builder may add to a new agent's workflow: model-only or pure steps,
+ /// which need no connection, parameter or outbound destination. Any other step is added in the
+ /// workflow editor.
+-pub const BUILDER_STEP_TYPES: [&str; 4] =
+-    ["ai.classify", "decision.agent", "decision.rule", "data.map"];
++pub const BUILDER_STEP_TYPES: [&str; 5] = [
++    "ai.classify",
++    "decision.agent",
++    "decision.rule",
++    "data.map",
++    "channel.no_reply",
++];
+ 
+ /// The most agents `list_company_agents` returns, by slug.
+ pub const MAX_LISTED_AGENTS: usize = 200;
+diff --git a/src/application/workflow/run_views.rs b/src/application/workflow/run_views.rs
+index ac5c9c2d..00fcfb45 100644
+--- a/src/application/workflow/run_views.rs
++++ b/src/application/workflow/run_views.rs
+@@ -88,6 +88,7 @@ pub struct RunView {
+     pub channel_name: Option<String>,
+     /// The inbound message whose admission started the run, if a message did.
+     pub trigger_message: Option<Uuid>,
++    pub response: Option<super::channel_reply::ChannelResponseOutcome>,
+     pub input: Value,
+     pub params: Value,
+     pub lineage: Option<Lineage>,
+@@ -260,6 +261,7 @@ impl RunView {
+             return;
+         }
+         self.payload_restricted = true;
++        self.response = None;
+         self.dependencies = None;
+         for child in &mut self.children {
+             child.dependency = None;
+diff --git a/src/application/workflow/sample/definitions.rs b/src/application/workflow/sample/definitions.rs
+index 8adfe68e..8494cb6f 100644
+--- a/src/application/workflow/sample/definitions.rs
++++ b/src/application/workflow/sample/definitions.rs
+@@ -38,6 +38,8 @@ struct ConfigurationIdentity<'a> {
+     company: CompanyId,
+     agents: &'a [SampleAgentSelection],
+     workflows: &'a [SampleWorkflowSelection],
++    response_contract: &'a Option<super::super::channel_reply::ChannelReplyContract>,
++    response_approval_policy: &'a Option<super::super::channel_reply::ReplyApprovalPolicy>,
+ }
+ 
+ pub struct PreparedSample {
+@@ -67,6 +69,7 @@ impl PreparedSample {
+         if extra.len() > MAX_AGENT_DEPENDENCIES {
+             return Err(refused("Too many sample workflows"));
+         }
++        validate_response(&root, &request)?;
+         let mut agents = BTreeMap::new();
+         for agent in std::mem::take(&mut request.agents) {
+             agent.validate()?;
+@@ -103,10 +106,12 @@ impl PreparedSample {
+             })
+             .collect();
+         let identity = serde_json::to_value(ConfigurationIdentity {
+-            kind: "sample-only-v1",
++            kind: "sample-only-v2",
+             company: root.company_id(),
+             agents: &agent_selections,
+             workflows: &workflow_selections,
++            response_contract: &request.response_contract,
++            response_approval_policy: &request.response_approval_policy,
+         })
+         .map_err(|_| refused("Invalid sample identity"))?;
+         let configuration_hash = SampleConfigurationHash(format!(
+@@ -126,6 +131,23 @@ impl PreparedSample {
+         })
+     }
+ }
++
++fn validate_response(root: &PublishedBundle, request: &SampleRequest) -> AppResult<()> {
++    match &request.response_contract {
++        Some(contract) => contract.validate(
++            root.compiled()
++                .graph()
++                .definition()
++                .output_schema
++                .as_ref()
++                .unwrap_or(&Value::Bool(true)),
++        ),
++        None if request.response_approval_policy.is_some() => Err(refused(
++            "A sample final approval policy needs an explicit response contract",
++        )),
++        None => Ok(()),
++    }
++}
+ fn collect_workflows(
+     root: Arc<PublishedBundle>,
+     extra: Vec<Arc<PublishedBundle>>,
+diff --git a/src/application/workflow/sample/dispatch.rs b/src/application/workflow/sample/dispatch.rs
+index ce4dea74..1fd49e59 100644
+--- a/src/application/workflow/sample/dispatch.rs
++++ b/src/application/workflow/sample/dispatch.rs
+@@ -37,7 +37,13 @@ impl Session {
+         {
+             return self.workflow_tool_step(bundle, frame, activation, path, &tool);
+         }
+-        let response = self.response(bundle, &activation.step)?;
++        let response = match self.response(bundle, &activation.step) {
++            Ok(response) => response,
++            Err(error) => {
++                self.waiting_response(kind, activation)?;
++                return Err(error);
++            }
++        };
+         if kind == "jev.evaluate" {
+             return self.jev(bundle, activation, response);
+         }
+diff --git a/src/application/workflow/sample/mod.rs b/src/application/workflow/sample/mod.rs
+index bf831cd8..5c8e0787 100644
+--- a/src/application/workflow/sample/mod.rs
++++ b/src/application/workflow/sample/mod.rs
+@@ -22,6 +22,7 @@ pub use definitions::{
+     PreparedSample, SampleAgentSelection, SampleConfigurationHash, SampleWorkflowSelection,
+ };
+ mod dispatch;
++mod responses;
+ mod tools;
+ mod types;
+ pub use types::*;
+@@ -32,6 +33,8 @@ struct ScriptKey {
+     step: StepId,
+ }
+ struct Session {
++    response_contract: Option<super::channel_reply::ChannelReplyContract>,
++    response_approval_policy: Option<super::channel_reply::ReplyApprovalPolicy>,
+     agents: BTreeMap<
+         crate::entities::agent_capability::AgentId,
+         crate::application::agent::ResolvedAgentDefinition,
+@@ -93,6 +96,8 @@ pub fn execute(sample: PreparedSample) -> AppResult<SampleReport> {
+     } = sample;
+     let scripts = script_queues(request.scripts)?;
+     let mut session = Session {
++        response_contract: request.response_contract,
++        response_approval_policy: request.response_approval_policy,
+         agents,
+         workflows,
+         scripts,
+@@ -105,6 +110,7 @@ pub fn execute(sample: PreparedSample) -> AppResult<SampleReport> {
+             .clone(),
+         report_bytes: 1024,
+         report: SampleReport {
++            response: None,
+             content_hash: bundle.content_hash().clone(),
+             configuration_hash,
+             agent_selections,
+@@ -229,7 +235,12 @@ impl Session {
+                 .outputs
+                 .insert(step.clone(), completion.output.clone());
+             match completion.target {
+-                TransitionTarget::End => return Ok(completion.output),
++                TransitionTarget::End => {
++                    if frame.depth == 0 {
++                        self.completed_response(&bundle, &completion)?;
++                    }
++                    return Ok(completion.output);
++                }
+                 TransitionTarget::Step(next) => step = next,
+             }
+         }
+diff --git a/src/application/workflow/sample/tests.rs b/src/application/workflow/sample/tests.rs
+index 7c0ab5c9..9f526131 100644
+--- a/src/application/workflow/sample/tests.rs
++++ b/src/application/workflow/sample/tests.rs
+@@ -4,6 +4,8 @@ use crate::application::workflow::{fixtures::Fixture, publication::*, registry};
+ use crate::domain::workflow::{CompanyId, TypeName, VersionId};
+ use serde_json::json;
+ 
++#[path = "channel_reply_preview_tests.rs"]
++mod channel_reply_preview_tests;
+ #[path = "channel_reply_terminal_tests.rs"]
+ mod channel_reply_terminal_tests;
+ #[path = "tools_tests.rs"]
+@@ -149,6 +151,8 @@ fn script(workflow: u128, step: &str, outputs: Vec<Value>) -> StepScript {
+ }
+ fn request(scripts: Vec<StepScript>) -> SampleRequest {
+     SampleRequest {
++        response_contract: None,
++        response_approval_policy: None,
+         agents: vec![],
+         input: json!({}),
+         params: json!({}),
+@@ -369,6 +373,8 @@ fn descendants_cannot_replenish_root_budgets_and_report_size_is_bounded() {
+     let report = execute(
+         build(&raw, DependencySnapshots::default(), vec![]),
+         SampleRequest {
++            response_contract: None,
++            response_approval_policy: None,
+             input: json!({"value":"x".repeat(8192)}),
+             ..request(vec![])
+         },
+diff --git a/src/application/workflow/sample/types.rs b/src/application/workflow/sample/types.rs
+index 8273827b..37f34269 100644
+--- a/src/application/workflow/sample/types.rs
++++ b/src/application/workflow/sample/types.rs
+@@ -11,6 +11,10 @@ pub(super) const MAX_TOOL_CALLS: usize = 64;
+ #[derive(Clone, Serialize, Deserialize)]
+ #[serde(deny_unknown_fields)]
+ pub struct SampleRequest {
++    #[serde(default)]
++    pub response_contract: Option<super::super::channel_reply::ChannelReplyContract>,
++    #[serde(default)]
++    pub response_approval_policy: Option<super::super::channel_reply::ReplyApprovalPolicy>,
+     pub agents: Vec<crate::application::agent::ResolvedAgentDefinition>,
+     pub input: Value,
+     pub params: Value,
+@@ -98,6 +102,7 @@ pub struct SampleUsage {
+ }
+ #[derive(Debug, Serialize)]
+ pub struct SampleReport {
++    pub response: Option<SampleResponse>,
+     pub content_hash: super::super::publication::ContentHash,
+     pub configuration_hash: super::SampleConfigurationHash,
+     pub agent_selections: Vec<super::SampleAgentSelection>,
+@@ -110,3 +115,41 @@ pub struct SampleReport {
+     pub unused_responses: usize,
+     pub diagnostic: Option<String>,
+ }
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++#[serde(tag = "kind", rename_all = "snake_case")]
++pub enum SampleResponse {
++    AutomaticUnmapped,
++    Automatic {
++        content: SampleResponseContent,
++        approval_required: bool,
++    },
++    Suppressed,
++    Waiting {
++        stage: SampleWaitStage,
++        preview: Value,
++    },
++}
++
++#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
++#[serde(rename_all = "snake_case")]
++pub enum SampleWaitStage {
++    HumanReply,
++    FormalReview,
++    QuestionApproval,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct SampleResponseContent {
++    pub subject: String,
++    pub body: String,
++}
++
++impl From<crate::application::transport::CanonicalContent> for SampleResponseContent {
++    fn from(content: crate::application::transport::CanonicalContent) -> Self {
++        Self {
++            subject: content.subject().to_owned(),
++            body: content.body_text().to_owned(),
++        }
++    }
++}
+diff --git a/src/application/workflow/templates/agent_workflow.rs b/src/application/workflow/templates/agent_workflow.rs
+index 3e64a3d4..a26ca150 100644
+--- a/src/application/workflow/templates/agent_workflow.rs
++++ b/src/application/workflow/templates/agent_workflow.rs
+@@ -18,6 +18,8 @@ pub const HISTORY_STEP: &str = "context";
+ pub const REPLY_STEP: &str = "reply";
+ /// The gate a reviewed channel adds before its reply.
+ pub const REVIEW_STEP: &str = "review";
++const REVIEW_REJECTED_STEP: &str = "review_rejected";
++const FINISH_RESPONSE_STEP: &str = "finish_response";
+ /// The route target a custom step names for whichever step follows it.
+ pub const NEXT_STEP: &str = "$next";
+ const END_STEP: &str = "$end";
+@@ -76,6 +78,7 @@ impl AgentWorkflow {
+     ) -> Result<SourceNode, Diagnostic> {
+         let decoded = decoder.decode(base)?;
+         let root = entries(&decoded.root, "")?;
++        let schema = self.response_schema(&root)?;
+         let mut base_steps = BaseSteps::read(&root)?;
+         self.check_steps()?;
+         let custom = |slot| self.steps.iter().filter(move |step| step.slot == slot);
+@@ -107,15 +110,14 @@ impl AgentWorkflow {
+         }
+         reply_with(&mut reply, &answer)?;
+         chain.push(Link::base(REPLY_STEP, reply));
+-        chain.extend(custom(StepSlot::AfterReply).map(Link::custom));
+-
+-        let steps = route(chain)?;
++        let steps = self.complete_chain(chain, &schema, &root)?;
+         let entry = steps.first().map(|(id, _)| id.clone()).unwrap_or_default();
+         root.into_iter()
+             .map(|(key, node)| {
+                 let value = match key.as_str() {
+                     "entry" => SourceNode::Value(Value::String(entry.clone())),
+                     "steps" => SourceNode::Mapping(steps.clone()),
++                    "output_schema" => SourceNode::Value(schema.clone()),
+                     "parameter_schema" if self.reviewed => {
+                         SourceNode::Value(with_reviewer(json_value(node, "/parameter_schema")?)?)
+                     }
+@@ -127,6 +129,81 @@ impl AgentWorkflow {
+             .map(SourceNode::Mapping)
+     }
+ 
++    fn complete_chain(
++        &self,
++        mut chain: Vec<Link>,
++        schema: &Value,
++        root: &[(String, &LocatedNode)],
++    ) -> Result<Vec<(String, SourceNode)>, Diagnostic> {
++        let tail: Vec<_> = self
++            .steps
++            .iter()
++            .filter(|step| step.slot == StepSlot::AfterReply)
++            .collect();
++        chain.extend(tail.iter().map(|step| Link::custom(step)));
++        if !tail.is_empty()
++            && !tail
++                .last()
++                .is_some_and(|step| step.definition["type"] == "channel.no_reply")
++        {
++            chain.push(Link::base(
++                FINISH_RESPONSE_STEP,
++                response_map(&format!("/steps/{REPLY_STEP}/output"), schema),
++            ));
++        }
++        let limit = root
++            .iter()
++            .find(|(key, _)| key == "limits")
++            .map(|(_, node)| json_value(node, "/limits"))
++            .transpose()?
++            .and_then(|limits| limits.get("max_steps").and_then(Value::as_u64))
++            .ok_or_else(|| {
++                invalid(
++                    "/limits/max_steps",
++                    "The base needs an explicit step budget",
++                )
++            })?;
++        if chain.len() as u64 > limit {
++            return Err(invalid(
++                "/steps",
++                "The composed response and custom steps exceed the base step budget; reduce custom steps",
++            ));
++        }
++        let mut steps = route(chain)?;
++        if self.reviewed {
++            let rejected = json!({"type":"channel.no_reply","with":{
++                "value":{"object":{"body":{"literal":""},"review":{"ref":"/steps/review/output"}}},
++                "output_schema":{"literal":schema}},"routes":{"success":"$end"}});
++            steps.push((
++                REVIEW_REJECTED_STEP.into(),
++                ordered(rejected.as_object().cloned().expect("object")),
++            ));
++        }
++        Ok(steps)
++    }
++
++    fn response_schema(&self, root: &[(String, &LocatedNode)]) -> Result<Value, Diagnostic> {
++        let node = root
++            .iter()
++            .find(|(key, _)| key == "output_schema")
++            .map(|(_, node)| *node)
++            .ok_or_else(|| invalid("/output_schema", "The base needs a response schema"))?;
++        let mut schema = json_value(node, "/output_schema")?;
++        if self.reviewed {
++            schema
++                .get_mut("properties")
++                .and_then(Value::as_object_mut)
++                .ok_or_else(|| {
++                    invalid(
++                        "/output_schema",
++                        "The base response schema needs object properties",
++                    )
++                })?
++                .insert("review".into(), json!({"type":"object"}));
++        }
++        Ok(schema)
++    }
++
+     fn check_steps(&self) -> Result<(), Diagnostic> {
+         if self.steps.len() > MAX_CUSTOM_STEPS {
+             return Err(invalid(
+@@ -134,7 +211,14 @@ impl AgentWorkflow {
+                 &format!("At most {MAX_CUSTOM_STEPS} custom steps are allowed"),
+             ));
+         }
+-        let mut seen = BTreeSet::from([HISTORY_STEP, REPLY_AGENT_STEP, REPLY_STEP, REVIEW_STEP]);
++        let mut seen = BTreeSet::from([
++            HISTORY_STEP,
++            REPLY_AGENT_STEP,
++            REPLY_STEP,
++            REVIEW_STEP,
++            REVIEW_REJECTED_STEP,
++            FINISH_RESPONSE_STEP,
++        ]);
+         for step in &self.steps {
+             let at = format!("/steps/{}", step.id);
+             if StepId::parse(&step.id).is_err() {
+@@ -149,6 +233,11 @@ impl AgentWorkflow {
+             if !step.definition.get("type").is_some_and(Value::is_string) {
+                 return Err(invalid(&at, "A custom step needs a type"));
+             }
++            if step.definition["type"] != "channel.no_reply"
++                && let Some(routes) = step.definition.get("routes")
++            {
++                reject_custom_end(routes, &format!("{at}/routes"))?;
++            }
+         }
+         Ok(())
+     }
+@@ -238,7 +327,9 @@ fn route(chain: Vec<Link>) -> Result<Vec<(String, SourceNode)>, Diagnostic> {
+         .map(|(mut link, next)| {
+             let routes = match link.routes {
+                 Routes::Base => json!({"success": next}),
+-                Routes::Review => json!({"choices": {"approve": next, "reject": END_STEP}}),
++                Routes::Review => {
++                    json!({"choices": {"approve": next, "reject": REVIEW_REJECTED_STEP}})
++                }
+                 Routes::Custom => {
+                     let mut routes = link
+                         .step
+@@ -344,10 +435,30 @@ fn reply_with(reply: &mut Map<String, Value>, answer: &str) -> Result<(), Diagno
+                 "The base reply has no inputs",
+             )
+         })?;
+-    content.insert("content".into(), json!({"ref": answer}));
++    content.insert("value".into(), json!({"ref": answer}));
+     Ok(())
+ }
+ 
++fn reject_custom_end(routes: &Value, at: &str) -> Result<(), Diagnostic> {
++    match routes {
++        Value::String(target) if target == END_STEP => Err(invalid(
++            at,
++            "Use a terminal channel.no_reply (Finish without reply) for intentional silence; custom steps cannot end the native response directly",
++        )),
++        Value::Object(routes) => routes
++            .values()
++            .try_for_each(|route| reject_custom_end(route, at)),
++        _ => Ok(()),
++    }
++}
++
++fn response_map(answer: &str, schema: &Value) -> Map<String, Value> {
++    json!({"type":"data.map","with":{"value":{"ref":answer},"output_schema":{"literal":schema}}})
++        .as_object()
++        .cloned()
++        .expect("object")
++}
++
+ /// The base's parameters plus the reviewer the review gate names.
+ fn with_reviewer(mut schema: Value) -> Result<Value, Diagnostic> {
+     let missing = || {
+diff --git a/src/application/workflow/templates/agent_workflow_tests.rs b/src/application/workflow/templates/agent_workflow_tests.rs
+index 18a344fd..e1aa363c 100644
+--- a/src/application/workflow/templates/agent_workflow_tests.rs
++++ b/src/application/workflow/templates/agent_workflow_tests.rs
+@@ -60,7 +60,7 @@ fn gate() -> CustomStep {
+             "data_schema": {"literal": {"type": "string", "enum": ["billing", "other"]}}},
+         "rule": {"cases": [{"when": {"eq": [{"ref": "/steps/topic/output"}, {"literal": "billing"}]},
+             "choice": "send"}], "default": "hold"},
+-        "routes": {"choices": {"send": "$next", "hold": "$end"}}}),
++        "routes": {"choices": {"send": "$next", "hold": "$next"}}}),
+     )
+ }
+ 
+@@ -117,20 +117,28 @@ fn custom_steps_join_the_base_in_their_slots() {
+     assert_eq!(steps["draft"]["routes"], json!({"success": "gate"}));
+     assert_eq!(
+         steps["gate"]["routes"],
+-        json!({"choices": {"send": "review", "hold": "$end"}})
++        json!({"choices": {"send": "review", "hold": "review"}})
+     );
+     assert_eq!(
+         steps["review"]["routes"],
+-        json!({"choices": {"approve": "reply", "reject": "$end"}})
++        json!({"choices": {"approve": "reply", "reject": "review_rejected"}})
+     );
+     assert_eq!(steps["reply"]["routes"], json!({"success": "note"}));
+-    assert_eq!(steps["note"]["routes"], json!({"success": "$end"}));
++    assert_eq!(
++        steps["note"]["routes"],
++        json!({"success": "finish_response"})
++    );
++    assert_eq!(
++        steps["finish_response"]["with"]["value"],
++        json!({"ref": "/steps/reply/output"})
++    );
++    assert_eq!(steps["review_rejected"]["type"], "channel.no_reply");
+     assert_eq!(
+         steps["draft"]["with"]["context"]["object"]["untrusted_topic"],
+         json!({"ref": "/steps/topic/output"})
+     );
+     assert_eq!(
+-        steps["reply"]["with"]["content"],
++        steps["reply"]["with"]["value"],
+         json!({"ref": "/steps/review/output/data"})
+     );
+     // Without review the reply sends the draft, and a gate continues straight to it.
+@@ -139,10 +147,10 @@ fn custom_steps_join_the_base_in_their_slots() {
+     ));
+     assert_eq!(
+         source["steps"]["gate"]["routes"],
+-        json!({"choices": {"send": "reply", "hold": "$end"}})
++        json!({"choices": {"send": "reply", "hold": "reply"}})
+     );
+     assert_eq!(
+-        source["steps"]["reply"]["with"]["content"],
++        source["steps"]["reply"]["with"]["value"],
+         json!({"ref": "/steps/draft/output"})
+     );
+ }
+@@ -196,9 +204,42 @@ fn the_largest_composition_fits_the_base_step_limit() {
+         step.id = format!("note_{n}");
+         step
+     }));
+-    let source = plain(&composed(
+-        &AgentWorkflow::base().reviewed().with_steps(steps),
+-    ));
++    // An autonomous composition has room for all six custom nodes and the saved-response tail.
++    let source = plain(&composed(&AgentWorkflow::base().with_steps(steps.clone())));
+     let limit = source["limits"]["max_steps"].as_u64().unwrap();
+     assert_eq!(source["steps"].as_object().unwrap().len() as u64, limit);
++    // Review adds one activation on the approved path: refuse it before resource creation.
++    assert!(
++        AgentWorkflow::base()
++            .reviewed()
++            .with_steps(steps)
++            .compose(&WorkflowSourceDecoder, AGENT_BASE_SOURCE)
++            .is_err()
++    );
++}
++
++#[test]
++fn channel_reply_authoring_custom_end_requires_terminal_no_reply() {
++    for routes in [
++        json!({"success":"$end"}),
++        json!({"error":"$end"}),
++        json!({"choices":{"approve":"$next","reject":"$end"}}),
++    ] {
++        let mut custom = classify();
++        custom.definition.insert("routes".into(), routes);
++        let error = AgentWorkflow::base()
++            .with_steps(vec![custom])
++            .compose(&WorkflowSourceDecoder, AGENT_BASE_SOURCE)
++            .unwrap_err();
++        assert!(error.message.contains("Finish without reply"));
++    }
++    let silence = step(
++        json!({"id":"silence","slot":"after_reply","type":"channel.no_reply",
++        "with":{"value":{"ref":"/steps/reply/output"},
++        "output_schema":{"literal":{"type":"object","properties":{"body":{"type":"string","maxLength":16384}},"required":["body"],"additionalProperties":false}}},
++        "routes":{"success":"$end"}}),
++    );
++    let source = plain(&composed(&AgentWorkflow::base().with_steps(vec![silence])));
++    assert_eq!(source["steps"]["silence"]["routes"]["success"], "$end");
++    assert!(source["steps"].get("finish_response").is_none());
+ }
+diff --git a/src/application/workflow/templates/catalogue.rs b/src/application/workflow/templates/catalogue.rs
+index 80693db0..fb87135d 100644
+--- a/src/application/workflow/templates/catalogue.rs
++++ b/src/application/workflow/templates/catalogue.rs
+@@ -143,7 +143,7 @@ impl TemplateCatalogue {
+         let offer = |id: &str, title: &'static str, description: &'static str, source| {
+             Ok::<_, TemplateError>(TemplateOffer {
+                 id: TemplateId::parse(id).map_err(|_| TemplateError::Limit("template id"))?,
+-                revision: TemplateRevision::new(1).expect("first template revision"),
++                revision: TemplateRevision::new(2).expect("current template revision"),
+                 title,
+                 description,
+                 source,
+@@ -156,13 +156,13 @@ impl TemplateCatalogue {
+                 offer(
+                     AUTONOMOUS_RESPONSE,
+                     "Autonomous response",
+-                    "The agent drafts an answer to each inbound message and sends it as the reply.",
++                    "The agent returns a typed answer; the channel's designated responder publishes the automatic final reply.",
+                     sources[0],
+                 )?,
+                 offer(
+                     REVIEWED_SUPPORT,
+                     "Reviewed response",
+-                    "The agent drafts an answer; a reviewer approves or edits it before it is sent, or rejects it, before the run's deadline.",
++                    "A reviewer approves or edits the agent's answer before automatic publication; rejection completes without a reply.",
+                     sources[1],
+                 )?,
+             ],
+diff --git a/src/infra/workflow/services.rs b/src/infra/workflow/services.rs
+index cae56bce..2bc27f02 100644
+--- a/src/infra/workflow/services.rs
++++ b/src/infra/workflow/services.rs
+@@ -62,6 +62,12 @@ impl WorkflowServices {
+         &self.persistence
+     }
+ 
++    pub fn channel_replies(
++        &self,
++    ) -> &dyn crate::application::workflow::channel_reply::ChannelReplies {
++        &self.persistence
++    }
++
+     /// A published version of this company whose workflow is not archived — the one a binding
+     /// may select — for the binding form's parameter fields and resource slots (p09 B1b). It
+     /// authorizes nothing; the route has.

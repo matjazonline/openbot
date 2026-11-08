@@ -15,6 +15,8 @@ mod usage;
 pub use usage::RunUsage;
 mod state;
 pub use state::*;
+mod seed;
+pub use seed::*;
 
 pub use crate::entities::harness_run::{
     CheckpointRevision, InvocationId, InvocationRef, ModelRequestId, RunId,

@@ -1,0 +1,33 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+   Compiling open_bots v0.1.0 (/private/tmp/openbot-agent-history-h_82_5pw/worktree)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 52.37s
+     Running unittests src/lib.rs (/private/tmp/openbot-chs-p06-3f43t2k7/worktree/target/debug/deps/open_bots-8b80d02f0b6cf2e6)
+
+running 11 tests
+test application::workflow::sample::tests::history_tests::agent_history_samples_model_only_step_has_no_logical_seed ... ok
+test application::workflow::sample::tests::history_tests::agent_history_samples_actual_agent_identity_separates_streams ... ok
+test application::workflow::sample::tests::history_tests::agent_history_samples_repeated_calls_keep_exact_local_pairs_and_current_input_separate ... ok
+test application::workflow::sample::tests::history_tests::agent_history_samples_same_agent_child_has_its_own_ephemeral_branch ... ok
+test application::workflow::sample::tests::history_tests::agent_history_samples_oversized_newest_pair_stops_before_older_pair ... ok
+test application::workflow::sample::tests::history_tests::agent_history_samples_exact_pair_limit_reports_only_recent_complete_suffix ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_graph::descendants::history_integration::agent_history_callers_repeated_activation_replay_keeps_outputs_after_later_workflow_failure ... FAILED
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::callers::agent_history_level_lower_private_session_reuse_filters_hidden_pairs_without_raising_ceiling ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_graph::descendants::history_integration::agent_history_children_same_agent_private_branch_completes_without_parent_transcript ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_graph::descendants::history_integration::agent_history_level_child_branch_inherits_content_and_result_taints_parent ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::callers::agent_history_callers_copied_context_cannot_join_private_session_but_authenticated_reuse_can ... ok
+
+failures:
+
+---- adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_graph::descendants::history_integration::agent_history_callers_repeated_activation_replay_keeps_outputs_after_later_workflow_failure stdout ----
+
+thread 'adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_graph::descendants::history_integration::agent_history_callers_repeated_activation_replay_keeps_outputs_after_later_workflow_failure' (35941802) panicked at src/adapters/persistence/workflow/autonomous_agent_graph_tests.rs:62:40:
+called `Result::unwrap()` on an `Err` value: Validation(Diagnostic { code: "graph.invalid", message: "workflow contains a cycle involving start", field_path: "/steps/start", span: SourceSpan { start: 184, end: 185, line: 1, column: 185 }, instance_path: None, schema_path: None })
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_graph::descendants::history_integration::agent_history_callers_repeated_activation_replay_keeps_outputs_after_later_workflow_failure
+
+test result: FAILED. 10 passed; 1 failed; 0 ignored; 0 measured; 3338 filtered out; finished in 2.74s
+
+error: test failed, to rerun pass `--lib`

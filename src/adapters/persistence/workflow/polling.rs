@@ -131,6 +131,7 @@ pub(super) const CANDIDATES_SQL: &str = concat!(
                             WHERE event.company_id = wait.company_id AND event.run_id = wait.run_id
                               AND event.consumed_execution_id IS NULL
                               AND event.event_name = wait.event_name AND event.correlation = wait.correlation))
+                        OR (wait.reason='agent_turn' AND agent_history_turn_ready(wait.company_id,wait.agent_exchange_id))
                         -- A child_run wait wakes on its child's terminal fact (07-D1 §D1.4).
                         OR (wait.reason = 'child_run' AND EXISTS (SELECT 1 FROM workflow_runs AS child
                             WHERE child.company_id = wait.company_id AND child.id = wait.child_run_id

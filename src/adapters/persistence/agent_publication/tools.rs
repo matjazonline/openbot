@@ -225,7 +225,13 @@ async fn http_tool(
             "Selected HTTP connection is unavailable".into(),
         ));
     }
-    if current.bearer {
+    if matches!(
+        current.credential_source,
+        crate::domain::integrations::authority::CredentialSource::Integration(_)
+    ) {
+        return Err(unavailable());
+    }
+    if current.uses_owned_bearer() {
         credential_ready(tx, company, connection, CredentialOwner::Http).await?;
     }
     let (snapshot, approval_required): (serde_json::Value, bool) = sqlx::query_as(
@@ -274,6 +280,9 @@ async fn mcp_tool(
         return Err(AppError::BadRequest(
             "Selected MCP connection is unavailable".into(),
         ));
+    }
+    if matches!(current.auth, McpAuth::Integration(_)) {
+        return Err(unavailable());
     }
     if current.auth == McpAuth::Bearer {
         credential_ready(tx, company, connection, CredentialOwner::Mcp).await?;

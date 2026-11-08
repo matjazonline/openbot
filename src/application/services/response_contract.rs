@@ -9,6 +9,15 @@ use serde_json::Value;
 pub const MAX_RESPONSE_BYTES: usize = 65_536;
 pub const MAX_REPAIR_CALLS: usize = 2;
 
+/// Shared by request construction and conservative preparation budgeting.
+pub fn final_answer_preamble(mut text: String, contract: Option<&ResponseContract>) -> String {
+    if let Some(contract) = contract {
+        text.push_str("\nFinal answer: return exactly one JSON value conforming to this Draft 2020-12 schema. No prose or code fences. Apply this only to the final answer, after tools finish.\n");
+        text.push_str(&contract.schema().to_string());
+    }
+    text
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum InvalidResponse {

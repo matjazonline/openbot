@@ -1,0 +1,16 @@
+{
+  "digest": true,
+  "head": true,
+  "branch": true,
+  "scope": true,
+  "owned_archive": true,
+  "producer_archive": true,
+  "evidence": true,
+  "case_inventory": true,
+  "skill": true,
+  "coordination": true,
+  "owned_mismatch": [],
+  "external_mismatch": [],
+  "archive_content": true,
+  "checked_at": "2026-11-08T02:58:07.966525+00:00"
+}

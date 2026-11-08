@@ -1,0 +1,251 @@
+{
+  "distinct_named_tests": 226,
+  "test_evidence_errors": [],
+  "checks": {
+    "migrations-main-02": {
+      "exit_code": 0,
+      "command": [
+        "cargo",
+        "sqlx",
+        "migrate",
+        "run"
+      ],
+      "results": [
+        "Applied 20260817000000/migrate init schema (310.629583ms)"
+      ],
+      "log_sha256": "5fe804069d621a6a02fa697da9f7fdf2941764c0f5f499749cd8742ae65c42a4"
+    },
+    "migrations-test-02": {
+      "exit_code": 0,
+      "command": [
+        "env",
+        "DATABASE_URL=postgres://mac02@127.0.0.1:65037/openbot_chs_p07_test",
+        "cargo",
+        "sqlx",
+        "migrate",
+        "run"
+      ],
+      "results": [
+        "Applied 20260817000000/migrate init schema (296.87475ms)"
+      ],
+      "log_sha256": "02453bc8867fe3c0b1ddeb288aa05eb947637977119a7601557b30e43242b3d8"
+    },
+    "channel-family-runtime-01": {
+      "exit_code": 0,
+      "command": [
+        "scripts/test-network-isolation.sh",
+        "cargo",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "channel_reply_"
+      ],
+      "results": [
+        "test result: ok. 208 passed; 0 failed; 0 ignored; 0 measured; 3027 filtered out; finished in 62.81s"
+      ],
+      "log_sha256": "b59ad36fb7f46281074d6e010b57383f812f4fec68d75bf6a73e8d9c8fb3794b"
+    },
+    "e2e-runtime-final-03": {
+      "exit_code": 0,
+      "command": [
+        "scripts/test-network-isolation.sh",
+        "cargo",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "channel_reply_e2e_"
+      ],
+      "results": [
+        "test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 3226 filtered out; finished in 18.61s"
+      ],
+      "log_sha256": "da80cdde1a613057b498f9f8e29fad8d6840e41d14a66faa288ef38b20aeb7b9"
+    },
+    "reviewed-email-runtime-02": {
+      "exit_code": 0,
+      "command": [
+        "scripts/test-network-isolation.sh",
+        "cargo",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "workflow_cutover_reviewed_email_delivers_exact_accepted_artifact"
+      ],
+      "results": [
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3238 filtered out; finished in 9.22s"
+      ],
+      "log_sha256": "dc063e9cd11ce0e651d9f3ae67948519f9de510cace9b4d66eba960de3b36cbf"
+    },
+    "message-delivery-runtime-01": {
+      "exit_code": 0,
+      "command": [
+        "scripts/test-network-isolation.sh",
+        "cargo",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "workflow_message_delivery_"
+      ],
+      "results": [
+        "test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 3234 filtered out; finished in 2.49s"
+      ],
+      "log_sha256": "d95a4b00aedcd5e31212de4fcea93e1a68600bb21933a6c034129e49b119e946"
+    },
+    "source-modules-01": {
+      "exit_code": 0,
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "--offline",
+        "--test",
+        "source_modules"
+      ],
+      "results": [
+        "test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.39s"
+      ],
+      "log_sha256": "193b0df92c5e22fd0af463065ba3146812c63c13a61afe17024637ee18c4a5e3"
+    },
+    "sqlx-prepare-final-01": {
+      "exit_code": 0,
+      "command": [
+        "cargo",
+        "sqlx",
+        "prepare",
+        "--",
+        "--all-targets"
+      ],
+      "results": [],
+      "log_sha256": "a3806ec3a4050e9bcf2fae10c741e9f273a72edc37fd58bbc7fde56fc3308de0"
+    },
+    "sqlx-check-final-01": {
+      "exit_code": 0,
+      "command": [
+        "cargo",
+        "sqlx",
+        "prepare",
+        "--check",
+        "--",
+        "--all-targets"
+      ],
+      "results": [],
+      "log_sha256": "501252854cff4c24bacfeb47f84613665931fc748e169119cb298cec2b036017"
+    },
+    "clippy-final-01": {
+      "exit_code": 0,
+      "command": [
+        "cargo",
+        "clippy",
+        "--locked",
+        "--offline",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "results": [],
+      "log_sha256": "cf35d39222767c9bd7bb866b74bbe1070402df4611876794dae36478a23a7619"
+    },
+    "fmt-final-01": {
+      "exit_code": 0,
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "results": [],
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "diff-final-02": {
+      "exit_code": 0,
+      "command": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "results": [],
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "graph-final-02": {
+      "exit_code": 0,
+      "command": [
+        "graft",
+        "build"
+      ],
+      "results": [],
+      "log_sha256": "e0ef52352e7896fd2c7b561abd3ccd57115757bf2e256652544064edfeba8cc4"
+    },
+    "css-final-01": {
+      "exit_code": 0,
+      "command": [
+        "npm",
+        "run",
+        "check:css"
+      ],
+      "results": [],
+      "log_sha256": "9b75a1b1338990c1fdca4c73c3bdf1fcb03769fab37bf4ed3bc5cc9c40ddd676"
+    },
+    "browser-protocols-01": {
+      "exit_code": 0,
+      "command": [
+        "env",
+        "CHROME_PATH=/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+        "node",
+        "--test",
+        "scripts/tests/channel-response-authoring.mjs",
+        "scripts/tests/workflow-runs.mjs",
+        "scripts/tests/workflow-conversations.mjs"
+      ],
+      "results": [],
+      "log_sha256": "4f6079a81b2dedbec836941a93acf3eb23eb8ec3e3a3eb4b15b485437d21a96f"
+    },
+    "sample-boundary-fixtures-01": {
+      "exit_code": 0,
+      "command": [
+        "python3",
+        "scripts/tests/workflow-sample-boundary.py"
+      ],
+      "results": [
+        "Ran 4 tests in 0.031s"
+      ],
+      "log_sha256": "44825f24cdbd1bcc73113cc0e880161c602c66296af8171cc29ead1360391377"
+    },
+    "sample-boundary-final-01": {
+      "exit_code": 0,
+      "command": [
+        "python3",
+        "scripts/workflow-sample-boundary.py"
+      ],
+      "results": [],
+      "log_sha256": "228c0f0f23407594379b257a3e3684550f2f3eb1741d27acbc9be312e22e6d2d"
+    },
+    "query-statistics-01": {
+      "exit_code": 0,
+      "command": [
+        "python3",
+        "plan/03-channel-handles-send/phases/p07/docs/logs/query-statistics.py"
+      ],
+      "results": [],
+      "log_sha256": "2075a8f029f9b8f01063596388ce842cd4ef662cb630e7ac8fa1d01b44d5c2b9"
+    },
+    "evidence-validator-fixtures-01": {
+      "exit_code": 0,
+      "command": [
+        "env",
+        "PYTHONDONTWRITEBYTECODE=1",
+        "python3",
+        "scripts/tests/workflow-evidence.py"
+      ],
+      "results": [
+        "Ran 12 tests in 1.236s"
+      ],
+      "log_sha256": "21df236fe88182d2805b8b03b0c82c4253d18f50c583baa5bd8b77b73d674067"
+    }
+  },
+  "archive_file_mismatches": []
+}

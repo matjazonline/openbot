@@ -94,6 +94,7 @@ impl AdmissionFixture {
     }
     fn request(&self, key: &str, trigger: TriggerRef) -> AdmitWorkflowRequest {
         AdmitWorkflowRequest {
+            history_session: None,
             company_id: self.binding.target.company,
             actor: self.binding.target.actor,
             association: RelatedAssociation::Company,
@@ -457,3 +458,6 @@ async fn workflow_run_triggers_notify_a_threadless_run_on_insert_and_state_chang
 
 #[path = "knowledge_admission_tests.rs"]
 mod knowledge_admission_tests;
+
+#[path = "agent_history_session_tests.rs"]
+mod agent_history_sessions;

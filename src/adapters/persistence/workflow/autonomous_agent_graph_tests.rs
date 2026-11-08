@@ -188,7 +188,17 @@ async fn autonomous_agent_admission_cycle_refuses_atomically_but_model_only_is_a
         .await
         .unwrap();
     assert_eq!(before, after);
-    let old = p.prepare_agent(&setup.claim).await.unwrap();
+    let old = p
+        .prepare_agent(
+            &setup.claim,
+            crate::application::workflow::lease::LeasePolicy::new(std::time::Duration::from_secs(
+                60,
+            ))
+            .unwrap(),
+        )
+        .await
+        .unwrap()
+        .expect_ready();
     assert_eq!(
         old.prepared.tools().len(),
         1,
@@ -264,7 +274,17 @@ async fn assert_model_only_leaf(setup: &AgentSetup) {
         .await
         .unwrap()
         .unwrap();
-    let launch = p.prepare_agent(&claim).await.unwrap();
+    let launch = p
+        .prepare_agent(
+            &claim,
+            crate::application::workflow::lease::LeasePolicy::new(std::time::Duration::from_secs(
+                60,
+            ))
+            .unwrap(),
+        )
+        .await
+        .unwrap()
+        .expect_ready();
     assert!(launch.prepared.tools().is_empty());
     assert!(launch.prepared.selection().skills().is_empty());
     assert_eq!(

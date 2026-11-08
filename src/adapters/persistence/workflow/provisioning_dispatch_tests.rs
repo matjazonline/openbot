@@ -129,6 +129,7 @@ async fn call(
         },
         arguments,
         context: ActionPolicyContext {
+            integration: None,
             origin: crate::application::agent::ToolCallOrigin::Workflow,
             actor: owner(f).user_id(),
             capability_ceiling: vec![contract.policy.capability.clone()],
@@ -903,3 +904,6 @@ mod knowledge_provisioning_tests;
 
 #[path = "autonomous_agent_provisioning_atomic_tests.rs"]
 mod autonomous_provisioning;
+
+#[path = "channel_reply_native_tests.rs"]
+mod channel_reply_native_tests;

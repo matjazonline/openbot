@@ -1,0 +1,52 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+   Compiling open_bots v0.1.0 (/private/tmp/openbot-agent-history-h_82_5pw/worktree)
+warning: unused import: `WorkflowFailure`
+ --> src/adapters/persistence/workflow/agent_history_turn_guard_tests.rs:5:32
+  |
+5 |     lease::{LeaseReleaseCause, WorkflowFailure},
+  |                                ^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: `open_bots` (lib test) generated 1 warning (run `cargo fix --lib -p open_bots --tests` to apply 1 suggestion)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 47.77s
+     Running unittests src/lib.rs (/private/tmp/openbot-chs-p06-3f43t2k7/worktree/target/debug/deps/open_bots-8b80d02f0b6cf2e6)
+
+running 7 tests
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::guards::agent_history_recovery_queued_deadline_vs_resume_settles_once_without_releasing_another_owner ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::guards::agent_history_recovery_revoked_wait_head_reaches_normal_terminal_owner_and_frees_successor ... FAILED
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::guards::agent_history_ordering_native_guards_refuse_pointer_theft_nonowner_activation_and_wait_retag ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::guards::agent_history_recovery_company_teardown_removes_turn_and_parked_companion_proofs ... FAILED
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::guards::agent_history_recovery_replacement_before_checkpoint_keeps_turn_and_fences_old_preparation ... FAILED
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::guards::agent_history_recovery_invalid_model_settlement_releases_without_accepting_an_answer ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::guards::agent_history_ordering_native_pointer_cannot_reference_another_tenants_exchange ... ok
+
+failures:
+
+---- adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::guards::agent_history_recovery_revoked_wait_head_reaches_normal_terminal_owner_and_frees_successor stdout ----
+
+thread 'adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::guards::agent_history_recovery_revoked_wait_head_reaches_normal_terminal_owner_and_frees_successor' (35709301) panicked at src/adapters/persistence/workflow/agent_history_turn_guard_tests.rs:190:5:
+assertion `left == right` failed
+  left: Retryable
+ right: Terminal
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::guards::agent_history_recovery_company_teardown_removes_turn_and_parked_companion_proofs stdout ----
+
+thread 'adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::guards::agent_history_recovery_company_teardown_removes_turn_and_parked_companion_proofs' (35709297) panicked at src/adapters/persistence/workflow/agent_history_turn_guard_tests.rs:308:10:
+called `Result::unwrap()` on an `Err` value: Database(PgDatabaseError { severity: Error, code: "23503", message: "update or delete on table \"agent_history_exchanges\" violates foreign key constraint \"workflow_waits_company_id_run_id_execution_id_agent_exchan_fkey\" on table \"workflow_waits\"", detail: Some("Key (company_id, run_id, execution_id, id)=(81b3b906-0c63-414b-86f6-13ceedce2fcc, 1d88f271-ab6a-4bb5-bb45-88d675d6b598, 4928f0b4-e59f-4884-8f50-6b1b01781d05, 4928f0b4-e59f-4884-8f50-6b1b01781d05) is still referenced from table \"workflow_waits\"."), hint: None, position: None, where: None, schema: Some("public"), table: Some("workflow_waits"), column: None, data_type: None, constraint: Some("workflow_waits_company_id_run_id_execution_id_agent_exchan_fkey"), file: Some("ri_triggers.c"), line: Some(2811), routine: Some("ri_ReportViolation") })
+
+---- adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::guards::agent_history_recovery_replacement_before_checkpoint_keeps_turn_and_fences_old_preparation stdout ----
+
+thread 'adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::guards::agent_history_recovery_replacement_before_checkpoint_keeps_turn_and_fences_old_preparation' (35709300) panicked at src/adapters/persistence/workflow/agent_history_turn_guard_tests.rs:115:5:
+assertion failed: f.s.p().open_workflow_checkpoint(old.fence, &spec, policy()).await.is_err()
+
+
+failures:
+    adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::guards::agent_history_recovery_company_teardown_removes_turn_and_parked_companion_proofs
+    adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::guards::agent_history_recovery_replacement_before_checkpoint_keeps_turn_and_fences_old_preparation
+    adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::guards::agent_history_recovery_revoked_wait_head_reaches_normal_terminal_owner_and_frees_successor
+
+test result: FAILED. 4 passed; 3 failed; 0 ignored; 0 measured; 3306 filtered out; finished in 3.64s
+
+error: test failed, to rerun pass `--lib`

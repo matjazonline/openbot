@@ -33,14 +33,13 @@ pub(super) async fn child_checkpoint(f: &TokenFixture) -> WorkflowCheckpointWrit
         .await
         .unwrap()
         .unwrap();
-    let mut identity = f.model.run.identity.clone();
-    identity.task_id = scope.job.0;
-    let spec = WorkflowCheckpointSpec {
-        identity,
-        initial_prompt: "untrusted child context".into(),
-        policy: f.model.run.policy,
-        prepared: f.model.native.row["workflow_prepared"].clone(),
-    };
+    let prepared =
+        crate::application::workflow::agent::AgentPreparation::prepare_agent(p, &claim, policy)
+            .await
+            .unwrap()
+            .expect_ready()
+            .prepared;
+    let spec = prepared.spec(claim.fence).unwrap();
     let WriteOutcome::Applied(run) = p
         .open_workflow_checkpoint(claim.fence, &spec, policy)
         .await

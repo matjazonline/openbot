@@ -1,0 +1,20 @@
+{
+  "at": "2026-11-08T04:08:59.364748+00:00",
+  "root": "/root",
+  "review": "AH-PUBLISH-B1-R1",
+  "result": "ACCEPTED",
+  "source_digest": "b1f1194ed9a2672c731a7ee4c9a20861c9a386aa77bb39193afb1e925ea99d9a",
+  "history_parent": "48461f665c827addd176a6e4cad436406ea4a0cb",
+  "vault_parent": "0d32a33d385796b493313aba8455c110402e8e2a",
+  "owned_index_and_worktree_hashes": 863,
+  "archive_members_verified": 863,
+  "primary_inputs_preserved": 77,
+  "coordination_revision": 36,
+  "vault_coordination_revision": 14,
+  "targeted_passed": 198,
+  "ignored": 0,
+  "root_snapshot_exact": true,
+  "evidence_validator_exit": 0,
+  "limitations": "Targeted checks only; inherited Vault scanner and overflow limitations retained; no full-suite, hosted CI or live-provider claim.",
+  "next": "Commit exact reviewed merge; nonforce push; verify remote; fast-forward primary with preserved unrelated edits."
+}

@@ -1,0 +1,25 @@
+    Checking open_bots v0.1.0 (/private/tmp/openbot-agent-history-h_82_5pw/worktree)
+error[E0425]: cannot find value `details` in this scope
+   --> src/adapters/http/routes/workflows/bindings.rs:127:33
+    |
+127 |         let association = match details.association {
+    |                                 ^^^^^^^ not found in this scope
+
+error[E0425]: cannot find value `association` in this scope
+   --> src/adapters/http/routes/workflows/bindings.rs:409:29
+    |
+409 |     let association = match association {
+    |                             ^^^^^^^^^^^ not found in this scope
+
+For more information about this error, try `rustc --explain E0425`.
+error: could not compile `open_bots` (lib) due to 2 previous errors
+warning: build failed, waiting for other jobs to finish...
+error[E0063]: missing field `history_session` in initializer of `application::workflow::contracts::AdmitWorkflowRequest`
+   --> src/application/workflow/tests.rs:119:5
+    |
+119 |     AdmitWorkflowRequest {
+    |     ^^^^^^^^^^^^^^^^^^^^ missing `history_session`
+
+Some errors have detailed explanations: E0063, E0425.
+For more information about an error, try `rustc --explain E0063`.
+error: could not compile `open_bots` (lib test) due to 3 previous errors

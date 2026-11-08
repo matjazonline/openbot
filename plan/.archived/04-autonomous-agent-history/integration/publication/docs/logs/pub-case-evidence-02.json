@@ -1,0 +1,20 @@
+{
+  "command": [
+    "python3",
+    "plan/04-autonomous-agent-history/integration/publication/docs/logs/verify-cases.py"
+  ],
+  "cwd": "/private/var/folders/qc/f8s9x42x5sz6vbh79sb0cfth0000gn/T/openbot-history-publication-pc5qkluy/worktree",
+  "environment": {
+    "DATABASE_URL": "postgres://mac02@127.0.0.1:65037/openbot_ah_publish_pc5qkluy",
+    "TEST_DATABASE_URL": "postgres://mac02@127.0.0.1:65037/openbot_ah_publish_pc5qkluy_test",
+    "SQLX_OFFLINE": "true",
+    "CARGO_INCREMENTAL": "1",
+    "CARGO_TARGET_DIR": "/private/tmp/openbot-chs-p06-3f43t2k7/worktree/target",
+    "CARGO_BUILD_JOBS": "4",
+    "RUST_MIN_STACK": "2097152"
+  },
+  "started": "2026-11-08T03:56:46.534674+00:00",
+  "seconds": 0.025,
+  "exit_code": 0,
+  "log": "/private/var/folders/qc/f8s9x42x5sz6vbh79sb0cfth0000gn/T/openbot-history-publication-pc5qkluy/worktree/plan/04-autonomous-agent-history/integration/publication/docs/logs/pub-case-evidence-02.txt"
+}

@@ -1,0 +1,46 @@
+    Checking open_bots v0.1.0 (/private/tmp/openbot-agent-history-h_82_5pw/worktree)
+error: this `if` statement can be collapsed
+  --> src/adapters/persistence/workflow/agent_history_views/mod.rs:65:5
+   |
+65 | /     if let Some(cursor) = &request.after {
+66 | |         if cursor.parts()?.0.as_uuid() != anchor.conversation_id {
+67 | |             return Err(AppError::NotFound("Agent history cursor".into()));
+68 | |         }
+69 | |     }
+   | |_____^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#collapsible_if
+   = note: `-D clippy::collapsible-if` implied by `-D warnings`
+   = help: to override `-D warnings` add `#[allow(clippy::collapsible_if)]`
+help: collapse nested if block
+   |
+65 ~     if let Some(cursor) = &request.after
+66 ~         && cursor.parts()?.0.as_uuid() != anchor.conversation_id {
+67 |             return Err(AppError::NotFound("Agent history cursor".into()));
+68 ~         }
+   |
+
+error: this `if` statement can be collapsed
+   --> src/adapters/persistence/workflow/agent_history_views/mod.rs:210:5
+    |
+210 | /     if let Some(payload) = &mut detail.payload {
+211 | |         if let Some(frozen) = &payload.frozen {
+212 | |             payload.selected_sources =
+213 | |                 selected_sources(&mut tx, scope, &current, &frozen.history).await?;
+214 | |         }
+215 | |     }
+    | |_____^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#collapsible_if
+help: collapse nested if block
+    |
+210 ~     if let Some(payload) = &mut detail.payload
+211 ~         && let Some(frozen) = &payload.frozen {
+212 |             payload.selected_sources =
+213 |                 selected_sources(&mut tx, scope, &current, &frozen.history).await?;
+214 ~         }
+    |
+
+error: could not compile `open_bots` (lib) due to 2 previous errors
+warning: build failed, waiting for other jobs to finish...
+error: could not compile `open_bots` (lib test) due to 2 previous errors

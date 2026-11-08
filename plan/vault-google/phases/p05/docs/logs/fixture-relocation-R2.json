@@ -1,0 +1,9 @@
+{
+  "reason": "VG-P05-VF1: deliberate hostile HTML escaping fixture must follow existing test-only tests.rs module convention; source scanner and runtime assertions unchanged",
+  "old_path": "src/adapters/http/routes/vault_management_tests.rs",
+  "new_path": "src/adapters/http/routes/ui_vault/tests.rs",
+  "old_sha256": "2c1e74b32da10c85b5d86c184c0077e8c1c57d25742a53ba6aa1cbd8b089792e",
+  "new_sha256": "2c1e74b32da10c85b5d86c184c0077e8c1c57d25742a53ba6aa1cbd8b089792e",
+  "namespace": "adapters::http::routes::ui_vault::tests unchanged",
+  "module_change": "remove only old explicit path attribute; keep cfg(test) mod tests"
+}

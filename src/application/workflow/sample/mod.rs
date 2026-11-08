@@ -22,6 +22,8 @@ pub use definitions::{
     PreparedSample, SampleAgentSelection, SampleConfigurationHash, SampleWorkflowSelection,
 };
 mod dispatch;
+mod history;
+mod responses;
 mod tools;
 mod types;
 pub use types::*;
@@ -32,6 +34,9 @@ struct ScriptKey {
     step: StepId,
 }
 struct Session {
+    history: self::history::SampleHistoryStore,
+    response_contract: Option<super::channel_reply::ChannelReplyContract>,
+    response_approval_policy: Option<super::channel_reply::ReplyApprovalPolicy>,
     agents: BTreeMap<
         crate::entities::agent_capability::AgentId,
         crate::application::agent::ResolvedAgentDefinition,
@@ -93,6 +98,9 @@ pub fn execute(sample: PreparedSample) -> AppResult<SampleReport> {
     } = sample;
     let scripts = script_queues(request.scripts)?;
     let mut session = Session {
+        history: self::history::SampleHistoryStore::default(),
+        response_contract: request.response_contract,
+        response_approval_policy: request.response_approval_policy,
         agents,
         workflows,
         scripts,
@@ -105,6 +113,7 @@ pub fn execute(sample: PreparedSample) -> AppResult<SampleReport> {
             .clone(),
         report_bytes: 1024,
         report: SampleReport {
+            response: None,
             content_hash: bundle.content_hash().clone(),
             configuration_hash,
             agent_selections,
@@ -206,6 +215,7 @@ impl Session {
                 choice: prepared.choice,
             };
             let path = frame.path.child(format!("{}:{ordinal}", step.as_str()));
+            let history = self.history.prepare(&bundle, &frame, &activation)?;
             let completion = self
                 .step(&bundle, &frame, &activation, &path)
                 .map_err(|error| {
@@ -215,6 +225,7 @@ impl Session {
                         definition.steps[&step].step_type
                     ))
                 })?;
+            let history = self.history.complete(history, &completion.output)?;
             let trace = SampleStep {
                 path,
                 workflow_id: definition.workflow_id,
@@ -222,6 +233,7 @@ impl Session {
                 kind: definition.steps[&step].step_type.clone(),
                 inputs: activation.inputs,
                 output: completion.output.clone(),
+                history,
             };
             self.charge_report(&trace)?;
             self.report.steps.push(trace);
@@ -229,7 +241,12 @@ impl Session {
                 .outputs
                 .insert(step.clone(), completion.output.clone());
             match completion.target {
-                TransitionTarget::End => return Ok(completion.output),
+                TransitionTarget::End => {
+                    if frame.depth == 0 {
+                        self.completed_response(&bundle, &completion)?;
+                    }
+                    return Ok(completion.output);
+                }
                 TransitionTarget::Step(next) => step = next,
             }
         }

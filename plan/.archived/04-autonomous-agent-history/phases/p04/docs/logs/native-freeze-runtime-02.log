@@ -1,0 +1,52 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+   Compiling open_bots v0.1.0 (/private/tmp/openbot-agent-history-h_82_5pw/worktree)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 48.52s
+     Running unittests src/lib.rs (/private/tmp/openbot-chs-p06-3f43t2k7/worktree/target/debug/deps/open_bots-8b80d02f0b6cf2e6)
+
+running 4 tests
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::native::agent_history_preparation_failed_commit_rolls_back_snapshot_selection_taint_and_order ... FAILED
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::native::agent_history_preparation_seed_mismatch_refuses_checkpoint_and_pruned_sources_replay_exactly ... FAILED
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::native::agent_history_level_selection_raises_once_for_competing_preparations_and_replay ... FAILED
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::native::agent_history_preparation_native_first_freeze_attests_sources_content_order_and_level ... FAILED
+
+failures:
+
+---- adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::native::agent_history_preparation_failed_commit_rolls_back_snapshot_selection_taint_and_order stdout ----
+
+thread 'adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::native::agent_history_preparation_failed_commit_rolls_back_snapshot_selection_taint_and_order' (35819404) panicked at src/adapters/persistence/workflow/agent_history_freeze_guard_tests.rs:63:9:
+assertion `left == right` failed: template must use this actual run's manifest
+  left: c56fcf99-3d0e-4a4c-a8b8-3068eef4d9cb
+ right: bf841366-7ca6-42d4-9f52-1bb70209f783
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::native::agent_history_preparation_seed_mismatch_refuses_checkpoint_and_pruned_sources_replay_exactly stdout ----
+
+thread 'adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::native::agent_history_preparation_seed_mismatch_refuses_checkpoint_and_pruned_sources_replay_exactly' (35819406) panicked at src/adapters/persistence/workflow/agent_history_freeze_guard_tests.rs:63:9:
+assertion `left == right` failed: template must use this actual run's manifest
+  left: 68c3cd22-222e-4276-99d6-7a9de1a30da6
+ right: 0cdda77b-456b-4ed2-88ed-eac4a79c0619
+
+---- adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::native::agent_history_level_selection_raises_once_for_competing_preparations_and_replay stdout ----
+
+thread 'adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::native::agent_history_level_selection_raises_once_for_competing_preparations_and_replay' (35819403) panicked at src/adapters/persistence/workflow/agent_history_freeze_guard_tests.rs:63:9:
+assertion `left == right` failed: template must use this actual run's manifest
+  left: 4a1b9ef6-541f-4e82-843c-b1471710268c
+ right: 2aa477d5-f06e-4ce6-9fce-780000877c2b
+
+---- adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::native::agent_history_preparation_native_first_freeze_attests_sources_content_order_and_level stdout ----
+
+thread 'adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::native::agent_history_preparation_native_first_freeze_attests_sources_content_order_and_level' (35819405) panicked at src/adapters/persistence/workflow/agent_history_freeze_guard_tests.rs:63:9:
+assertion `left == right` failed: template must use this actual run's manifest
+  left: 7ceb2725-524c-407c-8a23-1f21c7b9a6ac
+ right: c774dbf0-7ac4-49e9-ade5-5d6239312bf1
+
+
+failures:
+    adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::native::agent_history_level_selection_raises_once_for_competing_preparations_and_replay
+    adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::native::agent_history_preparation_failed_commit_rolls_back_snapshot_selection_taint_and_order
+    adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::native::agent_history_preparation_native_first_freeze_attests_sources_content_order_and_level
+    adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::native::agent_history_preparation_seed_mismatch_refuses_checkpoint_and_pruned_sources_replay_exactly
+
+test result: FAILED. 0 passed; 4 failed; 0 ignored; 0 measured; 3324 filtered out; finished in 2.56s
+
+error: test failed, to rerun pass `--lib`

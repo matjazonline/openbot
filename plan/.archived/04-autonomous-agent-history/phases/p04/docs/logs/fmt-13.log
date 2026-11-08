@@ -1,0 +1,35 @@
+error: expected identifier, found keyword `pub`
+  --> /private/tmp/openbot-agent-history-h_82_5pw/worktree/src/adapters/persistence/workflow/agent_history_freeze_fixture.rs:77:5
+   |
+77 |     pub(super) f: &HistoryThread,
+   |     ^^^ expected identifier, found keyword
+   |
+help: escape `pub` to use it as an identifier
+   |
+77 |     r#pub(super) f: &HistoryThread,
+   |     ++
+
+error: expected one of `:` or `|`, found `f`
+  --> /private/tmp/openbot-agent-history-h_82_5pw/worktree/src/adapters/persistence/workflow/agent_history_freeze_fixture.rs:77:16
+   |
+77 |     pub(super) f: &HistoryThread,
+   |                ^ expected one of `:` or `|`
+
+error: expected identifier, found keyword `pub`
+  --> /private/tmp/openbot-agent-history-h_82_5pw/worktree/src/adapters/persistence/workflow/agent_history_freeze_fixture.rs:78:5
+   |
+78 |     pub(super) claim: &ClaimedWorkflow,
+   |     ^^^ expected identifier, found keyword
+   |
+help: escape `pub` to use it as an identifier
+   |
+78 |     r#pub(super) claim: &ClaimedWorkflow,
+   |     ++
+
+error: expected one of `:` or `|`, found `claim`
+  --> /private/tmp/openbot-agent-history-h_82_5pw/worktree/src/adapters/persistence/workflow/agent_history_freeze_fixture.rs:78:16
+   |
+78 |     pub(super) claim: &ClaimedWorkflow,
+   |                ^^^^^ expected one of `:` or `|`
+
+Error writing files: failed to resolve mod `fixture`: cannot parse /private/tmp/openbot-agent-history-h_82_5pw/worktree/src/adapters/persistence/workflow/agent_history_freeze_fixture.rs

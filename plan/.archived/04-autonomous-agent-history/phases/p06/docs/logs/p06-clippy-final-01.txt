@@ -1,0 +1,2 @@
+    Checking open_bots v0.1.0 (/private/tmp/openbot-agent-history-h_82_5pw/worktree)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 31.39s

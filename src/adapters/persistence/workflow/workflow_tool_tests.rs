@@ -541,3 +541,6 @@ async fn knowledge_run_level_workflow_tool_child_and_saved_result_replay_taint_p
     assert_eq!(call_parked(p, scope).await.children, 1);
     assert_eq!(llm.finish().await.unwrap(), 2);
 }
+
+#[path = "agent_history_cascade_tests.rs"]
+mod history_cascade;

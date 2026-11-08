@@ -160,9 +160,16 @@ async fn autonomous_agent_children_first_tool_child_keeps_root_selected_agent_an
     };
     let claim = claim_run(&setup, run).await;
     let root_manifest = p
-        .prepare_agent(&claim)
+        .prepare_agent(
+            &claim,
+            crate::application::workflow::lease::LeasePolicy::new(std::time::Duration::from_secs(
+                60,
+            ))
+            .unwrap(),
+        )
         .await
         .unwrap()
+        .expect_ready()
         .prepared
         .selection()
         .manifest_id();
@@ -220,7 +227,17 @@ async fn assert_child_selection(
     root_manifest: DependencyManifestId,
 ) {
     let p = &setup.fixture.persistence;
-    let selected = p.prepare_agent(claim).await.unwrap();
+    let selected = p
+        .prepare_agent(
+            claim,
+            crate::application::workflow::lease::LeasePolicy::new(std::time::Duration::from_secs(
+                60,
+            ))
+            .unwrap(),
+        )
+        .await
+        .unwrap()
+        .expect_ready();
     assert_eq!(selected.prepared.selection().manifest_id(), root_manifest);
     assert_eq!(
         selected.prepared.selection().revision().id,
@@ -259,7 +276,17 @@ async fn finish_and_resume(
     ));
     let leaf = actual_child(setup, claim.fence.scope.run).await;
     let leaf_claim = claim_run(setup, leaf).await;
-    let leaf_prepared = p.prepare_agent(&leaf_claim).await.unwrap();
+    let leaf_prepared = p
+        .prepare_agent(
+            &leaf_claim,
+            crate::application::workflow::lease::LeasePolicy::new(std::time::Duration::from_secs(
+                60,
+            ))
+            .unwrap(),
+        )
+        .await
+        .unwrap()
+        .expect_ready();
     let root_manifest: Uuid = sqlx::query_scalar(
         "SELECT manifest_id FROM run_dependency_manifests WHERE company_id=$1 AND run_id=$2",
     )

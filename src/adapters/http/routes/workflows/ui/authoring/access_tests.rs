@@ -289,6 +289,7 @@ async fn every_workspace_write_refuses_a_cross_origin_cookie_post() {
         let path = pattern
             .replace("{workflow_id}", &Uuid::new_v4().to_string())
             .replace("{company_id}", &Uuid::new_v4().to_string())
+            .replace("{channel_id}", &Uuid::new_v4().to_string())
             .replace("{id}", &Uuid::new_v4().to_string())
             .replace("{binding_id}", &Uuid::new_v4().to_string())
             .replace("{agent_id}", &Uuid::new_v4().to_string())

@@ -1,0 +1,93 @@
+{
+  "knowledge-human-resume-runtime-02.log": {
+    "failed": [
+      "adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::history_resume::agent_history_level_later_real_knowledge_then_human_wait_allows_unchanged_audience",
+      "adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::history_resume::agent_history_level_later_real_knowledge_then_human_wait_refuses_downgraded_resume_before_provider"
+    ],
+    "current_missing": []
+  },
+  "knowledge-human-resume-runtime-01.log": {
+    "failed": [
+      "adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::history_resume::agent_history_level_later_real_knowledge_then_human_wait_refuses_downgraded_resume_before_provider",
+      "adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::history_resume::agent_history_level_later_real_knowledge_then_human_wait_allows_unchanged_audience"
+    ],
+    "current_missing": []
+  },
+  "selection-basic-runtime-01.log": {
+    "failed": [
+      "adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::agent_history_selection_second_real_call_sees_complete_pair_and_current_input_last",
+      "adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::agent_history_ordering_competing_preparations_park_without_checkpoint_or_retry_and_resume_once"
+    ],
+    "current_missing": []
+  },
+  "model-only-budget-plan-runtime-01.log": {
+    "failed": [
+      "adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::agent_history_selection_pair_limit_keeps_recent_complete_suffix_and_exact_omissions"
+    ],
+    "current_missing": []
+  },
+  "final-focused-runtime-01.log": {
+    "failed": [
+      "adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::workflow_harness_model_owner_new_claim_releases_slot_without_refunding",
+      "adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::store_tests::workflow_harness_owner_store_competing_open_and_execution_replay",
+      "adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::store_tests::workflow_harness_owner_store_deferred_failure_rolls_back_open_and_debit",
+      "adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::store_tests::workflow_harness_owner_store_fence_and_actor_revocation",
+      "adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::store_tests::workflow_harness_owner_store_new_claim_retains_checkpoint_and_debits_execution"
+    ],
+    "current_missing": []
+  },
+  "selection-protocol-runtime-01.log": {
+    "failed": [
+      "adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::agent_history_selection_second_real_call_sees_complete_pair_and_current_input_last"
+    ],
+    "current_missing": []
+  },
+  "native-freeze-runtime-01.log": {
+    "failed": [
+      "adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::native::agent_history_preparation_seed_mismatch_refuses_checkpoint_and_pruned_sources_replay_exactly",
+      "adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::native::agent_history_level_selection_raises_once_for_competing_preparations_and_replay",
+      "adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::native::agent_history_preparation_failed_commit_rolls_back_snapshot_selection_taint_and_order",
+      "adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::native::agent_history_preparation_native_first_freeze_attests_sources_content_order_and_level"
+    ],
+    "current_missing": []
+  },
+  "private-anchor-audience-runtime-01.log": {
+    "failed": [
+      "adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::agent_history_level_private_thread_anchor_checks_current_acting_member_on_resume"
+    ],
+    "current_missing": []
+  },
+  "native-freeze-runtime-02.log": {
+    "failed": [
+      "adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::native::agent_history_preparation_failed_commit_rolls_back_snapshot_selection_taint_and_order",
+      "adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::native::agent_history_preparation_seed_mismatch_refuses_checkpoint_and_pruned_sources_replay_exactly",
+      "adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::native::agent_history_level_selection_raises_once_for_competing_preparations_and_replay",
+      "adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::native::agent_history_preparation_native_first_freeze_attests_sources_content_order_and_level"
+    ],
+    "current_missing": []
+  },
+  "selection-plan-bounds-runtime-02.log": {
+    "failed": [
+      "adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::native::agent_history_level_hidden_rows_are_filtered_before_candidate_limit_and_omission_count"
+    ],
+    "current_missing": []
+  },
+  "private-anchor-audience-runtime-02.log": {
+    "failed": [
+      "adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::agent_history_level_private_thread_anchor_checks_current_acting_member_on_resume"
+    ],
+    "current_missing": []
+  },
+  "knowledge-private-runtime-01.log": {
+    "failed": [
+      "adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::agent_history_preparation_mandatory_current_budget_refusal_has_no_provider_snapshot_or_order"
+    ],
+    "current_missing": []
+  },
+  "history-protocol-runtime-01.log": {
+    "failed": [
+      "adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::agent_history_selection_second_real_call_sees_complete_pair_and_current_input_last"
+    ],
+    "current_missing": []
+  }
+}

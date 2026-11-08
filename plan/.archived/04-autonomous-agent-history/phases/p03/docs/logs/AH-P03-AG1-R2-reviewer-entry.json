@@ -1,0 +1,13 @@
+{
+  "at": "2026-11-07T15:32:11.720491+00:00",
+  "HEAD": "4ab45555f8316ec7a8b1b64e8c05b77ff7d9a29d",
+  "branch": "codex/autonomous-agent-history-h_82_5pw",
+  "digest_matches": true,
+  "decision_matches": true,
+  "authority_matches": true,
+  "pin_matches": true,
+  "local_matches": true,
+  "archive_matches": true,
+  "decision_delta_matches": true,
+  "source_hash_errors": []
+}

@@ -1,0 +1,331 @@
+{
+  "at": "2026-11-07T10:23:42.369678+00:00",
+  "read_only": true,
+  "owned_path_checks": [
+    {
+      "path": ".github/workflows/ci.yml",
+      "classification": "shared clean merge, verify external hunk preservation"
+    },
+    {
+      "path": "docs/workflow-operations.md",
+      "classification": "unchanged primary base"
+    },
+    {
+      "path": "docs/workflow-verification.md",
+      "classification": "unchanged primary base"
+    },
+    {
+      "path": "migrations/20260817000000_init_schema.sql",
+      "classification": "known initial owned export"
+    },
+    {
+      "path": "scripts/check.sh",
+      "classification": "shared clean merge, verify external hunk preservation"
+    },
+    {
+      "path": "scripts/tests/channel-response-authoring.mjs",
+      "classification": "new path, absent in primary"
+    },
+    {
+      "path": "scripts/workflow-sample-boundary.py",
+      "classification": "unchanged primary base"
+    },
+    {
+      "path": "src/adapters/http/pages/tests.rs",
+      "classification": "known initial owned export"
+    },
+    {
+      "path": "src/adapters/http/pages/thread_activity.rs",
+      "classification": "known initial owned export"
+    },
+    {
+      "path": "src/adapters/http/pages/workflow_authoring/bindings.rs",
+      "classification": "known initial owned export"
+    },
+    {
+      "path": "src/adapters/http/pages/workflow_authoring/catalogue.rs",
+      "classification": "unchanged primary base"
+    },
+    {
+      "path": "src/adapters/http/pages/workflow_authoring/channel_response.rs",
+      "classification": "known initial owned export"
+    },
+    {
+      "path": "src/adapters/http/pages/workflow_authoring/graph.rs",
+      "classification": "unchanged primary base"
+    },
+    {
+      "path": "src/adapters/http/pages/workflow_authoring/mod.rs",
+      "classification": "known initial owned export"
+    },
+    {
+      "path": "src/adapters/http/pages/workflow_authoring/sample.rs",
+      "classification": "unchanged primary base"
+    },
+    {
+      "path": "src/adapters/http/pages/workflow_conversation_tests.rs",
+      "classification": "known initial owned export"
+    },
+    {
+      "path": "src/adapters/http/pages/workflow_runs/detail.rs",
+      "classification": "known initial owned export"
+    },
+    {
+      "path": "src/adapters/http/pages/workflow_runs/mod.rs",
+      "classification": "known initial owned export"
+    },
+    {
+      "path": "src/adapters/http/pages/workflow_runs/responses.rs",
+      "classification": "known initial owned export"
+    },
+    {
+      "path": "src/adapters/http/routes/ui_conversation_stream_tests.rs",
+      "classification": "known initial owned export"
+    },
+    {
+      "path": "src/adapters/http/routes/ui_stream_tests.rs",
+      "classification": "known initial owned export"
+    },
+    {
+      "path": "src/adapters/http/routes/workflows/channel_replies.rs",
+      "classification": "known initial owned export"
+    },
+    {
+      "path": "src/adapters/http/routes/workflows/mod.rs",
+      "classification": "known initial owned export"
+    },
+    {
+      "path": "src/adapters/http/routes/workflows/ui/authoring/access_tests.rs",
+      "classification": "unchanged primary base"
+    },
+    {
+      "path": "src/adapters/http/routes/workflows/ui/authoring/bindings.rs",
+      "classification": "known initial owned export"
+    },
+    {
+      "path": "src/adapters/http/routes/workflows/ui/authoring/bindings_tests.rs",
+      "classification": "known initial owned export"
+    },
+    {
+      "path": "src/adapters/http/routes/workflows/ui/authoring/channel_response.rs",
+      "classification": "known initial owned export"
+    },
+    {
+      "path": "src/adapters/http/routes/workflows/ui/authoring/channel_response_tests.rs",
+      "classification": "new path, absent in primary"
+    },
+    {
+      "path": "src/adapters/http/routes/workflows/ui/authoring/mod.rs",
+      "classification": "known initial owned export"
+    },
+    {
+      "path": "src/adapters/http/routes/workflows/ui/authoring/sample.rs",
+      "classification": "unchanged primary base"
+    },
+    {
+      "path": "src/adapters/http/routes/workflows/ui/authoring/sample_tests.rs",
+      "classification": "unchanged primary base"
+    },
+    {
+      "path": "src/adapters/http/routes/workflows/ui/runs/pages_tests.rs",
+      "classification": "known initial owned export"
+    },
+    {
+      "path": "src/adapters/persistence/onboarding/tests.rs",
+      "classification": "unchanged primary base"
+    },
+    {
+      "path": "src/adapters/persistence/thread_activity.rs",
+      "classification": "known initial owned export"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/autonomous_agent_sample_closure_tests.rs",
+      "classification": "unchanged primary base"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/channel_reply.rs",
+      "classification": "unchanged primary base"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/channel_reply_completion.rs",
+      "classification": "unchanged primary base"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/channel_reply_continuation_views_support.rs",
+      "classification": "new path, absent in primary"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/channel_reply_continuation_views_tests.rs",
+      "classification": "new path, absent in primary"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/channel_reply_e2e_hitl_tests.rs",
+      "classification": "new path, absent in primary"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/channel_reply_e2e_recovery_tests.rs",
+      "classification": "new path, absent in primary"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/channel_reply_e2e_support.rs",
+      "classification": "new path, absent in primary"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/channel_reply_e2e_tests.rs",
+      "classification": "new path, absent in primary"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/channel_reply_native_runtime_tests.rs",
+      "classification": "new path, absent in primary"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/channel_reply_native_tests.rs",
+      "classification": "new path, absent in primary"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/channel_reply_publication_tests.rs",
+      "classification": "known initial owned export"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/channel_reply_views.rs",
+      "classification": "known initial owned export"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/channel_reply_views.sql",
+      "classification": "known initial owned export"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/channel_reply_views_tests.rs",
+      "classification": "known initial owned export"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/mcp_agent_tests.rs",
+      "classification": "unchanged primary base"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/message_ingress_tests.rs",
+      "classification": "unchanged primary base"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/mod.rs",
+      "classification": "known initial owned export"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/provisioning.rs",
+      "classification": "unchanged primary base"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/provisioning_dispatch_tests.rs",
+      "classification": "unchanged primary base"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/provisioning_native.rs",
+      "classification": "new path, absent in primary"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/provisioning_runtime_tests.rs",
+      "classification": "unchanged primary base"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/reviewed_delivery_tests.rs",
+      "classification": "unchanged primary base"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/run_views.rs",
+      "classification": "known initial owned export"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/sample_capture_bounds_tests.rs",
+      "classification": "unchanged primary base"
+    },
+    {
+      "path": "src/application/thread_activity.rs",
+      "classification": "known initial owned export"
+    },
+    {
+      "path": "src/application/workflow/authoring/tests.rs",
+      "classification": "unchanged primary base"
+    },
+    {
+      "path": "src/application/workflow/channel_reply/examples.rs",
+      "classification": "new path, absent in primary"
+    },
+    {
+      "path": "src/application/workflow/channel_reply/mod.rs",
+      "classification": "known initial owned export"
+    },
+    {
+      "path": "src/application/workflow/channel_reply/outcomes.rs",
+      "classification": "known initial owned export"
+    },
+    {
+      "path": "src/application/workflow/fixtures/autonomous-response.yaml",
+      "classification": "unchanged primary base"
+    },
+    {
+      "path": "src/application/workflow/fixtures/reviewed-support.yaml",
+      "classification": "unchanged primary base"
+    },
+    {
+      "path": "src/application/workflow/fixtures/tests.rs",
+      "classification": "unchanged primary base"
+    },
+    {
+      "path": "src/application/workflow/provisioning.rs",
+      "classification": "unchanged primary base"
+    },
+    {
+      "path": "src/application/workflow/run_views.rs",
+      "classification": "known initial owned export"
+    },
+    {
+      "path": "src/application/workflow/sample/channel_reply_preview_tests.rs",
+      "classification": "new path, absent in primary"
+    },
+    {
+      "path": "src/application/workflow/sample/definitions.rs",
+      "classification": "unchanged primary base"
+    },
+    {
+      "path": "src/application/workflow/sample/dispatch.rs",
+      "classification": "unchanged primary base"
+    },
+    {
+      "path": "src/application/workflow/sample/mod.rs",
+      "classification": "unchanged primary base"
+    },
+    {
+      "path": "src/application/workflow/sample/responses.rs",
+      "classification": "new path, absent in primary"
+    },
+    {
+      "path": "src/application/workflow/sample/tests.rs",
+      "classification": "unchanged primary base"
+    },
+    {
+      "path": "src/application/workflow/sample/types.rs",
+      "classification": "unchanged primary base"
+    },
+    {
+      "path": "src/application/workflow/templates/agent_workflow.rs",
+      "classification": "unchanged primary base"
+    },
+    {
+      "path": "src/application/workflow/templates/agent_workflow_tests.rs",
+      "classification": "unchanged primary base"
+    },
+    {
+      "path": "src/application/workflow/templates/catalogue.rs",
+      "classification": "unchanged primary base"
+    },
+    {
+      "path": "src/infra/workflow/services.rs",
+      "classification": "known initial owned export"
+    }
+  ],
+  "conflicts": [],
+  "source_frozen_digest": "cb9845d3593414402b1834fe230e14d9adb4361df98c96ee88434d3a035c338c",
+  "primary_head": "97e5d60dc538e26c7cb976a8d63772eed80baff2",
+  "origin_main": "97e5d60dc538e26c7cb976a8d63772eed80baff2",
+  "index_empty": true
+}

@@ -17,6 +17,8 @@ use support::*;
 
 #[path = "http_authority_tests.rs"]
 mod authority_tests;
+#[path = "channel_reply_knowledge_uncertainty_tests.rs"]
+mod final_knowledge;
 #[path = "metrics_tests.rs"]
 mod metrics_tests;
 #[path = "reconciliation_fixture.rs"]
@@ -511,3 +513,6 @@ mod agent_runtime_tests;
 
 #[path = "knowledge_http_tests.rs"]
 mod knowledge_http_tests;
+
+#[path = "vault_tests/mod.rs"]
+mod vault_tests;

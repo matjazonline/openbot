@@ -9,6 +9,9 @@ use tokio::{
     task::JoinHandle,
 };
 
+mod inheritance;
+pub use inheritance::InheritedScriptedListener;
+
 const WAIT: Duration = Duration::from_secs(10);
 const MAX_EXCHANGES: usize = 64;
 
@@ -75,8 +78,20 @@ pub struct ScriptedLlm {
     pub requests: mpsc::Receiver<Value>,
     stop: Option<oneshot::Sender<()>>,
     worker: Option<JoinHandle<Result<usize, String>>>,
+    inheritance: InheritedScriptedListener,
 }
 impl ScriptedLlm {
+    pub fn inherited_listener(&self) -> InheritedScriptedListener {
+        assert!(
+            !self
+                .worker
+                .as_ref()
+                .expect("live fixture owner")
+                .is_finished()
+        );
+        self.inheritance.clone()
+    }
+
     pub fn observed(&mut self) -> Vec<Value> {
         let mut requests = Vec::new();
         while let Ok(request) = self.requests.try_recv() {
@@ -138,12 +153,20 @@ pub async fn scripted_scenario(exchanges: Vec<ScriptedExchange>) -> ScriptedLlm 
     super::register_origin(&base_url);
     let (sender, requests) = mpsc::channel(MAX_EXCHANGES);
     let (stop, stopped) = oneshot::channel();
-    let worker = tokio::spawn(serve(listener, exchanges, sender, stopped));
+    let inheritance = InheritedScriptedListener::new(base_url.clone());
+    let worker = tokio::spawn(serve(
+        listener,
+        exchanges,
+        sender,
+        stopped,
+        inheritance.clone(),
+    ));
     ScriptedLlm {
         base_url,
         requests,
         stop: Some(stop),
         worker: Some(worker),
+        inheritance,
     }
 }
 
@@ -152,10 +175,12 @@ async fn serve(
     exchanges: Vec<ScriptedExchange>,
     sender: mpsc::Sender<Value>,
     mut stopped: oneshot::Receiver<()>,
+    inheritance: InheritedScriptedListener,
 ) -> Result<usize, String> {
     let expected = exchanges.len();
     let mut exchanges = exchanges.into_iter();
     let mut count = 0;
+    let mut inheritance = Some(inheritance);
     let lifetime = tokio::time::sleep(Duration::from_secs(60));
     tokio::pin!(lifetime);
     loop {
@@ -165,18 +190,16 @@ async fn serve(
             _ = &mut stopped => break,
             _ = &mut lifetime => return Err("scenario lifetime exceeded".into()),
         };
-        let Some(exchange) = exchanges.next() else {
-            return Err("unexpected extra request".into());
-        };
         tokio::select! {
             biased;
-            result = tokio::time::timeout(WAIT, exchange_one(accepted.0, exchange, &sender)) => {
-                result.map_err(|_| "scenario exchange timed out")??;
+            result = tokio::time::timeout(WAIT, serve_one(accepted.0, &mut exchanges, &sender, &mut inheritance)) => {
+                if matches!(result.map_err(|_| "scenario exchange timed out")??, Served::Model) {
+                    count += 1;
+                }
             }
             _ = &mut stopped => return Err("scenario stopped during an exchange".into()),
             _ = &mut lifetime => return Err("scenario lifetime exceeded".into()),
         }
-        count += 1;
     }
     if count != expected {
         return Err(format!(
@@ -186,14 +209,38 @@ async fn serve(
     Ok(count)
 }
 
-async fn exchange_one(
+enum Served {
+    Model,
+    Inherited,
+}
+
+async fn serve_one(
     mut stream: TcpStream,
-    exchange: ScriptedExchange,
+    exchanges: &mut std::vec::IntoIter<ScriptedExchange>,
     sender: &mpsc::Sender<Value>,
-) -> Result<(), String> {
+    inheritance: &mut Option<InheritedScriptedListener>,
+) -> Result<Served, String> {
     let request = read_request(&mut stream)
         .await
         .ok_or("invalid scripted request framing")?;
+    if request.path == inheritance::PATH {
+        let proof = inheritance
+            .take()
+            .ok_or("parent fixture capability already consumed")?;
+        proof.respond(request, &mut stream).await?;
+        return Ok(Served::Inherited);
+    }
+    let exchange = exchanges.next().ok_or("unexpected extra request")?;
+    exchange_one(stream, request, exchange, sender).await?;
+    Ok(Served::Model)
+}
+
+async fn exchange_one(
+    mut stream: TcpStream,
+    request: ScriptedRequest,
+    exchange: ScriptedExchange,
+    sender: &mpsc::Sender<Value>,
+) -> Result<(), String> {
     (exchange.check)(&request).map_err(|reason| format!("request mismatch: {reason}"))?;
     sender
         .try_send(request.body)

@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "round": "AH-P06-AG1-R2",
+  "artifact": "998dd158c6878b33e0fccb06405452843fbfc0ba257ef747efeb84a653cd4c9c",
+  "checks": [
+    {
+      "criteria": [
+        "AC1",
+        "AC2",
+        "AC3",
+        "AC4",
+        "AC5",
+        "AC6",
+        "AC7",
+        "AC8"
+      ],
+      "command": "planned focused P06 native/view/retention/control/level/browser and affected build checks in D1r2/TASK",
+      "fixture": "planned P06 ownedpair loopback65037; stock2MiB; existing supervised storage owner",
+      "status": "NOT EXERCISED",
+      "reason": "pre-implementation architecture gate; no P06 native/schema source edits or behavior checks yet"
+    }
+  ]
+}

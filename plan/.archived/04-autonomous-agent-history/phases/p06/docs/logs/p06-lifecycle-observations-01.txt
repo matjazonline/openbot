@@ -1,0 +1,25 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+   Compiling open_bots v0.1.0 (/private/tmp/openbot-agent-history-h_82_5pw/worktree)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 55.19s
+     Running unittests src/lib.rs (/private/tmp/openbot-chs-p06-3f43t2k7/worktree/target/debug/deps/open_bots-8b80d02f0b6cf2e6)
+
+running 3 tests
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::controls::agent_history_controls_native_scope_deletions_keep_retained_history_and_recreated_thread_window_rejects_old_cursor ... FAILED
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::views::authority::agent_history_views_payload_expiry_after_fetch_releases_only_expired_metadata_without_stale_payload ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::retention::agent_history_retention_lifecycle_events_are_structured_and_never_contain_the_native_payload_or_credential ... ok
+
+failures:
+
+---- adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::controls::agent_history_controls_native_scope_deletions_keep_retained_history_and_recreated_thread_window_rejects_old_cursor stdout ----
+
+thread 'adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::controls::agent_history_controls_native_scope_deletions_keep_retained_history_and_recreated_thread_window_rejects_old_cursor' (36158400) panicked at src/adapters/persistence/workflow/agent_history_controls_tests.rs:81:5:
+published source/revision pins refuse destructive agent retirement: Database("error returned from database: update or delete on table \"agents\" violates foreign key constraint \"agent_history_conversations_company_id_agent_id_fkey\" on table \"agent_history_conversations\"")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::controls::agent_history_controls_native_scope_deletions_keep_retained_history_and_recreated_thread_window_rejects_old_cursor
+
+test result: FAILED. 2 passed; 1 failed; 0 ignored; 0 measured; 3380 filtered out; finished in 1.69s
+
+error: test failed, to rerun pass `--lib`

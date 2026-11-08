@@ -30,12 +30,11 @@ pub(super) fn repair_reservation(
 
 /// `base` is the owner's rendered instructions; the final-answer contract is shared so every
 /// binding asks for the same validated candidate. A repair leaves it unchanged.
-pub(super) fn response_preamble(checkpoint: &RunCheckpoint, mut preamble: String) -> String {
-    if let Some(contract) = &checkpoint.identity.response_contract {
-        preamble.push_str("\nFinal answer: return exactly one JSON value conforming to this Draft 2020-12 schema. No prose or code fences. Apply this only to the final answer, after tools finish.\n");
-        preamble.push_str(&contract.schema().to_string());
-    }
-    preamble
+pub(super) fn response_preamble(checkpoint: &RunCheckpoint, preamble: String) -> String {
+    crate::services::response_contract::final_answer_preamble(
+        preamble,
+        checkpoint.identity.response_contract.as_ref(),
+    )
 }
 
 /// The user turn that answers an invalid final candidate. A repair request must end on it:

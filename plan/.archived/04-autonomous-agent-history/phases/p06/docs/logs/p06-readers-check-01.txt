@@ -1,0 +1,47 @@
+    Checking open_bots v0.1.0 (/private/tmp/openbot-agent-history-h_82_5pw/worktree)
+error[E0603]: struct import `ResponseContract` is private
+  --> src/adapters/persistence/workflow/agent_history_views/projection.rs:5:25
+   |
+ 5 |     response_contract::{ResponseContract, final_answer_preamble},
+   |                         ^^^^^^^^^^^^^^^^ private struct import
+   |
+note: the struct import `ResponseContract` is defined here...
+  --> src/application/services/response_contract.rs:4:56
+   |
+ 4 |     entities::response_contract::{ContractFingerprint, ResponseContract},
+   |                                                        ^^^^^^^^^^^^^^^^
+note: ...and refers to the struct `ResponseContract` which is defined here
+  --> src/domain/entities/response_contract.rs:11:1
+   |
+11 | pub struct ResponseContract {
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ you could import this directly
+help: import `ResponseContract` through the re-export
+   |
+ 5 |     response_contract::{entities::response_contract::ResponseContract, final_answer_preamble},
+   |                         +++++++++++++++++++++++++++++
+
+error[E0308]: mismatched types
+  --> src/adapters/http/routes/workflows/ui/runs/history.rs:17:30
+   |
+17 |     let company = ui.company(query.company_id).await?.id;
+   |                      ------- ^^^^^^^^^^^^^^^^ expected `Uuid`, found `Option<Uuid>`
+   |                      |
+   |                      arguments to this method are incorrect
+   |
+   = note: expected struct `uuid::Uuid`
+                found enum `std::option::Option<uuid::Uuid>`
+note: method defined here
+  --> src/adapters/http/routes/workflows/ui/mod.rs:63:14
+   |
+63 |     async fn company(&self, company_id: Uuid) -> AppResult<Company> {
+   |              ^^^^^^^        ----------------
+help: consider using `Option::expect` to unwrap the `std::option::Option<uuid::Uuid>` value, panicking if the value is an `Option::None`
+   |
+17 |     let company = ui.company(query.company_id.expect("REASON")).await?.id;
+   |                                              +++++++++++++++++
+
+Some errors have detailed explanations: E0308, E0603.
+For more information about an error, try `rustc --explain E0308`.
+error: could not compile `open_bots` (lib) due to 2 previous errors
+warning: build failed, waiting for other jobs to finish...
+error: could not compile `open_bots` (lib test) due to 2 previous errors

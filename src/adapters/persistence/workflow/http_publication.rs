@@ -49,7 +49,7 @@ pub(in crate::adapters::persistence::workflow) async fn capture_on(
         let connection = connection_on(tx, company, selection.connection)
             .await?
             .ok_or_else(missing)?;
-        if !connection.enabled || (connection.bearer && !connection.secret_set) {
+        if !connection.enabled || (connection.uses_owned_bearer() && !connection.secret_set) {
             return Err(missing());
         }
         let snapshot: Value = sqlx::query_scalar("SELECT snapshot FROM workflow_http_operations WHERE revoked_at IS NULL AND company_id=$1 AND connection_id=$2 AND name=$3")

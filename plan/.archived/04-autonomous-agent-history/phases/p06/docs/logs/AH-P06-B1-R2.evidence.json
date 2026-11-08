@@ -1,0 +1,475 @@
+{
+  "version": 1,
+  "round": "AH-P06-B1-R2",
+  "artifact": "f36a749426ec84d0dc5755380bb05312c34677bb49d1101316b2c66094d3ad20",
+  "checks": [
+    {
+      "criteria": [
+        "AC3",
+        "AC4",
+        "AC6",
+        "AC7",
+        "AH-P06-B1-F1",
+        "AH-P06-B1-F2"
+      ],
+      "command": "scripts/test-network-isolation.sh cargo test --locked --offline --lib -- agent_history_retention_actual_preparation_owner agent_history_retention_actual_expiry_owner agent_history_retention_completed_output_failed_job_pressure agent_history_retention_actual_human_submission_owner agent_history_continuation_two_real_approval_rounds",
+      "fixture": "P06 owned PG18.6 loopback65037; stock2MiB; scripted providers; explicit installed Chrome for browser gates",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/p06-corrections-02.json",
+          "sha256": "a4d5e15bf17c675c6e4795f06078a096a01f74de175e9b22d267230a3a55bd8f"
+        },
+        {
+          "path": "logs/p06-corrections-02.txt",
+          "sha256": "8817692a46ac1a5d5cb39a81a6e216da49c97479f576c037c245675b36eaaabc"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC6",
+        "AC7"
+      ],
+      "command": "scripts/test-network-isolation.sh cargo test --locked --offline --lib -- agent_history_retention_company_payload_actual_limit_and_pressure_expire_sparse_streams_to_soft_ceiling agent_history_retention_actual_last_payload_slot_has_one_competing_producer_and_replay_survives_capacity",
+      "fixture": "P06 owned PG18.6 loopback65037; stock2MiB; scripted providers; explicit installed Chrome for browser gates",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/p06-pressure-recheck-01.json",
+          "sha256": "aa3b1dd27f7a4fed9f6ce9d609d8fe0d09cc6341c2a476add45d8dc7ea306c08"
+        },
+        {
+          "path": "logs/p06-pressure-recheck-01.txt",
+          "sha256": "1b74b18e4843967121e1e9daca6bf0057cf2c582afb9b7bc1ab0c9dfa3829859"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC8"
+      ],
+      "command": "cargo test --locked --offline --test source_modules",
+      "fixture": "P06 owned PG18.6 loopback65037; stock2MiB; scripted providers; explicit installed Chrome for browser gates",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/p06-source-modules-r2.json",
+          "sha256": "5c74596395e33fe0a70906aafc957d50a20aaf8e52d723e36086237d04c07049"
+        },
+        {
+          "path": "logs/p06-source-modules-r2.txt",
+          "sha256": "aa000325c72ab12e373100cf8d791dd8068d5039e05a88851738dcb4648da0f2"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC8"
+      ],
+      "command": "cargo sqlx migrate run",
+      "fixture": "P06 owned PG18.6 loopback65037; stock2MiB; scripted providers; explicit installed Chrome for browser gates",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/p06-migrate-validate-r2.json",
+          "sha256": "30e2d076768a76002980039a5f5afae06e0f1bc858a276b2f8c0a6a704852a13"
+        },
+        {
+          "path": "logs/p06-migrate-validate-r2.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC8"
+      ],
+      "command": "cargo sqlx prepare -- --all-targets",
+      "fixture": "P06 owned PG18.6 loopback65037; stock2MiB; scripted providers; explicit installed Chrome for browser gates",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/p06-sqlx-prepare-r2.json",
+          "sha256": "9f156e29a38a078f8a9c9ff76298fe73feef9af0ec99e3ede7665d2c2bad8c26"
+        },
+        {
+          "path": "logs/p06-sqlx-prepare-r2.txt",
+          "sha256": "0c819490bcffbaab94a3d9540e7e28c300906c7dd416ec5d425c692bd85aa79c"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC8"
+      ],
+      "command": "cargo sqlx prepare --check -- --all-targets",
+      "fixture": "P06 owned PG18.6 loopback65037; stock2MiB; scripted providers; explicit installed Chrome for browser gates",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/p06-sqlx-check-r2.json",
+          "sha256": "27d507861e05452c555d533a48a05b741ac70623dc3387ea8bbf057508655b86"
+        },
+        {
+          "path": "logs/p06-sqlx-check-r2.txt",
+          "sha256": "568407f33f56328176348cd412abec98c6ce9cb2bfb2c662787f25743d3749b5"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC8"
+      ],
+      "command": "cargo check --locked --offline --all-targets",
+      "fixture": "P06 owned PG18.6 loopback65037; stock2MiB; scripted providers; explicit installed Chrome for browser gates",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/p06-offline-r2.json",
+          "sha256": "dea5771ffaf4bc6dcb0f84eba469a0c7f4aa68fd29a69d956d52ffc0b98ec2e1"
+        },
+        {
+          "path": "logs/p06-offline-r2.txt",
+          "sha256": "2bc683fb4e4f4f21ee9ee39e2b8ecce2efe20d3b1be57bda5316aa519ab3d30a"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC8"
+      ],
+      "command": "cargo clippy --locked --offline --all-targets -- -D warnings",
+      "fixture": "P06 owned PG18.6 loopback65037; stock2MiB; scripted providers; explicit installed Chrome for browser gates",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/p06-clippy-r2.json",
+          "sha256": "561c66248443bdeb2f73c4c641ea1211b2dc33ff67bbd51d499053ab6e16d326"
+        },
+        {
+          "path": "logs/p06-clippy-r2.txt",
+          "sha256": "fb949c3b6f6f9a809eb89b87c82d4db42ab9baa19995c7edcc0aa8553035aaa7"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC8"
+      ],
+      "command": "scripts/test-network-isolation.sh cargo test --locked --offline --lib -- --list agent_history_ workflow_agent_ workflow_model_steps_ workflow_classify_ workflow_decision_ workflow_harness_ workflow_wait_ workflow_poll_ workflow_control_ workflow_tool_ channel_reply_ adapters::harness::rig:: application::services::harness::runs::tests:: message_tests::ingress_tests:: application::workflow::sample::tests:: workflow_failure_ workflow_pending_ workflow_action_approval_ workflow_action_uncertainty_ workflow_http_crash_before_marker workflow_http_remote_failure workflow_message_recovery_ workflow_mcp_cancellation_ knowledge_search_ knowledge_run_level_ knowledge_view_ knowledge_message_ workflow_storage_ storage_sweep_ autonomous_agent_storage_ workflow_run_view_ workflow_step_view_ run_retention_ workflow_registry_ logical_seed_ workflow_capacity_count_prunes_retained_terminal_history --skip dump_autonomous_workflow_agent_picker_browser_fixtures",
+      "fixture": "P06 owned PG18.6 loopback65037; stock2MiB; scripted providers; explicit installed Chrome for browser gates",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/p06-discovery-final-02.json",
+          "sha256": "3eaaf1d9e94d35c6615cb0a3f3466899fe45f7b83bd7db0fc4f506b86447f1e3"
+        },
+        {
+          "path": "logs/p06-discovery-final-02.txt",
+          "sha256": "79f2d57fad67be8ecbdf6391f8343a50ba2adc89dfb1783005d469d1b12a6e81"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC8"
+      ],
+      "command": "cargo fmt --all -- --check",
+      "fixture": "P06 owned PG18.6 loopback65037; stock2MiB; scripted providers; explicit installed Chrome for browser gates",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/p06-fmt-r2.json",
+          "sha256": "4e482ffdf18883920c6338951dc2ebd67a02564deaabbccc42ce879f5def0b6b"
+        },
+        {
+          "path": "logs/p06-fmt-r2.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC8"
+      ],
+      "command": "git diff --check",
+      "fixture": "P06 owned PG18.6 loopback65037; stock2MiB; scripted providers; explicit installed Chrome for browser gates",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/p06-diff-r2.json",
+          "sha256": "c1ae0d797c74325d31a5827cf3fe24c1ac6e0a13d28f25a94f9ca8db9f771886"
+        },
+        {
+          "path": "logs/p06-diff-r2.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC8"
+      ],
+      "command": "graft build",
+      "fixture": "P06 owned PG18.6 loopback65037; stock2MiB; scripted providers; explicit installed Chrome for browser gates",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/p06-graft-r2.json",
+          "sha256": "b9753d608348c61c34cba655788a0aff46b3d8383cc15890cf42fcc42dd1d46f"
+        },
+        {
+          "path": "logs/p06-graft-r2.txt",
+          "sha256": "0107930a110869e06c4b866d5b64c51264ce033fed432e0bbb1704eeaf7c98ec"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC8"
+      ],
+      "command": "python3 plan/04-autonomous-agent-history/phases/p06/docs/logs/verify-case-evidence-r2.py",
+      "fixture": "P06 owned PG18.6 loopback65037; stock2MiB; scripted providers; explicit installed Chrome for browser gates",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/p06-case-evidence-r2-02.json",
+          "sha256": "584b62cf4d132b21b817fe5a6efb236357ae420d446f9891e41540737b20bcaf"
+        },
+        {
+          "path": "logs/p06-case-evidence-r2-02.txt",
+          "sha256": "9199194e253aa820766170ab01483e3650e64754a8204c4b3b8447b9bb047ffb"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC1",
+        "AC2",
+        "AC3",
+        "AC4"
+      ],
+      "command": "env CHROME_PATH=/Applications/Google Chrome.app/Contents/MacOS/Google Chrome AGENT_HISTORY_BROWSER_FIXTURES=plan/04-autonomous-agent-history/phases/p06/docs/logs/browser-fixtures-03 node --test scripts/tests/agent-history-browser.mjs",
+      "fixture": "P06 owned PG18.6 loopback65037; stock2MiB; scripted providers; explicit installed Chrome for browser gates",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/p06-browser-03.json",
+          "sha256": "20a4f708e4ee32d5474e900065d298015098f4818e16b72e46fe87095b46168a"
+        },
+        {
+          "path": "logs/p06-browser-03.txt",
+          "sha256": "a97afc8013ff49f01016702b1432270e063612ee05ad9855f866140030581c77"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC1",
+        "AC3",
+        "AC8"
+      ],
+      "command": "env CHROME_PATH=/Applications/Google Chrome.app/Contents/MacOS/Google Chrome node --test scripts/tests/workflow-runs.mjs scripts/tests/workflow-samples.mjs scripts/tests/workflow-conversations.mjs",
+      "fixture": "P06 owned PG18.6 loopback65037; stock2MiB; scripted providers; explicit installed Chrome for browser gates",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/p06-protocols-02.json",
+          "sha256": "8d51f822e2ff63fe6ee69754c2953919138b8306757a6b00b208df6095249111"
+        },
+        {
+          "path": "logs/p06-protocols-02.txt",
+          "sha256": "24ef91adc868eb65e11942e1d9db498becbe054e225013016598bbcad23afc94"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC2",
+        "AC3",
+        "AC8"
+      ],
+      "command": "env CHROME_PATH=/Applications/Google Chrome.app/Contents/MacOS/Google Chrome WORKFLOW_DECISION_BROWSER_FIXTURES=/private/tmp/openbot-agent-history-h_82_5pw/worktree/plan/04-autonomous-agent-history/phases/p06/docs/logs/decision-fixtures-01 node --test scripts/tests/workflow-decisions.mjs",
+      "fixture": "P06 owned PG18.6 loopback65037; stock2MiB; scripted providers; explicit installed Chrome for browser gates",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/p06-decision-browser-01.json",
+          "sha256": "e0569e3d1f30b029de876db1f5e7fe18ffc6373abb99dd049d33198a71fe42ff"
+        },
+        {
+          "path": "logs/p06-decision-browser-01.txt",
+          "sha256": "b6d1ad5e962e200cc9377fb5a2f90c2eb4b6d11e1ae02f77c704d374e6ffd194"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC1",
+        "AC2",
+        "AC3",
+        "AC4",
+        "AC5",
+        "AC6",
+        "AC7",
+        "AC8"
+      ],
+      "command": "python3 plan/04-autonomous-agent-history/phases/p06/docs/logs/verify-case-evidence.py",
+      "fixture": "current discovery and latest successful per-case observations; exact R1/R2 source/fixture/env impact dispositions in current inventory",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/verification-case-inventory-r2.json",
+          "sha256": "aff8a4d1fc3613e3b352e2a28795987d6d06dcfff2951f1f4117dfe07cc93dd4"
+        },
+        {
+          "path": "logs/p06-final-history-01.json",
+          "sha256": "3fc39c0b7f36b559abaf1b9f24591c01dc263e9a7bcddca0e6faa723d0bb69c0"
+        },
+        {
+          "path": "logs/p06-final-history-01.txt",
+          "sha256": "fdfd95b497559a19beace232af9eca9f6e44ab0ac21951eac5da10ff6756589c"
+        },
+        {
+          "path": "logs/p06-final-focused-runtime-01.json",
+          "sha256": "e469945fc53ea0f8ada0cf6f5155407f088deb080ec1297c851475ca44377450"
+        },
+        {
+          "path": "logs/p06-final-focused-runtime-01.txt",
+          "sha256": "b3e21e02c7aeb27febdd3cca1b3b39d51e9a6fa2a4a9309d502eec786b0e4945"
+        },
+        {
+          "path": "logs/p06-final-inspector-01.json",
+          "sha256": "410fca24aacb2e662b50fbccb8d1ae8f0bbbc89fff0f2f4d1f5c2fe3d7276bf2"
+        },
+        {
+          "path": "logs/p06-final-inspector-01.txt",
+          "sha256": "61982b3a348d65b5f663dec2e8da5d0d15cdc7483e54010b65d1846cb05becfd"
+        },
+        {
+          "path": "logs/p06-decision-fixtures-01.json",
+          "sha256": "d8f84323926a2e3c2ab19e68333fa3dd69496a932990525d95f976ce24f83a01"
+        },
+        {
+          "path": "logs/p06-decision-fixtures-01.txt",
+          "sha256": "9761dad33cd24e3fb9b4456168eda043d64b6bf8fa8f7a3d879b41fdbccfc6d2"
+        },
+        {
+          "path": "logs/p06-corrections-02.json",
+          "sha256": "a4d5e15bf17c675c6e4795f06078a096a01f74de175e9b22d267230a3a55bd8f"
+        },
+        {
+          "path": "logs/p06-corrections-02.txt",
+          "sha256": "8817692a46ac1a5d5cb39a81a6e216da49c97479f576c037c245675b36eaaabc"
+        },
+        {
+          "path": "logs/p06-correction-affected-runtime-01.json",
+          "sha256": "9b0f1d98e03a730185542a21df8482b2a152fe086d6889117dd73d62a2b69cd7"
+        },
+        {
+          "path": "logs/p06-correction-affected-runtime-01.txt",
+          "sha256": "e06d7d4091bb52269fd5aa0eba8e55d27aa30971875286ba00ca61422615df06"
+        },
+        {
+          "path": "logs/p06-pressure-recheck-01.json",
+          "sha256": "aa3b1dd27f7a4fed9f6ce9d609d8fe0d09cc6341c2a476add45d8dc7ea306c08"
+        },
+        {
+          "path": "logs/p06-pressure-recheck-01.txt",
+          "sha256": "1b74b18e4843967121e1e9daca6bf0057cf2c582afb9b7bc1ab0c9dfa3829859"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC8"
+      ],
+      "command": "env AGENT_HISTORY_BROWSER_FIXTURES=plan/04-autonomous-agent-history/phases/p06/docs/logs/browser-fixtures-02 scripts/test-network-isolation.sh cargo test --locked --offline --lib -- agent_history_ workflow_storage_ run_retention_ workflow_registry_ logical_seed_",
+      "fixture": "sole positive member grant fixture required provenance; current inspector/focused cases corrected",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/p06-final-history-01.json",
+          "sha256": "3fc39c0b7f36b559abaf1b9f24591c01dc263e9a7bcddca0e6faa723d0bb69c0"
+        },
+        {
+          "path": "logs/p06-final-history-01.txt",
+          "sha256": "fdfd95b497559a19beace232af9eca9f6e44ab0ac21951eac5da10ff6756589c"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC8"
+      ],
+      "command": "scripts/test-network-isolation.sh cargo test --locked --offline --lib -- agent_history_ workflow_agent_ workflow_model_steps_ workflow_classify_ workflow_decision_ workflow_harness_ workflow_wait_ workflow_poll_ workflow_control_ workflow_tool_ channel_reply_ adapters::harness::rig:: application::services::harness::runs::tests:: message_tests::ingress_tests:: application::workflow::sample::tests:: workflow_failure_ workflow_pending_ workflow_action_approval_ workflow_action_uncertainty_ workflow_http_crash_before_marker workflow_http_remote_failure workflow_message_recovery_ workflow_mcp_cancellation_ knowledge_search_ knowledge_run_level_ knowledge_view_ knowledge_message_ workflow_storage_ storage_sweep_ autonomous_agent_storage_ workflow_run_view_ workflow_step_view_ --skip dump_autonomous_workflow_agent_picker_browser_fixtures",
+      "fixture": "sole source collector fixture upgraded for retained-history pin/native expiry; decision-fixtures01 correction",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/p06-final-focused-runtime-01.json",
+          "sha256": "e469945fc53ea0f8ada0cf6f5155407f088deb080ec1297c851475ca44377450"
+        },
+        {
+          "path": "logs/p06-final-focused-runtime-01.txt",
+          "sha256": "b3e21e02c7aeb27febdd3cca1b3b39d51e9a6fa2a4a9309d502eec786b0e4945"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC8"
+      ],
+      "command": "node --test scripts/tests/workflow-runs.mjs scripts/tests/workflow-decisions.mjs scripts/tests/workflow-samples.mjs scripts/tests/workflow-conversations.mjs",
+      "fixture": "missing explicit Chrome and decision fixtures; protocols02 and generated decision fixtures/browser correction",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/p06-protocols-01.json",
+          "sha256": "54183da7e7cd88afbdbd2c668c7c3be18425a0e549fb23f9f12d9e5ee969508b"
+        },
+        {
+          "path": "logs/p06-protocols-01.txt",
+          "sha256": "a7be537cdce993495897c7f2e75f2cc7218b0ba4cfe121cd4bebdf356377fa68"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC8"
+      ],
+      "command": "scripts/test-network-isolation.sh cargo test --locked --offline --lib -- agent_history_ workflow_storage_ run_retention_ autonomous_agent_storage_ workflow_capacity_count_prunes_retained_terminal_history --skip run_retention_native_schema_100001_members_reaches_delete_without_activation_cutoff",
+      "fixture": "186PASS/2FAIL: cancellation pressure fixtures now use completed own jobs or explicitly elapsed original retry window; all original thresholds/assertions preserved and pressure-recheck01 PASS2",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/p06-correction-affected-runtime-01.json",
+          "sha256": "9b0f1d98e03a730185542a21df8482b2a152fe086d6889117dd73d62a2b69cd7"
+        },
+        {
+          "path": "logs/p06-correction-affected-runtime-01.txt",
+          "sha256": "e06d7d4091bb52269fd5aa0eba8e55d27aa30971875286ba00ca61422615df06"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC8"
+      ],
+      "command": "scripts/test-network-isolation.sh cargo test --locked --offline --lib -- agent_history_retention_actual_preparation_owner agent_history_retention_actual_expiry_owner agent_history_retention_completed_output_failed_job_pressure agent_history_retention_actual_human_submission_owner agent_history_continuation_two_real_approval_rounds",
+      "fixture": "compile-only test imports, corrected before actual five-case PASS02",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/p06-corrections-01.json",
+          "sha256": "df1a325135d0ded0fe66323426388c76175fa22f02c0c557d336aa889c93c826"
+        },
+        {
+          "path": "logs/p06-corrections-01.txt",
+          "sha256": "72f1c077d8dc18e0288e9201797aae70cc82f883735530e75cf198884e7ecd75"
+        }
+      ]
+    }
+  ]
+}

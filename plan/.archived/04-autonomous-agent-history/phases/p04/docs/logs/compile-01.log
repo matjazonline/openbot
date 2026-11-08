@@ -1,0 +1,85 @@
+    Checking open_bots v0.1.0 (/private/tmp/openbot-agent-history-h_82_5pw/worktree)
+error[E0425]: cannot find type `Value` in this scope
+  --> src/adapters/persistence/workflow/agent_history/frozen.rs:19:23
+   |
+19 |     let saved: Option<Value> = sqlx::query_scalar("SELECT frozen_preparation FROM agent_history_exchanges WHERE company_id=$1 AND ru...
+   |                       ^^^^^ not found in this scope
+   |
+help: there is an enum variant `crate::application::workflow::compiler::SourceNode::Value`; try using the variant's enum
+   |
+19 -     let saved: Option<Value> = sqlx::query_scalar("SELECT frozen_preparation FROM agent_history_exchanges WHERE company_id=$1 AND run_id=$2 AND execution_id=$3")
+19 +     let saved: Option<crate::application::workflow::compiler::SourceNode> = sqlx::query_scalar("SELECT frozen_preparation FROM agent_history_exchanges WHERE company_id=$1 AND run_id=$2 AND execution_id=$3")
+   |
+help: you might be missing a type parameter
+   |
+14 | pub(super) async fn restore_on<Value>(
+   |                               +++++++
+
+error[E0425]: cannot find type `Value` in this scope
+  --> src/adapters/persistence/workflow/agent_history/selection.rs:26:12
+   |
+26 |     input: Value,
+   |            ^^^^^ not found in this scope
+   |
+help: there is an enum variant `crate::application::workflow::compiler::SourceNode::Value`; try using the variant's enum
+   |
+26 -     input: Value,
+26 +     input: crate::application::workflow::compiler::SourceNode,
+   |
+
+error[E0425]: cannot find type `Value` in this scope
+  --> src/adapters/persistence/workflow/agent_history/selection.rs:27:13
+   |
+27 |     output: Value,
+   |             ^^^^^ not found in this scope
+   |
+help: there is an enum variant `crate::application::workflow::compiler::SourceNode::Value`; try using the variant's enum
+   |
+27 -     output: Value,
+27 +     output: crate::application::workflow::compiler::SourceNode,
+   |
+
+error[E0425]: cannot find type `Value` in this scope
+  --> src/adapters/persistence/workflow/agent_history/frozen.rs:19:23
+   |
+19 |     let saved: Option<Value> = sqlx::query_scalar("SELECT frozen_preparation FROM agent_history_exchanges WHERE company_id=$1 AND ru...
+   |                       ^^^^^ not found in this scope
+   |
+help: there is an enum variant `crate::application::workflow::templates::agent_workflow::tests::SourceNode::Value`; try using the variant's enum
+   |
+19 -     let saved: Option<Value> = sqlx::query_scalar("SELECT frozen_preparation FROM agent_history_exchanges WHERE company_id=$1 AND run_id=$2 AND execution_id=$3")
+19 +     let saved: Option<crate::application::workflow::templates::agent_workflow::tests::SourceNode> = sqlx::query_scalar("SELECT frozen_preparation FROM agent_history_exchanges WHERE company_id=$1 AND run_id=$2 AND execution_id=$3")
+   |
+help: you might be missing a type parameter
+   |
+14 | pub(super) async fn restore_on<Value>(
+   |                               +++++++
+
+error[E0425]: cannot find type `Value` in this scope
+  --> src/adapters/persistence/workflow/agent_history/selection.rs:26:12
+   |
+26 |     input: Value,
+   |            ^^^^^ not found in this scope
+   |
+help: there is an enum variant `crate::application::workflow::templates::agent_workflow::tests::SourceNode::Value`; try using the variant's enum
+   |
+26 -     input: Value,
+26 +     input: crate::application::workflow::templates::agent_workflow::tests::SourceNode,
+   |
+
+error[E0425]: cannot find type `Value` in this scope
+  --> src/adapters/persistence/workflow/agent_history/selection.rs:27:13
+   |
+27 |     output: Value,
+   |             ^^^^^ not found in this scope
+   |
+help: there is an enum variant `crate::application::workflow::templates::agent_workflow::tests::SourceNode::Value`; try using the variant's enum
+   |
+27 -     output: Value,
+27 +     output: crate::application::workflow::templates::agent_workflow::tests::SourceNode,
+   |
+
+For more information about this error, try `rustc --explain E0425`.
+error: could not compile `open_bots` (lib) due to 3 previous errors
+warning: build failed, waiting for other jobs to finish...
+error: could not compile `open_bots` (lib test) due to 3 previous errors

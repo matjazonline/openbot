@@ -85,6 +85,7 @@ async fn workflow_http_admission_rechecks_bound_operation_after_activation() {
     let p = &fixture.persistence;
     let result = WorkflowService::new(p.clone(), p.clone(), p.clone(), p.clone(), Preflight)
         .admit(AdmitWorkflowRequest {
+            history_session: None,
             company_id: target.company,
             actor: target.actor,
             association: RelatedAssociation::Company,

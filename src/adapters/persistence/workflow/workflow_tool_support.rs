@@ -180,6 +180,11 @@ impl ToolSetup {
         let child = fixture
             .publish_workflow(WorkflowId::new(Uuid::from_u128(CHILD)), child)
             .await;
+        // Box shared fixture assembly to keep native tests on the stock thread stack.
+        Box::pin(Self::bind_child(fixture, reviewer, child)).await
+    }
+
+    pub(super) async fn bind_child(fixture: Fixture, reviewer: Uuid, child: VersionId) -> Self {
         let p = fixture.persistence.clone();
         let company = fixture.target.company;
         p.register_workflow_tool(
@@ -272,6 +277,7 @@ impl ToolSetup {
         let company = self.fixture.target.company;
         WorkflowService::new(p.clone(), p.clone(), p.clone(), p.clone(), Preflight)
             .admit(AdmitWorkflowRequest {
+                history_session: None,
                 company_id: company,
                 actor: self.fixture.target.actor,
                 association: RelatedAssociation::Company,

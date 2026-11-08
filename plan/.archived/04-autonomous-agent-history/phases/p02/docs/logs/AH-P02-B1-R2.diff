@@ -1,0 +1,3285 @@
+--- accepted-p01/migrations/20260817000000_init_schema.sql
++++ p02/migrations/20260817000000_init_schema.sql
+@@ -13633,6 +13633,7 @@
+     session_id uuid,
+     child_run_id uuid,
+     created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
++    last_exchange_order bigint NOT NULL DEFAULT 0 CHECK (last_exchange_order >= 0),
+     PRIMARY KEY (company_id,id),
+     UNIQUE (company_id,agent_id,id),
+     FOREIGN KEY (company_id,agent_id) REFERENCES public.agents(company_id,id),
+@@ -13748,3 +13749,354 @@
+ END $$;
+ CREATE TRIGGER agent_history_conversation_guard BEFORE INSERT OR UPDATE ON public.agent_history_conversations
+     FOR EACH ROW EXECUTE FUNCTION public.guard_agent_history_conversation();
++
++-- A position belongs to the logical activation, including authorized control retry.
++CREATE TABLE public.agent_history_exchanges (
++    company_id uuid NOT NULL REFERENCES public.companies(id) ON DELETE CASCADE,
++    id uuid NOT NULL,
++    conversation_id uuid NOT NULL,
++    agent_id uuid NOT NULL,
++    revision_id uuid NOT NULL,
++    manifest_id uuid NOT NULL,
++    run_id uuid NOT NULL,
++    execution_id uuid NOT NULL,
++    job_id uuid NOT NULL,
++    position bigint NOT NULL CHECK (position > 0),
++    input_digest bytea NOT NULL CHECK (octet_length(input_digest)=32),
++    provenance jsonb NOT NULL CHECK (jsonb_typeof(provenance)='object' AND octet_length(provenance::text)<=262144),
++    access_level public.access_level NOT NULL,
++    state text NOT NULL CHECK (state IN ('queued','active','completed','failed','cancelled')),
++    checkpoint_id uuid,
++    output jsonb,
++    created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
++    activated_at timestamptz,
++    finished_at timestamptz,
++    PRIMARY KEY (company_id,id),
++    UNIQUE (company_id,execution_id),
++    UNIQUE (company_id,conversation_id,position),
++    FOREIGN KEY (company_id,agent_id,conversation_id)
++        REFERENCES public.agent_history_conversations(company_id,agent_id,id),
++    FOREIGN KEY (company_id,agent_id,revision_id) REFERENCES public.agent_revisions(company_id,agent_id,id),
++    FOREIGN KEY (company_id,manifest_id) REFERENCES public.agent_dependency_manifests(company_id,id),
++    FOREIGN KEY (company_id,run_id,execution_id) REFERENCES public.workflow_executions(company_id,run_id,id),
++    FOREIGN KEY (company_id,execution_id,job_id) REFERENCES public.background_tasks(company_id,workflow_execution_id,id),
++    FOREIGN KEY (company_id,job_id,checkpoint_id) REFERENCES public.task_harness_runs(company_id,task_id,id)
++        DEFERRABLE INITIALLY DEFERRED,
++    CHECK (id=execution_id),
++    CHECK ((state='completed')=(output IS NOT NULL)),
++    CHECK (output IS NULL OR octet_length(output::text)<=1048576),
++    CHECK ((state IN ('completed','failed','cancelled'))=(finished_at IS NOT NULL)),
++    CHECK (state NOT IN ('active','completed') OR (checkpoint_id IS NOT NULL AND activated_at IS NOT NULL)),
++    CHECK (activated_at IS NULL OR activated_at>=created_at),
++    CHECK (finished_at IS NULL OR finished_at>=created_at)
++);
++CREATE INDEX agent_history_exchanges_pending ON public.agent_history_exchanges
++    (company_id,conversation_id,position) WHERE state IN ('queued','active');
++CREATE INDEX agent_history_exchanges_recent ON public.agent_history_exchanges
++    (company_id,conversation_id,access_level,position DESC) WHERE state='completed';
++CREATE INDEX agent_history_exchanges_source ON public.agent_history_exchanges(company_id,run_id,execution_id);
++CREATE INDEX agent_history_exchanges_checkpoint ON public.agent_history_exchanges(company_id,checkpoint_id)
++    WHERE checkpoint_id IS NOT NULL;
++
++CREATE OR REPLACE FUNCTION public.guard_agent_history_conversation() RETURNS trigger LANGUAGE plpgsql AS $$
++BEGIN
++    IF TG_OP='UPDATE' THEN
++        IF (to_jsonb(NEW)-'last_exchange_order') IS NOT DISTINCT FROM (to_jsonb(OLD)-'last_exchange_order')
++            AND NEW.last_exchange_order::numeric=OLD.last_exchange_order::numeric+1
++            AND EXISTS (SELECT 1 FROM public.agent_history_exchanges AS exchange
++                WHERE exchange.company_id=OLD.company_id AND exchange.conversation_id=OLD.id
++                    AND exchange.position=NEW.last_exchange_order)
++        THEN
++            RETURN NEW;
++        END IF;
++        RAISE EXCEPTION 'agent conversation identity/order is immutable' USING ERRCODE='23514';
++    END IF;
++    IF NEW.last_exchange_order<>0 THEN
++        RAISE EXCEPTION 'new conversation has no assigned exchanges' USING ERRCODE='23514';
++    END IF;
++    IF NEW.scope_kind='child_branch' AND NOT EXISTS (
++        SELECT 1 FROM public.workflow_runs AS run WHERE run.company_id=NEW.company_id
++            AND run.id=NEW.child_run_id AND run.parent_run_id IS NOT NULL
++            AND run.parent_execution_id IS NOT NULL
++    ) THEN
++        RAISE EXCEPTION 'agent child conversation requires genuine child run' USING ERRCODE='23514';
++    END IF;
++    RETURN NEW;
++END $$;
++
++CREATE FUNCTION public.guard_agent_history_exchange_insert() RETURNS trigger LANGUAGE plpgsql AS $$
++DECLARE last_position bigint;
++BEGIN
++    SELECT conversation.last_exchange_order INTO STRICT last_position
++        FROM public.agent_history_conversations AS conversation
++        WHERE conversation.company_id=NEW.company_id AND conversation.id=NEW.conversation_id
++            AND conversation.agent_id=NEW.agent_id FOR UPDATE;
++    IF NEW.position::numeric<>last_position::numeric+1 OR NEW.state<>'queued'
++        OR NEW.checkpoint_id IS NOT NULL OR NEW.output IS NOT NULL
++        OR NEW.activated_at IS NOT NULL OR NEW.finished_at IS NOT NULL
++    THEN
++        RAISE EXCEPTION 'invalid initial agent exchange or position' USING ERRCODE='23514';
++    END IF;
++    IF NOT EXISTS (
++        SELECT 1 FROM public.workflow_runs AS run
++        JOIN public.workflow_executions AS execution ON execution.company_id=run.company_id AND execution.run_id=run.id
++        JOIN public.background_tasks AS job ON job.company_id=execution.company_id AND job.workflow_execution_id=execution.id
++        JOIN public.run_dependency_manifests AS ownership ON ownership.company_id=run.company_id AND ownership.run_id=run.id
++        JOIN public.agent_manifest_revisions AS selected ON selected.company_id=ownership.company_id
++            AND selected.manifest_id=ownership.manifest_id AND selected.agent_id=NEW.agent_id
++        JOIN public.agent_revisions AS revision ON revision.company_id=selected.company_id
++            AND revision.agent_id=selected.agent_id AND revision.id=selected.revision_id
++        JOIN public.agent_history_conversations AS conversation ON conversation.company_id=run.company_id
++            AND conversation.id=NEW.conversation_id AND conversation.agent_id=NEW.agent_id
++        WHERE run.company_id=NEW.company_id AND run.id=NEW.run_id
++            AND execution.id=NEW.execution_id AND job.id=NEW.job_id
++            AND run.state IN ('queued','running') AND run.deadline>clock_timestamp()
++            AND job.status='processing' AND job.lock_expires_at>clock_timestamp()
++            AND execution.activated_at IS NOT NULL AND execution.completed_at IS NULL
++            AND execution.frozen_inputs ? 'context'
++            AND NEW.input_digest=sha256(convert_to((execution.frozen_inputs->'context')::text,'UTF8'))
++            AND NEW.access_level=run.content_level
++            AND NEW.manifest_id=ownership.manifest_id AND NEW.revision_id=selected.revision_id
++            AND (NEW.provenance-ARRAY['agent','revision','model','output_contract']::text[])='{}'::jsonb
++            AND NEW.provenance->>'agent'=NEW.agent_id::text
++            AND NEW.provenance->>'revision'=NEW.revision_id::text
++            AND NEW.provenance->'model'=revision.content::jsonb->'model'
++            AND NEW.provenance->'output_contract'->>'version'='1'
++            AND NEW.provenance->'output_contract'->>'format'='json_schema'
++            AND NEW.provenance->'output_contract'->'schema'=execution.frozen_inputs->'output_schema'
++            AND (
++                (conversation.scope_kind='child_branch' AND conversation.child_run_id=run.id AND run.parent_run_id IS NOT NULL)
++                OR (run.parent_run_id IS NULL AND conversation.scope_kind='private_session' AND EXISTS (
++                    SELECT 1 FROM public.workflow_agent_sessions AS mapping
++                    JOIN public.agent_history_sessions AS session ON session.company_id=mapping.company_id AND session.id=mapping.session_id
++                    WHERE mapping.company_id=run.company_id AND mapping.run_id=run.id
++                        AND mapping.session_id=conversation.session_id AND session.creator_user_id=run.actor_id))
++                OR (run.parent_run_id IS NULL AND conversation.scope_kind='thread'
++                    AND conversation.channel_id=run.channel_id AND conversation.thread_id=run.thread_id
++                    AND EXISTS (SELECT 1 FROM public.workflow_agent_sessions AS mapping
++                        WHERE mapping.company_id=run.company_id AND mapping.run_id=run.id AND mapping.thread_input_proven))
++            )
++    ) THEN
++        RAISE EXCEPTION 'agent exchange source/provenance differs from its genuine activation' USING ERRCODE='23514';
++    END IF;
++    RETURN NEW;
++END $$;
++CREATE TRIGGER agent_history_exchange_insert BEFORE INSERT ON public.agent_history_exchanges
++    FOR EACH ROW EXECUTE FUNCTION public.guard_agent_history_exchange_insert();
++
++CREATE FUNCTION public.advance_agent_history_order() RETURNS trigger LANGUAGE plpgsql AS $$
++BEGIN
++    UPDATE public.agent_history_conversations SET last_exchange_order=NEW.position
++        WHERE company_id=NEW.company_id AND id=NEW.conversation_id AND last_exchange_order=NEW.position-1;
++    IF NOT FOUND THEN
++        RAISE EXCEPTION 'agent conversation position moved' USING ERRCODE='23514';
++    END IF;
++    RETURN NULL;
++END $$;
++CREATE TRIGGER agent_history_exchange_order AFTER INSERT ON public.agent_history_exchanges
++    FOR EACH ROW EXECUTE FUNCTION public.advance_agent_history_order();
++
++CREATE FUNCTION public.agent_history_checkpoint_matches(exchange public.agent_history_exchanges)
++RETURNS boolean LANGUAGE sql VOLATILE AS $$
++    SELECT CASE WHEN exchange.checkpoint_id IS NULL THEN exchange.state IN ('queued','failed','cancelled')
++    ELSE EXISTS (
++        SELECT 1 FROM public.task_harness_runs AS checkpoint
++        JOIN public.workflow_executions AS execution ON execution.company_id=checkpoint.company_id
++            AND execution.run_id=checkpoint.workflow_run_id AND execution.id=checkpoint.workflow_execution_id
++        WHERE checkpoint.company_id=exchange.company_id AND checkpoint.id=exchange.checkpoint_id
++            AND checkpoint.task_id=exchange.job_id AND checkpoint.workflow_run_id=exchange.run_id
++            AND checkpoint.workflow_execution_id=exchange.execution_id AND checkpoint.agent_id=exchange.agent_id
++            AND checkpoint.workflow_prepared->>'version'='4'
++            AND checkpoint.workflow_prepared->>'history_exchange'=exchange.id::text
++            AND checkpoint.workflow_prepared->'selection'->>'mode'='tools'
++            AND checkpoint.workflow_prepared->'selection'->>'manifest'=exchange.manifest_id::text
++            AND checkpoint.workflow_prepared->'selection'->>'agent'=exchange.agent_id::text
++            AND checkpoint.workflow_prepared->'selection'->>'revision'=exchange.revision_id::text
++            AND checkpoint.workflow_prepared->'context'=execution.frozen_inputs->'context'
++            AND checkpoint.checkpoint->'identity'->'response_contract'=exchange.provenance->'output_contract'
++            AND checkpoint.checkpoint->'identity'->>'provider'=exchange.provenance->'model'->>'provider'
++            AND checkpoint.checkpoint->'identity'->>'model'=exchange.provenance->'model'->>'model'
++            AND (checkpoint.state='completed')=(exchange.state='completed')
++            AND (checkpoint.state<>'invalid_output' OR exchange.state IN ('failed','cancelled'))
++            AND (exchange.state<>'completed' OR (
++                checkpoint.checkpoint->'final_output'->'structured'->'contract'=exchange.provenance->'output_contract'
++                AND exchange.output=(checkpoint.checkpoint->'final_output'->'structured'->>'body')::jsonb))
++    ) END
++$$;
++
++CREATE FUNCTION public.agent_history_transition_allowed(
++    previous public.agent_history_exchanges, following public.agent_history_exchanges)
++RETURNS boolean LANGUAGE plpgsql VOLATILE AS $$
++BEGIN
++    IF previous.state=following.state THEN
++        RETURN true;
++    END IF;
++    IF following.state='active' THEN
++        RETURN previous.state='queued' AND following.checkpoint_id IS NOT NULL;
++    END IF;
++    IF following.state='completed' THEN
++        RETURN previous.state='active' AND following.checkpoint_id IS NOT NULL;
++    END IF;
++    IF following.state='failed' AND previous.state IN ('queued','active') THEN
++        RETURN EXISTS (
++            SELECT 1 FROM public.workflow_runs AS run
++            JOIN public.workflow_executions AS execution ON execution.company_id=run.company_id AND execution.run_id=run.id
++            WHERE run.company_id=following.company_id AND run.id=following.run_id AND execution.id=following.execution_id
++                AND (run.state='failed' OR execution.committed_route='final_error'
++                    OR EXISTS (SELECT 1 FROM public.task_harness_runs AS checkpoint
++                        WHERE checkpoint.company_id=following.company_id AND checkpoint.id=following.checkpoint_id
++                            AND checkpoint.state='invalid_output')));
++    END IF;
++    IF following.state='cancelled' AND previous.state IN ('queued','active') THEN
++        RETURN EXISTS (SELECT 1 FROM public.workflow_runs AS run
++            WHERE run.company_id=following.company_id AND run.id=following.run_id AND run.state='cancelled');
++    END IF;
++    IF previous.state='failed' AND following.state='queued' AND pg_trigger_depth()>1 THEN
++        -- Only the genuine native failed-root reopen hook may take this exceptional edge.
++        RETURN EXISTS (
++            SELECT 1 FROM public.workflow_runs AS run
++            JOIN public.workflow_executions AS execution ON execution.company_id=run.company_id AND execution.run_id=run.id
++            JOIN public.background_tasks AS job ON job.company_id=execution.company_id AND job.workflow_execution_id=execution.id
++            WHERE run.company_id=following.company_id AND run.id=following.run_id AND run.state='running'
++                AND execution.id=following.execution_id AND execution.completed_at IS NULL
++                AND job.id=following.job_id AND job.status='pending'
++                AND public.workflow_control_retry_safe(run.company_id,run.id,job.id));
++    END IF;
++    RETURN false;
++END $$;
++
++CREATE FUNCTION public.guard_agent_history_exchange_change() RETURNS trigger LANGUAGE plpgsql AS $$
++DECLARE current_level public.access_level;
++        source record;
++BEGIN
++    IF TG_OP='DELETE' THEN
++        IF NOT EXISTS (SELECT 1 FROM public.companies WHERE id=OLD.company_id) THEN
++            RETURN OLD; -- Intentional whole-tenant teardown owns its cascades.
++        END IF;
++        IF OLD.state IN ('queued','active') THEN
++            RAISE EXCEPTION 'live agent exchange cannot be removed' USING ERRCODE='23514';
++        END IF;
++        IF OLD.state='failed' THEN
++            -- DELETE already owns the exchange tuple. Never wait for the opposite
++            -- run->exchange control order: fail busy while another owner has the run.
++            SELECT state,deadline,terminal_execution_id INTO STRICT source
++                FROM public.workflow_runs WHERE company_id=OLD.company_id AND id=OLD.run_id
++                FOR SHARE NOWAIT;
++            IF source.deadline>clock_timestamp() AND (
++                source.state NOT IN ('succeeded','failed','cancelled')
++                OR (source.state='failed' AND source.terminal_execution_id=OLD.execution_id
++                    AND public.workflow_control_retry_safe(OLD.company_id,OLD.run_id,OLD.job_id))
++            ) THEN
++                RAISE EXCEPTION 'resumable agent exchange cannot be removed' USING ERRCODE='23514';
++            END IF;
++        END IF;
++        RETURN OLD;
++    END IF;
++    IF to_jsonb(NEW)=to_jsonb(OLD) AND NEW.output::text IS NOT DISTINCT FROM OLD.output::text THEN
++        RETURN NEW;
++    END IF;
++    IF OLD.state IN ('completed','cancelled')
++        OR (to_jsonb(NEW)-ARRAY['state','checkpoint_id','output','access_level','activated_at','finished_at']::text[])
++            IS DISTINCT FROM
++           (to_jsonb(OLD)-ARRAY['state','checkpoint_id','output','access_level','activated_at','finished_at']::text[])
++        OR (OLD.checkpoint_id IS NOT NULL AND NEW.checkpoint_id IS DISTINCT FROM OLD.checkpoint_id)
++        OR (OLD.activated_at IS NOT NULL AND NEW.activated_at IS DISTINCT FROM OLD.activated_at)
++        OR NOT public.agent_history_transition_allowed(OLD,NEW)
++    THEN
++        RAISE EXCEPTION 'agent exchange identity or lifecycle changed' USING ERRCODE='23514';
++    END IF;
++    SELECT content_level INTO STRICT current_level FROM public.workflow_runs
++        WHERE company_id=NEW.company_id AND id=NEW.run_id;
++    IF NEW.access_level<OLD.access_level OR NEW.access_level<current_level
++        OR (NEW.finished_at IS NOT NULL AND NEW.finished_at>clock_timestamp())
++        OR (NEW.activated_at IS NOT NULL AND NEW.activated_at>clock_timestamp())
++        OR NOT public.agent_history_checkpoint_matches(NEW)
++    THEN
++        RAISE EXCEPTION 'agent exchange level/checkpoint agreement failed' USING ERRCODE='23514';
++    END IF;
++    RETURN NEW;
++END $$;
++CREATE TRIGGER agent_history_exchange_change BEFORE UPDATE OR DELETE ON public.agent_history_exchanges
++    FOR EACH ROW EXECUTE FUNCTION public.guard_agent_history_exchange_change();
++
++CREATE FUNCTION public.guard_agent_history_checkpoint_agreement() RETURNS trigger LANGUAGE plpgsql AS $$
++DECLARE related public.agent_history_exchanges;
++        proof text;
++BEGIN
++    IF TG_TABLE_NAME='task_harness_runs' THEN
++        proof:=NEW.workflow_prepared->>'history_exchange';
++        IF proof IS NULL THEN
++            RETURN NULL;
++        END IF;
++        SELECT * INTO related FROM public.agent_history_exchanges
++            WHERE company_id=NEW.company_id AND id=proof::uuid;
++        IF NOT FOUND AND NOT EXISTS (SELECT 1 FROM public.companies WHERE id=NEW.company_id) THEN
++            RETURN NULL;
++        END IF;
++        IF NOT FOUND OR related.checkpoint_id IS DISTINCT FROM NEW.id THEN
++            RAISE EXCEPTION 'checkpoint has no matching logical exchange' USING ERRCODE='23514';
++        END IF;
++    ELSE
++        SELECT * INTO related FROM public.agent_history_exchanges WHERE company_id=NEW.company_id AND id=NEW.id;
++        IF NOT FOUND THEN
++            IF EXISTS (SELECT 1 FROM public.companies WHERE id=NEW.company_id) THEN
++                RAISE EXCEPTION 'agent exchange disappeared during its write' USING ERRCODE='23514';
++            END IF;
++            RETURN NULL;
++        END IF;
++    END IF;
++    IF NOT public.agent_history_checkpoint_matches(related) THEN
++        RAISE EXCEPTION 'agent output and final checkpoint must agree' USING ERRCODE='23514';
++    END IF;
++    RETURN NULL;
++END $$;
++CREATE CONSTRAINT TRIGGER agent_history_exchange_agreement AFTER INSERT OR UPDATE ON public.agent_history_exchanges
++    DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION public.guard_agent_history_checkpoint_agreement();
++CREATE CONSTRAINT TRIGGER agent_history_checkpoint_agreement AFTER INSERT OR UPDATE ON public.task_harness_runs
++    DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION public.guard_agent_history_checkpoint_agreement();
++
++CREATE INDEX agent_history_exchanges_live_source ON public.agent_history_exchanges(company_id,run_id,execution_id)
++    WHERE state IN ('queued','active');
++
++CREATE FUNCTION public.settle_agent_history_run() RETURNS trigger LANGUAGE plpgsql AS $$
++BEGIN
++    IF NEW.state IN ('failed','cancelled') AND OLD.state IS DISTINCT FROM NEW.state THEN
++        UPDATE public.agent_history_exchanges SET
++            state=CASE WHEN NEW.state='cancelled' THEN 'cancelled' ELSE 'failed' END,
++            access_level=GREATEST(access_level,NEW.content_level),
++            finished_at=COALESCE(finished_at,clock_timestamp())
++        WHERE company_id=NEW.company_id AND run_id=NEW.id AND state IN ('queued','active');
++        IF NEW.state='failed' THEN
++            -- An invalid-output checkpoint may have closed its input before run retirement.
++            UPDATE public.agent_history_exchanges SET access_level=GREATEST(access_level,NEW.content_level)
++                WHERE company_id=NEW.company_id AND run_id=NEW.id
++                    AND execution_id=NEW.terminal_execution_id AND state='failed';
++        END IF;
++    ELSIF OLD.state='failed' AND NEW.state='running' AND OLD.terminal_execution_id IS NOT NULL THEN
++        -- The existing run transition guard proves safe native control retry on this job.
++        UPDATE public.agent_history_exchanges AS exchange SET state='queued',finished_at=NULL,
++            access_level=GREATEST(exchange.access_level,NEW.content_level)
++        WHERE exchange.company_id=NEW.company_id AND exchange.run_id=NEW.id
++            AND exchange.execution_id=OLD.terminal_execution_id AND exchange.state='failed'
++            AND public.workflow_control_retry_safe(NEW.company_id,NEW.id,exchange.job_id);
++    END IF;
++    RETURN NULL;
++END $$;
++CREATE TRIGGER agent_history_run_terminal AFTER UPDATE OF state ON public.workflow_runs
++    FOR EACH ROW EXECUTE FUNCTION public.settle_agent_history_run();
++
++CREATE FUNCTION public.settle_agent_history_routed_failure() RETURNS trigger LANGUAGE plpgsql AS $$
++BEGIN
++    IF NEW.committed_route='final_error' AND OLD.committed_route IS DISTINCT FROM NEW.committed_route THEN
++        UPDATE public.agent_history_exchanges AS exchange SET state='failed',
++            access_level=GREATEST(exchange.access_level,run.content_level),
++            finished_at=clock_timestamp()
++        FROM public.workflow_runs AS run
++        WHERE exchange.company_id=NEW.company_id AND exchange.run_id=NEW.run_id
++            AND exchange.execution_id=NEW.id AND exchange.state IN ('queued','active')
++            AND run.company_id=exchange.company_id AND run.id=exchange.run_id;
++    END IF;
++    RETURN NULL;
++END $$;
++CREATE TRIGGER agent_history_routed_failure AFTER UPDATE OF committed_route ON public.workflow_executions
++    FOR EACH ROW EXECUTE FUNCTION public.settle_agent_history_routed_failure();
+--- accepted-p01/src/adapters/harness/rig/workflow.rs
++++ p02/src/adapters/harness/rig/workflow.rs
+@@ -280,7 +280,7 @@
+             .window
+             .run_deadline
+             .min(tokio::time::Instant::now() + std::time::Duration::from_millis(MAX_CLAIM_MS));
+-        let launch = self.store.prepare_agent(claim).await?;
++        let launch = self.store.prepare_agent(claim, self.lease).await?;
+         let spec = launch.prepared.spec(claim.fence)?;
+         JsonResponseValidator.validate_contract(
+             spec.identity
+--- accepted-p01/src/adapters/persistence/workflow/agent_history/checkpoint.rs
++++ p02/src/adapters/persistence/workflow/agent_history/checkpoint.rs
+@@ -0,0 +1,269 @@
++use super::*;
++use crate::application::workflow::{
++    agent_contract::AgentSelectionIdentity, publication::AgentUseMode,
++};
++use crate::services::harness::runs::{RunCheckpoint, RunState};
++use serde_json::Value;
++
++#[derive(Debug, Clone, Copy, PartialEq, Eq)]
++pub(in crate::adapters::persistence::workflow) enum LinkChange {
++    Linked,
++    Unchanged,
++}
++
++#[derive(sqlx::FromRow)]
++struct Record {
++    id: Uuid,
++    job_id: Uuid,
++    agent_id: Uuid,
++    revision_id: Uuid,
++    manifest_id: Uuid,
++    checkpoint_id: Option<Uuid>,
++    #[sqlx(try_from = "String")]
++    state: AgentExchangeState,
++    input_matches: bool,
++    output_contract: Value,
++}
++
++fn reference(prepared: &Value) -> AppResult<Option<AgentExchangeId>> {
++    serde_json::from_value(prepared["history_exchange"].clone()).map_err(|_| invalid())
++}
++
++async fn record_on(
++    db: &mut PgConnection,
++    scope: ActionScope,
++    actual_mode: AgentUseMode,
++    prepared: &Value,
++) -> AppResult<Option<Record>> {
++    let reference = reference(prepared)?;
++    if actual_mode == AgentUseMode::ModelOnly {
++        return if reference.is_none() {
++            Ok(None)
++        } else {
++            Err(invalid())
++        };
++    }
++    if prepared["version"] != 4 {
++        return Err(invalid());
++    }
++    let reference =
++        reference.ok_or_else(|| AppError::Conflict("Agent input was not durably queued".into()))?;
++    if reference != AgentExchangeId::for_execution(scope.execution) {
++        return Err(invalid());
++    }
++    let selection: AgentSelectionIdentity =
++        serde_json::from_value(prepared["selection"].clone()).map_err(|_| invalid())?;
++    let input = prepared.get("context").ok_or_else(invalid)?;
++    let row = sqlx::query_as::<_, Record>(
++        "SELECT id,job_id,agent_id,revision_id,manifest_id,checkpoint_id,state, \
++         provenance->'output_contract' AS output_contract, \
++         input_digest=sha256(convert_to($4::jsonb::text,'UTF8')) AS input_matches \
++         FROM agent_history_exchanges WHERE company_id=$1 AND run_id=$2 AND execution_id=$3",
++    )
++    .bind(scope.company.as_uuid())
++    .bind(scope.run.as_uuid())
++    .bind(scope.execution.as_uuid())
++    .bind(input)
++    .fetch_optional(db)
++    .await?
++    .ok_or_else(missing)?;
++    if row.id != reference.as_uuid()
++        || row.agent_id != selection.agent.as_uuid()
++        || row.revision_id != selection.revision.as_uuid()
++        || row.manifest_id != selection.manifest.as_uuid()
++        || selection.mode != actual_mode
++        || !row.input_matches
++        || row.output_contract["schema"] != prepared["output_schema"]
++    {
++        return Err(AppError::Conflict(
++            "Checkpoint preparation differs from its queued input".into(),
++        ));
++    }
++    Ok(Some(row))
++}
++
++#[derive(sqlx::FromRow)]
++struct StepSource {
++    bundle: Vec<u8>,
++    step_id: String,
++}
++
++/// Generic native checkpoint fixtures may be non-model work. The immutable program, rather
++/// than a caller's prepared label, decides whether this is an eligible production agent.
++async fn eligible_on(db: &mut PgConnection, scope: ActionScope) -> AppResult<AgentUseMode> {
++    let source=sqlx::query_as::<_,StepSource>(
++        "SELECT stored.bundle,execution.step_id FROM workflow_runs AS run \
++         JOIN workflow_bundles AS stored ON stored.company_id=run.company_id AND stored.digest=run.bundle_digest \
++         JOIN workflow_executions AS execution ON execution.company_id=run.company_id AND execution.run_id=run.id \
++         WHERE run.company_id=$1 AND run.id=$2 AND execution.id=$3 AND octet_length(stored.bundle)<=$4",
++    ).bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(scope.execution.as_uuid())
++        .bind(MAX_BUNDLE_BYTES as i32).fetch_optional(db).await?.ok_or_else(missing)?;
++    let bundle = restore_bundle(
++        &source.bundle,
++        &crate::adapters::workflow_source::WorkflowSourceDecoder,
++    )?;
++    let step = StepId::parse(source.step_id).map_err(|_| invalid())?;
++    let kind = bundle
++        .compiled()
++        .graph()
++        .definition()
++        .steps
++        .get(&step)
++        .ok_or_else(invalid)?;
++    Ok(if kind.step_type.as_str() == "agent.run" {
++        AgentUseMode::Tools
++    } else {
++        AgentUseMode::ModelOnly
++    })
++}
++
++pub(in crate::adapters::persistence::workflow) async fn check_prepared_on(
++    db: &mut PgConnection,
++    scope: ActionScope,
++    actual_mode: AgentUseMode,
++    prepared: &Value,
++) -> AppResult<()> {
++    if prepared["version"] != 4 {
++        return Err(invalid());
++    }
++    record_on(db, scope, actual_mode, prepared).await?;
++    Ok(())
++}
++
++pub(in crate::adapters::persistence::workflow) async fn attach_on(
++    db: &mut PgConnection,
++    fence: WorkflowFence,
++    prepared: &Value,
++    checkpoint: Uuid,
++) -> AppResult<LinkChange> {
++    let scope = ActionScope {
++        company: fence.scope.company,
++        run: fence.scope.run,
++        execution: fence.scope.execution,
++    };
++    let mode = eligible_on(db, scope).await?;
++    let Some(row) = record_on(db, scope, mode, prepared).await? else {
++        return Ok(LinkChange::Unchanged);
++    };
++    if row.job_id != fence.scope.job.0 || row.checkpoint_id.is_some_and(|saved| saved != checkpoint)
++    {
++        return Err(invalid());
++    }
++    if row.state != AgentExchangeState::Queued {
++        return if row.checkpoint_id == Some(checkpoint) {
++            Ok(LinkChange::Unchanged)
++        } else {
++            Err(invalid())
++        };
++    }
++    let changed = sqlx::query(
++        "UPDATE agent_history_exchanges AS exchange SET state='active',checkpoint_id=$4, \
++         activated_at=COALESCE(exchange.activated_at,clock_timestamp()), \
++         access_level=GREATEST(exchange.access_level,run.content_level) \
++         FROM workflow_runs AS run WHERE exchange.company_id=$1 AND exchange.run_id=$2 AND exchange.id=$3 \
++           AND run.company_id=exchange.company_id AND run.id=exchange.run_id AND exchange.state='queued'",
++    ).bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(row.id).bind(checkpoint).execute(db).await?;
++    if changed.rows_affected() != 1 {
++        return Err(missing());
++    }
++    Ok(LinkChange::Linked)
++}
++
++/// Read-only evidence for checkpoint open, including its additional reactivation effect.
++pub(in crate::adapters::persistence::workflow) async fn linked_on(
++    db: &mut PgConnection,
++    fence: WorkflowFence,
++    prepared: &Value,
++    checkpoint: Uuid,
++) -> AppResult<bool> {
++    let scope = ActionScope {
++        company: fence.scope.company,
++        run: fence.scope.run,
++        execution: fence.scope.execution,
++    };
++    let mode = eligible_on(db, scope).await?;
++    let Some(row) = record_on(db, scope, mode, prepared).await? else {
++        return Ok(true);
++    };
++    Ok(row.checkpoint_id == Some(checkpoint) && row.state != AgentExchangeState::Queued)
++}
++
++pub(in crate::adapters::persistence::workflow) async fn require_active_on(
++    db: &mut PgConnection,
++    fence: WorkflowFence,
++    prepared: &Value,
++    checkpoint: Uuid,
++) -> AppResult<()> {
++    let scope = ActionScope {
++        company: fence.scope.company,
++        run: fence.scope.run,
++        execution: fence.scope.execution,
++    };
++    let mode = eligible_on(db, scope).await?;
++    let Some(row) = record_on(db, scope, mode, prepared).await? else {
++        return Ok(());
++    };
++    if row.state != AgentExchangeState::Active || row.checkpoint_id != Some(checkpoint) {
++        return Err(AppError::Execution(
++            crate::app_error::ExecutionFailure::CheckpointDenied,
++        ));
++    }
++    Ok(())
++}
++
++pub(in crate::adapters::persistence::workflow) async fn accepted_on(
++    db: &mut PgConnection,
++    fence: WorkflowFence,
++    prepared: &Value,
++    checkpoint: &RunCheckpoint,
++) -> AppResult<()> {
++    if !matches!(
++        checkpoint.state,
++        RunState::Completed | RunState::InvalidOutput
++    ) {
++        return Ok(());
++    }
++    let scope = ActionScope {
++        company: fence.scope.company,
++        run: fence.scope.run,
++        execution: fence.scope.execution,
++    };
++    let mode = eligible_on(db, scope).await?;
++    let Some(row) = record_on(db, scope, mode, prepared).await? else {
++        return Ok(());
++    };
++    if row.checkpoint_id != Some(checkpoint.run_id.0) {
++        return Err(invalid());
++    }
++    let output = if checkpoint.state == RunState::Completed {
++        let structured = checkpoint
++            .final_output
++            .as_ref()
++            .and_then(|output| output.structured.as_ref())
++            .ok_or_else(invalid)?;
++        if serde_json::to_value(structured.contract()).map_err(|_| invalid())?
++            != row.output_contract
++        {
++            return Err(invalid());
++        }
++        Some(
++            AgentLogicalOutput::new(
++                serde_json::from_str(structured.body()).map_err(|_| invalid())?,
++            )?
++            .into_value(),
++        )
++    } else {
++        None
++    };
++    let changed = sqlx::query(
++        "UPDATE agent_history_exchanges AS exchange SET state=$4,output=$5,finished_at=clock_timestamp(), \
++         access_level=GREATEST(exchange.access_level,run.content_level) \
++         FROM workflow_runs AS run WHERE exchange.company_id=$1 AND exchange.run_id=$2 AND exchange.id=$3 \
++           AND run.company_id=exchange.company_id AND run.id=exchange.run_id AND exchange.state='active'",
++    ).bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(row.id)
++        .bind(if output.is_some() {"completed"} else {"failed"}).bind(output).execute(db).await?;
++    if changed.rows_affected() != 1 {
++        return Err(missing());
++    }
++    Ok(())
++}
+--- accepted-p01/src/adapters/persistence/workflow/agent_history/mod.rs
++++ p02/src/adapters/persistence/workflow/agent_history/mod.rs
+@@ -1,4 +1,4 @@
+-//! Trusted identity allocation. No exchange recording or provider history is enabled here.
++//! Native identity, original input capture and checkpoint-owned logical exchanges.
+ use super::*;
+ use crate::application::workflow::{
+     actions::ActionScope, agent_history::*, lease::WorkflowFence, registry::ModelStep,
+@@ -6,7 +6,14 @@
+ use crate::entities::agent_capability::AgentId;
+ use persistence_bound::{Attempt, End, Evidence, WriteBound};
+ 
++mod checkpoint;
++mod preparation;
++pub(super) use checkpoint::{
++    LinkChange, accepted_on, attach_on, check_prepared_on, linked_on, require_active_on,
++};
+ mod scope;
++mod storage;
++pub(super) use preparation::prepare;
+ 
+ #[async_trait]
+ impl AgentHistoryIdentity for PostgresPersistence {
+@@ -110,6 +117,17 @@
+     let Some(context) = authorized_on(tx, fence, bound).await? else {
+         return Ok(None);
+     };
++    let id = conversation_on(tx, &context).await?;
++    if lease::live_window(tx, fence, bound.started())
++        .await?
++        .is_none()
++    {
++        return Err(ownership_lost());
++    }
++    Ok(Some(context.identity(id)))
++}
++
++async fn conversation_on(tx: &mut PgConnection, context: &Context) -> AppResult<Uuid> {
+     let columns = context.columns();
+     let proposed = Uuid::new_v4();
+     sqlx::query(
+@@ -125,16 +143,10 @@
+     .bind(columns.thread)
+     .bind(columns.session)
+     .bind(columns.child)
+-    .execute(&mut **tx)
++    .execute(&mut *tx)
+     .await?;
+-    let id = find_on(tx, &context).await?.ok_or_else(invalid)?;
+-    if lease::live_window(tx, fence, bound.started())
+-        .await?
+-        .is_none()
+-    {
+-        return Err(ownership_lost());
+-    }
+-    Ok(Some(context.identity(id)))
++    let id = find_on(tx, context).await?.ok_or_else(invalid)?;
++    Ok(id)
+ }
+ 
+ async fn find_on(db: &mut PgConnection, context: &Context) -> AppResult<Option<Uuid>> {
+@@ -161,24 +173,16 @@
+     fence: WorkflowFence,
+     bound: &WriteBound,
+ ) -> AppResult<Option<Context>> {
++    let preparation::LockedAgent {
++        actor,
++        facts,
++        selection,
++    } = preparation::locked_on(tx, fence, bound).await?;
+     let action = ActionScope {
+         company: fence.scope.company,
+         run: fence.scope.run,
+         execution: fence.scope.execution,
+     };
+-    let actor = action_authority::prelock_on(tx, action)
+-        .await?
+-        .ok_or_else(missing)?;
+-    let facts = scope::facts_on(tx, action, actor).await?;
+-    let association = binding_rows::association_from_columns(facts.channel_id, facts.thread_id)?;
+-    association::authorize_association(tx, action.company, actor, association).await?;
+-    let selection =
+-        agent_manifest::execution_selection_on(tx, action, actor, &facts.bundle).await?;
+-    agent_authority::check_execution_on(tx, action, selection.agent(), selection.mode()).await?;
+-    // All current global authority, including agent grants, precedes local workflow locks.
+-    if !checkpoints::lock_owner(tx, fence, bound).await? {
+-        return Err(ownership_lost());
+-    }
+     if !agent_history_eligible(facts.kind) {
+         return Ok(None);
+     }
+--- accepted-p01/src/adapters/persistence/workflow/agent_history/preparation.rs
++++ p02/src/adapters/persistence/workflow/agent_history/preparation.rs
+@@ -0,0 +1,175 @@
++//! One bounded native owner captures original input before checkpoint/provider entry.
++use super::*;
++use crate::application::workflow::{
++    agent::{PreparedAgent, PreparedStep},
++    lease::{ClaimedWorkflow, LeasePolicy},
++    publication::ResolvedAgent,
++};
++
++pub(super) struct LockedAgent {
++    pub actor: WorkflowActor,
++    pub facts: scope::Facts,
++    pub selection: ResolvedAgent,
++}
++struct Candidate {
++    prepared: PreparedAgent,
++    context: Option<Context>,
++}
++
++pub(in crate::adapters::persistence::workflow) async fn prepare(
++    persistence: &PostgresPersistence,
++    claim: &ClaimedWorkflow,
++    policy: LeasePolicy,
++) -> AppResult<PreparedAgent> {
++    let bound = WriteBound::start("agent_history.prepare", policy);
++    let attempt = bound
++        .attempt(Box::pin(async {
++            let mut connection = bound.acquire(persistence.pool()).await?;
++            let mut tx = bound.begin(&mut connection).await?;
++            let body = async {
++                let candidate = Box::pin(candidate_on(&mut tx, claim, &bound)).await?;
++                let prepared = match candidate.context {
++                    None => candidate.prepared,
++                    Some(context) => {
++                        let conversation = conversation_on(&mut tx, &context).await?;
++                        let exchange = storage::enqueue_on(
++                            &mut tx,
++                            claim.fence,
++                            conversation,
++                            &candidate.prepared,
++                        )
++                        .await?;
++                        candidate.prepared.with_history(exchange)?
++                    }
++                };
++                if lease::live_window(&mut tx, claim.fence, bound.started())
++                    .await?
++                    .is_none()
++                {
++                    return Err(ownership_lost());
++                }
++                Ok(prepared)
++            }
++            .await;
++            bound.end(tx, body.map(End::Commit)).await
++        }))
++        .await;
++    match attempt {
++        Attempt::Done(prepared) => Ok(prepared),
++        Attempt::Failed(error) => Err(error),
++        Attempt::Ambiguous => {
++            bound
++                .resolve(Box::pin(async {
++                    let mut connection = bound.acquire(persistence.pool()).await?;
++                    let mut tx = bound.begin(&mut connection).await?;
++                    let body = async {
++                        let candidate = Box::pin(candidate_on(&mut tx, claim, &bound)).await?;
++                        let Some(context) = candidate.context else {
++                            return Ok(Evidence::Applied(candidate.prepared));
++                        };
++                        let Some(conversation) = find_on(&mut tx, &context).await? else {
++                            return Ok(Evidence::NotApplied);
++                        };
++                        Ok(
++                            match storage::matching_on(
++                                &mut tx,
++                                claim.fence,
++                                conversation,
++                                &candidate.prepared,
++                            )
++                            .await?
++                            {
++                                Some(exchange) => {
++                                    Evidence::Applied(candidate.prepared.with_history(exchange)?)
++                                }
++                                None => Evidence::NotApplied,
++                            },
++                        )
++                    }
++                    .await;
++                    bound.roll_back(tx, body).await
++                }))
++                .await
++        }
++    }
++}
++
++pub(super) async fn locked_on(
++    tx: &mut Transaction<'_, Postgres>,
++    fence: WorkflowFence,
++    bound: &WriteBound,
++) -> AppResult<LockedAgent> {
++    let action = ActionScope {
++        company: fence.scope.company,
++        run: fence.scope.run,
++        execution: fence.scope.execution,
++    };
++    let actor = action_authority::prelock_on(tx, action)
++        .await?
++        .ok_or_else(missing)?;
++    let facts = scope::facts_on(tx, action, actor).await?;
++    let association = binding_rows::association_from_columns(facts.channel_id, facts.thread_id)?;
++    association::authorize_association(tx, action.company, actor, association).await?;
++    let selection =
++        agent_manifest::execution_selection_on(tx, action, actor, &facts.bundle).await?;
++    agent_authority::check_execution_on(tx, action, selection.agent(), selection.mode()).await?;
++    // Global account/company/association/agent authority precedes the native local fence.
++    if !checkpoints::lock_owner(tx, fence, bound).await? {
++        return Err(ownership_lost());
++    }
++    Ok(LockedAgent {
++        actor,
++        facts,
++        selection,
++    })
++}
++
++async fn candidate_on(
++    tx: &mut Transaction<'_, Postgres>,
++    claim: &ClaimedWorkflow,
++    bound: &WriteBound,
++) -> AppResult<Candidate> {
++    let LockedAgent {
++        actor,
++        facts,
++        selection,
++    } = locked_on(tx, claim.fence, bound).await?;
++    if facts.step != claim.activation.step || facts.inputs != claim.activation.inputs {
++        return Err(missing());
++    }
++    let prepared = build(selection, &facts)?;
++    let context = if agent_history_eligible(facts.kind) {
++        let action = ActionScope {
++            company: claim.fence.scope.company,
++            run: claim.fence.scope.run,
++            execution: claim.fence.scope.execution,
++        };
++        Some(Context {
++            company: action.company,
++            actor,
++            agent: prepared.selection().agent().agent_id,
++            boundary: scope::boundary_on(tx, action, actor, &facts).await?,
++        })
++    } else {
++        None
++    };
++    Ok(Candidate { prepared, context })
++}
++
++fn build(selection: ResolvedAgent, facts: &scope::Facts) -> AppResult<PreparedAgent> {
++    let step = match facts.kind {
++        ModelStep::AgentRun => PreparedStep::AgentRun {
++            targets: agent_preparation::targets(selection.agent().company_id, selection.tools())?,
++        },
++        ModelStep::Classify => PreparedStep::Classify,
++        ModelStep::Decide => PreparedStep::Decide {
++            contract: facts
++                .bundle
++                .compiled()
++                .step_output_schema(&facts.step)
++                .cloned()
++                .ok_or_else(invalid)?,
++        },
++    };
++    PreparedAgent::new(selection, &facts.inputs, step)
++}
+--- accepted-p01/src/adapters/persistence/workflow/agent_history/scope.rs
++++ p02/src/adapters/persistence/workflow/agent_history/scope.rs
+@@ -5,6 +5,7 @@
+     pub kind: ModelStep,
+     pub step: StepId,
+     pub activation: i64,
++    pub inputs: serde_json::Value,
+     pub parent: Option<Uuid>,
+     pub channel_id: Option<Uuid>,
+     pub thread_id: Option<Uuid>,
+@@ -15,6 +16,7 @@
+     bundle: Vec<u8>,
+     step_id: String,
+     activation: i64,
++    frozen_inputs: serde_json::Value,
+     parent_run_id: Option<Uuid>,
+     channel_id: Option<Uuid>,
+     thread_id: Option<Uuid>,
+@@ -27,7 +29,7 @@
+     actor: WorkflowActor,
+ ) -> AppResult<Facts> {
+     let row = sqlx::query_as::<_, FactsRow>(
+-        "SELECT run.actor_id,stored.bundle,execution.step_id,execution.activation, \
++        "SELECT run.actor_id,stored.bundle,execution.step_id,execution.activation,execution.frozen_inputs, \
+          run.parent_run_id,run.channel_id,run.thread_id FROM workflow_runs AS run \
+          JOIN workflow_bundles AS stored ON stored.company_id=run.company_id AND stored.digest=run.bundle_digest \
+          JOIN workflow_executions AS execution ON execution.company_id=run.company_id AND execution.run_id=run.id \
+@@ -56,6 +58,7 @@
+         kind,
+         step,
+         activation: row.activation,
++        inputs: row.frozen_inputs,
+         parent: row.parent_run_id,
+         channel_id: row.channel_id,
+         thread_id: row.thread_id,
+--- accepted-p01/src/adapters/persistence/workflow/agent_history/storage.rs
++++ p02/src/adapters/persistence/workflow/agent_history/storage.rs
+@@ -0,0 +1,101 @@
++use super::*;
++use crate::application::workflow::agent::PreparedAgent;
++use serde_json::Value;
++
++#[derive(sqlx::FromRow)]
++struct SavedExchange {
++    id: Uuid,
++    conversation_id: Uuid,
++    agent_id: Uuid,
++    revision_id: Uuid,
++    manifest_id: Uuid,
++    run_id: Uuid,
++    job_id: Uuid,
++    input_matches: bool,
++    provenance: Value,
++}
++
++fn provenance(prepared: &PreparedAgent) -> AppResult<Value> {
++    let selection = prepared.selection();
++    serde_json::to_value(AgentExchangeProvenance {
++        agent: selection.agent().agent_id,
++        revision: selection.revision().id,
++        model: selection.agent().model.clone(),
++        output_contract: prepared.response_contract()?,
++    })
++    .map_err(|_| invalid())
++}
++
++pub(super) async fn matching_on(
++    db: &mut PgConnection,
++    fence: WorkflowFence,
++    conversation: Uuid,
++    prepared: &PreparedAgent,
++) -> AppResult<Option<AgentExchangeId>> {
++    let saved = sqlx::query_as::<_, SavedExchange>(
++        "SELECT id,conversation_id,agent_id,revision_id,manifest_id,run_id,job_id,provenance, \
++         input_digest=sha256(convert_to($3::jsonb::text,'UTF8')) AS input_matches \
++         FROM agent_history_exchanges WHERE company_id=$1 AND execution_id=$2",
++    )
++    .bind(fence.scope.company.as_uuid())
++    .bind(fence.scope.execution.as_uuid())
++    .bind(prepared.logical_input().value())
++    .fetch_optional(db)
++    .await?;
++    let Some(saved) = saved else { return Ok(None) };
++    let selection = prepared.selection();
++    if saved.id != fence.scope.execution.as_uuid()
++        || saved.conversation_id != conversation
++        || saved.agent_id != selection.agent().agent_id.as_uuid()
++        || saved.revision_id != selection.revision().id.as_uuid()
++        || saved.manifest_id != selection.manifest_id().as_uuid()
++        || saved.run_id != fence.scope.run.as_uuid()
++        || saved.job_id != fence.scope.job.0
++        || !saved.input_matches
++        || saved.provenance != provenance(prepared)?
++    {
++        return Err(AppError::Conflict(
++            "Agent exchange differs from its logical activation".into(),
++        ));
++    }
++    Ok(Some(AgentExchangeId::new(saved.id)))
++}
++
++pub(super) async fn enqueue_on(
++    db: &mut PgConnection,
++    fence: WorkflowFence,
++    conversation: Uuid,
++    prepared: &PreparedAgent,
++) -> AppResult<AgentExchangeId> {
++    if let Some(saved) = matching_on(db, fence, conversation, prepared).await? {
++        return Ok(saved);
++    }
++    let last: i64 = sqlx::query_scalar(
++        "SELECT last_exchange_order FROM agent_history_conversations \
++        WHERE company_id=$1 AND id=$2 FOR UPDATE",
++    )
++    .bind(fence.scope.company.as_uuid())
++    .bind(conversation)
++    .fetch_one(&mut *db)
++    .await?;
++    let position = last
++        .checked_add(1)
++        .ok_or_else(|| AppError::Conflict("Agent conversation order is exhausted".into()))?;
++    let selection = prepared.selection();
++    let inserted=sqlx::query_scalar::<_,Uuid>(
++        "INSERT INTO agent_history_exchanges \
++         (company_id,id,conversation_id,agent_id,revision_id,manifest_id,run_id,execution_id,job_id, \
++          position,input_digest,provenance,access_level,state) \
++         SELECT $1,$2,$3,$4,$5,$6,$7,$2,$8,$9,sha256(convert_to($10::jsonb::text,'UTF8')),$11,run.content_level,'queued' \
++         FROM workflow_runs AS run JOIN workflow_executions AS execution \
++           ON execution.company_id=run.company_id AND execution.run_id=run.id \
++         WHERE run.company_id=$1 AND run.id=$7 AND execution.id=$2 \
++           AND sha256(convert_to((execution.frozen_inputs->'context')::text,'UTF8'))=sha256(convert_to($10::jsonb::text,'UTF8')) \
++         RETURNING id",
++    ).bind(fence.scope.company.as_uuid()).bind(fence.scope.execution.as_uuid()).bind(conversation)
++        .bind(selection.agent().agent_id.as_uuid()).bind(selection.revision().id.as_uuid())
++        .bind(selection.manifest_id().as_uuid()).bind(fence.scope.run.as_uuid()).bind(fence.scope.job.0)
++        .bind(position).bind(prepared.logical_input().value()).bind(provenance(prepared)?)
++        .fetch_optional(db).await?.ok_or_else(||AppError::Conflict("Agent exchange input changed".into()))?;
++    Ok(AgentExchangeId::new(inserted))
++}
+--- accepted-p01/src/adapters/persistence/workflow/agent_history_commit_ack_tests.rs
++++ p02/src/adapters/persistence/workflow/agent_history_commit_ack_tests.rs
+@@ -0,0 +1,149 @@
++use super::*;
++use crate::adapters::persistence::workflow::persistence_bound::recorder::Injected;
++use crate::adapters::persistence::workflow::tests::admission_tests::lease_tests::resolution_gate::{Abort,Gate,GatePool,Stall,connect,resolution_behind};
++use crate::application::workflow::agent::AgentLaunch;
++
++struct HistoryPool<'a>(&'a PostgresPersistence);
++impl GatePool for HistoryPool<'_> {
++    fn gate_pool(&self) -> &sqlx::PgPool {
++        self.0.pool()
++    }
++}
++struct EnqueueAck {
++    setup: AgentSetup,
++    outcome: AppResult<AgentLaunch>,
++}
++
++async fn prepare_ambiguously(abort: Abort) -> EnqueueAck {
++    let setup = Box::pin(agent_setup("http://127.0.0.1:1")).await;
++    let p = &setup.fixture.persistence;
++    let fixture = HistoryPool(p);
++    let mut gate = Gate::arm(
++        &fixture,
++        "agent_history_exchanges",
++        "INSERT",
++        "true",
++        Stall::Commit,
++    )
++    .await;
++    let (mut observer, _) = connect(&fixture).await;
++    let pending = {
++        let p = p.clone();
++        let claim = setup.claim.clone();
++        tokio::spawn(async move { p.prepare_agent(&claim, lease()).await })
++    };
++    let stalled = gate
++        .stalled(&mut observer, &[&|| !pending.is_finished()])
++        .await;
++    resolution_behind(
++        &mut observer,
++        stalled,
++        lease(),
++        &[&|| !pending.is_finished()],
++    )
++    .await;
++    gate.abort_on_release(abort).await;
++    gate.drain().await;
++    let outcome = pending.await.unwrap();
++    gate.abort_on_release(Abort::Nothing).await;
++    assert_eq!(usage_rows(p, setup.claim.fence.scope.run).await, 0);
++    EnqueueAck { setup, outcome }
++}
++
++#[tokio::test]
++async fn agent_history_storage_ambiguous_enqueue_committed_reuses_one_position_before_checkpoint() {
++    let injected = Injected::mark();
++    let ack = prepare_ambiguously(Abort::Nothing).await;
++    assert!(ack.outcome.is_ok());
++    assert!(injected.outcomes().iter().any(|event|event.op=="agent_history.prepare" && event.outcome=="resolved_applied"));
++    let rows = captured(&ack.setup).await;
++    assert_eq!(rows.len(), 1);
++    assert_eq!(rows[0].id, ack.setup.claim.fence.scope.execution.as_uuid());
++    assert_eq!(rows[0].position, 1);
++    assert_eq!(rows[0].state, "queued");
++    assert!(rows[0].checkpoint_id.is_none());
++    ack.setup
++        .fixture
++        .persistence
++        .prepare_agent(&ack.setup.claim, lease())
++        .await
++        .unwrap();
++    assert_eq!(captured(&ack.setup).await, rows);
++}
++
++#[tokio::test]
++async fn agent_history_storage_ambiguous_enqueue_aborted_keeps_counter_available_for_recovery() {
++    let injected = Injected::mark();
++    let ack = prepare_ambiguously(Abort::Every).await;
++    assert!(ack.outcome.is_err());
++    assert!(injected.outcomes().iter().any(
++        |event| event.op == "agent_history.prepare" && event.outcome == "resolved_not_applied"
++    ));
++    assert!(captured(&ack.setup).await.is_empty());
++    ack.setup
++        .fixture
++        .persistence
++        .prepare_agent(&ack.setup.claim, lease())
++        .await
++        .unwrap();
++    let rows = captured(&ack.setup).await;
++    assert_eq!(rows.len(), 1);
++    assert_eq!(rows[0].position, 1);
++    assert_eq!(rows[0].id, ack.setup.claim.fence.scope.execution.as_uuid());
++    assert!(rows[0].checkpoint_id.is_none());
++}
++
++#[tokio::test]
++async fn agent_history_completion_actual_final_commit_ack_loss_replays_without_another_provider_call()
++ {
++    let injected = Injected::mark();
++    let setup = Box::pin(agent_setup("http://127.0.0.1:1")).await;
++    let llm = scripted_llm(vec![LlmTurn::text("\"accepted\"")]).await;
++    register_scripted_agent_base_url(setup.agent, &llm.base_url);
++    let fixture = HistoryPool(&setup.fixture.persistence);
++    let mut gate = Gate::arm(
++        &fixture,
++        "task_harness_runs",
++        "UPDATE",
++        "NEW.state='completed'",
++        Stall::Commit,
++    )
++    .await;
++    let (mut observer, _) = connect(&fixture).await;
++    let pending = {
++        let runtime = agent_runtime(&setup);
++        let claim = setup.claim.clone();
++        tokio::spawn(async move {
++            Box::pin(runtime.execute(&WorkflowStepKind("agent.run".into()), &claim)).await
++        })
++    };
++    gate.stalled(&mut observer, &[&|| !pending.is_finished()])
++        .await;
++    let first = tokio::time::timeout(Duration::from_secs(5), pending)
++        .await
++        .unwrap()
++        .unwrap();
++    assert!(first.completed_result().is_err());
++    assert!(
++        injected
++            .outcomes()
++            .iter()
++            .any(|event| event.op == "checkpoint.update" && event.outcome == "unknown")
++    );
++    gate.drain().await;
++    let rows = captured(&setup).await;
++    assert_eq!(rows.len(), 1);
++    assert_eq!(rows[0].state, "completed");
++    assert_eq!(rows[0].output, Some(json!("accepted")));
++    let replay = Box::pin(
++        agent_runtime(&setup).execute(&WorkflowStepKind("agent.run".into()), &setup.claim),
++    )
++    .await;
++    assert_eq!(replay.completed_result().unwrap(), json!("accepted"));
++    assert_eq!(captured(&setup).await, rows);
++    assert_eq!(
++        usage_rows(&setup.fixture.persistence, setup.claim.fence.scope.run).await,
++        1
++    );
++    assert_eq!(llm.finish().await.unwrap(), 1);
++}
+--- accepted-p01/src/adapters/persistence/workflow/agent_history_completion_tests.rs
++++ p02/src/adapters/persistence/workflow/agent_history_completion_tests.rs
+@@ -0,0 +1,294 @@
++//! Real native model accounting, checkpoint writes and workflow controls share one exchange.
++use super::*;
++use crate::services::harness::AgentExecutionOutput;
++use crate::services::response_contract::StructuredResponse;
++
++async fn settled_history() -> ModelFixture {
++    let mut f = opened().await;
++    let p = f.native.fixture.persistence();
++    let request = reservation();
++    let WorkflowModelAdmission::New(permit) = p
++        .reserve_workflow_model(f.write, model_request(&request), None)
++        .await
++        .unwrap()
++    else {
++        panic!("one model request must be admitted")
++    };
++    f.write.expected_revision = permit.consume().revision;
++    let WorkflowModelSettlement::Saved(result) = p
++        .settle_workflow_model(f.write, response(&request), None)
++        .await
++        .unwrap()
++    else {
++        panic!("the model response must settle")
++    };
++    f.run = match *result {
++        WriteOutcome::Applied(run) => run,
++        other => panic!("unexpected settlement {other:?}"),
++    };
++    f.write.expected_revision = f.run.revision;
++    f
++}
++
++fn accepted(f: &ModelFixture) -> WorkflowCheckpointUpdate {
++    let structured = StructuredResponse::validate(
++        f.run.identity.response_contract.as_ref().unwrap(),
++        r#"{"answer":[null,3.5]}"#,
++        None,
++        &crate::adapters::response_schema::JsonResponseValidator,
++    )
++    .unwrap()
++    .unwrap();
++    WorkflowCheckpointUpdate::FinalOutput(Box::new(AgentExecutionOutput {
++        content: structured.body().into(),
++        structured: Some(structured),
++        metadata: None,
++        token_usage: Default::default(),
++    }))
++}
++
++async fn exchange(f: &ModelFixture) -> Value {
++    sqlx::query_scalar("SELECT to_jsonb(exchange) FROM agent_history_exchanges AS exchange WHERE company_id=$1 AND execution_id=$2")
++        .bind(f.write.fence.scope.company.as_uuid()).bind(f.write.fence.scope.execution.as_uuid())
++        .fetch_one(f.native.fixture.persistence().pool()).await.unwrap()
++}
++
++#[tokio::test]
++async fn agent_history_completion_competing_finalizers_and_durable_replay_keep_one_answer() {
++    let f = Box::pin(settled_history()).await;
++    let p = f.native.fixture.persistence();
++    let update = accepted(&f);
++    let (a, b) = tokio::join!(
++        p.update_workflow_checkpoint(f.write, update.clone()),
++        p.update_workflow_checkpoint(f.write, update.clone())
++    );
++    let outcomes = [a.unwrap(), b.unwrap()];
++    assert_eq!(
++        outcomes
++            .iter()
++            .filter(|v| matches!(v, WriteOutcome::Applied(_)))
++            .count(),
++        1
++    );
++    assert_eq!(
++        outcomes
++            .iter()
++            .filter(|v| matches!(v, WriteOutcome::AlreadyApplied(_)))
++            .count(),
++        1
++    );
++    let saved = exchange(&f).await;
++    assert_eq!(saved["id"], json!(f.write.fence.scope.execution.as_uuid()));
++    assert_eq!(saved["checkpoint_id"], json!(f.run.run_id.0));
++    assert_eq!(saved["state"], "completed");
++    assert_eq!(saved["output"], json!({"answer":[null,3.5]}));
++    assert!(matches!(
++        p.update_workflow_checkpoint(f.write, update).await.unwrap(),
++        WriteOutcome::AlreadyApplied(_)
++    ));
++    assert_eq!(exchange(&f).await, saved);
++    assert_eq!(accounting(&f).await["calls"], 1);
++}
++
++#[tokio::test]
++async fn agent_history_completion_rollback_keeps_checkpoint_and_exchange_active() {
++    let f = Box::pin(settled_history()).await;
++    let p = f.native.fixture.persistence();
++    let before = exchange(&f).await;
++    let checkpoint = stored(&f.native.fixture, f.run.run_id.0).await;
++    sqlx::raw_sql("CREATE FUNCTION history_commit_fault() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'injected history commit failure'; END $$; CREATE CONSTRAINT TRIGGER history_commit_fault AFTER UPDATE ON task_harness_runs DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION history_commit_fault();")
++        .execute(p.pool()).await.unwrap();
++    assert!(
++        p.update_workflow_checkpoint(f.write, accepted(&f))
++            .await
++            .is_err()
++    );
++    sqlx::raw_sql("DROP TRIGGER history_commit_fault ON task_harness_runs; DROP FUNCTION history_commit_fault();").execute(p.pool()).await.unwrap();
++    assert_eq!(exchange(&f).await, before);
++    assert_eq!(stored(&f.native.fixture, f.run.run_id.0).await, checkpoint);
++    assert!(matches!(
++        p.update_workflow_checkpoint(f.write, accepted(&f))
++            .await
++            .unwrap(),
++        WriteOutcome::Applied(_)
++    ));
++    assert_eq!(accounting(&f).await["calls"], 1);
++}
++
++async fn raise(f: &ModelFixture, level: i16) {
++    sqlx::query("UPDATE workflow_runs SET content_level=$3 WHERE company_id=$1 AND id=$2")
++        .bind(f.write.fence.scope.company.as_uuid())
++        .bind(f.write.fence.scope.run.as_uuid())
++        .bind(level)
++        .execute(f.native.fixture.persistence().pool())
++        .await
++        .unwrap();
++}
++
++#[tokio::test]
++async fn agent_history_level_enqueue_and_final_acceptance_only_raise_the_stamp() {
++    let native = model_support::fixture(Fixture::new().await, lease_source()).await;
++    // Preparation has already captured the original level; a later observation is joined at completion.
++    let f = Box::pin(open_native(native)).await;
++    raise(&f, 5).await;
++    let request = reservation();
++    let WorkflowModelAdmission::New(permit) = f
++        .native
++        .fixture
++        .persistence()
++        .reserve_workflow_model(f.write, model_request(&request), None)
++        .await
++        .unwrap()
++    else {
++        panic!("not admitted")
++    };
++    let mut write = WorkflowCheckpointWrite {
++        expected_revision: permit.consume().revision,
++        ..f.write
++    };
++    let WorkflowModelSettlement::Saved(result) = f
++        .native
++        .fixture
++        .persistence()
++        .settle_workflow_model(write, response(&request), None)
++        .await
++        .unwrap()
++    else {
++        panic!("not settled")
++    };
++    let WriteOutcome::Applied(run) = *result else {
++        panic!("not saved")
++    };
++    write.expected_revision = run.revision;
++    f.native
++        .fixture
++        .persistence()
++        .update_workflow_checkpoint(write, accepted(&f))
++        .await
++        .unwrap();
++    assert_eq!(exchange(&f).await["access_level"], 5);
++    let error =
++        sqlx::query("UPDATE agent_history_exchanges SET access_level=10 WHERE company_id=$1")
++            .bind(write.fence.scope.company.as_uuid())
++            .execute(f.native.fixture.persistence().pool())
++            .await
++            .unwrap_err();
++    assert_eq!(
++        error.as_database_error().unwrap().code().as_deref(),
++        Some("23514")
++    );
++}
++
++#[path = "agent_history_lifecycle_tests.rs"]
++mod lifecycle;
++
++#[tokio::test]
++async fn agent_history_level_competing_observation_commit_precedes_the_output_stamp() {
++    let f = Box::pin(settled_history()).await;
++    let p = f.native.fixture.persistence();
++    let scope = f.write.fence.scope;
++    let mut observation = p.pool().begin().await.unwrap();
++    let observer: i32 = sqlx::query_scalar("SELECT pg_backend_pid()")
++        .fetch_one(&mut *observation)
++        .await
++        .unwrap();
++    crate::adapters::persistence::workflow::knowledge::raise_content_level_on(
++        &mut observation,
++        scope.company,
++        scope.run,
++        crate::entities::access_level::AccessLevel::L5,
++    )
++    .await
++    .unwrap();
++    let release = async {
++        tokio::time::timeout(Duration::from_secs(3),async {
++            loop {
++                let blocked:bool=sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM pg_stat_activity AS waiting WHERE waiting.datname=current_database() AND waiting.wait_event_type='Lock' AND $1=ANY(pg_blocking_pids(waiting.pid)))")
++                    .bind(observer).fetch_one(p.pool()).await.unwrap();
++                if blocked {break;}
++                tokio::time::sleep(Duration::from_millis(5)).await;
++            }
++        }).await.expect("finalization must contend with the actual observation lock");
++        observation.commit().await.unwrap();
++    };
++    let (completed, ()) = tokio::time::timeout(Duration::from_secs(5), async {
++        tokio::join!(
++            Box::pin(p.update_workflow_checkpoint(f.write, accepted(&f))),
++            release
++        )
++    })
++    .await
++    .unwrap();
++    assert!(matches!(completed.unwrap(), WriteOutcome::Applied(_)));
++    assert_eq!(exchange(&f).await["access_level"], 5);
++    assert_eq!(exchange(&f).await["state"], "completed");
++    assert_eq!(accounting(&f).await["calls"], 1);
++}
++
++#[tokio::test]
++async fn agent_history_storage_repeated_step_admission_has_new_activation_in_same_private_conversation()
++ {
++    use crate::application::workflow::{
++        agent::AgentPreparation, agent_history::AgentHistorySessionRef,
++        completion::WorkflowCompletion,
++    };
++    let f = Box::pin(settled_history()).await;
++    let fixture = &f.native.fixture;
++    let p = fixture.persistence();
++    let update = accepted(&f);
++    let WorkflowCheckpointUpdate::FinalOutput(ref output) = update else {
++        unreachable!()
++    };
++    let logical: Value = serde_json::from_str(&output.content).unwrap();
++    p.update_workflow_checkpoint(f.write, update).await.unwrap();
++    p.complete_io(FencedWorkflowResult {
++        fence: f.write.fence,
++        output: logical,
++        policy: f.write.lease_policy,
++    })
++    .await
++    .unwrap()
++    .unwrap();
++    let mut request = fixture.request("repeated-step", fixture.manual());
++    request.history_session = Some(AgentHistorySessionRef {
++        from_run: f.write.fence.scope.run,
++    });
++    let command = fixture.prepare(request).await;
++    p.admit(&command).await.unwrap();
++    let job: Uuid = sqlx::query_scalar(
++        "SELECT id FROM background_tasks WHERE company_id=$1 AND workflow_execution_id=$2",
++    )
++    .bind(command.company_id().as_uuid())
++    .bind(command.first_execution_id().as_uuid())
++    .fetch_one(p.pool())
++    .await
++    .unwrap();
++    let scope = ActivationRequest {
++        company: command.company_id(),
++        run: command.proposed_run_id(),
++        execution: command.first_execution_id(),
++        job: WorkflowJobId(job),
++    };
++    let claim = p
++        .claim_io(scope, worker(), f.write.lease_policy)
++        .await
++        .unwrap()
++        .unwrap();
++    p.prepare_agent(&claim, f.write.lease_policy).await.unwrap();
++    p.prepare_agent(&claim, f.write.lease_policy).await.unwrap();
++    let saved:Value=sqlx::query_scalar("SELECT jsonb_build_object('positions',jsonb_agg(position ORDER BY position),'executions',count(DISTINCT execution_id),'conversations',count(DISTINCT conversation_id)) FROM agent_history_exchanges WHERE company_id=$1")
++        .bind(scope.company.as_uuid()).fetch_one(p.pool()).await.unwrap();
++    assert_eq!(
++        saved,
++        json!({"positions":[1,2],"executions":2,"conversations":1})
++    );
++    let steps: Vec<String> = sqlx::query_scalar(
++        "SELECT step_id FROM workflow_executions WHERE company_id=$1 ORDER BY run_id",
++    )
++    .bind(scope.company.as_uuid())
++    .fetch_all(p.pool())
++    .await
++    .unwrap();
++    assert_eq!(steps, vec!["start", "start"]);
++    assert_eq!(accounting(&f).await["calls"], 1);
++}
+--- accepted-p01/src/adapters/persistence/workflow/agent_history_identity_tests.rs
++++ p02/src/adapters/persistence/workflow/agent_history_identity_tests.rs
+@@ -88,6 +88,21 @@
+             None
+         );
+         assert_eq!(identities(&setup).await, 0);
++        let launch = crate::application::workflow::agent::AgentPreparation::prepare_agent(
++            &setup.fixture.persistence,
++            &setup.claim,
++            LeasePolicy::new(Duration::from_secs(60)).unwrap(),
++        )
++        .await
++        .unwrap();
++        assert!(launch.prepared.history_exchange().is_none());
++        let exchanges: i64 =
++            sqlx::query_scalar("SELECT count(*) FROM agent_history_exchanges WHERE company_id=$1")
++                .bind(setup.fixture.target.company.as_uuid())
++                .fetch_one(setup.fixture.persistence.pool())
++                .await
++                .unwrap();
++        assert_eq!(exchanges, 0);
+     }
+ }
+ 
+--- accepted-p01/src/adapters/persistence/workflow/agent_history_lifecycle_tests.rs
++++ p02/src/adapters/persistence/workflow/agent_history_lifecycle_tests.rs
+@@ -0,0 +1,256 @@
++use super::*;
++
++async fn control(f: &ModelFixture, key: &str) -> CancelCommand {
++    let scope = f.write.fence.scope;
++    CancelCommand {
++        company_id: scope.company,
++        run_id: scope.run,
++        actor: f.native.fixture.binding.target.actor,
++        command_key: IdempotencyKey::parse(key).unwrap(),
++        expected_revision: f
++            .native
++            .fixture
++            .persistence()
++            .head(scope.company, scope.run)
++            .await
++            .unwrap()
++            .unwrap()
++            .revision,
++    }
++}
++
++async fn fail(f: &ModelFixture) {
++    use crate::domain::workflow::{FailureClass, FailureCode, RetrySafety, StepFailure};
++    let cause = LeaseReleaseCause::Classified(WorkflowFailure {
++        failure: StepFailure::new(
++            FailureClass::Terminal,
++            FailureCode::parse("provider.rejected").unwrap(),
++            None,
++        )
++        .unwrap(),
++        safety: RetrySafety::SafeToRetry,
++    });
++    assert!(
++        f.native
++            .fixture
++            .persistence()
++            .settled()
++            .release_io(f.write.fence, f.write.lease_policy, cause)
++            .await
++            .unwrap()
++    );
++}
++
++async fn retry_failed(f: &ModelFixture) {
++    let command = control(f, "history-retry").await;
++    let result = f
++        .native
++        .fixture
++        .persistence()
++        .retry(RetryCommand {
++            company_id: command.company_id,
++            run_id: command.run_id,
++            actor: command.actor,
++            command_key: command.command_key,
++            expected_revision: command.expected_revision,
++        })
++        .await
++        .unwrap();
++    assert!(matches!(result, RetryResult::Applied { .. }));
++}
++
++#[tokio::test]
++async fn agent_history_completion_cancel_before_acceptance_has_input_and_no_answer() {
++    let f = Box::pin(settled_history()).await;
++    let p = f.native.fixture.persistence();
++    raise(&f, 5).await;
++    assert!(matches!(
++        p.cancel(control(&f, "cancel-before").await).await.unwrap(),
++        CancelResult::Applied { .. }
++    ));
++    let saved = exchange(&f).await;
++    assert_eq!(saved["state"], "cancelled");
++    assert!(saved["output"].is_null());
++    assert_eq!(saved["access_level"], 5);
++    assert!(matches!(
++        p.update_workflow_checkpoint(f.write, accepted(&f))
++            .await
++            .unwrap(),
++        WriteOutcome::OwnershipLost
++    ));
++    assert_eq!(exchange(&f).await, saved);
++    assert_eq!(accounting(&f).await["calls"], 1);
++}
++
++#[tokio::test]
++async fn agent_history_completion_cancel_after_acceptance_preserves_the_accepted_exchange() {
++    let f = Box::pin(settled_history()).await;
++    let p = f.native.fixture.persistence();
++    p.update_workflow_checkpoint(f.write, accepted(&f))
++        .await
++        .unwrap();
++    let saved = exchange(&f).await;
++    assert!(matches!(
++        p.cancel(control(&f, "cancel-after").await).await.unwrap(),
++        CancelResult::Applied { .. }
++    ));
++    assert_eq!(exchange(&f).await, saved);
++    assert_eq!(saved["state"], "completed");
++    assert_eq!(accounting(&f).await["calls"], 1);
++}
++
++#[tokio::test]
++async fn agent_history_completion_workflow_failure_and_control_retry_preserve_accepted_output() {
++    let f = Box::pin(settled_history()).await;
++    let p = f.native.fixture.persistence();
++    p.update_workflow_checkpoint(f.write, accepted(&f))
++        .await
++        .unwrap();
++    let saved = exchange(&f).await;
++    fail(&f).await;
++    assert_eq!(exchange(&f).await, saved);
++    retry_failed(&f).await;
++    assert_eq!(exchange(&f).await, saved);
++    let claim = p
++        .settled()
++        .claim_io(f.write.fence.scope, worker(), f.write.lease_policy)
++        .await
++        .unwrap()
++        .unwrap();
++    let prepared = crate::application::workflow::agent::AgentPreparation::prepare_agent(
++        p,
++        &claim,
++        f.write.lease_policy,
++    )
++    .await
++    .unwrap()
++    .prepared;
++    let WriteOutcome::AlreadyApplied(checkpoint) = p
++        .open_workflow_checkpoint(
++            claim.fence,
++            &prepared.spec(claim.fence).unwrap(),
++            f.write.lease_policy,
++        )
++        .await
++        .unwrap()
++    else {
++        panic!("accepted output must replay")
++    };
++    assert_eq!(
++        checkpoint
++            .final_output
++            .as_ref()
++            .unwrap()
++            .structured
++            .as_ref()
++            .unwrap()
++            .body(),
++        r#"{"answer":[null,3.5]}"#
++    );
++    assert_eq!(exchange(&f).await, saved);
++    assert_eq!(accounting(&f).await["calls"], 1);
++}
++
++#[tokio::test]
++async fn agent_history_completion_safe_control_retry_reactivates_same_checkpoint_without_refunding()
++{
++    let f = Box::pin(settled_history()).await;
++    let p = f.native.fixture.persistence();
++    let before = exchange(&f).await;
++    let usage = accounting(&f).await;
++    fail(&f).await;
++    assert_eq!(exchange(&f).await["state"], "failed");
++    let failed = exchange(&f).await;
++    let deletion =
++        sqlx::query("DELETE FROM agent_history_exchanges WHERE company_id=$1 AND execution_id=$2")
++            .bind(f.write.fence.scope.company.as_uuid())
++            .bind(f.write.fence.scope.execution.as_uuid())
++            .execute(p.pool())
++            .await
++            .unwrap_err();
++    assert_eq!(
++        deletion.as_database_error().unwrap().code().as_deref(),
++        Some("23514")
++    );
++    assert_eq!(exchange(&f).await, failed);
++    retry_failed(&f).await;
++    let queued = exchange(&f).await;
++    assert_eq!(queued["state"], "queued");
++    for field in [
++        "id",
++        "position",
++        "input_digest",
++        "provenance",
++        "checkpoint_id",
++        "conversation_id",
++        "activated_at",
++    ] {
++        assert_eq!(queued[field], before[field], "{field}");
++    }
++    assert!(queued["finished_at"].is_null());
++    let claim = p
++        .settled()
++        .claim_io(f.write.fence.scope, worker(), f.write.lease_policy)
++        .await
++        .unwrap()
++        .unwrap();
++    let prepared = crate::application::workflow::agent::AgentPreparation::prepare_agent(
++        p,
++        &claim,
++        f.write.lease_policy,
++    )
++    .await
++    .unwrap()
++    .prepared;
++    let WriteOutcome::AlreadyApplied(checkpoint) = p
++        .open_workflow_checkpoint(
++            claim.fence,
++            &prepared.spec(claim.fence).unwrap(),
++            f.write.lease_policy,
++        )
++        .await
++        .unwrap()
++    else {
++        panic!("existing checkpoint expected")
++    };
++    assert_eq!(checkpoint, f.run);
++    assert_eq!(
++        exchange(&f).await["state"],
++        "active",
++        "AlreadyApplied open must still commit reactivation"
++    );
++    assert_eq!(accounting(&f).await, usage);
++    assert!(matches!(
++        p.update_workflow_checkpoint(f.write, accepted(&f))
++            .await
++            .unwrap(),
++        WriteOutcome::OwnershipLost
++    ));
++    let write = WorkflowCheckpointWrite {
++        fence: claim.fence,
++        ..f.write
++    };
++    let WriteOutcome::Applied(checkpoint) =
++        p.reserve_workflow_execution(write, 1000).await.unwrap()
++    else {
++        panic!("new owner reserves time")
++    };
++    let write = WorkflowCheckpointWrite {
++        expected_revision: checkpoint.revision,
++        ..write
++    };
++    assert!(matches!(
++        p.update_workflow_checkpoint(write, accepted(&f))
++            .await
++            .unwrap(),
++        WriteOutcome::Applied(_)
++    ));
++    assert_eq!(exchange(&f).await["state"], "completed");
++    assert_eq!(accounting(&f).await, usage);
++}
++
++#[path = "agent_history_retry_deletion_tests.rs"]
++mod deletion;
++
++#[path = "agent_history_reopen_ambiguity_tests.rs"]
++mod ambiguity;
+--- accepted-p01/src/adapters/persistence/workflow/agent_history_reopen_ambiguity_tests.rs
++++ p02/src/adapters/persistence/workflow/agent_history_reopen_ambiguity_tests.rs
+@@ -0,0 +1,146 @@
++use super::*;
++use crate::adapters::persistence::workflow::persistence_bound::recorder::Injected;
++use crate::adapters::persistence::workflow::tests::admission_tests::lease_tests::resolution_gate::{Abort,Gate,Stall,connect,resolution_behind};
++use crate::application::workflow::agent::AgentPreparation;
++
++struct Reopen {
++    fixture: ModelFixture,
++    claim: ClaimedWorkflow,
++    spec: WorkflowCheckpointSpec,
++    outcome: AppResult<WriteOutcome<RunCheckpoint>>,
++    before: Value,
++}
++
++async fn ambiguous(abort: Abort) -> Reopen {
++    let f = Box::pin(settled_history()).await;
++    fail(&f).await;
++    retry_failed(&f).await;
++    let p = f.native.fixture.persistence();
++    let policy = LeasePolicy::new(Duration::from_secs(6)).unwrap();
++    let claim = p
++        .claim_io(f.write.fence.scope, worker(), f.write.lease_policy)
++        .await
++        .unwrap()
++        .unwrap();
++    let prepared = p.prepare_agent(&claim, policy).await.unwrap().prepared;
++    let spec = prepared.spec(claim.fence).unwrap();
++    let task_spec = prepared.spec(claim.fence).unwrap();
++    let before = exchange(&f).await;
++    assert_eq!(before["state"], "queued");
++    let mut gate = Gate::arm(
++        &f.native.fixture,
++        "agent_history_exchanges",
++        "UPDATE",
++        "OLD.state='queued' AND NEW.state='active'",
++        Stall::Commit,
++    )
++    .await;
++    let pending = {
++        let p = p.clone();
++        let fence = claim.fence;
++        tokio::spawn(async move { p.open_workflow_checkpoint(fence, &task_spec, policy).await })
++    };
++    let (mut observer, _) = connect(&f.native.fixture).await;
++    let stalled = gate
++        .stalled(&mut observer, &[&|| !pending.is_finished()])
++        .await;
++    resolution_behind(
++        &mut observer,
++        stalled,
++        policy,
++        &[&|| !pending.is_finished()],
++    )
++    .await;
++    gate.abort_on_release(abort).await;
++    gate.drain().await;
++    let outcome = tokio::time::timeout(Duration::from_secs(5), pending)
++        .await
++        .unwrap()
++        .unwrap();
++    gate.abort_on_release(Abort::Nothing).await;
++    assert_eq!(accounting(&f).await["calls"], 1);
++    let saved = exchange(&f).await;
++    for field in [
++        "id",
++        "position",
++        "input_digest",
++        "provenance",
++        "checkpoint_id",
++        "activated_at",
++    ] {
++        assert_eq!(saved[field], before[field], "{field}");
++    }
++    Reopen {
++        fixture: f,
++        claim,
++        spec,
++        outcome,
++        before,
++    }
++}
++
++#[tokio::test]
++async fn agent_history_completion_ambiguous_reopen_committed_proves_reactivation_and_current_refusal()
++ {
++    let _injected = Injected::mark();
++    let result = ambiguous(Abort::Nothing).await;
++    let f = &result.fixture;
++    let p = f.native.fixture.persistence();
++    assert!(matches!(result.outcome,Ok(WriteOutcome::AlreadyApplied(ref run)) if run==&f.run));
++    let saved = exchange(f).await;
++    assert_eq!(saved["state"], "active");
++    assert!(matches!(
++        p.open_workflow_checkpoint(f.write.fence, &result.spec, f.write.lease_policy)
++            .await
++            .unwrap(),
++        WriteOutcome::OwnershipLost
++    ));
++    sqlx::query("DELETE FROM company_model_connections WHERE company_id=$1")
++        .bind(f.write.fence.scope.company.as_uuid())
++        .execute(p.pool())
++        .await
++        .unwrap();
++    assert!(
++        p.prepare_agent(&result.claim, f.write.lease_policy)
++            .await
++            .is_err()
++    );
++    let write = WorkflowCheckpointWrite {
++        fence: result.claim.fence,
++        ..f.write
++    };
++    assert!(
++        p.reserve_workflow_model(write, model_request(&reservation()), None)
++            .await
++            .is_err()
++    );
++    assert_eq!(exchange(f).await, saved);
++    assert_eq!(accounting(f).await["calls"], 1);
++}
++
++#[tokio::test]
++async fn agent_history_completion_ambiguous_reopen_aborted_reports_missing_effect_and_recovers() {
++    let _injected = Injected::mark();
++    let result = ambiguous(Abort::Every).await;
++    let f = &result.fixture;
++    let p = f.native.fixture.persistence();
++    assert!(
++        result.outcome.is_err(),
++        "old checkpoint cannot prove missing activation: {:?}",
++        result.outcome
++    );
++    assert_eq!(exchange(f).await, result.before);
++    let reopened = p
++        .open_workflow_checkpoint(result.claim.fence, &result.spec, f.write.lease_policy)
++        .await
++        .unwrap();
++    assert!(matches!(reopened,WriteOutcome::AlreadyApplied(ref run) if run==&f.run));
++    assert_eq!(exchange(f).await["state"], "active");
++    assert!(matches!(
++        p.open_workflow_checkpoint(f.write.fence, &result.spec, f.write.lease_policy)
++            .await
++            .unwrap(),
++        WriteOutcome::OwnershipLost
++    ));
++    assert_eq!(accounting(f).await["calls"], 1);
++}
+--- accepted-p01/src/adapters/persistence/workflow/agent_history_retry_deletion_tests.rs
++++ p02/src/adapters/persistence/workflow/agent_history_retry_deletion_tests.rs
+@@ -0,0 +1,148 @@
++use super::*;
++use crate::adapters::persistence::workflow::tests::admission_tests::lease_tests::resolution_gate::{Gate,Stall,connect};
++
++async fn delete(f: &ModelFixture) -> Result<sqlx::postgres::PgQueryResult, sqlx::Error> {
++    sqlx::query("DELETE FROM agent_history_exchanges WHERE company_id=$1 AND execution_id=$2")
++        .bind(f.write.fence.scope.company.as_uuid())
++        .bind(f.write.fence.scope.execution.as_uuid())
++        .execute(f.native.fixture.persistence().pool())
++        .await
++}
++
++#[tokio::test]
++async fn agent_history_storage_failed_exchange_delete_and_actual_control_retry_do_not_deadlock() {
++    let f = Box::pin(settled_history()).await;
++    fail(&f).await;
++    let original = exchange(&f).await;
++    let scope = f.write.fence.scope;
++    let fixture = &f.native.fixture;
++    let condition = format!(
++        "NEW.id='{}'::uuid AND OLD.status='failed' AND NEW.status='pending'",
++        scope.job.0
++    );
++    let mut gate = Gate::arm(
++        fixture,
++        "background_tasks",
++        "UPDATE",
++        &condition,
++        Stall::Statement {
++            table: "background_tasks",
++            events: "UPDATE",
++            when: &condition,
++        },
++    )
++    .await;
++    let command = control(&f, "delete-versus-retry").await;
++    let retry = RetryCommand {
++        company_id: command.company_id,
++        run_id: command.run_id,
++        actor: command.actor,
++        command_key: command.command_key,
++        expected_revision: command.expected_revision,
++    };
++    let p = fixture.persistence().clone();
++    let pending = tokio::spawn(async move { p.retry(retry).await });
++    let (mut observer, _) = connect(fixture).await;
++    gate.stalled(&mut observer, &[&|| !pending.is_finished()])
++        .await;
++    let error = tokio::time::timeout(Duration::from_secs(2), delete(&f))
++        .await
++        .unwrap()
++        .unwrap_err();
++    assert_eq!(
++        error.as_database_error().unwrap().code().as_deref(),
++        Some("55P03")
++    );
++    gate.drain().await;
++    assert!(matches!(
++        pending.await.unwrap().unwrap(),
++        RetryResult::Applied { .. }
++    ));
++    let queued = exchange(&f).await;
++    assert_eq!(queued["state"], "queued");
++    for field in [
++        "id",
++        "position",
++        "checkpoint_id",
++        "input_digest",
++        "provenance",
++    ] {
++        assert_eq!(queued[field], original[field], "{field}");
++    }
++}
++
++#[tokio::test]
++async fn agent_history_storage_expired_failed_exchange_can_release_its_source_pin() {
++    let f = Box::pin(settled_history()).await;
++    fail(&f).await;
++    let p = f.native.fixture.persistence();
++    // Isolated fixture time travel; restore the native snapshot guard before DELETE/retry.
++    sqlx::raw_sql("ALTER TABLE workflow_runs DISABLE TRIGGER workflow_run_snapshot_immutable; UPDATE workflow_runs SET created_at=clock_timestamp()-interval '2 minutes',deadline=clock_timestamp()-interval '1 minute'; SET CONSTRAINTS ALL IMMEDIATE; ALTER TABLE workflow_runs ENABLE TRIGGER workflow_run_snapshot_immutable")
++        .execute(p.pool()).await.unwrap();
++    assert_eq!(delete(&f).await.unwrap().rows_affected(), 1);
++    let command = control(&f, "expired-retry").await;
++    let result = p
++        .retry(RetryCommand {
++            company_id: command.company_id,
++            run_id: command.run_id,
++            actor: command.actor,
++            command_key: command.command_key,
++            expected_revision: command.expected_revision,
++        })
++        .await
++        .unwrap();
++    assert!(!matches!(result, RetryResult::Applied { .. }));
++    let count: i64 =
++        sqlx::query_scalar("SELECT count(*) FROM agent_history_exchanges WHERE company_id=$1")
++            .bind(f.write.fence.scope.company.as_uuid())
++            .fetch_one(p.pool())
++            .await
++            .unwrap();
++    assert_eq!(count, 0);
++}
++
++#[tokio::test]
++async fn agent_history_storage_nonresumable_failed_exchange_can_be_deleted_before_deadline() {
++    use crate::domain::workflow::{FailureClass, FailureCode, RetrySafety, StepFailure};
++    let f = Box::pin(settled_history()).await;
++    let p = f.native.fixture.persistence();
++    let failure = WorkflowFailure {
++        failure: StepFailure::new(
++            FailureClass::Terminal,
++            FailureCode::parse("agent.budget").unwrap(),
++            None,
++        )
++        .unwrap(),
++        safety: RetrySafety::SafeToRetry,
++    };
++    p.settled()
++        .release_io(
++            f.write.fence,
++            f.write.lease_policy,
++            LeaseReleaseCause::Classified(failure),
++        )
++        .await
++        .unwrap();
++    assert_eq!(exchange(&f).await["state"], "failed");
++    assert_eq!(delete(&f).await.unwrap().rows_affected(), 1);
++}
++
++#[tokio::test]
++async fn agent_history_storage_company_teardown_removes_even_retryable_failed_exchange() {
++    let f = Box::pin(settled_history()).await;
++    fail(&f).await;
++    let p = f.native.fixture.persistence();
++    let company = f.write.fence.scope.company.as_uuid();
++    sqlx::query("DELETE FROM companies WHERE id=$1")
++        .bind(company)
++        .execute(p.pool())
++        .await
++        .unwrap();
++    let count: i64 =
++        sqlx::query_scalar("SELECT count(*) FROM agent_history_exchanges WHERE company_id=$1")
++            .bind(company)
++            .fetch_one(p.pool())
++            .await
++            .unwrap();
++    assert_eq!(count, 0);
++}
+--- accepted-p01/src/adapters/persistence/workflow/agent_history_storage_tests.rs
++++ p02/src/adapters/persistence/workflow/agent_history_storage_tests.rs
+@@ -0,0 +1,401 @@
++use super::*;
++use crate::application::workflow::{agent::AgentPreparation, agent_history::*};
++
++#[derive(Debug, PartialEq, sqlx::FromRow)]
++struct Captured {
++    id: Uuid,
++    execution_id: Uuid,
++    position: i64,
++    state: String,
++    input: Value,
++    output: Option<Value>,
++    checkpoint_id: Option<Uuid>,
++}
++async fn captured(setup: &AgentSetup) -> Vec<Captured> {
++    sqlx::query_as(
++        "SELECT exchange.id,exchange.execution_id,exchange.position,exchange.state,exchange.output,exchange.checkpoint_id, \
++         execution.frozen_inputs->'context' AS input FROM agent_history_exchanges AS exchange \
++         JOIN workflow_executions AS execution ON execution.company_id=exchange.company_id AND execution.id=exchange.execution_id \
++         WHERE exchange.company_id=$1 ORDER BY exchange.position",
++    ).bind(setup.fixture.target.company.as_uuid()).fetch_all(setup.fixture.persistence.pool()).await.unwrap()
++}
++
++#[tokio::test]
++async fn agent_history_storage_capture_precedes_checkpoint_and_replays_one_original_input() {
++    let setup = Box::pin(agent_setup_source(
++        "http://127.0.0.1:1",
++        None,
++        false,
++        |source, _| {
++            source["steps"]["start"]["with"]["context"] =
++                json!({"literal":[null,{"input":"original"},1.5]});
++        },
++    ))
++    .await;
++    let p = &setup.fixture.persistence;
++    let policy = LeasePolicy::new(Duration::from_secs(60)).unwrap();
++    let first = p.prepare_agent(&setup.claim, policy).await.unwrap();
++    let expected = AgentExchangeId::for_execution(setup.claim.fence.scope.execution);
++    assert_eq!(first.prepared.history_exchange(), Some(expected));
++    let rows = captured(&setup).await;
++    assert_eq!(
++        rows,
++        vec![Captured {
++            id: expected.as_uuid(),
++            execution_id: expected.as_uuid(),
++            position: 1,
++            state: "queued".into(),
++            input: json!([null,{"input":"original"},1.5]),
++            output: None,
++            checkpoint_id: None,
++        }]
++    );
++    let checkpoint_count: i64 =
++        sqlx::query_scalar("SELECT count(*) FROM task_harness_runs WHERE company_id=$1")
++            .bind(setup.fixture.target.company.as_uuid())
++            .fetch_one(p.pool())
++            .await
++            .unwrap();
++    assert_eq!(
++        checkpoint_count, 0,
++        "input is durable even before a checkpoint exists"
++    );
++    let second = p.prepare_agent(&setup.claim, policy).await.unwrap();
++    assert_eq!(
++        first.prepared.spec(setup.claim.fence).unwrap().prepared,
++        second.prepared.spec(setup.claim.fence).unwrap().prepared
++    );
++    assert_eq!(captured(&setup).await, rows);
++    let last: i64 = sqlx::query_scalar(
++        "SELECT last_exchange_order FROM agent_history_conversations WHERE company_id=$1",
++    )
++    .bind(setup.fixture.target.company.as_uuid())
++    .fetch_one(p.pool())
++    .await
++    .unwrap();
++    assert_eq!(last, 1, "replay cannot consume another queue position");
++}
++
++#[tokio::test]
++async fn agent_history_completion_driver_keeps_exact_json_and_replays_without_provider() {
++    let setup = Box::pin(agent_setup_source(
++        "http://127.0.0.1:1",
++        None,
++        false,
++        |source, _| {
++            source["steps"]["start"]["with"]["output_schema"] = json!({"literal":{}});
++        },
++    ))
++    .await;
++    let value = json!({"answer":[null,3.5,{"quoted":"<data>"}]});
++    let llm = scripted_llm(vec![LlmTurn::text(value.to_string())]).await;
++    register_scripted_agent_base_url(setup.agent, &llm.base_url);
++    let runtime = agent_runtime(&setup);
++    let kind = WorkflowStepKind("agent.run".into());
++    let first = Box::pin(runtime.execute(&kind, &setup.claim)).await;
++    assert_eq!(first.completed_result().unwrap(), value);
++    let rows = captured(&setup).await;
++    assert_eq!(rows.len(), 1);
++    assert_eq!(rows[0].state, "completed");
++    assert_eq!(rows[0].output, Some(value.clone()));
++    assert!(rows[0].checkpoint_id.is_some());
++    let replay = Box::pin(runtime.execute(&kind, &setup.claim)).await;
++    assert_eq!(replay.completed_result().unwrap(), value);
++    assert_eq!(captured(&setup).await, rows);
++    assert_eq!(
++        usage_rows(&setup.fixture.persistence, setup.claim.fence.scope.run).await,
++        1
++    );
++    assert_eq!(llm.finish().await.unwrap(), 1);
++}
++
++#[tokio::test]
++async fn agent_history_completion_repair_accepts_only_the_repaired_value() {
++    let setup = Box::pin(agent_setup("http://127.0.0.1:1")).await;
++    let llm = scripted_llm(vec![
++        LlmTurn::text("not json"),
++        LlmTurn::text("\"repaired\""),
++    ])
++    .await;
++    register_scripted_agent_base_url(setup.agent, &llm.base_url);
++    let outcome = Box::pin(
++        agent_runtime(&setup).execute(&WorkflowStepKind("agent.run".into()), &setup.claim),
++    )
++    .await;
++    assert_eq!(outcome.completed_result().unwrap(), json!("repaired"));
++    let rows = captured(&setup).await;
++    assert_eq!(rows.len(), 1);
++    assert_eq!(rows[0].position, 1);
++    assert_eq!(rows[0].state, "completed");
++    assert_eq!(rows[0].output, Some(json!("repaired")));
++    assert_eq!(
++        usage_rows(&setup.fixture.persistence, setup.claim.fence.scope.run).await,
++        2
++    );
++    assert_eq!(llm.finish().await.unwrap(), 2);
++}
++
++#[tokio::test]
++async fn agent_history_completion_invalid_candidates_never_become_an_answer() {
++    let setup = Box::pin(agent_setup("http://127.0.0.1:1")).await;
++    let llm = scripted_llm(vec![
++        LlmTurn::text("not json"),
++        LlmTurn::text("still not json"),
++        LlmTurn::text("last invalid repair"),
++    ])
++    .await;
++    register_scripted_agent_base_url(setup.agent, &llm.base_url);
++    let outcome = Box::pin(
++        agent_runtime(&setup).execute(&WorkflowStepKind("agent.run".into()), &setup.claim),
++    )
++    .await;
++    let outcome = outcome.completed_result();
++    assert!(outcome.is_err());
++    let rows = captured(&setup).await;
++    assert_eq!(rows.len(), 1);
++    assert_eq!(rows[0].state, "failed", "{outcome:?}");
++    assert_eq!(rows[0].output, None);
++    assert_eq!(
++        usage_rows(&setup.fixture.persistence, setup.claim.fence.scope.run).await,
++        3
++    );
++    assert_eq!(llm.finish().await.unwrap(), 3);
++}
++
++#[tokio::test]
++async fn agent_history_storage_competing_preparations_share_position_and_reject_changed_replay() {
++    let setup = Box::pin(agent_setup("http://127.0.0.1:1")).await;
++    let p = &setup.fixture.persistence;
++    let policy = LeasePolicy::new(Duration::from_secs(60)).unwrap();
++    let (left, right) = tokio::join!(
++        Box::pin(p.prepare_agent(&setup.claim, policy)),
++        Box::pin(p.prepare_agent(&setup.claim, policy))
++    );
++    assert_eq!(
++        left.unwrap()
++            .prepared
++            .spec(setup.claim.fence)
++            .unwrap()
++            .prepared,
++        right
++            .unwrap()
++            .prepared
++            .spec(setup.claim.fence)
++            .unwrap()
++            .prepared
++    );
++    let before = captured(&setup).await;
++    let mut changed = setup.claim.clone();
++    changed.activation.inputs["context"] = json!({"changed":true});
++    assert!(p.prepare_agent(&changed, policy).await.is_err());
++    let mut stale = setup.claim.clone();
++    stale.fence.attempt.0 += 1;
++    assert!(p.prepare_agent(&stale, policy).await.is_err());
++    assert_eq!(captured(&setup).await, before);
++    assert_eq!(before.len(), 1);
++    assert_eq!(before[0].position, 1);
++}
++
++#[tokio::test]
++async fn agent_history_storage_native_identity_order_and_source_pins_are_enforced() {
++    let setup = Box::pin(agent_setup("http://127.0.0.1:1")).await;
++    let p = &setup.fixture.persistence;
++    p.prepare_agent(
++        &setup.claim,
++        LeasePolicy::new(Duration::from_secs(60)).unwrap(),
++    )
++    .await
++    .unwrap();
++    let scope = setup.claim.fence.scope;
++    let before = captured(&setup).await;
++    for assignment in [
++        "position=2",
++        "conversation_id=gen_random_uuid()",
++        "input_digest=sha256('changed'::bytea)",
++        "agent_id=gen_random_uuid()",
++        "access_level=10",
++    ] {
++        let sql = format!(
++            "UPDATE agent_history_exchanges SET {assignment} WHERE company_id=$1 AND execution_id=$2"
++        );
++        assert!(
++            sqlx::query(&sql)
++                .bind(scope.company.as_uuid())
++                .bind(scope.execution.as_uuid())
++                .execute(p.pool())
++                .await
++                .is_err(),
++            "{assignment}"
++        );
++    }
++    assert!(sqlx::query("UPDATE agent_history_conversations SET last_exchange_order=last_exchange_order+1 WHERE company_id=$1")
++        .bind(scope.company.as_uuid()).execute(p.pool()).await.is_err());
++    assert!(
++        sqlx::query("DELETE FROM agent_history_exchanges WHERE company_id=$1")
++            .bind(scope.company.as_uuid())
++            .execute(p.pool())
++            .await
++            .is_err()
++    );
++    let deletion = sqlx::query("DELETE FROM workflow_runs WHERE company_id=$1 AND id=$2")
++        .bind(scope.company.as_uuid())
++        .bind(scope.run.as_uuid())
++        .execute(p.pool())
++        .await
++        .unwrap_err();
++    assert_eq!(
++        deletion.as_database_error().unwrap().code().as_deref(),
++        Some("23503")
++    );
++    assert_eq!(captured(&setup).await, before);
++    let indexes:Vec<String>=sqlx::query_scalar("SELECT indexname FROM pg_indexes WHERE schemaname='public' AND tablename='agent_history_exchanges'")
++        .fetch_all(p.pool()).await.unwrap();
++    for name in [
++        "agent_history_exchanges_pending",
++        "agent_history_exchanges_recent",
++        "agent_history_exchanges_source",
++        "agent_history_exchanges_checkpoint",
++    ] {
++        assert!(
++            indexes.iter().any(|index| index == name),
++            "missing {name}: {indexes:?}"
++        );
++    }
++}
++
++#[tokio::test]
++async fn agent_history_level_enqueue_uses_current_content_and_refuses_lower_or_out_of_domain() {
++    let setup = Box::pin(agent_setup("http://127.0.0.1:1")).await;
++    let p = &setup.fixture.persistence;
++    let scope = setup.claim.fence.scope;
++    crate::adapters::persistence::workflow::knowledge::raise_content_level_on(
++        &mut p.pool().acquire().await.unwrap(),
++        scope.company,
++        scope.run,
++        crate::entities::access_level::AccessLevel::L5,
++    )
++    .await
++    .unwrap();
++    p.prepare_agent(
++        &setup.claim,
++        LeasePolicy::new(Duration::from_secs(60)).unwrap(),
++    )
++    .await
++    .unwrap();
++    let level: i16 =
++        sqlx::query_scalar("SELECT access_level FROM agent_history_exchanges WHERE company_id=$1")
++            .bind(scope.company.as_uuid())
++            .fetch_one(p.pool())
++            .await
++            .unwrap();
++    assert_eq!(level, 5);
++    for lower in [0_i16, 10] {
++        assert!(
++            sqlx::query("UPDATE agent_history_exchanges SET access_level=$2 WHERE company_id=$1")
++                .bind(scope.company.as_uuid())
++                .bind(lower)
++                .execute(p.pool())
++                .await
++                .is_err()
++        );
++    }
++}
++
++#[tokio::test]
++async fn agent_history_storage_checkpoint_requires_exact_server_owned_exchange_reference() {
++    use crate::application::workflow::checkpoints::WorkflowCheckpointStore;
++    let setup = Box::pin(agent_setup("http://127.0.0.1:1")).await;
++    let p = &setup.fixture.persistence;
++    let policy = LeasePolicy::new(Duration::from_secs(60)).unwrap();
++    let prepared = p
++        .prepare_agent(&setup.claim, policy)
++        .await
++        .unwrap()
++        .prepared;
++    let spec = prepared.spec(setup.claim.fence).unwrap();
++    let before = captured(&setup).await;
++    for proof in [json!(null), json!(Uuid::new_v4())] {
++        let mut forged = prepared.spec(setup.claim.fence).unwrap();
++        forged.prepared["history_exchange"] = proof;
++        assert!(
++            p.open_workflow_checkpoint(setup.claim.fence, &forged, policy)
++                .await
++                .is_err()
++        );
++        assert_eq!(captured(&setup).await, before);
++    }
++    p.open_workflow_checkpoint(setup.claim.fence, &spec, policy)
++        .await
++        .unwrap();
++    assert_eq!(captured(&setup).await[0].state, "active");
++}
++
++#[tokio::test]
++async fn agent_history_completion_json_null_is_an_accepted_value_in_storage() {
++    let setup = Box::pin(agent_setup_source(
++        "http://127.0.0.1:1",
++        None,
++        false,
++        |source, _| {
++            source["steps"]["start"]["with"]["output_schema"] = json!({"literal":{}});
++        },
++    ))
++    .await;
++    let llm = scripted_llm(vec![LlmTurn::text("null")]).await;
++    register_scripted_agent_base_url(setup.agent, &llm.base_url);
++    let output = Box::pin(
++        agent_runtime(&setup).execute(&WorkflowStepKind("agent.run".into()), &setup.claim),
++    )
++    .await
++    .completed_result()
++    .unwrap();
++    assert_eq!(output, Value::Null);
++    let rows = captured(&setup).await;
++    assert_eq!(rows.len(), 1);
++    assert_eq!(rows[0].state, "completed");
++    assert_eq!(rows[0].output, Some(Value::Null));
++    assert_eq!(llm.finish().await.unwrap(), 1);
++}
++
++#[tokio::test]
++async fn agent_history_completion_cancel_before_checkpoint_keeps_the_captured_input() {
++    use crate::application::workflow::{
++        CancelCommand, CancelResult, WorkflowInspection, WorkflowRunTransitions,
++    };
++    let setup = Box::pin(agent_setup("http://127.0.0.1:1")).await;
++    let p = &setup.fixture.persistence;
++    let scope = setup.claim.fence.scope;
++    p.prepare_agent(
++        &setup.claim,
++        LeasePolicy::new(Duration::from_secs(60)).unwrap(),
++    )
++    .await
++    .unwrap();
++    let before = captured(&setup).await;
++    assert!(before[0].checkpoint_id.is_none());
++    let command = CancelCommand {
++        company_id: scope.company,
++        run_id: scope.run,
++        actor: setup.fixture.target.actor,
++        command_key: IdempotencyKey::parse("cancel-queued").unwrap(),
++        expected_revision: p
++            .head(scope.company, scope.run)
++            .await
++            .unwrap()
++            .unwrap()
++            .revision,
++    };
++    assert!(matches!(
++        p.cancel(command).await.unwrap(),
++        CancelResult::Applied { .. }
++    ));
++    let rows = captured(&setup).await;
++    assert_eq!(rows[0].id, before[0].id);
++    assert_eq!(rows[0].input, before[0].input);
++    assert_eq!(rows[0].state, "cancelled");
++    assert_eq!(rows[0].output, None);
++    assert_eq!(rows[0].checkpoint_id, None);
++}
++
++#[path = "agent_history_commit_ack_tests.rs"]
++mod acknowledgement;
+--- accepted-p01/src/adapters/persistence/workflow/agent_preparation.rs
++++ p02/src/adapters/persistence/workflow/agent_preparation.rs
+@@ -1,16 +1,21 @@
+ //! Native `agent.run` preparation and its current-authority check. The check narrows a
+ //! frozen selection to what the agent and company still allow; it never widens it.
+-use super::http::runtime;
+ use super::*;
+ use crate::application::workflow::{
+-    agent::{AgentLaunch, AgentPreparation, AgentToolTarget, PreparedAgent, PreparedStep},
+-    lease::ClaimedWorkflow,
+-    polling::WorkflowStepKind,
+-    registry::ModelStep,
++    agent::{AgentLaunch, AgentPreparation, AgentToolTarget},
++    lease::{ClaimedWorkflow, LeasePolicy},
+ };
+ use crate::entities::value_objects::ModelProvider;
+ use secrecy::SecretString;
+ use serde_json::Value;
++
++#[derive(sqlx::FromRow)]
++struct AuthorityFacts {
++    actor_id: Uuid,
++    bundle: Vec<u8>,
++    channel_id: Option<Uuid>,
++    thread_id: Option<Uuid>,
++}
+ 
+ /// Reload the immutable definition named by the checkpoint; mutable draft edits grant nothing.
+ pub(in crate::adapters::persistence::workflow) async fn current_on(
+@@ -20,13 +25,20 @@
+ ) -> AppResult<()> {
+     let identity: crate::application::workflow::agent_contract::AgentSelectionIdentity =
+         serde_json::from_value(prepared["selection"].clone()).map_err(|_| invalid())?;
+-    let (actor, bundle): (Uuid, Vec<u8>) = sqlx::query_as(
+-        "SELECT run.actor_id,stored.bundle FROM workflow_runs AS run JOIN workflow_bundles AS stored ON stored.company_id=run.company_id AND stored.digest=run.bundle_digest WHERE run.company_id=$1 AND run.id=$2 AND octet_length(stored.bundle)<=$3"
++    let facts = sqlx::query_as::<_,AuthorityFacts>(
++        "SELECT run.actor_id,stored.bundle,run.channel_id,run.thread_id FROM workflow_runs AS run JOIN workflow_bundles AS stored ON stored.company_id=run.company_id AND stored.digest=run.bundle_digest WHERE run.company_id=$1 AND run.id=$2 AND octet_length(stored.bundle)<=$3"
+     ).bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(MAX_BUNDLE_BYTES as i32)
+         .fetch_optional(&mut *db).await?.ok_or_else(missing)?;
+-    let actor = WorkflowActor::authenticated(actor).map_err(|_| invalid())?;
++    let actor = WorkflowActor::authenticated(facts.actor_id).map_err(|_| invalid())?;
++    association::authorize_association(
++        db,
++        scope.company,
++        actor,
++        binding_rows::association_from_columns(facts.channel_id, facts.thread_id)?,
++    )
++    .await?;
+     let bundle = restore_bundle(
+-        &bundle,
++        &facts.bundle,
+         &crate::adapters::workflow_source::WorkflowSourceDecoder,
+     )?;
+     let selection =
+@@ -39,7 +51,8 @@
+     {
+         return Err(invalid());
+     }
+-    super::agent_authority::check_execution_on(db, scope, selection.agent(), identity.mode).await
++    super::agent_authority::check_execution_on(db, scope, selection.agent(), identity.mode).await?;
++    agent_history::check_prepared_on(db, scope, selection.mode(), prepared).await
+ }
+ 
+ /// Terminal: retrying cannot restore a revoked grant or connection.
+@@ -48,7 +61,7 @@
+ }
+ 
+ /// Concrete dispatch edges for the frozen selection; unsupported bindings fail here.
+-fn targets(
++pub(super) fn targets(
+     company: CompanyId,
+     tools: &[crate::application::agent::ResolvedAgentTool],
+ ) -> AppResult<Vec<AgentToolTarget>> {
+@@ -90,58 +103,18 @@
+ 
+ #[async_trait]
+ impl AgentPreparation for PostgresPersistence {
+-    async fn prepare_agent(&self, claim: &ClaimedWorkflow) -> AppResult<AgentLaunch> {
++    async fn prepare_agent(
++        &self,
++        claim: &ClaimedWorkflow,
++        policy: LeasePolicy,
++    ) -> AppResult<AgentLaunch> {
+         let scope = claim.fence.scope;
+         let action = crate::application::workflow::actions::ActionScope {
+             company: scope.company,
+             run: scope.run,
+             execution: scope.execution,
+         };
+-        let mut tx = super::http::begin_http(self).await?;
+-        let facts = runtime::facts(&mut tx, action).await?;
+-        let definition = facts
+-            .bundle
+-            .compiled()
+-            .graph()
+-            .definition()
+-            .steps
+-            .get(&claim.activation.step)
+-            .ok_or_else(invalid)?;
+-        let step = ModelStep::of(definition.step_type.as_str()).ok_or_else(invalid)?;
+-        let kind = WorkflowStepKind(step.kind().into());
+-        let inputs = runtime::frozen_inputs(&mut tx, &facts, claim, &kind).await?;
+-        let selection = super::agent_manifest::execution_selection_on(
+-            &mut tx,
+-            action,
+-            facts.actor,
+-            &facts.bundle,
+-        )
+-        .await?;
+-        let prepared = match step {
+-            ModelStep::AgentRun => {
+-                let targets = targets(scope.company, selection.tools())?;
+-                PreparedAgent::new(selection, &inputs, PreparedStep::AgentRun { targets })?
+-            }
+-            ModelStep::Classify => {
+-                PreparedAgent::new(selection.model_only(), &inputs, PreparedStep::Classify)?
+-            }
+-            ModelStep::Decide => {
+-                let contract = facts
+-                    .bundle
+-                    .compiled()
+-                    .step_output_schema(&claim.activation.step)
+-                    .cloned()
+-                    .ok_or_else(invalid)?;
+-                PreparedAgent::new(
+-                    selection.model_only(),
+-                    &inputs,
+-                    PreparedStep::Decide { contract },
+-                )?
+-            }
+-        };
+-        // Current authority is checked by the store before local locks (06-D5), not here
+-        // after the run lock.
+-        tx.commit().await?;
++        let prepared = Box::pin(super::agent_history::prepare(self, claim, policy)).await?;
+         let provider = ModelProvider::from(prepared.selection().agent().model.provider.as_str());
+         let secret = crate::application::use_cases::company::CompanyPersistence::model_api_key(
+             self,
+--- accepted-p01/src/adapters/persistence/workflow/agent_runtime_tests.rs
++++ p02/src/adapters/persistence/workflow/agent_runtime_tests.rs
+@@ -894,3 +894,6 @@
+ 
+ #[path = "agent_history_identity_tests.rs"]
+ mod history_identity;
++
++#[path = "agent_history_storage_tests.rs"]
++mod history_storage;
+--- accepted-p01/src/adapters/persistence/workflow/autonomous_agent_admission_tests.rs
++++ p02/src/adapters/persistence/workflow/autonomous_agent_admission_tests.rs
+@@ -108,7 +108,16 @@
+         new.version, old.version,
+         "publishing an agent leaves the workflow version intact"
+     );
+-    let launch = p.prepare_agent(&setup.claim).await.unwrap();
++    let launch = p
++        .prepare_agent(
++            &setup.claim,
++            crate::application::workflow::lease::LeasePolicy::new(std::time::Duration::from_secs(
++                60,
++            ))
++            .unwrap(),
++        )
++        .await
++        .unwrap();
+     assert!(
+         !launch
+             .prepared
+@@ -264,10 +273,14 @@
+ async fn autonomous_agent_authority_checkpoint_requires_the_exact_selected_agent_identity() {
+     let setup = Box::pin(agent_setup("http://127.0.0.1:1")).await;
+     let p = &setup.fixture.persistence;
+-    let launch =
+-        crate::application::workflow::agent::AgentPreparation::prepare_agent(p, &setup.claim)
+-            .await
+-            .unwrap();
++    let launch = crate::application::workflow::agent::AgentPreparation::prepare_agent(
++        p,
++        &setup.claim,
++        crate::application::workflow::lease::LeasePolicy::new(std::time::Duration::from_secs(60))
++            .unwrap(),
++    )
++    .await
++    .unwrap();
+     let mut prepared = launch.prepared.spec(setup.claim.fence).unwrap().prepared;
+     let scope = crate::application::workflow::actions::ActionScope {
+         company: setup.claim.fence.scope.company,
+--- accepted-p01/src/adapters/persistence/workflow/autonomous_agent_child_selection_tests.rs
++++ p02/src/adapters/persistence/workflow/autonomous_agent_child_selection_tests.rs
+@@ -22,7 +22,16 @@
+         panic!("parent admitted")
+     };
+     let parent_claim = claim_run(&setup, run).await;
+-    let initial = p.prepare_agent(&parent_claim).await.unwrap();
++    let initial = p
++        .prepare_agent(
++            &parent_claim,
++            crate::application::workflow::lease::LeasePolicy::new(std::time::Duration::from_secs(
++                60,
++            ))
++            .unwrap(),
++        )
++        .await
++        .unwrap();
+     let manifest = initial.prepared.selection().manifest_id();
+     let classified = run_model(&setup, &parent_claim, ModelStep::Classify, "billing").await;
+     let next = p
+@@ -59,7 +68,16 @@
+     let child:Uuid=sqlx::query_scalar("SELECT id FROM workflow_runs WHERE company_id=$1 AND parent_run_id=$2 AND parent_execution_id=$3")
+         .bind(scope.company.as_uuid()).bind(run.as_uuid()).bind(next.execution.as_uuid()).fetch_one(p.pool()).await.unwrap();
+     let claim = claim_run(&setup, RunId::new(child)).await;
+-    let child = p.prepare_agent(&claim).await.unwrap();
++    let child = p
++        .prepare_agent(
++            &claim,
++            crate::application::workflow::lease::LeasePolicy::new(std::time::Duration::from_secs(
++                60,
++            ))
++            .unwrap(),
++        )
++        .await
++        .unwrap();
+     assert_eq!(child.prepared.selection().manifest_id(), manifest);
+     assert_eq!(child.prepared.selection().revision().id, original.id);
+     assert_eq!(
+--- accepted-p01/src/adapters/persistence/workflow/autonomous_agent_children_tests.rs
++++ p02/src/adapters/persistence/workflow/autonomous_agent_children_tests.rs
+@@ -160,7 +160,13 @@
+     };
+     let claim = claim_run(&setup, run).await;
+     let root_manifest = p
+-        .prepare_agent(&claim)
++        .prepare_agent(
++            &claim,
++            crate::application::workflow::lease::LeasePolicy::new(std::time::Duration::from_secs(
++                60,
++            ))
++            .unwrap(),
++        )
+         .await
+         .unwrap()
+         .prepared
+@@ -220,7 +226,16 @@
+     root_manifest: DependencyManifestId,
+ ) {
+     let p = &setup.fixture.persistence;
+-    let selected = p.prepare_agent(claim).await.unwrap();
++    let selected = p
++        .prepare_agent(
++            claim,
++            crate::application::workflow::lease::LeasePolicy::new(std::time::Duration::from_secs(
++                60,
++            ))
++            .unwrap(),
++        )
++        .await
++        .unwrap();
+     assert_eq!(selected.prepared.selection().manifest_id(), root_manifest);
+     assert_eq!(
+         selected.prepared.selection().revision().id,
+@@ -259,7 +274,16 @@
+     ));
+     let leaf = actual_child(setup, claim.fence.scope.run).await;
+     let leaf_claim = claim_run(setup, leaf).await;
+-    let leaf_prepared = p.prepare_agent(&leaf_claim).await.unwrap();
++    let leaf_prepared = p
++        .prepare_agent(
++            &leaf_claim,
++            crate::application::workflow::lease::LeasePolicy::new(std::time::Duration::from_secs(
++                60,
++            ))
++            .unwrap(),
++        )
++        .await
++        .unwrap();
+     let root_manifest: Uuid = sqlx::query_scalar(
+         "SELECT manifest_id FROM run_dependency_manifests WHERE company_id=$1 AND run_id=$2",
+     )
+--- accepted-p01/src/adapters/persistence/workflow/autonomous_agent_graph_tests.rs
++++ p02/src/adapters/persistence/workflow/autonomous_agent_graph_tests.rs
+@@ -188,7 +188,16 @@
+         .await
+         .unwrap();
+     assert_eq!(before, after);
+-    let old = p.prepare_agent(&setup.claim).await.unwrap();
++    let old = p
++        .prepare_agent(
++            &setup.claim,
++            crate::application::workflow::lease::LeasePolicy::new(std::time::Duration::from_secs(
++                60,
++            ))
++            .unwrap(),
++        )
++        .await
++        .unwrap();
+     assert_eq!(
+         old.prepared.tools().len(),
+         1,
+@@ -264,7 +273,16 @@
+         .await
+         .unwrap()
+         .unwrap();
+-    let launch = p.prepare_agent(&claim).await.unwrap();
++    let launch = p
++        .prepare_agent(
++            &claim,
++            crate::application::workflow::lease::LeasePolicy::new(std::time::Duration::from_secs(
++                60,
++            ))
++            .unwrap(),
++        )
++        .await
++        .unwrap();
+     assert!(launch.prepared.tools().is_empty());
+     assert!(launch.prepared.selection().skills().is_empty());
+     assert_eq!(
+--- accepted-p01/src/adapters/persistence/workflow/checkpoint_models.rs
++++ p02/src/adapters/persistence/workflow/checkpoint_models.rs
+@@ -31,6 +31,8 @@
+     if let Some(result) = admission_replay(&saved, &current, write, &request.reservation)? {
+         return Ok(End::Rollback(result));
+     }
++    agent_history::require_active_on(tx, write.fence, &saved.workflow_prepared, current.run_id.0)
++        .await?;
+     if let Some(decision) = saved.model_blocked_decision {
+         decisions::tokens::approved_request(tx, write.fence.scope, decision, request).await?;
+     }
+@@ -168,6 +170,7 @@
+     token_budget::lock_on(tx, write.fence).await?;
+     super::super::super::model_usage::persist_checkpoint_usage_on(tx, &current, &next).await?;
+     persist_on(tx, write.fence, &next, CheckpointOwnership::Model(None)).await?;
++    agent_history::accepted_on(tx, write.fence, &saved.workflow_prepared, &next).await?;
+     let root = token_budget::lock_on(tx, write.fence).await?;
+     live(tx, write.fence, bound).await?;
+     if root.refusal.is_some() {
+--- accepted-p01/src/adapters/persistence/workflow/checkpoint_updates.rs
++++ p02/src/adapters/persistence/workflow/checkpoint_updates.rs
+@@ -58,6 +58,7 @@
+         token_budget::require_progression(tx, write.fence.scope).await?;
+     }
+     persist_on(tx, write.fence, &next, CheckpointOwnership::Progression).await?;
++    agent_history::accepted_on(tx, write.fence, &saved.workflow_prepared, &next).await?;
+     live(tx, write.fence, bound).await?;
+     Ok(End::Commit(WriteOutcome::Applied(next)))
+ }
+--- accepted-p01/src/adapters/persistence/workflow/checkpoints.rs
++++ p02/src/adapters/persistence/workflow/checkpoints.rs
+@@ -89,6 +89,16 @@
+                                 return Ok(Evidence::NotApplied);
+                             };
+                             let run = matching(saved, spec)?;
++                            if !agent_history::linked_on(
++                                &mut tx,
++                                fence,
++                                &spec.prepared,
++                                run.run_id.0,
++                            )
++                            .await?
++                            {
++                                return Ok(Evidence::NotApplied);
++                            }
+                             Ok(Evidence::Applied(WriteOutcome::AlreadyApplied(run)))
+                         }
+                         .await;
+@@ -391,8 +401,14 @@
+     }
+     if let Some(saved) = load_on(tx, fence).await? {
+         let run = matching(saved, spec)?;
++        let linked = agent_history::attach_on(tx, fence, &spec.prepared, run.run_id.0).await?;
+         live(tx, fence, bound).await?;
+-        return Ok(End::Rollback(WriteOutcome::AlreadyApplied(run)));
++        return Ok(match linked {
++            agent_history::LinkChange::Linked => End::Commit(WriteOutcome::AlreadyApplied(run)),
++            agent_history::LinkChange::Unchanged => {
++                End::Rollback(WriteOutcome::AlreadyApplied(run))
++            }
++        });
+     }
+     sqlx::query("INSERT INTO task_harness_runs
+         (id, company_id, task_id, agent_id, workflow_run_id, workflow_execution_id, workflow_generation, workflow_worker_id, workflow_attempt, workflow_prepared, schema_version, revision, state, checkpoint)
+@@ -401,6 +417,7 @@
+         .bind(fence.scope.run.as_uuid()).bind(fence.scope.execution.as_uuid()).bind(fence.generation.0)
+         .bind(fence.worker.0).bind(fence.attempt.0).bind(&spec.prepared).bind(serde_json::to_value(proposed).map_err(|_| invalid())?)
+         .execute(&mut **tx).await?;
++    agent_history::attach_on(tx, fence, &spec.prepared, proposed.run_id.0).await?;
+     live(tx, fence, bound).await?;
+     Ok(End::Commit(WriteOutcome::Applied(proposed.clone())))
+ }
+@@ -435,6 +452,8 @@
+     if !changed {
+         return Ok(End::Rollback(WriteOutcome::AlreadyApplied(next)));
+     }
++    agent_history::require_active_on(tx, write.fence, &saved.workflow_prepared, current.run_id.0)
++        .await?;
+     persist_on(tx, write.fence, &next, CheckpointOwnership::Execution).await?;
+     live(tx, write.fence, bound).await?;
+     Ok(End::Commit(WriteOutcome::Applied(next)))
+--- accepted-p01/src/adapters/persistence/workflow/control_revision_tests.rs
++++ p02/src/adapters/persistence/workflow/control_revision_tests.rs
+@@ -81,7 +81,7 @@
+     let (f, scope) = fixture().await;
+     // Isolated fixture setup reaches the otherwise impractical bigint boundary.
+     // Restore the trigger before any operation being tested.
+-    sqlx::raw_sql("ALTER TABLE workflow_runs DISABLE TRIGGER workflow_run_revision; UPDATE workflow_runs SET revision=9223372036854775807; ALTER TABLE workflow_runs ENABLE TRIGGER workflow_run_revision")
++    sqlx::raw_sql("ALTER TABLE workflow_runs DISABLE TRIGGER workflow_run_revision; UPDATE workflow_runs SET revision=9223372036854775807; SET CONSTRAINTS ALL IMMEDIATE; ALTER TABLE workflow_runs ENABLE TRIGGER workflow_run_revision")
+         .execute(f.persistence().pool()).await.unwrap();
+     let before = control_state(&f).await;
+     let cmd = command(&f, scope, "cancel").await;
+--- accepted-p01/src/adapters/persistence/workflow/harness_checkpoint_update_tests.rs
++++ p02/src/adapters/persistence/workflow/harness_checkpoint_update_tests.rs
+@@ -3,10 +3,18 @@
+ use crate::services::harness::AgentExecutionOutput;
+ use crate::services::harness::runs::{InvocationId, SavedToolCall};
+ 
+-fn output() -> AgentExecutionOutput {
++fn output(model: &ModelFixture) -> AgentExecutionOutput {
++    let structured = crate::services::response_contract::StructuredResponse::validate(
++        model.run.identity.response_contract.as_ref().unwrap(),
++        "\"saved\"",
++        None,
++        &crate::adapters::response_schema::JsonResponseValidator,
++    )
++    .unwrap()
++    .unwrap();
+     AgentExecutionOutput {
+-        content: "saved".into(),
+-        structured: None,
++        content: structured.body().into(),
++        structured: Some(structured),
+         metadata: None,
+         token_usage: Default::default(),
+     }
+@@ -22,7 +30,7 @@
+         .await
+         .unwrap();
+     let write = resumed(&f.model, &paused).await;
+-    let update = Update::FinalOutput(Box::new(output()));
++    let update = Update::FinalOutput(Box::new(output(&f.model)));
+     let (left, right) = tokio::join!(
+         p.update_workflow_checkpoint(write, update.clone()),
+         p.update_workflow_checkpoint(write, update.clone())
+@@ -44,7 +52,7 @@
+     );
+     let saved = stored(&f.model.native.fixture, f.model.run.run_id.0).await;
+     assert!(saved["model_blocked_decision"].is_null());
+-    assert_eq!(saved["checkpoint"]["final_output"]["content"], "saved");
++    assert_eq!(saved["checkpoint"]["final_output"]["content"], "\"saved\"");
+     assert_eq!(accounting(&f.model).await["calls"], 1);
+     assert!(matches!(
+         p.update_workflow_checkpoint(write, update).await.unwrap(),
+--- accepted-p01/src/adapters/persistence/workflow/harness_model_fixture.rs
++++ p02/src/adapters/persistence/workflow/harness_model_fixture.rs
+@@ -20,10 +20,13 @@
+         .await
+         .unwrap()
+         .unwrap();
+-    let launch = fixture.persistence().prepare_agent(&claim).await.unwrap();
+-    let agent = launch.prepared.agent_id();
+-    let prepared = launch.prepared.spec(claim.fence).unwrap().prepared;
+-    let row = model_row(&claim, agent, prepared);
++    let launch = fixture
++        .persistence()
++        .prepare_agent(&claim, policy)
++        .await
++        .unwrap();
++    let spec = launch.prepared.spec(claim.fence).unwrap();
++    let row = model_row(&claim, spec);
+     NativeFixture {
+         fixture,
+         fence: claim.fence,
+@@ -104,23 +107,11 @@
+     (fixture, scope)
+ }
+ 
+-fn model_row(claim: &ClaimedWorkflow, agent: Uuid, prepared: Value) -> Value {
++fn model_row(claim: &ClaimedWorkflow, spec: WorkflowCheckpointSpec) -> Value {
+     let scope = claim.fence.scope;
+-    let run = RunCheckpoint::new(
+-        RunIdentity {
+-            company_id: scope.company.as_uuid(),
+-            task_id: scope.job.0,
+-            agent_id: agent,
+-            harness: HarnessKind::Rig,
+-            provider: "openai".into(),
+-            model: "fixture".into(),
+-            response_contract: None,
+-            capability_fingerprint: "b".repeat(64),
+-        },
+-        "untrusted context".into(),
+-        RigExecutionPolicy::default(),
+-    )
+-    .unwrap();
++    let agent = spec.identity.agent_id;
++    let prepared = spec.prepared;
++    let run = RunCheckpoint::new(spec.identity, spec.initial_prompt, spec.policy).unwrap();
+     let fence = claim.fence;
+     json!({"id":run.run_id.0,"company_id":scope.company.as_uuid(),"task_id":scope.job.0,"agent_id":agent,
+         "workflow_run_id":scope.run.as_uuid(),"workflow_execution_id":scope.execution.as_uuid(),
+--- accepted-p01/src/adapters/persistence/workflow/harness_model_store_tests.rs
++++ p02/src/adapters/persistence/workflow/harness_model_store_tests.rs
+@@ -34,7 +34,10 @@
+     let initial: RunCheckpoint = serde_json::from_value(native.row["checkpoint"].clone()).unwrap();
+     let spec = WorkflowCheckpointSpec {
+         identity: initial.identity,
+-        initial_prompt: "untrusted context".into(),
++        initial_prompt: match &initial.messages[0] {
++            crate::services::harness::runs::ConversationMessage::User { text } => text.clone(),
++            _ => panic!("missing initial input"),
++        },
+         policy: initial.policy,
+         prepared: native.row["workflow_prepared"].clone(),
+     };
+@@ -220,3 +223,6 @@
+             .all(|r| r["settled_at"].is_null())
+     );
+ }
++
++#[path = "agent_history_completion_tests.rs"]
++mod history_completion;
+--- accepted-p01/src/adapters/persistence/workflow/harness_token_refusal_tests.rs
++++ p02/src/adapters/persistence/workflow/harness_token_refusal_tests.rs
+@@ -33,14 +33,12 @@
+         .await
+         .unwrap()
+         .unwrap();
+-    let mut identity = f.model.run.identity.clone();
+-    identity.task_id = scope.job.0;
+-    let spec = WorkflowCheckpointSpec {
+-        identity,
+-        initial_prompt: "untrusted child context".into(),
+-        policy: f.model.run.policy,
+-        prepared: f.model.native.row["workflow_prepared"].clone(),
+-    };
++    let prepared =
++        crate::application::workflow::agent::AgentPreparation::prepare_agent(p, &claim, policy)
++            .await
++            .unwrap()
++            .prepared;
++    let spec = prepared.spec(claim.fence).unwrap();
+     let WriteOutcome::Applied(run) = p
+         .open_workflow_checkpoint(claim.fence, &spec, policy)
+         .await
+--- accepted-p01/src/adapters/persistence/workflow/knowledge_search_atomic_tests.rs
++++ p02/src/adapters/persistence/workflow/knowledge_search_atomic_tests.rs
+@@ -337,3 +337,48 @@
+     assert_eq!(f.snapshot().await, before);
+     f.library.shutdown().await.unwrap();
+ }
++
++#[tokio::test]
++async fn agent_history_level_accepted_checkpoint_contains_the_real_classified_observation() {
++    let f = Box::pin(SearchFixture::new(AccessLevel::L5)).await;
++    let call = f.prepare(json!({"query":"floor"})).await;
++    let result = f
++        .p()
++        .observe_knowledge(
++            f.claim.fence,
++            &call,
++            observation("PRIVATE FLOOR 60", AccessLevel::L5),
++        )
++        .await
++        .unwrap();
++    let llm = scripted_llm(vec![LlmTurn::text("\"answer\"")]).await;
++    register_scripted_agent_base_url(f.agent, &llm.base_url);
++    let output = Box::pin(
++        f.runtime()
++            .execute(&WorkflowStepKind("agent.run".into()), &f.claim),
++    )
++    .await
++    .completed_result()
++    .unwrap();
++    assert_eq!(output, json!("answer"));
++    let checkpoint = f.checkpoint().await;
++    assert_eq!(checkpoint.invocations[0].result.as_ref(), Some(&result));
++    assert_eq!(checkpoint.turns.len(), 2);
++    let history:Value=sqlx::query_scalar("SELECT jsonb_build_object('level',access_level,'output',output,'checkpoint',checkpoint_id,'state',state) FROM agent_history_exchanges WHERE company_id=$1 AND execution_id=$2")
++        .bind(f.claim.fence.scope.company.as_uuid()).bind(f.claim.fence.scope.execution.as_uuid()).fetch_one(f.p().pool()).await.unwrap();
++    assert_eq!(
++        history,
++        json!({"level":5,"output":"answer","checkpoint":checkpoint.run_id.0,"state":"completed"})
++    );
++    let calls: i64 = sqlx::query_scalar(
++        "SELECT count(*) FROM model_usage_calls WHERE company_id=$1 AND run_id=$2",
++    )
++    .bind(f.claim.fence.scope.company.as_uuid())
++    .bind(f.claim.fence.scope.run.as_uuid())
++    .fetch_one(f.p().pool())
++    .await
++    .unwrap();
++    assert_eq!(calls, 2);
++    assert_eq!(llm.finish().await.unwrap(), 1);
++    f.library.shutdown().await.unwrap();
++}
+--- accepted-p01/src/adapters/persistence/workflow/mcp_agent_tests.rs
++++ p02/src/adapters/persistence/workflow/mcp_agent_tests.rs
+@@ -257,7 +257,17 @@
+     use crate::entities::agent_capability::{
+         AgentBindingId, AgentId, AgentRevisionId, DependencyManifestId,
+     };
+-    let prepared = p.prepare_agent(claim).await.unwrap().prepared;
++    let prepared = p
++        .prepare_agent(
++            claim,
++            crate::application::workflow::lease::LeasePolicy::new(std::time::Duration::from_secs(
++                60,
++            ))
++            .unwrap(),
++        )
++        .await
++        .unwrap()
++        .prepared;
+     let original = prepared.tools()[0].origin;
+     let connection = match prepared.tools()[0].target {
+         crate::application::workflow::agent::AgentToolTarget::Mcp { connection } => connection,
+--- accepted-p01/src/adapters/persistence/workflow/storage_checkpoint_tests.rs
++++ p02/src/adapters/persistence/workflow/storage_checkpoint_tests.rs
+@@ -69,15 +69,12 @@
+         .await
+         .unwrap()
+         .unwrap();
+-    let spec = WorkflowCheckpointSpec {
+-        identity: RunIdentity {
+-            task_id: scope.job.0,
+-            ..f.run.identity.clone()
+-        },
+-        initial_prompt: "protected context".into(),
+-        policy: f.run.policy,
+-        prepared: f.native.row["workflow_prepared"].clone(),
+-    };
++    let prepared =
++        crate::application::workflow::agent::AgentPreparation::prepare_agent(p, &claim, policy)
++            .await
++            .unwrap()
++            .prepared;
++    let spec = prepared.spec(claim.fence).unwrap();
+     let WriteOutcome::Applied(run) = p
+         .open_workflow_checkpoint(claim.fence, &spec, policy)
+         .await
+@@ -98,6 +95,21 @@
+     run
+ }
+ 
++async fn release_history_pin(f: &ModelFixture, candidate: RetentionRoot) {
++    let p = f.native.fixture.persistence();
++    let before = snapshot(p).await;
++    assert!(
++        p.retire_tree(candidate).await.unwrap().is_none(),
++        "independently retained input must pin its source"
++    );
++    assert_eq!(snapshot(p).await, before);
++    // Workflow cleanup can proceed only after history's independent owner removes
++    // this terminal exchange. This exercises the lifetime boundary, not phase 06 policy.
++    let removed=sqlx::query("DELETE FROM agent_history_exchanges WHERE company_id=$1 AND run_id=$2 AND state='cancelled'")
++        .bind(candidate.company.as_uuid()).bind(candidate.run.as_uuid()).execute(p.pool()).await.unwrap();
++    assert_eq!(removed.rows_affected(), 1);
++}
++
+ async fn case(fault: bool) {
+     let f = Box::pin(opened()).await;
+     let p = f.native.fixture.persistence();
+@@ -114,6 +126,7 @@
+     // An unrelated live root/checkpoint in the SAME company and owned database.
+     let protected = open_protected(&f).await;
+     let candidate = retire_candidate(&f).await;
++    release_history_pin(&f, candidate).await;
+     let before = snapshot(p).await;
+     assert_eq!(before["checkpoints"].as_array().unwrap().len(), 2);
+     assert_eq!(before["calls"].as_array().unwrap().len(), 1);
+--- accepted-p01/src/adapters/persistence/workflow/storage_retention_eligible.sql
++++ p02/src/adapters/persistence/workflow/storage_retention_eligible.sql
+@@ -4,6 +4,9 @@
+ SELECT
+     NOT EXISTS(SELECT 1 FROM workflow_runs AS run JOIN tree ON tree.run_id=run.id
+         WHERE run.company_id=$1 AND run.state NOT IN ('succeeded','failed','cancelled'))
++    -- Logical input/checkpoint ownership is retained until eligible history pruning.
++    AND NOT EXISTS(SELECT 1 FROM agent_history_exchanges AS exchange
++        JOIN tree ON tree.run_id=exchange.run_id WHERE exchange.company_id=$1)
+     AND NOT EXISTS(SELECT 1 FROM background_tasks AS job JOIN workflow_executions AS execution
+         ON execution.company_id=job.company_id AND execution.id=job.workflow_execution_id
+         JOIN tree ON tree.run_id=execution.run_id WHERE execution.company_id=$1 AND job.status IN ('pending','processing'))
+--- accepted-p01/src/application/workflow/agent.rs
++++ p02/src/application/workflow/agent.rs
+@@ -6,9 +6,9 @@
+ use super::{
+     actions::ModelToolCallId,
+     agent_contract::{AgentSelectionIdentity, agent_action_snapshot},
+-    agent_history::AgentLogicalInput,
++    agent_history::{AgentExchangeId, AgentLogicalInput},
+     checkpoints::WorkflowCheckpointSpec,
+-    lease::{ClaimedWorkflow, WorkflowFence},
++    lease::{ClaimedWorkflow, LeasePolicy, WorkflowFence},
+     message::MessageKind,
+     publication::{ResolvedAgent, WorkflowToolPin},
+     registry::ModelStep,
+@@ -26,7 +26,7 @@
+ use sha2::{Digest, Sha256};
+ use uuid::Uuid;
+ 
+-const VERSION: u8 = 3;
++const VERSION: u8 = 4;
+ use crate::application::agent::{AgentModelToolName, AgentToolOrigin, ResolvedAgentTool};
+ use crate::entities::agent_capability::AgentBindingSource;
+ 
+@@ -106,6 +106,7 @@
+     tools: Vec<PreparedTool>,
+     preamble: String,
+     context: AgentLogicalInput,
++    history_exchange: Option<AgentExchangeId>,
+     output_schema: Value,
+ }
+ 
+@@ -154,6 +155,7 @@
+             tools,
+             preamble,
+             context,
++            history_exchange: None,
+             output_schema,
+         })
+     }
+@@ -182,6 +184,21 @@
+     }
+     pub fn agent_id(&self) -> Uuid {
+         self.selection.agent().agent_id.as_uuid()
++    }
++
++    /// Bound only by the native preparation owner after durable input capture.
++    pub fn with_history(mut self, exchange: AgentExchangeId) -> AppResult<Self> {
++        if self.step != ModelStep::AgentRun
++            || self.history_exchange.is_some_and(|saved| saved != exchange)
++        {
++            return Err(invalid("History exchange differs from the model step"));
++        }
++        self.history_exchange = Some(exchange);
++        Ok(self)
++    }
++
++    pub fn history_exchange(&self) -> Option<AgentExchangeId> {
++        self.history_exchange
+     }
+ 
+     pub fn response_contract(&self) -> AppResult<ResponseContract> {
+@@ -245,7 +262,11 @@
+ pub trait AgentPreparation: Send + Sync {
+     /// The claimed model step's frozen inputs, the frozen selection (tool-free for
+     /// `ai.classify`/`decision.agent`) and, for `agent.run`, concrete tool targets.
+-    async fn prepare_agent(&self, claim: &ClaimedWorkflow) -> AppResult<AgentLaunch>;
++    async fn prepare_agent(
++        &self,
++        claim: &ClaimedWorkflow,
++        policy: LeasePolicy,
++    ) -> AppResult<AgentLaunch>;
+ }
+ 
+ /// What a saved model tool call observed at its dispatch boundary: ActionService for HTTP, MCP
+--- accepted-p01/src/application/workflow/agent_history/contracts.rs
++++ p02/src/application/workflow/agent_history/contracts.rs
+@@ -59,6 +59,14 @@
+     Cancelled,
+ }
+ 
++impl TryFrom<String> for AgentExchangeState {
++    type Error = AppError;
++    fn try_from(value: String) -> AppResult<Self> {
++        serde_json::from_value(Value::String(value))
++            .map_err(|_| AppError::BadRequest("Invalid agent exchange state".into()))
++    }
++}
++
+ impl AgentExchangeState {
+     pub fn permits(self, next: Self) -> bool {
+         self == next
+@@ -70,6 +78,11 @@
+                         Self::Completed | Self::Failed | Self::Cancelled
+                     )
+             )
++    }
++
++    /// State eligibility only. The native safe control-retry owner proves this exception.
++    pub fn can_control_retry(self) -> bool {
++        self == Self::Failed
+     }
+ 
+     pub fn as_str(self) -> &'static str {
+--- accepted-p01/src/application/workflow/agent_history_preparation_tests.rs
++++ p02/src/application/workflow/agent_history_preparation_tests.rs
+@@ -18,7 +18,7 @@
+         .unwrap();
+         assert_eq!(prepared.logical_input().value(), &context);
+         let spec = prepared.spec(fence()).unwrap();
+-        assert_eq!(spec.prepared["version"], 3);
++        assert_eq!(spec.prepared["version"], 4);
+         assert_eq!(spec.prepared["context"], context);
+         assert!(spec.prepared.get("prompt").is_none());
+         assert_eq!(spec.initial_prompt.matches("</context>").count(), 1);

@@ -1,8 +1,8 @@
 //! Selection and frozen admission ownership. Publication is a later durable owner.
 use super::*;
 use crate::application::workflow::channel_reply::{
-    ChannelReplies, ChannelReplySettings, ConfigureChannelReply, ReplySettingsRevision,
-    SelectedResponder,
+    ChannelReplies, ChannelReplyContract, ChannelReplySettings, ConfigureChannelReply,
+    ConfigureResponder, ReplySettingsRevision, ReplyText, SelectedResponder,
 };
 use serde_json::Value;
 
@@ -59,6 +59,56 @@ async fn settings_on(
     .await?
     .map(SettingsRow::settings)
     .transpose()
+}
+
+/// Only the just-created native binding is selected, inside provisioning's savepoint.
+/// Caller authorization and account locks already belong to the provisioning transaction.
+pub(super) async fn bootstrap_native_on(
+    tx: &mut Transaction<'_, Postgres>,
+    company: CompanyId,
+    channel: RelatedChannelId,
+    actor: WorkflowActor,
+    binding: WorkflowBindingId,
+) -> AppResult<()> {
+    authorize_settings(tx, company, channel, actor).await?;
+    if settings_on(tx, company, channel).await?.is_some() {
+        return Err(conflict());
+    }
+    let binding_state = binding_rows::read_binding(tx, company, binding)
+        .await?
+        .ok_or_else(missing)?;
+    if binding_state.configuration.run_as() != actor {
+        return Err(conflict());
+    }
+    let request = ConfigureChannelReply {
+        company,
+        channel,
+        actor,
+        expected: None,
+        responder: Some(ConfigureResponder {
+            binding,
+            expected_binding_revision: binding_state.revision,
+            contract: ChannelReplyContract {
+                format_version: 1,
+                subject: ReplyText::Literal {
+                    literal: "Response".into(),
+                },
+                body: ReplyText::Reference {
+                    r#ref: "/input/body"
+                        .to_owned()
+                        .try_into()
+                        .expect("native response reference"),
+                },
+            },
+        }),
+        approval_policy: None,
+    };
+    let state = ChannelReplySettings {
+        revision: ReplySettingsRevision::try_from(1).expect("initial revision"),
+        responder: selected_on(tx, &request).await?,
+        approval_policy: None,
+    };
+    write_settings(tx, &request, &state).await
 }
 
 #[async_trait]

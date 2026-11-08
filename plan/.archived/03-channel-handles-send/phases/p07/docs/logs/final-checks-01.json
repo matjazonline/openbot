@@ -1,0 +1,10 @@
+[
+  {
+    "name": "reviewed-email-list-01",
+    "exit_code": 0
+  },
+  {
+    "name": "reviewed-email-runtime-01",
+    "exit_code": 101
+  }
+]

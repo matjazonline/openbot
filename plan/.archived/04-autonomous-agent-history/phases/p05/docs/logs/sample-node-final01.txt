@@ -1,0 +1,67 @@
+✖ response form supports keyboard navigation and submit and shows request progress without dropping form fields (9.834584ms)
+
+Interrupted while running:
+
+⚠ scripts/tests/workflow-samples.mjs (scripts/tests/workflow-samples.mjs:1:1)
+✖ sample progress, failed request recovery and late navigation response use the requesting form (10.177708ms)
+✖ actual sample textarea template preserves leading newlines for every raw JSON field (1.784208ms)
+✖ scripts/tests/workflow-samples.mjs (73656.989208ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 0
+ℹ fail 3
+ℹ cancelled 1
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 73663.175458
+
+✖ failing tests:
+
+test at scripts/tests/channel-response-authoring.mjs:16:1
+✖ response form supports keyboard navigation and submit and shows request progress without dropping form fields (9.834584ms)
+  browserType.launch: Executable doesn't exist at /Users/mac02/Library/Caches/ms-playwright/chromium_headless_shell-1193/chrome-mac/headless_shell
+  ╔═════════════════════════════════════════════════════════════════════════╗
+  ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+  ║ Please run the following command to download new browsers:              ║
+  ║                                                                         ║
+  ║     npx playwright install                                              ║
+  ║                                                                         ║
+  ║ <3 Playwright Team                                                      ║
+  ╚═════════════════════════════════════════════════════════════════════════╝
+      at TestContext.<anonymous> (/private/tmp/openbot-agent-history-h_82_5pw/worktree/scripts/tests/channel-response-authoring.mjs:33:34) {
+    name: 'Error'
+  }
+
+test at scripts/tests/workflow-samples.mjs:9:1
+✖ sample progress, failed request recovery and late navigation response use the requesting form (10.177708ms)
+  browserType.launch: Executable doesn't exist at /Users/mac02/Library/Caches/ms-playwright/chromium_headless_shell-1193/chrome-mac/headless_shell
+  ╔═════════════════════════════════════════════════════════════════════════╗
+  ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+  ║ Please run the following command to download new browsers:              ║
+  ║                                                                         ║
+  ║     npx playwright install                                              ║
+  ║                                                                         ║
+  ║ <3 Playwright Team                                                      ║
+  ╚═════════════════════════════════════════════════════════════════════════╝
+      at TestContext.<anonymous> (/private/tmp/openbot-agent-history-h_82_5pw/worktree/scripts/tests/workflow-samples.mjs:19:34) {
+    name: 'Error'
+  }
+
+test at scripts/tests/workflow-samples.mjs:42:1
+✖ actual sample textarea template preserves leading newlines for every raw JSON field (1.784208ms)
+  browserType.launch: Executable doesn't exist at /Users/mac02/Library/Caches/ms-playwright/chromium_headless_shell-1193/chrome-mac/headless_shell
+  ╔═════════════════════════════════════════════════════════════════════════╗
+  ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+  ║ Please run the following command to download new browsers:              ║
+  ║                                                                         ║
+  ║     npx playwright install                                              ║
+  ║                                                                         ║
+  ║ <3 Playwright Team                                                      ║
+  ╚═════════════════════════════════════════════════════════════════════════╝
+      at TestContext.<anonymous> (/private/tmp/openbot-agent-history-h_82_5pw/worktree/scripts/tests/workflow-samples.mjs:46:34) {
+    name: 'Error'
+  }
+
+test at scripts/tests/workflow-samples.mjs:1:1
+✖ scripts/tests/workflow-samples.mjs (73656.989208ms)
+  'Promise resolution is still pending but the event loop has already resolved'

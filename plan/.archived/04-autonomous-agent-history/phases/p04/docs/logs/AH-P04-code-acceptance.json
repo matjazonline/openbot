@@ -1,0 +1,31 @@
+{
+  "acceptance": "AH-P04-code-acceptance",
+  "at": "2026-11-07T19:47:22.583956+00:00",
+  "result": "accepted in phase; not integrated/pushed",
+  "review": "AH-P04-B1-R1 PASS",
+  "source_digest": "12de390114bb49391c9b20a091795450ee4aac280ff195fe3848032af17b7a4d",
+  "head": "4ab45555f8316ec7a8b1b64e8c05b77ff7d9a29d",
+  "coordination_revision": 17,
+  "coordination_sha256": "29debb1a50cad7245c2b8ab0a4b6e5c59f32267046d9d26d6f3d746cf5b5c810",
+  "owned": 128,
+  "phase_delta": 42,
+  "external": 36,
+  "archive_sha256": "54fa5e45d05859f8f03107cd83a67661981c0006dee4675ec0a6b52f90522d13",
+  "distinct_targeted_passes": 597,
+  "history_passes": 99,
+  "ignored": 0,
+  "checks": "all pinned receipts/log hashes and exit statuses, exact selected/executed names verified; no runtime reruns",
+  "records": "root read complete new B review/notes/findings/entry/exit before executing acceptance; no unresolved actionable findings",
+  "exclusions": [
+    "plan/04-autonomous-agent-history/COORDINATION.md",
+    "plan/04-autonomous-agent-history/phases/p01/docs",
+    "plan/04-autonomous-agent-history/phases/p02/docs",
+    "plan/04-autonomous-agent-history/phases/p03/docs",
+    "plan/04-autonomous-agent-history/phases/p04/docs",
+    "plan/04-autonomous-agent-history/phases/p05/docs",
+    "plan/04-autonomous-agent-history/phases/p06/docs",
+    "plan/04-autonomous-agent-history/phases/p07/docs",
+    "plan/04-autonomous-agent-history/integration/final/docs"
+  ],
+  "next": "publish accepted producer C005/r4 and start ordered P05"
+}

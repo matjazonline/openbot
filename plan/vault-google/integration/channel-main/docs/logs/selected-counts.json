@@ -1,0 +1,12 @@
+{
+  "vault_dispatch_authority_": 15,
+  "vault_binding_": 14,
+  "vault_storage_": 14,
+  "vault_rotation_": 6,
+  "google_refresh_race_": 4,
+  "channel_reply_completion_": 34,
+  "channel_reply_e2e_": 13,
+  "provisioning_": 29,
+  "production_workers_stop_on_the_shutdown_token": 1,
+  "rendered_markup_carries_no_inline_javascript": 1
+}

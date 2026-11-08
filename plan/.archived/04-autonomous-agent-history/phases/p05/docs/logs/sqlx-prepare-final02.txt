@@ -1,0 +1,3 @@
+    Checking open_bots v0.1.0 (/private/tmp/openbot-agent-history-h_82_5pw/worktree)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 14.69s
+query data written to .sqlx in the current directory; please check this into version control

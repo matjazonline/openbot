@@ -1,0 +1,232 @@
+{
+  "review": "AH-P01-B1-R1",
+  "reviewer_runtime_execution": false,
+  "selected": 165,
+  "listed": 165,
+  "distinct_passed": 165,
+  "selected_missing_from_pass": [],
+  "passes_not_selected": [],
+  "list_difference": [],
+  "runtime_summary": [
+    "test result: ok. 165 passed; 0 failed; 0 ignored; 0 measured; 3103 filtered out; finished in 61.12s"
+  ],
+  "original_revocation_regressions": {
+    "workflow_action_authority_revocation_contender_blocks_then_rechecks": true,
+    "workflow_action_authority_sql_scope_actor_and_current_membership": true,
+    "workflow_admit_sql_actor_revocation_blocks_new_replay_and_alias": true
+  },
+  "receipts": [
+    {
+      "receipt": "reset-principal-lifecycle-02.json",
+      "exit_code": 0,
+      "command": [
+        "python3",
+        "plan/04-autonomous-agent-history/phases/p01/docs/logs/reset-owned-databases.py"
+      ],
+      "log_sha256": "88334b38e7d24a8a03d285e87e12fcce6d5aa223dcba69732912873079a51492",
+      "log_tail": [
+        "CREATE DATABASE",
+        "DROP DATABASE",
+        "CREATE DATABASE"
+      ]
+    },
+    {
+      "receipt": "migrations-main-lifecycle-02.json",
+      "exit_code": 0,
+      "command": [
+        "cargo",
+        "sqlx",
+        "migrate",
+        "run"
+      ],
+      "log_sha256": "74320e2b052fe242242c7018b03198467d8c9815a47873febcc3739cd9e44cff",
+      "log_tail": [
+        "Applied 20260817000000/migrate init schema (277.942875ms)"
+      ]
+    },
+    {
+      "receipt": "migrations-test-lifecycle-02.json",
+      "exit_code": 0,
+      "command": [
+        "env",
+        "DATABASE_URL=postgres://mac02@127.0.0.1:65037/openbot_ah_p01_test",
+        "cargo",
+        "sqlx",
+        "migrate",
+        "run"
+      ],
+      "log_sha256": "c290688c3643af86b3e6edd51e5c6d120eddf0bb6e2818f9ccb1fd6e5f2cd6fb",
+      "log_tail": [
+        "Applied 20260817000000/migrate init schema (284.698208ms)"
+      ]
+    },
+    {
+      "receipt": "sqlx-prepare-lifecycle-01.json",
+      "exit_code": 0,
+      "command": [
+        "cargo",
+        "sqlx",
+        "prepare",
+        "--",
+        "--all-targets"
+      ],
+      "log_sha256": "a53dfed12bc7a767f5ac44aeac33b93298caf3167192a07fc6b39f34668cb0c1",
+      "log_tail": [
+        "    Checking open_bots v0.1.0 (/private/tmp/openbot-agent-history-h_82_5pw/worktree)",
+        "    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1m 10s",
+        "query data written to .sqlx in the current directory; please check this into version control"
+      ]
+    },
+    {
+      "receipt": "sqlx-check-lifecycle-01.json",
+      "exit_code": 0,
+      "command": [
+        "cargo",
+        "sqlx",
+        "prepare",
+        "--check",
+        "--",
+        "--all-targets"
+      ],
+      "log_sha256": "c893d43cc3fd3be77bdebb3d5be94fb140059fa64c65cdd0f3ad7451bd851441",
+      "log_tail": [
+        "    Checking open_bots v0.1.0 (/private/tmp/openbot-agent-history-h_82_5pw/worktree)",
+        "    Finished `dev` profile [unoptimized + debuginfo] target(s) in 11.48s"
+      ]
+    },
+    {
+      "receipt": "history-and-affected-list-04.json",
+      "exit_code": 0,
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "--",
+        "--list",
+        "agent_history_",
+        "workflow_admit_",
+        "workflow_agent_run_",
+        "autonomous_agent_admission_",
+        "activation_tests::",
+        "rerun_tests::",
+        "manual::tests",
+        "channel_reply_e2e_",
+        "autonomous_agent_samples_",
+        "ui::runs::"
+      ],
+      "log_sha256": "0be0cb4e2cfecbd6c0693893b10c95bc7c938a7f29195afc8eb123bf3376d7cd",
+      "log_tail": [
+        "application::workflow::sample::tests::tools_tests::approvals::autonomous_agent_samples_protected_http_binding_requires_explicit_simulated_approval: test",
+        "",
+        "165 tests, 0 benchmarks"
+      ]
+    },
+    {
+      "receipt": "history-and-affected-runtime-06.json",
+      "exit_code": 0,
+      "command": [
+        "scripts/test-network-isolation.sh",
+        "cargo",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "--",
+        "agent_history_",
+        "workflow_admit_",
+        "workflow_agent_run_",
+        "autonomous_agent_admission_",
+        "activation_tests::",
+        "rerun_tests::",
+        "manual::tests",
+        "channel_reply_e2e_",
+        "autonomous_agent_samples_",
+        "ui::runs::"
+      ],
+      "log_sha256": "a5589d6f4f040868e26196b3455ce5ea23b12f93bdd33ec8ca085441458cc7eb",
+      "log_tail": [
+        "",
+        "test result: ok. 165 passed; 0 failed; 0 ignored; 0 measured; 3103 filtered out; finished in 61.12s",
+        ""
+      ]
+    },
+    {
+      "receipt": "offline-all-targets-lifecycle-01.json",
+      "exit_code": 0,
+      "command": [
+        "cargo",
+        "check",
+        "--locked",
+        "--offline",
+        "--all-targets"
+      ],
+      "log_sha256": "f4403412cb20dc7d8a0a94c08c9c8853e4bac9b3e8489158834f30512311ed97",
+      "log_tail": [
+        "    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.22s"
+      ]
+    },
+    {
+      "receipt": "identity-clippy-02.json",
+      "exit_code": 0,
+      "command": [
+        "cargo",
+        "clippy",
+        "--locked",
+        "--offline",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "log_sha256": "9210ddffbfd1496282bfe50693e25d22b45c89c64a0a88e62d58c0e401615e80",
+      "log_tail": [
+        "    Checking open_bots v0.1.0 (/private/tmp/openbot-agent-history-h_82_5pw/worktree)",
+        "    Finished `dev` profile [unoptimized + debuginfo] target(s) in 58.57s"
+      ]
+    },
+    {
+      "receipt": "identity-fmt-check-01.json",
+      "exit_code": 0,
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "log_tail": []
+    },
+    {
+      "receipt": "graph-implementation-03.json",
+      "exit_code": 0,
+      "command": [
+        "graft",
+        "build"
+      ],
+      "log_sha256": "77e991811cdc5d27b5306cf783ed6b58f2c9f19a34c51a64d421059f06e75a6e",
+      "log_tail": [
+        "  parsed: 3 of 1553 files (1550 replayed from cache)",
+        "  \u2192 /private/tmp/openbot-agent-history-h_82_5pw/worktree/graft",
+        "  graft/ is git-ignored (added automatically), a local cache; teammates run `graft build` to get their own."
+      ]
+    },
+    {
+      "receipt": "identity-diff-check-01.json",
+      "exit_code": 0,
+      "command": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "log_tail": []
+    }
+  ],
+  "limitations": [
+    "Author-run targeted checks independently inspected, not re-executed by reviewer.",
+    "No full suite/live-provider/history02+ acceptance."
+  ]
+}

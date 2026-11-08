@@ -1,0 +1,1134 @@
+diff --git a/migrations/20260817000000_init_schema.sql b/migrations/20260817000000_init_schema.sql
+index 5ba69625..3597f8b5 100644
+--- a/migrations/20260817000000_init_schema.sql
++++ b/migrations/20260817000000_init_schema.sql
+@@ -213,6 +213,15 @@ BEGIN
+                                                 AND proposal.owner_attempt=OLD.attempt_ordinal AND proposal.owner_worker=OLD.worker_id
+                                                 AND proposal.owner_generation=OLD.execution_generation AND proposal.owner_expiry=OLD.lock_expires_at))
+                                     AND wait.reason='decision' AND wait.state='waiting'))
++                        OR (attempt.stop_reason='agent_turn_parked' AND execution.completed_at IS NULL
++                            AND execution.committed_route IS NULL AND run.state='waiting' AND run.waiting_reason='agent_turn'
++                            AND OLD.continuation_count < workflow_job_continuation_limit()
++                            AND EXISTS (SELECT 1 FROM workflow_waits AS wait
++                                JOIN agent_history_exchanges AS exchange ON exchange.company_id=wait.company_id
++                                    AND exchange.id=wait.agent_exchange_id AND exchange.job_id=OLD.id
++                                WHERE wait.company_id=execution.company_id AND wait.run_id=execution.run_id
++                                    AND wait.execution_id=execution.id AND wait.reason='agent_turn' AND wait.state='waiting'
++                                    AND wait.parked_attempt_number=OLD.attempt_ordinal AND exchange.state='queued'))
+                         -- A workflow tool call parks its agent job on the call's child (07-D2 §D2.5).
+                         OR (attempt.stop_reason='child_parked' AND execution.completed_at IS NULL
+                             AND execution.committed_route IS NULL AND run.state='waiting' AND run.waiting_reason='child_run'
+@@ -295,6 +304,21 @@ BEGIN
+                     AND wait.reason='child_run' AND wait.state='completed'
+                     AND wait.child_tool_call_id IS NOT NULL AND wait.parked_attempt_number=OLD.attempt_ordinal
+                     AND child.terminal_wakeup_sequence IS NOT NULL
++            ) OR EXISTS (
++                SELECT 1 FROM workflow_executions AS execution
++                JOIN workflow_runs AS run ON run.company_id=execution.company_id AND run.id=execution.run_id
++                JOIN workflow_waits AS wait ON wait.company_id=execution.company_id AND wait.execution_id=execution.id
++                JOIN agent_history_exchanges AS exchange ON exchange.company_id=wait.company_id
++                    AND exchange.id=wait.agent_exchange_id AND exchange.job_id=OLD.id
++                JOIN agent_history_conversations AS conversation ON conversation.company_id=exchange.company_id
++                    AND conversation.id=exchange.conversation_id AND conversation.active_exchange_id=exchange.id
++                JOIN task_attempts AS attempt ON attempt.task_id=OLD.id AND attempt.attempt_number=OLD.attempt_ordinal
++                WHERE execution.company_id=NEW.company_id AND execution.id=NEW.workflow_execution_id
++                    AND execution.completed_at IS NULL AND execution.committed_route IS NULL
++                    AND run.state='running' AND run.deadline>clock_timestamp()
++                    AND attempt.status='completed' AND attempt.stop_reason='agent_turn_parked'
++                    AND wait.reason='agent_turn' AND wait.state='completed'
++                    AND wait.parked_attempt_number=OLD.attempt_ordinal AND exchange.state='queued'
+             )) THEN
+             RAISE EXCEPTION 'workflow job reopen requires an approval, delivery or child continuation' USING ERRCODE='23514', CONSTRAINT='workflow_guard:check_workflow_fenced_completion';
+         END IF;
+@@ -454,13 +478,13 @@ CREATE FUNCTION public.check_workflow_wait_commit() RETURNS trigger
+     LANGUAGE plpgsql
+     AS $$
+ BEGIN
+-    IF (NEW.notification_intent IS NOT NULL OR NEW.reason='decision') AND
++    IF (NEW.notification_intent IS NOT NULL OR NEW.reason IN ('decision','agent_turn')) AND
+        (TG_OP='INSERT' OR (OLD.state='waiting' AND NEW.state='completed')) THEN
+         -- An event recorded by the wait's deadline still completes it after the deadline
+         -- (p08 D1.5.6); the run's own deadline is never extended.
+         IF EXISTS (SELECT 1 FROM workflow_runs AS run WHERE run.company_id=NEW.company_id
+             AND run.id=NEW.run_id AND run.deadline<=clock_timestamp()) OR
+-           (NEW.reason='decision' AND NEW.deadline<=clock_timestamp()) OR
++           (NEW.reason IN ('decision','agent_turn') AND NEW.deadline<=clock_timestamp()) OR
+            (NEW.reason='event' AND NEW.deadline<=clock_timestamp() AND NOT EXISTS (
+                SELECT 1 FROM workflow_wait_events AS event WHERE event.company_id=NEW.company_id
+                  AND event.run_id=NEW.run_id AND event.id=NEW.consumed_event_id
+@@ -4284,7 +4308,7 @@ CREATE TABLE public.task_attempts (
+     CONSTRAINT task_attempts_finished_check CHECK ((status = 'processing') = (finished_at IS NULL)),
+     CONSTRAINT task_attempts_stop_reason_check CHECK (CASE status
+         WHEN 'processing' THEN stop_reason IS NULL
+-        WHEN 'completed' THEN stop_reason IS NOT NULL AND stop_reason IN ('completed','effect_parked','question_parked','approval_parked','child_parked')
++        WHEN 'completed' THEN stop_reason IS NOT NULL AND stop_reason IN ('completed','effect_parked','question_parked','approval_parked','child_parked','agent_turn_parked')
+         WHEN 'failed' THEN stop_reason IS NULL OR stop_reason IN ('timed_out','lease_lost')
+         ELSE false END),
+     CONSTRAINT workflow_attempt_failure_shape CHECK ((((workflow_failure_class IS NULL) AND (workflow_failure_code IS NULL) AND (workflow_retry_safety IS NULL) AND (workflow_retirement IS NULL)) OR ((status = 'failed'::text) AND (finished_at IS NOT NULL) AND (workflow_failure_class IS NOT NULL) AND (workflow_failure_class = ANY (ARRAY['retryable'::text, 'terminal'::text])) AND (workflow_failure_code IS NOT NULL) AND ((octet_length(workflow_failure_code) >= 1) AND (octet_length(workflow_failure_code) <= 128)) AND (workflow_retry_safety IS NOT NULL) AND (workflow_retry_safety = ANY (ARRAY['safe'::text, 'unknown'::text])) AND (workflow_retirement IS NOT NULL) AND (workflow_retirement = ANY (ARRAY['live'::text, 'expired'::text, 'deadline'::text, 'cancel'::text, 'guard'::text])))))
+@@ -5749,7 +5773,7 @@ CREATE TABLE public.workflow_runs (
+     CONSTRAINT workflow_parent_shape CHECK ((((parent_run_id IS NULL) AND (parent_execution_id IS NULL)) OR ((parent_run_id IS NOT NULL) AND (parent_execution_id IS NOT NULL) AND (parent_run_id <> id)))),
+     CONSTRAINT workflow_run_terminal_execution_shape CHECK ((state IN ('succeeded','failed')) = (terminal_execution_id IS NOT NULL)),
+     CONSTRAINT workflow_run_state CHECK ((state = ANY (ARRAY['queued'::text, 'running'::text, 'waiting'::text, 'succeeded'::text, 'failed'::text, 'cancelled'::text]))),
+-    CONSTRAINT workflow_run_waiting_shape CHECK ((((state = 'waiting'::text) AND (waiting_reason IS NOT NULL) AND (waiting_reason = ANY (ARRAY['decision'::text, 'event'::text, 'timer'::text, 'child_run'::text, 'effect'::text, 'reconciliation'::text]))) OR ((state <> 'waiting'::text) AND (waiting_reason IS NULL)))),
++    CONSTRAINT workflow_run_waiting_shape CHECK ((((state = 'waiting'::text) AND (waiting_reason IS NOT NULL) AND (waiting_reason = ANY (ARRAY['decision'::text, 'event'::text, 'timer'::text, 'child_run'::text, 'effect'::text, 'reconciliation'::text, 'agent_turn'::text]))) OR ((state <> 'waiting'::text) AND (waiting_reason IS NULL)))),
+     CONSTRAINT workflow_runs_binding_revision_check CHECK ((binding_revision > 0)),
+     CONSTRAINT workflow_runs_check CHECK (((thread_id IS NULL) OR (channel_id IS NOT NULL))),
+     CONSTRAINT workflow_runs_check1 CHECK ((deadline > created_at)),
+@@ -5846,7 +5870,8 @@ CREATE TABLE public.workflow_waits (
+     child_ordinal integer,
+     child_tool_call_id uuid,
+     parked_attempt_number integer,
+-    CONSTRAINT workflow_wait_child CHECK ((((reason = 'child_run'::text) = (child_run_id IS NOT NULL)) AND ((reason = 'child_run'::text) = ((child_ordinal IS NOT NULL) <> (child_tool_call_id IS NOT NULL))) AND ((reason = 'child_run'::text) OR ((child_ordinal IS NULL) AND (child_tool_call_id IS NULL))) AND ((child_ordinal IS NULL) OR ((child_ordinal >= 1) AND (child_ordinal <= 1000))) AND ((parked_attempt_number IS NOT NULL) = (child_tool_call_id IS NOT NULL)) AND ((parked_attempt_number IS NULL) OR (parked_attempt_number >= 1)))),
++    agent_exchange_id uuid,
++    CONSTRAINT workflow_wait_child CHECK ((((reason = 'child_run'::text) = (child_run_id IS NOT NULL)) AND ((reason = 'child_run'::text) = ((child_ordinal IS NOT NULL) <> (child_tool_call_id IS NOT NULL))) AND ((reason = 'child_run'::text) OR ((child_ordinal IS NULL) AND (child_tool_call_id IS NULL))) AND ((child_ordinal IS NULL) OR ((child_ordinal >= 1) AND (child_ordinal <= 1000))) AND ((parked_attempt_number IS NOT NULL) = ((child_tool_call_id IS NOT NULL) OR (reason='agent_turn'))) AND ((parked_attempt_number IS NULL) OR (parked_attempt_number >= 1)))),
+     CONSTRAINT workflow_wait_correlation CHECK (((correlation IS NULL) OR ((octet_length(correlation) >= 1) AND (octet_length(correlation) <= 256)))),
+     CONSTRAINT workflow_wait_deadline CHECK (((reason = 'timer'::text) OR (deadline > created_at))),
+     CONSTRAINT workflow_wait_event_name CHECK (((event_name IS NULL) OR ((octet_length(event_name) >= 1) AND (octet_length(event_name) <= 128)))),
+@@ -5854,7 +5879,10 @@ CREATE TABLE public.workflow_waits (
+     CONSTRAINT workflow_wait_intent CHECK (((notification_intent IS NULL) OR ((jsonb_typeof(notification_intent) = 'object'::text) AND ((notification_intent ->> 'version'::text) = '1'::text) AND ((notification_intent ->> 'wait_id'::text) = (id)::text) AND (octet_length((notification_intent)::text) <= 2048)))),
+     CONSTRAINT workflow_wait_settlement CHECK (((state = 'waiting'::text) = (settled_at IS NULL))),
+     CONSTRAINT workflow_wait_state CHECK ((state = ANY (ARRAY['waiting'::text, 'completed'::text, 'expired'::text, 'failed'::text, 'cancelled'::text]))),
+-    CONSTRAINT workflow_waits_reason_check CHECK ((reason = ANY (ARRAY['decision'::text, 'event'::text, 'timer'::text, 'child_run'::text, 'effect'::text, 'reconciliation'::text])))
++    CONSTRAINT workflow_wait_agent_turn CHECK ((reason='agent_turn')=(agent_exchange_id IS NOT NULL)
++        AND (reason<>'agent_turn' OR (event_name IS NULL AND correlation IS NULL
++            AND notification_intent IS NULL AND consumed_event_id IS NULL))),
++    CONSTRAINT workflow_waits_reason_check CHECK ((reason = ANY (ARRAY['decision'::text, 'event'::text, 'timer'::text, 'child_run'::text, 'effect'::text, 'reconciliation'::text, 'agent_turn'::text])))
+ );
+ 
+ 
+@@ -12944,7 +12972,7 @@ CREATE TABLE public.channel_reply_decisions (
+     message_id uuid,
+     delivery_id uuid,
+     diagnostic_code text CHECK (diagnostic_code IN ('attempts_exhausted','authority_revoked','policy_changed',
+-        'source_unavailable','release_denied','invalid_proposal','publication_failed')),
++        'source_unavailable','knowledge.audience_below_content','invalid_proposal','publication_failed')),
+     created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
+     updated_at timestamptz NOT NULL DEFAULT clock_timestamp(),
+     PRIMARY KEY (company_id,run_id),
+@@ -13598,6 +13626,1026 @@ CREATE TRIGGER channel_response_question_notify_changed AFTER UPDATE OF state ON
+     FOR EACH ROW WHEN (NEW.reason='event' AND OLD.state IS DISTINCT FROM NEW.state)
+     EXECUTE FUNCTION public.notify_channel_response_question_settled();
+ 
++-- Agent conversations are independent of workflow disposition and delivery.
++-- Default private identities use their genuine root admission UUID, in a distinct type.
++CREATE TABLE public.agent_history_sessions (
++    company_id uuid NOT NULL REFERENCES public.companies(id) ON DELETE CASCADE,
++    id uuid NOT NULL,
++    creator_principal_id uuid NOT NULL,
++    live_creator_principal_id uuid,
++    creator_user_id uuid NOT NULL,
++    channel_id uuid,
++    thread_id uuid,
++    created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
++    PRIMARY KEY (company_id,id),
++    CONSTRAINT agent_history_sessions_live_creator_fk
++        FOREIGN KEY (company_id,live_creator_principal_id) REFERENCES public.principals(company_id,id)
++        ON DELETE SET NULL (live_creator_principal_id) DEFERRABLE INITIALLY DEFERRED,
++    FOREIGN KEY (company_id,channel_id) REFERENCES public.channels(company_id,id),
++    FOREIGN KEY (company_id,channel_id,thread_id) REFERENCES public.threads(company_id,channel_id,id),
++    CHECK (thread_id IS NULL OR channel_id IS NOT NULL)
++);
++CREATE TABLE public.workflow_agent_sessions (
++    company_id uuid NOT NULL,
++    run_id uuid NOT NULL,
++    session_id uuid NOT NULL,
++    thread_input_proven boolean NOT NULL DEFAULT false,
++    PRIMARY KEY (company_id,run_id),
++    FOREIGN KEY (company_id,run_id) REFERENCES public.workflow_runs(company_id,id) ON DELETE CASCADE,
++    FOREIGN KEY (company_id,session_id) REFERENCES public.agent_history_sessions(company_id,id)
++        DEFERRABLE INITIALLY DEFERRED
++);
++CREATE INDEX workflow_agent_sessions_by_session ON public.workflow_agent_sessions(company_id,session_id);
++CREATE TABLE public.agent_history_conversations (
++    company_id uuid NOT NULL REFERENCES public.companies(id) ON DELETE CASCADE,
++    id uuid NOT NULL,
++    agent_id uuid NOT NULL,
++    scope_kind text NOT NULL CHECK (scope_kind IN ('thread','private_session','child_branch')),
++    channel_id uuid,
++    thread_id uuid,
++    session_id uuid,
++    child_run_id uuid,
++    created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
++    last_exchange_order bigint NOT NULL DEFAULT 0 CHECK (last_exchange_order >= 0),
++    active_exchange_id uuid,
++    expired_count bigint NOT NULL DEFAULT 0 CHECK (expired_count BETWEEN 0 AND last_exchange_order),
++    expired_through_order bigint NOT NULL DEFAULT 0 CHECK (expired_through_order BETWEEN 0 AND last_exchange_order),
++    PRIMARY KEY (company_id,id),
++    UNIQUE (company_id,agent_id,id),
++    FOREIGN KEY (company_id,agent_id) REFERENCES public.agents(company_id,id),
++    FOREIGN KEY (company_id,channel_id,thread_id) REFERENCES public.threads(company_id,channel_id,id),
++    FOREIGN KEY (company_id,session_id) REFERENCES public.agent_history_sessions(company_id,id),
++    FOREIGN KEY (company_id,child_run_id) REFERENCES public.workflow_runs(company_id,id) ON DELETE CASCADE,
++    CHECK ((scope_kind='thread' AND channel_id IS NOT NULL AND thread_id IS NOT NULL
++            AND session_id IS NULL AND child_run_id IS NULL)
++        OR (scope_kind='private_session' AND session_id IS NOT NULL
++            AND channel_id IS NULL AND thread_id IS NULL AND child_run_id IS NULL)
++        OR (scope_kind='child_branch' AND child_run_id IS NOT NULL
++            AND channel_id IS NULL AND thread_id IS NULL AND session_id IS NULL))
++);
++CREATE UNIQUE INDEX agent_history_conversations_thread ON public.agent_history_conversations
++    (company_id,agent_id,channel_id,thread_id) WHERE scope_kind='thread';
++CREATE UNIQUE INDEX agent_history_conversations_private ON public.agent_history_conversations
++    (company_id,agent_id,session_id) WHERE scope_kind='private_session';
++CREATE UNIQUE INDEX agent_history_conversations_child ON public.agent_history_conversations
++    (company_id,agent_id,child_run_id) WHERE scope_kind='child_branch';
++
++CREATE FUNCTION public.guard_agent_history_session() RETURNS trigger LANGUAGE plpgsql AS $$
++BEGIN
++    IF TG_OP='UPDATE' THEN
++        -- Retain the immutable audit snapshot while the real principal deletion clears its
++        -- live link. Neither an ordinary NULL update nor a later principal can retarget it.
++        IF OLD.live_creator_principal_id IS NOT NULL AND NEW.live_creator_principal_id IS NULL
++            AND (to_jsonb(NEW)-'live_creator_principal_id') IS NOT DISTINCT FROM
++                (to_jsonb(OLD)-'live_creator_principal_id')
++            AND NOT EXISTS (SELECT 1 FROM public.principals AS creator
++                WHERE creator.company_id=OLD.company_id AND creator.id=OLD.live_creator_principal_id)
++        THEN
++            RETURN NEW;
++        END IF;
++        RAISE EXCEPTION 'agent history session identity is immutable' USING ERRCODE='23514';
++    END IF;
++    IF NOT EXISTS (
++        SELECT 1 FROM public.workflow_runs AS run
++        JOIN public.workflow_admissions AS admission ON admission.company_id=run.company_id AND admission.run_id=run.id
++        JOIN public.workflow_run_events AS event ON event.company_id=run.company_id AND event.run_id=run.id
++            AND event.sequence=1 AND event.event_kind='admitted' AND event.actor_id=run.actor_id
++        JOIN public.principals AS creator ON creator.company_id=run.company_id
++            AND creator.id=NEW.creator_principal_id AND creator.id=NEW.live_creator_principal_id
++            AND creator.kind='person' AND creator.user_id=run.actor_id
++        WHERE run.company_id=NEW.company_id AND run.id=NEW.id AND run.parent_run_id IS NULL
++            AND NEW.creator_user_id=run.actor_id
++            AND NEW.channel_id IS NOT DISTINCT FROM run.channel_id
++            AND NEW.thread_id IS NOT DISTINCT FROM run.thread_id
++    ) THEN
++        RAISE EXCEPTION 'agent history session requires genuine root admission' USING ERRCODE='23514';
++    END IF;
++    RETURN NEW;
++END $$;
++CREATE TRIGGER agent_history_session_guard BEFORE INSERT OR UPDATE ON public.agent_history_sessions
++    FOR EACH ROW EXECUTE FUNCTION public.guard_agent_history_session();
++
++CREATE FUNCTION public.guard_workflow_agent_session() RETURNS trigger LANGUAGE plpgsql AS $$
++BEGIN
++    IF TG_OP='UPDATE' THEN
++        RAISE EXCEPTION 'workflow private session is immutable' USING ERRCODE='23514';
++    END IF;
++    IF TG_OP='DELETE' THEN
++        IF EXISTS (SELECT 1 FROM public.workflow_runs AS run WHERE run.company_id=OLD.company_id AND run.id=OLD.run_id) THEN
++            RAISE EXCEPTION 'live workflow private session cannot be removed' USING ERRCODE='23514';
++        END IF;
++        RETURN OLD;
++    END IF;
++    IF NOT EXISTS (
++        SELECT 1 FROM public.workflow_runs AS run
++        JOIN public.workflow_admissions AS admission ON admission.company_id=run.company_id AND admission.run_id=run.id
++        JOIN public.workflow_run_events AS event ON event.company_id=run.company_id AND event.run_id=run.id
++            AND event.sequence=1 AND event.event_kind='admitted' AND event.actor_id=run.actor_id
++        JOIN public.agent_history_sessions AS session ON session.company_id=run.company_id AND session.id=NEW.session_id
++        WHERE run.company_id=NEW.company_id AND run.id=NEW.run_id AND run.parent_run_id IS NULL
++            AND session.creator_user_id=run.actor_id
++            AND session.channel_id IS NOT DISTINCT FROM run.channel_id
++            AND session.thread_id IS NOT DISTINCT FROM run.thread_id
++            AND (session.id=run.id OR (
++                (substring(admission.source_key FROM 4)::jsonb->>0)='manual'
++                AND EXISTS (SELECT 1 FROM public.workflow_agent_sessions AS source
++                    WHERE source.company_id=NEW.company_id AND source.session_id=NEW.session_id)))
++    ) THEN
++        RAISE EXCEPTION 'workflow session requires matching trusted admission' USING ERRCODE='23514';
++    END IF;
++    IF NEW.thread_input_proven AND NOT EXISTS (
++        SELECT 1 FROM public.workflow_runs AS run
++        JOIN public.workflow_message_intents AS intent ON intent.company_id=run.company_id
++            AND intent.id=run.trigger_id AND intent.channel_id=run.channel_id AND intent.thread_id=run.thread_id
++        JOIN public.workflow_admissions AS admission ON admission.company_id=run.company_id AND admission.run_id=run.id
++        WHERE run.company_id=NEW.company_id AND run.id=NEW.run_id AND run.parent_run_id IS NULL
++            AND (substring(admission.source_key FROM 4)::jsonb)=jsonb_build_array('message',intent.message_id)
++            AND run.input->>'source_message'=intent.message_id::text
++    ) THEN
++        RAISE EXCEPTION 'thread input proof requires actual message producer' USING ERRCODE='23514';
++    END IF;
++    RETURN NEW;
++END $$;
++CREATE TRIGGER workflow_agent_session_guard BEFORE INSERT OR UPDATE OR DELETE ON public.workflow_agent_sessions
++    FOR EACH ROW EXECUTE FUNCTION public.guard_workflow_agent_session();
++
++CREATE FUNCTION public.guard_agent_history_conversation() RETURNS trigger LANGUAGE plpgsql AS $$
++BEGIN
++    IF TG_OP='UPDATE' THEN
++        RAISE EXCEPTION 'agent conversation identity is immutable' USING ERRCODE='23514';
++    END IF;
++    IF NEW.scope_kind='child_branch' AND NOT EXISTS (
++        SELECT 1 FROM public.workflow_runs AS run WHERE run.company_id=NEW.company_id
++            AND run.id=NEW.child_run_id AND run.parent_run_id IS NOT NULL
++            AND run.parent_execution_id IS NOT NULL
++    ) THEN
++        RAISE EXCEPTION 'agent child conversation requires genuine child run' USING ERRCODE='23514';
++    END IF;
++    RETURN NEW;
++END $$;
++CREATE TRIGGER agent_history_conversation_guard BEFORE INSERT OR UPDATE ON public.agent_history_conversations
++    FOR EACH ROW EXECUTE FUNCTION public.guard_agent_history_conversation();
++
++-- A position belongs to the logical activation, including authorized control retry.
++CREATE TABLE public.agent_history_exchanges (
++    company_id uuid NOT NULL REFERENCES public.companies(id) ON DELETE CASCADE,
++    id uuid NOT NULL,
++    conversation_id uuid NOT NULL,
++    agent_id uuid NOT NULL,
++    revision_id uuid NOT NULL,
++    manifest_id uuid NOT NULL,
++    run_id uuid NOT NULL,
++    execution_id uuid NOT NULL,
++    job_id uuid NOT NULL,
++    position bigint NOT NULL CHECK (position > 0),
++    input_digest bytea NOT NULL CHECK (octet_length(input_digest)=32),
++    provenance jsonb NOT NULL CHECK (jsonb_typeof(provenance)='object' AND octet_length(provenance::text)<=262144),
++    access_level public.access_level NOT NULL,
++    state text NOT NULL CHECK (state IN ('queued','active','completed','failed','cancelled')),
++    checkpoint_id uuid,
++    output jsonb,
++    frozen_preparation jsonb CHECK (frozen_preparation IS NULL OR (jsonb_typeof(frozen_preparation)='object' AND octet_length(frozen_preparation::text)<=2097152)),
++    payload_retained boolean NOT NULL DEFAULT true,
++    payload_expired_at timestamptz,
++    preparation_digest bytea CHECK (preparation_digest IS NULL OR octet_length(preparation_digest)=32),
++    output_digest bytea CHECK (output_digest IS NULL OR octet_length(output_digest)=32),
++    created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
++    activated_at timestamptz,
++    finished_at timestamptz,
++    PRIMARY KEY (company_id,id),
++    UNIQUE (company_id,execution_id),
++    UNIQUE (company_id,conversation_id,position),
++    FOREIGN KEY (company_id,agent_id,conversation_id)
++        REFERENCES public.agent_history_conversations(company_id,agent_id,id) ON DELETE CASCADE,
++    FOREIGN KEY (company_id,agent_id,revision_id) REFERENCES public.agent_revisions(company_id,agent_id,id),
++    FOREIGN KEY (company_id,manifest_id) REFERENCES public.agent_dependency_manifests(company_id,id),
++    FOREIGN KEY (company_id,run_id,execution_id) REFERENCES public.workflow_executions(company_id,run_id,id) ON DELETE CASCADE,
++    FOREIGN KEY (company_id,execution_id,job_id) REFERENCES public.background_tasks(company_id,workflow_execution_id,id),
++    FOREIGN KEY (company_id,job_id,checkpoint_id) REFERENCES public.task_harness_runs(company_id,task_id,id)
++        DEFERRABLE INITIALLY DEFERRED,
++    CHECK (id=execution_id),
++    CHECK ((state='completed' AND payload_retained)=(output IS NOT NULL)),
++    CHECK ((state='completed')=(output_digest IS NOT NULL)),
++    CHECK (payload_retained=(payload_expired_at IS NULL)),
++    CHECK (payload_retained OR (state IN ('completed','failed','cancelled') AND output IS NULL AND frozen_preparation IS NULL)),
++    CHECK (frozen_preparation IS NULL OR preparation_digest=sha256(convert_to(frozen_preparation::text,'UTF8'))),
++    CHECK (output IS NULL OR output_digest=sha256(convert_to(output::text,'UTF8'))),
++    CHECK (output IS NULL OR octet_length(output::text)<=1048576),
++    CHECK ((state IN ('completed','failed','cancelled'))=(finished_at IS NOT NULL)),
++    CHECK (state NOT IN ('active','completed') OR (checkpoint_id IS NOT NULL AND activated_at IS NOT NULL)),
++    CHECK (activated_at IS NULL OR activated_at>=created_at),
++    CHECK (finished_at IS NULL OR finished_at>=created_at)
++);
++CREATE INDEX agent_history_exchanges_pending ON public.agent_history_exchanges
++    (company_id,conversation_id,position) WHERE state IN ('queued','active');
++CREATE INDEX agent_history_exchanges_recent ON public.agent_history_exchanges
++    (company_id,conversation_id,access_level,position DESC) WHERE state='completed' AND payload_retained;
++CREATE INDEX agent_history_exchanges_retained ON public.agent_history_exchanges(company_id,conversation_id,position) WHERE payload_retained;
++CREATE INDEX agent_history_exchanges_expiry ON public.agent_history_exchanges(company_id,finished_at,id) WHERE payload_retained AND state IN ('completed','failed','cancelled');
++CREATE INDEX agent_history_exchanges_source ON public.agent_history_exchanges(company_id,run_id,execution_id);
++CREATE INDEX agent_history_exchanges_checkpoint ON public.agent_history_exchanges(company_id,checkpoint_id)
++    WHERE checkpoint_id IS NOT NULL;
++
++CREATE OR REPLACE FUNCTION public.guard_agent_history_conversation() RETURNS trigger LANGUAGE plpgsql AS $$
++BEGIN
++    IF TG_OP='UPDATE' THEN
++        IF (to_jsonb(NEW)-'last_exchange_order') IS NOT DISTINCT FROM (to_jsonb(OLD)-'last_exchange_order')
++            AND NEW.last_exchange_order::numeric=OLD.last_exchange_order::numeric+1
++            AND EXISTS (SELECT 1 FROM public.agent_history_exchanges AS exchange
++                WHERE exchange.company_id=OLD.company_id AND exchange.conversation_id=OLD.id
++                    AND exchange.position=NEW.last_exchange_order)
++        THEN
++            RETURN NEW;
++        END IF;
++        RAISE EXCEPTION 'agent conversation identity/order is immutable' USING ERRCODE='23514';
++    END IF;
++    IF NEW.last_exchange_order<>0 THEN
++        RAISE EXCEPTION 'new conversation has no assigned exchanges' USING ERRCODE='23514';
++    END IF;
++    IF NEW.scope_kind='child_branch' AND NOT EXISTS (
++        SELECT 1 FROM public.workflow_runs AS run WHERE run.company_id=NEW.company_id
++            AND run.id=NEW.child_run_id AND run.parent_run_id IS NOT NULL
++            AND run.parent_execution_id IS NOT NULL
++    ) THEN
++        RAISE EXCEPTION 'agent child conversation requires genuine child run' USING ERRCODE='23514';
++    END IF;
++    RETURN NEW;
++END $$;
++
++-- Initial, code-owned history limits; workflow/checkpoint storage has its own retention owner.
++CREATE FUNCTION public.agent_history_limits()
++RETURNS TABLE(conversation_payloads bigint, company_payloads bigint, recent_payloads bigint,
++    pressure_payloads bigint, conversation_metadata bigint, company_metadata bigint, company_conversations bigint)
++LANGUAGE sql IMMUTABLE AS $$ SELECT 128::bigint,2048::bigint,64::bigint,1536::bigint,4096::bigint,32768::bigint,2048::bigint $$;
++
++CREATE FUNCTION public.agent_history_conversation_available(tenant uuid)
++RETURNS boolean LANGUAGE plpgsql VOLATILE AS $$
++DECLARE maximum bigint;
++BEGIN
++    PERFORM 1 FROM public.companies WHERE id=tenant FOR NO KEY UPDATE NOWAIT;
++    IF NOT FOUND THEN RETURN false; END IF;
++    SELECT company_conversations INTO STRICT maximum FROM public.agent_history_limits();
++    RETURN (SELECT count(*)<maximum FROM (SELECT 1 FROM public.agent_history_conversations
++        WHERE company_id=tenant LIMIT maximum) AS rows);
++END $$;
++
++CREATE FUNCTION public.agent_history_conversation_unused(conversation public.agent_history_conversations)
++RETURNS boolean LANGUAGE sql VOLATILE AS $$
++    SELECT conversation.active_exchange_id IS NULL
++      AND NOT EXISTS(SELECT 1 FROM public.agent_history_exchanges AS exchange
++        WHERE exchange.company_id=conversation.company_id AND exchange.conversation_id=conversation.id)
++      AND NOT EXISTS(SELECT 1 FROM public.workflow_runs AS run
++        WHERE run.company_id=conversation.company_id AND run.state IN ('queued','running','waiting') AND (
++          (conversation.scope_kind='child_branch' AND run.id=conversation.child_run_id)
++          OR (conversation.scope_kind='thread' AND run.channel_id=conversation.channel_id AND run.thread_id=conversation.thread_id)
++          OR (conversation.scope_kind='private_session' AND EXISTS(SELECT 1 FROM public.workflow_agent_sessions AS mapping
++            WHERE mapping.company_id=run.company_id AND mapping.run_id=run.id AND mapping.session_id=conversation.session_id))))
++$$;
++
++CREATE FUNCTION public.guard_agent_history_conversation_delete() RETURNS trigger LANGUAGE plpgsql AS $$
++BEGIN
++    IF NOT EXISTS(SELECT 1 FROM public.companies WHERE id=OLD.company_id) THEN RETURN OLD; END IF;
++    PERFORM 1 FROM public.companies WHERE id=OLD.company_id FOR NO KEY UPDATE NOWAIT;
++    -- A child source cascade may also remove its safely expired terminal metadata.
++    IF OLD.scope_kind='child_branch' AND NOT EXISTS(SELECT 1 FROM public.workflow_runs
++        WHERE company_id=OLD.company_id AND id=OLD.child_run_id)
++        AND OLD.active_exchange_id IS NULL AND NOT EXISTS(SELECT 1 FROM public.agent_history_exchanges
++            WHERE company_id=OLD.company_id AND conversation_id=OLD.id AND payload_retained) THEN RETURN OLD; END IF;
++    IF NOT public.agent_history_conversation_unused(OLD) THEN
++        RAISE EXCEPTION 'agent conversation has retained metadata or live work' USING ERRCODE='23514';
++    END IF;
++    RETURN OLD;
++END $$;
++CREATE TRIGGER agent_history_conversation_delete BEFORE DELETE ON public.agent_history_conversations
++    FOR EACH ROW EXECUTE FUNCTION public.guard_agent_history_conversation_delete();
++
++CREATE FUNCTION public.agent_history_storage_available(tenant uuid, conversation uuid)
++RETURNS boolean LANGUAGE plpgsql VOLATILE AS $$
++DECLARE bounds record;
++BEGIN
++    -- Direct writers also serialize before taking local locks. Reverse-order callers fail busy.
++    PERFORM 1 FROM public.companies WHERE id=tenant FOR NO KEY UPDATE NOWAIT;
++    IF NOT FOUND THEN RETURN false; END IF;
++    SELECT * INTO STRICT bounds FROM public.agent_history_limits();
++    RETURN (SELECT count(*)<bounds.conversation_payloads FROM (SELECT 1 FROM public.agent_history_exchanges
++        WHERE company_id=tenant AND conversation_id=conversation AND payload_retained LIMIT bounds.conversation_payloads) AS rows)
++      AND (SELECT count(*)<bounds.company_payloads FROM (SELECT 1 FROM public.agent_history_exchanges
++        WHERE company_id=tenant AND payload_retained LIMIT bounds.company_payloads) AS rows)
++      AND (SELECT count(*)<bounds.conversation_metadata FROM (SELECT 1 FROM public.agent_history_exchanges
++        WHERE company_id=tenant AND conversation_id=conversation LIMIT bounds.conversation_metadata) AS rows)
++      AND (SELECT count(*)<bounds.company_metadata FROM (SELECT 1 FROM public.agent_history_exchanges
++        WHERE company_id=tenant LIMIT bounds.company_metadata) AS rows);
++END $$;
++
++CREATE FUNCTION public.agent_history_payload_expirable(exchange public.agent_history_exchanges)
++RETURNS boolean LANGUAGE sql VOLATILE AS $$
++    SELECT exchange.payload_retained AND exchange.state IN ('completed','failed','cancelled')
++      AND ((exchange.state<>'failed' AND job.status<>'failed') OR run.deadline<=clock_timestamp())
++      AND job.status IN ('completed','failed')
++      AND (execution.completed_at IS NOT NULL OR run.state IN ('succeeded','failed','cancelled'))
++      AND NOT EXISTS(SELECT 1 FROM public.agent_history_conversations AS conversation
++        WHERE conversation.company_id=exchange.company_id AND conversation.id=exchange.conversation_id
++          AND conversation.active_exchange_id=exchange.id)
++      AND NOT EXISTS(SELECT 1 FROM public.task_attempts AS attempt WHERE attempt.task_id=job.id AND attempt.status='processing')
++      AND NOT EXISTS(SELECT 1 FROM public.workflow_waits AS wait WHERE wait.company_id=exchange.company_id
++        AND wait.run_id=exchange.run_id AND wait.execution_id=exchange.execution_id AND wait.state='waiting')
++      AND NOT EXISTS(SELECT 1 FROM public.workflow_decisions AS decision
++        JOIN public.workflow_waits AS wait ON wait.company_id=decision.company_id AND wait.id=decision.wait_id
++        WHERE decision.company_id=exchange.company_id AND decision.run_id=exchange.run_id
++          AND wait.execution_id=exchange.execution_id AND decision.submitted_at IS NULL AND wait.state='waiting')
++      AND public.workflow_action_retry_safe(exchange.company_id,exchange.execution_id) IS DISTINCT FROM false
++      AND NOT EXISTS(SELECT 1 FROM public.workflow_action_evidence_conflicts AS conflict
++        WHERE conflict.company_id=exchange.company_id AND conflict.run_id=exchange.run_id)
++      AND NOT EXISTS(SELECT 1 FROM public.workflow_message_actions AS action
++        WHERE action.company_id=exchange.company_id AND action.run_id=exchange.run_id AND action.state IN ('pending','uncertain','stalled'))
++      AND NOT EXISTS(SELECT 1 FROM public.channel_reply_decisions AS final
++        LEFT JOIN public.message_deliveries AS delivery ON delivery.company_id=final.company_id AND delivery.id=final.delivery_id
++        WHERE final.company_id=exchange.company_id AND final.run_id=exchange.run_id
++          AND (final.state IN ('pending','claimed') OR (final.state='published' AND final.delivery_id IS NOT NULL
++            AND (delivery.id IS NULL OR delivery.status NOT IN ('delivered','dead_letter')))))
++      AND (exchange.finished_at<=clock_timestamp()-interval '90 days'
++        OR (SELECT count(*)>=bounds.recent_payloads FROM (SELECT 1 FROM public.agent_history_exchanges AS newer
++          WHERE newer.company_id=exchange.company_id AND newer.conversation_id=exchange.conversation_id
++            AND newer.payload_retained AND newer.state IN ('completed','failed','cancelled')
++            AND newer.position>exchange.position LIMIT bounds.recent_payloads) AS rows)
++        OR (SELECT count(*)>bounds.pressure_payloads FROM (SELECT 1 FROM public.agent_history_exchanges AS retained
++          WHERE retained.company_id=exchange.company_id AND retained.payload_retained LIMIT bounds.pressure_payloads+1) AS rows))
++    FROM public.workflow_runs AS run
++    JOIN public.workflow_executions AS execution ON execution.company_id=run.company_id AND execution.run_id=run.id
++    JOIN public.background_tasks AS job ON job.company_id=execution.company_id AND job.workflow_execution_id=execution.id
++    CROSS JOIN public.agent_history_limits() AS bounds
++    WHERE run.company_id=exchange.company_id AND run.id=exchange.run_id
++      AND execution.id=exchange.execution_id AND job.id=exchange.job_id
++$$;
++
++CREATE FUNCTION public.agent_history_expiry_allowed(exchange public.agent_history_exchanges)
++RETURNS boolean LANGUAGE plpgsql VOLATILE AS $$
++BEGIN
++    -- A direct UPDATE already owns the exchange tuple; never wait in reverse lock order.
++    PERFORM 1 FROM public.companies WHERE id=exchange.company_id FOR NO KEY UPDATE NOWAIT;
++    PERFORM 1 FROM public.workflow_runs WHERE company_id=exchange.company_id AND id=exchange.run_id FOR SHARE NOWAIT;
++    PERFORM 1 FROM public.workflow_executions WHERE company_id=exchange.company_id AND id=exchange.execution_id FOR SHARE NOWAIT;
++    PERFORM 1 FROM public.background_tasks WHERE company_id=exchange.company_id AND id=exchange.job_id FOR SHARE NOWAIT;
++    RETURN public.agent_history_payload_expirable(exchange) IS TRUE;
++END $$;
++
++CREATE FUNCTION public.refresh_agent_history_expiry() RETURNS trigger LANGUAGE plpgsql AS $$
++BEGIN
++    UPDATE public.agent_history_conversations AS conversation SET
++      expired_count=conversation.last_exchange_order-(SELECT count(*) FROM public.agent_history_exchanges AS exchange
++        WHERE exchange.company_id=conversation.company_id AND exchange.conversation_id=conversation.id AND exchange.payload_retained),
++      expired_through_order=COALESCE((SELECT min(position)-1 FROM public.agent_history_exchanges AS exchange
++        WHERE exchange.company_id=conversation.company_id AND exchange.conversation_id=conversation.id AND exchange.payload_retained),conversation.last_exchange_order)
++      WHERE conversation.company_id=NEW.company_id AND conversation.id=NEW.conversation_id;
++    RETURN NULL;
++END $$;
++CREATE TRIGGER agent_history_payload_expired AFTER UPDATE OF payload_retained ON public.agent_history_exchanges
++    FOR EACH ROW WHEN (OLD.payload_retained IS DISTINCT FROM NEW.payload_retained)
++    EXECUTE FUNCTION public.refresh_agent_history_expiry();
++
++CREATE FUNCTION public.guard_agent_history_exchange_insert() RETURNS trigger LANGUAGE plpgsql AS $$
++DECLARE last_position bigint;
++BEGIN
++    IF NOT public.agent_history_storage_available(NEW.company_id,NEW.conversation_id) THEN
++        RAISE EXCEPTION 'agent history storage is full' USING ERRCODE='23514', CONSTRAINT='agent_history_capacity';
++    END IF;
++    SELECT conversation.last_exchange_order INTO STRICT last_position
++        FROM public.agent_history_conversations AS conversation
++        WHERE conversation.company_id=NEW.company_id AND conversation.id=NEW.conversation_id
++            AND conversation.agent_id=NEW.agent_id FOR UPDATE;
++    IF NOT public.agent_history_admit(NEW.company_id,NEW.conversation_id) THEN
++        RAISE EXCEPTION 'agent history queue is full' USING ERRCODE='23514', CONSTRAINT='agent_history_capacity';
++    END IF;
++    IF NEW.position::numeric<>last_position::numeric+1 OR NEW.state<>'queued'
++        OR NEW.checkpoint_id IS NOT NULL OR NEW.output IS NOT NULL OR NEW.frozen_preparation IS NOT NULL
++        OR NEW.activated_at IS NOT NULL OR NEW.finished_at IS NOT NULL
++        OR NOT NEW.payload_retained OR NEW.payload_expired_at IS NOT NULL
++        OR NEW.preparation_digest IS NOT NULL OR NEW.output_digest IS NOT NULL
++    THEN
++        RAISE EXCEPTION 'invalid initial agent exchange or position' USING ERRCODE='23514';
++    END IF;
++    IF NOT EXISTS (
++        SELECT 1 FROM public.workflow_runs AS run
++        JOIN public.workflow_executions AS execution ON execution.company_id=run.company_id AND execution.run_id=run.id
++        JOIN public.background_tasks AS job ON job.company_id=execution.company_id AND job.workflow_execution_id=execution.id
++        JOIN public.run_dependency_manifests AS ownership ON ownership.company_id=run.company_id AND ownership.run_id=run.id
++        JOIN public.agent_manifest_revisions AS selected ON selected.company_id=ownership.company_id
++            AND selected.manifest_id=ownership.manifest_id AND selected.agent_id=NEW.agent_id
++        JOIN public.agent_revisions AS revision ON revision.company_id=selected.company_id
++            AND revision.agent_id=selected.agent_id AND revision.id=selected.revision_id
++        JOIN public.agent_history_conversations AS conversation ON conversation.company_id=run.company_id
++            AND conversation.id=NEW.conversation_id AND conversation.agent_id=NEW.agent_id
++        WHERE run.company_id=NEW.company_id AND run.id=NEW.run_id
++            AND execution.id=NEW.execution_id AND job.id=NEW.job_id
++            AND run.state IN ('queued','running') AND run.deadline>clock_timestamp()
++            AND job.status='processing' AND job.lock_expires_at>clock_timestamp()
++            AND execution.activated_at IS NOT NULL AND execution.completed_at IS NULL
++            AND execution.frozen_inputs ? 'context'
++            AND NEW.input_digest=sha256(convert_to((execution.frozen_inputs->'context')::text,'UTF8'))
++            AND NEW.access_level=run.content_level
++            AND NEW.manifest_id=ownership.manifest_id AND NEW.revision_id=selected.revision_id
++            AND (NEW.provenance-ARRAY['agent','revision','model','output_contract']::text[])='{}'::jsonb
++            AND NEW.provenance->>'agent'=NEW.agent_id::text
++            AND NEW.provenance->>'revision'=NEW.revision_id::text
++            AND NEW.provenance->'model'=revision.content::jsonb->'model'
++            AND NEW.provenance->'output_contract'->>'version'='1'
++            AND NEW.provenance->'output_contract'->>'format'='json_schema'
++            AND NEW.provenance->'output_contract'->'schema'=execution.frozen_inputs->'output_schema'
++            AND (
++                (conversation.scope_kind='child_branch' AND conversation.child_run_id=run.id AND run.parent_run_id IS NOT NULL)
++                OR (run.parent_run_id IS NULL AND conversation.scope_kind='private_session' AND EXISTS (
++                    SELECT 1 FROM public.workflow_agent_sessions AS mapping
++                    JOIN public.agent_history_sessions AS session ON session.company_id=mapping.company_id AND session.id=mapping.session_id
++                    WHERE mapping.company_id=run.company_id AND mapping.run_id=run.id
++                        AND mapping.session_id=conversation.session_id AND session.creator_user_id=run.actor_id))
++                OR (run.parent_run_id IS NULL AND conversation.scope_kind='thread'
++                    AND conversation.channel_id=run.channel_id AND conversation.thread_id=run.thread_id
++                    AND EXISTS (SELECT 1 FROM public.workflow_agent_sessions AS mapping
++                        WHERE mapping.company_id=run.company_id AND mapping.run_id=run.id AND mapping.thread_input_proven))
++            )
++    ) THEN
++        RAISE EXCEPTION 'agent exchange source/provenance differs from its genuine activation' USING ERRCODE='23514';
++    END IF;
++    RETURN NEW;
++END $$;
++CREATE TRIGGER agent_history_exchange_insert BEFORE INSERT ON public.agent_history_exchanges
++    FOR EACH ROW EXECUTE FUNCTION public.guard_agent_history_exchange_insert();
++
++CREATE FUNCTION public.advance_agent_history_order() RETURNS trigger LANGUAGE plpgsql AS $$
++BEGIN
++    UPDATE public.agent_history_conversations SET last_exchange_order=NEW.position
++        WHERE company_id=NEW.company_id AND id=NEW.conversation_id AND last_exchange_order=NEW.position-1;
++    IF NOT FOUND THEN
++        RAISE EXCEPTION 'agent conversation position moved' USING ERRCODE='23514';
++    END IF;
++    RETURN NULL;
++END $$;
++CREATE TRIGGER agent_history_exchange_order AFTER INSERT ON public.agent_history_exchanges
++    FOR EACH ROW EXECUTE FUNCTION public.advance_agent_history_order();
++
++CREATE FUNCTION public.agent_history_checkpoint_matches(exchange public.agent_history_exchanges)
++RETURNS boolean LANGUAGE sql VOLATILE AS $$
++    SELECT CASE WHEN exchange.checkpoint_id IS NULL THEN exchange.state IN ('queued','failed','cancelled')
++    ELSE EXISTS (
++        SELECT 1 FROM public.task_harness_runs AS checkpoint
++        JOIN public.workflow_executions AS execution ON execution.company_id=checkpoint.company_id
++            AND execution.run_id=checkpoint.workflow_run_id AND execution.id=checkpoint.workflow_execution_id
++        WHERE checkpoint.company_id=exchange.company_id AND checkpoint.id=exchange.checkpoint_id
++            AND checkpoint.task_id=exchange.job_id AND checkpoint.workflow_run_id=exchange.run_id
++            AND checkpoint.workflow_execution_id=exchange.execution_id AND checkpoint.agent_id=exchange.agent_id
++            AND checkpoint.workflow_prepared->>'version'='5'
++            AND ((exchange.payload_retained AND checkpoint.workflow_prepared=exchange.frozen_preparation)
++                OR (NOT exchange.payload_retained AND exchange.preparation_digest=sha256(convert_to(checkpoint.workflow_prepared::text,'UTF8'))))
++            AND checkpoint.checkpoint->'seed'=checkpoint.workflow_prepared->'history'->'seed'
++            AND checkpoint.workflow_prepared->>'history_exchange'=exchange.id::text
++            AND checkpoint.workflow_prepared->'selection'->>'mode'='tools'
++            AND checkpoint.workflow_prepared->'selection'->>'manifest'=exchange.manifest_id::text
++            AND checkpoint.workflow_prepared->'selection'->>'agent'=exchange.agent_id::text
++            AND checkpoint.workflow_prepared->'selection'->>'revision'=exchange.revision_id::text
++            AND checkpoint.workflow_prepared->'context'=execution.frozen_inputs->'context'
++            AND checkpoint.checkpoint->'identity'->'response_contract'=exchange.provenance->'output_contract'
++            AND checkpoint.checkpoint->'identity'->>'provider'=exchange.provenance->'model'->>'provider'
++            AND checkpoint.checkpoint->'identity'->>'model'=exchange.provenance->'model'->>'model'
++            AND (checkpoint.state='completed')=(exchange.state='completed')
++            AND (checkpoint.state<>'invalid_output' OR exchange.state IN ('failed','cancelled'))
++            AND (exchange.state<>'completed' OR (
++                checkpoint.checkpoint->'final_output'->'structured'->'contract'=exchange.provenance->'output_contract'
++                AND ((exchange.payload_retained AND exchange.output=(checkpoint.checkpoint->'final_output'->'structured'->>'body')::jsonb)
++                    OR (NOT exchange.payload_retained AND exchange.output_digest=sha256(convert_to(((checkpoint.checkpoint->'final_output'->'structured'->>'body')::jsonb)::text,'UTF8'))))))
++    ) END
++$$;
++
++CREATE FUNCTION public.agent_history_selected_pair_matches(
++    owner public.agent_history_exchanges, metadata jsonb, pair jsonb, ceiling public.access_level)
++RETURNS boolean LANGUAGE sql VOLATILE AS $$
++    SELECT (metadata-ARRAY['id','position','access_level']::text[])='{}'::jsonb
++        AND (pair-ARRAY['input','output']::text[])='{}'::jsonb
++        AND EXISTS (
++            SELECT 1 FROM public.agent_history_exchanges AS prior
++            JOIN public.workflow_executions AS execution ON execution.company_id=prior.company_id
++                AND execution.run_id=prior.run_id AND execution.id=prior.execution_id
++            WHERE prior.company_id=owner.company_id AND prior.conversation_id=owner.conversation_id
++                AND prior.id=(metadata->>'id')::uuid AND prior.position=(metadata->>'position')::bigint
++                AND prior.position<owner.position AND prior.state='completed' AND prior.payload_retained AND prior.access_level<=ceiling
++                AND prior.access_level=(metadata->>'access_level')::smallint
++                AND pair->'input'=execution.frozen_inputs->'context' AND pair->'output'=prior.output)
++$$;
++
++CREATE FUNCTION public.agent_history_preparation_valid(owner public.agent_history_exchanges)
++RETURNS boolean LANGUAGE plpgsql AS $$
++DECLARE document jsonb:=owner.frozen_preparation;
++        history jsonb:=document->'history';
++        source record;
++        selected jsonb;
++        pair jsonb;
++        highest smallint:=0;
++        previous_position bigint:=0;
++        ordinal integer;
++        eligible bigint;
++BEGIN
++    IF jsonb_typeof(document) IS DISTINCT FROM 'object'
++        OR jsonb_typeof(history) IS DISTINCT FROM 'object'
++        OR jsonb_typeof(history->'selected') IS DISTINCT FROM 'array'
++        OR jsonb_typeof(history->'seed') IS DISTINCT FROM 'array'
++        OR octet_length(document::text)>2097152 OR octet_length((history->'seed')::text)>65536
++        OR jsonb_array_length(history->'selected')>16
++        OR jsonb_array_length(history->'selected')<>jsonb_array_length(history->'seed')
++        OR (history-ARRAY['selected','seed','omitted_eligible','selected_level','content_level','budget']::text[])<>'{}'::jsonb
++        OR owner.state<>'queued' OR owner.checkpoint_id IS NOT NULL
++    THEN RETURN false; END IF;
++    -- UPDATE already owns this exchange: never wait backwards against a source owner.
++    SELECT run.knowledge_ceiling,run.content_level,execution.frozen_inputs INTO STRICT source
++        FROM public.workflow_runs AS run JOIN public.workflow_executions AS execution
++          ON execution.company_id=run.company_id AND execution.run_id=run.id
++        JOIN public.background_tasks AS job ON job.company_id=run.company_id AND job.id=owner.job_id
++          AND job.workflow_execution_id=execution.id
++        WHERE run.company_id=owner.company_id AND run.id=owner.run_id AND execution.id=owner.execution_id
++          AND run.state IN ('queued','running') AND run.deadline>clock_timestamp()
++          AND job.status='processing' AND job.lock_expires_at>clock_timestamp()
++          AND execution.completed_at IS NULL FOR SHARE OF run NOWAIT;
++    PERFORM 1 FROM public.agent_history_conversations WHERE company_id=owner.company_id
++        AND id=owner.conversation_id AND active_exchange_id=owner.id FOR UPDATE;
++    IF NOT FOUND OR document->>'version' IS DISTINCT FROM '5'
++        OR document->>'history_exchange' IS DISTINCT FROM owner.id::text
++        OR document->'context' IS DISTINCT FROM source.frozen_inputs->'context'
++        OR document->'output_schema' IS DISTINCT FROM owner.provenance->'output_contract'->'schema'
++        OR document->'selection'->>'mode' IS DISTINCT FROM 'tools'
++        OR document->'selection'->>'agent' IS DISTINCT FROM owner.agent_id::text
++        OR document->'selection'->>'revision' IS DISTINCT FROM owner.revision_id::text
++        OR document->'selection'->>'manifest' IS DISTINCT FROM owner.manifest_id::text
++        OR (history->>'content_level')::smallint IS DISTINCT FROM source.content_level
++    THEN RETURN false; END IF;
++    FOR ordinal IN 0..jsonb_array_length(history->'selected')-1 LOOP
++        selected:=history->'selected'->ordinal;
++        pair:=history->'seed'->ordinal;
++        IF jsonb_typeof(selected) IS DISTINCT FROM 'object' OR jsonb_typeof(pair) IS DISTINCT FROM 'object'
++            OR (selected->>'position')::bigint<=previous_position
++            OR public.agent_history_selected_pair_matches(owner,selected,pair,source.knowledge_ceiling) IS DISTINCT FROM true
++        THEN RETURN false; END IF;
++        previous_position:=(selected->>'position')::bigint;
++        highest:=GREATEST(highest,(selected->>'access_level')::smallint);
++    END LOOP;
++    SELECT count(*) INTO eligible FROM public.agent_history_exchanges
++        WHERE company_id=owner.company_id AND conversation_id=owner.conversation_id AND state='completed' AND payload_retained
++            AND position<owner.position AND access_level<=source.knowledge_ceiling;
++    RETURN (history->>'selected_level')::smallint=highest AND source.content_level>=highest
++        AND (history->>'omitted_eligible')::bigint=eligible-jsonb_array_length(history->'selected')
++        AND jsonb_typeof(history->'budget')='object'
++        AND ((history->'budget')-ARRAY['mandatory_tokens','history_tokens','reserved_output_tokens','request_limit']::text[])='{}'::jsonb
++        AND (history->'budget'->>'request_limit')::bigint=131072
++        AND (history->'budget'->>'mandatory_tokens')::bigint>0
++        AND (history->'budget'->>'history_tokens')::bigint>=0
++        AND (history->'budget'->>'reserved_output_tokens')::bigint BETWEEN 1 AND 16384
++        AND (history->'budget'->>'mandatory_tokens')::numeric
++            +(history->'budget'->>'history_tokens')::numeric
++            +(history->'budget'->>'reserved_output_tokens')::numeric<=131072;
++END $$;
++
++CREATE FUNCTION public.agent_history_transition_allowed(
++    previous public.agent_history_exchanges, following public.agent_history_exchanges)
++RETURNS boolean LANGUAGE plpgsql VOLATILE AS $$
++BEGIN
++    IF previous.state=following.state THEN
++        RETURN true;
++    END IF;
++    IF following.state='active' THEN
++        RETURN previous.state='queued' AND following.checkpoint_id IS NOT NULL;
++    END IF;
++    IF following.state='completed' THEN
++        RETURN previous.state='active' AND following.checkpoint_id IS NOT NULL;
++    END IF;
++    IF following.state='failed' AND previous.state IN ('queued','active') THEN
++        RETURN EXISTS (
++            SELECT 1 FROM public.workflow_runs AS run
++            JOIN public.workflow_executions AS execution ON execution.company_id=run.company_id AND execution.run_id=run.id
++            WHERE run.company_id=following.company_id AND run.id=following.run_id AND execution.id=following.execution_id
++                AND (run.state='failed' OR execution.committed_route='final_error'
++                    OR EXISTS (SELECT 1 FROM public.task_harness_runs AS checkpoint
++                        WHERE checkpoint.company_id=following.company_id AND checkpoint.id=following.checkpoint_id
++                            AND checkpoint.state='invalid_output')));
++    END IF;
++    IF following.state='cancelled' AND previous.state IN ('queued','active') THEN
++        RETURN EXISTS (SELECT 1 FROM public.workflow_runs AS run
++            WHERE run.company_id=following.company_id AND run.id=following.run_id AND run.state='cancelled');
++    END IF;
++    IF previous.state='failed' AND following.state='queued' AND pg_trigger_depth()>1 THEN
++        -- Only the genuine native failed-root reopen hook may take this exceptional edge.
++        RETURN EXISTS (
++            SELECT 1 FROM public.workflow_runs AS run
++            JOIN public.workflow_executions AS execution ON execution.company_id=run.company_id AND execution.run_id=run.id
++            JOIN public.background_tasks AS job ON job.company_id=execution.company_id AND job.workflow_execution_id=execution.id
++            WHERE run.company_id=following.company_id AND run.id=following.run_id AND run.state='running'
++                AND execution.id=following.execution_id AND execution.completed_at IS NULL
++                AND job.id=following.job_id AND job.status='pending'
++                AND public.workflow_control_retry_safe(run.company_id,run.id,job.id));
++    END IF;
++    RETURN false;
++END $$;
++
++CREATE FUNCTION public.guard_agent_history_exchange_change() RETURNS trigger LANGUAGE plpgsql AS $$
++DECLARE current_level public.access_level;
++BEGIN
++    IF TG_OP='DELETE' THEN
++        IF NOT EXISTS (SELECT 1 FROM public.companies WHERE id=OLD.company_id) THEN
++            RETURN OLD; -- Intentional whole-tenant teardown owns its cascades.
++        END IF;
++        IF OLD.payload_retained OR EXISTS(SELECT 1 FROM public.workflow_runs
++            WHERE company_id=OLD.company_id AND id=OLD.run_id) THEN
++            RAISE EXCEPTION 'agent metadata retires only with its expired source' USING ERRCODE='23514';
++        END IF;
++        RETURN OLD;
++    END IF;
++    IF to_jsonb(NEW)=to_jsonb(OLD) AND NEW.output::text IS NOT DISTINCT FROM OLD.output::text THEN
++        RETURN NEW;
++    END IF;
++    IF OLD.payload_retained AND NOT NEW.payload_retained THEN
++        IF (to_jsonb(NEW)-ARRAY['payload_retained','payload_expired_at','output','frozen_preparation']::text[])
++            IS DISTINCT FROM (to_jsonb(OLD)-ARRAY['payload_retained','payload_expired_at','output','frozen_preparation']::text[])
++            OR NEW.output IS NOT NULL OR NEW.frozen_preparation IS NOT NULL
++            OR NEW.payload_expired_at IS NULL OR NEW.payload_expired_at<OLD.created_at
++            OR NEW.payload_expired_at>clock_timestamp()
++            OR NOT public.agent_history_expiry_allowed(OLD)
++            OR NOT public.agent_history_checkpoint_matches(NEW) THEN
++            RAISE EXCEPTION 'agent payload is pinned or expiry changed metadata' USING ERRCODE='23514';
++        END IF;
++        RETURN NEW;
++    END IF;
++    IF NOT OLD.payload_retained OR NEW.payload_retained IS DISTINCT FROM OLD.payload_retained
++        OR NEW.payload_expired_at IS DISTINCT FROM OLD.payload_expired_at THEN
++        RAISE EXCEPTION 'expired agent payload cannot reopen' USING ERRCODE='23514';
++    END IF;
++    IF OLD.preparation_digest IS NULL AND NEW.frozen_preparation IS NOT NULL THEN
++        IF NEW.preparation_digest IS NOT NULL AND NEW.preparation_digest<>sha256(convert_to(NEW.frozen_preparation::text,'UTF8')) THEN
++            RAISE EXCEPTION 'forged agent preparation digest' USING ERRCODE='23514';
++        END IF;
++        NEW.preparation_digest:=sha256(convert_to(NEW.frozen_preparation::text,'UTF8'));
++    ELSIF NEW.preparation_digest IS DISTINCT FROM OLD.preparation_digest THEN
++        RAISE EXCEPTION 'agent preparation digest is immutable' USING ERRCODE='23514';
++    END IF;
++    IF OLD.output_digest IS NULL AND NEW.output IS NOT NULL THEN
++        IF NEW.output_digest IS NOT NULL AND NEW.output_digest<>sha256(convert_to(NEW.output::text,'UTF8')) THEN
++            RAISE EXCEPTION 'forged agent output digest' USING ERRCODE='23514';
++        END IF;
++        NEW.output_digest:=sha256(convert_to(NEW.output::text,'UTF8'));
++    ELSIF NEW.output_digest IS DISTINCT FROM OLD.output_digest THEN
++        RAISE EXCEPTION 'agent output digest is immutable' USING ERRCODE='23514';
++    END IF;
++    IF OLD.state IN ('completed','cancelled')
++        OR (to_jsonb(NEW)-ARRAY['state','checkpoint_id','output','access_level','activated_at','finished_at','frozen_preparation','preparation_digest','output_digest']::text[])
++            IS DISTINCT FROM
++           (to_jsonb(OLD)-ARRAY['state','checkpoint_id','output','access_level','activated_at','finished_at','frozen_preparation','preparation_digest','output_digest']::text[])
++        OR (OLD.checkpoint_id IS NOT NULL AND NEW.checkpoint_id IS DISTINCT FROM OLD.checkpoint_id)
++        OR (OLD.activated_at IS NOT NULL AND NEW.activated_at IS DISTINCT FROM OLD.activated_at)
++        OR NOT public.agent_history_transition_allowed(OLD,NEW)
++    THEN
++        RAISE EXCEPTION 'agent exchange identity or lifecycle changed' USING ERRCODE='23514';
++    END IF;
++    IF NEW.frozen_preparation IS DISTINCT FROM OLD.frozen_preparation AND (
++        OLD.frozen_preparation IS NOT NULL
++        OR public.agent_history_preparation_valid(NEW) IS DISTINCT FROM true
++    ) THEN
++        RAISE EXCEPTION 'invalid or changed frozen agent preparation' USING ERRCODE='23514', CONSTRAINT='agent_history_preparation';
++    END IF;
++    IF OLD.state='failed' AND NEW.state='queued' AND NOT public.agent_history_admit(NEW.company_id,NEW.conversation_id) THEN
++        RAISE EXCEPTION 'agent history queue is full' USING ERRCODE='23514', CONSTRAINT='agent_history_capacity';
++    END IF;
++    IF NEW.state='active' THEN
++        PERFORM 1 FROM public.agent_history_conversations WHERE company_id=NEW.company_id
++            AND id=NEW.conversation_id AND active_exchange_id=NEW.id FOR UPDATE;
++        IF NOT FOUND THEN
++            RAISE EXCEPTION 'agent exchange does not own its turn' USING ERRCODE='23514';
++        END IF;
++    END IF;
++    SELECT content_level INTO STRICT current_level FROM public.workflow_runs
++        WHERE company_id=NEW.company_id AND id=NEW.run_id;
++    IF NEW.access_level<OLD.access_level OR NEW.access_level<current_level
++        OR (NEW.finished_at IS NOT NULL AND NEW.finished_at>clock_timestamp())
++        OR (NEW.activated_at IS NOT NULL AND NEW.activated_at>clock_timestamp())
++        OR NOT public.agent_history_checkpoint_matches(NEW)
++    THEN
++        RAISE EXCEPTION 'agent exchange level/checkpoint agreement failed' USING ERRCODE='23514';
++    END IF;
++    RETURN NEW;
++END $$;
++CREATE TRIGGER agent_history_exchange_change BEFORE UPDATE OR DELETE ON public.agent_history_exchanges
++    FOR EACH ROW EXECUTE FUNCTION public.guard_agent_history_exchange_change();
++
++CREATE FUNCTION public.guard_agent_history_checkpoint_agreement() RETURNS trigger LANGUAGE plpgsql AS $$
++DECLARE related public.agent_history_exchanges;
++        proof text;
++BEGIN
++    IF TG_TABLE_NAME='task_harness_runs' THEN
++        proof:=NEW.workflow_prepared->>'history_exchange';
++        IF proof IS NULL THEN
++            IF NEW.checkpoint->'seed' IS DISTINCT FROM '[]'::jsonb THEN
++                RAISE EXCEPTION 'model-only checkpoint has a logical seed' USING ERRCODE='23514';
++            END IF;
++            RETURN NULL;
++        END IF;
++        SELECT * INTO related FROM public.agent_history_exchanges
++            WHERE company_id=NEW.company_id AND id=proof::uuid;
++        IF NOT FOUND AND NOT EXISTS(SELECT 1 FROM public.task_harness_runs WHERE company_id=NEW.company_id AND id=NEW.id)
++            AND NOT EXISTS(SELECT 1 FROM public.workflow_runs WHERE company_id=NEW.company_id AND id=NEW.workflow_run_id) THEN
++            RETURN NULL;
++        END IF;
++        IF NOT FOUND OR related.checkpoint_id IS DISTINCT FROM NEW.id THEN
++            RAISE EXCEPTION 'checkpoint has no matching logical exchange' USING ERRCODE='23514';
++        END IF;
++    ELSE
++        SELECT * INTO related FROM public.agent_history_exchanges WHERE company_id=NEW.company_id AND id=NEW.id;
++        IF NOT FOUND THEN
++            IF EXISTS(SELECT 1 FROM public.companies WHERE id=NEW.company_id) AND
++                (NEW.payload_retained OR EXISTS(SELECT 1 FROM public.workflow_runs WHERE company_id=NEW.company_id AND id=NEW.run_id)) THEN
++                RAISE EXCEPTION 'agent exchange disappeared during its write' USING ERRCODE='23514';
++            END IF;
++            RETURN NULL;
++        END IF;
++    END IF;
++    IF NOT public.agent_history_checkpoint_matches(related) THEN
++        RAISE EXCEPTION 'agent output and final checkpoint must agree' USING ERRCODE='23514';
++    END IF;
++    RETURN NULL;
++END $$;
++CREATE CONSTRAINT TRIGGER agent_history_exchange_agreement AFTER INSERT OR UPDATE ON public.agent_history_exchanges
++    DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION public.guard_agent_history_checkpoint_agreement();
++CREATE CONSTRAINT TRIGGER agent_history_checkpoint_agreement AFTER INSERT OR UPDATE ON public.task_harness_runs
++    DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION public.guard_agent_history_checkpoint_agreement();
++
++CREATE INDEX agent_history_exchanges_live_source ON public.agent_history_exchanges(company_id,run_id,execution_id)
++    WHERE state IN ('queued','active');
++
++CREATE FUNCTION public.settle_agent_history_run() RETURNS trigger LANGUAGE plpgsql AS $$
++BEGIN
++    IF NEW.state IN ('failed','cancelled') AND OLD.state IS DISTINCT FROM NEW.state THEN
++        UPDATE public.agent_history_exchanges SET
++            state=CASE WHEN NEW.state='cancelled' THEN 'cancelled' ELSE 'failed' END,
++            access_level=GREATEST(access_level,NEW.content_level),
++            finished_at=COALESCE(finished_at,clock_timestamp())
++        WHERE company_id=NEW.company_id AND run_id=NEW.id AND state IN ('queued','active');
++        IF NEW.state='failed' THEN
++            -- An invalid-output checkpoint may have closed its input before run retirement.
++            UPDATE public.agent_history_exchanges SET access_level=GREATEST(access_level,NEW.content_level)
++                WHERE company_id=NEW.company_id AND run_id=NEW.id
++                    AND execution_id=NEW.terminal_execution_id AND state='failed';
++        END IF;
++    ELSIF OLD.state='failed' AND NEW.state='running' AND OLD.terminal_execution_id IS NOT NULL THEN
++        -- The existing run transition guard proves safe native control retry on this job.
++        UPDATE public.agent_history_exchanges AS exchange SET state='queued',finished_at=NULL,
++            access_level=GREATEST(exchange.access_level,NEW.content_level)
++        WHERE exchange.company_id=NEW.company_id AND exchange.run_id=NEW.id
++            AND exchange.execution_id=OLD.terminal_execution_id AND exchange.state='failed'
++            AND public.workflow_control_retry_safe(NEW.company_id,NEW.id,exchange.job_id);
++    END IF;
++    RETURN NULL;
++END $$;
++CREATE TRIGGER agent_history_run_terminal AFTER UPDATE OF state ON public.workflow_runs
++    FOR EACH ROW EXECUTE FUNCTION public.settle_agent_history_run();
++
++CREATE FUNCTION public.settle_agent_history_routed_failure() RETURNS trigger LANGUAGE plpgsql AS $$
++BEGIN
++    IF NEW.committed_route='final_error' AND OLD.committed_route IS DISTINCT FROM NEW.committed_route THEN
++        UPDATE public.agent_history_exchanges AS exchange SET state='failed',
++            access_level=GREATEST(exchange.access_level,run.content_level),
++            finished_at=clock_timestamp()
++        FROM public.workflow_runs AS run
++        WHERE exchange.company_id=NEW.company_id AND exchange.run_id=NEW.run_id
++            AND exchange.execution_id=NEW.id AND exchange.state IN ('queued','active')
++            AND run.company_id=exchange.company_id AND run.id=exchange.run_id;
++    END IF;
++    RETURN NULL;
++END $$;
++CREATE TRIGGER agent_history_routed_failure AFTER UPDATE OF committed_route ON public.workflow_executions
++    FOR EACH ROW EXECUTE FUNCTION public.settle_agent_history_routed_failure();
++
++-- AH-P03-D1/r2: own run/checkpoint/job/exchange -> conversation -> admission leaf.
++-- Only membership increases take the leaf. Release never locks another source.
++ALTER TABLE public.agent_history_exchanges
++    ADD UNIQUE (company_id,conversation_id,id),
++    ADD UNIQUE (company_id,run_id,execution_id,id);
++ALTER TABLE public.agent_history_conversations ADD FOREIGN KEY (company_id,id,active_exchange_id)
++    REFERENCES public.agent_history_exchanges(company_id,conversation_id,id) DEFERRABLE INITIALLY DEFERRED;
++-- NO ACTION is checked at commit: tenant teardown finishes its existing cascades,
++-- while a retained companion still prevents an exchange-only deletion from committing.
++ALTER TABLE public.workflow_waits ADD FOREIGN KEY (company_id,run_id,execution_id,agent_exchange_id)
++    REFERENCES public.agent_history_exchanges(company_id,run_id,execution_id,id) DEFERRABLE INITIALLY DEFERRED;
++CREATE UNIQUE INDEX agent_history_one_active ON public.agent_history_exchanges(company_id,conversation_id)
++    WHERE state='active';
++CREATE INDEX agent_history_company_pending ON public.agent_history_exchanges(company_id)
++    WHERE state IN ('queued','active');
++CREATE TABLE public.agent_history_admission (
++    company_id uuid PRIMARY KEY REFERENCES public.companies(id) ON DELETE CASCADE
++);
++CREATE FUNCTION public.guard_agent_history_admission() RETURNS trigger LANGUAGE plpgsql AS $$
++BEGIN
++    IF TG_OP='DELETE' AND NOT EXISTS(SELECT 1 FROM public.companies WHERE id=OLD.company_id) THEN
++        RETURN OLD;
++    END IF;
++    RAISE EXCEPTION 'agent admission identity is immutable' USING ERRCODE='23514';
++END $$;
++CREATE TRIGGER agent_history_admission_guard BEFORE UPDATE OR DELETE ON public.agent_history_admission
++    FOR EACH ROW EXECUTE FUNCTION public.guard_agent_history_admission();
++
++CREATE FUNCTION public.agent_history_admit(tenant uuid, conversation uuid)
++RETURNS boolean LANGUAGE plpgsql VOLATILE AS $$
++BEGIN
++    PERFORM 1 FROM public.agent_history_conversations WHERE company_id=tenant AND id=conversation FOR UPDATE;
++    IF NOT FOUND THEN RETURN false; END IF;
++    INSERT INTO public.agent_history_admission(company_id) VALUES(tenant) ON CONFLICT DO NOTHING;
++    PERFORM 1 FROM public.agent_history_admission WHERE company_id=tenant FOR UPDATE;
++    RETURN (SELECT count(*)<32 FROM (SELECT 1 FROM public.agent_history_exchanges
++                WHERE company_id=tenant AND conversation_id=conversation AND state IN ('queued','active') LIMIT 32) AS pending)
++       AND (SELECT count(*)<256 FROM (SELECT 1 FROM public.agent_history_exchanges
++                WHERE company_id=tenant AND state IN ('queued','active') LIMIT 256) AS pending);
++END $$;
++
++CREATE OR REPLACE FUNCTION public.guard_agent_history_conversation() RETURNS trigger LANGUAGE plpgsql AS $$
++DECLARE owner public.agent_history_exchanges;
++BEGIN
++    IF TG_OP='INSERT' THEN
++        IF NOT public.agent_history_conversation_available(NEW.company_id)
++            OR NOT public.agent_history_storage_available(NEW.company_id,NEW.id) THEN
++            RAISE EXCEPTION 'agent conversation storage is full' USING ERRCODE='23514', CONSTRAINT='agent_history_capacity';
++        END IF;
++        IF NEW.last_exchange_order<>0 OR NEW.active_exchange_id IS NOT NULL OR NEW.expired_count<>0 OR NEW.expired_through_order<>0 THEN
++            RAISE EXCEPTION 'new conversation has no order or owner' USING ERRCODE='23514';
++        END IF;
++        IF NEW.scope_kind='child_branch' AND NOT EXISTS(SELECT 1 FROM public.workflow_runs
++            WHERE company_id=NEW.company_id AND id=NEW.child_run_id
++                AND parent_run_id IS NOT NULL AND parent_execution_id IS NOT NULL) THEN
++            RAISE EXCEPTION 'agent child conversation requires genuine child run' USING ERRCODE='23514';
++        END IF;
++        RETURN NEW;
++    END IF;
++    IF (to_jsonb(NEW)-ARRAY['last_exchange_order','active_exchange_id','expired_count','expired_through_order']) IS DISTINCT FROM
++       (to_jsonb(OLD)-ARRAY['last_exchange_order','active_exchange_id','expired_count','expired_through_order']) THEN
++        RAISE EXCEPTION 'agent conversation identity is immutable' USING ERRCODE='23514';
++    END IF;
++    IF NEW.expired_count<OLD.expired_count OR NEW.expired_through_order<OLD.expired_through_order
++        OR NEW.expired_count<>NEW.last_exchange_order-(SELECT count(*) FROM public.agent_history_exchanges
++            WHERE company_id=NEW.company_id AND conversation_id=NEW.id AND payload_retained)
++        OR NEW.expired_through_order<>COALESCE((SELECT min(position)-1 FROM public.agent_history_exchanges
++            WHERE company_id=NEW.company_id AND conversation_id=NEW.id AND payload_retained),NEW.last_exchange_order) THEN
++        RAISE EXCEPTION 'agent expiry boundary must match retained records' USING ERRCODE='23514';
++    END IF;
++    IF NEW.last_exchange_order IS DISTINCT FROM OLD.last_exchange_order THEN
++        IF NEW.active_exchange_id IS DISTINCT FROM OLD.active_exchange_id
++            OR NEW.last_exchange_order::numeric<>OLD.last_exchange_order::numeric+1
++            OR NOT EXISTS(SELECT 1 FROM public.agent_history_exchanges
++                WHERE company_id=NEW.company_id AND conversation_id=NEW.id AND position=NEW.last_exchange_order) THEN
++            RAISE EXCEPTION 'agent conversation order has no exchange' USING ERRCODE='23514';
++        END IF;
++    END IF;
++    IF NEW.active_exchange_id IS NOT DISTINCT FROM OLD.active_exchange_id THEN RETURN NEW; END IF;
++    IF OLD.active_exchange_id IS NOT NULL THEN
++        IF NEW.active_exchange_id IS NOT NULL OR EXISTS(SELECT 1 FROM public.agent_history_exchanges
++            WHERE company_id=OLD.company_id AND id=OLD.active_exchange_id AND state IN ('queued','active')) THEN
++            RAISE EXCEPTION 'unfinished agent turn cannot be released or stolen' USING ERRCODE='23514';
++        END IF;
++        RETURN NEW;
++    END IF;
++    SELECT * INTO owner FROM public.agent_history_exchanges
++        WHERE company_id=NEW.company_id AND conversation_id=NEW.id AND id=NEW.active_exchange_id;
++    IF NOT FOUND OR owner.state<>'queued' OR owner.position IS DISTINCT FROM
++        (SELECT min(position) FROM public.agent_history_exchanges
++            WHERE company_id=NEW.company_id AND conversation_id=NEW.id AND state='queued')
++        OR NOT EXISTS(SELECT 1 FROM public.workflow_runs AS run
++            JOIN public.workflow_executions AS execution ON execution.company_id=run.company_id AND execution.run_id=run.id
++            JOIN public.background_tasks AS job ON job.company_id=execution.company_id AND job.workflow_execution_id=execution.id
++            WHERE run.company_id=owner.company_id AND run.id=owner.run_id AND execution.id=owner.execution_id
++                AND job.id=owner.job_id AND run.deadline>clock_timestamp() AND run.state IN ('queued','running','waiting')
++                AND execution.completed_at IS NULL AND execution.committed_route IS NULL
++                AND ((job.status='processing' AND job.lock_expires_at>clock_timestamp())
++                    OR (job.status='completed' AND EXISTS(SELECT 1 FROM public.workflow_waits AS wait
++                        WHERE wait.company_id=owner.company_id AND wait.run_id=owner.run_id
++                            AND wait.execution_id=owner.execution_id AND wait.agent_exchange_id=owner.id
++                            AND wait.reason='agent_turn' AND wait.state='waiting')))) THEN
++        RAISE EXCEPTION 'agent turn requires the eligible live source' USING ERRCODE='23514';
++    END IF;
++    RETURN NEW;
++END $$;
++
++CREATE FUNCTION public.agent_history_take_turn(tenant uuid, exchange_id uuid)
++RETURNS boolean LANGUAGE plpgsql VOLATILE AS $$
++DECLARE exchange public.agent_history_exchanges;
++        held uuid;
++BEGIN
++    SELECT * INTO exchange FROM public.agent_history_exchanges WHERE company_id=tenant AND id=exchange_id;
++    IF NOT FOUND THEN RETURN false; END IF;
++    IF exchange.state='completed' THEN RETURN true; END IF;
++    IF exchange.state NOT IN ('queued','active') THEN RETURN false; END IF;
++    SELECT active_exchange_id INTO STRICT held FROM public.agent_history_conversations
++        WHERE company_id=tenant AND id=exchange.conversation_id FOR UPDATE;
++    IF held IS NOT NULL THEN RETURN held=exchange_id; END IF;
++    IF exchange.position IS DISTINCT FROM(SELECT min(position) FROM public.agent_history_exchanges
++        WHERE company_id=tenant AND conversation_id=exchange.conversation_id AND state='queued') THEN RETURN false; END IF;
++    UPDATE public.agent_history_conversations SET active_exchange_id=exchange_id
++        WHERE company_id=tenant AND id=exchange.conversation_id AND active_exchange_id IS NULL;
++    RETURN true;
++END $$;
++
++CREATE FUNCTION public.agent_history_turn_ready(tenant uuid, exchange_id uuid)
++RETURNS boolean LANGUAGE sql STABLE AS $$
++    SELECT EXISTS(SELECT 1 FROM public.agent_history_exchanges AS exchange
++        JOIN public.agent_history_conversations AS conversation
++            ON conversation.company_id=exchange.company_id AND conversation.id=exchange.conversation_id
++        WHERE exchange.company_id=tenant AND exchange.id=exchange_id AND exchange.state='queued'
++            AND (conversation.active_exchange_id=exchange.id OR (conversation.active_exchange_id IS NULL
++                AND exchange.position=(SELECT min(position) FROM public.agent_history_exchanges
++                    WHERE company_id=tenant AND conversation_id=exchange.conversation_id AND state='queued'))))
++$$;
++
++CREATE FUNCTION public.release_agent_history_turn() RETURNS trigger LANGUAGE plpgsql AS $$
++BEGIN
++    IF NEW.state IN ('completed','failed','cancelled') AND OLD.state IS DISTINCT FROM NEW.state THEN
++        UPDATE public.agent_history_conversations SET active_exchange_id=NULL
++            WHERE company_id=NEW.company_id AND id=NEW.conversation_id AND active_exchange_id=NEW.id;
++    END IF;
++    RETURN NULL;
++END $$;
++CREATE TRIGGER agent_history_turn_release AFTER UPDATE OF state ON public.agent_history_exchanges
++    FOR EACH ROW EXECUTE FUNCTION public.release_agent_history_turn();
++
++CREATE FUNCTION public.guard_agent_history_turn_agreement() RETURNS trigger LANGUAGE plpgsql AS $$
++DECLARE tenant uuid;
++        conversation uuid;
++BEGIN
++    tenant:=NEW.company_id;
++    IF TG_TABLE_NAME='agent_history_conversations' THEN conversation:=NEW.id;
++    ELSE conversation:=NEW.conversation_id; END IF;
++    IF EXISTS(SELECT 1 FROM public.agent_history_conversations AS stream
++        LEFT JOIN public.agent_history_exchanges AS owner ON owner.company_id=stream.company_id
++            AND owner.conversation_id=stream.id AND owner.id=stream.active_exchange_id
++        WHERE stream.company_id=tenant AND stream.id=conversation
++            AND stream.active_exchange_id IS NOT NULL AND (owner.id IS NULL OR owner.state NOT IN ('queued','active')))
++        OR EXISTS(SELECT 1 FROM public.agent_history_exchanges AS exchange
++            JOIN public.agent_history_conversations AS stream ON stream.company_id=exchange.company_id AND stream.id=exchange.conversation_id
++            WHERE exchange.company_id=tenant AND exchange.conversation_id=conversation AND exchange.state='active'
++                AND stream.active_exchange_id IS DISTINCT FROM exchange.id) THEN
++        RAISE EXCEPTION 'agent turn and exchange must agree' USING ERRCODE='23514';
++    END IF;
++    RETURN NULL;
++END $$;
++CREATE CONSTRAINT TRIGGER agent_history_turn_conversation_agreement AFTER INSERT OR UPDATE ON public.agent_history_conversations
++    DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION public.guard_agent_history_turn_agreement();
++CREATE CONSTRAINT TRIGGER agent_history_turn_exchange_agreement AFTER INSERT OR UPDATE ON public.agent_history_exchanges
++    DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION public.guard_agent_history_turn_agreement();
++
++CREATE FUNCTION public.guard_agent_turn_wait() RETURNS trigger LANGUAGE plpgsql AS $$
++BEGIN
++    IF TG_OP='UPDATE' AND (to_jsonb(NEW)-ARRAY['state','settled_at','failure_code']) IS DISTINCT FROM
++        (to_jsonb(OLD)-ARRAY['state','settled_at','failure_code']) THEN
++        RAISE EXCEPTION 'agent turn wait identity is immutable' USING ERRCODE='23514';
++    END IF;
++    IF TG_OP='INSERT' AND (NEW.state<>'waiting' OR NOT EXISTS(
++        SELECT 1 FROM public.agent_history_exchanges AS exchange
++        JOIN public.workflow_runs AS run ON run.company_id=exchange.company_id AND run.id=exchange.run_id
++        JOIN public.background_tasks AS job ON job.company_id=exchange.company_id AND job.id=exchange.job_id
++        JOIN public.task_attempts AS attempt ON attempt.task_id=job.id AND attempt.attempt_number=NEW.parked_attempt_number
++        WHERE exchange.company_id=NEW.company_id AND exchange.id=NEW.agent_exchange_id
++            AND exchange.run_id=NEW.run_id AND exchange.execution_id=NEW.execution_id AND exchange.state='queued'
++            AND NEW.deadline=run.deadline AND run.deadline>clock_timestamp() AND run.state IN ('queued','running')
++            AND job.status='processing' AND job.attempt_ordinal=NEW.parked_attempt_number
++            AND job.lock_expires_at>clock_timestamp() AND job.continuation_count<public.workflow_job_continuation_limit()
++            AND attempt.status='processing' AND attempt.worker_id=job.worker_id
++            AND attempt.execution_generation=job.execution_generation)) THEN
++        RAISE EXCEPTION 'agent turn wait requires its live exact attempt' USING ERRCODE='23514';
++    END IF;
++    IF TG_OP='UPDATE' AND OLD.state<>'waiting' AND to_jsonb(NEW) IS DISTINCT FROM to_jsonb(OLD) THEN
++        RAISE EXCEPTION 'settled agent turn wait is immutable' USING ERRCODE='23514';
++    END IF;
++    RETURN NEW;
++END $$;
++CREATE TRIGGER agent_turn_wait_insert BEFORE INSERT ON public.workflow_waits
++    FOR EACH ROW WHEN (NEW.reason='agent_turn') EXECUTE FUNCTION public.guard_agent_turn_wait();
++CREATE TRIGGER agent_turn_wait_change BEFORE UPDATE ON public.workflow_waits
++    FOR EACH ROW WHEN (OLD.reason='agent_turn' OR NEW.reason='agent_turn') EXECUTE FUNCTION public.guard_agent_turn_wait();
++
++CREATE FUNCTION public.check_agent_turn_wait() RETURNS trigger LANGUAGE plpgsql AS $$
++DECLARE saved public.workflow_waits;
++BEGIN
++    SELECT * INTO saved FROM public.workflow_waits WHERE company_id=NEW.company_id AND id=NEW.id;
++    IF NOT FOUND THEN RETURN NULL; END IF;
++    IF NOT EXISTS(SELECT 1 FROM public.agent_history_exchanges AS exchange
++        JOIN public.background_tasks AS job ON job.company_id=exchange.company_id AND job.id=exchange.job_id
++        JOIN public.workflow_runs AS run ON run.company_id=exchange.company_id AND run.id=exchange.run_id
++        JOIN public.task_attempts AS attempt ON attempt.task_id=job.id AND attempt.attempt_number=saved.parked_attempt_number
++        LEFT JOIN public.agent_history_conversations AS conversation ON conversation.company_id=exchange.company_id
++            AND conversation.id=exchange.conversation_id
++        WHERE exchange.company_id=saved.company_id AND exchange.id=saved.agent_exchange_id
++            AND attempt.status='completed' AND attempt.stop_reason='agent_turn_parked'
++            AND ((saved.state='waiting' AND job.status='completed' AND exchange.state='queued'
++                    AND run.state='waiting' AND run.waiting_reason='agent_turn')
++                OR (saved.state='completed' AND job.status='pending' AND exchange.state='queued'
++                    AND run.state='running' AND conversation.active_exchange_id=exchange.id)
++                OR (saved.state IN ('cancelled','expired','failed') AND run.state IN ('failed','cancelled','succeeded')))) THEN
++        RAISE EXCEPTION 'agent turn wait must park or continue its exact job' USING ERRCODE='23514', CONSTRAINT='workflow_guard:check_agent_turn_wait';
++    END IF;
++    RETURN NULL;
++END $$;
++CREATE CONSTRAINT TRIGGER agent_turn_wait_agreement AFTER INSERT OR UPDATE ON public.workflow_waits
++    DEFERRABLE INITIALLY DEFERRED FOR EACH ROW WHEN (NEW.reason='agent_turn')
++    EXECUTE FUNCTION public.check_agent_turn_wait();
++
+ -- Private connected accounts. Owners are stable client references, never host-table FKs.
+ CREATE TABLE public.integration_owner_states (
+     owner_namespace text NOT NULL CHECK (octet_length(owner_namespace) BETWEEN 1 AND 256),

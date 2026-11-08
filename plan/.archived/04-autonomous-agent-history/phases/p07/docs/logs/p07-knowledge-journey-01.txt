@@ -1,0 +1,12 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+   Compiling open_bots v0.1.0 (/private/tmp/openbot-agent-history-h_82_5pw/worktree)
+error[E0609]: no field `model` on type `ingress_tests::Deployment`
+   --> src/adapters/persistence/workflow/agent_history_knowledge_e2e_tests.rs:203:13
+    |
+203 |         j.d.model.query_count(),
+    |             ^^^^^ unknown field
+    |
+    = note: available fields are: `fixture`, `channel`, `threads`, `engine`, `knowledge` ... and 3 others
+
+For more information about this error, try `rustc --explain E0609`.
+error: could not compile `open_bots` (lib test) due to 1 previous error

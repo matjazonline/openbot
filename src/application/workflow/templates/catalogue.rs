@@ -143,7 +143,7 @@ impl TemplateCatalogue {
         let offer = |id: &str, title: &'static str, description: &'static str, source| {
             Ok::<_, TemplateError>(TemplateOffer {
                 id: TemplateId::parse(id).map_err(|_| TemplateError::Limit("template id"))?,
-                revision: TemplateRevision::new(1).expect("first template revision"),
+                revision: TemplateRevision::new(2).expect("current template revision"),
                 title,
                 description,
                 source,
@@ -156,13 +156,13 @@ impl TemplateCatalogue {
                 offer(
                     AUTONOMOUS_RESPONSE,
                     "Autonomous response",
-                    "The agent drafts an answer to each inbound message and sends it as the reply.",
+                    "The agent returns a typed answer; the channel's designated responder publishes the automatic final reply.",
                     sources[0],
                 )?,
                 offer(
                     REVIEWED_SUPPORT,
                     "Reviewed response",
-                    "The agent drafts an answer; a reviewer approves or edits it before it is sent, or rejects it, before the run's deadline.",
+                    "A reviewer approves or edits the agent's answer before automatic publication; rejection completes without a reply.",
                     sources[1],
                 )?,
             ],

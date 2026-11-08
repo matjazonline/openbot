@@ -1,0 +1,37 @@
+{
+  "root": "/Users/mac02/.codex/worktrees/1133/openbot",
+  "pre_pull_head": "97e5d60dc538e26c7cb976a8d63772eed80baff2",
+  "pulled_main": "4ab45555f8316ec7a8b1b64e8c05b77ff7d9a29d",
+  "accepted_vault_digest": "9d561a9cd7b6e4662d859bca78e70b0739b985b1dad6d8e75e5f30b68311088b",
+  "stage_worktree": "/private/tmp/vault-main-pull-rtehstpa/worktree",
+  "stage_role": "merge preparation only; no Cargo or DB use",
+  "cargo_target": "/Users/mac02/.codex/worktrees/1133/openbot/target",
+  "excludes": [
+    "plan/vault-google/COORDINATION.md",
+    "plan/vault-google/phases/p01/docs",
+    "plan/vault-google/phases/p02/docs",
+    "plan/vault-google/phases/p03/docs",
+    "plan/vault-google/phases/p04/docs",
+    "plan/vault-google/phases/p05/docs",
+    "plan/vault-google/integration/channel-p05/docs",
+    "plan/vault-google/integration/channel-main/docs"
+  ],
+  "backup_stash_existing": "c6cf2a088ef25fe678a8458e5db190eb6bffd73f",
+  "apply_exit": 1,
+  "copied_untracked_source_count": 92,
+  "conflicts": [
+    "migrations/20260817000000_init_schema.sql"
+  ],
+  "backup_stash_pull": "9483cc87716984f371328d3367f3bff24cce13c5",
+  "restored_untracked_files": 544,
+  "installed_head": "4ab45555f8316ec7a8b1b64e8c05b77ff7d9a29d",
+  "installed_digest": "5320fe97999703b8d54b2360ac089f2fae441cd1b37f417a377f2c73a3a0c7a9",
+  "installation": "identical prepared source installed; all original untracked files restored/verified; index left unstaged; backup stash retained",
+  "database": "vault_pull_main_1133_43797f74ae21",
+  "database_url": "postgresql://localhost/vault_pull_main_1133_43797f74ae21",
+  "test_database_url": "postgresql://localhost/vault_pull_main_1133_43797f74ae21",
+  "database_owned": true,
+  "database_state": "created fresh owned base",
+  "browser_executable": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+  "browser_version": "Google Chrome 156.0.8078.80"
+}

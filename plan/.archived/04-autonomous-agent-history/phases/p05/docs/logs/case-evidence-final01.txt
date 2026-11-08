@@ -1,0 +1,57 @@
+{
+  "status": "PASS",
+  "selected": 769,
+  "distinct_latest_passes": 769,
+  "ignored": 0,
+  "required_families": {
+    "agent_history_callers_": 4,
+    "agent_history_children_": 1,
+    "agent_history_samples_": 7,
+    "agent_history_continuation_": 2,
+    "agent_history_channel_": 5,
+    "agent_history_level_": 16
+  },
+  "accepted_p04_names_preserved": 597,
+  "observations": [
+    {
+      "run": "final-focused-runtime-02",
+      "exit_code": 101,
+      "counts": {
+        "ok": 802,
+        "ignored, browser fixture: exact production library markup and JavaScript": 1,
+        "FAILED": 1
+      },
+      "receipt_sha256": "4be548945c1f659aa7c2327c2f3b6aaed138c51fcfd9b5dbd22e9d17905c85c3",
+      "log_sha256": "754581c043846badc1d679bc739244368ae6824bfe9603b1684c686cd3e8f845"
+    },
+    {
+      "run": "final-affected-recheck01",
+      "exit_code": 101,
+      "counts": {
+        "ok": 238,
+        "FAILED": 1
+      },
+      "receipt_sha256": "ec5682d3edec1f40d6285be18cde27ac87d2dd4937aef0f23430209689a21e92",
+      "log_sha256": "c570790f4ef18789c684d2001ab1f273858b6dbee70d4c07a8af605594825901"
+    },
+    {
+      "run": "knowledge-cc-final02",
+      "exit_code": 0,
+      "counts": {
+        "ok": 1
+      },
+      "receipt_sha256": "0419f78c53c25b739403513fc44276fde7dbddf050e24f94525bbba24a90d91f",
+      "log_sha256": "82820fed2af31c6cf003b360ed6224e00c3a8a88273f2ae4ba03e9787141e031"
+    },
+    {
+      "run": "cc-owner-final01",
+      "exit_code": 0,
+      "counts": {
+        "ok": 1
+      },
+      "receipt_sha256": "56bc10aeaf3c57137f579e25bdd74d27dcbdffe0deea10119fef83ff02326ef2",
+      "log_sha256": "d885fe0596e088a1739a146f7829afec062c1469b8240f498e52f21430292795"
+    }
+  ],
+  "reuse_disposition": "Unchanged cases reuse runtime02 successful observations. Recheck01 covers every changed finalization/sample fixture caller, including synchronous saved-result and repeated fixture extractions plus permanent delivery case. Sole remaining CC test-only expectation/draining/script declaration corrections are covered by final02. Native producer/history/provider code, owned PG/schema/environment unchanged. Original whole-run failures remain FAIL, never relabelled. No single-command whole-cohort PASS claim."
+}

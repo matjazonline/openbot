@@ -231,28 +231,12 @@ impl MessageIntentQueue for PostgresPersistence {
     }
 
     async fn trigger_input(&self, intent: &ClaimedIntent) -> AppResult<MessageTriggerInput> {
-        let (subject, body, sender): (String, String, Option<String>) = sqlx::query_as(
-            "SELECT message.subject, message.clean_text_body, \
-               COALESCE((SELECT identity.subject FROM message_participants AS participant \
-                  JOIN participant_identities AS identity ON identity.company_id = participant.company_id \
-                    AND identity.id = participant.participant_identity_id \
-                 WHERE participant.company_id = message.company_id AND participant.message_id = message.id \
-                   AND participant.kind = 'sender' ORDER BY participant.position LIMIT 1), \
-                 (SELECT principal.display_label FROM principals AS principal \
-                 WHERE principal.company_id = message.company_id AND principal.id = message.author_principal_id)) \
-             FROM messages AS message WHERE message.company_id = $1 AND message.id = $2",
-        )
-        .bind(intent.claim.company.as_uuid())
-        .bind(intent.message.as_uuid())
-        .fetch_optional(&self.pool)
-        .await?
-        .ok_or_else(missing)?;
-        Ok(MessageTriggerInput::new(
+        trigger_input_on(
+            &mut *self.pool.acquire().await?,
+            intent.claim.company,
             intent.message,
-            &body,
-            &subject,
-            sender.as_deref().unwrap_or_default(),
-        ))
+        )
+        .await
     }
 
     async fn record_binding_outcome(
@@ -384,4 +368,40 @@ async fn fence_holds(pool: &sqlx::PgPool, claim: IntentClaim) -> AppResult<bool>
     .bind(claim.generation)
     .fetch_one(pool)
     .await?)
+}
+
+/// The canonical producer input and admission audience proof use the same source read.
+#[derive(sqlx::FromRow)]
+struct MessageInputRow {
+    subject: String,
+    clean_text_body: String,
+    sender: Option<String>,
+}
+pub(super) async fn trigger_input_on(
+    db: &mut PgConnection,
+    company: CompanyId,
+    message: CanonicalMessageId,
+) -> AppResult<MessageTriggerInput> {
+    let row = sqlx::query_as::<_, MessageInputRow>(
+            "SELECT message.subject, message.clean_text_body, \
+               COALESCE((SELECT identity.subject FROM message_participants AS participant \
+                  JOIN participant_identities AS identity ON identity.company_id = participant.company_id \
+                    AND identity.id = participant.participant_identity_id \
+                 WHERE participant.company_id = message.company_id AND participant.message_id = message.id \
+                   AND participant.kind = 'sender' ORDER BY participant.position LIMIT 1), \
+                 (SELECT principal.display_label FROM principals AS principal \
+                 WHERE principal.company_id = message.company_id AND principal.id = message.author_principal_id)) AS sender \
+             FROM messages AS message WHERE message.company_id = $1 AND message.id = $2",
+        )
+        .bind(company.as_uuid())
+        .bind(message.as_uuid())
+        .fetch_optional(db)
+        .await?
+        .ok_or_else(missing)?;
+    Ok(MessageTriggerInput::new(
+        message,
+        &row.clean_text_body,
+        &row.subject,
+        row.sender.as_deref().unwrap_or_default(),
+    ))
 }

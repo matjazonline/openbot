@@ -20,10 +20,14 @@ pub(super) async fn fixture(fixture: Fixture, source: Value) -> NativeFixture {
         .await
         .unwrap()
         .unwrap();
-    let launch = fixture.persistence().prepare_agent(&claim).await.unwrap();
-    let agent = launch.prepared.agent_id();
-    let prepared = launch.prepared.spec(claim.fence).unwrap().prepared;
-    let row = model_row(&claim, agent, prepared);
+    let launch = fixture
+        .persistence()
+        .prepare_agent(&claim, policy)
+        .await
+        .unwrap()
+        .expect_ready();
+    let spec = launch.prepared.spec(claim.fence).unwrap();
+    let row = model_row(&claim, spec);
     NativeFixture {
         fixture,
         fence: claim.fence,
@@ -104,23 +108,11 @@ async fn admit_source(fixture: Fixture, source: Value) -> (AdmissionFixture, Act
     (fixture, scope)
 }
 
-fn model_row(claim: &ClaimedWorkflow, agent: Uuid, prepared: Value) -> Value {
+fn model_row(claim: &ClaimedWorkflow, spec: WorkflowCheckpointSpec) -> Value {
     let scope = claim.fence.scope;
-    let run = RunCheckpoint::new(
-        RunIdentity {
-            company_id: scope.company.as_uuid(),
-            task_id: scope.job.0,
-            agent_id: agent,
-            harness: HarnessKind::Rig,
-            provider: "openai".into(),
-            model: "fixture".into(),
-            response_contract: None,
-            capability_fingerprint: "b".repeat(64),
-        },
-        "untrusted context".into(),
-        RigExecutionPolicy::default(),
-    )
-    .unwrap();
+    let agent = spec.identity.agent_id;
+    let prepared = spec.prepared;
+    let run = RunCheckpoint::new(spec.identity, spec.initial_prompt, spec.policy).unwrap();
     let fence = claim.fence;
     json!({"id":run.run_id.0,"company_id":scope.company.as_uuid(),"task_id":scope.job.0,"agent_id":agent,
         "workflow_run_id":scope.run.as_uuid(),"workflow_execution_id":scope.execution.as_uuid(),

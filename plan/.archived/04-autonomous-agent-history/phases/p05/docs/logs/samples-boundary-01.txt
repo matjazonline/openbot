@@ -1,0 +1,8 @@
+/private/tmp/openbot-agent-history-h_82_5pw/worktree/src/application/workflow/sample/history.rs: forbidden sample dependency crate::application::services::harness::runs::LogicalSeed
+/private/tmp/openbot-agent-history-h_82_5pw/worktree/src/application/workflow/sample/history.rs: forbidden sample dependency crate::application::services::harness::runs::LogicalSeedPair
+/private/tmp/openbot-agent-history-h_82_5pw/worktree/src/application/workflow/sample/history.rs: forbidden sample dependency crate::application::services::harness::runs::MAX_LOGICAL_SEED_BYTES
+/private/tmp/openbot-agent-history-h_82_5pw/worktree/src/application/workflow/sample/history.rs: forbidden sample dependency crate::application::services::harness::runs::MAX_LOGICAL_SEED_PAIRS
+/private/tmp/openbot-agent-history-h_82_5pw/worktree/src/application/workflow/sample/history.rs: forbidden sample dependency usize::from
+/private/tmp/openbot-agent-history-h_82_5pw/worktree/src/application/workflow/sample/mod.rs: forbidden sample dependency history::SampleHistoryStore
+/private/tmp/openbot-agent-history-h_82_5pw/worktree/src/application/workflow/sample/mod.rs: forbidden sample dependency history::SampleHistoryStore::default
+/private/tmp/openbot-agent-history-h_82_5pw/worktree/src/application/workflow/sample/types.rs: forbidden sample dependency crate::application::services::harness::runs::LogicalSeed

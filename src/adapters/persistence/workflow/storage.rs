@@ -4,7 +4,7 @@ use crate::application::workflow::storage::*;
 use chrono::{DateTime, Utc};
 use sqlx::{Postgres, Transaction};
 
-async fn begin(pool: &sqlx::PgPool) -> AppResult<Transaction<'_, Postgres>> {
+pub(super) async fn begin(pool: &sqlx::PgPool) -> AppResult<Transaction<'_, Postgres>> {
     let mut tx = pool.begin().await?;
     for setting in [
         "SET LOCAL statement_timeout='5s'",
@@ -25,6 +25,18 @@ fn sweep_limit(limit: u16) -> AppResult<i64> {
 }
 #[async_trait]
 impl WorkflowStorageMaintenance for PostgresPersistence {
+    async fn history_page(&self, after: Option<HistoryCandidate>) -> AppResult<HistoryPage> {
+        super::agent_history_retention::page(&self.pool, after).await
+    }
+    async fn expire_history(&self, candidate: HistoryCandidate) -> AppResult<bool> {
+        super::agent_history_retention::expire(&self.pool, candidate).await
+    }
+    async fn history_scope_page(&self, after: Option<CompanyId>) -> AppResult<Vec<CompanyId>> {
+        super::agent_history_retention::scope_page(&self.pool, after).await
+    }
+    async fn prune_history(&self, company: CompanyId, limit: u16) -> AppResult<u64> {
+        super::agent_history_retention::prune(&self.pool, company, limit).await
+    }
     async fn sweep_obsolete_witnesses(&self, limit: u16) -> AppResult<u64> {
         let limit = sweep_limit(limit)?;
         let mut tx = begin(&self.pool).await?;

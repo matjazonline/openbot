@@ -59,6 +59,7 @@ struct ConnectionRow {
     origin: String,
     enabled: bool,
     bearer: bool,
+    integration: Option<Value>,
     secret_set: bool,
     revision: i64,
     access_level: i16,
@@ -70,7 +71,17 @@ impl ConnectionRow {
             id: self.id,
             origin: HttpOrigin::parse(&self.origin)?,
             enabled: self.enabled,
-            bearer: self.bearer,
+            credential_source: match self.integration {
+                Some(value) => {
+                    crate::domain::integrations::authority::CredentialSource::Integration(
+                        serde_json::from_value(value).map_err(|_| invalid())?,
+                    )
+                }
+                None if self.bearer => {
+                    crate::domain::integrations::authority::CredentialSource::ConnectionBearer
+                }
+                None => crate::domain::integrations::authority::CredentialSource::None,
+            },
             secret_set: self.secret_set,
             revision: self.revision,
             access_level: crate::entities::access_level::AccessLevel::try_from(self.access_level)
@@ -83,7 +94,7 @@ pub(in crate::adapters::persistence) async fn connection_on(
     company: CompanyId,
     id: Uuid,
 ) -> AppResult<Option<HttpConnection>> {
-    sqlx::query_as::<_, ConnectionRow>("SELECT connection.company_id, connection.id, connection.origin, connection.enabled, connection.bearer, connection.revision, connection.access_level::smallint AS access_level, EXISTS(SELECT 1 FROM workflow_http_credentials AS credential WHERE credential.company_id=connection.company_id AND credential.connection_id=connection.id) AS secret_set FROM workflow_http_connections AS connection WHERE connection.company_id=$1 AND connection.id=$2 FOR SHARE OF connection")
+    sqlx::query_as::<_, ConnectionRow>("SELECT connection.company_id, connection.id, connection.origin, connection.enabled, connection.bearer,CASE WHEN connection.integration_grant_id IS NOT NULL THEN jsonb_build_object('account',connection.integration_account_id,'grant',connection.integration_grant_id,'authorization',connection.integration_authorization,'grant_revision',connection.integration_grant_revision) END AS integration, connection.revision, connection.access_level::smallint AS access_level, EXISTS(SELECT 1 FROM workflow_http_credentials AS credential WHERE credential.company_id=connection.company_id AND credential.connection_id=connection.id) AS secret_set FROM workflow_http_connections AS connection WHERE connection.company_id=$1 AND connection.id=$2 FOR SHARE OF connection")
         .bind(company.as_uuid()).bind(id).fetch_optional(&mut *tx).await?.map(ConnectionRow::decode).transpose()
 }
 async fn edit_on(
@@ -134,7 +145,7 @@ impl HttpConnections for PostgresPersistence {
     ) -> AppResult<Vec<HttpConnection>> {
         let mut tx = begin_http(self).await?;
         authority::authorize_company(&mut tx, company, actor).await?;
-        let rows=sqlx::query_as::<_,ConnectionRow>("SELECT connection.company_id,connection.id,connection.origin,connection.enabled,connection.bearer,connection.revision,connection.access_level::smallint AS access_level, EXISTS(SELECT 1 FROM workflow_http_credentials AS credential WHERE credential.company_id=connection.company_id AND credential.connection_id=connection.id) AS secret_set FROM workflow_http_connections AS connection WHERE connection.company_id=$1 ORDER BY connection.id LIMIT 257")
+        let rows=sqlx::query_as::<_,ConnectionRow>("SELECT connection.company_id,connection.id,connection.origin,connection.enabled,connection.bearer,CASE WHEN connection.integration_grant_id IS NOT NULL THEN jsonb_build_object('account',connection.integration_account_id,'grant',connection.integration_grant_id,'authorization',connection.integration_authorization,'grant_revision',connection.integration_grant_revision) END AS integration,connection.revision,connection.access_level::smallint AS access_level, EXISTS(SELECT 1 FROM workflow_http_credentials AS credential WHERE credential.company_id=connection.company_id AND credential.connection_id=connection.id) AS secret_set FROM workflow_http_connections AS connection WHERE connection.company_id=$1 ORDER BY connection.id LIMIT 257")
             .bind(company.as_uuid()).fetch_all(&mut *tx).await?;
         if rows.len() > 256 {
             return Err(AppError::BadRequest(
@@ -237,7 +248,7 @@ impl HttpConnections for PostgresPersistence {
         }
         let mut tx = begin_http(self).await?;
         let connection = edit_on(&mut tx, company, actor, id, revision).await?;
-        if secret.is_some() && !connection.bearer {
+        if secret.is_some() && !connection.uses_owned_bearer() {
             return Err(invalid());
         }
         if let Some(secret) = secret {
@@ -317,7 +328,7 @@ pub(super) async fn status_on(
         authorized: true,
         readiness: if !connection.enabled {
             ResourceReadiness::Revoked
-        } else if connection.bearer && !connection.secret_set {
+        } else if connection.uses_owned_bearer() && !connection.secret_set {
             ResourceReadiness::Unavailable
         } else {
             ResourceReadiness::Ready
@@ -366,6 +377,8 @@ impl action_dispatch::SqlActionAuthority for HttpActionAuthority {
         let connection = connection_on(tx, request.scope.company, id)
             .await?
             .ok_or_else(missing)?;
+        let current = super::integration_authority::http_snapshot(tx, &connection).await?;
+        super::integration_authority::check_snapshot(request, current)?;
         Ok(action_dispatch::LockedActionAuthority {
             resource: status_on(tx, &connection).await?,
             policy: policy_on(tx, request.scope.company, id, &request.contract).await?,
@@ -390,7 +403,7 @@ impl PostgresPersistence {
     pub(crate) async fn http_for_action(
         &self,
         action: &FrozenAction,
-    ) -> AppResult<(HttpConnection, Option<SecretString>)> {
+    ) -> AppResult<(HttpConnection, PreparedAuthentication)> {
         let request = action.request();
         let company = request.scope.company;
         let id = http_target(&request.target)?;
@@ -415,6 +428,15 @@ impl PostgresPersistence {
         {
             return Err(missing());
         }
+        let current = super::integration_authority::http_snapshot(&mut tx, &connection).await?;
+        super::integration_authority::check_snapshot(request, current.clone())?;
+        if let Some(snapshot) = current {
+            tx.commit().await?;
+            return Ok((
+                connection,
+                PreparedAuthentication::Integration(Box::new(snapshot)),
+            ));
+        }
         let envelope: Option<String> = sqlx::query_scalar("SELECT envelope FROM workflow_http_credentials WHERE company_id=$1 AND connection_id=$2").bind(company.as_uuid()).bind(id).fetch_optional(&mut *tx).await?;
         let secret = envelope
             .map(|envelope| {
@@ -424,11 +446,11 @@ impl PostgresPersistence {
                 )
             })
             .transpose()?;
-        if connection.bearer != secret.is_some() {
+        if connection.uses_owned_bearer() != secret.is_some() {
             return Err(missing());
         }
         tx.commit().await?;
-        Ok((connection, secret))
+        Ok((connection, PreparedAuthentication::ConnectionOwned(secret)))
     }
 }
 

@@ -1,0 +1,10 @@
+{
+  "acceptance": "AH-P06-architecture-acceptance-r3",
+  "at": "2026-11-08T01:02:36.406318+00:00",
+  "decision_sha256": "a831e406269f6eaab045f0758be6065adc3c6008a0002454ab2e24ec84b7b2c6",
+  "source_digest": "00802f0612c99b0beadd30c01cfc1bf78ad252a7d3eed9326b8fd2003a4e1110",
+  "coordination_revision": 28,
+  "result": "architecture-only accepted; CODE F1/F2 OPEN and all correction checks NOT EXERCISED",
+  "root_review": "read complete new B review/note/findings disposition/decision delta/entry+exit/evidence; independently verified source/decision/archive/external36/authority/evidence",
+  "next": "activate C007r3 and implement all corrections, then one consolidated code recheck"
+}

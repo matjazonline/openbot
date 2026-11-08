@@ -117,12 +117,29 @@ impl ThreadActivityReader for PostgresPersistence {
                     .flat_map(|row| row.run_ids.iter().copied()),
             )
             .collect();
-        let inspectable = self.inspectable_runs(company_id, viewer, &ids).await?;
+        let mut inspectable = self.inspectable_runs(company_id, viewer, &ids).await?;
+        let (response_ids, responses_truncated) =
+            super::workflow::channel_reply_views::thread_runs(self, company_id, thread_id).await?;
+        // The independent response strip has its own bounded eligibility batch; retain the
+        // existing message-attribution cap rather than increasing it to fit more work.
+        inspectable.extend(
+            self.inspectable_runs(company_id, viewer, &response_ids)
+                .await?,
+        );
+        let response_outcomes = super::workflow::channel_reply_views::read(
+            self,
+            crate::domain::workflow::CompanyId::new(company_id),
+            crate::application::workflow::WorkflowActor::authenticated(viewer)?,
+            &response_ids,
+        )
+        .await?;
         Ok(ThreadRuns {
             inspectable,
             items,
             has_more,
             message_runs,
+            response_outcomes,
+            responses_truncated,
         })
     }
 

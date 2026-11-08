@@ -130,10 +130,13 @@ pub(super) async fn rerun(
         company,
         ui.actor()?,
         summary.binding.as_uuid(),
-        Some(summary.association),
-        view.input.clone(),
-        form.text("command_key"),
-        Some(run),
+        super::super::super::bindings::StartDetails {
+            association: Some(summary.association),
+            input: view.input.clone(),
+            key: form.text("command_key"),
+            rerun_of: Some(run),
+            history_session: None,
+        },
     )
     .await;
     match started {

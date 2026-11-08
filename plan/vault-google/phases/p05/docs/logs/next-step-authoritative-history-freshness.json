@@ -1,0 +1,37 @@
+{
+  "method": "Read-only current authoritative external main-worktree metadata; no source imported or modified.",
+  "plan/03-channel-handles-send/COORDINATION.md": {
+    "authority": "/Users/mac02/dev/openbot/plan/03-channel-handles-send/COORDINATION.md",
+    "headers": [
+      "# Plan coordination: 03-channel-handles-send",
+      "- Revision: 28",
+      "## Plan-wide instructions",
+      "## Phase directory",
+      "## Cross-phase notices",
+      "### CHS-C001 / r1",
+      "### CHS-C002 / r1",
+      "### CHS-C003 / r1 \u2014 proposed final-effect policy and staging",
+      "### CHS-C003 / r2 \u2014 proposed final-effect policy and staging",
+      "### CHS-C003 / r2 \u2014 accepted producer addendum (coordination revision8)",
+      "### CHS-C004 / r1 \u2014 proposed canonical final publication",
+      "### CHS-C004 / r2 \u2014 amended canonical final publication",
+      "### CHS-C004 / r2 \u2014 activation (coordination revision11)",
+      "### CHS-C004 / r2 \u2014 accepted producer (coordination revision12)"
+    ]
+  },
+  "plan/04-autonomous-agent-history/COORDINATION.md": {
+    "authority": "/Users/mac02/dev/openbot/plan/04-autonomous-agent-history/COORDINATION.md",
+    "headers": [
+      "# Plan coordination: 04-autonomous-agent-history",
+      "- Revision: 6",
+      "## Plan-wide instructions",
+      "## Phase directory",
+      "## Cross-plan contracts",
+      "### AH-C001 / r1 \u2014 accepted channel and knowledge producer contracts",
+      "### AH-C002 / r5 \u2014 trusted history identity contract",
+      "### AH-C003 / r2 \u2014 durable exchange and checkpoint ownership"
+    ]
+  },
+  "external_head": "4ab45555f8316ec7a8b1b64e8c05b77ff7d9a29d",
+  "currently_dirty_shared_source_paths": []
+}

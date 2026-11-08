@@ -1,0 +1,76 @@
+name: Agent history protocols
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  history:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18.6-bookworm
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: open_bots_history_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d open_bots_history_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/open_bots_history_test
+      TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5432/open_bots_history_test
+      SQLX_OFFLINE: "true"
+      RUST_MIN_STACK: "2097152"
+      AGENT_HISTORY_BROWSER_FIXTURES: ${{ runner.temp }}/agent-history-browser
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install locked frontend dependencies and browser
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+      - name: Fetch locked Rust dependencies
+        run: cargo fetch --locked
+      - name: Configure query statistics without parameter logging
+        run: |
+          container="$(docker ps --filter ancestor=postgres:18.6-bookworm --format '{{.ID}}')"
+          test -n "$container"
+          docker exec "$container" psql -U postgres -d open_bots_history_test -v ON_ERROR_STOP=1 \
+            -c "ALTER SYSTEM SET shared_preload_libraries = 'pg_stat_statements'" \
+            -c "ALTER SYSTEM SET compute_query_id = 'on'" \
+            -c "ALTER SYSTEM SET log_parameter_max_length = '0'" \
+            -c "ALTER SYSTEM SET log_parameter_max_length_on_error = '0'"
+          docker restart "$container"
+          until docker exec "$container" pg_isready -U postgres -d open_bots_history_test; do sleep 1; done
+          docker exec "$container" psql -U postgres -d open_bots_history_test -v ON_ERROR_STOP=1 \
+            -c "ALTER SYSTEM SET pg_stat_statements.track = 'top'" \
+            -c "ALTER SYSTEM SET pg_stat_statements.track_utility = 'off'" \
+            -c "SELECT pg_reload_conf()" \
+            -c "CREATE EXTENSION pg_stat_statements"
+          test "$(psql "$DATABASE_URL" -X -Atqc 'SHOW pg_stat_statements.track')" = "top"
+          test "$(psql "$DATABASE_URL" -X -Atqc 'SHOW pg_stat_statements.track_utility')" = "off"
+          test "$(psql "$DATABASE_URL" -X -Atqc 'SHOW log_parameter_max_length')" = "0"
+          test "$(psql "$DATABASE_URL" -X -Atqc 'SHOW log_parameter_max_length_on_error')" = "0"
+          psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 -c "SELECT 1 AS history_ci_query_probe"
+          psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 -Atqc \
+            "SELECT queryid FROM pg_stat_statements WHERE dbid = (SELECT oid FROM pg_database WHERE datname = current_database()) AND query LIKE '%history_ci_query_probe%' LIMIT 1" \
+            | grep -Eq '^-?[0-9]+$'
+      - name: Compile offline before network isolation
+        run: cargo test --locked --offline --lib --no-run
+      - name: Native history journeys and actual inspection markup
+        run: |
+          scripts/test-network-isolation.sh cargo test --locked --offline --lib -- \
+            agent_history_e2e_ \
+            agent_history_views_maximum_page_reaches_last_source_outside_page_and_keeps_exact_frozen_copy_after_expiry
+      - name: History browser keyboard, pagination and recovery
+        run: node --test scripts/tests/agent-history-browser.mjs

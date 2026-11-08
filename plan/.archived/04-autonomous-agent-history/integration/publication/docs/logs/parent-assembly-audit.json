@@ -1,0 +1,21 @@
+{
+  "common_base": "4ab45555f8316ec7a8b1b64e8c05b77ff7d9a29d",
+  "history_owned_exact": 211,
+  "history_owned_shared_changes": {
+    "migrations/20260817000000_init_schema.sql": "01d59011282c4d48213982bc338569c4562831dffb3349dc6324e2a0454c41f4",
+    "src/adapters/persistence/workflow/http_tests.rs": "c3308f93956a0fef4593f17e5162b418631220037df25e13273cdeceae07575f",
+    "src/adapters/persistence/workflow/mcp_test_support.rs": "a4af30816220999b74237cc136a8d1186ace2af7913452322e28b6eca9d7419f",
+    "src/adapters/persistence/workflow/mod.rs": "e5d411f7ed34208d2dbd60f6e26ea42031f6094712b9d3570cd24b9fe0c4275f",
+    "src/infra/workflow.rs": "0ff9a1b646cd552c95f3aadac83e7ab44ddd2d322963299fc6b4812cc0debcae"
+  },
+  "vault_remote_paths_preserved_exact": 647,
+  "shared_paths": [
+    "migrations/20260817000000_init_schema.sql",
+    "src/adapters/persistence/workflow/http_tests.rs",
+    "src/adapters/persistence/workflow/mcp_test_support.rs",
+    "src/adapters/persistence/workflow/mod.rs",
+    "src/infra/workflow.rs"
+  ],
+  "schema_suffixes": "both byteexact proof in schema-merge-disposition.json",
+  "unexpected_changes": []
+}

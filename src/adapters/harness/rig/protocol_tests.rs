@@ -11,6 +11,9 @@ use rig_core::completion::{CompletionModel, CompletionRequest, ToolDefinition};
 use serde_json::json;
 use uuid::Uuid;
 
+#[path = "logical_seed_tests.rs"]
+mod logical_seed;
+
 fn request(chat_history: Vec<Message>) -> CompletionRequest {
     CompletionRequest {
         model: None,

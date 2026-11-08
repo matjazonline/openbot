@@ -1,0 +1,26 @@
+{
+  "acceptance": "AH-P04-architecture-acceptance",
+  "at": "2026-11-07T17:58:17.972481+00:00",
+  "review": "AH-P04-AG1-R2 PASS",
+  "decision": "/private/tmp/openbot-agent-history-h_82_5pw/worktree/plan/04-autonomous-agent-history/phases/p04/docs/logs/AH-P04-D1-r2.md",
+  "decision_sha256": "642993aa5857d93778385b365a6205b689e08cf57de6a952d4b99d04b74b78ae",
+  "source_digest": "fd507b5bb5be7ca2d7661a002528e10a1a04a33b999ff0303dcf493b70077473",
+  "head": "4ab45555f8316ec7a8b1b64e8c05b77ff7d9a29d",
+  "coordination_revision": 13,
+  "coordination_sha256": "fe8a22d29b5029291ea6abb550cb900702c9ccdbbaf499fcb1d4e94fbb4900c5",
+  "owned": 100,
+  "external": 36,
+  "result": "architecture only accepted; both F1/F2 FIXED at architecture level; no runtime/code acceptance",
+  "records": "root read complete all R1/R2 review/notes/findings/entry/exit; exact source/decision/scope/archive/allowned/external/currentcoord verified",
+  "exclusions": [
+    "plan/04-autonomous-agent-history/COORDINATION.md",
+    "plan/04-autonomous-agent-history/phases/p01/docs",
+    "plan/04-autonomous-agent-history/phases/p02/docs",
+    "plan/04-autonomous-agent-history/phases/p03/docs",
+    "plan/04-autonomous-agent-history/phases/p04/docs",
+    "plan/04-autonomous-agent-history/phases/p05/docs",
+    "plan/04-autonomous-agent-history/phases/p06/docs",
+    "plan/04-autonomous-agent-history/phases/p07/docs",
+    "plan/04-autonomous-agent-history/integration/final/docs"
+  ]
+}

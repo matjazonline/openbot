@@ -1,0 +1,34 @@
+[
+  {
+    "check": "sqlx-check-lifecycle-01",
+    "exit_code": 0
+  },
+  {
+    "check": "history-and-affected-list-04",
+    "exit_code": 0
+  },
+  {
+    "check": "history-and-affected-runtime-06",
+    "exit_code": 0
+  },
+  {
+    "check": "offline-all-targets-lifecycle-01",
+    "exit_code": 0
+  },
+  {
+    "check": "identity-clippy-02",
+    "exit_code": 0
+  },
+  {
+    "check": "identity-fmt-check-01",
+    "exit_code": 0
+  },
+  {
+    "check": "graph-implementation-03",
+    "exit_code": 0
+  },
+  {
+    "check": "identity-diff-check-01",
+    "exit_code": 0
+  }
+]

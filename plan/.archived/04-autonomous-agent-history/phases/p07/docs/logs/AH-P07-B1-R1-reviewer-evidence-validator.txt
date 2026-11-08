@@ -1,0 +1,2 @@
+plan/04-autonomous-agent-history/phases/p07/docs/logs/AH-P07-B1-R1.evidence.json: retained evidence valid {"FAIL": 10, "NOT EXERCISED": 1, "PASS": 24}
+1 evidence manifest(s) validated; declared results are not acceptance

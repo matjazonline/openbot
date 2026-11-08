@@ -1,0 +1,62 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+   Compiling open_bots v0.1.0 (/private/tmp/openbot-agent-history-h_82_5pw/worktree)
+error[E0603]: module `contracts` is private
+  --> src/adapters/persistence/workflow/agent_history_retry_retention_tests.rs:6:36
+   |
+ 6 | use crate::application::workflow::{contracts::*, lease::*, storage::WorkflowStorageMaintenance};
+   |                                    ^^^^^^^^^ private module
+   |
+note: the module `contracts` is defined here
+  --> src/application/workflow/mod.rs:26:1
+   |
+26 | mod contracts;
+   | ^^^^^^^^^^^^^^
+
+warning: unused import: `lease::*`
+ --> src/adapters/persistence/workflow/agent_history_retry_retention_tests.rs:6:50
+  |
+6 | use crate::application::workflow::{contracts::*, lease::*, storage::WorkflowStorageMaintenance};
+  |                                                  ^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+error[E0599]: no method named `complete_io` found for reference `&persistence::PostgresPersistence` in the current scope
+  --> src/adapters/persistence/workflow/agent_history_retry_retention_tests.rs:25:10
+   |
+23 | /     f.f.s
+24 | |         .p()
+25 | |         .complete_io(FencedWorkflowResult {
+   | |_________-^^^^^^^^^^^
+   |
+   = help: items from traits can only be used if the trait is in scope
+help: trait `WorkflowCompletion` which provides `complete_io` is implemented but not in scope; perhaps you want to import it
+   |
+ 1 + use crate::application::workflow::completion::WorkflowCompletion;
+   |
+help: there is a method `complete_inbound_event` with a similar name
+   |
+25 -         .complete_io(FencedWorkflowResult {
+25 +         .complete_inbound_event(FencedWorkflowResult {
+   |
+
+error[E0599]: no method named `settled` found for reference `&persistence::PostgresPersistence` in the current scope
+  --> src/adapters/persistence/workflow/agent_history_retry_retention_tests.rs:48:14
+   |
+46 | /         f.f.s
+47 | |             .p()
+48 | |             .settled()
+   | |             -^^^^^^^ method not found in `&persistence::PostgresPersistence`
+   | |_____________|
+   |
+   |
+   = help: items from traits can only be used if the trait is implemented and in scope
+note: `admission_tests::lease_tests::Settle` defines an item `settled`, perhaps you need to implement it
+  --> src/adapters/persistence/workflow/lease_tests.rs:42:1
+   |
+42 | trait Settle {
+   | ^^^^^^^^^^^^
+
+Some errors have detailed explanations: E0599, E0603.
+For more information about an error, try `rustc --explain E0599`.
+warning: `open_bots` (lib test) generated 1 warning
+error: could not compile `open_bots` (lib test) due to 3 previous errors; 1 warning emitted

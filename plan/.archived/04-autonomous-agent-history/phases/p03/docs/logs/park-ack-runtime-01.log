@@ -1,0 +1,31 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+   Compiling open_bots v0.1.0 (/private/tmp/openbot-agent-history-h_82_5pw/worktree)
+error[E0614]: type `agent_history_threads::HistoryThread` cannot be dereferenced
+  --> src/adapters/persistence/workflow/agent_history_turn_ack_tests.rs:26:10
+   |
+26 |         &*f,
+   |          ^^ can't be dereferenced
+
+error[E0614]: type `agent_history_threads::HistoryThread` cannot be dereferenced
+  --> src/adapters/persistence/workflow/agent_history_turn_ack_tests.rs:33:38
+   |
+33 |     let (mut observer, _) = connect(&*f).await;
+   |                                      ^^ can't be dereferenced
+
+error[E0308]: mismatched types
+  --> src/adapters/persistence/workflow/agent_history_turn_ack_tests.rs:55:9
+   |
+55 |         f,
+   |         ^ expected `Box<HistoryThread>`, found `HistoryThread`
+   |
+   = note: expected struct `Box<agent_history_threads::HistoryThread>`
+              found struct `agent_history_threads::HistoryThread`
+   = note: for more on the distinction between the stack and the heap, read https://doc.rust-lang.org/book/ch15-01-box.html, https://doc.rust-lang.org/rust-by-example/std/box.html, and https://doc.rust-lang.org/std/boxed/index.html
+help: store this in the heap by calling `Box::new`
+   |
+55 |         f: Box::new(f),
+   |         ++++++++++++ +
+
+Some errors have detailed explanations: E0308, E0614.
+For more information about an error, try `rustc --explain E0308`.
+error: could not compile `open_bots` (lib test) due to 3 previous errors

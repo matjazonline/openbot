@@ -1,0 +1,594 @@
+--- review-r1/migrations/20260817000000_init_schema.sql
++++ review-r2/migrations/20260817000000_init_schema.sql
+@@ -13967,10 +13967,28 @@
+ 
+ CREATE FUNCTION public.guard_agent_history_exchange_change() RETURNS trigger LANGUAGE plpgsql AS $$
+ DECLARE current_level public.access_level;
++        source record;
+ BEGIN
+     IF TG_OP='DELETE' THEN
+-        IF OLD.state IN ('queued','active') AND EXISTS (SELECT 1 FROM public.companies WHERE id=OLD.company_id) THEN
++        IF NOT EXISTS (SELECT 1 FROM public.companies WHERE id=OLD.company_id) THEN
++            RETURN OLD; -- Intentional whole-tenant teardown owns its cascades.
++        END IF;
++        IF OLD.state IN ('queued','active') THEN
+             RAISE EXCEPTION 'live agent exchange cannot be removed' USING ERRCODE='23514';
++        END IF;
++        IF OLD.state='failed' THEN
++            -- DELETE already owns the exchange tuple. Never wait for the opposite
++            -- run->exchange control order: fail busy while another owner has the run.
++            SELECT state,deadline,terminal_execution_id INTO STRICT source
++                FROM public.workflow_runs WHERE company_id=OLD.company_id AND id=OLD.run_id
++                FOR SHARE NOWAIT;
++            IF source.deadline>clock_timestamp() AND (
++                source.state NOT IN ('succeeded','failed','cancelled')
++                OR (source.state='failed' AND source.terminal_execution_id=OLD.execution_id
++                    AND public.workflow_control_retry_safe(OLD.company_id,OLD.run_id,OLD.job_id))
++            ) THEN
++                RAISE EXCEPTION 'resumable agent exchange cannot be removed' USING ERRCODE='23514';
++            END IF;
+         END IF;
+         RETURN OLD;
+     END IF;
+--- review-r1/src/adapters/persistence/workflow/agent_history/checkpoint.rs
++++ review-r2/src/adapters/persistence/workflow/agent_history/checkpoint.rs
+@@ -169,6 +169,25 @@
+     Ok(LinkChange::Linked)
+ }
+ 
++/// Read-only evidence for checkpoint open, including its additional reactivation effect.
++pub(in crate::adapters::persistence::workflow) async fn linked_on(
++    db: &mut PgConnection,
++    fence: WorkflowFence,
++    prepared: &Value,
++    checkpoint: Uuid,
++) -> AppResult<bool> {
++    let scope = ActionScope {
++        company: fence.scope.company,
++        run: fence.scope.run,
++        execution: fence.scope.execution,
++    };
++    let mode = eligible_on(db, scope).await?;
++    let Some(row) = record_on(db, scope, mode, prepared).await? else {
++        return Ok(true);
++    };
++    Ok(row.checkpoint_id == Some(checkpoint) && row.state != AgentExchangeState::Queued)
++}
++
+ pub(in crate::adapters::persistence::workflow) async fn require_active_on(
+     db: &mut PgConnection,
+     fence: WorkflowFence,
+--- review-r1/src/adapters/persistence/workflow/agent_history/mod.rs
++++ review-r2/src/adapters/persistence/workflow/agent_history/mod.rs
+@@ -9,7 +9,7 @@
+ mod checkpoint;
+ mod preparation;
+ pub(super) use checkpoint::{
+-    LinkChange, accepted_on, attach_on, check_prepared_on, require_active_on,
++    LinkChange, accepted_on, attach_on, check_prepared_on, linked_on, require_active_on,
+ };
+ mod scope;
+ mod storage;
+--- review-r1/src/adapters/persistence/workflow/agent_history_commit_ack_tests.rs
++++ review-r2/src/adapters/persistence/workflow/agent_history_commit_ack_tests.rs
+@@ -0,0 +1,149 @@
++use super::*;
++use crate::adapters::persistence::workflow::persistence_bound::recorder::Injected;
++use crate::adapters::persistence::workflow::tests::admission_tests::lease_tests::resolution_gate::{Abort,Gate,GatePool,Stall,connect,resolution_behind};
++use crate::application::workflow::agent::AgentLaunch;
++
++struct HistoryPool<'a>(&'a PostgresPersistence);
++impl GatePool for HistoryPool<'_> {
++    fn gate_pool(&self) -> &sqlx::PgPool {
++        self.0.pool()
++    }
++}
++struct EnqueueAck {
++    setup: AgentSetup,
++    outcome: AppResult<AgentLaunch>,
++}
++
++async fn prepare_ambiguously(abort: Abort) -> EnqueueAck {
++    let setup = Box::pin(agent_setup("http://127.0.0.1:1")).await;
++    let p = &setup.fixture.persistence;
++    let fixture = HistoryPool(p);
++    let mut gate = Gate::arm(
++        &fixture,
++        "agent_history_exchanges",
++        "INSERT",
++        "true",
++        Stall::Commit,
++    )
++    .await;
++    let (mut observer, _) = connect(&fixture).await;
++    let pending = {
++        let p = p.clone();
++        let claim = setup.claim.clone();
++        tokio::spawn(async move { p.prepare_agent(&claim, lease()).await })
++    };
++    let stalled = gate
++        .stalled(&mut observer, &[&|| !pending.is_finished()])
++        .await;
++    resolution_behind(
++        &mut observer,
++        stalled,
++        lease(),
++        &[&|| !pending.is_finished()],
++    )
++    .await;
++    gate.abort_on_release(abort).await;
++    gate.drain().await;
++    let outcome = pending.await.unwrap();
++    gate.abort_on_release(Abort::Nothing).await;
++    assert_eq!(usage_rows(p, setup.claim.fence.scope.run).await, 0);
++    EnqueueAck { setup, outcome }
++}
++
++#[tokio::test]
++async fn agent_history_storage_ambiguous_enqueue_committed_reuses_one_position_before_checkpoint() {
++    let injected = Injected::mark();
++    let ack = prepare_ambiguously(Abort::Nothing).await;
++    assert!(ack.outcome.is_ok());
++    assert!(injected.outcomes().iter().any(|event|event.op=="agent_history.prepare" && event.outcome=="resolved_applied"));
++    let rows = captured(&ack.setup).await;
++    assert_eq!(rows.len(), 1);
++    assert_eq!(rows[0].id, ack.setup.claim.fence.scope.execution.as_uuid());
++    assert_eq!(rows[0].position, 1);
++    assert_eq!(rows[0].state, "queued");
++    assert!(rows[0].checkpoint_id.is_none());
++    ack.setup
++        .fixture
++        .persistence
++        .prepare_agent(&ack.setup.claim, lease())
++        .await
++        .unwrap();
++    assert_eq!(captured(&ack.setup).await, rows);
++}
++
++#[tokio::test]
++async fn agent_history_storage_ambiguous_enqueue_aborted_keeps_counter_available_for_recovery() {
++    let injected = Injected::mark();
++    let ack = prepare_ambiguously(Abort::Every).await;
++    assert!(ack.outcome.is_err());
++    assert!(injected.outcomes().iter().any(
++        |event| event.op == "agent_history.prepare" && event.outcome == "resolved_not_applied"
++    ));
++    assert!(captured(&ack.setup).await.is_empty());
++    ack.setup
++        .fixture
++        .persistence
++        .prepare_agent(&ack.setup.claim, lease())
++        .await
++        .unwrap();
++    let rows = captured(&ack.setup).await;
++    assert_eq!(rows.len(), 1);
++    assert_eq!(rows[0].position, 1);
++    assert_eq!(rows[0].id, ack.setup.claim.fence.scope.execution.as_uuid());
++    assert!(rows[0].checkpoint_id.is_none());
++}
++
++#[tokio::test]
++async fn agent_history_completion_actual_final_commit_ack_loss_replays_without_another_provider_call()
++ {
++    let injected = Injected::mark();
++    let setup = Box::pin(agent_setup("http://127.0.0.1:1")).await;
++    let llm = scripted_llm(vec![LlmTurn::text("\"accepted\"")]).await;
++    register_scripted_agent_base_url(setup.agent, &llm.base_url);
++    let fixture = HistoryPool(&setup.fixture.persistence);
++    let mut gate = Gate::arm(
++        &fixture,
++        "task_harness_runs",
++        "UPDATE",
++        "NEW.state='completed'",
++        Stall::Commit,
++    )
++    .await;
++    let (mut observer, _) = connect(&fixture).await;
++    let pending = {
++        let runtime = agent_runtime(&setup);
++        let claim = setup.claim.clone();
++        tokio::spawn(async move {
++            Box::pin(runtime.execute(&WorkflowStepKind("agent.run".into()), &claim)).await
++        })
++    };
++    gate.stalled(&mut observer, &[&|| !pending.is_finished()])
++        .await;
++    let first = tokio::time::timeout(Duration::from_secs(5), pending)
++        .await
++        .unwrap()
++        .unwrap();
++    assert!(first.completed_result().is_err());
++    assert!(
++        injected
++            .outcomes()
++            .iter()
++            .any(|event| event.op == "checkpoint.update" && event.outcome == "unknown")
++    );
++    gate.drain().await;
++    let rows = captured(&setup).await;
++    assert_eq!(rows.len(), 1);
++    assert_eq!(rows[0].state, "completed");
++    assert_eq!(rows[0].output, Some(json!("accepted")));
++    let replay = Box::pin(
++        agent_runtime(&setup).execute(&WorkflowStepKind("agent.run".into()), &setup.claim),
++    )
++    .await;
++    assert_eq!(replay.completed_result().unwrap(), json!("accepted"));
++    assert_eq!(captured(&setup).await, rows);
++    assert_eq!(
++        usage_rows(&setup.fixture.persistence, setup.claim.fence.scope.run).await,
++        1
++    );
++    assert_eq!(llm.finish().await.unwrap(), 1);
++}
+--- review-r1/src/adapters/persistence/workflow/agent_history_completion_tests.rs
++++ review-r2/src/adapters/persistence/workflow/agent_history_completion_tests.rs
+@@ -54,7 +54,7 @@
+ }
+ 
+ #[tokio::test]
+-async fn agent_history_completion_competing_finalizers_and_lost_ack_keep_one_answer() {
++async fn agent_history_completion_competing_finalizers_and_durable_replay_keep_one_answer() {
+     let f = Box::pin(settled_history()).await;
+     let p = f.native.fixture.persistence();
+     let update = accepted(&f);
+--- review-r1/src/adapters/persistence/workflow/agent_history_lifecycle_tests.rs
++++ review-r2/src/adapters/persistence/workflow/agent_history_lifecycle_tests.rs
+@@ -160,6 +160,19 @@
+     let usage = accounting(&f).await;
+     fail(&f).await;
+     assert_eq!(exchange(&f).await["state"], "failed");
++    let failed = exchange(&f).await;
++    let deletion =
++        sqlx::query("DELETE FROM agent_history_exchanges WHERE company_id=$1 AND execution_id=$2")
++            .bind(f.write.fence.scope.company.as_uuid())
++            .bind(f.write.fence.scope.execution.as_uuid())
++            .execute(p.pool())
++            .await
++            .unwrap_err();
++    assert_eq!(
++        deletion.as_database_error().unwrap().code().as_deref(),
++        Some("23514")
++    );
++    assert_eq!(exchange(&f).await, failed);
+     retry_failed(&f).await;
+     let queued = exchange(&f).await;
+     assert_eq!(queued["state"], "queued");
+@@ -235,3 +248,9 @@
+     assert_eq!(exchange(&f).await["state"], "completed");
+     assert_eq!(accounting(&f).await, usage);
+ }
++
++#[path = "agent_history_retry_deletion_tests.rs"]
++mod deletion;
++
++#[path = "agent_history_reopen_ambiguity_tests.rs"]
++mod ambiguity;
+--- review-r1/src/adapters/persistence/workflow/agent_history_reopen_ambiguity_tests.rs
++++ review-r2/src/adapters/persistence/workflow/agent_history_reopen_ambiguity_tests.rs
+@@ -0,0 +1,146 @@
++use super::*;
++use crate::adapters::persistence::workflow::persistence_bound::recorder::Injected;
++use crate::adapters::persistence::workflow::tests::admission_tests::lease_tests::resolution_gate::{Abort,Gate,Stall,connect,resolution_behind};
++use crate::application::workflow::agent::AgentPreparation;
++
++struct Reopen {
++    fixture: ModelFixture,
++    claim: ClaimedWorkflow,
++    spec: WorkflowCheckpointSpec,
++    outcome: AppResult<WriteOutcome<RunCheckpoint>>,
++    before: Value,
++}
++
++async fn ambiguous(abort: Abort) -> Reopen {
++    let f = Box::pin(settled_history()).await;
++    fail(&f).await;
++    retry_failed(&f).await;
++    let p = f.native.fixture.persistence();
++    let policy = LeasePolicy::new(Duration::from_secs(6)).unwrap();
++    let claim = p
++        .claim_io(f.write.fence.scope, worker(), f.write.lease_policy)
++        .await
++        .unwrap()
++        .unwrap();
++    let prepared = p.prepare_agent(&claim, policy).await.unwrap().prepared;
++    let spec = prepared.spec(claim.fence).unwrap();
++    let task_spec = prepared.spec(claim.fence).unwrap();
++    let before = exchange(&f).await;
++    assert_eq!(before["state"], "queued");
++    let mut gate = Gate::arm(
++        &f.native.fixture,
++        "agent_history_exchanges",
++        "UPDATE",
++        "OLD.state='queued' AND NEW.state='active'",
++        Stall::Commit,
++    )
++    .await;
++    let pending = {
++        let p = p.clone();
++        let fence = claim.fence;
++        tokio::spawn(async move { p.open_workflow_checkpoint(fence, &task_spec, policy).await })
++    };
++    let (mut observer, _) = connect(&f.native.fixture).await;
++    let stalled = gate
++        .stalled(&mut observer, &[&|| !pending.is_finished()])
++        .await;
++    resolution_behind(
++        &mut observer,
++        stalled,
++        policy,
++        &[&|| !pending.is_finished()],
++    )
++    .await;
++    gate.abort_on_release(abort).await;
++    gate.drain().await;
++    let outcome = tokio::time::timeout(Duration::from_secs(5), pending)
++        .await
++        .unwrap()
++        .unwrap();
++    gate.abort_on_release(Abort::Nothing).await;
++    assert_eq!(accounting(&f).await["calls"], 1);
++    let saved = exchange(&f).await;
++    for field in [
++        "id",
++        "position",
++        "input_digest",
++        "provenance",
++        "checkpoint_id",
++        "activated_at",
++    ] {
++        assert_eq!(saved[field], before[field], "{field}");
++    }
++    Reopen {
++        fixture: f,
++        claim,
++        spec,
++        outcome,
++        before,
++    }
++}
++
++#[tokio::test]
++async fn agent_history_completion_ambiguous_reopen_committed_proves_reactivation_and_current_refusal()
++ {
++    let _injected = Injected::mark();
++    let result = ambiguous(Abort::Nothing).await;
++    let f = &result.fixture;
++    let p = f.native.fixture.persistence();
++    assert!(matches!(result.outcome,Ok(WriteOutcome::AlreadyApplied(ref run)) if run==&f.run));
++    let saved = exchange(f).await;
++    assert_eq!(saved["state"], "active");
++    assert!(matches!(
++        p.open_workflow_checkpoint(f.write.fence, &result.spec, f.write.lease_policy)
++            .await
++            .unwrap(),
++        WriteOutcome::OwnershipLost
++    ));
++    sqlx::query("DELETE FROM company_model_connections WHERE company_id=$1")
++        .bind(f.write.fence.scope.company.as_uuid())
++        .execute(p.pool())
++        .await
++        .unwrap();
++    assert!(
++        p.prepare_agent(&result.claim, f.write.lease_policy)
++            .await
++            .is_err()
++    );
++    let write = WorkflowCheckpointWrite {
++        fence: result.claim.fence,
++        ..f.write
++    };
++    assert!(
++        p.reserve_workflow_model(write, model_request(&reservation()), None)
++            .await
++            .is_err()
++    );
++    assert_eq!(exchange(f).await, saved);
++    assert_eq!(accounting(f).await["calls"], 1);
++}
++
++#[tokio::test]
++async fn agent_history_completion_ambiguous_reopen_aborted_reports_missing_effect_and_recovers() {
++    let _injected = Injected::mark();
++    let result = ambiguous(Abort::Every).await;
++    let f = &result.fixture;
++    let p = f.native.fixture.persistence();
++    assert!(
++        result.outcome.is_err(),
++        "old checkpoint cannot prove missing activation: {:?}",
++        result.outcome
++    );
++    assert_eq!(exchange(f).await, result.before);
++    let reopened = p
++        .open_workflow_checkpoint(result.claim.fence, &result.spec, f.write.lease_policy)
++        .await
++        .unwrap();
++    assert!(matches!(reopened,WriteOutcome::AlreadyApplied(ref run) if run==&f.run));
++    assert_eq!(exchange(f).await["state"], "active");
++    assert!(matches!(
++        p.open_workflow_checkpoint(f.write.fence, &result.spec, f.write.lease_policy)
++            .await
++            .unwrap(),
++        WriteOutcome::OwnershipLost
++    ));
++    assert_eq!(accounting(f).await["calls"], 1);
++}
+--- review-r1/src/adapters/persistence/workflow/agent_history_retry_deletion_tests.rs
++++ review-r2/src/adapters/persistence/workflow/agent_history_retry_deletion_tests.rs
+@@ -0,0 +1,148 @@
++use super::*;
++use crate::adapters::persistence::workflow::tests::admission_tests::lease_tests::resolution_gate::{Gate,Stall,connect};
++
++async fn delete(f: &ModelFixture) -> Result<sqlx::postgres::PgQueryResult, sqlx::Error> {
++    sqlx::query("DELETE FROM agent_history_exchanges WHERE company_id=$1 AND execution_id=$2")
++        .bind(f.write.fence.scope.company.as_uuid())
++        .bind(f.write.fence.scope.execution.as_uuid())
++        .execute(f.native.fixture.persistence().pool())
++        .await
++}
++
++#[tokio::test]
++async fn agent_history_storage_failed_exchange_delete_and_actual_control_retry_do_not_deadlock() {
++    let f = Box::pin(settled_history()).await;
++    fail(&f).await;
++    let original = exchange(&f).await;
++    let scope = f.write.fence.scope;
++    let fixture = &f.native.fixture;
++    let condition = format!(
++        "NEW.id='{}'::uuid AND OLD.status='failed' AND NEW.status='pending'",
++        scope.job.0
++    );
++    let mut gate = Gate::arm(
++        fixture,
++        "background_tasks",
++        "UPDATE",
++        &condition,
++        Stall::Statement {
++            table: "background_tasks",
++            events: "UPDATE",
++            when: &condition,
++        },
++    )
++    .await;
++    let command = control(&f, "delete-versus-retry").await;
++    let retry = RetryCommand {
++        company_id: command.company_id,
++        run_id: command.run_id,
++        actor: command.actor,
++        command_key: command.command_key,
++        expected_revision: command.expected_revision,
++    };
++    let p = fixture.persistence().clone();
++    let pending = tokio::spawn(async move { p.retry(retry).await });
++    let (mut observer, _) = connect(fixture).await;
++    gate.stalled(&mut observer, &[&|| !pending.is_finished()])
++        .await;
++    let error = tokio::time::timeout(Duration::from_secs(2), delete(&f))
++        .await
++        .unwrap()
++        .unwrap_err();
++    assert_eq!(
++        error.as_database_error().unwrap().code().as_deref(),
++        Some("55P03")
++    );
++    gate.drain().await;
++    assert!(matches!(
++        pending.await.unwrap().unwrap(),
++        RetryResult::Applied { .. }
++    ));
++    let queued = exchange(&f).await;
++    assert_eq!(queued["state"], "queued");
++    for field in [
++        "id",
++        "position",
++        "checkpoint_id",
++        "input_digest",
++        "provenance",
++    ] {
++        assert_eq!(queued[field], original[field], "{field}");
++    }
++}
++
++#[tokio::test]
++async fn agent_history_storage_expired_failed_exchange_can_release_its_source_pin() {
++    let f = Box::pin(settled_history()).await;
++    fail(&f).await;
++    let p = f.native.fixture.persistence();
++    // Isolated fixture time travel; restore the native snapshot guard before DELETE/retry.
++    sqlx::raw_sql("ALTER TABLE workflow_runs DISABLE TRIGGER workflow_run_snapshot_immutable; UPDATE workflow_runs SET created_at=clock_timestamp()-interval '2 minutes',deadline=clock_timestamp()-interval '1 minute'; SET CONSTRAINTS ALL IMMEDIATE; ALTER TABLE workflow_runs ENABLE TRIGGER workflow_run_snapshot_immutable")
++        .execute(p.pool()).await.unwrap();
++    assert_eq!(delete(&f).await.unwrap().rows_affected(), 1);
++    let command = control(&f, "expired-retry").await;
++    let result = p
++        .retry(RetryCommand {
++            company_id: command.company_id,
++            run_id: command.run_id,
++            actor: command.actor,
++            command_key: command.command_key,
++            expected_revision: command.expected_revision,
++        })
++        .await
++        .unwrap();
++    assert!(!matches!(result, RetryResult::Applied { .. }));
++    let count: i64 =
++        sqlx::query_scalar("SELECT count(*) FROM agent_history_exchanges WHERE company_id=$1")
++            .bind(f.write.fence.scope.company.as_uuid())
++            .fetch_one(p.pool())
++            .await
++            .unwrap();
++    assert_eq!(count, 0);
++}
++
++#[tokio::test]
++async fn agent_history_storage_nonresumable_failed_exchange_can_be_deleted_before_deadline() {
++    use crate::domain::workflow::{FailureClass, FailureCode, RetrySafety, StepFailure};
++    let f = Box::pin(settled_history()).await;
++    let p = f.native.fixture.persistence();
++    let failure = WorkflowFailure {
++        failure: StepFailure::new(
++            FailureClass::Terminal,
++            FailureCode::parse("agent.budget").unwrap(),
++            None,
++        )
++        .unwrap(),
++        safety: RetrySafety::SafeToRetry,
++    };
++    p.settled()
++        .release_io(
++            f.write.fence,
++            f.write.lease_policy,
++            LeaseReleaseCause::Classified(failure),
++        )
++        .await
++        .unwrap();
++    assert_eq!(exchange(&f).await["state"], "failed");
++    assert_eq!(delete(&f).await.unwrap().rows_affected(), 1);
++}
++
++#[tokio::test]
++async fn agent_history_storage_company_teardown_removes_even_retryable_failed_exchange() {
++    let f = Box::pin(settled_history()).await;
++    fail(&f).await;
++    let p = f.native.fixture.persistence();
++    let company = f.write.fence.scope.company.as_uuid();
++    sqlx::query("DELETE FROM companies WHERE id=$1")
++        .bind(company)
++        .execute(p.pool())
++        .await
++        .unwrap();
++    let count: i64 =
++        sqlx::query_scalar("SELECT count(*) FROM agent_history_exchanges WHERE company_id=$1")
++            .bind(company)
++            .fetch_one(p.pool())
++            .await
++            .unwrap();
++    assert_eq!(count, 0);
++}
+--- review-r1/src/adapters/persistence/workflow/agent_history_storage_tests.rs
++++ review-r2/src/adapters/persistence/workflow/agent_history_storage_tests.rs
+@@ -396,3 +396,6 @@
+     assert_eq!(rows[0].output, None);
+     assert_eq!(rows[0].checkpoint_id, None);
+ }
++
++#[path = "agent_history_commit_ack_tests.rs"]
++mod acknowledgement;
+--- review-r1/src/adapters/persistence/workflow/checkpoints.rs
++++ review-r2/src/adapters/persistence/workflow/checkpoints.rs
+@@ -89,6 +89,16 @@
+                                 return Ok(Evidence::NotApplied);
+                             };
+                             let run = matching(saved, spec)?;
++                            if !agent_history::linked_on(
++                                &mut tx,
++                                fence,
++                                &spec.prepared,
++                                run.run_id.0,
++                            )
++                            .await?
++                            {
++                                return Ok(Evidence::NotApplied);
++                            }
+                             Ok(Evidence::Applied(WriteOutcome::AlreadyApplied(run)))
+                         }
+                         .await;

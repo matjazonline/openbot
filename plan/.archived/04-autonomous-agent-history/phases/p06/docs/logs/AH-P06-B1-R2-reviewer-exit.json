@@ -1,0 +1,19 @@
+{
+  "digest": true,
+  "head": true,
+  "branch": true,
+  "decision": true,
+  "scope": true,
+  "owned_archive": true,
+  "producer_archive": true,
+  "evidence": true,
+  "case_inventory": true,
+  "previous_review_input": true,
+  "correction_delta": true,
+  "skill": true,
+  "coordination": true,
+  "owned_mismatch": [],
+  "external_mismatch": [],
+  "archive_content": true,
+  "checked_at": "2026-11-08T01:31:53.242573+00:00"
+}

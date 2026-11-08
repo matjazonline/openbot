@@ -150,9 +150,9 @@ fn graph_svg(graph: &WorkflowGraph, marks: &BTreeMap<String, NodeMark>) -> Strin
                 t1 = y - 3,
                 t2 = y + 13,
                 id = escape_html_text(&truncated(&node.id, 22)),
-                kind = escape_html_text(&node.kind),
+                kind = escape_html_text(step_kind_label(&node.kind)),
                 id_title = escape_html_text(&node.id),
-                kind_title = escape_html_text(&node.kind),
+                kind_title = escape_html_text(step_kind_label(&node.kind)),
             )
         })
         .collect();
@@ -201,7 +201,7 @@ fn graph_list(graph: &WorkflowGraph, marks: &BTreeMap<String, NodeMark>) -> Stri
             format!(
                 r#"<li class="py-1"><span class="font-semibold">{id}</span> <span class="font-mono text-xs opacity-70">{kind}</span>{entry}{mark}<ul class="ml-4 list-disc text-xs">{routes}</ul></li>"#,
                 id = escape_html_text(&node.id),
-                kind = escape_html_text(&node.kind),
+                kind = escape_html_text(step_kind_label(&node.kind)),
                 entry = if node.entry {
                     r#" <span class="badge badge-sm badge-ghost">entry</span>"#
                 } else {
@@ -213,4 +213,12 @@ fn graph_list(graph: &WorkflowGraph, marks: &BTreeMap<String, NodeMark>) -> Stri
     format!(
         r#"<details class="text-sm"><summary class="cursor-pointer">Steps and routes as a list</summary><ol class="mt-2 divide-y divide-base-300">{items}</ol></details>"#
     )
+}
+
+fn step_kind_label(kind: &str) -> &str {
+    if kind == "channel.no_reply" {
+        "Finish without reply"
+    } else {
+        kind
+    }
 }

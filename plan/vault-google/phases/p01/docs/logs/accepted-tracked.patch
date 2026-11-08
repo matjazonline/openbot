@@ -1,0 +1,43 @@
+diff --git a/src/adapters/mod.rs b/src/adapters/mod.rs
+index 6f27d518..c09cea18 100644
+--- a/src/adapters/mod.rs
++++ b/src/adapters/mod.rs
+@@ -21,4 +21,5 @@ pub mod workflow_message;
+ pub mod workflow_provisioning;
+ pub mod workflow_source;
+ 
++pub(crate) mod integrations;
+ pub mod workflow_jev;
+diff --git a/src/application/mod.rs b/src/application/mod.rs
+index 0882d399..7b306544 100644
+--- a/src/application/mod.rs
++++ b/src/application/mod.rs
+@@ -1,6 +1,7 @@
+ pub mod agent;
+ pub mod app_error;
+ pub mod attention;
++pub mod integrations;
+ pub mod knowledge;
+ pub mod message_outcomes;
+ pub mod model_providers;
+diff --git a/src/domain/mod.rs b/src/domain/mod.rs
+index 84b56869..9a02306a 100644
+--- a/src/domain/mod.rs
++++ b/src/domain/mod.rs
+@@ -1,3 +1,4 @@
+ pub mod entities;
++pub mod integrations;
+ pub mod monitoring;
+ pub mod workflow;
+diff --git a/src/lib.rs b/src/lib.rs
+index 620cef20..e84a6340 100644
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -11,6 +11,7 @@ pub mod infra;
+ pub(crate) mod test_support;
+ 
+ // Re-exports for shorter use statements.
++pub use application::integrations;
+ pub use application::*;
+ pub use domain::workflow;
+ pub use domain::*;

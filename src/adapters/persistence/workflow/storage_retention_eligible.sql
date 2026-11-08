@@ -4,6 +4,9 @@ WITH tree AS MATERIALIZED (
 SELECT
     NOT EXISTS(SELECT 1 FROM workflow_runs AS run JOIN tree ON tree.run_id=run.id
         WHERE run.company_id=$1 AND run.state NOT IN ('succeeded','failed','cancelled'))
+    -- Retained history payloads pin their source; expired metadata cascades with eligible source retirement.
+    AND NOT EXISTS(SELECT 1 FROM agent_history_exchanges AS exchange
+        JOIN tree ON tree.run_id=exchange.run_id WHERE exchange.company_id=$1 AND exchange.payload_retained)
     AND NOT EXISTS(SELECT 1 FROM background_tasks AS job JOIN workflow_executions AS execution
         ON execution.company_id=job.company_id AND execution.id=job.workflow_execution_id
         JOIN tree ON tree.run_id=execution.run_id WHERE execution.company_id=$1 AND job.status IN ('pending','processing'))

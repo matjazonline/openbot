@@ -1,0 +1,30 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+   Compiling open_bots v0.1.0 (/private/tmp/openbot-agent-history-h_82_5pw/worktree)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 53.85s
+     Running unittests src/lib.rs (/private/tmp/openbot-chs-p06-3f43t2k7/worktree/target/debug/deps/open_bots-8b80d02f0b6cf2e6)
+
+running 6 tests
+test application::workflow::publication::tests::agent_tests::history_preparation::agent_history_preparation_current_content_and_reserved_output_precede_history ... ok
+test adapters::harness::rig::protocol::tests::logical_seed::agent_history_protocol_all_providers_repair_only_current_live_candidates ... ok
+test adapters::harness::rig::protocol::tests::logical_seed::agent_history_protocol_all_providers_keep_seed_separate_from_current_tool_turns ... ok
+test adapters::harness::rig::protocol::tests::logical_seed::agent_history_preparation_seed_boundaries_preserve_existing_checkpoint_ceiling ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::agent_history_ordering_competing_preparations_park_without_checkpoint_or_retry_and_resume_once ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::agent_history_selection_second_real_call_sees_complete_pair_and_current_input_last ... FAILED
+
+failures:
+
+---- adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::agent_history_selection_second_real_call_sees_complete_pair_and_current_input_last stdout ----
+
+thread 'adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::agent_history_selection_second_real_call_sees_complete_pair_and_current_input_last' (35807473) panicked at src/adapters/persistence/workflow/agent_history_selection_tests.rs:70:5:
+assertion `left == right` failed
+  left: Array [Object {"text": String("\"first\""), "type": String("text")}]
+ right: String("\"first\"")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::agent_history_selection_second_real_call_sees_complete_pair_and_current_input_last
+
+test result: FAILED. 5 passed; 1 failed; 0 ignored; 0 measured; 3315 filtered out; finished in 1.46s
+
+error: test failed, to rerun pass `--lib`

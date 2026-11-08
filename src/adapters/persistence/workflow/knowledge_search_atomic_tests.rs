@@ -337,3 +337,48 @@ async fn knowledge_search_observation_above_actual_immutable_ceiling_cannot_comm
     assert_eq!(f.snapshot().await, before);
     f.library.shutdown().await.unwrap();
 }
+
+#[tokio::test]
+async fn agent_history_level_accepted_checkpoint_contains_the_real_classified_observation() {
+    let f = Box::pin(SearchFixture::new(AccessLevel::L5)).await;
+    let call = f.prepare(json!({"query":"floor"})).await;
+    let result = f
+        .p()
+        .observe_knowledge(
+            f.claim.fence,
+            &call,
+            observation("PRIVATE FLOOR 60", AccessLevel::L5),
+        )
+        .await
+        .unwrap();
+    let llm = scripted_llm(vec![LlmTurn::text("\"answer\"")]).await;
+    register_scripted_agent_base_url(f.agent, &llm.base_url);
+    let output = Box::pin(
+        f.runtime()
+            .execute(&WorkflowStepKind("agent.run".into()), &f.claim),
+    )
+    .await
+    .completed_result()
+    .unwrap();
+    assert_eq!(output, json!("answer"));
+    let checkpoint = f.checkpoint().await;
+    assert_eq!(checkpoint.invocations[0].result.as_ref(), Some(&result));
+    assert_eq!(checkpoint.turns.len(), 2);
+    let history:Value=sqlx::query_scalar("SELECT jsonb_build_object('level',access_level,'output',output,'checkpoint',checkpoint_id,'state',state) FROM agent_history_exchanges WHERE company_id=$1 AND execution_id=$2")
+        .bind(f.claim.fence.scope.company.as_uuid()).bind(f.claim.fence.scope.execution.as_uuid()).fetch_one(f.p().pool()).await.unwrap();
+    assert_eq!(
+        history,
+        json!({"level":5,"output":"answer","checkpoint":checkpoint.run_id.0,"state":"completed"})
+    );
+    let calls: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM model_usage_calls WHERE company_id=$1 AND run_id=$2",
+    )
+    .bind(f.claim.fence.scope.company.as_uuid())
+    .bind(f.claim.fence.scope.run.as_uuid())
+    .fetch_one(f.p().pool())
+    .await
+    .unwrap();
+    assert_eq!(calls, 2);
+    assert_eq!(llm.finish().await.unwrap(), 1);
+    f.library.shutdown().await.unwrap();
+}

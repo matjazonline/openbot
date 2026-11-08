@@ -72,6 +72,8 @@ pub(super) async fn sample(
         input: form.text("input"),
         params: form.text("params"),
         scripts: form.text("scripts"),
+        response_contract: sample_option_field(&form, "response_contract"),
+        response_approval_policy: sample_option_field(&form, "response_approval_policy"),
     };
     let result = run_sample(&ui, company, workflow, revision, &inputs, &selections).await;
     let mut state = SampleState {
@@ -109,6 +111,11 @@ async fn run_sample(
             .map_err(|error| AppError::BadRequest(format!("Invalid sample JSON: {error}")))
     };
     let request = SampleRequest {
+        response_contract: serde_json::from_str(&inputs.response_contract)
+            .map_err(|error| AppError::BadRequest(format!("Invalid response mapping: {error}")))?,
+        response_approval_policy: serde_json::from_str(&inputs.response_approval_policy).map_err(
+            |error| AppError::BadRequest(format!("Invalid final approval policy: {error}")),
+        )?,
         agents: vec![],
         input: parse(&inputs.input)?,
         params: parse(&inputs.params)?,
@@ -126,4 +133,13 @@ async fn run_sample(
     )
     .await?;
     Ok(ui.engine.sample(prepared)?)
+}
+
+fn sample_option_field(form: &FormFields, name: &str) -> String {
+    let raw = form.text(name);
+    if raw.trim().is_empty() {
+        "null".into()
+    } else {
+        raw
+    }
 }
