@@ -172,6 +172,9 @@ impl WorkflowLeases for PostgresPersistence {
         fence: WorkflowFence,
         wait: crate::domain::workflow::WaitId,
     ) -> AppResult<bool> {
+        if local_agents::confirm_suspension(self, fence, wait.as_uuid()).await? {
+            return Ok(true);
+        }
         if message::receipts::confirm_suspension(self, fence, wait.as_uuid()).await? {
             return Ok(true);
         }

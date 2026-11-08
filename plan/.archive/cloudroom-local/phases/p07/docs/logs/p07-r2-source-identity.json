@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "reviewBaseCommit": "97e5d60dc538e26c7cb976a8d63772eed80baff2",
+  "prerequisite": "c52a03aec4aaa4fbc55afcf807c77e8814aa4eedffa05f3d727b3217723d3def",
+  "prerequisitePatchSha256": "8eca418baf77034c3811056c03e537b51818c5e226878daf5c5ae4af1ae0f9a3",
+  "prerequisiteTree": "/var/folders/n2/5y7x75r92zl0ll90154hxdzr0000gn/T/openbot-cloudroom-p06-review-base-dw34n3om",
+  "exclusions": [
+    "plan/cloudroom-local/COORDINATION.md",
+    "plan/cloudroom-local/phases/p01/docs",
+    "plan/cloudroom-local/phases/p02/docs",
+    "plan/cloudroom-local/phases/p03/docs",
+    "plan/cloudroom-local/phases/p04/docs",
+    "plan/cloudroom-local/phases/p05/docs",
+    "plan/cloudroom-local/phases/p06/docs",
+    "plan/cloudroom-local/phases/p07/docs"
+  ],
+  "fullPatch": "p07-r2-source.patch",
+  "fullPatchSha256": "280fa13781e63d6a89af13fd0ae6668d68ed894c2a5b4b6a66145969eaa4cd88",
+  "deltaPatch": "p07-r2-delta.patch",
+  "deltaPatchSha256": "fb4907b7d2d28896d0918e658db01843dc501b0fbe2e4c333b7d248d08d7c406"
+}

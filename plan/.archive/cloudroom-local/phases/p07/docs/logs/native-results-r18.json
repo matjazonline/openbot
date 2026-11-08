@@ -1,0 +1,20 @@
+[
+  {
+    "provider": "codex",
+    "status": "FAIL",
+    "seconds": 23.52,
+    "file": "logs/native-codex-r18.txt"
+  },
+  {
+    "provider": "claude",
+    "status": "FAIL",
+    "seconds": 63.84,
+    "file": "logs/native-claude-r18.txt"
+  },
+  {
+    "provider": "opencode",
+    "status": "PASS",
+    "seconds": 70.6,
+    "file": "logs/native-opencode-r18.txt"
+  }
+]

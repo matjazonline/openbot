@@ -1,0 +1,11 @@
+{
+  "proposedArtifact": "4b2ee0aa2561cb8116e73a9f8b6083eb5982977274a73c1db1f5c8ec82faaff9",
+  "previousArtifact": "1b45290aa64d13e0a82057a37aeadeb99105ad8382e596aae1e30124088098be",
+  "changedPatchBlocks": [
+    "a/scripts/__pycache__/prepare-knowledge-model.cpython-314.pyc b/scripts/__pycache__/prepare-knowledge-model.cpython-314.pyc",
+    "a/src/adapters/persistence/workflow/action_dispatch_resolution_tests.rs b/src/adapters/persistence/workflow/action_dispatch_resolution_tests.rs"
+  ],
+  "unexpectedGeneratedCache": "scripts/__pycache__/prepare-knowledge-model.cpython-314.pyc",
+  "cacheSha256": "55deecdbd626ea5dac0c8147c9d0858c27c96a642fed9e3ec70bec9b9683178c",
+  "status": "root notified; remove task-generated cache and refreeze, preserving historical R5 export"
+}

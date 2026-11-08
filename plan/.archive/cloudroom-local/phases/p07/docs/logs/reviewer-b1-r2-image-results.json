@@ -1,0 +1,27 @@
+{
+  "artifact": "bd92212d24d49b9d937eac2c52723eae45085cdb81abc36d12c262dcdf33cbe9",
+  "command": [
+    "limactl",
+    "shell",
+    "img",
+    "--",
+    "python3",
+    "/tmp/openbot-p07-image/scripts/check-knowledge-image.py",
+    "--image",
+    "openbot-cloudroom-p07-knowledge:r3"
+  ],
+  "fixture": {
+    "limaHome": "/private/tmp/ob7-dq_2z0jj/i",
+    "instance": "img",
+    "image": "openbot-cloudroom-p07-knowledge:r3"
+  },
+  "status": "PASS",
+  "exit": 0,
+  "seconds": 9.81,
+  "files": [
+    {
+      "path": "logs/reviewer-b1-r2-image-check.txt",
+      "sha256": "05fffb98dc87003ac2140f11edcc3aac2ced456a2ba84d645ccc2909b0b5214c"
+    }
+  ]
+}

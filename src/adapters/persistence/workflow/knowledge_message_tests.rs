@@ -281,7 +281,7 @@ async fn recovery_setup() -> Setup {
     source["steps"]["start"]["routes"]["error"] = json!("recover");
     source["steps"]["recover"] = json!({"type":"data.map","with":{"value":{"literal":42},
         "output_schema":{"literal":{"type":"integer"}}},"routes":{"success":"$end"}});
-    let directory = message::MessagePublicationDirectory {
+    let directory = step_builtins::StepBuiltinPublicationDirectory {
         persistence: fixture.persistence.clone(),
     };
     let definitions = DefinitionService::new(

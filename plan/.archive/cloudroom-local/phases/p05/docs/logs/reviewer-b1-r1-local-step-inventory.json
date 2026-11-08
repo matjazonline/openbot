@@ -1,0 +1,291 @@
+{
+  "pattern": "local_agent.run",
+  "filesSearched": 1621,
+  "totalHits": 17,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/application/workflow/registry/examples.rs#values",
+        "name": "values",
+        "kind": "function",
+        "path": "src/application/workflow/registry/examples.rs",
+        "span": "L81-L137"
+      },
+      "path": "src/application/workflow/registry/examples.rs",
+      "inDegree": 50,
+      "hits": [
+        {
+          "line": 103,
+          "text": "\"local_agent.run\" => {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/completion.rs#is_io_kind",
+        "name": "is_io_kind",
+        "kind": "function",
+        "path": "src/application/workflow/completion.rs",
+        "span": "L37-L55"
+      },
+      "path": "src/application/workflow/completion.rs",
+      "inDegree": 4,
+      "hits": [
+        {
+          "line": 46,
+          "text": "| \"local_agent.run\""
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/actions/failure.rs#marker_owned_effect_kind",
+        "name": "marker_owned_effect_kind",
+        "kind": "function",
+        "path": "src/application/workflow/actions/failure.rs",
+        "span": "L26-L38"
+      },
+      "path": "src/application/workflow/actions/failure.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 36,
+          "text": "| \"local_agent.run\""
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/registry/help.rs#notes",
+        "name": "notes",
+        "kind": "function",
+        "path": "src/application/workflow/registry/help.rs",
+        "span": "L54-L112"
+      },
+      "path": "src/application/workflow/registry/help.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 71,
+          "text": "\"local_agent.run\" => {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/registry/metadata.rs#constraints",
+        "name": "constraints",
+        "kind": "function",
+        "path": "src/application/workflow/registry/metadata.rs",
+        "span": "L52-L103"
+      },
+      "path": "src/application/workflow/registry/metadata.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 63,
+          "text": "\"http.request\" | \"mcp.call\" | \"local_agent.run\" => ("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/registry/mod.rs#resolve",
+        "name": "resolve",
+        "kind": "function",
+        "path": "src/application/workflow/registry/mod.rs",
+        "span": "L312-L386"
+      },
+      "path": "src/application/workflow/registry/mod.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 345,
+          "text": "| \"message.ask\" | \"local_agent.run\" => self.action()?,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/pages/local_agents/sessions.rs#start",
+        "name": "start",
+        "kind": "function",
+        "path": "src/adapters/http/pages/local_agents/sessions.rs",
+        "span": "L3-L34"
+      },
+      "path": "src/adapters/http/pages/local_agents/sessions.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 10,
+          "text": "r#\"<section class=\"space-y-3\"><h2 class=\"text-xl font-semibold\">Local sessions</h2><p>Open a conversation in Mailbox and choose “Run locally” to start a session"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/workflows/ui/authoring/sample_tests.rs#cloudroom_samples_local_run_uses_scripted_output_without_machine_or_production_effects",
+        "name": "cloudroom_samples_local_run_uses_scripted_output_without_machine_or_production_effects",
+        "kind": "function",
+        "path": "src/adapters/http/routes/workflows/ui/authoring/sample_tests.rs",
+        "span": "L37-L63"
+      },
+      "path": "src/adapters/http/routes/workflows/ui/authoring/sample_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 43,
+          "text": "&source_of(\"local_agent.run\", workflow),"
+        },
+        {
+          "line": 60,
+          "text": "assert!(html.contains(\"local_agent.run\") && html.contains(\"intercepted_write\"));"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/local_agents/mod.rs#run_local_agent",
+        "name": "run_local_agent",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/local_agents/mod.rs",
+        "span": "L59-L89"
+      },
+      "path": "src/adapters/persistence/workflow/local_agents/mod.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 66,
+          "text": "let bound = WriteBound::start(\"local_agent.run\", policy);"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/local_agents/workflow/mod.rs#KIND",
+        "name": "KIND",
+        "kind": "constant",
+        "path": "src/application/local_agents/workflow/mod.rs",
+        "span": "L28-L28"
+      },
+      "path": "src/application/local_agents/workflow/mod.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 28,
+          "text": "pub const KIND: &str = \"local_agent.run\";"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/actions/failure.rs#workflow_action_marker_owned_kinds_are_exactly_the_action_service_owners",
+        "name": "workflow_action_marker_owned_kinds_are_exactly_the_action_service_owners",
+        "kind": "function",
+        "path": "src/application/workflow/actions/failure.rs",
+        "span": "L293-L310"
+      },
+      "path": "src/application/workflow/actions/failure.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 303,
+          "text": "\"local_agent.run\","
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/registry/actions.rs#action",
+        "name": "action",
+        "kind": "function",
+        "path": "src/application/workflow/registry/actions.rs",
+        "span": "L3-L34"
+      },
+      "path": "src/application/workflow/registry/actions.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 5,
+          "text": "\"local_agent.run\" => Ok(Contract {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/registry/mod.rs#TYPES",
+        "name": "TYPES",
+        "kind": "constant",
+        "path": "src/application/workflow/registry/mod.rs",
+        "span": "L52-L75"
+      },
+      "path": "src/application/workflow/registry/mod.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 59,
+          "text": "\"local_agent.run\","
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/registry/runtime_tests.rs#workflow_registry_each_type_validates_dynamic_required_inputs",
+        "name": "workflow_registry_each_type_validates_dynamic_required_inputs",
+        "kind": "function",
+        "path": "src/application/workflow/registry/runtime_tests.rs",
+        "span": "L63-L90"
+      },
+      "path": "src/application/workflow/registry/runtime_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 76,
+          "text": "\"local_agent.run\" => (\"profile_id\", json!(3)),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/registry/tests.rs#workflow_registry_exact_catalogue_and_help_examples_compile",
+        "name": "workflow_registry_exact_catalogue_and_help_examples_compile",
+        "kind": "function",
+        "path": "src/application/workflow/registry/tests.rs",
+        "span": "L39-L106"
+      },
+      "path": "src/application/workflow/registry/tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 40,
+          "text": "let expected = \"agent.run ai.classify channel.no_reply context.history data.map decision.agent decision.human decision.rule flow.repeat http.request jev.evaluat"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/sample/dispatch.rs#step",
+        "name": "step",
+        "kind": "function",
+        "path": "src/application/workflow/sample/dispatch.rs",
+        "span": "L15-L66"
+      },
+      "path": "src/application/workflow/sample/dispatch.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 61,
+          "text": "\"local_agent.run\" => self.external_step(bundle, activation, path, kind, response),"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 14,
+    "baselineChars": 128784
+  }
+}

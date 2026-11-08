@@ -1,4 +1,4 @@
-//! The production tool capture for publication (p08 D1.8): the trusted message built-ins plus the
+//! Production publication capture: trusted step built-ins plus the
 //! HTTP operations and MCP tools the publisher selected, merged into one dependency set. Agent
 //! and child captures nest around it (`ChildPublicationDirectory` outermost, WF-C001 r2).
 use super::http::{HttpPublicationDirectory, HttpPublicationSelection};
@@ -20,7 +20,7 @@ impl PublicationDirectory for ToolPublicationDirectory {
         actor: WorkflowActor,
         draft: &CompanyWorkflowDraft,
     ) -> AppResult<PublicationDependencies> {
-        let message = message::MessagePublicationDirectory {
+        let builtins = step_builtins::StepBuiltinPublicationDirectory {
             persistence: self.persistence.clone(),
         }
         .capture(actor, draft)
@@ -37,7 +37,7 @@ impl PublicationDirectory for ToolPublicationDirectory {
         }
         .capture(actor, draft)
         .await?;
-        let mut snapshots = message.snapshots;
+        let mut snapshots = builtins.snapshots;
         for captured in [http, mcp] {
             snapshots.tools.extend(captured.snapshots.tools);
         }

@@ -1,0 +1,19 @@
+
+> @cloudroom/app@0.0.1 build /private/tmp/openbot-cloudroom-d8b3cc3/gui/apps/app
+> node scripts/generate-pwa-icons.mjs && vite build --logLevel warn && node ../../scripts/precompress-app-dist.mjs dist
+
+
+ WARN  advancedChunks option is deprecated, please use codeSplitting instead.
+
+React Compiler cache: 0 hits, 1203 misses
+[plugin builtin:vite-reporter] 
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+[33m[PLUGIN_TIMINGS] Warning:[0m Your build spent significant time in plugins. Here is a breakdown:
+  - bb:shared-ui-env-seam (88%)
+  - @rolldown/plugin-babel (11%)
+See https://rolldown.rs/options/checks#plugintimings for more details.
+
+precompressed 446 files (446 br, 446 gzip) in /private/tmp/openbot-cloudroom-d8b3cc3/gui/apps/app/dist

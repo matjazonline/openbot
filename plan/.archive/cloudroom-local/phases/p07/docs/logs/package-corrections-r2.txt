@@ -1,0 +1,7 @@
+
+> bb-plugin-openbot-local@0.2.0 package
+> node scripts/package.mjs /tmp/openbot-cloudroom-p07-artifacts-r2
+
+built 1 plugin entry
+built 1 plugin entry
+{"filename":"bb-plugin-openbot-local-0.2.0.tgz","sha256":"856dcb17e329acade810bd9f8dba0feddbf78312e98b1099ccd4dcac793f1149"}

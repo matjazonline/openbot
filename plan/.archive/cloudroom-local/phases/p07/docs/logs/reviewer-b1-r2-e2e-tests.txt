@@ -1,0 +1,16 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.20s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-50aeda0c9f5dbc3a)
+
+running 8 tests
+test adapters::persistence::workflow::tests::local_agent_tests::e2e::native::cloudroom_e2e_native_claude_packaged_plugin_pairing_workflow_ui_restart_followup_stop ... ignored, explicitly authorized disposable native provider acceptance
+test adapters::persistence::workflow::tests::local_agent_tests::e2e::native::cloudroom_e2e_native_codex_packaged_plugin_pairing_workflow_ui_restart_followup_stop ... ignored, explicitly authorized disposable native provider acceptance
+test adapters::persistence::workflow::tests::local_agent_tests::e2e::native::cloudroom_e2e_native_opencode_packaged_plugin_pairing_workflow_ui_restart_followup_stop ... ignored, explicitly authorized disposable native provider acceptance
+observed gated transaction pids=[85118] blocker=85153 elapsed_ms=222
+test adapters::persistence::workflow::tests::local_agent_tests::e2e::early::cloudroom_e2e_committed_delivery_marker_before_socket_never_blindly_dispatches ... ok
+test adapters::persistence::workflow::tests::local_agent_tests::e2e::early::cloudroom_e2e_crash_after_admission_before_peer_connect_dispatches_once ... ok
+test adapters::persistence::workflow::tests::local_agent_tests::e2e::cloudroom_e2e_competing_workers_native_thread_followup_controls_and_company_fences ... ok
+test adapters::persistence::workflow::tests::local_agent_tests::e2e::cloudroom_e2e_cut_points_reconstruct_server_plugin_and_workers_without_blind_native_retry ... ok
+test adapters::persistence::workflow::tests::local_agent_tests::e2e::early::cloudroom_e2e_crash_before_admission_commit_reconstructs_workers_server_and_peer ... ok
+
+test result: ok. 5 passed; 0 failed; 3 ignored; 0 measured; 3319 filtered out; finished in 35.09s
+

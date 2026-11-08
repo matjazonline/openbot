@@ -1,0 +1,14 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.18s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-27a3d10d41cba73d)
+adapters::http::auth_admission::tests::cloudroom_connection_enrollment_and_upgrade_share_bounded_credential_admission: test
+adapters::http::auth_admission::tests::security_auth_limits_body_is_rejected_before_handler: test
+adapters::http::auth_admission::tests::security_auth_limits_competing_claimants_share_last_active_slot: test
+adapters::http::auth_admission::tests::security_auth_limits_encoded_profile_kind_uses_matched_route_budget: test
+adapters::http::auth_admission::tests::security_auth_limits_every_costly_route_is_classified: test
+adapters::http::auth_admission::tests::security_auth_limits_head_oauth_requests_consume_the_budget: test
+adapters::http::auth_admission::tests::security_auth_limits_metric_rollup_uses_fixed_kinds_and_saturating_counts: test
+adapters::http::auth_admission::tests::security_auth_limits_stalled_body_times_out_without_reaching_handler: test
+adapters::http::auth_admission::tests::security_auth_limits_trusted_proxy_requires_one_ip: test
+adapters::http::auth_admission::tests::security_auth_limits_untrusted_forwarded_source_cannot_escape_budget: test
+
+10 tests, 0 benchmarks

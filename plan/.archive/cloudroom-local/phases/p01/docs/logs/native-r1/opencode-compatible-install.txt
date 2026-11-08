@@ -1,0 +1,6 @@
+
+added 2 packages in 10s
+
+changed 2 packages, and audited 17 packages in 2s
+
+found 0 vulnerabilities

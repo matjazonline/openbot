@@ -1,0 +1,6 @@
+
+running 1 test
+test adapters::persistence::workflow::tests::local_agent_tests::retention::peer::cloudroom_lifecycle_real_server_plugin_retention_preserves_prepared_and_unseen_queued_work_once ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3318 filtered out; finished in 4.50s
+

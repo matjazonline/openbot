@@ -1,0 +1,4 @@
+npm warn install-scripts .npmrc allow-scripts setting is being ignored because package.json declares its own allowScripts field
+npm warn deprecated prebuild-install@7.1.3: No longer maintained. Please contact the author of the relevant native addon; alternatives are available.
+
+added 54 packages in 7s

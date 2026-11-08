@@ -1,0 +1,268 @@
+{
+  "pattern": "sweep_waits",
+  "filesSearched": 1621,
+  "totalHits": 21,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/child_runtime_tests.rs#workflow_child_timeout_fails_child_and_reaches_parent_error_route",
+        "name": "workflow_child_timeout_fails_child_and_reaches_parent_error_route",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/child_runtime_tests.rs",
+        "span": "L451-L480"
+      },
+      "path": "src/adapters/persistence/workflow/child_runtime_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 465,
+          "text": "assert_eq!(p.sweep_waits(8).await.unwrap(), 1);"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/local_agent_behavior_tests.rs#cloudroom_workflow_completion_racing_cancellation_retains_evidence_without_revival",
+        "name": "cloudroom_workflow_completion_racing_cancellation_retains_evidence_without_revival",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/local_agent_behavior_tests.rs",
+        "span": "L46-L80"
+      },
+      "path": "src/adapters/persistence/workflow/local_agent_behavior_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 67,
+          "text": "p.sweep_waits(8).await.unwrap();"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/local_agent_behavior_tests.rs#cloudroom_workflow_offline_operation_expires_at_frozen_deadline_without_native_work",
+        "name": "cloudroom_workflow_offline_operation_expires_at_frozen_deadline_without_native_work",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/local_agent_behavior_tests.rs",
+        "span": "L263-L311"
+      },
+      "path": "src/adapters/persistence/workflow/local_agent_behavior_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 297,
+          "text": "p.sweep_waits(8).await.unwrap();"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/local_agent_tests.rs#cloudroom_workflow_competing_claims_park_one_operation_and_fresh_claim_consumes_once",
+        "name": "cloudroom_workflow_competing_claims_park_one_operation_and_fresh_claim_consumes_once",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/local_agent_tests.rs",
+        "span": "L258-L340"
+      },
+      "path": "src/adapters/persistence/workflow/local_agent_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 298,
+          "text": "assert_eq!(p.sweep_waits(8).await.unwrap(), 1);"
+        },
+        {
+          "line": 300,
+          "text": "p.sweep_waits(8).await.unwrap(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/maintenance_tests.rs#workflow_maintenance_wait_sweeper_competes_and_preserves_notification",
+        "name": "workflow_maintenance_wait_sweeper_competes_and_preserves_notification",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/maintenance_tests.rs",
+        "span": "L279-L327"
+      },
+      "path": "src/adapters/persistence/workflow/maintenance_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 298,
+          "text": "f.persistence().sweep_waits(8).await.unwrap()"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/wait_deadline_tests.rs#workflow_wait_due_timer_sweeps_once_and_future_timer_waits",
+        "name": "workflow_wait_due_timer_sweeps_once_and_future_timer_waits",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/wait_deadline_tests.rs",
+        "span": "L3-L38"
+      },
+      "path": "src/adapters/persistence/workflow/wait_deadline_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 13,
+          "text": "p.sweep_waits(16).await.unwrap()"
+        },
+        {
+          "line": 17,
+          "text": "assert_eq!(p.sweep_waits(16).await.unwrap(), 0);"
+        },
+        {
+          "line": 36,
+          "text": "assert!(p.sweep_waits(0).await.is_err());"
+        },
+        {
+          "line": 37,
+          "text": "assert!(p.sweep_waits(129).await.is_err());"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/wait_deadline_tests.rs#workflow_wait_expiry_and_cancellation_do_not_schedule",
+        "name": "workflow_wait_expiry_and_cancellation_do_not_schedule",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/wait_deadline_tests.rs",
+        "span": "L40-L71"
+      },
+      "path": "src/adapters/persistence/workflow/wait_deadline_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 57,
+          "text": "assert_eq!(p.sweep_waits(8).await.unwrap(), 1);"
+        },
+        {
+          "line": 58,
+          "text": "assert_eq!(p.sweep_waits(8).await.unwrap(), 0);"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/wait_guard_tests.rs#workflow_wait_poison_timer_does_not_block_valid_due_work",
+        "name": "workflow_wait_poison_timer_does_not_block_valid_due_work",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/wait_guard_tests.rs",
+        "span": "L4-L38"
+      },
+      "path": "src/adapters/persistence/workflow/wait_guard_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 20,
+          "text": "assert_eq!(p.sweep_waits(8).await.unwrap(), 2);"
+        },
+        {
+          "line": 21,
+          "text": "assert_eq!(p.sweep_waits(8).await.unwrap(), 0);"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/wait_guard_tests.rs#workflow_wait_sweep_selection_has_bounded_lock_wait",
+        "name": "workflow_wait_sweep_selection_has_bounded_lock_wait",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/wait_guard_tests.rs",
+        "span": "L40-L55"
+      },
+      "path": "src/adapters/persistence/workflow/wait_guard_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 49,
+          "text": "tokio::time::timeout(Duration::from_secs(4), p.sweep_waits(8))"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/wait_guard_tests.rs#workflow_wait_expiry_competes_with_resume",
+        "name": "workflow_wait_expiry_competes_with_resume",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/wait_guard_tests.rs",
+        "span": "L226-L264"
+      },
+      "path": "src/adapters/persistence/workflow/wait_guard_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 243,
+          "text": "p.sweep_waits(8).await.unwrap()"
+        },
+        {
+          "line": 262,
+          "text": "assert_eq!(p.sweep_waits(8).await.unwrap(), 0);"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/waits.rs#sweep_waits",
+        "name": "sweep_waits",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/waits.rs",
+        "span": "L64-L92"
+      },
+      "path": "src/adapters/persistence/workflow/waits.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 64,
+          "text": "async fn sweep_waits(&self, limit: u16) -> AppResult<u16> {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/wakeup_guard_tests.rs#workflow_wakeup_actual_wait_expiry_produces_failed_fact",
+        "name": "workflow_wakeup_actual_wait_expiry_produces_failed_fact",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/wakeup_guard_tests.rs",
+        "span": "L72-L86"
+      },
+      "path": "src/adapters/persistence/workflow/wakeup_guard_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 80,
+          "text": "assert_eq!(f.persistence().sweep_waits(8).await.unwrap(), 1);"
+        },
+        {
+          "line": 81,
+          "text": "assert_eq!(f.persistence().sweep_waits(8).await.unwrap(), 0);"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/waits.rs#sweep_waits",
+        "name": "sweep_waits",
+        "kind": "function",
+        "path": "src/application/workflow/waits.rs",
+        "span": "L143-L143"
+      },
+      "path": "src/application/workflow/waits.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 143,
+          "text": "async fn sweep_waits(&self, limit: u16) -> AppResult<u16>;"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 9,
+    "baselineChars": 121666
+  }
+}

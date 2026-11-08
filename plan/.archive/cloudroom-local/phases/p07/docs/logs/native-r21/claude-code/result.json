@@ -1,0 +1,149 @@
+{
+  "activeNativeStopMatchedInterruptedTurn": true,
+  "actualUi": true,
+  "actualWorkflowWorkers": 2,
+  "afterRestart": {
+    "archived": false,
+    "event": "snapshot",
+    "requests": 1,
+    "terminals": [
+      {
+        "status": "completed",
+        "turn": "da29167e91-t1"
+      }
+    ],
+    "thread": "thr_jx8rdmpdwm",
+    "turns": [
+      "da29167e91-t1"
+    ]
+  },
+  "beforeRestart": {
+    "archived": false,
+    "event": "snapshot",
+    "requests": 1,
+    "terminals": [
+      {
+        "status": "completed",
+        "turn": "da29167e91-t1"
+      }
+    ],
+    "thread": "thr_jx8rdmpdwm",
+    "turns": [
+      "da29167e91-t1"
+    ]
+  },
+  "explicitThreadControlsAdmitted": true,
+  "fileAccess": true,
+  "final": {
+    "archived": true,
+    "controls": [
+      {
+        "command": {
+          "kind": "stop"
+        },
+        "outcome": "uncertain",
+        "sdkCalls": 1
+      },
+      {
+        "command": {
+          "kind": "archive"
+        },
+        "outcome": "succeeded",
+        "sdkCalls": 1
+      }
+    ],
+    "event": "snapshot",
+    "requests": 6,
+    "terminals": [
+      {
+        "status": "completed",
+        "turn": "da29167e91-t1"
+      },
+      {
+        "status": "completed",
+        "turn": "daace069b2-t1"
+      },
+      {
+        "status": "completed",
+        "turn": "da3f0655ec-t1"
+      },
+      {
+        "status": "completed",
+        "turn": "da3f0655ec-t2"
+      },
+      {
+        "status": "completed",
+        "turn": "da3f0655ec-t3"
+      },
+      {
+        "status": "interrupted",
+        "turn": "da3f0655ec-t4"
+      }
+    ],
+    "thread": "thr_jx8rdmpdwm",
+    "turns": [
+      "da29167e91-t1",
+      "daace069b2-t1",
+      "da3f0655ec-t1",
+      "da3f0655ec-t2",
+      "da3f0655ec-t3",
+      "da3f0655ec-t4"
+    ]
+  },
+  "isolatedLoggedOutProvider": {
+    "isolation": {
+      "credentialEnvironmentRemoved": [
+        "OPENAI_API_KEY",
+        "CODEX_API_KEY",
+        "OPENAI_ACCESS_TOKEN",
+        "ANTHROPIC_API_KEY",
+        "ANTHROPIC_AUTH_TOKEN",
+        "CLAUDE_CODE_OAUTH_TOKEN",
+        "OPENCODE_AUTH_JSON",
+        "OPENCODE_CONFIG_CONTENT"
+      ],
+      "event": "logged_out",
+      "isolatedProviderConfiguration": true,
+      "nativeLoginStatus": 1,
+      "parentLoginUntouched": true,
+      "provider": "claude-code"
+    },
+    "nativeOperation": "ac0c4bad-8585-43b8-b996-58ffd56c6831",
+    "originalWorkflowUnchanged": true,
+    "sdkCalls": 1,
+    "status": "PASS",
+    "successfulReceipts": 0,
+    "workflow": "failed"
+  },
+  "linux": "NOT EXERCISED on this host",
+  "nativeHumanPermission": {
+    "actualUiPermissionDenied": true,
+    "independentHumanTurn": "da3f0655ec-t3",
+    "openbotWaitingForMatchingInput": true,
+    "outcome": "succeeded",
+    "ownTurn": "da3f0655ec-t2",
+    "sdkCalls": 1,
+    "status": "PASS"
+  },
+  "nativeStopIsNotAnAtomicTargetedTurnGuarantee": true,
+  "nativeThreadArchived": true,
+  "outputRecoveredAfterNativeOutputBeforeServerReceipt": true,
+  "platform": "macos",
+  "productionPlugin": true,
+  "provider": "claude-code",
+  "realPairingHttp": true,
+  "selection": {
+    "machine_id": "7beb83e3-101a-456b-9489-88c5524907c0",
+    "model": "claude-haiku-5-5",
+    "policy": {
+      "permissions": "provider_default",
+      "reasoning": "low",
+      "workspace": "project_directory"
+    },
+    "project_id": "proj_n74tk896yd",
+    "provider": "claude-code"
+  },
+  "session": "46790c77-63b1-4f10-9f1a-51f1ccc72fdd",
+  "status": "PASS",
+  "thread": "thr_jx8rdmpdwm"
+}

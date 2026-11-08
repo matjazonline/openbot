@@ -87,6 +87,11 @@ impl Session {
     ) -> AppResult<Value> {
         validate(&tool.contract.input_schema, &input)?;
         let (output, kind) = match tool.kind() {
+            ToolKind::LocalAgent => {
+                return Err(refused(
+                    "Local agents are workflow steps, not selectable tools",
+                ));
+            }
             ToolKind::Workflow(pin) => {
                 if fixture.is_some() {
                     return Err(refused(

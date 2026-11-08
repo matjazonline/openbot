@@ -1,0 +1,7 @@
+{
+  "path": "patches/local-onboarding.patch",
+  "sha256": "c201acedcbe1003a3867507e7fb4138c4171d7f5fa0c2971c4e182800cd58ca4",
+  "sourcePath": "gui/apps/app/src/components/Onboarding.tsx",
+  "beforeSha256": "26edcb0d980159dbf88fd28979d7d87dcd1935c8e429546e90228dbe5c22e489",
+  "afterSha256": "d2aebaadf687bc3863f645acd2dff5add1fb943219afe0dec4f5a9ac2836496d"
+}

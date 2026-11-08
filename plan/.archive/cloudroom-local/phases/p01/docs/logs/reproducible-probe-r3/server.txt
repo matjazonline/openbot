@@ -1,0 +1,49 @@
+[12:07:54] INFO: [server] Server listening {"bindHost":"127.0.0.1","port":61569,"dataDir":"/var/folders/n2/5y7x75r92zl0ll90154hxdzr0000gn/T/openbot-cloudroom-proof-D4JNT8/profile"}
+[12:07:54] INFO: [server] plugin custom-instructions@0.1.0 loaded
+[12:07:54] INFO: [server] plugin machine-ssh@0.1.0 loaded
+[12:07:54] INFO: [server] plugin bb-guide@0.1.0 loaded
+[12:07:54] INFO: [server] plugin time-in-cloudroom@0.1.0 loaded
+[12:07:54] INFO: [server] plugin drafts@0.1.0 loaded
+[12:07:54] INFO: [server] plugin side-chat@0.1.0 loaded
+[12:07:54] INFO: [server] plugin pdf-preview@0.1.0 loaded
+[12:07:54] INFO: [server] plugin scheduled-send@0.1.0 loaded
+[12:07:54] INFO: [server] plugin push-notifications@0.1.0 loaded
+[12:07:54] INFO: [server] plugin provider-usage@0.1.0 loaded
+[12:07:54] INFO: [server] plugin accounts@0.1.0 loaded
+[12:07:54] INFO: [server] plugin gpu@0.1.0 loaded
+[12:07:54] INFO: [server] plugin inline-vis@0.1.0 loaded
+[12:07:54] INFO: [server] plugin secrets@0.1.0 loaded
+[12:07:54] INFO: [server] plugin provider-retry@0.1.0 loaded
+[12:07:54] INFO: [server] plugin connect@0.1.0 loaded
+[12:07:54] INFO: [server] plugin monaco-editor@0.1.0 loaded
+[12:07:55] INFO: [server] plugin automations@0.1.0 loaded
+[12:07:55] WARN: [server] marketplace bb-community refresh dropped 1 catalog entry whose id matches a bundled plugin: provider-usage
+[12:07:55] INFO: [server] plugin openbot-compatibility-probe@0.1.0 loaded
+[12:07:57] INFO: [server] plugin environment-personal-workspace@0.1.0 loaded
+[12:07:57] INFO: [server] plugin computer-use@0.1.0 loaded
+[12:07:57] INFO: [server] plugin keep-awake@0.1.0 loaded
+[12:07:57] INFO: [server] plugin environment-project-checkout@0.1.0 loaded
+[12:07:57] INFO: [server] plugin environment-git-worktree@0.1.0 loaded
+[12:07:57] INFO: [server] plugin provider-codex@0.1.0 loaded
+[12:07:57] INFO: [server] plugin provider-pi@0.1.0 loaded
+[12:07:57] INFO: [server] plugin provider-claude-code@0.1.0 loaded
+[12:07:57] INFO: [server] plugin provider-acp@0.1.0 loaded
+[12:07:57] WARN: [server] Failed to resolve host for provider discovery {"errorCode":"host_unavailable","errorMessage":"Local host daemon is not initialized","errorStatus":502}
+[12:07:57] INFO: [server] Slow API request {"durationMs":1454.4,"method":"GET","path":"/api/v1/system/providers","status":200}
+[12:07:57] INFO: [server] Slow API request {"durationMs":1465.3,"method":"POST","path":"/api/v1/plugins/openbot-compatibility-probe/cli","status":200}
+[12:07:58] INFO: [server] plugin openbot-compatibility-probe@0.1.0 loaded
+[12:07:58] WARN: [server] Failed to resolve host for provider discovery {"errorCode":"host_unavailable","errorMessage":"Local host daemon is not initialized","errorStatus":502}
+[12:07:59] INFO: [server] Session opened {"sessionId":"hses_aypj6s4jsa","hostId":"host_5ixdnmdagc","replacedSessionId":null}
+[12:07:59] INFO: [server] Daemon WebSocket opened {"sessionId":"hses_aypj6s4jsa","hostId":"host_5ixdnmdagc"}
+[12:07:59] INFO: [server] Event loop stalled {"intervalMs":5000,"maxDelayMs":604.5,"meanDelayMs":26.2,"p99DelayMs":95,"resolutionMs":20,"thresholdMs":500,"currentWork":null,"lastWork":"ws:daemon host-rpc.response","lastWorkMs":1.1,"slowestWork":"ws:daemon host-rpc.response","slowestWorkMs":1.1,"cpuMs":2621.2,"gcMs":57.6,"maxGcMs":5.8,"heapUsedMb":374,"rssMb":655}
+[12:08:00] WARN: [server] Provider model catalog refresh settled {"hostId":"host_5ixdnmdagc","providerId":"pi","scope":"host","durationMs":173,"outcome":"failed","errorCode":"command_failed","errorMessage":"Could not find the pi CLI on this host. Install @earendil-works/pi-coding-agent and retry.","errorStatus":502,"errorRetryable":false,"changed":true}
+[12:08:00] WARN: [server] Provider model catalog refresh settled {"hostId":"host_5ixdnmdagc","providerId":"acp-cursor","scope":"host","durationMs":210,"outcome":"missing_executable","errorCode":"missing_executable","errorMessage":"spawn cursor-agent ENOENT","errorStatus":502,"errorRetryable":false,"changed":true}
+[12:08:00] INFO: [server] Provider model catalog refresh settled {"hostId":"host_5ixdnmdagc","providerId":"claude-code","scope":"host","durationMs":803,"outcome":"success","modelCount":20,"changed":true}
+[12:08:01] INFO: [server] Provider model catalog refresh settled {"hostId":"host_5ixdnmdagc","providerId":"codex","scope":"host","durationMs":1801,"outcome":"success","modelCount":8,"changed":true}
+[12:08:01] INFO: [server] Slow API request {"durationMs":1843.6,"method":"POST","path":"/api/v1/threads","status":201}
+[12:08:01] INFO: [server] Slow API request {"durationMs":1920.1,"method":"POST","path":"/api/v1/plugins/openbot-compatibility-probe/cli","status":200}
+[12:08:17] INFO: [server] Slow API request {"durationMs":15012.5,"method":"POST","path":"/api/v1/plugins/openbot-compatibility-probe/cli","status":200}
+[12:08:30] WARN: [server] Provider model catalog refresh settled {"hostId":"host_5ixdnmdagc","providerId":"acp-opencode","scope":"host","durationMs":30004,"outcome":"timeout","errorCode":"command_timeout","errorMessage":"Timed out waiting for command result","errorStatus":504,"changed":true}
+[12:08:30] INFO: [server] Provider model catalog prewarm pass finished {"hostId":"host_5ixdnmdagc","providerCount":5,"durationMs":31229}
+[12:08:30] INFO: [server] Slow API request {"durationMs":28438.9,"method":"GET","path":"/api/v1/system/execution-options","status":200}
+[12:09:08] INFO: [server] Daemon WebSocket closed {"sessionId":"hses_aypj6s4jsa"}

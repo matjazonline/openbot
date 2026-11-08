@@ -1,0 +1,9 @@
+{
+  "snapshots_equal": true,
+  "authority_equal": true,
+  "decision_sha256": "137e653cbf2e4691855dab793d2a4298ac31e1683ada0b79cc92012371c7d1d2",
+  "snapshot": [
+    "base:   97e5d60dc538e26c7cb976a8d63772eed80baff2",
+    "digest: c7dfb6034c5f3f5001e107ac94a008da7fc55b88054af8208cfa1b79a6685664"
+  ]
+}

@@ -1,0 +1,1 @@
+PASS: public SDK lifecycle and queued-mutation characterization; native inference/terminal recovery NOT EXERCISED

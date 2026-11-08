@@ -1,0 +1,16 @@
+    Checking tokio-tungstenite v0.26.2
+    Checking axum v0.8.4
+    Checking axum-extra v0.10.1
+    Checking open_bots v0.1.0 (/Users/mac03/dev/openbot)
+warning: associated function `local_agent` is never used
+  --> src/application/workflow/actions/local_agents.rs:15:19
+   |
+14 | impl FrozenAction {
+   | ----------------- associated function in this implementation
+15 |     pub(crate) fn local_agent(request: ActionRequest) -> AppResult<Self> {
+   |                   ^^^^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `open_bots` (lib) generated 1 warning
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 26.44s

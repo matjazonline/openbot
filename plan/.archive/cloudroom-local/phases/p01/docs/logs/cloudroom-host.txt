@@ -1,0 +1,4 @@
+Error: Missing host bootstrap material. Provide BB_HOST_ENROLL_KEY or populate /tmp/openbot-cloudroom-p01-profile/auth.json first.
+    at <anonymous> (/private/tmp/openbot-cloudroom-d8b3cc3/gui/apps/host-daemon/src/start-host-daemon.ts:111:21)
+    at Module.startHostDaemon (/private/tmp/openbot-cloudroom-d8b3cc3/gui/apps/host-daemon/src/start-host-daemon.ts:114:13)
+    at async runHostDaemonEntrypoint (/private/tmp/openbot-cloudroom-d8b3cc3/gui/apps/host-daemon/src/index.ts:59:18)

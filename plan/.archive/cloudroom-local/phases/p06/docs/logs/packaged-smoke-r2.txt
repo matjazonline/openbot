@@ -1,0 +1,11 @@
+file:///Users/mac03/dev/openbot/plan/cloudroom-local/phases/p06/docs/logs/packaged-smoke-r2.mjs:33
+    if (service.exitCode !== null) throw new Error('packaged launcher exited: ' + Buffer.concat(output).toString());
+                                         ^
+
+Error: packaged launcher exited: {"component":"cloudroom-local","stage":"bootstrap","state":"failed"}
+{"component":"cloudroom-local","stage":"bootstrap","state":"stopped"}
+
+    at start (file:///Users/mac03/dev/openbot/plan/cloudroom-local/phases/p06/docs/logs/packaged-smoke-r2.mjs:33:42)
+    at async file:///Users/mac03/dev/openbot/plan/cloudroom-local/phases/p06/docs/logs/packaged-smoke-r2.mjs:48:3
+
+Node.js v24.21.0

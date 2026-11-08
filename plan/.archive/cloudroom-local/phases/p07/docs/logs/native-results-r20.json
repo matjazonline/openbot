@@ -1,0 +1,8 @@
+[
+  {
+    "provider": "claude",
+    "status": "FAIL",
+    "seconds": 100.81,
+    "file": "logs/native-claude-r20.txt"
+  }
+]

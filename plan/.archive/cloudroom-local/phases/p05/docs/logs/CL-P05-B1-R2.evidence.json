@@ -1,0 +1,270 @@
+{
+  "version": 1,
+  "round": "CL-P05-B1-R2",
+  "artifact": "c7dfb6034c5f3f5001e107ac94a008da7fc55b88054af8208cfa1b79a6685664",
+  "checks": [
+    {
+      "criteria": [
+        "AC1",
+        "AC2",
+        "AC3",
+        "AC4",
+        "AC5",
+        "AC6",
+        "F1",
+        "F2",
+        "F3",
+        "F4",
+        "F5"
+      ],
+      "command": "target/debug/deps/open_bots-27a3d10d41cba73d cloudroom_ --list; target/debug/deps/open_bots-27a3d10d41cba73d cloudroom_ --nocapture",
+      "fixture": "owned PostgreSQL18.6 loopback56388;113 discovered/112 passed/1 ignored fixture generator; no original104 names removed",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/corrections-test-list-r5.txt",
+          "sha256": "a2228c56990658fc5f47153cba3069678e238f5d7e39f979402ffafbb44dbb2f"
+        },
+        {
+          "path": "logs/corrections-tests-r5.txt",
+          "sha256": "d06e6444f95973c71d260eaace4f26c432f3ab4b999634141d57a6624fd6a3af"
+        },
+        {
+          "path": "logs/corrections-test-discovery-r5.json",
+          "sha256": "e050cf6f5ac82a9ad6d73e21ccb03d309ee322d8f56a116d27111632d7e0db23"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC3",
+        "AC4",
+        "AC6",
+        "F1",
+        "F3"
+      ],
+      "command": "target/debug/deps/open_bots-27a3d10d41cba73d fair --nocapture",
+      "fixture": "isolated migrated PostgreSQL tests;20 passed",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/fair-poll-corrections-r5.txt",
+          "sha256": "3913df99ed89275072440fd72cd5e40edf13726133c3abaf200c36cd93a7230e"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC3",
+        "AC4",
+        "AC6",
+        "F1",
+        "F3"
+      ],
+      "command": "target/debug/deps/open_bots-27a3d10d41cba73d wait --nocapture",
+      "fixture": "isolated migrated PostgreSQL tests;113 passed",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/wait-corrections-r5.txt",
+          "sha256": "7a00bf82fa515c50069244883e7da764e3a231c59bc3f0f40d104304e6a678ae"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC3",
+        "AC4",
+        "AC6",
+        "F1",
+        "F3"
+      ],
+      "command": "target/debug/deps/open_bots-27a3d10d41cba73d adapters::persistence::workflow::tests::message_tests:: --nocapture",
+      "fixture": "isolated migrated PostgreSQL tests;303 passed",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/message-corrections-r5.txt",
+          "sha256": "e0bda8e7695971b494851603e5e7a3192c4f56495e5f2e95c45bd2fe489db557"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC1",
+        "AC2",
+        "AC6",
+        "F4"
+      ],
+      "command": "CLOUDROOM_MANAGEMENT_BROWSER_FIXTURES=<phase browser-r3> target/debug/deps/open_bots-27a3d10d41cba73d dump_cloudroom_management_browser_fixtures --ignored --nocapture; node --test scripts/tests/local-agents-browser.mjs",
+      "fixture": "actual Rust renderer/PG projections and production CSP/compiled CSS;Chromium navigation through >100 profiles, selected ID/conversation submitted;fixture response server",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/browser-fixtures-r3.txt",
+          "sha256": "052f7ce86120b4e86745e83001f2676b156e224afd1232c42d67791f824c33c0"
+        },
+        {
+          "path": "logs/browser-corrections-r1.txt",
+          "sha256": "67b1d7283f211044cff9de18ef29e21069084e361c092ae93641f404c2878ba6"
+        },
+        {
+          "path": "logs/browser-r3/app.js",
+          "sha256": "d16cde30526cc2c9711c020d625c231c375a253a9d8d92f3d3250ab9583f9dda"
+        },
+        {
+          "path": "logs/browser-r3/metadata.json",
+          "sha256": "d654777f05cd2933f69a29c6c813eb9e80be8521c0ce1d283683287b75a7ba32"
+        },
+        {
+          "path": "logs/browser-r3/page.html",
+          "sha256": "59908ab35df6e80131dcd31fc27eea6a721a90e2cf77c7b6d2051cb81db25622"
+        },
+        {
+          "path": "logs/browser-r3/profiles-first.html",
+          "sha256": "9ba29ac73cbeed6ca52d657bc52f124cd2262cc1ad59f99cd1c6c7f892e16b37"
+        },
+        {
+          "path": "logs/browser-r3/profiles-navigation.json",
+          "sha256": "24b7cd58c813cd43e6c0ec333aa96645575431001208426d642e028283665aee"
+        },
+        {
+          "path": "logs/browser-r3/profiles-next.html",
+          "sha256": "34c20c9f60b840efed393ec3c8a0151ee2697cce924b67ba359039f3bf5472ef"
+        },
+        {
+          "path": "logs/browser-r3/profiles-selected.html",
+          "sha256": "c4f2ebff4165d2cba9e92322c922f3997389cba7fb3c4e6bf5d508d9e1b70cfe"
+        },
+        {
+          "path": "logs/browser-r3/theme-init.js",
+          "sha256": "b23ad4c72d7f288bfa1df3666ae18c4087fb8f6118f6b4187b3173bd4705c0c6"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC4",
+        "AC6",
+        "F2"
+      ],
+      "command": "reset disposable build/test public schemas and cargo sqlx migrate run",
+      "fixture": "only owned PostgreSQL build/test schemas;new workflow_outcome/ready_at constraints",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/reset-corrections-schema-r1.txt",
+          "sha256": "89359f2e74eed1db1098b55bd4a31eca9259599ad30fc4d9041c5ad3e9231a75"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC6"
+      ],
+      "command": "SQLX_OFFLINE=false cargo sqlx prepare -- --all-targets",
+      "fixture": "owned build DB;no.sqlx diff",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/sqlx-corrections-r5.txt",
+          "sha256": "28d39b34c808554039c0e069488ec74b2a0b713ba1ecb5d08c92888741c4ac6a"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC6"
+      ],
+      "command": "SQLX_OFFLINE=true cargo clippy --locked --offline --all-targets -- -D warnings",
+      "fixture": "locked local cache;all Cargo targets",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/clippy-corrections-r6.txt",
+          "sha256": "b24a01394066d1fe61bcb99ea9b145a53c01926e981f2031a2033ef46f124c2c"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC6"
+      ],
+      "command": "cargo fmt --all -- --check;git diff --check;npm run check:css",
+      "fixture": "current tree;borrow removal has no formatting impact",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/format-corrections-r5.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": "logs/whitespace-corrections-r5.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": "logs/css-corrections-r5.txt",
+          "sha256": "b41abdae6073288c551a411e78ffb7a99472cf82f6335e2e24e5f359e150d987"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC3",
+        "AC6"
+      ],
+      "command": "target/debug/deps/open_bots-27a3d10d41cba73d application::workflow::registry:: --nocapture",
+      "fixture": "28 registry assertions; native handler contracts retained;unaffected evidence retained,source paths unchanged in R2",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/registry-management-r1.txt",
+          "sha256": "35195825066ad5b9be231698187bb22fffa733ffab3292e4acf78089a328ce07"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC5",
+        "AC6"
+      ],
+      "command": "python3 scripts/workflow-sample-boundary.py",
+      "fixture": "actual production sample dispatch/capture source; no production fallback;unaffected evidence retained,source paths unchanged in R2",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/sample-boundary-r1.txt",
+          "sha256": "228c0f0f23407594379b257a3e3684550f2f3eb1741d27acbc9be312e22e6d2d"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "F5"
+      ],
+      "command": "target/debug/deps/open_bots-27a3d10d41cba73d cloudroom_ --nocapture",
+      "fixture": "historical r4:111 pass/1 fail/1 ignored;unverified-email fixture rejected admission before withdrawal assertion;corrected by r5",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/corrections-tests-r4.txt",
+          "sha256": "5f1bb0830a9fdbf162bb4ebadd954d20808f98259ad4ea6ffafc0d7ef8710359"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC6"
+      ],
+      "command": "cargo clippy --locked --offline --all-targets -- -D warnings",
+      "fixture": "historical r5:needless_borrow in new test helper;corrected to equivalent finish(s);r6 passes",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/clippy-corrections-r5.txt",
+          "sha256": "2deb5e6828f8a77650520ff12cc4c4b3bbf00f8fdf9426b91a4b4ad58403787b"
+        }
+      ]
+    }
+  ]
+}

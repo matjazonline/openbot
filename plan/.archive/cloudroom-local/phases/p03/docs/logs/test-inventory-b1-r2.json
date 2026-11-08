@@ -1,0 +1,18 @@
+{
+  "before": "test-list-r4.txt",
+  "after": "test-list-binary-r1.txt",
+  "beforeCount": 69,
+  "afterCount": 77,
+  "removed": [],
+  "added": [
+    "adapters::http::routes::local_machine_connection::tests::recovery::cloudroom_connection_uncertain_reconnect_withholds_new_effect_until_reconciled",
+    "adapters::persistence::local_agents::protocol::recovery_tests::cloudroom_commands_expired_uncertain_work_reconciles_before_new_effects",
+    "adapters::persistence::local_agents::protocol::recovery_tests::cloudroom_commands_explicit_uncertainty_reconciles_before_new_effects",
+    "adapters::persistence::local_agents::protocol::recovery_tests::cloudroom_observations_every_preflight_refusal_preserves_expired_uncertainty",
+    "adapters::persistence::local_agents::protocol::recovery_tests::cloudroom_observations_every_preflight_refusal_preserves_explicit_uncertainty",
+    "adapters::persistence::local_agents::protocol::recovery_tests::cloudroom_observations_every_preflight_refusal_rejects_after_possible_submission",
+    "adapters::persistence::local_agents::protocol::recovery_tests::cloudroom_observations_preflight_refusals_before_intent_are_definitive",
+    "application::local_agents::wire_tests::cloudroom_protocol_rust_node_command_hash_preserves_exact_deadline_and_text"
+  ],
+  "moved": []
+}

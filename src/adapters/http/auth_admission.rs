@@ -112,7 +112,16 @@ fn kind(method: &Method, path: &str) -> Option<Kind> {
         | (&Method::GET, "/auth/apple/register" | "/auth/apple/login" | "/auth/apple/connect")
         | (&Method::POST, "/auth/apple/callback") => Some(Kind::Oauth),
         (&Method::PUT, "/ui/profile" | "/ui/profile/password" | "/ui/profile/password/setup")
-        | (&Method::POST | &Method::DELETE, "/ui/profile/changes/{kind}") => Some(Kind::Credential),
+        | (&Method::POST | &Method::DELETE, "/ui/profile/changes/{kind}")
+        | (
+            &Method::POST,
+            "/v1/local-machines/pair"
+            | "/api/companies/{company}/local-machine-pairings"
+            | "/api/companies/{company}/local-machines/{machine}/replacement-pairing",
+        )
+        | (&Method::GET, "/v1/local-machines/pair-status" | "/v1/local-machines/connect") => {
+            Some(Kind::Credential)
+        }
         _ => None,
     }
 }
@@ -601,6 +610,25 @@ mod tests {
             assert_eq!(kind(&method, path), Some(expected), "{method} {path}");
         }
         assert_eq!(kind(&Method::GET, "/login"), None);
+    }
+
+    #[test]
+    fn cloudroom_connection_enrollment_and_upgrade_share_bounded_credential_admission() {
+        for (method, path) in [
+            (Method::GET, "/v1/local-machines/connect"),
+            (Method::GET, "/v1/local-machines/pair-status"),
+            (Method::POST, "/v1/local-machines/pair"),
+            (
+                Method::POST,
+                "/api/companies/{company}/local-machine-pairings",
+            ),
+            (
+                Method::POST,
+                "/api/companies/{company}/local-machines/{machine}/replacement-pairing",
+            ),
+        ] {
+            assert_eq!(kind(&method, path), Some(Kind::Credential));
+        }
     }
 
     #[tokio::test]

@@ -1,0 +1,79 @@
+{
+  "activeNativeStopMatchedInterruptedTurn": true,
+  "actualUi": true,
+  "actualWorkflowWorkers": 2,
+  "afterRestart": {
+    "event": "snapshot",
+    "requests": 1,
+    "terminals": [
+      {
+        "status": "completed",
+        "turn": "da295f3729-t1"
+      }
+    ],
+    "thread": "thr_r9vtccgp8e",
+    "turns": [
+      "da295f3729-t1"
+    ]
+  },
+  "beforeRestart": {
+    "event": "snapshot",
+    "requests": 1,
+    "terminals": [
+      {
+        "status": "completed",
+        "turn": "da295f3729-t1"
+      }
+    ],
+    "thread": "thr_r9vtccgp8e",
+    "turns": [
+      "da295f3729-t1"
+    ]
+  },
+  "explicitThreadStopAndArchiveAccepted": true,
+  "fileAccess": true,
+  "final": {
+    "event": "snapshot",
+    "requests": 3,
+    "terminals": [
+      {
+        "status": "completed",
+        "turn": "da295f3729-t1"
+      },
+      {
+        "status": "completed",
+        "turn": "daefdf7151-t1"
+      },
+      {
+        "status": "interrupted",
+        "turn": "daef2bab45-t1"
+      }
+    ],
+    "thread": "thr_r9vtccgp8e",
+    "turns": [
+      "da295f3729-t1",
+      "daefdf7151-t1",
+      "daef2bab45-t1"
+    ]
+  },
+  "linux": "NOT EXERCISED on this host",
+  "nativeStopIsNotAnAtomicTargetedTurnGuarantee": true,
+  "platform": "macos",
+  "productionPlugin": true,
+  "provider": "claude-code",
+  "realPairingHttp": true,
+  "selection": {
+    "machine_id": "b8cd387b-ef12-46d1-8e09-8cedfb89438b",
+    "model": "claude-haiku-5-5",
+    "policy": {
+      "permissions": "provider_default",
+      "reasoning": "low",
+      "workspace": "project_directory"
+    },
+    "project_id": "proj_h6zfh7niik",
+    "provider": "claude-code"
+  },
+  "session": "4f2e7991-2533-4b34-b364-5c97a26d2bfe",
+  "status": "PASS",
+  "thread": "thr_r9vtccgp8e"
+}

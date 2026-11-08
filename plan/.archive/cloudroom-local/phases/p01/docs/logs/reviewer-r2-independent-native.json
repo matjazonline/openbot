@@ -1,0 +1,32 @@
+{
+  "native": [
+    {
+      "provider": "codex",
+      "thread": "thr_3f7ej72rxx",
+      "completedCorrelatedMarkers": 3,
+      "events": 44,
+      "replay": true,
+      "pagination": true
+    },
+    {
+      "provider": "claude-code",
+      "thread": "thr_rvbjg3dc7k",
+      "completedCorrelatedMarkers": 5,
+      "events": 94,
+      "replay": true,
+      "pagination": true
+    },
+    {
+      "provider": "acp-opencode",
+      "thread": "thr_b5aydp5pc8",
+      "completedCorrelatedMarkers": 1,
+      "events": 17,
+      "replay": true,
+      "pagination": true
+    }
+  ],
+  "sourceHashes": "PASS",
+  "exactUpstreamChangedPath": "PASS",
+  "coordinationR3": "MATCH",
+  "scope": "Correlated requested/accepted/completed events plus final-output marker; older Codex capture predates retained agentText fields, so per-turn response text there not independently established."
+}

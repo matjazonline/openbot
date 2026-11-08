@@ -1,0 +1,11 @@
+{
+  "decision": "CL-P02-D02/r1",
+  "decision_sha256": "603b7bc224d3a49aeeb7e7cc6bad177a91b14b4e454d7eb4dccfd807bdbbcb42",
+  "source_digest": "e707ccc09d026a257ace8fa7f7837af425564736dc3ccac9e6f25942d842372e",
+  "coordination_revision": 6,
+  "coordination_sha256": "729956f0b2f134dbc5aaf56c4f1cb5da46802f47502d03d12f795e978398c1c1",
+  "pinned_coordination_sha256": "729956f0b2f134dbc5aaf56c4f1cb5da46802f47502d03d12f795e978398c1c1",
+  "coordination_byte_identical": true,
+  "runtime_tests_executed_by_reviewer": false,
+  "parent_database_or_sessions_operated": false
+}

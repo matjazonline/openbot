@@ -1,0 +1,148 @@
+{
+  "version": 1,
+  "cloudroom": {
+    "repository": "https://github.com/davidondrej/cloudroom",
+    "revision": "d8b3cc3a16bb4b06fc99d8e543d40f1087d1e815",
+    "artifact": "pinned source plus reviewed local-onboarding and SDK mutation cancellation patches; no verified npm release"
+  },
+  "sdk": {
+    "package": "@get-bb/plugin-sdk",
+    "version": "0.6.50",
+    "registryArtifact": "NOT AVAILABLE (npm E404); build the pinned source"
+  },
+  "runtime": {
+    "node": "24.21.0",
+    "upstreamMinimumNode": "22.19.0",
+    "packageManager": "pnpm@10.34.9"
+  },
+  "sourceFiles": [
+    {
+      "path": "gui/pnpm-lock.yaml",
+      "sha256": "622dbe230cc3b4d3b54877f79a9e89a6a8a1649a681a1af4a4c564c5f358b075"
+    },
+    {
+      "path": "gui/package.json",
+      "sha256": "80f22c9e175035d945465ecd99e19f14ebb0346e04c81243d93eee4faedfd669"
+    },
+    {
+      "path": "gui/packages/plugin-sdk/package.json",
+      "sha256": "5948e85c84679fe5183040a093dead9ac0a56249720fe8e06ce5d26070c3b903"
+    },
+    {
+      "path": "gui/packages/sdk/src/areas/threads.ts",
+      "sha256": "87c13f25884f240e7b94267d497d82fd1a8cc50398783e63185064aa846d8fe3"
+    },
+    {
+      "path": "gui/packages/plugin-sdk/src/backend-contract.ts",
+      "sha256": "55c598c5615815a1047b84c0f82cf07fd21938a4f0039b9c10c5d83f6b03cede"
+    },
+    {
+      "path": "gui/plugins/provider-codex/package.json",
+      "sha256": "4dc37a03b2de76dabd7afd951bb7b760c103ec1c0a11e00dcf3b5133e9a6bf7a"
+    },
+    {
+      "path": "gui/plugins/provider-claude-code/package.json",
+      "sha256": "5cbc90c81ce66d3f23c31aa6d637387b5c8e449c76f38da478d595d843d4de47"
+    },
+    {
+      "path": "gui/plugins/provider-acp/package.json",
+      "sha256": "ee831c345d3272141b5fa07e7628ff34477fe779eff1a8c02f9501a91ede9c2b"
+    },
+    {
+      "path": "gui/plugins/provider-acp/src/known-agents.ts",
+      "sha256": "e7379a85db9a45b0eb95495e97ea8f046b81e37d8d37f8c53110925705a7a31a"
+    },
+    {
+      "path": "gui/apps/server/src/services/threads/thread-send-request.ts",
+      "sha256": "4dbaf4229428338ec8a3ba5d52e84991adf77a868d3868d76bf7125193f4ddc5"
+    },
+    {
+      "path": "gui/apps/server/src/services/threads/thread-create.ts",
+      "sha256": "3b70dd43bd7df639a4bb7737ee340d0f89fe6c822cfd61a6d50cf085cea353fc"
+    },
+    {
+      "path": "gui/packages/config/src/caller-proof.ts",
+      "sha256": "56bc472a4b257c5e75c1e2af57ec435e99e17f61062e0bd5485a16372949290f"
+    },
+    {
+      "path": "gui/packages/db/src/data/events.ts",
+      "sha256": "5c5c8be1366862eab94db9fd5735f0646fc4671b8063352c6d1e0aa2f5a0bbe8"
+    }
+  ],
+  "providers": [
+    {
+      "id": "claude-code",
+      "package": "provider-claude-code",
+      "version": "0.1.0"
+    },
+    {
+      "id": "codex",
+      "package": "provider-codex",
+      "version": "0.1.0"
+    },
+    {
+      "id": "acp-opencode",
+      "package": "provider-acp",
+      "version": "0.1.0"
+    }
+  ],
+  "guarantees": {
+    "pluginReloadAndDurability": "PASS: live public SDK, disposable profile",
+    "localCreateRequestIdIdempotency": "UNSUPPORTED: two equal requests created two scheduled threads",
+    "queuedSendRequestIdIdempotency": "UNSUPPORTED: two equal sends produced two queue entries",
+    "backgroundCancellation": "PASS: abort recorded before storage closes on reload",
+    "targetedTurnStop": "UNSUPPORTED: public stop accepts only a thread ID",
+    "terminalTurnCorrelation": "PASS: native client request -> accepted turn -> matching terminal event and output marker for Claude Code, Codex and OpenCode; idle/latest output alone is never used",
+    "eventReplay": "PASS: nonempty public SDK pagination/replay for all 3 native providers; Claude/Codex history retained across server restart",
+    "nativeProviderInference": "PASS: Claude Code 2.1.319, Codex 0.166.0 and OpenCode 1.19.5 in disposable projects using authorized local logins",
+    "macOSUI": "PASS: actual built Cloudroom UI renders SDK-identical native threads for all 3 providers; real Codex approval denial and Claude user-question answer recover their native turns without a hosted account",
+    "headlessLinux": "NOT EXERCISED",
+    "acceptedCreateMetadataRecovery": "PASS: SIGKILL after SDK acceptance before plugin mapping; positive operation metadata recovered after server restart without a new spawn",
+    "serverRestartIdentity": "PASS: same disposable profile retains secret, SQLite journal and host identity across crash and graceful restart",
+    "twoClients": "PASS: public SDK and independent Cloudroom CLI share queued message order; active-turn interleaving NOT EXERCISED",
+    "providerModelDiscovery": "PASS: Claude Code, Codex and OpenCode 1.19.5 public SDK catalogs; catalog discovery is distinct from authentication and inference",
+    "activeThreadStop": "PASS: public thread-wide stop during native Codex shell execution yields interrupted for the same accepted turn; no atomic targeted-turn stop exists",
+    "optionalLocalOnboarding": "PASS: reviewed UI-only patch, production build/typecheck, real native interaction controls visible without hosted account, manual setup opens and Skip setup dismisses",
+    "mutationCancellation": "PASS: actual patched public SDK HTTP header/body waits abort for spawn/send/stop/archive/archiveAll, including pre-aborted calls; cancellation never proves native nonexecution",
+    "eventSequence": "Strictly increasing retained-event cursors; completed streaming deltas may be compacted. Only completed message snapshots become terminal output; sequence gaps conservatively mark truncation."
+  },
+  "recoveryPolicy": {
+    "dispatchIntentWithoutPositiveReceipt": "uncertain; never resubmit",
+    "matchedCreateMetadata": "recover the found identity; a bounded negative listing is not proof of absence",
+    "idleOrLatestAssistantText": "never terminal evidence",
+    "deadlines": "end server wait; no automatic broad thread stop",
+    "missingJournal": "recovery required; do not dispatch new effects"
+  },
+  "verificationTooling": {
+    "playwright": "1.55.1",
+    "chromiumRevision": "1193"
+  },
+  "nativeClients": {
+    "claude-code": "2.1.319",
+    "codex": "0.166.0",
+    "acp-opencode": {
+      "version": "1.19.5",
+      "package": "opencode-ai",
+      "packageIntegrity": "sha512-tEqMvQahfhdDj8vceYpXtoIrvjPXm5XRfetWnPN5YISueU7adNx9JcUA3zZ+2GKuDVgDpGdQe1ZLtCZDjqodvA==",
+      "testedModel": "openai/gpt-6-luna",
+      "reasoningLevel": "low",
+      "unsupportedObserved": "Local 2.1.4 initialized ACP but session/new timed out; not a supported native pin."
+    }
+  },
+  "sourcePatches": [
+    {
+      "path": "patches/local-onboarding.patch",
+      "sha256": "c201acedcbe1003a3867507e7fb4138c4171d7f5fa0c2971c4e182800cd58ca4",
+      "sourcePath": "gui/apps/app/src/components/Onboarding.tsx",
+      "beforeSha256": "26edcb0d980159dbf88fd28979d7d87dcd1935c8e429546e90228dbe5c22e489",
+      "afterSha256": "d2aebaadf687bc3863f645acd2dff5add1fb943219afe0dec4f5a9ac2836496d"
+    },
+    {
+      "path": "patches/sdk-mutation-abort.patch",
+      "sha256": "1a8782db46c9450974cadede95d32c76ad1d3ffa6eb9bb53db97315df6228451",
+      "sourcePath": "gui/packages/sdk/src/areas/threads.ts",
+      "beforeSha256": "2fcd66e9c89af1bf288ac20d08d7c55bc67104b61e982d009cc517710df70413",
+      "afterSha256": "87c13f25884f240e7b94267d497d82fd1a8cc50398783e63185064aa846d8fe3"
+    }
+  ]
+}

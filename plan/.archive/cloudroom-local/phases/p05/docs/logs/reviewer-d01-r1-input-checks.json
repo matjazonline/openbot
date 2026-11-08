@@ -1,0 +1,9 @@
+{
+  "decision_sha256": "4a5173ccf88cc6725553c98e895a14097559c5348d71424cad4812b3602abfe4",
+  "decision_matches": true,
+  "coordination_sha256": "d5dcfcb42c5d4a7fff413d8cc00a5a0cba6218b05e3e7c6a9534b075b76c0b66",
+  "coordination_hash_matches": true,
+  "coordination_pin_matches": true,
+  "entry_source_matches": true,
+  "runtime_checks": "NOT EXERCISED: architecture gate only"
+}

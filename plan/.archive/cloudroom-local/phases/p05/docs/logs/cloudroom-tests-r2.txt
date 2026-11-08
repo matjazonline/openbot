@@ -1,0 +1,207 @@
+
+running 98 tests
+test adapters::http::auth_admission::tests::cloudroom_connection_enrollment_and_upgrade_share_bounded_credential_admission ... ok
+test adapters::http::routes::local_machine_connection::framing::tests::cloudroom_protocol_refuses_unsafe_javascript_integers_and_nul_output ... ok
+test adapters::http::routes::local_machine_connection::framing::tests::cloudroom_protocol_journal_digest_excludes_current_connection_envelope ... ok
+test adapters::http::routes::local_machine_connection::framing::tests::cloudroom_protocol_rejects_expired_interleaved_corrupt_and_unknown_chunks ... ok
+test adapters::http::routes::local_machine_connection::framing::tests::cloudroom_protocol_chunks_round_trip_exact_logical_limit_and_bound_each_frame ... ok
+test adapters::http::routes::local_agents::tests::cloudroom_management_http_foreign_ids_cannot_read_or_mutate_resources ... ok
+test adapters::http::routes::local_machine_connection::tests::failures::cloudroom_connection_header_authentication_and_version_refuse_before_lease ... ok
+test adapters::http::routes::local_machine_connection::tests::failures::cloudroom_connection_database_outage_is_not_invalid_credentials ... ok
+test adapters::http::routes::local_agents::tests::cloudroom_management_http_auth_csrf_typed_requests_and_frozen_session_roundtrip ... ok
+test adapters::http::routes::local_machine_connection::tests::cloudroom_connection_revocation_during_bounded_hello_accepts_no_observation ... ok
+test adapters::http::routes::local_machine_connection::tests::cloudroom_connection_two_replicas_supersede_live_socket_and_join_shutdown ... ok
+test adapters::http::routes::local_machine_connection::tests::failures::cloudroom_connection_oversized_binary_and_unknown_frame_close_without_ack ... ok
+test adapters::http::routes::local_machine_connection::tests::cloudroom_connection_lost_ack_reconnect_rewraps_receipt_and_rejects_old_envelope ... ok
+test adapters::http::routes::local_machine_connection::tests::failures::resources::cloudroom_connection_concurrent_replicas_with_independent_pools_accept_one_hello ... ok
+test adapters::http::routes::local_machine_connection::tests::failures::cloudroom_connection_partial_terminal_output_replays_after_shutdown_without_early_ack ... ok
+test adapters::http::routes::local_machine_connection::tests::failures::resources::cloudroom_connection_global_capacity_bounds_pending_upgrades_and_releases_all ... ok
+test adapters::http::routes::local_machine_connection::tests::submission::cloudroom_submission_actual_websocket_accepts_thread_before_native_turn ... ok
+test adapters::http::routes::local_machine_connection::tests::recovery::cloudroom_connection_uncertain_reconnect_withholds_new_effect_until_reconciled ... ok
+test adapters::http::routes::local_machines::tests::cloudroom_company_http_foreign_mutations_preserve_pairing_projects_and_machine ... ok
+test adapters::http::routes::local_machine_connection::tests::tls::cloudroom_connection_real_wss_validates_certificate_and_commits_result ... ok
+test adapters::http::routes::local_machines::tests::cloudroom_company_http_session_csrf_and_foreign_object_guards ... ok
+test adapters::http::routes::local_machines::tests::cloudroom_pairing_http_bounds_and_closed_payloads_reject_before_enrollment ... ok
+test adapters::http::routes::local_machines::tests::cloudroom_pairing_http_response_loss_and_dedicated_header_recovery ... ok
+test adapters::http::routes::local_machine_connection::tests::failures::resources::cloudroom_connection_shutdown_cancels_slow_consumer_and_keeps_possible_delivery_uncertain ... ok
+
+thread 'adapters::http::routes::workflows::ui::authoring::tests::sample_tests::cloudroom_samples_local_run_uses_scripted_output_without_machine_or_production_effects' (17833383) panicked at src/adapters/http/routes/workflows/ui/authoring/sample_tests.rs:59:5:
+<section id="workflow-pane" class="ui-pane-detail flex min-w-0 flex-1 flex-col bg-base-100">
+            <div class="border-b border-base-300 px-4 pt-4 sm:px-6">
+                <div class="flex flex-wrap items-center gap-2">
+                    <h2 class="min-w-0 truncate text-xl font-bold">Local sample</h2>
+                    <a class="btn btn-ghost btn-xs ml-auto" href="/ui/workflow-runs?company_id=ad4e0514-b7cc-4180-8a44-d94c477495db&amp;view=board&amp;workflow_id=fcce5f3a-f6fe-4625-92ce-1d1a9da3b0f8">Runs board</a>
+                </div>
+                <p class="mt-1 text-xs opacity-60">Draft revision 1 · 0 published versions</p>
+                <nav role="tablist" class="tabs tabs-border mt-3" aria-label="Workflow views"><a role="tab" class="tab" aria-selected="false"
+                href="/ui/workflows?company_id=ad4e0514-b7cc-4180-8a44-d94c477495db&amp;workflow_id=fcce5f3a-f6fe-4625-92ce-1d1a9da3b0f8&amp;tab=editor"
+                hx-get="/ui/workflows/fcce5f3a-f6fe-4625-92ce-1d1a9da3b0f8?company_id=ad4e0514-b7cc-4180-8a44-d94c477495db&amp;tab=editor"
+                hx-target="#workflow-pane" hx-swap="outerHTML" hx-sync="#workflow-pane:replace"
+                hx-push-url="/ui/workflows?company_id=ad4e0514-b7cc-4180-8a44-d94c477495db&amp;workflow_id=fcce5f3a-f6fe-4625-92ce-1d1a9da3b0f8&amp;tab=editor">Editor</a><a role="tab" class="tab tab-active" aria-selected="true"
+                href="/ui/workflows?company_id=ad4e0514-b7cc-4180-8a44-d94c477495db&amp;workflow_id=fcce5f3a-f6fe-4625-92ce-1d1a9da3b0f8&amp;tab=sample"
+                hx-get="/ui/workflows/fcce5f3a-f6fe-4625-92ce-1d1a9da3b0f8?company_id=ad4e0514-b7cc-4180-8a44-d94c477495db&amp;tab=sample"
+                hx-target="#workflow-pane" hx-swap="outerHTML" hx-sync="#workflow-pane:replace"
+                hx-push-url="/ui/workflows?company_id=ad4e0514-b7cc-4180-8a44-d94c477495db&amp;workflow_id=fcce5f3a-f6fe-4625-92ce-1d1a9da3b0f8&amp;tab=sample">Sample</a><a role="tab" class="tab" aria-selected="false"
+                href="/ui/workflows?company_id=ad4e0514-b7cc-4180-8a44-d94c477495db&amp;workflow_id=fcce5f3a-f6fe-4625-92ce-1d1a9da3b0f8&amp;tab=versions"
+                hx-get="/ui/workflows/fcce5f3a-f6fe-4625-92ce-1d1a9da3b0f8?company_id=ad4e0514-b7cc-4180-8a44-d94c477495db&amp;tab=versions"
+                hx-target="#workflow-pane" hx-swap="outerHTML" hx-sync="#workflow-pane:replace"
+                hx-push-url="/ui/workflows?company_id=ad4e0514-b7cc-4180-8a44-d94c477495db&amp;workflow_id=fcce5f3a-f6fe-4625-92ce-1d1a9da3b0f8&amp;tab=versions">Versions and usage</a><a role="tab" class="tab" aria-selected="false"
+                href="/ui/workflows?company_id=ad4e0514-b7cc-4180-8a44-d94c477495db&amp;workflow_id=fcce5f3a-f6fe-4625-92ce-1d1a9da3b0f8&amp;tab=bindings"
+                hx-get="/ui/workflows/fcce5f3a-f6fe-4625-92ce-1d1a9da3b0f8?company_id=ad4e0514-b7cc-4180-8a44-d94c477495db&amp;tab=bindings"
+                hx-target="#workflow-pane" hx-swap="outerHTML" hx-sync="#workflow-pane:replace"
+                hx-push-url="/ui/workflows?company_id=ad4e0514-b7cc-4180-8a44-d94c477495db&amp;workflow_id=fcce5f3a-f6fe-4625-92ce-1d1a9da3b0f8&amp;tab=bindings">Bindings</a></nav>
+            </div>
+            <div class="flex-1 overflow-y-auto px-4 py-4 sm:px-6"><div class="space-y-4">
+        <h3 class="font-semibold">Try the saved draft</h3>
+        <p class="text-sm">Samples use your scripted responses. Messages and writes are captured here; no provider, external service or production run is called. Durability, retries and real service behavior are not tested. A sample cannot be resumed or promoted into a production run.</p>
+        <p class="text-xs opacity-70">Draft revision 1. Save changes in Editor before sampling.</p>
+        
+        <form id="workflow-sample-form" class="space-y-3" hx-post="/ui/workflows/fcce5f3a-f6fe-4625-92ce-1d1a9da3b0f8/sample?company_id=ad4e0514-b7cc-4180-8a44-d94c477495db"
+            hx-target="#workflow-pane" hx-swap="outerHTML" hx-disabled-elt="find button[type='submit']">
+            <input type="hidden" name="expected_revision" value="1">
+            <label class="fieldset"><span class="fieldset-legend">Workflow input (JSON)</span>
+            <textarea name="input" class="textarea w-full font-mono text-xs" rows="6" required spellcheck="false">
+{}</textarea></label><label class="fieldset"><span class="fieldset-legend">Parameters (JSON)</span>
+            <textarea name="params" class="textarea w-full font-mono text-xs" rows="6" required spellcheck="false">
+{}</textarea></label><label class="fieldset"><span class="fieldset-legend">Scripted responses (JSON array)</span>
+            <textarea name="scripts" class="textarea w-full font-mono text-xs" rows="6" required spellcheck="false">
+[{&quot;responses&quot;:[{&quot;output&quot;:{&quot;operation_id&quot;:&quot;3b0ef661-9307-47ce-955e-be31f9f60d59&quot;,&quot;session_id&quot;:&quot;021afdb4-ee0f-412d-92f1-aa5d2b453db3&quot;,&quot;text&quot;:&quot;Sample &lt;img src=x onerror=alert(1)&gt;&quot;,&quot;thread_id&quot;:null,&quot;truncated&quot;:false,&quot;usage&quot;:null}}],&quot;step&quot;:&quot;start&quot;,&quot;workflow_id&quot;:&quot;fcce5f3a-f6fe-4625-92ce-1d1a9da3b0f8&quot;}]</textarea></label>
+            <details class="rounded-box border border-base-300 p-3"><summary class="cursor-pointer text-sm">Script format and limits</summary>
+                <p class="mt-2 text-sm">Each external step consumes the next response for its workflow and step. Child workflows use their own workflow ID. Missing or invalid responses stop the sample. Pure steps and workflow children execute directly.</p>
+                <pre class="overflow-x-auto rounded-box bg-base-200 p-3 font-mono text-xs">[
+  {
+    &quot;responses&quot;: [
+      {
+        &quot;output&quot;: {},
+        &quot;tokens&quot;: 0
+      }
+    ],
+    &quot;step&quot;: &quot;STEP_ID&quot;,
+    &quot;workflow_id&quot;: &quot;fcce5f3a-f6fe-4625-92ce-1d1a9da3b0f8&quot;
+  }
+]</pre>
+                <p class="text-xs opacity-70">Replace STEP_ID and output with the step's declared result. Human output needs choice, data and feedback. Agent responses may include tools: [{"name":"tool_name","input":{},"output":{}}]. Omit a workflow tool's output: its pinned child runs inside the sample. Protected requests require approval: true. Token usage is synthetic. Limits: 256 KiB input, 128 activations/responses, 64 direct tools, 8 child levels, 1 MiB report; workflow budgets may be lower.</p>
+            </details>
+            <button class="btn btn-primary" type="submit"><span class="loading loading-spinner loading-sm hidden [.htmx-request_&]:inline-block"></span><span class="[.htmx-request_&]:hidden">Run sample</span><span class="hidden [.htmx-request_&]:inline">Running sample…</span></button>
+        <p data-sample-status role="status" class="text-sm" aria-live="polite"></p></form><section id="sample-report" class="space-y-3" aria-label="Sample report"><h3 role="status" class="font-semibold">Sample stopped</h3>
+        <p class="text-xs opacity-70">Exact frozen content: <span class="font-mono">e2e40ea04405459fb7da089ede900391146679e81a14d7ab034db15d361a79db</span></p>
+        <p class="text-xs opacity-70">Frozen configuration: <span class="font-mono">764cea11c3512d324ee783d720c04dbd1a6e216d9866332bdc2d6924b9c51f7c</span></p>
+        <div class="alert alert-error mb-4 text-sm">Bad request: sample/start:1 (local_agent.run): Bad request: Value does not match schema</div><p class="text-sm">0 unused scripted responses. Execution paths below are sample identities.</p><pre class="overflow-x-auto rounded-box bg-base-200 p-3 font-mono text-xs">{
+  &quot;agent_selections&quot;: [],
+  &quot;configuration_hash&quot;: &quot;764cea11c3512d324ee783d720c04dbd1a6e216d9866332bdc2d6924b9c51f7c&quot;,
+  &quot;content_hash&quot;: &quot;e2e40ea04405459fb7da089ede900391146679e81a14d7ab034db15d361a79db&quot;,
+  &quot;diagnostic&quot;: &quot;Bad request: sample/start:1 (local_agent.run): Bad request: Value does not match schema&quot;,
+  &quot;effects&quot;: [],
+  &quot;output&quot;: null,
+  &quot;status&quot;: &quot;stopped&quot;,
+  &quot;steps&quot;: [],
+  &quot;unused_responses&quot;: 0,
+  &quot;usage&quot;: {
+    &quot;activations&quot;: 1,
+    &quot;direct_tool_calls&quot;: 0,
+    &quot;model_calls&quot;: 0,
+    &quot;repetitions&quot;: 0,
+    &quot;scripted_tokens&quot;: 0
+  },
+  &quot;workflow_selections&quot;: [
+    {
+      &quot;content_hash&quot;: &quot;e2e40ea04405459fb7da089ede900391146679e81a14d7ab034db15d361a79db&quot;,
+      &quot;version_id&quot;: &quot;00000000-0000-0000-0000-000000000000&quot;,
+      &quot;workflow_id&quot;: &quot;fcce5f3a-f6fe-4625-92ce-1d1a9da3b0f8&quot;
+    }
+  ]
+}</pre></section></div></div>
+        </section>
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test adapters::http::routes::workflows::ui::authoring::tests::sample_tests::cloudroom_samples_local_run_uses_scripted_output_without_machine_or_production_effects ... FAILED
+test adapters::persistence::local_agents::machine_tests::cloudroom_company_operation_deadline_round_trip_preserves_digest ... ok
+test adapters::persistence::local_agents::machine_tests::cloudroom_revocation_fences_competing_connections_and_preserves_uncertainty ... ok
+test adapters::persistence::local_agents::machine_tests::cloudroom_company_profiles_sessions_operations_are_scoped_and_frozen ... ok
+test adapters::persistence::local_agents::machine_tests::cloudroom_revocation_repair_is_new_and_installation_reservation_survives_company_deletion ... ok
+test adapters::persistence::local_agents::machine_tests::constraint_tests::cloudroom_company_machine_reference_constraints_reject_foreign_rows ... ok
+test adapters::persistence::local_agents::management::tests::dump_cloudroom_management_browser_fixtures ... ignored, explicit browser fixture output
+test adapters::persistence::local_agents::machine_tests::constraint_tests::cloudroom_company_session_operation_constraints_reject_foreign_rows ... ok
+test adapters::persistence::local_agents::machine_tests::constraint_tests::cloudroom_company_workflow_session_constraint_rejects_existing_foreign_run ... ok
+test adapters::persistence::local_agents::management::tests::cloudroom_management_competing_starts_freeze_one_session_and_replay_before_profile_edits ... ok
+test adapters::persistence::local_agents::management::tests::cloudroom_management_connection_diagnostics_are_fenced_and_do_not_claim_provider_execution ... ok
+test adapters::persistence::local_agents::management::tests::cloudroom_management_controls_keep_disabled_headroom_and_stable_request_actor ... ok
+test adapters::persistence::local_agents::management::tests::cloudroom_management_private_and_foreign_session_reads_and_every_control_fail_closed ... ok
+test adapters::persistence::local_agents::management::tests::cloudroom_management_profile_pages_are_complete_without_cross_company_rows ... ok
+test adapters::persistence::local_agents::pairing_tests::cloudroom_pairing_secret_encodings_entropy_and_debug_redaction ... ok
+test adapters::persistence::local_agents::management::tests::cloudroom_management_recent_output_is_bounded_and_usage_remains_unavailable ... ok
+test adapters::persistence::local_agents::pairing_tests::cloudroom_company_live_issuer_revocation_and_management_scope ... ok
+test adapters::persistence::local_agents::pairing_tests::cloudroom_pairing_budget_cardinality_is_bounded_under_competing_new_keys ... ok
+test adapters::persistence::local_agents::pairing_tests::cloudroom_pairing_cancel_and_consume_are_linearized ... ok
+test adapters::persistence::local_agents::pairing_tests::cloudroom_pairing_code_limit_cancel_and_competing_attempt_budget ... ok
+test adapters::http::routes::local_machine_connection::tests::failures::cloudroom_connection_handshake_timeout_and_shutdown_join_pending_hello ... ok
+test adapters::persistence::local_agents::pairing_tests::cloudroom_pairing_competing_claimants_and_lost_response_recover_only_winner ... ok
+test adapters::persistence::local_agents::pairing_tests::cloudroom_pairing_expiry_uses_database_time_after_waiting_for_locks ... ok
+test adapters::persistence::local_agents::pairing_tests::cloudroom_pairing_reused_claim_or_credential_never_reserves_another_installation ... ok
+test adapters::persistence::local_agents::protocol::capacity_tests::cloudroom_commands_capacity_sql_matches_command_kind_and_terminal_evidence_matrix ... ok
+test adapters::persistence::local_agents::protocol::capacity_tests::cloudroom_commands_uncertain_native_work_keeps_capacity_until_known_terminal_evidence ... ok
+test adapters::persistence::local_agents::protocol::command_tests::cloudroom_commands_competing_capacity_keeps_eight_control_slots ... ok
+test adapters::persistence::local_agents::protocol::command_tests::cloudroom_commands_competing_expiration_sweeps_leave_no_poison_batch ... ok
+test adapters::persistence::local_agents::protocol::command_tests::cloudroom_commands_competing_logical_invocations_reuse_frozen_operation ... ok
+test adapters::persistence::local_agents::protocol::command_tests::cloudroom_commands_withdrawal_refuses_untouched_but_reconciles_possible_delivery ... ok
+test adapters::persistence::local_agents::protocol::command_tests::failures::cloudroom_commands_accepted_controls_still_bound_the_outstanding_queue ... ok
+test adapters::persistence::local_agents::protocol::command_tests::failures::cloudroom_commands_create_binds_once_and_logical_replay_survives_native_mapping ... ok
+test adapters::persistence::local_agents::protocol::command_tests::failures::cloudroom_commands_foreign_session_and_observation_are_missing_to_an_authorized_manager ... ok
+test adapters::persistence::local_agents::protocol::command_tests::failures::cloudroom_commands_live_actor_withdrawal_races_first_dispatch_without_false_refusal ... ok
+test adapters::persistence::local_agents::protocol::observation_tests::cloudroom_observations_lost_ack_replay_uses_current_fence_and_same_payload ... ok
+test adapters::persistence::local_agents::protocol::observation_tests::cloudroom_observations_lost_journal_or_cursor_cannot_release_recovery_barrier ... ok
+test adapters::persistence::local_agents::protocol::observation_tests::cloudroom_observations_matching_turn_result_is_durable_and_human_turn_cannot_replace_it ... ok
+test adapters::persistence::local_agents::protocol::observation_tests::failures::cloudroom_observations_competing_sequence_claims_commit_only_one_content ... ok
+test adapters::persistence::local_agents::protocol::observation_tests::failures::cloudroom_observations_lease_expiry_is_rechecked_after_an_actual_row_lock_wait ... ok
+test adapters::persistence::local_agents::protocol::observation_tests::failures::cloudroom_observations_one_native_turn_cannot_settle_two_operations ... ok
+test adapters::persistence::local_agents::protocol::observation_tests::failures::cloudroom_observations_thread_stop_is_separate_and_allowed_after_disable ... ok
+test adapters::persistence::local_agents::protocol::operation_record_tests::cloudroom_commands_persisted_command_session_binding_is_checked_beyond_its_digest ... ok
+test adapters::persistence::local_agents::protocol::recovery_tests::cloudroom_commands_explicit_uncertainty_reconciles_before_new_effects ... ok
+test adapters::persistence::local_agents::protocol::recovery_tests::cloudroom_observations_every_preflight_refusal_preserves_explicit_uncertainty ... ok
+test adapters::persistence::local_agents::protocol::recovery_tests::cloudroom_observations_every_preflight_refusal_rejects_after_possible_submission ... ok
+test adapters::persistence::local_agents::protocol::observation_tests::failures::cloudroom_observations_late_result_is_audit_without_successful_wait ... ok
+test adapters::persistence::local_agents::protocol::recovery_tests::cloudroom_observations_preflight_refusals_before_intent_are_definitive ... ok
+test adapters::persistence::local_agents::protocol::recovery_tests::cloudroom_commands_expired_uncertain_work_reconciles_before_new_effects ... ok
+test adapters::persistence::local_agents::protocol::submission_tests::cloudroom_submission_queued_thread_maps_once_without_completing_native_work ... ok
+test application::local_agents::contract_tests::cloudroom_bounds_admission_preserves_control_capacity ... ok
+test application::local_agents::contract_tests::cloudroom_bounds_deadline_rejects_elapsed_and_above_maximum ... ok
+test application::local_agents::contract_tests::cloudroom_bounds_output_and_catalog_decode_at_their_limits ... ok
+test application::local_agents::contract_tests::cloudroom_bounds_prompt_counts_utf8_bytes_and_redacts_debug ... ok
+test application::local_agents::contract_tests::cloudroom_contract_aligned_leap_seconds_are_not_representable_operation_deadlines ... ok
+test application::local_agents::contract_tests::cloudroom_contract_catalog_refuses_unsupported_model_reasoning ... ok
+test application::local_agents::contract_tests::cloudroom_contract_catalog_success_requires_catalog_evidence ... ok
+test application::local_agents::contract_tests::cloudroom_contract_commands_are_closed_and_controls_are_explicit ... ok
+test application::local_agents::contract_tests::cloudroom_contract_deadline_precision_is_frozen_before_hashing ... ok
+test application::local_agents::contract_tests::cloudroom_contract_effect_success_requires_its_thread_and_a_turn ... ok
+test application::local_agents::contract_tests::cloudroom_contract_identities_validate_on_decode ... ok
+test application::local_agents::contract_tests::cloudroom_contract_machine_capabilities_reference_an_installation_scoped_snapshot ... ok
+test application::local_agents::contract_tests::cloudroom_contract_operations_freeze_digest_and_separate_dispatch_outcomes ... ok
+test application::local_agents::contract_tests::cloudroom_contract_reasoning_is_frozen_into_the_create_digest ... ok
+PASS Rust→Node command hashes: all 6 kinds, exact microseconds, escaping/Unicode, tampering and lossy Date negatives
+test application::local_agents::wire_tests::cloudroom_protocol_rust_node_command_hash_preserves_exact_deadline_and_text ... ok
+PASS Rust→Node submission evidence: accepted/queued/missing, no turn fabrication or terminal variant
+test application::local_agents::wire_tests::cloudroom_submission_rust_node_evidence_has_thread_without_turn_or_terminal_authority ... ok
+test adapters::persistence::local_agents::protocol::submission_tests::cloudroom_submission_requires_intent_and_preserves_known_turn_and_foreign_binding ... ok
+test adapters::persistence::local_agents::protocol::recovery_tests::cloudroom_observations_every_preflight_refusal_preserves_expired_uncertainty ... ok
+test adapters::persistence::workflow::tests::local_agent_tests::cloudroom_publication_native_output_is_data_and_direct_followup_cannot_reopen_workflow ... ok
+test adapters::persistence::workflow::tests::local_agent_tests::cloudroom_workflow_approval_parks_before_native_admission_and_grants_one_effect ... ok
+
+thread 'adapters::persistence::workflow::tests::local_agent_tests::cloudroom_workflow_completion_racing_cancellation_retains_evidence_without_revival' (17834340) panicked at src/adapters/persistence/workflow/local_agent_tests.rs:152:14:
+authorized saved workflow command
+test adapters::persistence::local_agents::protocol::submission_tests::cloudroom_submission_missing_and_late_identity_preserve_uncertainty_and_capacity ... ok
+test adapters::persistence::workflow::tests::local_agent_tests::cloudroom_workflow_competing_claims_park_one_operation_and_fresh_claim_consumes_once ... ok
+test adapters::persistence::workflow::tests::local_agent_tests::cloudroom_workflow_completion_racing_cancellation_retains_evidence_without_revival ... FAILED
+
+thread 'adapters::persistence::workflow::tests::local_agent_tests::cloudroom_workflow_machine_withdrawal_refuses_parked_output_and_live_delivery' (17834350) panicked at src/adapters/persistence/workflow/local_agent_tests.rs:366:34:
+called `Result::unwrap()` on an `Err` value: Database("error returned from database: new row for relation \"workflow_run_events\" violates check constraint \"workflow_run_event_wait_shape\"")
+test adapters::persistence::workflow::tests::local_agent_tests::cloudroom_workflow_machine_withdrawal_refuses_parked_output_and_live_delivery ... FAILED
+test adapters::persistence::workflow::tests::local_agent_tests::cloudroom_workflow_result_bounds_utf8_and_classifies_native_uncertainty ... ok
+
+failures:
+
+failures:
+    adapters::http::routes::workflows::ui::authoring::tests::sample_tests::cloudroom_samples_local_run_uses_scripted_output_without_machine_or_production_effects
+    adapters::persistence::workflow::tests::local_agent_tests::cloudroom_workflow_completion_racing_cancellation_retains_evidence_without_revival
+    adapters::persistence::workflow::tests::local_agent_tests::cloudroom_workflow_machine_withdrawal_refuses_parked_output_and_live_delivery
+
+test result: FAILED. 94 passed; 3 failed; 1 ignored; 0 measured; 3194 filtered out; finished in 27.49s
+

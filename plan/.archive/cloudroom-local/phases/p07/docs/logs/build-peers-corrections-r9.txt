@@ -1,0 +1,5 @@
+npm error Missing script: "build:peers"
+npm error
+npm error To see a list of scripts, run:
+npm error   npm run
+npm error A complete log of this run can be found in: /Users/mac03/.npm/_logs/2026-11-08T13_18_06_513Z-debug-0.log

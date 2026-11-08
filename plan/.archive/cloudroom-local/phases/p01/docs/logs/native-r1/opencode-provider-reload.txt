@@ -1,0 +1,4 @@
+provider-acp@0.1.0  running
+  source: builtin:provider-acp
+  handlers: 18 calls / 2.3s total / 806ms max
+  service acp-capability-probe: running

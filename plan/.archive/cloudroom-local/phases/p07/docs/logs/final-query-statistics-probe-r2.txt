@@ -1,0 +1,5 @@
+ ci_pg_stat_statements_probe 
+-----------------------------
+                           1
+(1 row)
+

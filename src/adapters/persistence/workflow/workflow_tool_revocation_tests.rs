@@ -207,7 +207,7 @@ async fn workflow_tool_repin_and_archive_leave_published_workflows_on_their_froz
             persistence: p.clone(),
             inner: agent_publication::AgentPublicationDirectory {
                 persistence: p.clone(),
-                inner: message::MessagePublicationDirectory {
+                inner: step_builtins::StepBuiltinPublicationDirectory {
                     persistence: p.clone(),
                 },
             },

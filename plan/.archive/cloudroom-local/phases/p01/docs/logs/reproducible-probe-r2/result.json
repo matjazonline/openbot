@@ -1,0 +1,18 @@
+{
+  "sourceRevision": "d8b3cc3a16bb4b06fc99d8e543d40f1087d1e815",
+  "sdkVersion": "0.6.50",
+  "nodeVersion": "v24.21.0",
+  "profile": "/var/folders/n2/5y7x75r92zl0ll90154hxdzr0000gn/T/openbot-cloudroom-proof-D0aLMz/profile",
+  "lifecycle": "PASS",
+  "restartIdentity": "PASS",
+  "acceptanceMappingCrash": "PASS",
+  "twoClientsQueuedOrder": "PASS",
+  "queuedMutations": "PASS",
+  "createDeduplicates": false,
+  "queuedSendDeduplicates": false,
+  "nativeProviderInference": "NOT EXERCISED",
+  "terminalTurnCorrelation": "NOT EXERCISED",
+  "eventReplay": "NOT EXERCISED",
+  "targetedStop": "UNSUPPORTED",
+  "platform": "darwin"
+}

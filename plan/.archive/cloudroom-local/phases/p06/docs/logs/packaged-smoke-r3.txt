@@ -1,0 +1,23 @@
+error: unknown option '--yes'
+node:internal/errors:986
+  const err = new Error(message);
+              ^
+
+Error: Command failed: /opt/homebrew/Cellar/node@24/24.21.0/bin/node /tmp/openbot-cloudroom-d8b3cc3/gui/apps/cli/dist/index.js plugin remove openbot-local --yes
+error: unknown option '--yes'
+
+    at genericNodeError (node:internal/errors:986:15)
+    at wrappedFn (node:internal/errors:540:14)
+    at checkExecSyncError (node:child_process:942:11)
+    at execFileSync (node:child_process:978:15)
+    at cli (file:///Users/mac03/dev/openbot/plan/cloudroom-local/phases/p06/docs/logs/packaged-smoke-r3.mjs:44:21)
+    at file:///Users/mac03/dev/openbot/plan/cloudroom-local/phases/p06/docs/logs/packaged-smoke-r3.mjs:60:3 {
+  status: 1,
+  signal: null,
+  output: [ null, '', "error: unknown option '--yes'\n" ],
+  pid: 37986,
+  stdout: '',
+  stderr: "error: unknown option '--yes'\n"
+}
+
+Node.js v24.21.0

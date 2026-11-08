@@ -837,7 +837,7 @@ async fn compiled(
     // As the production directory nests them: the message built-ins (the caller holds the
     // company lock and authorized the requester), then the agents. Provisioned templates select
     // no HTTP or MCP operation and call no child.
-    let mut captured = super::message::message_builtins(draft.company())?;
+    let mut captured = super::step_builtins::dependencies(draft.company())?;
     let selection = match super::agent_publication::agent_selection(draft) {
         Ok(selection) => selection,
         Err(AppError::BadRequest(message)) => {

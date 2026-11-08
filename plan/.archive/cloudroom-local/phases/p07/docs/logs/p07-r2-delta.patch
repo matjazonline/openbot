@@ -1,0 +1,2511 @@
+diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml
+index 8a4090ef..93fd0142 100644
+--- a/.github/workflows/ci.yml
++++ b/.github/workflows/ci.yml
+@@ -36,10 +36,13 @@ jobs:
+           cache: npm
+       - name: Install frontend dependencies
+         run: npm ci
+-      - name: Install and build counted local-agent test peer
++      - name: Verify local-agent plugin and build counted test peers
+         run: |
+           npm --prefix integrations/cloudroom-plugin ci
+-          npm --prefix integrations/cloudroom-plugin run build -- --test
++          npm --prefix integrations/cloudroom-plugin run typecheck
++          npm --prefix integrations/cloudroom-plugin run build
++          npm --prefix integrations/cloudroom-plugin test
++          npm --prefix integrations/cloudroom-plugin run test:guards
+       - name: Reproducible local-agent package and locked runtime installation
+         run: |
+           npm --prefix integrations/cloudroom-plugin run package
+diff --git a/integrations/cloudroom-plugin/OPERATIONS.md b/integrations/cloudroom-plugin/OPERATIONS.md
+index f0203d2e..b69930ce 100644
+--- a/integrations/cloudroom-plugin/OPERATIONS.md
++++ b/integrations/cloudroom-plugin/OPERATIONS.md
+@@ -72,6 +72,14 @@ and stops its whole owned group on a component failure. SIGINT/SIGTERM starts a
+ five-second graceful drain followed by bounded forced shutdown. A stopped socket,
+ server or wrapper does not establish that a native agent stopped. Use explicit
+ thread stop and inspect its matching native turn when that proof is required.
++The plugin bounds each SDK wait to five seconds. A slow stop/archive response, including
++release of an already idle provider runtime, can therefore remain uncertain even if Cloudroom
++later completes it. Inspect the mapped thread before deciding on another explicit control; the
++plugin never retries that uncertain mutation automatically.
++Provider startup can fail before a native turn is accepted, including when a login is missing.
++The plugin reports uncertainty in that case and retains the original request for reconciliation;
++it does not manufacture a failed turn or resend the prompt. Inspect Cloudroom's thread and the
++provider login before deciding on a new explicit operation.
+ Wrapper output contains component/state only. Raw child output is suppressed;
+ Cloudroom's own diagnostics under the private profile remain sensitive upstream data.
+ 
+diff --git a/integrations/cloudroom-plugin/README.md b/integrations/cloudroom-plugin/README.md
+index 0e5b9a89..b0721643 100644
+--- a/integrations/cloudroom-plugin/README.md
++++ b/integrations/cloudroom-plugin/README.md
+@@ -49,9 +49,13 @@ original candidate and must recover that same claim. Rejection never resets an i
+ 
+ An operation receives a visible `[Openbot operation …]` header. Follow-up prompts use Cloudroom's
+ queue. Only the exact originating request and accepted native turn can complete the operation;
+-human messages, idle status and the latest answer do not suffice. Answer permission prompts in
++human messages, idle status and the latest answer do not suffice. Native event cursors can be sparse
++after Cloudroom compacts streaming deltas. Final output uses completed message snapshots; gaps
++conservatively mark the result truncated. Answer permission prompts in
+ Cloudroom. Stop/archive explicitly affect the whole mapped thread. Deadlines, disconnects,
+ service cancellation and credential revocation do not prove the native agent stopped.
++If provider startup fails before a native turn is accepted, the operation becomes uncertain.
++Inspect the thread and fix the provider login before deciding on a new explicit request.
+ 
+ The plugin retains immutable observations until a contiguous server acknowledgment. It reserves
+ terminal space before submission, limits native effects to eight, bounds output to 256 KiB and
+diff --git a/integrations/cloudroom-plugin/compatibility/manifest.json b/integrations/cloudroom-plugin/compatibility/manifest.json
+index ebf853cb..aa154ff0 100644
+--- a/integrations/cloudroom-plugin/compatibility/manifest.json
++++ b/integrations/cloudroom-plugin/compatibility/manifest.json
+@@ -63,6 +63,10 @@
+     {
+       "path": "gui/packages/config/src/caller-proof.ts",
+       "sha256": "56bc472a4b257c5e75c1e2af57ec435e99e17f61062e0bd5485a16372949290f"
++    },
++    {
++      "path": "gui/packages/db/src/data/events.ts",
++      "sha256": "5c5c8be1366862eab94db9fd5735f0646fc4671b8063352c6d1e0aa2f5a0bbe8"
+     }
+   ],
+   "providers": [
+@@ -99,7 +103,8 @@
+     "providerModelDiscovery": "PASS: Claude Code, Codex and OpenCode 1.19.5 public SDK catalogs; catalog discovery is distinct from authentication and inference",
+     "activeThreadStop": "PASS: public thread-wide stop during native Codex shell execution yields interrupted for the same accepted turn; no atomic targeted-turn stop exists",
+     "optionalLocalOnboarding": "PASS: reviewed UI-only patch, production build/typecheck, real native interaction controls visible without hosted account, manual setup opens and Skip setup dismisses",
+-    "mutationCancellation": "PASS: actual patched public SDK HTTP header/body waits abort for spawn/send/stop/archive/archiveAll, including pre-aborted calls; cancellation never proves native nonexecution"
++    "mutationCancellation": "PASS: actual patched public SDK HTTP header/body waits abort for spawn/send/stop/archive/archiveAll, including pre-aborted calls; cancellation never proves native nonexecution",
++    "eventSequence": "Strictly increasing retained-event cursors; completed streaming deltas may be compacted. Only completed message snapshots become terminal output; sequence gaps conservatively mark truncation."
+   },
+   "recoveryPolicy": {
+     "dispatchIntentWithoutPositiveReceipt": "uncertain; never resubmit",
+diff --git a/integrations/cloudroom-plugin/compatibility/prove-native-ui.mjs b/integrations/cloudroom-plugin/compatibility/prove-native-ui.mjs
+index 1e848e9d..804cee65 100644
+--- a/integrations/cloudroom-plugin/compatibility/prove-native-ui.mjs
++++ b/integrations/cloudroom-plugin/compatibility/prove-native-ui.mjs
+@@ -18,14 +18,27 @@ for (const value of [origin, backendOrigin]) {
+   assert.equal(url.hostname, "127.0.0.1");
+ }
+ const browser = await chromium.launch({ headless: true });
++let page;
++const refused = [];
+ try {
+   const context = await browser.newContext({ extraHTTPHeaders: await localCallerHeaders(backendOrigin, profile) });
+   await restrictToProbeServers(context, [origin, backendOrigin]);
+-  const page = await context.newPage();
++  page = await context.newPage();
++  page.on("response", (response) => {
++    if (response.status() >= 400 && refused.length < 16) refused.push({
++      path: new URL(response.url()).pathname, status: response.status(),
++    });
++  });
+   await page.goto(`${origin}/projects/${projectId}/threads/${threadId}`, { waitUntil: "domcontentloaded" });
+   await expect(page.getByRole("button", { name: "Set up Cloudroom", exact: true })).toBeVisible();
+   await expect(page.getByRole("button", { name: "Skip setup", exact: true })).toHaveCount(0);
+   const button = action === "answer" ? "Submit answer" : "Deny";
++  if (action === "deny") {
++    const deny = page.getByRole("button", { name: "Deny", exact: true });
++    const approval = page.getByRole("button", { name: "Approval needed", exact: true });
++    await expect(deny.or(approval).first()).toBeVisible({ timeout: 30_000 });
++    if (!(await deny.isVisible())) await approval.click();
++  }
+   await expect(page.getByRole("button", { name: button, exact: true })).toBeVisible({ timeout: 30_000 });
+   await page.screenshot({ path: resolve(evidence, `${action}-before.png`), fullPage: true });
+   if (action === "answer") await page.getByRole("button", { name: /^Continue smoke/ }).click();
+@@ -42,4 +55,14 @@ try {
+     threadId, projectId, action, actualUi: true, hostedAccount: false, apiStandIns: false,
+     realInteractionSubmitted: true,
+   }, null, 2) + "\n");
++} catch (error) {
++  if (page) {
++    await page.screenshot({ path: resolve(evidence, `${action}-failure.png`), fullPage: true });
++    await writeFile(resolve(evidence, `${action}-failure.json`), JSON.stringify({
++      threadId, action, refused,
++      message: String(error.message).slice(0, 2000),
++      buttons: (await page.getByRole("button").allTextContents()).slice(0, 80).map(text => text.slice(0, 160)),
++    }, null, 2) + "\n");
++  }
++  throw error;
+ } finally { await browser.close(); }
+diff --git a/integrations/cloudroom-plugin/scripts/build.mjs b/integrations/cloudroom-plugin/scripts/build.mjs
+index 667252db..e4b13bd3 100644
+--- a/integrations/cloudroom-plugin/scripts/build.mjs
++++ b/integrations/cloudroom-plugin/scripts/build.mjs
+@@ -2,7 +2,7 @@ import { build } from 'esbuild';
+ import { readdir, mkdir } from 'node:fs/promises';
+ const tests = process.argv.includes('--test');
+ const entries = tests
+-  ? (await readdir('test')).filter(name => name.endsWith('.test.ts') || name === 'retention-peer.ts').map(name => `test/${name}`)
++  ? (await readdir('test')).filter(name => name.endsWith('.test.ts') || name.endsWith('-peer.ts')).map(name => `test/${name}`)
+   : ['src/server.ts'];
+ if (!entries.length) throw new Error('no selected plugin tests');
+ const outdir = tests ? 'build-tests' : 'dist';
+diff --git a/integrations/cloudroom-plugin/src/sdk.ts b/integrations/cloudroom-plugin/src/sdk.ts
+index eb9bc559..7a13d7c9 100644
+--- a/integrations/cloudroom-plugin/src/sdk.ts
++++ b/integrations/cloudroom-plugin/src/sdk.ts
+@@ -182,7 +182,8 @@ export class CloudroomSdk {
+     }
+     if (!record.threadId) await this.recoverCreate(record, signal);
+     if (!record.threadId) return { kind: 'uncertain', record };
+-    try { await this.sdk.threads.get({ threadId: record.threadId, signal }); }
++    let nativeFailed: boolean;
++    try { nativeFailed = (await this.sdk.threads.get({ threadId: record.threadId, signal })).status === 'error'; }
+     catch (error) {
+       if (!missing(error)) throw error;
+       if (record.turnId) {
+@@ -199,6 +200,9 @@ export class CloudroomSdk {
+     }
+     const events = await this.sdk.threads.events.list({ threadId: record.threadId, afterSeq: String(record.cursor), limit: '100', order: 'asc', signal });
+     const update = applyNativeEvents(record, events);
++    // Startup can fail before any turn is accepted (for example, no provider
++    // login). Report uncertainty without inventing a turn result or resending.
++    if (nativeFailed && !update.record.turnId) return { kind: 'uncertain', record: update.record };
+     if (update.kind !== 'terminal' && update.kind !== 'uncertain' && update.record.turnId) {
+       const interactions = await this.sdk.threads.interactions.list({ threadId: record.threadId, signal });
+       if (interactions.length > LIMITS.page) throw new Error('native interaction bound');
+diff --git a/integrations/cloudroom-plugin/src/turns.ts b/integrations/cloudroom-plugin/src/turns.ts
+index ef3abe3a..a557c4cc 100644
+--- a/integrations/cloudroom-plugin/src/turns.ts
++++ b/integrations/cloudroom-plugin/src/turns.ts
+@@ -46,7 +46,10 @@ export function applyNativeEvents(original: CommandRecord, events: readonly Even
+   };
+   for (const event of events) {
+     if (!Number.isSafeInteger(event.seq) || event.seq <= record.cursor) throw new Error('native event cursor did not advance');
+-    if (event.seq > record.cursor + 1) { record.cursor = event.seq; return conflict(); }
++    // Cloudroom prunes resolved streaming deltas without renumbering retained
++    // events. A gap is not a lost request/turn binding; expose incomplete history
++    // conservatively while still requiring every positive correlation below.
++    if (event.seq > record.cursor + 1) record.truncated = true;
+     record.cursor = event.seq;
+     if (event.type === 'client/turn/requested' && ownInput(event.data.input, record.sdkInput)
+         && event.data.source === (record.operation.command.kind === 'create' ? 'spawn' : 'tell')) {
+@@ -59,11 +62,7 @@ export function applyNativeEvents(original: CommandRecord, events: readonly Even
+     }
+     if (event.scope.kind !== 'turn' || event.scope.turnId !== record.turnId) continue;
+     if (event.type.startsWith('item/') && record.nativeState === 'waiting_for_input') record.nativeState = 'running';
+-    if (event.type === 'item/agentMessage/delta' && !event.data.parentToolCallId) {
+-      const prior = record.items.find(item => item.id === event.data.itemId)?.text ?? '';
+-      replaceText(record, event.data.itemId, prior + event.data.delta.slice(0, LIMITS.output + 1));
+-    }
+-    if ((event.type === 'item/started' || event.type === 'item/completed')
++    if (event.type === 'item/completed'
+         && event.data.item.type === 'agentMessage' && !event.data.item.parentToolCallId) {
+       replaceText(record, event.data.item.id, event.data.item.text);
+     }
+diff --git a/Users/mac03/dev/openbot/integrations/cloudroom-plugin/test/e2e-peer.ts b/integrations/cloudroom-plugin/test/e2e-peer.ts
+new file mode 100644
+index 00000000..72abd8c0
+--- /dev/null
++++ b/integrations/cloudroom-plugin/test/e2e-peer.ts
+@@ -0,0 +1,103 @@
++// Counted native-runtime stand-in, driven by real PostgreSQL/workflow/WSS tests.
++// Durable provider state is separate from the plugin journal, as it is in Cloudroom.
++import Database from 'better-sqlite3';
++import { existsSync, readFileSync, writeFileSync, statSync } from 'node:fs';
++import { join } from 'node:path';
++import { createInterface } from 'node:readline';
++import { Connector } from '../src/connector.js';
++import { Dispatcher } from '../src/dispatcher.js';
++import { Journal, JOURNAL_SCHEMA, type CommandRecord } from '../src/journal.js';
++import { nativeInput, selectionSchema } from '../src/protocol.js';
++import { acquireProfileLock } from '../src/lock.js';
++import type { Paired } from '../src/enrollment.js';
++import { nativeFixture, event } from './native-fixture.js';
++
++const config = JSON.parse(readFileSync(process.argv[2]!, 'utf8')) as {
++  directory: string; paired: Paired; selection: unknown; cut: string;
++};
++process.umask(0o077);
++const selection = selectionSchema.parse(config.selection);
++const db = new Database(join(config.directory, 'journal.db')); db.pragma('journal_mode=WAL');
++const release = acquireProfileLock(db.name);
++if (!db.prepare("SELECT 1 FROM sqlite_master WHERE name='journal_meta'").get()) for (const statement of JOURNAL_SCHEMA) db.exec(statement);
++const journal = new Journal(db); journal.initialize(config.paired.binding);
++const native = nativeFixture(journal, selection);
++const providerFile = join(config.directory, 'provider.json'); const cutFile = join(config.directory, 'cut.json');
++if (existsSync(providerFile)) {
++  if (statSync(providerFile).size > 2 * 1024 * 1024) throw new Error('provider fixture bound');
++  const saved = JSON.parse(readFileSync(providerFile, 'utf8')) as { state: typeof native.state; calls: string[] };
++  Object.assign(native.state, saved.state);
++  for (const kind of saved.calls) native.calls.push({ kind, input: {} });
++}
++const persistProvider = () => writeFileSync(providerFile, JSON.stringify({ state: native.state, calls: native.calls.map(call => call.kind) }), { mode: 0o600 });
++persistProvider();
++if (config.cut === 'after_admission' && !existsSync(cutFile)) {
++  // The Rust owner has committed admission; this peer has not opened a socket.
++  writeFileSync(cutFile, JSON.stringify({ stage: config.cut }), { mode: 0o600 });
++  process.kill(process.pid, 'SIGKILL');
++}
++function cut(stage: string, record: CommandRecord) {
++  if (config.cut !== stage || existsSync(cutFile) || !['create', 'send'].includes(record.operation.command.kind)) return;
++  writeFileSync(cutFile, JSON.stringify({ stage, operation: record.operation.id }), { mode: 0o600 });
++  process.kill(process.pid, 'SIGKILL');
++}
++const admit = journal.admit.bind(journal);
++journal.admit = delivery => {
++  const provisional = { operation: delivery.operation } as CommandRecord;
++  cut('before_receipt', provisional);
++  const result = admit(delivery); cut('after_receipt', result.record); return result;
++};
++const intent = journal.beginIntent.bind(journal);
++journal.beginIntent = record => { intent(record); cut('after_intent', record); };
++const submission = journal.submission.bind(journal);
++journal.submission = (record, selected, state) => { submission(record, selected, state); cut('after_mapping', record); };
++const evidence = journal.evidence.bind(journal);
++journal.evidence = (record, value, importance) => { evidence(record, value, importance); if (importance === 'terminal') cut('after_terminal', record); };
++const acknowledge = journal.acknowledge.bind(journal);
++journal.acknowledge = through => {
++  for (const observation of journal.outbox()) {
++    if (observation.kind !== 'agent' || observation.observation.sequence > through) continue;
++    const record = journal.get(observation.observation.operation_id);
++    if (record?.stage === 'terminal' && observation.observation.evidence.kind === 'turn'
++        && observation.observation.evidence.state === 'completed') cut('after_server_receipt', record);
++  }
++  acknowledge(through);
++};
++function completeNative(record: CommandRecord) {
++  const sequence = native.state.events.at(-1)?.seq ?? 0;
++  if (sequence >= 400) throw new Error('native event fixture bound');
++  const request = `request_${record.operation.id}`; const turn = `turn_${record.operation.id}`;
++  native.state.events.push(event(sequence + 1, 'client/turn/requested', {
++    input: [{ type: 'text', text: nativeInput(record.operation) }], source: record.operation.command.kind === 'create' ? 'spawn' : 'tell', requestId: request,
++  }), event(sequence + 2, 'turn/input/accepted', { clientRequestId: request }, turn),
++  event(sequence + 3, 'item/completed', { item: { type: 'agentMessage', id: `answer_${sequence}`, text: 'counted e2e native result' } }, turn),
++  event(sequence + 4, 'turn/completed', { status: 'completed' }, turn));
++  persistProvider(); cut('after_sdk', record);
++}
++for (const kind of ['spawn', 'send'] as const) {
++  const original = native.bb.sdk.threads[kind].bind(native.bb.sdk.threads);
++  // The fixture records actual SDK mutator entry, then independently persists the
++  // native transcript before a crash can interrupt the plugin's mapping write.
++  (native.bb.sdk.threads as any)[kind] = async (input: unknown) => {
++    const result = await (original as (input: unknown) => Promise<unknown>)(input);
++    const record = journal.pending().find(candidate => candidate.sdkCalls === 1 && candidate.operation.command.kind === (kind === 'spawn' ? 'create' : 'send'));
++    if (!record) throw new Error('native effect without journal intent'); completeNative(record); return result;
++  };
++}
++const emit = (value: unknown) => process.stdout.write(JSON.stringify(value) + '\n');
++const stop = new AbortController(); const connector = new Connector(new Dispatcher(journal, native.sdk));
++const running = connector.run(config.paired, stop.signal); void running.catch(() => emit({ event: 'failure', stage: 'connector' }));
++const lines = createInterface({ input: process.stdin }); const deadline = setTimeout(() => stop.abort(), 120_000);
++emit({ event: 'started' });
++try {
++  for await (const line of lines) {
++    if (Buffer.byteLength(line) > 1024) throw new Error('fixture input bound');
++    const input = JSON.parse(line) as { command: string };
++    if (input.command === 'snapshot') emit({ event: 'snapshot', calls: native.calls.map(call => call.kind),
++      connection: connector.status, sequence: journal.sequence(), acknowledged: journal.acknowledged(),
++      recovery: journal.recoveryRequired(), outbox: journal.outbox().length });
++    else if (input.command === 'close') break;
++    else throw new Error('unknown fixture command');
++  }
++} catch { emit({ event: 'failure', stage: 'fixture' }); process.exitCode = 1; }
++finally { stop.abort(); clearTimeout(deadline); await running.catch(() => {}); lines.close(); persistProvider(); db.close(); release(); }
+diff --git a/Users/mac03/dev/openbot/integrations/cloudroom-plugin/test/native-peer.ts b/integrations/cloudroom-plugin/test/native-peer.ts
+new file mode 100644
+index 00000000..1e767e69
+--- /dev/null
++++ b/integrations/cloudroom-plugin/test/native-peer.ts
+@@ -0,0 +1,297 @@
++// Explicitly opted-in disposable acceptance of the packaged production plugin.
++// Pairing/auth material remains in a private config file and request bodies.
++import assert from 'node:assert/strict';
++import { spawn, execFileSync, type ChildProcess } from 'node:child_process';
++import { readFileSync, statSync, mkdirSync, writeFileSync, mkdtempSync, existsSync, rmSync } from 'node:fs';
++import { homedir } from 'node:os';
++import Database from 'better-sqlite3';
++import { resolve, join } from 'node:path';
++import { createServer } from 'node:net';
++import { once } from 'node:events';
++import { createHash } from 'node:crypto';
++import { createInterface } from 'node:readline';
++import { readBoundedJson } from '../src/enrollment.js';
++import { loggedOutProviderEnvironment } from './native-provider-environment.js';
++
++assert.equal(process.env.OPENBOT_CLOUDROOM_NATIVE_SMOKE, '1', 'native acceptance requires explicit opt-in');
++const inputFile = process.argv[2]!; assert(statSync(inputFile).size < 16 * 1024);
++const cfg = JSON.parse(readFileSync(inputFile, 'utf8')) as {
++  directory: string; source: string; artifact: string; workspace: string; origin: string;
++  pairingCode: string; provider: string; opencodeBin?: string; evidence: string;
++};
++assert(['codex', 'claude-code', 'acp-opencode'].includes(cfg.provider));
++const integrity = JSON.parse(readFileSync(cfg.artifact + '.integrity.json', 'utf8'));
++assert.equal(createHash('sha256').update(readFileSync(cfg.artifact)).digest('hex'), integrity.sha256);
++process.umask(0o077);
++const plugin = join(cfg.directory, 'plugin'); const profile = join(cfg.directory, 'profile');
++mkdirSync(plugin); execFileSync('tar', ['-xzf', cfg.artifact, '-C', plugin, '--strip-components=1']);
++execFileSync('npm', ['ci', '--omit=dev'], { cwd: plugin, stdio: 'pipe', timeout: 180_000, maxBuffer: 1024 * 1024 });
++const port = async () => { const listener = createServer(); listener.listen(0, '127.0.0.1'); await once(listener, 'listening');
++  const value = (listener.address() as { port: number }).port; await new Promise<void>(done => listener.close(() => done())); return value; };
++const ports = [await port(), await port(), await port()]; const origin = `http://127.0.0.1:${ports[0]}`;
++const uiOrigin = `http://127.0.0.1:${ports[2]}`;
++let env: NodeJS.ProcessEnv = { ...process.env, NODE_ENV: 'production', BB_DATA_DIR: profile, ROOM_SERVER_URL: origin,
++  ROOM_HOST_DAEMON_PORT: String(ports[1]), PATH: cfg.opencodeBin ? `${cfg.opencodeBin}:${process.env.PATH}` : process.env.PATH };
++if (cfg.provider === 'acp-opencode') {
++  assert.match(execFileSync('opencode', ['--version'], { env, encoding: 'utf8', timeout: 5000 }), /1\.19\.5/);
++  assert(!env.OPENCODE_CONFIG_CONTENT, 'native acceptance must not replace an existing inline provider configuration');
++  env.OPENCODE_CONFIG_CONTENT = JSON.stringify({ permission: { edit: 'ask' } });
++}
++const cli = (args: string[]) => execFileSync(process.execPath, [resolve(cfg.source, 'gui/apps/cli/dist/index.js'), ...args], {
++  cwd: resolve(cfg.source, 'gui'), env, encoding: 'utf8', timeout: 60_000, maxBuffer: 2 * 1024 * 1024,
++});
++const jsonCli = (args: string[]) => JSON.parse(cli(args));
++const emit = (value: unknown) => process.stdout.write(JSON.stringify(value) + '\n');
++let service: ChildProcess | undefined; let output = ''; let stage = 'boot';
++async function boot() {
++  output = '';
++  service = spawn(process.execPath, [join(plugin, 'services/run.mjs'), '--source', cfg.source, '--profile', profile,
++    '--server-port', String(ports[0]), '--daemon-port', String(ports[1]), '--ui-port', String(ports[2])], { env, stdio: ['ignore', 'pipe', 'ignore'] });
++  service.stdout!.on('data', part => { output += part; if (Buffer.byteLength(output) > 64 * 1024) service!.kill('SIGTERM'); });
++  const deadline = performance.now() + 45_000;
++  while (!output.includes('"state":"ready"')) {
++    assert(service.exitCode === null && performance.now() < deadline, 'packaged native service boot failed');
++    await new Promise(done => setTimeout(done, 100));
++  }
++}
++async function stop() {
++  if (!service || service.exitCode !== null) return;
++  const exited = once(service, 'exit'); service.kill('SIGTERM');
++  const timer = setTimeout(() => service?.kill('SIGKILL'), 12_000);
++  try { const [code] = await exited; assert.equal(code, 0); } finally { clearTimeout(timer); }
++}
++const compatibility = new URL('../compatibility/', import.meta.url);
++const { localCallerHeaders } = await import(new URL('local-caller.mjs', compatibility).href);
++const { proveUi } = await import(new URL('prove-ui.mjs', compatibility).href);
++let headers: Record<string, string>; let thread: string | undefined; let ownedProject: string | undefined;
++let permissionDirectory: string | undefined; let permissionTarget: string | undefined;
++async function settings(values: Record<string, unknown>) {
++  const response = await fetch(`${origin}/api/v1/plugins/openbot-local/settings`, { method: 'PUT', redirect: 'error',
++    headers: { ...headers, 'content-type': 'application/json' }, body: JSON.stringify({ values }), signal: AbortSignal.timeout(10_000) });
++  assert(response.ok, 'public plugin settings refused'); await readBoundedJson(response, 256 * 1024);
++}
++async function waitStatus(ready: (status: any) => boolean) {
++  const deadline = performance.now() + 60_000;
++  while (performance.now() < deadline) {
++    const status = jsonCli(['plugin', 'run', 'openbot-local', 'status']);
++    if (status.paired && status.connection === 'connected' && ready(status)) return status;
++    await new Promise(done => setTimeout(done, 250));
++  }
++  throw new Error('paired production connector did not become ready');
++}
++const connected = () => waitStatus(status => status.providers.some((item: {provider:string;status:string}) => item.provider === cfg.provider && item.status === 'available'));
++const lines = createInterface({ input: process.stdin });
++const deadline = setTimeout(() => lines.close(), 5 * 60_000);
++function readEvents(id: string): any[] {
++  const events: any[] = []; let after = 0;
++  for (let page = 0; page < 4; page++) {
++    const batch = jsonCli(['thread', 'log', id, '--json', '--limit', '100', '--after-seq', String(after)]);
++    assert(Array.isArray(batch) && batch.length <= 100);
++    for (const event of batch) { assert(Number.isSafeInteger(event.seq) && event.seq > after); after = event.seq; events.push(event); }
++    if (batch.length < 100) return events;
++  }
++  throw new Error('native acceptance history exceeded four bounded pages');
++}
++async function humanTerminal(marker: string) {
++  assert(thread); const deadline = performance.now() + 120_000;
++  // A native permission denial may interrupt the turn and pause its queue.
++  // The human explicitly sends the existing queued message; never resubmit it.
++  const queued = jsonCli(['thread', 'queue', 'list', thread, '--json']);
++  assert(Array.isArray(queued) && queued.length <= 32);
++  const own = queued.filter(item => JSON.stringify(item.content).includes(marker));
++  assert(own.length <= 1);
++  if (own.length === 1) {
++    assert(typeof own[0].id === 'string');
++    const lastTurn = readEvents(thread).filter(event => event.type === 'turn/completed').at(-1);
++    // ACP can retain an active thread after the denied turn is interrupted.
++    // The human explicitly stops that thread before resuming its existing queue.
++    if (lastTurn?.data.status === 'interrupted') cli(['thread', 'stop', thread]);
++    jsonCli(['thread', 'queue', 'send', thread, own[0].id, '--json']);
++  }
++  while (performance.now() < deadline) {
++    const events = readEvents(thread);
++    const requests = events.filter(event => event.type === 'client/turn/requested' && JSON.stringify(event.data.input).includes(marker));
++    assert(requests.length <= 1, 'independent human input must not be resubmitted');
++    const request = requests[0];
++    const accepted = request && events.find(event => event.type === 'turn/input/accepted' && event.data.clientRequestId === request.data.requestId);
++    if (accepted && events.some(event => event.type === 'turn/completed' && event.scope.turnId === accepted.scope.turnId)) {
++      assert(events.some(event => event.type === 'item/completed' && event.scope.turnId === accepted.scope.turnId
++        && event.data.item.type === 'agentMessage' && event.data.item.text.includes(marker)));
++      return accepted.scope.turnId;
++    }
++    await new Promise(done => setTimeout(done, 100));
++  }
++  throw new Error('independent human turn did not finish');
++}
++function transcript(operation: string) {
++  assert(thread && /^[0-9a-f-]{36}$/.test(operation));
++  const events = readEvents(thread);
++  assert(Array.isArray(events) && events.length <= 400);
++  const request = events.find((event: any) => event.type === 'client/turn/requested'
++    && JSON.stringify(event.data.input).includes(`Openbot operation ${operation}`));
++  const accepted = request && events.find((event: any) => event.type === 'turn/input/accepted' && event.data.clientRequestId === request.data.requestId);
++  return { events, turn: accepted?.scope.turnId };
++}
++async function terminal(operation: string, marker: string) {
++  const deadline = performance.now() + 120_000;
++  while (performance.now() < deadline) {
++    const { events, turn } = transcript(operation);
++    const complete = turn && events.find((event: any) => event.type === 'turn/completed' && event.scope.turnId === turn);
++    if (complete) {
++      assert.equal(complete.data.status, 'completed');
++      assert(events.some((event: any) => event.type === 'item/completed' && event.scope.turnId === turn
++        && event.data.item.type === 'agentMessage' && event.data.item.text.includes(marker)));
++      return turn;
++    }
++    await new Promise(done => setTimeout(done, 100));
++  }
++  throw new Error('native output did not become durable');
++}
++async function executing(operation: string) {
++  assert(thread && /^[0-9a-f-]{36}$/.test(operation));
++  const deadline = performance.now() + 30_000;
++  while (performance.now() < deadline) {
++    const { events, turn } = transcript(operation);
++    if (turn && events.some((event: any) => event.type === 'item/started' && event.data.item.type === 'commandExecution'
++        && event.scope.kind === 'turn' && event.scope.turnId === turn)) return turn;
++    await new Promise(done => setTimeout(done, 100));
++  }
++  throw new Error('native stop task did not execute its bounded shell command');
++}
++function diagnostics() {
++  // Read only the plugin-owned database, never Cloudroom's internal tables.
++  const db = new Database(join(profile, 'plugins/openbot-local/data.db'), { readonly: true, fileMustExist: true });
++  try {
++    const commands = db.prepare(`SELECT id,json_extract(state,'$.operation.command.kind') AS kind,
++      json_extract(state,'$.stage') AS stage,json_extract(state,'$.sdkCalls') AS sdkCalls,
++      json_extract(state,'$.threadId') AS thread,json_extract(state,'$.requestId') AS request,
++      json_extract(state,'$.turnId') AS turn,json_extract(state,'$.queueId') AS queue,
++      json_extract(state,'$.cursor') AS cursor,json_extract(state,'$.correlationConflict') AS correlationConflict,
++      json_extract(state,'$.nativeState') AS nativeState,
++      COALESCE(json_extract(state,'$.lastObservation.observation.sequence'),json_extract(state,'$.lastObservation.sequence')) AS sequence,
++      json_extract(state,'$.lastObservation.observation.evidence.kind') AS evidence
++      FROM commands ORDER BY rowid LIMIT 16`).all();
++    const events = thread ? readEvents(thread) : [];
++    const threads = jsonCli(['thread', 'list', '--json']);
++    assert(Array.isArray(threads) && threads.length <= 8);
++    const nativeThreads = threads.map(item => ({ id: item.id, status: item.status,
++      events: readEvents(item.id).map(event => ({ type: event.type, status: event.data.status })) }));
++    writeFileSync(join(cfg.evidence, 'diagnostics.json'), JSON.stringify({ stage, commands, nativeThreads, permissionTargetCreated: permissionTarget ? existsSync(permissionTarget) : null, events: events.map((event: any) => ({
++      seq: event.seq, type: event.type, scope: event.scope, request: event.data.requestId, clientRequest: event.data.clientRequestId,
++      source: event.data.source, status: event.data.status, itemType: event.data.item?.type,
++      ...(cfg.provider === 'acp-opencode' && stage === 'permission_prompt' && event.data.item?.type === 'agentMessage'
++        ? { fixtureAgentText: String(event.data.item.text).slice(0, 1000) } : {}),
++      operation: JSON.stringify(event.data.input ?? '').match(/Openbot operation ([0-9a-f-]{36})/)?.[1],
++    })) }, null, 2));
++  } finally { db.close(); }
++}
++try {
++  await boot(); stage = 'install'; cli(['plugin', 'install', `path:${plugin}`, '--yes']);
++  headers = await localCallerHeaders(origin, profile);
++  const host = JSON.parse(readFileSync(join(profile, 'auth.json'), 'utf8')).hostId;
++  const project = jsonCli(['project', 'create', '--name', `Disposable Openbot ${cfg.provider} acceptance`, '--root', cfg.workspace, '--machine', host, '--json']);
++  assert(/^proj_[a-z0-9]+$/.test(project.id));
++  ownedProject = project.id;
++  stage = 'catalog';
++  // Warm provider discovery before the connector's bounded read. This is separate
++  // from successful authentication/inference, which only the later task proves.
++  for (const provider of ['codex', 'claude-code', 'acp-opencode']) {
++    try { jsonCli(['provider', 'models', provider, '--machine', host, '--json']); } catch { /* actual selected-provider proof remains mandatory */ }
++  }
++  stage = 'pair';
++  await settings({ openbotOrigin: cfg.origin, machineName: `Disposable ${cfg.provider} acceptance`, selectedProjects: project.id, pairingCode: cfg.pairingCode });
++  cli(['plugin', 'reload', 'openbot-local']); await connected();
++  emit({ event: 'ready', project: project.id, profile, ports });
++  for await (const line of lines) {
++    assert(Buffer.byteLength(line) <= 4096); const input = JSON.parse(line) as { command: string; thread?: string; text?: string; operation?: string; permissionMode?: string };
++    if (input.thread !== undefined) { assert(/^thr_[a-z0-9]+$/.test(input.thread)); thread = input.thread; }
++    if (input.command === 'restart') {
++      stage = 'restart'; await stop(); await boot(); headers = await localCallerHeaders(origin, profile); await connected(); emit({ event: 'restarted' });
++    } else if (input.command === 'shutdown') {
++      stage = 'shutdown'; await stop(); emit({ event: 'shutdown' });
++    } else if (input.command === 'boot') {
++      stage = 'boot'; await boot(); headers = await localCallerHeaders(origin, profile); await connected(); emit({ event: 'booted' });
++    } else if (input.command === 'terminal') {
++      stage = 'terminal'; assert(input.operation && input.text); emit({ event: 'terminal', turn: await terminal(input.operation, input.text) });
++    } else if (input.command === 'ui') {
++      stage = 'ui'; assert(thread && input.text && input.text.length <= 256);
++      const evidence = join(cfg.evidence, `ui-${Date.now()}`); mkdirSync(evidence, { recursive: true });
++      await proveUi({ origin: uiOrigin, backendOrigin: origin, profile, projectId: project.id, threadId: thread, expectedText: input.text, evidence });
++      emit({ event: 'ui', thread, project: project.id, evidence });
++    } else if (input.command === 'executing') {
++      stage = 'executing'; assert(input.operation); emit({ event: 'executing', turn: await executing(input.operation) });
++    } else if (input.command === 'human') {
++      stage = 'human'; assert(thread && input.text && input.text.length <= 256);
++      assert(input.permissionMode === undefined || input.permissionMode === 'accept-edits');
++      const receipt = jsonCli(['thread', 'tell', thread, `Reply exactly ${input.text}. Do not use tools, change files, access network, or start subagents.`, '--mode', 'queue', '--json',
++        ...(input.permissionMode ? ['--permission-mode', input.permissionMode] : [])]);
++      emit({ event: 'human', independentlyOriginated: true, queued: receipt.delivery === 'queued' });
++    } else if (input.command === 'human_terminal') {
++      stage = 'human_terminal'; assert(input.text); emit({ event: 'human_terminal', turn: await humanTerminal(input.text) });
++    } else if (input.command === 'permission_prompt') {
++      stage = 'permission_prompt'; assert(input.text && input.text.length <= 256);
++      if (cfg.provider === 'codex') {
++        emit({ event: 'permission_prompt', prompt: `Disposable permission test: call exec_command exactly once with sandbox_permissions set to require_escalated and a justification asking the human to allow this disposable local request. Do not attempt the command without requesting elevated permission first. The command is exactly curl --max-time 5 --silent ${origin}/api/v1/system/version. If denied, do not retry or work around it. Finally reply exactly ${input.text}. Do not read/change files, use other URLs, or start subagents.` });
++      } else {
++        assert(!permissionTarget);
++        if (cfg.provider === 'claude-code') {
++          permissionDirectory = mkdtempSync(join(homedir(), '.openbot-p07-permission-'));
++          permissionTarget = join(permissionDirectory, 'smoke.txt');
++        } else permissionTarget = join(cfg.workspace, 'smoke-permission.txt');
++        assert(!existsSync(permissionTarget));
++        const tool = cfg.provider === 'claude-code' ? 'Write' : 'available file-creation (write or apply_patch)';
++        const policy = cfg.provider === 'claude-code' ? 'The fresh test-owned target is outside the project.' : 'The fresh test-owned target is in the project, whose native edit policy explicitly requires human approval.';
++        emit({ event: 'permission_prompt', prompt: `Authorized disposable permission test: invoke your ${tool} tool exactly once to write the single word smoke to exactly ${permissionTarget}. ${policy} Invoke the tool directly; let its native permission callback ask the human. Do not ask in chat instead. If denied, do not retry or work around the boundary. Finally reply exactly ${input.text}. Do not access any other paths, use network, or start subagents.` });
++      }
++    } else if (input.command === 'deny') {
++      stage = 'deny'; assert(thread);
++      try {
++        execFileSync(process.execPath, [resolve(new URL('prove-native-ui.mjs', compatibility).pathname), uiOrigin, origin, profile, project.id, thread, 'deny', cfg.evidence],
++          { env, stdio: 'pipe', timeout: 75_000, maxBuffer: 1024 * 1024 });
++      } catch (error) {
++        // This controlled UI probe reports locator/assertion errors, never request headers.
++        const detail = (error as { stderr?: Buffer }).stderr?.toString('utf8') ?? 'UI probe timeout';
++        writeFileSync(join(cfg.evidence, 'deny-probe-failure.txt'), detail.slice(0, 4096), { mode: 0o600 });
++        throw error;
++      }
++      assert(!permissionTarget || !existsSync(permissionTarget), 'denied permission must not create the test-owned file');
++      emit({ event: 'deny', actualUi: true, deniedFileAbsent: true });
++    } else if (input.command === 'logged_out') {
++      stage = 'logged_out'; await stop(); const isolated = loggedOutProviderEnvironment(cfg.provider, env, cfg.directory); env = isolated.env;
++      await boot(); headers = await localCallerHeaders(origin, profile); const status = await waitStatus(() => true);
++      emit({ event: 'logged_out', ...isolated.proof, health: status.providers.find((item: any) => item.provider === cfg.provider)?.status });
++    } else if (input.command === 'journal') {
++      stage = 'journal'; assert(input.operation && /^[0-9a-f-]{36}$/.test(input.operation));
++      const db = new Database(join(profile, 'plugins/openbot-local/data.db'), { readonly: true, fileMustExist: true });
++      try {
++        const row = db.prepare('SELECT state FROM commands WHERE id=?').get(input.operation) as {state:string} | undefined;
++        assert(!row || Buffer.byteLength(row.state) <= 2 * 1024 * 1024); const record = row && JSON.parse(row.state);
++        emit({ event: 'journal', present: Boolean(record), sdkCalls: record?.sdkCalls ?? 0, stage: record?.stage, thread: record?.threadId, turn: record?.turnId });
++      } finally { db.close(); }
++    } else if (input.command === 'snapshot') {
++      stage = 'snapshot'; assert(thread);
++      const events = readEvents(thread); assert(Array.isArray(events) && events.length <= 400);
++      emit({ event: 'snapshot', thread, requests: events.filter(event => event.type === 'client/turn/requested').length,
++        turns: [...new Set(events.filter(event => event.scope?.kind === 'turn').map(event => event.scope.turnId))],
++        terminals: events.filter(event => event.type === 'turn/completed').map(event => ({ turn: event.scope.turnId, status: event.data.status })) });
++    } else if (input.command === 'close') break;
++    else throw new Error('unknown native acceptance command');
++  }
++} catch {
++  emit({ event: 'failure', stage }); process.exitCode = 1;
++} finally {
++  clearTimeout(deadline); lines.close();
++  if (service?.exitCode === null) {
++    try { diagnostics(); } catch { /* no raw SDK objects or credentials in diagnostics */ }
++    if (ownedProject) {
++      try {
++        const own = jsonCli(['thread', 'list', '--json']).filter((item: {projectId:string}) => item.projectId === ownedProject);
++        assert(own.length <= 8);
++        for (const item of own) cli(['thread', 'stop', item.id]);
++      } catch {}
++    }
++    try { cli(['plugin', 'remove', 'openbot-local']); } catch {}
++  }
++  await stop();
++  if (permissionDirectory) rmSync(permissionDirectory, { recursive: true, force: true });
++}
+diff --git a/Users/mac03/dev/openbot/integrations/cloudroom-plugin/test/native-provider-environment.ts b/integrations/cloudroom-plugin/test/native-provider-environment.ts
+new file mode 100644
+index 00000000..e747ecc5
+--- /dev/null
++++ b/integrations/cloudroom-plugin/test/native-provider-environment.ts
+@@ -0,0 +1,39 @@
++import assert from 'node:assert/strict';
++import { spawnSync } from 'node:child_process';
++import { mkdirSync, writeFileSync } from 'node:fs';
++import { join } from 'node:path';
++
++// Standard provider configuration directories are scoped to these child CLIs.
++// The parent environment and ordinary login/config files are never changed/read.
++export function loggedOutProviderEnvironment(provider: string, current: NodeJS.ProcessEnv, directory: string) {
++  const isolated = join(directory, 'logged-out-provider'); mkdirSync(isolated, { mode: 0o700 });
++  const env = { ...current };
++  const credentials = ['OPENAI_API_KEY', 'CODEX_API_KEY', 'OPENAI_ACCESS_TOKEN', 'ANTHROPIC_API_KEY',
++    'ANTHROPIC_AUTH_TOKEN', 'CLAUDE_CODE_OAUTH_TOKEN', 'OPENCODE_AUTH_JSON', 'OPENCODE_CONFIG_CONTENT'];
++  for (const key of credentials) delete env[key];
++  if (provider === 'codex') env.CODEX_HOME = isolated;
++  else if (provider === 'claude-code') env.CLAUDE_CONFIG_DIR = isolated;
++  else {
++    assert.equal(provider, 'acp-opencode');
++    env.XDG_CONFIG_HOME = join(isolated, 'config'); env.XDG_DATA_HOME = join(isolated, 'data');
++    env.OPENCODE_CONFIG_DIR = join(isolated, 'config'); env.OPENCODE_CONFIG = join(isolated, 'opencode.json');
++    writeFileSync(env.OPENCODE_CONFIG, '{}\n', { mode: 0o600 });
++  }
++  let nativeLoginStatus: number | null = null;
++  if (provider !== 'acp-opencode') {
++    const args = provider === 'codex' ? ['login', 'status'] : ['auth', 'status'];
++    const result = spawnSync(provider === 'codex' ? 'codex' : 'claude', args,
++      { env, cwd: directory, encoding: 'utf8', timeout: 15_000, maxBuffer: 16 * 1024 });
++    assert(!result.error && result.status !== null && result.status !== 0, 'isolated native CLI must be logged out');
++    nativeLoginStatus = result.status;
++  } else {
++    const result = spawnSync('opencode', ['auth', 'list'],
++      { env, cwd: directory, encoding: 'utf8', timeout: 15_000, maxBuffer: 16 * 1024 });
++    assert(!result.error && result.status === 0);
++    const plain = (result.stdout + result.stderr).replace(/\x1b\[[0-?]*[ -/]*[@-~]/g, '');
++    assert(/0 credentials|no credentials/i.test(plain), 'isolated OpenCode must have no stored login');
++    nativeLoginStatus = 0;
++  }
++  return { env, proof: { provider, isolatedProviderConfiguration: true, parentLoginUntouched: true,
++    credentialEnvironmentRemoved: credentials, nativeLoginStatus } };
++}
+diff --git a/integrations/cloudroom-plugin/test/sdk.test.ts b/integrations/cloudroom-plugin/test/sdk.test.ts
+index 62ab889c..5c2b75ca 100644
+--- a/integrations/cloudroom-plugin/test/sdk.test.ts
++++ b/integrations/cloudroom-plugin/test/sdk.test.ts
+@@ -34,6 +34,35 @@ function completed(input: string, source: 'spawn' | 'tell' = 'tell') {
+     event(4, 'turn/completed', { status: 'completed' }, 'turn_owned')];
+ }
+ 
++test('native startup error before turn acceptance stays uncertain across restart without resubmission', async () => {
++  const f = fixture(); const n = nativeFixture(f.journal, f.selection);
++  const op = operation({ kind: 'create', session_id: randomUUID(), selection: f.selection, prompt: 'authorized work' });
++  const d = new Dispatcher(f.journal, n.sdk);
++  try {
++    await d.process({ operation: op, mode: 'dispatch' }, context);
++    n.state.events = [event(1, 'client/turn/requested', { input: [{ type: 'text', text: nativeInput(op) }], source: 'spawn', requestId: 'request_owned' })];
++    await d.tick(context.signal);
++    assert.equal(f.journal.get(op.id)!.stage, 'observing', 'a pending acceptance is not a startup failure');
++    n.state.thread.status = 'error';
++    await d.tick(context.signal);
++    assert.equal(f.journal.get(op.id)!.stage, 'uncertain');
++    assert.equal(f.journal.get(op.id)!.turnId, null);
++    const observation = f.journal.get(op.id)!.lastObservation!;
++    assert(observation.kind === 'agent');
++    assert.equal(observation.observation.evidence.kind, 'uncertain');
++    f.journal.db.close(); const reopened = f.open();
++    const recovered = new Dispatcher(reopened, new CloudroomSdk(n.bb, reopened, () => [f.selection.project_id]));
++    await recovered.process({ operation: op, mode: 'reconcile' }, context);
++    assert.equal(reopened.get(op.id)!.stage, 'uncertain');
++    assert.equal(n.calls.length, 1);
++    n.state.events = completed(nativeInput(op), 'spawn');
++    await recovered.tick(context.signal);
++    assert.equal(reopened.get(op.id)!.stage, 'terminal', 'positive matching turn evidence can still reconcile late');
++    assert.equal(reopened.get(op.id)!.nativeState, 'completed');
++    assert.equal(n.calls.length, 1);
++  } finally { f.close(); }
++});
++
+ test('create freezes explicit local checkout/provider/model and duplicate concurrent delivery submits once', async () => {
+   const f = fixture(); const n = nativeFixture(f.journal, f.selection); const d = new Dispatcher(f.journal, n.sdk);
+   try {
+@@ -206,15 +235,42 @@ test('ambiguous duplicate matching requests cannot attribute a human or second t
+     assert.equal(later.kind, 'uncertain'); assert.equal(later.record.turnId, null);
+   } finally { f.close(); }
+ });
+-test('native event history gaps retain durable correlation uncertainty across restart', () => {
++test('compacted sparse native replay survives restart and uses completed snapshots', () => {
+   const f = fixture(); const op = operation(send());
+   try {
+     const record = f.journal.admit({ operation: op, mode: 'dispatch' }).record; record.threadId = 'thr_owned'; f.journal.beginIntent(record);
+-    const events = completed(nativeInput(op)); events[2] = event(4, 'turn/completed', { status: 'completed' }, 'turn_owned');
+-    const update = applyNativeEvents(record, events.slice(0, 3));
+-    assert.equal(update.kind, 'uncertain'); f.journal.save(update.record);
+-    f.journal.db.close(); const reopened = f.open(); const recovered = reopened.get(op.id)!;
+-    assert(recovered.correlationConflict); assert.equal(recovered.stage, 'uncertain');
+-    assert.equal(applyNativeEvents(recovered, [event(5, 'turn/completed', { status: 'completed' }, 'turn_owned')]).kind, 'uncertain');
++    const requested = event(1, 'client/turn/requested', { input: [{ type: 'text', text: nativeInput(op) }], source: 'tell', requestId: 'request_owned' });
++    const bound = applyNativeEvents(record, [requested, event(3, 'turn/input/accepted', { clientRequestId: 'request_owned' }, 'turn_owned'),
++      event(5, 'item/agentMessage/delta', { itemId: 'answer', delta: 'partial' }, 'turn_owned')]);
++    f.journal.save(bound.record); f.journal.db.close(); const reopened = f.open(); const recovered = reopened.get(op.id)!;
++    const update = applyNativeEvents(recovered, [event(9, 'item/completed', { item: { type: 'agentMessage', id: 'answer', text: 'complete retained snapshot' } }, 'turn_owned'),
++      event(11, 'turn/completed', { status: 'completed' }, 'turn_owned')]);
++    assert.equal(update.kind, 'terminal'); assert(!update.record.correlationConflict); assert.equal(update.record.sdkCalls, 1);
++    assert(update.evidence?.kind === 'turn'); assert.equal(update.evidence.output, 'complete retained snapshot'); assert(update.evidence.truncated);
++    reopened.evidence(update.record, update.evidence, 'terminal'); assert.equal(reopened.get(op.id)!.stage, 'terminal');
++  } finally { f.close(); }
++});
++for (const omitted of ['request', 'acceptance'] as const) test(`sparse native replay never invents missing ${omitted} correlation`, () => {
++  const f = fixture(); const op = operation(send());
++  try {
++    const record = f.journal.admit({ operation: op, mode: 'dispatch' }).record; record.threadId = 'thr_owned'; f.journal.beginIntent(record);
++    const events = completed(nativeInput(op));
++    const update = applyNativeEvents(record, events.filter((_, i) => i !== (omitted === 'request' ? 0 : 1)));
++    assert.notEqual(update.kind, 'terminal'); assert.equal(update.record.turnId, null); assert(update.record.truncated);
++    assert.notEqual(update.evidence?.kind === 'turn' && update.evidence.state, 'completed');
++  } finally { f.close(); }
++});
++test('prunable partial or started text cannot become final output without a completed snapshot', () => {
++  const f = fixture(); const op = operation(send());
++  try {
++    const record = f.journal.admit({ operation: op, mode: 'dispatch' }).record; record.threadId = 'thr_owned'; f.journal.beginIntent(record);
++    const events = completed(nativeInput(op));
++    const update = applyNativeEvents(record, [events[0]!, events[1]!,
++      event(3, 'item/started', { item: { type: 'agentMessage', id: 'answer', text: 'unfinished' } }, 'turn_owned'),
++      event(4, 'item/agentMessage/delta', { itemId: 'answer', delta: 'partial' }, 'turn_owned'),
++      event(8, 'item/completed', { item: { type: 'agentMessage', id: 'human_answer', text: 'foreign' } }, 'turn_human'),
++      event(9, 'turn/completed', { status: 'completed' }, 'turn_owned')]);
++    assert.equal(update.kind, 'terminal'); assert(update.evidence?.kind === 'turn'); assert.equal(update.evidence.output, null); assert(update.evidence.truncated);
++    assert.throws(() => applyNativeEvents(update.record, [events[0]!]), /cursor/);
+   } finally { f.close(); }
+ });
+diff --git a/src/adapters/http/routes/local_machine_connection/connection_tests.rs b/src/adapters/http/routes/local_machine_connection/connection_tests.rs
+index aa42c71d..a8fed16b 100644
+--- a/src/adapters/http/routes/local_machine_connection/connection_tests.rs
++++ b/src/adapters/http/routes/local_machine_connection/connection_tests.rs
+@@ -29,6 +29,11 @@ mod failures;
+ #[path = "tls_tests.rs"]
+ pub(crate) mod tls;
+ 
++pub(crate) struct CommandWriteGate {
++    pub operation: OperationId,
++    pub reached: tokio::sync::Notify,
++}
++
+ struct Server {
+     service: Arc<LocalMachineConnections>,
+     stop: CancellationToken,
+@@ -36,14 +41,31 @@ struct Server {
+     origin: String,
+ }
+ impl Server {
+-    async fn start(store: Arc<dyn LocalProtocolStore>) -> Self {
+-        let service = Arc::new(LocalMachineConnections::new(store));
+-        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
++    fn start(store: Arc<dyn LocalProtocolStore>) -> impl std::future::Future<Output = Self> {
++        Self::start_at(store, Router::new(), "127.0.0.1:0".parse().unwrap())
++    }
++    fn start_at(
++        store: Arc<dyn LocalProtocolStore>,
++        extra: Router,
++        address: std::net::SocketAddr,
++    ) -> impl std::future::Future<Output = Self> {
++        Self::start_with_gate(store, extra, address, None)
++    }
++    async fn start_with_gate(
++        store: Arc<dyn LocalProtocolStore>,
++        extra: Router,
++        address: std::net::SocketAddr,
++        gate: Option<Arc<CommandWriteGate>>,
++    ) -> Self {
++        let mut service = LocalMachineConnections::new(store);
++        service.command_write_gate = gate;
++        let service = Arc::new(service);
++        let listener = tokio::net::TcpListener::bind(address).await.unwrap();
+         let origin = format!(
+             "ws://{}/v1/local-machines/connect",
+             listener.local_addr().unwrap()
+         );
+-        let app = router().with_state(service.clone());
++        let app = router().with_state(service.clone()).merge(extra);
+         let stop = CancellationToken::new();
+         let shutdown = stop.clone();
+         let task = tokio::spawn(async move {
+diff --git a/src/adapters/http/routes/local_machine_connection/driver.rs b/src/adapters/http/routes/local_machine_connection/driver.rs
+index ea478c5f..71102b0d 100644
+--- a/src/adapters/http/routes/local_machine_connection/driver.rs
++++ b/src/adapters/http/routes/local_machine_connection/driver.rs
+@@ -63,6 +63,7 @@ pub(super) async fn run(
+     store: &dyn LocalProtocolStore,
+     stop: &CancellationToken,
+     fence: ConnectionFence,
++    #[cfg(test)] command_write_gate: Option<&super::tests::CommandWriteGate>,
+ ) -> AppResult<()> {
+     let identity = ConnectionIdentity::from_fence(fence)?;
+     let mut assembler = framing::Assembler::default();
+@@ -106,6 +107,14 @@ pub(super) async fn run(
+                 let deliveries=tokio::select! {biased; _=stop.cancelled()=>return Ok(()), result=store.pending_commands(fence)=>result?};
+                 for delivery in deliveries {
+                     if !store.renew_connection(fence).await? {return Err(AppError::InvalidCredentials);}
++                    #[cfg(test)]
++                    if let Some(gate) = command_write_gate.filter(|gate| gate.operation == delivery.operation.id()) {
++                        // First-delivery COMMIT has returned, but no command bytes
++                        // have reached the socket. Shutdown must cancel this cut.
++                        gate.reached.notify_one();
++                        stop.cancelled().await;
++                        return Ok(());
++                    }
+                     send(socket,&ServerMessage::Command{identity,delivery:Box::new(delivery)},stop).await?;
+                 }
+             },
+diff --git a/src/adapters/http/routes/local_machine_connection/mod.rs b/src/adapters/http/routes/local_machine_connection/mod.rs
+index 968afcd8..f853f97f 100644
+--- a/src/adapters/http/routes/local_machine_connection/mod.rs
++++ b/src/adapters/http/routes/local_machine_connection/mod.rs
+@@ -32,6 +32,8 @@ pub struct LocalMachineConnections {
+     tasks: TaskTracker,
+     slots: Arc<Semaphore>,
+     closing: Mutex<bool>,
++    #[cfg(test)]
++    command_write_gate: Option<Arc<tests::CommandWriteGate>>,
+ }
+ 
+ impl LocalMachineConnections {
+@@ -42,6 +44,8 @@ impl LocalMachineConnections {
+             tasks: TaskTracker::new(),
+             slots: Arc::new(Semaphore::new(MAX_CONNECTIONS)),
+             closing: Mutex::new(false),
++            #[cfg(test)]
++            command_write_gate: None,
+         };
+         let stop = service.shutdown.clone();
+         let store = service.store.clone();
+@@ -146,10 +150,21 @@ async fn connect(
+     let (sender, receiver) = oneshot::channel::<WebSocket>();
+     let store = service.store.clone();
+     let stop = service.shutdown.clone();
++    #[cfg(test)]
++    let command_write_gate = service.command_write_gate.clone();
+     let task = service.tasks.spawn(async move {
+         let _permit = permit;
+         let _reservation = reservation;
+-        connection_task(store, stop, fence, deadline, receiver).await;
++        connection_task(
++            store,
++            stop,
++            fence,
++            deadline,
++            receiver,
++            #[cfg(test)]
++            command_write_gate,
++        )
++        .await;
+     });
+     Ok(upgrade
+         .max_frame_size(MAX_FRAME_BYTES)
+@@ -168,6 +183,7 @@ async fn connection_task(
+     fence: ConnectionFence,
+     deadline: Instant,
+     receiver: oneshot::Receiver<WebSocket>,
++    #[cfg(test)] command_write_gate: Option<Arc<tests::CommandWriteGate>>,
+ ) {
+     let socket = tokio::select! {biased; _=stop.cancelled()=>None,
+     result=timeout_at(deadline,receiver)=>result.ok().and_then(Result::ok),};
+@@ -177,7 +193,8 @@ async fn connection_task(
+             result.unwrap_or_else(|_|Err(AppError::BadRequest("local machine handshake timed out".into()))),};
+         match initialized {
+             Ok(true) => {
+-                let result = tokio::select! {biased; _=stop.cancelled()=>Ok(()), result=driver::run(&mut socket,store.as_ref(),&stop,fence)=>result};
++                let result = tokio::select! {biased; _=stop.cancelled()=>Ok(()), result=driver::run(&mut socket,store.as_ref(),&stop,fence,
++                #[cfg(test)] command_write_gate.as_deref())=>result};
+                 if result.is_err() {
+                     record_issue(store.as_ref(), fence, ConnectionIssue::ConnectionFailed).await;
+                     tracing::debug!(machine_id=%fence.machine.machine_id,"local machine connection ended");
+diff --git a/src/adapters/http/routes/local_machine_connection/tls_tests.rs b/src/adapters/http/routes/local_machine_connection/tls_tests.rs
+index eb879bda..dbafff30 100644
+--- a/src/adapters/http/routes/local_machine_connection/tls_tests.rs
++++ b/src/adapters/http/routes/local_machine_connection/tls_tests.rs
+@@ -142,29 +142,57 @@ fn connector(roots: rustls::RootCertStore) -> TlsConnector {
+ 
+ /// Reuse the production route and TLS terminator for plugin lifecycle tests.
+ pub(crate) struct TestTlsServer {
+-    server: Server,
++    server: Option<Server>,
+     proxy: Proxy,
+     pub origin: String,
+     pub certificate: CertificateDer<'static>,
+ }
+ 
+ impl TestTlsServer {
+-    pub async fn start(store: Arc<dyn LocalProtocolStore>) -> Self {
+-        let server = Server::start(store).await;
++    pub fn start(store: Arc<dyn LocalProtocolStore>) -> impl std::future::Future<Output = Self> {
++        Self::with_routes(store, Router::new())
++    }
++    pub fn with_routes(
++        store: Arc<dyn LocalProtocolStore>,
++        extra: Router,
++    ) -> impl std::future::Future<Output = Self> {
++        Self::with_gate(store, extra, None)
++    }
++    pub async fn with_gate(
++        store: Arc<dyn LocalProtocolStore>,
++        extra: Router,
++        gate: Option<Arc<CommandWriteGate>>,
++    ) -> Self {
++        let server =
++            Server::start_with_gate(store, extra, "127.0.0.1:0".parse().unwrap(), gate).await;
+         let (certificate, key) = certificate();
+         let proxy = Proxy::start(&server, certificate.clone(), key).await;
+         let origin = format!("https://localhost:{}", proxy.address.port());
+         Self {
+-            server,
++            server: Some(server),
+             proxy,
+             origin,
+             certificate,
+         }
+     }
+ 
+-    pub async fn close(self) {
++    pub async fn restart(&mut self, store: Arc<dyn LocalProtocolStore>, extra: Router) {
++        let old = self.server.take().unwrap();
++        let address = old
++            .origin
++            .strip_prefix("ws://")
++            .unwrap()
++            .split('/')
++            .next()
++            .unwrap()
++            .parse()
++            .unwrap();
++        old.close().await;
++        self.server = Some(Server::start_at(store, extra, address).await);
++    }
++    pub async fn close(mut self) {
+         self.proxy.close().await;
+-        self.server.close().await;
++        self.server.take().unwrap().close().await;
+     }
+ }
+ 
+diff --git a/src/adapters/persistence/workflow/control_revision_tests.rs b/src/adapters/persistence/workflow/control_revision_tests.rs
+index 2a168772..8cec14b5 100644
+--- a/src/adapters/persistence/workflow/control_revision_tests.rs
++++ b/src/adapters/persistence/workflow/control_revision_tests.rs
+@@ -81,7 +81,7 @@ async fn workflow_control_revision_overflow_refuses_without_partial_writes() {
+     let (f, scope) = fixture().await;
+     // Isolated fixture setup reaches the otherwise impractical bigint boundary.
+     // Restore the trigger before any operation being tested.
+-    sqlx::raw_sql("ALTER TABLE workflow_runs DISABLE TRIGGER workflow_run_revision; UPDATE workflow_runs SET revision=9223372036854775807; ALTER TABLE workflow_runs ENABLE TRIGGER workflow_run_revision")
++    sqlx::raw_sql("ALTER TABLE workflow_runs DISABLE TRIGGER workflow_run_revision; UPDATE workflow_runs SET revision=9223372036854775807; SET CONSTRAINTS ALL IMMEDIATE; ALTER TABLE workflow_runs ENABLE TRIGGER workflow_run_revision")
+         .execute(f.persistence().pool()).await.unwrap();
+     let before = control_state(&f).await;
+     let cmd = command(&f, scope, "cancel").await;
+diff --git a/Users/mac03/dev/openbot/src/adapters/persistence/workflow/local_agent_e2e_tests.rs b/src/adapters/persistence/workflow/local_agent_e2e_tests.rs
+new file mode 100644
+index 00000000..c4835cac
+--- /dev/null
++++ b/src/adapters/persistence/workflow/local_agent_e2e_tests.rs
+@@ -0,0 +1,486 @@
++//! Real workers, PostgreSQL and TLS/WSS; the native runtime is a counted fixture.
++//! Native Cloudroom/provider acceptance is separate from these deterministic tests.
++use super::*;
++use crate::adapters::http::routes::local_machine_connection::tests::tls::TestTlsServer;
++use crate::application::local_agents::management::{
++    ControlSession, LocalAgentManagementStore, SessionCommand,
++};
++use crate::application::workflow::polling::PollPolicy;
++use base64::Engine;
++use std::{
++    os::unix::{fs::PermissionsExt, process::CommandExt},
++    path::PathBuf,
++    process::Stdio,
++};
++use tokio::{
++    io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader, Lines, Take},
++    process::{Child, ChildStdin, ChildStdout},
++    sync::Notify,
++    task::JoinHandle,
++};
++use tokio_util::sync::CancellationToken;
++
++struct Workers {
++    stop: CancellationToken,
++    tasks: Vec<JoinHandle<()>>,
++}
++impl Workers {
++    fn start(p: &PostgresPersistence) -> Self {
++        let stop = CancellationToken::new();
++        let tasks = (0..2)
++            .map(|_| {
++                let p = p.clone();
++                let shutdown = stop.clone();
++                tokio::spawn(async move {
++                    let handler = LocalAgentHandler::new(
++                        local_agents::PostgresLocalAgentWorkflow::new(
++                            p.clone(),
++                            Some(super::super::approval_test_support::notices(&p)),
++                        ),
++                        lease(),
++                    );
++                    let worker = WorkflowWorker {
++                        port: &p,
++                        handler: &handler,
++                        notices: None,
++                        worker: WorkflowWorkerId(Uuid::new_v4()),
++                        lease: lease(),
++                        poll: PollPolicy::new(std::time::Duration::from_millis(50), 2).unwrap(),
++                        active_jobs: None,
++                        monitoring: None,
++                    };
++                    worker.run(&Notify::new(), &shutdown).await;
++                })
++            })
++            .collect();
++        Self { stop, tasks }
++    }
++    async fn close(mut self) {
++        self.stop.cancel();
++        for task in self.tasks.drain(..) {
++            tokio::time::timeout(std::time::Duration::from_secs(2), task)
++                .await
++                .unwrap()
++                .unwrap();
++        }
++    }
++    async fn crash(mut self) {
++        for task in &self.tasks {
++            task.abort();
++        }
++        for task in self.tasks.drain(..) {
++            assert!(task.await.unwrap_err().is_cancelled());
++        }
++    }
++}
++impl Drop for Workers {
++    fn drop(&mut self) {
++        self.stop.cancel();
++        for task in &self.tasks {
++            task.abort();
++        }
++    }
++}
++
++struct Peer {
++    child: Child,
++    input: ChildStdin,
++    events: Lines<BufReader<Take<ChildStdout>>>,
++    directory: PathBuf,
++}
++impl Peer {
++    fn new(s: &Setup, server: &TestTlsServer, cut: &str) -> Self {
++        let directory = std::env::temp_dir().join(format!("openbot-e2e-peer-{}", Uuid::new_v4()));
++        std::fs::create_dir(&directory).unwrap();
++        std::fs::set_permissions(&directory, std::fs::Permissions::from_mode(0o700)).unwrap();
++        let encoded = base64::engine::general_purpose::STANDARD.encode(server.certificate.as_ref());
++        std::fs::write(
++            directory.join("ca.pem"),
++            format!("-----BEGIN CERTIFICATE-----\n{encoded}\n-----END CERTIFICATE-----\n"),
++        )
++        .unwrap();
++        let machine = &s.paired.receipt.machine;
++        let config = json!({"directory": directory, "cut": cut, "selection": s.profile.selection,
++            "paired":{"state":"paired","version":1,"binding":{"origin":server.origin,
++                "company_id":s.scope.company.as_uuid(),"machine_id":machine.id,"installation_id":machine.installation_id,
++                "credential_generation":machine.credential_generation,"journal_id":s.journal_id},
++                "credential":s.paired.candidate.credential.expose_secret()}});
++        std::fs::write(
++            directory.join("config.json"),
++            serde_json::to_vec(&config).unwrap(),
++        )
++        .unwrap();
++        std::fs::set_permissions(
++            directory.join("config.json"),
++            std::fs::Permissions::from_mode(0o600),
++        )
++        .unwrap();
++        Self::spawn(directory)
++    }
++    fn spawn(directory: PathBuf) -> Self {
++        Self::spawn_script(directory, "e2e-peer.js")
++    }
++    fn spawn_script(directory: PathBuf, name: &str) -> Self {
++        let script = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
++            .join("integrations/cloudroom-plugin/build-tests")
++            .join(name);
++        assert!(
++            script.is_file(),
++            "build the counted Node e2e peer before Rust tests"
++        );
++        let mut command = tokio::process::Command::new("node");
++        command
++            .arg(script)
++            .arg(directory.join("config.json"))
++            .env("NODE_EXTRA_CA_CERTS", directory.join("ca.pem"))
++            .stdin(Stdio::piped())
++            .stdout(Stdio::piped())
++            .stderr(Stdio::inherit())
++            .kill_on_drop(true);
++        command.as_std_mut().process_group(0);
++        let mut child = command.spawn().unwrap();
++        let input = child.stdin.take().unwrap();
++        let events = BufReader::new(child.stdout.take().unwrap().take(128 * 1024)).lines();
++        Self {
++            child,
++            input,
++            events,
++            directory,
++        }
++    }
++    fn event<'a>(&'a mut self, expected: &'a str) -> impl std::future::Future<Output = Value> + 'a {
++        self.event_timeout(expected, 15)
++    }
++    async fn event_timeout(&mut self, expected: &str, seconds: u64) -> Value {
++        tokio::time::timeout(std::time::Duration::from_secs(seconds), async {
++            loop {
++                let line = self
++                    .events
++                    .next_line()
++                    .await
++                    .unwrap()
++                    .expect("counted peer exited before event");
++                let value: Value = serde_json::from_str(&line).unwrap();
++                assert_ne!(value["event"], "failure", "counted fixture failure");
++                if value["event"] == expected {
++                    return value;
++                }
++            }
++        })
++        .await
++        .unwrap()
++    }
++    async fn command(&mut self, value: Value) {
++        let mut bytes = serde_json::to_vec(&value).unwrap();
++        assert!(bytes.len() <= 4096);
++        bytes.push(b'\n');
++        tokio::time::timeout(
++            std::time::Duration::from_secs(2),
++            self.input.write_all(&bytes),
++        )
++        .await
++        .unwrap()
++        .unwrap();
++    }
++    async fn snapshot(&mut self) -> Value {
++        tokio::time::timeout(
++            std::time::Duration::from_secs(2),
++            self.input.write_all(b"{\"command\":\"snapshot\"}\n"),
++        )
++        .await
++        .unwrap()
++        .unwrap();
++        self.event("snapshot").await
++    }
++    async fn crashed(&mut self, expected: &str) {
++        let status = tokio::time::timeout(std::time::Duration::from_secs(15), self.child.wait())
++            .await
++            .unwrap()
++            .unwrap();
++        assert!(!status.success());
++        let cut: Value =
++            serde_json::from_slice(&std::fs::read(self.directory.join("cut.json")).unwrap())
++                .unwrap();
++        assert_eq!(cut["stage"], expected);
++    }
++    fn reopen(&mut self) {
++        let directory = self.directory.clone();
++        let replacement = Self::spawn(directory);
++        // Transfer ownership of the retained fixture directory before dropping the old peer.
++        self.directory = PathBuf::new();
++        *self = replacement;
++    }
++    async fn kill(&mut self) {
++        self.child.start_kill().unwrap();
++        self.child.wait().await.unwrap();
++    }
++    async fn close(mut self) {
++        self.input
++            .write_all(b"{\"command\":\"close\"}\n")
++            .await
++            .unwrap();
++        assert!(
++            tokio::time::timeout(std::time::Duration::from_secs(3), self.child.wait())
++                .await
++                .unwrap()
++                .unwrap()
++                .success()
++        );
++    }
++}
++impl Drop for Peer {
++    fn drop(&mut self) {
++        if let Some(pid) = self.child.id() {
++            // The native fixture's launcher shares this owned group; its TERM
++            // handler joins its separate server/provider groups on unwinding too.
++            let _ = std::process::Command::new("/bin/kill")
++                .arg("-TERM")
++                .arg(format!("-{pid}"))
++                .status();
++        }
++        let _ = self.child.start_kill();
++        if !self.directory.as_os_str().is_empty() {
++            let _ = std::fs::remove_dir_all(&self.directory);
++        }
++    }
++}
++
++fn state<'a>(s: &'a Setup, expected: &'a str) -> impl std::future::Future<Output = ()> + 'a {
++    state_timeout(s, expected, 15)
++}
++async fn state_timeout(s: &Setup, expected: &str, seconds: u64) {
++    tokio::time::timeout(std::time::Duration::from_secs(seconds), async {
++        loop {
++            let actual: String =
++                sqlx::query_scalar("SELECT state FROM workflow_runs WHERE company_id=$1 AND id=$2")
++                    .bind(s.scope.company.as_uuid())
++                    .bind(s.scope.run.as_uuid())
++                    .fetch_one(s.fixture.persistence.pool())
++                    .await
++                    .unwrap();
++            if actual == expected {
++                return;
++            }
++            assert!(
++                !matches!(actual.as_str(), "succeeded" | "failed" | "cancelled"),
++                "expected workflow {expected}, observed terminal {actual}"
++            );
++            tokio::time::sleep(std::time::Duration::from_millis(20)).await;
++        }
++    })
++    .await
++    .unwrap();
++}
++async fn ready(s: &Setup) -> String {
++    tokio::time::timeout(std::time::Duration::from_secs(15), async {
++        loop {
++            let outcome: Option<String> = sqlx::query_scalar("SELECT workflow_outcome FROM workflow_local_agent_calls WHERE company_id=$1 AND execution_id=$2 AND ready_at IS NOT NULL")
++                .bind(s.scope.company.as_uuid()).bind(s.scope.execution.as_uuid()).fetch_optional(s.fixture.persistence.pool()).await.unwrap().flatten();
++            if let Some(outcome) = outcome { return outcome; }
++            tokio::time::sleep(std::time::Duration::from_millis(20)).await;
++        }
++    }).await.unwrap()
++}
++async fn parked(s: &Setup) {
++    let workers = Workers::start(&s.fixture.persistence);
++    state(s, "waiting").await;
++    workers.close().await;
++    let counts:(i64,i64)=sqlx::query_as("SELECT (SELECT count(*) FROM workflow_local_agent_calls WHERE company_id=$1 AND run_id=$2),(SELECT count(*) FROM local_agent_operations WHERE company_id=$1 AND command->>'kind' IN ('create','send'))")
++        .bind(s.scope.company.as_uuid()).bind(s.scope.run.as_uuid()).fetch_one(s.fixture.persistence.pool()).await.unwrap();
++    assert_eq!(
++        counts,
++        (1, 1),
++        "competing real workers must park exactly one native invocation"
++    );
++}
++async fn operation(s: &Setup, request: OperationId) {
++    tokio::time::timeout(std::time::Duration::from_secs(10), async {
++        loop {
++            let outcome: Option<String> = sqlx::query_scalar(
++                "SELECT outcome FROM local_agent_operations WHERE company_id=$1 AND id=$2",
++            )
++            .bind(s.scope.company.as_uuid())
++            .bind(request.as_uuid())
++            .fetch_one(s.fixture.persistence.pool())
++            .await
++            .unwrap();
++            if let Some(outcome) = outcome {
++                assert_eq!(outcome, "succeeded");
++                return;
++            }
++            tokio::time::sleep(std::time::Duration::from_millis(20)).await;
++        }
++    })
++    .await
++    .unwrap();
++}
++
++#[tokio::test]
++async fn cloudroom_e2e_competing_workers_native_thread_followup_controls_and_company_fences() {
++    let s = Setup::new().await;
++    let p = &s.fixture.persistence;
++    let server = TestTlsServer::start(Arc::new(p.clone())).await;
++    let mut peer = Peer::new(&s, &server, "none");
++    peer.event("started").await;
++    let workers = Workers::start(p);
++    state(&s, "succeeded").await;
++    workers.close().await;
++    let session: Uuid = sqlx::query_scalar(
++        "SELECT session_id FROM workflow_local_agent_calls WHERE company_id=$1 AND run_id=$2",
++    )
++    .bind(s.scope.company.as_uuid())
++    .bind(s.scope.run.as_uuid())
++    .fetch_one(p.pool())
++    .await
++    .unwrap();
++    let session = SessionId::new(session).unwrap();
++    for command in [
++        SessionCommand::Send {
++            prompt: LocalPrompt::try_from("explicit e2e follow-up".to_owned()).unwrap(),
++        },
++        SessionCommand::Stop,
++        SessionCommand::Archive,
++    ] {
++        let request = ControlSession {
++            actor: s.fixture.target.actor.user_id(),
++            company: s.scope.company.as_uuid(),
++            request_id: OperationId::new(Uuid::now_v7()).unwrap(),
++            session_id: session,
++            command,
++        };
++        p.control_session(&request).await.unwrap();
++        p.control_session(&request).await.unwrap();
++        operation(&s, request.request_id).await;
++    }
++    let original = p
++        .read_session(
++            s.fixture.target.actor.user_id(),
++            s.scope.company.as_uuid(),
++            session,
++        )
++        .await
++        .unwrap();
++    assert_eq!(
++        original.session.thread_id.as_ref().unwrap().as_str(),
++        "thr_owned"
++    );
++    let snapshot = peer.snapshot().await;
++    assert_eq!(
++        snapshot["calls"],
++        json!(["spawn", "send", "stop", "archive"])
++    );
++    let receipts: i64 = sqlx::query_scalar(
++        "SELECT count(*) FROM workflow_action_receipts WHERE company_id=$1 AND run_id=$2",
++    )
++    .bind(s.scope.company.as_uuid())
++    .bind(s.scope.run.as_uuid())
++    .fetch_one(p.pool())
++    .await
++    .unwrap();
++    assert_eq!(receipts, 1);
++    let foreign: Uuid =
++        sqlx::query_scalar("SELECT id FROM companies WHERE id<>$1 ORDER BY id LIMIT 1")
++            .bind(s.scope.company.as_uuid())
++            .fetch_one(p.pool())
++            .await
++            .unwrap();
++    assert!(
++        p.read_session(s.fixture.target.actor.user_id(), foreign, session)
++            .await
++            .is_err()
++    );
++    assert!(
++        p.control_session(&ControlSession {
++            actor: s.fixture.target.actor.user_id(),
++            company: foreign,
++            request_id: OperationId::new(Uuid::now_v7()).unwrap(),
++            session_id: session,
++            command: SessionCommand::Stop
++        })
++        .await
++        .is_err()
++    );
++    assert_eq!(peer.snapshot().await["calls"], snapshot["calls"]);
++    peer.close().await;
++    server.close().await;
++}
++
++#[tokio::test]
++async fn cloudroom_e2e_cut_points_reconstruct_server_plugin_and_workers_without_blind_native_retry()
++{
++    for cut in [
++        "before_receipt",
++        "after_receipt",
++        "after_intent",
++        "after_sdk",
++        "after_mapping",
++        "after_terminal",
++        "after_server_receipt",
++        "after_workflow_wake",
++    ] {
++        let s = Setup::new().await;
++        let p = &s.fixture.persistence;
++        parked(&s).await;
++        let mut server = TestTlsServer::start(Arc::new(p.clone())).await;
++        let mut peer = Peer::new(&s, &server, cut);
++        peer.event("started").await;
++        if cut == "after_workflow_wake" {
++            assert_eq!(ready(&s).await, "succeeded");
++            peer.kill().await;
++        } else {
++            peer.crashed(cut).await;
++        }
++        server
++            .restart(
++                Arc::new(PostgresPersistence::new(p.pool().clone())),
++                axum::Router::new(),
++            )
++            .await;
++        peer.reopen();
++        peer.event("started").await;
++        let outcome = ready(&s).await;
++        let succeeded = matches!(
++            cut,
++            "after_sdk"
++                | "after_mapping"
++                | "after_terminal"
++                | "after_server_receipt"
++                | "after_workflow_wake"
++        );
++        assert_eq!(outcome == "succeeded", succeeded, "cut {cut}");
++        let workers = Workers::start(p);
++        state(&s, if succeeded { "succeeded" } else { "failed" }).await;
++        workers.close().await;
++        let snapshot = peer.snapshot().await;
++        assert_eq!(
++            snapshot["calls"].as_array().unwrap().len(),
++            usize::from(succeeded),
++            "cut {cut}: zero or one actual native mutation, never a blind retry"
++        );
++        let receipt: Value = sqlx::query_scalar(
++            "SELECT result FROM workflow_action_receipts WHERE company_id=$1 AND run_id=$2",
++        )
++        .bind(s.scope.company.as_uuid())
++        .bind(s.scope.run.as_uuid())
++        .fetch_one(p.pool())
++        .await
++        .unwrap();
++        assert_eq!(
++            receipt["status"], outcome,
++            "the one shared receipt must preserve the actual disposition at {cut}"
++        );
++        assert_eq!(
++            receipt["status"] == "succeeded",
++            succeeded,
++            "uncertainty cannot turn into success at {cut}"
++        );
++        peer.close().await;
++        server.close().await;
++    }
++}
++
++#[path = "local_agent_native_e2e_tests.rs"]
++mod native;
++
++#[path = "local_agent_early_e2e_tests.rs"]
++mod early;
+diff --git a/Users/mac03/dev/openbot/src/adapters/persistence/workflow/local_agent_early_e2e_tests.rs b/src/adapters/persistence/workflow/local_agent_early_e2e_tests.rs
+new file mode 100644
+index 00000000..c87d2c95
+--- /dev/null
++++ b/src/adapters/persistence/workflow/local_agent_early_e2e_tests.rs
+@@ -0,0 +1,193 @@
++//! Early cuts use the actual admission transaction and command-write boundary.
++use super::*;
++use crate::adapters::http::routes::local_machine_connection::tests::CommandWriteGate;
++use crate::adapters::persistence::workflow::persistence_bound::recorder::Injected;
++use crate::adapters::persistence::workflow::tests::admission_tests::lease_tests::resolution_gate::{
++    Abort, Gate, Stall, connect,
++};
++
++pub(super) async fn disarm_local_gate(s: &Setup) {
++    sqlx::raw_sql("DROP TRIGGER aa_lease_stall ON local_agent_operations; DROP TRIGGER lease_gate_arm ON local_agent_operations; DROP FUNCTION lease_gate(); DROP FUNCTION lease_gate_uncancellable(); DROP TABLE lease_gate_abort")
++        .execute(s.fixture.persistence.pool()).await.unwrap();
++}
++
++pub(super) async fn terminal(s: &Setup) -> String {
++    tokio::time::timeout(std::time::Duration::from_secs(60), async {
++        loop {
++            let value: String =
++                sqlx::query_scalar("SELECT state FROM workflow_runs WHERE company_id=$1 AND id=$2")
++                    .bind(s.scope.company.as_uuid())
++                    .bind(s.scope.run.as_uuid())
++                    .fetch_one(s.fixture.persistence.pool())
++                    .await
++                    .unwrap();
++            if matches!(value.as_str(), "succeeded" | "failed" | "cancelled") {
++                return value;
++            }
++            tokio::time::sleep(std::time::Duration::from_millis(50)).await;
++        }
++    })
++    .await
++    .unwrap()
++}
++
++async fn assert_reconstructed(s: &Setup, peer: &mut Peer) -> String {
++    let workers = Workers::start(&s.fixture.persistence);
++    let result = terminal(s).await;
++    workers.close().await;
++    let snapshot = peer.snapshot().await;
++    let calls = snapshot["calls"].as_array().unwrap();
++    assert!(
++        calls.len() <= 1,
++        "recovery cannot blindly repeat a native mutation"
++    );
++    assert_eq!(calls.len(), usize::from(result == "succeeded"));
++    let receipts: Vec<Value> = sqlx::query_scalar(
++        "SELECT result FROM workflow_action_receipts WHERE company_id=$1 AND run_id=$2",
++    )
++    .bind(s.scope.company.as_uuid())
++    .bind(s.scope.run.as_uuid())
++    .fetch_all(s.fixture.persistence.pool())
++    .await
++    .unwrap();
++    assert!(
++        receipts.len() <= 1,
++        "a recovered invocation publishes at most once"
++    );
++    if result == "succeeded" {
++        assert_eq!(receipts.len(), 1);
++        assert_eq!(receipts[0]["status"], "succeeded");
++    } else {
++        assert!(
++            receipts
++                .iter()
++                .all(|receipt| receipt["status"] != "succeeded")
++        );
++    }
++    result
++}
++
++#[tokio::test]
++async fn cloudroom_e2e_crash_before_admission_commit_reconstructs_workers_server_and_peer() {
++    let _injected = Injected::mark();
++    let s = Setup::new().await;
++    let p = &s.fixture.persistence;
++    let mut gate = Gate::arm(
++        &s,
++        "local_agent_operations",
++        "INSERT",
++        "NEW.command->>'kind' = 'create'",
++        Stall::Statement {
++            table: "local_agent_operations",
++            events: "INSERT",
++            when: "NEW.command->>'kind' = 'create'",
++        },
++    )
++    .await;
++    let (mut observer, _) = connect(&s).await;
++    let mut server = TestTlsServer::start(Arc::new(p.clone())).await;
++    let mut peer = Peer::new(&s, &server, "none");
++    peer.event("started").await;
++    let workers = Workers::start(p);
++    let backend = gate.stalled(&mut observer, &[]).await;
++    assert_eq!(peer.snapshot().await["calls"].as_array().unwrap().len(), 0);
++    workers.crash().await;
++    gate.abort_on_release(Abort::Backend(backend)).await;
++    gate.drain().await;
++    disarm_local_gate(&s).await;
++    let rows: i64 = sqlx::query_scalar(
++        "SELECT count(*) FROM local_agent_operations WHERE company_id=$1 AND command->>'kind'='create'",
++    ).bind(s.scope.company.as_uuid()).fetch_one(p.pool()).await.unwrap();
++    assert_eq!(
++        rows, 0,
++        "the interrupted admission did not commit an operation"
++    );
++    peer.kill().await;
++    server
++        .restart(
++            Arc::new(PostgresPersistence::new(p.pool().clone())),
++            axum::Router::new(),
++        )
++        .await;
++    peer.reopen();
++    peer.event("started").await;
++    assert_reconstructed(&s, &mut peer).await;
++    peer.close().await;
++    server.close().await;
++}
++
++#[tokio::test]
++async fn cloudroom_e2e_crash_after_admission_before_peer_connect_dispatches_once() {
++    let s = Setup::new().await;
++    let p = &s.fixture.persistence;
++    parked(&s).await;
++    let mut server = TestTlsServer::start(Arc::new(p.clone())).await;
++    let mut peer = Peer::new(&s, &server, "after_admission");
++    peer.crashed("after_admission").await;
++    let marker: Option<chrono::DateTime<chrono::Utc>> = sqlx::query_scalar(
++        "SELECT delivery_attempted_at FROM local_agent_operations WHERE company_id=$1 AND command->>'kind'='create'",
++    ).bind(s.scope.company.as_uuid()).fetch_one(p.pool()).await.unwrap();
++    assert!(
++        marker.is_none(),
++        "no connection existed to attempt the admitted command"
++    );
++    server
++        .restart(
++            Arc::new(PostgresPersistence::new(p.pool().clone())),
++            axum::Router::new(),
++        )
++        .await;
++    peer.reopen();
++    peer.event("started").await;
++    assert_eq!(assert_reconstructed(&s, &mut peer).await, "succeeded");
++    peer.close().await;
++    server.close().await;
++}
++
++#[tokio::test]
++async fn cloudroom_e2e_committed_delivery_marker_before_socket_never_blindly_dispatches() {
++    let s = Setup::new().await;
++    let p = &s.fixture.persistence;
++    parked(&s).await;
++    let id: Uuid = sqlx::query_scalar(
++        "SELECT operation_id FROM workflow_local_agent_calls WHERE company_id=$1 AND run_id=$2",
++    )
++    .bind(s.scope.company.as_uuid())
++    .bind(s.scope.run.as_uuid())
++    .fetch_one(p.pool())
++    .await
++    .unwrap();
++    let gate = Arc::new(CommandWriteGate {
++        operation: OperationId::new(id).unwrap(),
++        reached: Notify::new(),
++    });
++    let mut server =
++        TestTlsServer::with_gate(Arc::new(p.clone()), axum::Router::new(), Some(gate.clone()))
++            .await;
++    let mut peer = Peer::new(&s, &server, "none");
++    peer.event("started").await;
++    tokio::time::timeout(std::time::Duration::from_secs(15), gate.reached.notified())
++        .await
++        .unwrap();
++    let marked: bool = sqlx::query_scalar(
++        "SELECT delivery_attempted_at IS NOT NULL FROM local_agent_operations WHERE company_id=$1 AND id=$2",
++    ).bind(s.scope.company.as_uuid()).bind(id).fetch_one(p.pool()).await.unwrap();
++    assert!(
++        marked,
++        "the real first-delivery transaction committed before the socket cut"
++    );
++    assert_eq!(peer.snapshot().await["calls"].as_array().unwrap().len(), 0);
++    peer.kill().await;
++    server
++        .restart(
++            Arc::new(PostgresPersistence::new(p.pool().clone())),
++            axum::Router::new(),
++        )
++        .await;
++    peer.reopen();
++    peer.event("started").await;
++    assert_ne!(assert_reconstructed(&s, &mut peer).await, "succeeded");
++    assert_eq!(peer.snapshot().await["calls"].as_array().unwrap().len(), 0);
++    peer.close().await;
++    server.close().await;
++}
+diff --git a/Users/mac03/dev/openbot/src/adapters/persistence/workflow/local_agent_native_e2e_tests.rs b/src/adapters/persistence/workflow/local_agent_native_e2e_tests.rs
+new file mode 100644
+index 00000000..c2e837b8
+--- /dev/null
++++ b/src/adapters/persistence/workflow/local_agent_native_e2e_tests.rs
+@@ -0,0 +1,352 @@
++//! Opt-in real native provider matrix; never part of credential-free CI execution.
++use super::*;
++use crate::application::local_agents::LocalMachineUseCases;
++use futures::FutureExt;
++#[path = "local_agent_native_recovery_tests.rs"]
++mod recovery;
++use recovery::initial_native;
++#[path = "local_agent_native_interaction_tests.rs"]
++mod interactions;
++
++struct NativeRig {
++    s: Setup,
++    cases: Arc<LocalMachineUseCases>,
++    server: TestTlsServer,
++    peer: Peer,
++    workspace: PathBuf,
++    marker: String,
++    provider: LocalProvider,
++    evidence: PathBuf,
++}
++struct NativeInitial {
++    session: SessionId,
++    thread: CloudroomThreadId,
++    before: Value,
++    after: Value,
++}
++async fn prepare_native(provider: LocalProvider) -> NativeRig {
++    assert_eq!(
++        std::env::var("OPENBOT_CLOUDROOM_NATIVE_SMOKE").as_deref(),
++        Ok("1"),
++        "native acceptance needs explicit opt-in"
++    );
++    let source = PathBuf::from(std::env::var("CLOUDROOM_SOURCE").expect("prepared pinned source"));
++    let artifact =
++        PathBuf::from(std::env::var("CLOUDROOM_PLUGIN_ARCHIVE").expect("verified plugin archive"));
++    let evidence = PathBuf::from(
++        std::env::var("CLOUDROOM_NATIVE_EVIDENCE").expect("retained native evidence directory"),
++    );
++    std::fs::create_dir_all(&evidence).unwrap();
++    let directory = std::env::temp_dir().join(format!("openbot-native-e2e-{}", Uuid::new_v4()));
++    std::fs::create_dir(&directory).unwrap();
++    std::fs::set_permissions(&directory, std::fs::Permissions::from_mode(0o700)).unwrap();
++    let workspace = directory.join("workspace");
++    std::fs::create_dir(&workspace).unwrap();
++    let marker = format!("OPENBOT_NATIVE_{}", Uuid::new_v4().simple());
++    std::fs::write(workspace.join("marker.txt"), format!("{marker}\n")).unwrap();
++    let prompt = format!(
++        "Authorized disposable local file smoke: use your shell tool once to run exactly cat {} and reply with the file's exact contents. Do not edit files, use other commands, access network, or start subagents.",
++        workspace.join("marker.txt").display()
++    );
++    let s = Setup::with_inputs(|inputs, _| inputs["prompt"] = json!({"literal":prompt})).await;
++    let p = s.fixture.persistence.clone();
++    let cases = Arc::new(LocalMachineUseCases::new(
++        Arc::new(p.clone()),
++        Arc::new(p.clone()),
++        "native-e2e-test-authority-unique-key-32".into(),
++    ));
++    let issued = cases
++        .create_pairing(
++            s.fixture.target.actor.user_id(),
++            s.scope.company.as_uuid(),
++            Some(s.profile.selection.machine_id),
++        )
++        .await
++        .unwrap();
++    let extra =
++        crate::adapters::http::routes::local_machines::public_router().with_state(cases.clone());
++    let server = TestTlsServer::with_routes(Arc::new(p.clone()), extra).await;
++    let encoded = base64::engine::general_purpose::STANDARD.encode(server.certificate.as_ref());
++    std::fs::write(
++        directory.join("ca.pem"),
++        format!("-----BEGIN CERTIFICATE-----\n{encoded}\n-----END CERTIFICATE-----\n"),
++    )
++    .unwrap();
++    let provider_name = serde_json::to_value(provider)
++        .unwrap()
++        .as_str()
++        .unwrap()
++        .to_owned();
++    let provider_evidence = evidence.join(&provider_name);
++    std::fs::create_dir_all(&provider_evidence).unwrap();
++    std::fs::write(directory.join("config.json"),serde_json::to_vec(&json!({"directory":directory,"workspace":workspace,
++        "source":source,"artifact":artifact,"origin":server.origin,"pairingCode":issued.code.expose_secret(),
++        "provider":provider_name,"opencodeBin":std::env::var("CLOUDROOM_OPENCODE_BIN").ok(),"evidence":provider_evidence})).unwrap()).unwrap();
++    std::fs::set_permissions(
++        directory.join("config.json"),
++        std::fs::Permissions::from_mode(0o600),
++    )
++    .unwrap();
++
++    let peer = Peer::spawn_script(directory, "native-peer.js");
++    NativeRig {
++        s,
++        cases,
++        server,
++        peer,
++        workspace,
++        marker,
++        provider,
++        evidence: provider_evidence,
++    }
++}
++async fn configure_native(rig: &mut NativeRig) {
++    let ready = rig.peer.event_timeout("ready", 180).await;
++    let project =
++        CloudroomProjectId::try_from(ready["project"].as_str().unwrap().to_owned()).unwrap();
++    let s = &mut rig.s;
++    let name = format!(
++        "Disposable {} acceptance",
++        serde_json::to_value(rig.provider)
++            .unwrap()
++            .as_str()
++            .unwrap()
++    );
++    let machine = rig
++        .cases
++        .machines(
++            s.fixture.target.actor.user_id(),
++            s.scope.company.as_uuid(),
++            None,
++        )
++        .await
++        .unwrap()
++        .into_iter()
++        .find(|machine| machine.name == name)
++        .expect("use the actual installation enrolled by the production plugin");
++    assert_eq!(machine.state, MachineState::Enabled);
++    s.profile.selection.machine_id = machine.id;
++    let details = tokio::time::timeout(std::time::Duration::from_secs(30), async {
++        loop {
++            let details = rig
++                .cases
++                .details(
++                    s.fixture.target.actor.user_id(),
++                    s.scope.company.as_uuid(),
++                    s.profile.selection.machine_id,
++                )
++                .await
++                .unwrap();
++            if details
++                .capabilities
++                .as_ref()
++                .is_some_and(|cap| cap.catalog.projects.contains(&project))
++            {
++                break details;
++            }
++            tokio::time::sleep(std::time::Duration::from_millis(100)).await;
++        }
++    })
++    .await
++    .unwrap();
++    rig.cases
++        .set_projects(
++            s.fixture.target.actor.user_id(),
++            s.scope.company.as_uuid(),
++            s.profile.selection.machine_id,
++            std::slice::from_ref(&project),
++        )
++        .await
++        .unwrap();
++    let catalog = details.capabilities.as_ref().unwrap();
++    let models = &catalog
++        .catalog
++        .providers
++        .iter()
++        .find(|item| item.provider == rig.provider)
++        .expect("selected real provider must advertise a catalog")
++        .models;
++    let selected = models
++        .iter()
++        .find(|item| match rig.provider {
++            LocalProvider::Codex => item.model.as_str() == "gpt-6-luna",
++            LocalProvider::OpenCode => item.model.as_str() == "openai/gpt-6-luna",
++            LocalProvider::ClaudeCode => item.model.as_str().contains("haiku"),
++        })
++        .expect("explicit bounded smoke model must be advertised");
++    s.profile.selection.project_id = project;
++    s.profile.selection.provider = rig.provider;
++    s.profile.selection.model = selected.model.clone();
++    s.profile.selection.policy.reasoning = if selected
++        .reasoning_levels
++        .contains(&LocalReasoningLevel::Low)
++    {
++        LocalReasoningLevel::Low
++    } else {
++        *selected.reasoning_levels.first().unwrap()
++    };
++    rig.cases
++        .save_profile(s.fixture.target.actor.user_id(), &s.profile)
++        .await
++        .unwrap();
++}
++async fn follow_native(rig: &mut NativeRig, initial: &NativeInitial) {
++    let s = &rig.s;
++    let p = &s.fixture.persistence;
++    let marker = format!("OPENBOT_FOLLOW_{}", Uuid::new_v4().simple());
++    let request=ControlSession {actor:s.fixture.target.actor.user_id(),company:s.scope.company.as_uuid(),request_id:OperationId::new(Uuid::now_v7()).unwrap(),session_id:initial.session,
++        command:SessionCommand::Send {prompt:LocalPrompt::try_from(format!("Reply exactly {marker}. Do not use tools, change files, access network, or start subagents.")).unwrap()}};
++    p.control_session(&request).await.unwrap();
++    native_outcome(s, request.request_id, OperationOutcome::Succeeded).await;
++    let details = p
++        .read_operation(request.actor, request.company, request.request_id)
++        .await
++        .unwrap();
++    assert!(details.output.as_ref().unwrap().as_str().contains(&marker));
++    rig.peer
++        .command(json!({"command":"ui","thread":initial.thread,"text":marker}))
++        .await;
++    rig.peer.event_timeout("ui", 120).await;
++}
++async fn stop_native(
++    rig: &mut NativeRig,
++    initial: &NativeInitial,
++    expected_requests: usize,
++) -> Value {
++    let s = &rig.s;
++    let p = &s.fixture.persistence;
++    let active = ControlSession {
++        actor: s.fixture.target.actor.user_id(), company: s.scope.company.as_uuid(),
++        request_id: OperationId::new(Uuid::now_v7()).unwrap(), session_id: initial.session,
++        command: SessionCommand::Send { prompt: LocalPrompt::try_from(
++            "Authorized disposable cancellation smoke: use your shell tool once to run exactly sleep 20. Do not read or change files, use network, or start subagents.".to_owned()).unwrap() },
++    };
++    p.control_session(&active).await.unwrap();
++    rig.peer
++        .command(
++            json!({"command":"executing","thread":initial.thread,"operation":active.request_id}),
++        )
++        .await;
++    let executing = rig.peer.event_timeout("executing", 45).await;
++    for command in [SessionCommand::Stop, SessionCommand::Archive] {
++        let control = ControlSession {
++            actor: active.actor,
++            company: active.company,
++            request_id: OperationId::new(Uuid::now_v7()).unwrap(),
++            session_id: initial.session,
++            command,
++        };
++        p.control_session(&control).await.unwrap();
++        native_outcome(s, control.request_id, OperationOutcome::Succeeded).await;
++        if matches!(control.command, SessionCommand::Stop) {
++            native_outcome(s, active.request_id, OperationOutcome::Cancelled).await;
++        }
++    }
++    rig.peer
++        .command(json!({"command":"snapshot","thread":initial.thread}))
++        .await;
++    let final_state = rig.peer.event("snapshot").await;
++    assert_eq!(final_state["requests"], expected_requests);
++    assert_eq!(
++        final_state["turns"].as_array().unwrap().len(),
++        expected_requests
++    );
++    assert_eq!(
++        final_state["terminals"].as_array().unwrap().len(),
++        expected_requests
++    );
++    assert!(
++        final_state["terminals"]
++            .as_array()
++            .unwrap()
++            .iter()
++            .any(|item| item["turn"] == executing["turn"] && item["status"] == "interrupted")
++    );
++    final_state
++}
++async fn verify_native(rig: &mut NativeRig) -> Value {
++    configure_native(rig).await;
++    let initial = initial_native(rig).await;
++    follow_native(rig, &initial).await;
++    let pending_permission = interactions::begin_permission(rig, &initial).await;
++    let interaction = interactions::finish_permission(rig, &initial, pending_permission).await;
++    let final_state = stop_native(rig, &initial, 6).await;
++    let logged_out = interactions::logged_out(rig).await;
++    json!({"status":"PASS","platform":std::env::consts::OS,"provider":rig.provider,"selection":rig.s.profile.selection,
++        "session":initial.session,"thread":initial.thread,"beforeRestart":initial.before,"afterRestart":initial.after,"final":final_state,
++        "nativeHumanPermission":interaction,"isolatedLoggedOutProvider":logged_out,
++        "realPairingHttp":true,"productionPlugin":true,"actualWorkflowWorkers":2,"actualUi":true,"fileAccess":true,
++        "outputRecoveredAfterNativeOutputBeforeServerReceipt":true,"explicitThreadStopAndArchiveAccepted":true,"activeNativeStopMatchedInterruptedTurn":true,"nativeStopIsNotAnAtomicTargetedTurnGuarantee":true,"linux":"NOT EXERCISED on this host"})
++}
++async fn close_native(mut rig: NativeRig) -> std::process::ExitStatus {
++    if rig.peer.child.try_wait().unwrap().is_none() {
++        rig.peer.command(json!({"command":"close"})).await;
++    }
++    let status = tokio::time::timeout(std::time::Duration::from_secs(90), rig.peer.child.wait())
++        .await
++        .unwrap()
++        .unwrap();
++    rig.server.close().await;
++    assert_eq!(
++        std::fs::read_to_string(rig.workspace.join("marker.txt")).unwrap(),
++        format!("{}\n", rig.marker),
++        "removal preserves workspace before disposable-fixture cleanup"
++    );
++    status
++}
++async fn native_case(provider: LocalProvider) {
++    // Keep the external runtime fixture's future off the libtest stack.
++    let mut rig = Box::pin(prepare_native(provider)).await;
++    let evidence = rig.evidence.join("result.json");
++    let result = std::panic::AssertUnwindSafe(Box::pin(verify_native(&mut rig)))
++        .catch_unwind()
++        .await;
++    let status = Box::pin(close_native(rig)).await;
++    match result {
++        Ok(proof) => {
++            assert!(status.success());
++            std::fs::write(evidence, serde_json::to_vec_pretty(&proof).unwrap()).unwrap();
++        }
++        Err(error) => std::panic::resume_unwind(error),
++    }
++}
++
++async fn native_outcome(s: &Setup, id: OperationId, expected: OperationOutcome) {
++    tokio::time::timeout(std::time::Duration::from_secs(120), async {
++        loop {
++            let view = s
++                .fixture
++                .persistence
++                .read_operation(
++                    s.fixture.target.actor.user_id(),
++                    s.scope.company.as_uuid(),
++                    id,
++                )
++                .await
++                .unwrap();
++            if let Some(outcome) = view.operation.outcome() {
++                assert_eq!(outcome, expected);
++                return;
++            }
++            tokio::time::sleep(std::time::Duration::from_millis(100)).await;
++        }
++    })
++    .await
++    .unwrap();
++}
++
++#[tokio::test]
++#[ignore = "explicitly authorized disposable native provider acceptance"]
++async fn cloudroom_e2e_native_codex_packaged_plugin_pairing_workflow_ui_restart_followup_stop() {
++    Box::pin(native_case(LocalProvider::Codex)).await;
++}
++#[tokio::test]
++#[ignore = "explicitly authorized disposable native provider acceptance"]
++async fn cloudroom_e2e_native_claude_packaged_plugin_pairing_workflow_ui_restart_followup_stop() {
++    Box::pin(native_case(LocalProvider::ClaudeCode)).await;
++}
++#[tokio::test]
++#[ignore = "explicitly authorized disposable native provider acceptance"]
++async fn cloudroom_e2e_native_opencode_packaged_plugin_pairing_workflow_ui_restart_followup_stop() {
++    Box::pin(native_case(LocalProvider::OpenCode)).await;
++}
+diff --git a/Users/mac03/dev/openbot/src/adapters/persistence/workflow/local_agent_native_interaction_tests.rs b/src/adapters/persistence/workflow/local_agent_native_interaction_tests.rs
+new file mode 100644
+index 00000000..ddff9fa0
+--- /dev/null
++++ b/src/adapters/persistence/workflow/local_agent_native_interaction_tests.rs
+@@ -0,0 +1,231 @@
++//! Actual independent human input, UI permission denial and isolated login failure.
++use super::*;
++use crate::application::local_agents::management::LocalOperationView;
++
++async fn waiting_input(rig: &NativeRig, id: OperationId) -> LocalOperationView {
++    tokio::time::timeout(std::time::Duration::from_secs(45), async {
++        loop {
++            let view = rig
++                .s
++                .fixture
++                .persistence
++                .read_operation(
++                    rig.s.fixture.target.actor.user_id(),
++                    rig.s.scope.company.as_uuid(),
++                    id,
++                )
++                .await
++                .unwrap();
++            assert!(
++                view.operation.outcome().is_none(),
++                "native permission scenario completed before requesting input"
++            );
++            if view.observed_turn_state == Some(TurnState::WaitingForInput) {
++                return view;
++            }
++            tokio::time::sleep(std::time::Duration::from_millis(100)).await;
++        }
++    })
++    .await
++    .unwrap()
++}
++
++async fn settled(rig: &NativeRig, id: OperationId) -> LocalOperationView {
++    tokio::time::timeout(std::time::Duration::from_secs(120), async {
++        loop {
++            let view = rig
++                .s
++                .fixture
++                .persistence
++                .read_operation(
++                    rig.s.fixture.target.actor.user_id(),
++                    rig.s.scope.company.as_uuid(),
++                    id,
++                )
++                .await
++                .unwrap();
++            if view.operation.outcome().is_some() {
++                return view;
++            }
++            tokio::time::sleep(std::time::Duration::from_millis(100)).await;
++        }
++    })
++    .await
++    .unwrap()
++}
++
++fn turn(view: &LocalOperationView) -> CloudroomTurnId {
++    match view.operation.dispatch() {
++        DispatchEvidence::NativeIdentity {
++            turn_id: Some(id), ..
++        } => id.clone(),
++        other => panic!("native interaction requires a positively accepted turn: {other:?}"),
++    }
++}
++
++pub(super) struct PermissionWait {
++    request: ControlSession,
++    own: String,
++    own_turn: CloudroomTurnId,
++}
++
++pub(super) async fn begin_permission(
++    rig: &mut NativeRig,
++    initial: &NativeInitial,
++) -> PermissionWait {
++    let policy = format!("OPENBOT_POLICY_{}", Uuid::new_v4().simple());
++    rig.peer.command(json!({"command":"human","thread":initial.thread,"text":policy,"permissionMode":"accept-edits"})).await;
++    rig.peer.event("human").await;
++    rig.peer
++        .command(json!({"command":"human_terminal","thread":initial.thread,"text":policy}))
++        .await;
++    rig.peer.event_timeout("human_terminal", 150).await;
++    let own = format!("OPENBOT_PERMISSION_{}", Uuid::new_v4().simple());
++    rig.peer
++        .command(json!({"command":"permission_prompt","text":own}))
++        .await;
++    let prompt = rig.peer.event("permission_prompt").await;
++    let request = ControlSession {
++        actor: rig.s.fixture.target.actor.user_id(),
++        company: rig.s.scope.company.as_uuid(),
++        request_id: OperationId::new(Uuid::now_v7()).unwrap(),
++        session_id: initial.session,
++        command: SessionCommand::Send {
++            prompt: LocalPrompt::try_from(prompt["prompt"].as_str().unwrap().to_owned()).unwrap(),
++        },
++    };
++    rig.s
++        .fixture
++        .persistence
++        .control_session(&request)
++        .await
++        .unwrap();
++    let waiting = waiting_input(rig, request.request_id).await;
++    let own_turn = turn(&waiting);
++    PermissionWait {
++        request,
++        own,
++        own_turn,
++    }
++}
++
++pub(super) async fn finish_permission(
++    rig: &mut NativeRig,
++    initial: &NativeInitial,
++    pending: PermissionWait,
++) -> Value {
++    let PermissionWait {
++        request,
++        own,
++        own_turn,
++    } = pending;
++    let human = format!("OPENBOT_HUMAN_{}", Uuid::new_v4().simple());
++    rig.peer
++        .command(json!({"command":"human","thread":initial.thread,"text":human}))
++        .await;
++    rig.peer.event("human").await;
++    let still_waiting = rig
++        .s
++        .fixture
++        .persistence
++        .read_operation(request.actor, request.company, request.request_id)
++        .await
++        .unwrap();
++    assert!(still_waiting.operation.outcome().is_none());
++    assert_eq!(turn(&still_waiting), own_turn);
++    assert_eq!(
++        still_waiting.observed_turn_state,
++        Some(TurnState::WaitingForInput)
++    );
++    rig.peer
++        .command(json!({"command":"deny","thread":initial.thread}))
++        .await;
++    assert_eq!(rig.peer.event_timeout("deny", 90).await["actualUi"], true);
++    let result = settled(rig, request.request_id).await;
++    assert_eq!(turn(&result), own_turn);
++    assert!(matches!(
++        result.operation.outcome(),
++        Some(OperationOutcome::Succeeded | OperationOutcome::Failed | OperationOutcome::Cancelled)
++    ));
++    if result.operation.outcome() == Some(OperationOutcome::Succeeded) {
++        assert!(result.output.as_ref().unwrap().as_str().contains(&own));
++    }
++    assert!(
++        !result
++            .output
++            .as_ref()
++            .is_some_and(|output| output.as_str().contains(&human))
++    );
++    rig.peer
++        .command(json!({"command":"human_terminal","thread":initial.thread,"text":human}))
++        .await;
++    let foreign = rig.peer.event_timeout("human_terminal", 150).await;
++    assert_ne!(foreign["turn"].as_str().unwrap(), own_turn.as_str());
++    rig.peer
++        .command(json!({"command":"journal","operation":request.request_id}))
++        .await;
++    let journal = rig.peer.event("journal").await;
++    assert_eq!(journal["sdkCalls"], 1);
++    assert_eq!(journal["turn"].as_str().unwrap(), own_turn.as_str());
++    json!({"status":"PASS","actualUiPermissionDenied":true,"openbotWaitingForMatchingInput":true,
++        "ownTurn":own_turn,"independentHumanTurn":foreign["turn"],"outcome":result.operation.outcome(),"sdkCalls":1})
++}
++
++pub(super) async fn logged_out(rig: &mut NativeRig) -> Value {
++    rig.peer.command(json!({"command":"logged_out"})).await;
++    let isolation = rig.peer.event_timeout("logged_out", 150).await;
++    assert_eq!(isolation["isolatedProviderConfiguration"], true);
++    assert_eq!(isolation["parentLoginUntouched"], true);
++    let original = rig.s.scope;
++    let actor = rig.s.fixture.target.actor;
++    let inputs = json!({"profile_id":{"literal":rig.s.profile.id},"prompt":{"literal":"Disposable logged-out acceptance: reply exactly OPENBOT_AUTH_FAILURE_PROBE. Do not use tools, read/change files, use network, or start subagents."}});
++    rig.s.scope = rig
++        .s
++        .activate(actor, inputs, RelatedAssociation::Company)
++        .await;
++    let workers = Workers::start(&rig.s.fixture.persistence);
++    let state = super::super::early::terminal(&rig.s).await;
++    workers.close().await;
++    assert_eq!(
++        state, "failed",
++        "an isolated logged-out provider cannot produce workflow success"
++    );
++    let operation: Option<Uuid> = sqlx::query_scalar(
++        "SELECT operation_id FROM workflow_local_agent_calls WHERE company_id=$1 AND run_id=$2 AND operation_id IS NOT NULL",
++    ).bind(rig.s.scope.company.as_uuid()).bind(rig.s.scope.run.as_uuid())
++        .fetch_optional(rig.s.fixture.persistence.pool()).await.unwrap();
++    let mut sdk_calls = 0;
++    if let Some(operation) = operation {
++        let id = OperationId::new(operation).unwrap();
++        let view = rig
++            .s
++            .fixture
++            .persistence
++            .read_operation(actor.user_id(), rig.s.scope.company.as_uuid(), id)
++            .await
++            .unwrap();
++        assert!(matches!(
++            view.operation.outcome(),
++            Some(OperationOutcome::Failed | OperationOutcome::Uncertain)
++        ));
++        rig.peer
++            .command(json!({"command":"journal","operation":id}))
++            .await;
++        sdk_calls = rig.peer.event("journal").await["sdkCalls"]
++            .as_u64()
++            .unwrap();
++        assert!(
++            sdk_calls <= 1,
++            "authentication failure never permits a blind mutation retry"
++        );
++    }
++    let successes: i64 = sqlx::query_scalar(
++        "SELECT count(*) FROM workflow_action_receipts WHERE company_id=$1 AND run_id=$2 AND result->>'status'='succeeded'",
++    ).bind(rig.s.scope.company.as_uuid()).bind(rig.s.scope.run.as_uuid())
++        .fetch_one(rig.s.fixture.persistence.pool()).await.unwrap();
++    assert_eq!(successes, 0);
++    rig.s.scope = original;
++    state_timeout(&rig.s, "succeeded", 10).await;
++    json!({"status":"PASS","isolation":isolation,"workflow":"failed","sdkCalls":sdk_calls,
++        "nativeOperation":operation,"successfulReceipts":successes,"originalWorkflowUnchanged":true})
++}
+diff --git a/Users/mac03/dev/openbot/src/adapters/persistence/workflow/local_agent_native_recovery_tests.rs b/src/adapters/persistence/workflow/local_agent_native_recovery_tests.rs
+new file mode 100644
+index 00000000..e211c842
+--- /dev/null
++++ b/src/adapters/persistence/workflow/local_agent_native_recovery_tests.rs
+@@ -0,0 +1,169 @@
++//! Real native output is durable locally but deliberately unconsumed at restart.
++use super::*;
++use crate::adapters::persistence::workflow::persistence_bound::recorder::Injected;
++use crate::adapters::persistence::workflow::tests::admission_tests::lease_tests::resolution_gate::{
++    Abort, Gate, Stall, connect,
++};
++
++async fn mapping(rig: &NativeRig) -> (SessionId, CloudroomThreadId) {
++    tokio::time::timeout(std::time::Duration::from_secs(30), async {
++        loop {
++            let session: Option<Uuid> = sqlx::query_scalar(
++                "SELECT session_id FROM workflow_local_agent_calls WHERE company_id=$1 AND run_id=$2",
++            )
++            .bind(rig.s.scope.company.as_uuid()).bind(rig.s.scope.run.as_uuid())
++            .fetch_optional(rig.s.fixture.persistence.pool()).await.unwrap();
++            if let Some(session) = session {
++                let session = SessionId::new(session).unwrap();
++                let details = rig.s.fixture.persistence.read_session(
++                    rig.s.fixture.target.actor.user_id(), rig.s.scope.company.as_uuid(), session,
++                ).await.unwrap();
++                if let Some(thread) = details.session.thread_id { return (session, thread); }
++            }
++            tokio::time::sleep(std::time::Duration::from_millis(50)).await;
++        }
++    }).await.unwrap()
++}
++
++async fn assert_unconsumed(s: &Setup, operation: OperationId) {
++    let outcome: Option<String> = sqlx::query_scalar(
++        "SELECT outcome FROM local_agent_operations WHERE company_id=$1 AND id=$2",
++    )
++    .bind(s.scope.company.as_uuid())
++    .bind(operation.as_uuid())
++    .fetch_one(s.fixture.persistence.pool())
++    .await
++    .unwrap();
++    assert!(
++        outcome.is_none(),
++        "server output must remain unconsumed until connector restart"
++    );
++}
++
++pub(super) async fn initial_native(rig: &mut NativeRig) -> NativeInitial {
++    let _injected = Injected::mark();
++    let s = &rig.s;
++    let when = "NEW.command->>'kind'='create' AND NEW.outcome='succeeded'";
++    let mut gate = Gate::arm(
++        s,
++        "local_agent_operations",
++        "UPDATE",
++        when,
++        Stall::Statement {
++            table: "local_agent_operations",
++            events: "UPDATE",
++            when,
++        },
++    )
++    .await;
++    let (mut observer, _) = connect(s).await;
++    let workers = Workers::start(&s.fixture.persistence);
++    state_timeout(s, "waiting", 30).await;
++    let (session, thread) = mapping(rig).await;
++    let operation: Uuid = sqlx::query_scalar(
++        "SELECT operation_id FROM workflow_local_agent_calls WHERE company_id=$1 AND run_id=$2",
++    )
++    .bind(s.scope.company.as_uuid())
++    .bind(s.scope.run.as_uuid())
++    .fetch_one(s.fixture.persistence.pool())
++    .await
++    .unwrap();
++    let operation = OperationId::new(operation).unwrap();
++    rig.peer
++        .command(
++            json!({"command":"terminal","thread":thread,"operation":operation,"text":rig.marker}),
++        )
++        .await;
++    let native = rig.peer.event_timeout("terminal", 150).await;
++    let backend = gate.stalled(&mut observer, &[]).await;
++    assert_unconsumed(s, operation).await;
++    state_timeout(s, "waiting", 10).await;
++    rig.peer
++        .command(json!({"command":"snapshot","thread":thread}))
++        .await;
++    let before = rig.peer.event("snapshot").await;
++    assert_eq!(before["requests"], 1);
++    assert!(
++        before["turns"]
++            .as_array()
++            .unwrap()
++            .contains(&native["turn"])
++    );
++    rig.peer.command(json!({"command":"shutdown"})).await;
++    rig.peer.event_timeout("shutdown", 30).await;
++    workers.close().await;
++    gate.abort_on_release(Abort::Backend(backend)).await;
++    gate.drain().await;
++    super::super::early::disarm_local_gate(s).await;
++    rig.server
++        .restart(
++            Arc::new(PostgresPersistence::new(
++                s.fixture.persistence.pool().clone(),
++            )),
++            crate::adapters::http::routes::local_machines::public_router()
++                .with_state(rig.cases.clone()),
++        )
++        .await;
++    assert_unconsumed(s, operation).await;
++    rig.peer.command(json!({"command":"boot"})).await;
++    rig.peer.event_timeout("booted", 120).await;
++    let recovered_workers = Workers::start(&s.fixture.persistence);
++    state_timeout(s, "succeeded", 120).await;
++    recovered_workers.close().await;
++    assert_recovered(rig, session, &thread, &before).await;
++    rig.peer
++        .command(json!({"command":"snapshot","thread":thread}))
++        .await;
++    let after = rig.peer.event("snapshot").await;
++    assert_eq!(after["requests"], 1);
++    assert_eq!(after["turns"], before["turns"]);
++    NativeInitial {
++        session,
++        thread,
++        before,
++        after,
++    }
++}
++
++async fn assert_recovered(
++    rig: &mut NativeRig,
++    session: SessionId,
++    thread: &CloudroomThreadId,
++    before: &Value,
++) {
++    let s = &rig.s;
++    let details = s
++        .fixture
++        .persistence
++        .read_session(
++            s.fixture.target.actor.user_id(),
++            s.scope.company.as_uuid(),
++            session,
++        )
++        .await
++        .unwrap();
++    assert!(details.recent.entries.iter().any(|operation| {
++        operation
++            .output
++            .as_ref()
++            .is_some_and(|output| output.as_str().contains(&rig.marker))
++    }));
++    let receipts: i64 = sqlx::query_scalar(
++        "SELECT count(*) FROM workflow_action_receipts WHERE company_id=$1 AND run_id=$2 AND result->>'status'='succeeded'",
++    ).bind(s.scope.company.as_uuid()).bind(s.scope.run.as_uuid())
++        .fetch_one(s.fixture.persistence.pool()).await.unwrap();
++    assert_eq!(
++        receipts, 1,
++        "replayed native output completes the original workflow once"
++    );
++    assert_eq!(before["requests"], 1);
++    rig.peer
++        .command(json!({"command":"ui","thread":thread,"text":rig.marker}))
++        .await;
++    assert_eq!(
++        rig.peer.event_timeout("ui", 120).await["thread"]
++            .as_str()
++            .unwrap(),
++        thread.as_str()
++    );
++}
+diff --git a/src/adapters/persistence/workflow/local_agent_retention_tests.rs b/src/adapters/persistence/workflow/local_agent_retention_tests.rs
+index 21035f7f..530cafad 100644
+--- a/src/adapters/persistence/workflow/local_agent_retention_tests.rs
++++ b/src/adapters/persistence/workflow/local_agent_retention_tests.rs
+@@ -17,16 +17,30 @@ struct WaitingRoot {
+     session: SessionId,
+ }
+ 
++async fn claim_retention(s: &Setup, scope: ActivationRequest) -> ClaimedWorkflow {
++    let worker = WorkflowWorkerId(Uuid::new_v4());
++    // These tests exercise retention, not claim latency. Retry only a positively
++    // unapplied setup claim under whole-suite contention; unknown commits fail.
++    // The separate uncontended lease-budget CI gate still bounds claim work.
++    for attempt in 0..3 {
++        match s.fixture.persistence.claim_io(scope, worker, lease()).await {
++            Ok(claim) => return claim.expect("retention fixture must be claimable"),
++            Err(AppError::DatabaseTimeout(message))
++                if attempt < 2 && message.contains("not applied") =>
++            {
++                tokio::time::sleep(std::time::Duration::from_millis(50)).await;
++            }
++            Err(error) => panic!("retention fixture claim failed: {error}"),
++        }
++    }
++    unreachable!()
++}
++
+ async fn complete_local(
+     s: &Setup,
+     scope: ActivationRequest,
+ ) -> (SessionId, Option<ActivationRequest>) {
+-    let p = &s.fixture.persistence;
+-    let claim = p
+-        .claim_io(scope, WorkflowWorkerId(Uuid::new_v4()), lease())
+-        .await
+-        .unwrap()
+-        .unwrap();
++    let claim = claim_retention(s, scope).await;
+     s.park(&claim).await;
+     s.native_success().await;
+     consume_local(s, scope).await
+@@ -38,11 +52,7 @@ async fn consume_local(
+ ) -> (SessionId, Option<ActivationRequest>) {
+     let p = &s.fixture.persistence;
+     p.resume_wait(scope).await.unwrap();
+-    let claim = p
+-        .claim_io(scope, WorkflowWorkerId(Uuid::new_v4()), lease())
+-        .await
+-        .unwrap()
+-        .unwrap();
++    let claim = claim_retention(s, scope).await;
+     let output = s
+         .handler()
+         .execute(&WorkflowStepKind(KIND.into()), &claim)
+diff --git a/src/adapters/persistence/workflow/local_agent_tests.rs b/src/adapters/persistence/workflow/local_agent_tests.rs
+index 13e9ce32..f2f391f6 100644
+--- a/src/adapters/persistence/workflow/local_agent_tests.rs
++++ b/src/adapters/persistence/workflow/local_agent_tests.rs
+@@ -476,6 +476,9 @@ async fn publish_local(fixture: &Fixture, inputs: Value) -> VersionId {
+     graph_support::publish(fixture, source).await
+ }
+ 
++#[cfg(unix)]
++#[path = "local_agent_e2e_tests.rs"]
++mod e2e;
+ #[path = "local_agent_graph_support.rs"]
+ mod graph_support;
+ #[path = "local_agent_retention_tests.rs"]
+diff --git a/src/infra/workflow.rs b/src/infra/workflow.rs
+index ac6f093c..8cf46287 100644
+--- a/src/infra/workflow.rs
++++ b/src/infra/workflow.rs
+@@ -759,8 +759,8 @@ mod tests {
+                 .unwrap();
+         }
+         assert_eq!(
+-            task_count, 6,
+-            "one slot, metrics, intent, final publication, schedule and storage workers"
++            task_count, 7,
++            "one slot, metrics, intent, final publication, schedule, workflow storage and local-agent storage workers"
+         );
+     }
+ 

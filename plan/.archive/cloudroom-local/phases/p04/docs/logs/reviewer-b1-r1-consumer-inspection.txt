@@ -1,0 +1,127 @@
+/tmp/openbot-cloudroom-d8b3cc3/gui/apps/server/src/services/plugins/plugin-service.ts:1786-1824
+1786:     async updateSettings(id, values) {
+1787:       const plugin = loaded.get(id);
+1788:       if (!plugin) return undefined;
+1789:       const storeArgs = {
+1790:         db: deps.db,
+1791:         dataDir: deps.dataDir,
+1792:         pluginId: id,
+1793:         descriptors: plugin.handle.settings.descriptors,
+1794:       };
+1795:       const errors = validateSettingsUpdate(storeArgs.descriptors, values);
+1796:       if (errors.length > 0) {
+1797:         throw new PluginSettingsValidationError(errors.join("; "));
+1798:       }
+1799:       const prev = await readPluginSettingsValues(storeArgs);
+1800:       await writePluginSettingsUpdate({ ...storeArgs, values });
+1801:       const next = await readPluginSettingsValues(storeArgs);
+1802:       if (JSON.stringify(next) !== JSON.stringify(prev)) {
+1803:         for (const listener of plugin.handle.settings.listeners) {
+1804:           try {
+1805:             listener(next, prev);
+1806:           } catch (error) {
+1807:             logger.warn(
+1808:               `plugin ${id} settings onChange listener failed: ${error instanceof Error ? error.message : String(error)}`,
+1809:             );
+1810:           }
+1811:         }
+1812:         deps.onSettingsChanged?.(id);
+1813:         notifyPluginsChanged();
+1814:         if (statuses.get(id)?.status === "needs-configuration") {
+1815:           const row = getInstalledPlugin(deps.db, id);
+1816:           if (row) {
+1817:             await withLifecycleLock(id, async () => {
+1818:               await disposeOne(id);
+1819:               await loadOne(row);
+1820:             });
+1821:             notifyPluginsChanged();
+1822:           }
+1823:         }
+1824:       }
+
+/tmp/openbot-cloudroom-d8b3cc3/gui/apps/server/src/server.ts:645-648
+645:     onSettingsChanged: (pluginId) => {
+646:       deps.providerNativeRoots.invalidate(pluginId);
+647:       deps.providerRegistry.forgetAllInstalled();
+648:     },
+
+/tmp/openbot-cloudroom-d8b3cc3/gui/apps/server/src/services/interactions/pending-interaction-timeline.ts:90-101
+90:   switch (interaction.status) {
+91:     case "pending":
+92:       return buildApprovalItem(subject, "pending", "waiting_for_approval");
+93:     case "resolving":
+94:       return null;
+95:     case "resolved":
+96:       return interaction.resolution?.decision === "deny"
+97:         ? buildApprovalItem(subject, "interrupted", "denied")
+98:         : null;
+99:     case "interrupted":
+100:       return buildApprovalItem(subject, "interrupted", null);
+101:     default:
+
+/tmp/openbot-cloudroom-d8b3cc3/gui/apps/server/src/services/interactions/pending-interaction-timeline.ts:141-171
+141: ): AppendStoredThreadEventArgs[] {
+142:   const environmentId =
+143:     getThread(db, interaction.threadId)?.environmentId ?? null;
+144:   const writes: AppendStoredThreadEventArgs[] = [
+145:     {
+146:       threadId: interaction.threadId,
+147:       environmentId,
+148:       type: INTERACTION_LIFECYCLE_EVENT_TYPE,
+149:       scope: interactionScope(interaction),
+150:       data: { interaction: toInteractionLifecycle(interaction) },
+151:     },
+152:   ];
+153:   const write = approvalItemWriteFor(interaction);
+154:   if (write !== null) {
+155:     const { providerThreadId, turnId } = write.interaction;
+156:     writes.push({
+157:       threadId: interaction.threadId,
+158:       environmentId,
+159:       type: write.item.status === "pending" ? "item/started" : "item/completed",
+160:       providerThreadId,
+161:       scope: turnScope(turnId),
+162:       data: { providerThreadId, item: write.item },
+163:     });
+164:   }
+165:   return writes;
+166: }
+167: 
+168: export function appendPendingInteractionTimelineEvent(
+169:   deps: Pick<AppDeps, "db" | "hub">,
+170:   interaction: PendingInteraction,
+171: ): void {
+
+/tmp/openbot-cloudroom-d8b3cc3/gui/apps/server/src/services/threads/thread-command-environment.ts:61-95
+61:   deps: WorkSessionDeps,
+62:   args: RequireThreadCommandEnvironmentArgs,
+63: ): Promise<EnvironmentRow> {
+64:   if (args.thread.environmentId !== null) {
+65:     await restoreParkedWorktree(
+66:       deps,
+67:       args.thread.id,
+68:       args.thread.environmentId,
+69:     );
+70:     const environment = requireEnvironment(deps.db, args.thread.environmentId);
+71:     const goneDetails = goneThreadEnvironmentDetails(environment);
+72:     if (goneDetails && environment.environmentProviderId === null) {
+73:       throwThreadEnvironmentUnavailable(goneDetails);
+74:     }
+75:     const admission = { ...environment, threadId: args.thread.id };
+76:     if (args.waitForPathClaim === true) {
+77:       await waitForEnvironmentPathAvailable(deps, admission);
+78:       return requireEnvironment(deps.db, environment.id);
+79:     }
+80:     assertEnvironmentPathAvailable(deps, admission);
+81:     return environment;
+82:   }
+83: 
+84:   throwThreadEnvironmentUnavailable(
+85:     threadEnvironmentUnavailableDetails(
+86:       threadHasProviderSession(deps.db, args.thread.id)
+87:         ? "destroyed"
+88:         : "never_attached",
+89:       null,
+90:     ),
+91:   );
+92: }

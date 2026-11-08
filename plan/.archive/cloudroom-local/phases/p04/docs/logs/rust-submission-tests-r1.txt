@@ -1,0 +1,13 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.69s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-27a3d10d41cba73d)
+
+running 5 tests
+PASS Rust→Node submission evidence: accepted/queued/missing, no turn fabrication or terminal variant
+test application::local_agents::wire_tests::cloudroom_submission_rust_node_evidence_has_thread_without_turn_or_terminal_authority ... ok
+test adapters::persistence::local_agents::protocol::submission_tests::cloudroom_submission_queued_thread_maps_once_without_completing_native_work ... ok
+test adapters::http::routes::local_machine_connection::tests::submission::cloudroom_submission_actual_websocket_accepts_thread_before_native_turn ... ok
+test adapters::persistence::local_agents::protocol::submission_tests::cloudroom_submission_requires_intent_and_preserves_known_turn_and_foreign_binding ... ok
+test adapters::persistence::local_agents::protocol::submission_tests::cloudroom_submission_missing_and_late_identity_preserve_uncertainty_and_capacity ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 3271 filtered out; finished in 2.96s
+

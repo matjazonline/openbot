@@ -3,10 +3,11 @@ use crate::application::workflow::{activation::*, completion::*, waits::*};
 use serde_json::{Value, json};
 
 pub(super) async fn resume_on(
-    db: &mut PgConnection,
+    db: &mut Transaction<'_, Postgres>,
     scope: ActivationRequest,
     notices: Option<&crate::application::workflow::decisions::DecisionNotices>,
 ) -> AppResult<WaitProgress> {
+    local_agents::prelock_wait_on(db, scope).await?;
     channel_reply_completion::prelock_on(db, scope).await?;
     if maintenance::expire_on(db, scope).await? {
         return Ok(WaitProgress::Expired(CommitDisposition::Committed));
@@ -57,7 +58,7 @@ pub(super) async fn resume_on(
         && {
             sqlx::query_scalar::<_, bool>("SELECT EXISTS(SELECT 1 FROM workflow_wait_events WHERE company_id=$1 AND run_id=$2 AND event_name=$3 AND correlation=$4 AND consumed_execution_id IS NULL AND created_at<=$5)")
             .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(&wait.event_name)
-            .bind(&wait.correlation).bind(wait.deadline).fetch_one(&mut *db).await?
+            .bind(&wait.correlation).bind(wait.deadline).fetch_one(&mut **db).await?
         };
     if run.state != "waiting" || (event_due && !answered_in_time) {
         return expire(db, scope, &run.state).await;
@@ -74,6 +75,9 @@ pub(super) async fn resume_on(
         return Box::pin(decision_timed_out(db, scope, wait.id)).await;
     }
     let wake = if wait.reason == "effect" {
+        if let Some(progress) = local_agents::resume_on(db, scope, wait.id).await? {
+            return Ok(progress);
+        }
         // Explicit, before the generic event lookup (04.11-D2 §4.4, D4 §M).
         match message::receipts::effect_resume_on(db, scope, wait.id).await? {
             message::receipts::EffectResume::Pending => return Ok(WaitProgress::Pending),
@@ -107,7 +111,7 @@ pub(super) async fn resume_on(
         // Past the deadline only an event recorded in time may complete it (checked above).
         let recorded_by = event_due.then_some(wait.deadline);
         let event:Option<ReceivedEvent>=sqlx::query_as("SELECT id,payload FROM workflow_wait_events WHERE company_id=$1 AND run_id=$2 AND event_name=$3 AND correlation=$4 AND consumed_execution_id IS NULL AND ($5::timestamptz IS NULL OR created_at<=$5) ORDER BY created_at,id LIMIT 1 FOR UPDATE")
-            .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(&wait.event_name).bind(&wait.correlation).bind(recorded_by).fetch_optional(&mut *db).await?;
+            .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(&wait.event_name).bind(&wait.correlation).bind(recorded_by).fetch_optional(&mut **db).await?;
         let Some(event) = event else {
             return Ok(WaitProgress::Pending);
         };
@@ -120,7 +124,7 @@ pub(super) async fn resume_on(
 /// Complete the exact delivery wait and reopen the agent job it parked (continuation
 /// debit only). The agent replays its saved call and reads the receipt; the step itself is
 /// not completed here. The SQL reopen guard requires this action's marker attempt.
-async fn continue_delivery(
+pub(super) async fn continue_delivery(
     db: &mut PgConnection,
     scope: ActivationRequest,
     wait: Uuid,

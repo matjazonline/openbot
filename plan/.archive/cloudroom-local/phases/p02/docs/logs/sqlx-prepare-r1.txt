@@ -1,0 +1,3 @@
+    Checking open_bots v0.1.0 (/Users/mac03/dev/openbot)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 53.44s
+query data written to .sqlx in the current directory; please check this into version control

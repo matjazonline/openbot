@@ -1,0 +1,2 @@
+time="2026-11-08T15:49:35+01:00" level=info msg="Terminal is not available, proceeding without opening an editor"
+time="2026-11-08T15:49:35+01:00" level=fatal msg="instance name `p07-image` too long: `/private/var/folders/n2/5y7x75r92zl0ll90154hxdzr0000gn/T/openbot-cloudroom-p07-lima-kfprd8o4/instances/p07-image/ssh.sock.1234567890123456` must be less than UNIX_PATH_MAX=104 characters, but is 138"

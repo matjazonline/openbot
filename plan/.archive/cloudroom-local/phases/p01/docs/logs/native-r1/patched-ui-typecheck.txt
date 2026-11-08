@@ -1,0 +1,4 @@
+
+> @cloudroom/app@0.0.1 typecheck /private/tmp/openbot-cloudroom-d8b3cc3/gui/apps/app
+> tsc --noEmit && tsc --noEmit -p tsconfig.node.json
+

@@ -1,0 +1,10 @@
+✔ source verification rejects changed tracked GUI source before any build, from any cwd (155.173625ms)
+✔ prepared source accepts only the exact approved patch and rejects tampering (376.858667ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 2
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 573.183584

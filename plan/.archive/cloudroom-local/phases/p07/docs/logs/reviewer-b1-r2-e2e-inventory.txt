@@ -1,0 +1,13 @@
+    Blocking waiting for file lock on package cache
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.73s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-50aeda0c9f5dbc3a)
+adapters::persistence::workflow::tests::local_agent_tests::e2e::cloudroom_e2e_competing_workers_native_thread_followup_controls_and_company_fences: test
+adapters::persistence::workflow::tests::local_agent_tests::e2e::cloudroom_e2e_cut_points_reconstruct_server_plugin_and_workers_without_blind_native_retry: test
+adapters::persistence::workflow::tests::local_agent_tests::e2e::early::cloudroom_e2e_committed_delivery_marker_before_socket_never_blindly_dispatches: test
+adapters::persistence::workflow::tests::local_agent_tests::e2e::early::cloudroom_e2e_crash_after_admission_before_peer_connect_dispatches_once: test
+adapters::persistence::workflow::tests::local_agent_tests::e2e::early::cloudroom_e2e_crash_before_admission_commit_reconstructs_workers_server_and_peer: test
+adapters::persistence::workflow::tests::local_agent_tests::e2e::native::cloudroom_e2e_native_claude_packaged_plugin_pairing_workflow_ui_restart_followup_stop: test
+adapters::persistence::workflow::tests::local_agent_tests::e2e::native::cloudroom_e2e_native_codex_packaged_plugin_pairing_workflow_ui_restart_followup_stop: test
+adapters::persistence::workflow::tests::local_agent_tests::e2e::native::cloudroom_e2e_native_opencode_packaged_plugin_pairing_workflow_ui_restart_followup_stop: test
+
+8 tests, 0 benchmarks

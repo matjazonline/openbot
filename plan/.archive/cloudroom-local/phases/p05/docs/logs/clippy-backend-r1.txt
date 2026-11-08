@@ -1,0 +1,89 @@
+    Checking open_bots v0.1.0 (/Users/mac03/dev/openbot)
+error: this `if` statement can be collapsed
+  --> src/adapters/persistence/workflow/local_agents/admission.rs:16:5
+   |
+16 | /     if let Some(call) = saved_on(tx, scope).await? {
+17 | |         if let Some(wait) = call.wait_id {
+18 | |             if continuation::confirm_on(tx, claim.fence, wait).await? {
+19 | |                 return Ok(LocalRunProgress::Suspended(WaitId::new(wait)));
+...  |
+22 | |     }
+   | |_____^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.96.0/index.html#collapsible_if
+   = note: `-D clippy::collapsible-if` implied by `-D warnings`
+   = help: to override `-D warnings` add `#[allow(clippy::collapsible_if)]`
+help: collapse nested if block
+   |
+16 ~     if let Some(call) = saved_on(tx, scope).await?
+17 ~         && let Some(wait) = call.wait_id {
+18 |             if continuation::confirm_on(tx, claim.fence, wait).await? {
+19 |                 return Ok(LocalRunProgress::Suspended(WaitId::new(wait)));
+20 |             }
+21 ~         }
+   |
+
+error: this `if` statement can be collapsed
+  --> src/adapters/persistence/workflow/local_agents/admission.rs:17:9
+   |
+17 | /         if let Some(wait) = call.wait_id {
+18 | |             if continuation::confirm_on(tx, claim.fence, wait).await? {
+19 | |                 return Ok(LocalRunProgress::Suspended(WaitId::new(wait)));
+20 | |             }
+21 | |         }
+   | |_________^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.96.0/index.html#collapsible_if
+help: collapse nested if block
+   |
+17 ~         if let Some(wait) = call.wait_id
+18 ~             && continuation::confirm_on(tx, claim.fence, wait).await? {
+19 |                 return Ok(LocalRunProgress::Suspended(WaitId::new(wait)));
+20 ~             }
+   |
+
+error: this expression creates a reference which is immediately dereferenced by the compiler
+  --> src/adapters/persistence/workflow/local_agents/delivery.rs:41:35
+   |
+41 |     validate_run_authority(scope, &subject, &authority)?;
+   |                                   ^^^^^^^^ help: change this to: `subject`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.96.0/index.html#needless_borrow
+   = note: `-D clippy::needless-borrow` implied by `-D warnings`
+   = help: to override `-D warnings` add `#[allow(clippy::needless_borrow)]`
+
+error: this `if` statement can be collapsed
+   --> src/adapters/persistence/workflow/local_agents/mod.rs:107:29
+    |
+107 | / ...                   if let Some(wait) = call.wait_id {
+108 | | ...                       if continuation::confirm_on(&mut tx, claim.fence, wait).await? {
+109 | | ...                           return Ok(Evidence::Applied(
+110 | | ...                               contract::LocalRunProgress::Suspended(WaitId::new(wait)),
+...   |
+113 | | ...                   }
+    | |_______________________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.96.0/index.html#collapsible_if
+help: collapse nested if block
+    |
+107 ~                             if let Some(wait) = call.wait_id
+108 ~                                 && continuation::confirm_on(&mut tx, claim.fence, wait).await? {
+109 |                                     return Ok(Evidence::Applied(
+110 |                                         contract::LocalRunProgress::Suspended(WaitId::new(wait)),
+111 |                                     ));
+112 ~                                 }
+    |
+
+error: could not compile `open_bots` (lib) due to 4 previous errors
+warning: build failed, waiting for other jobs to finish...
+error: this call to `clone` can be replaced with `std::slice::from_ref`
+  --> src/adapters/persistence/workflow/local_agent_tests.rs:42:17
+   |
+42 |                 &[profile.selection.project_id.clone()],
+   |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: try: `std::slice::from_ref(&profile.selection.project_id)`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.96.0/index.html#cloned_ref_to_slice_refs
+   = note: `-D clippy::cloned-ref-to-slice-refs` implied by `-D warnings`
+   = help: to override `-D warnings` add `#[allow(clippy::cloned_ref_to_slice_refs)]`
+
+error: could not compile `open_bots` (lib test) due to 5 previous errors

@@ -1,0 +1,7 @@
+Installing bb-plugin-openbot-compatibility-probe@0.1.0 from /Users/mac03/dev/openbot/integrations/cloudroom-plugin/compatibility/probe
+Plugins are full-trust code running inside the Cloudroom server. They can read all local Cloudroom data, including other plugins' secrets.
+Installed:
+openbot-compatibility-probe@0.1.0  running
+  source: path:/Users/mac03/dev/openbot/integrations/cloudroom-plugin/compatibility/probe
+  service openbot-proof: running
+  command: room-cli openbot-proof — Disposable, non-inference public SDK compatibility checks

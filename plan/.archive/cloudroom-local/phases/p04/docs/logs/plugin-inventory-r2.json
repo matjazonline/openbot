@@ -1,0 +1,31 @@
+{
+  "before": 49,
+  "after": 72,
+  "removed": [],
+  "added": [
+    "complete initial pairing 400 clears rejected input and explicit replacement starts a fresh attempt",
+    "complete initial pairing 401 clears rejected input and explicit replacement starts a fresh attempt",
+    "complete initial pairing 403 clears rejected input and explicit replacement starts a fresh attempt",
+    "complete initial pairing 404 clears rejected input and explicit replacement starts a fresh attempt",
+    "transport retains original pending secrets and ignores replacement input until outcome is resolved",
+    "incomplete_rejection retains original pending secrets and ignores replacement input until outcome is resolved",
+    "actual process interruption during definitive rejection cleaned cannot enroll stale input as a new identity",
+    "actual process interruption during definitive rejection rejected cannot enroll stale input as a new identity",
+    "a complete rejection cannot clear a Pending record or secret input once its journal is initialized",
+    "native idle admission preserves prompt order, queue identity and separate originating turns",
+    "native human admission preserves prompt order, queue identity and separate originating turns",
+    "native openbot admission preserves prompt order, queue identity and separate originating turns",
+    "native queue idle_to_busy race is decided at admission without steering or a second SDK call",
+    "native queue busy_to_idle race is decided at admission without steering or a second SDK call",
+    "accepted native queue work survives lost SDK response and replay with one mutation and original order",
+    "resolved matching permission updates running without item event across journal reopen",
+    "startup paired selectedProjects change prevents connector and native admission",
+    "startup paired openbotOrigin change prevents connector and native admission",
+    "startup paired enrollment change prevents connector and native admission",
+    "startup enrolling selectedProjects change prevents connector and native admission",
+    "startup enrolling openbotOrigin change prevents connector and native admission",
+    "startup enrolling enrollment change prevents connector and native admission",
+    "legitimate internal Pending to Paired secret writes do not cancel connector startup"
+  ],
+  "note": "Counter retains duplicate pre-existing parametrized origin test display names"
+}

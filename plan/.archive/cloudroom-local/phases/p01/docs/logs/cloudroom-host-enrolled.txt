@@ -1,0 +1,5 @@
+Error: Missing built bb CLI runtime at /private/tmp/openbot-cloudroom-d8b3cc3/gui/apps/cli/dist/index.js. Build @cloudroom/cli before starting the host daemon.
+    at requireCliRuntimePath (/private/tmp/openbot-cloudroom-d8b3cc3/gui/apps/host-daemon/src/runtime-shell-env.ts:151:13)
+    at async resolveLocalBbExecutablePath (/private/tmp/openbot-cloudroom-d8b3cc3/gui/apps/host-daemon/src/runtime-shell-env.ts:673:5)
+    at async Module.startHostDaemon (/private/tmp/openbot-cloudroom-d8b3cc3/gui/apps/host-daemon/src/start-host-daemon.ts:132:11)
+    at async runHostDaemonEntrypoint (/private/tmp/openbot-cloudroom-d8b3cc3/gui/apps/host-daemon/src/index.ts:59:18)

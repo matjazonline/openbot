@@ -1,0 +1,9 @@
+{
+  "from": "p07-r4-source.patch",
+  "to": "p07-r6-source.patch",
+  "differentPatchBlocks": [
+    "a/src/adapters/persistence/workflow/action_dispatch_resolution_tests.rs b/src/adapters/persistence/workflow/action_dispatch_resolution_tests.rs"
+  ],
+  "expectedOneFixtureChange": true,
+  "generatedPythonBytecodeRemoved": true
+}

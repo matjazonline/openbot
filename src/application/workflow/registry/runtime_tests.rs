@@ -73,6 +73,7 @@ fn workflow_registry_each_type_validates_dynamic_required_inputs() {
             "decision.human" => ("deadline", json!("bad")),
             "data.map" | "channel.no_reply" => ("value", json!(3)),
             "http.request" => ("method", json!("BOGUS")),
+            "local_agent.run" => ("profile_id", json!(3)),
             "tool.call" | "mcp.call" => ("arguments", json!({"key":3})),
             "message.send" | "message.reply" | "message.ask" => ("content", json!({"body":true})),
             "workflow.call" | "flow.repeat" => ("input", json!({"text":3})),

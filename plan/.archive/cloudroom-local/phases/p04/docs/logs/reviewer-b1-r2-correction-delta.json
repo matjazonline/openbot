@@ -1,0 +1,14 @@
+{
+  "changed": [
+    "integrations/cloudroom-plugin/README.md",
+    "integrations/cloudroom-plugin/src/enrollment.ts",
+    "integrations/cloudroom-plugin/src/sdk.ts",
+    "integrations/cloudroom-plugin/src/server.ts",
+    "integrations/cloudroom-plugin/test/enrollment.test.ts",
+    "integrations/cloudroom-plugin/test/native-queue-fixture.ts",
+    "integrations/cloudroom-plugin/test/queue.test.ts",
+    "integrations/cloudroom-plugin/test/sdk.test.ts",
+    "integrations/cloudroom-plugin/test/startup.test.ts"
+  ],
+  "current_bytes_match": true
+}

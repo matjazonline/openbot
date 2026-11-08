@@ -1,0 +1,5 @@
+
+> @cloudroom/sdk@0.0.1 build /private/tmp/openbot-cloudroom-d8b3cc3/gui/packages/sdk
+> node ../../scripts/build-package.mjs
+
+@cloudroom/sdk: built 4 entries

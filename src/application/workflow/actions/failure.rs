@@ -33,6 +33,7 @@ pub fn marker_owned_effect_kind(kind: &str) -> bool {
             | "message.reply"
             | "message.ask"
             | "agent.run"
+            | "local_agent.run"
     )
 }
 
@@ -299,6 +300,7 @@ mod tests {
             "message.reply",
             "message.ask",
             "agent.run",
+            "local_agent.run",
         ] {
             assert!(marker_owned_effect_kind(kind));
         }

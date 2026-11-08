@@ -1,0 +1,29 @@
+
+running 7 tests
+test adapters::persistence::local_agents::retention_tests::cloudroom_retention_saved_old_manual_replay_survives_age_then_collected_id_cannot_create_again ... ok
+
+thread 'adapters::persistence::workflow::tests::local_agent_tests::retention::cloudroom_retention_cancelled_workflow_needs_guarded_old_physical_proof_without_a_success_receipt' (18034415) panicked at src/adapters/persistence/workflow/local_agent_retention_tests.rs:149:56:
+called `Result::unwrap()` on an `Err` value: Database(PgDatabaseError { severity: Error, code: "55006", message: "cannot ALTER TABLE \"workflow_runs\" because it has pending trigger events", detail: None, hint: None, position: None, where: None, schema: None, table: None, column: None, data_type: None, constraint: None, file: Some("tablecmds.c"), line: Some(4444), routine: Some("CheckTableNotInUse") })
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test adapters::persistence::workflow::tests::local_agent_tests::retention::cloudroom_retention_cancelled_workflow_needs_guarded_old_physical_proof_without_a_success_receipt ... FAILED
+test adapters::persistence::local_agents::retention_tests::cloudroom_retention_unknown_native_work_survives_and_compacted_receipt_replays_under_current_fence ... ok
+test adapters::persistence::local_agents::retention_tests::cloudroom_retention_competing_collectors_remove_only_bounded_old_summaries_and_keep_unknown_work ... ok
+
+thread 'adapters::persistence::workflow::tests::local_agent_tests::retention::cloudroom_retention_prepared_and_queued_continuation_preserves_old_original_session' (18034416) panicked at src/adapters/persistence/workflow/local_agent_retention_tests.rs:149:56:
+called `Result::unwrap()` on an `Err` value: Database(PgDatabaseError { severity: Error, code: "55006", message: "cannot ALTER TABLE \"workflow_runs\" because it has pending trigger events", detail: None, hint: None, position: None, where: None, schema: None, table: None, column: None, data_type: None, constraint: None, file: Some("tablecmds.c"), line: Some(4444), routine: Some("CheckTableNotInUse") })
+test adapters::persistence::workflow::tests::local_agent_tests::retention::cloudroom_retention_prepared_and_queued_continuation_preserves_old_original_session ... FAILED
+test adapters::persistence::local_agents::retention_tests::cloudroom_retention_new_manual_requests_require_current_timestamp_and_replay_current_identity ... ok
+
+thread 'adapters::persistence::workflow::tests::local_agent_tests::retention::cloudroom_retention_two_terminal_roots_with_reciprocal_native_sessions_eventually_retire' (18034417) panicked at src/adapters/persistence/workflow/local_agent_retention_tests.rs:149:56:
+called `Result::unwrap()` on an `Err` value: Database(PgDatabaseError { severity: Error, code: "55006", message: "cannot ALTER TABLE \"workflow_runs\" because it has pending trigger events", detail: None, hint: None, position: None, where: None, schema: None, table: None, column: None, data_type: None, constraint: None, file: Some("tablecmds.c"), line: Some(4444), routine: Some("CheckTableNotInUse") })
+test adapters::persistence::workflow::tests::local_agent_tests::retention::cloudroom_retention_two_terminal_roots_with_reciprocal_native_sessions_eventually_retire ... FAILED
+
+failures:
+
+failures:
+    adapters::persistence::workflow::tests::local_agent_tests::retention::cloudroom_retention_cancelled_workflow_needs_guarded_old_physical_proof_without_a_success_receipt
+    adapters::persistence::workflow::tests::local_agent_tests::retention::cloudroom_retention_prepared_and_queued_continuation_preserves_old_original_session
+    adapters::persistence::workflow::tests::local_agent_tests::retention::cloudroom_retention_two_terminal_roots_with_reciprocal_native_sessions_eventually_retire
+
+test result: FAILED. 4 passed; 3 failed; 0 ignored; 0 measured; 3307 filtered out; finished in 4.59s
+

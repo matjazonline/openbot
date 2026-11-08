@@ -1,0 +1,118 @@
+{
+  "version": 1,
+  "round": "CL-P01-B1-R1",
+  "artifact": "79f5005f390df698935120b9dacdecabaa7ed8610eb03d2b0a563f8addd71cd4",
+  "checks": [
+    {
+      "criteria": [
+        "AC1"
+      ],
+      "command": "node integrations/cloudroom-plugin/compatibility/run-probe.mjs /tmp/openbot-cloudroom-d8b3cc3 plan/cloudroom-local/phases/p01/docs/logs/reproducible-probe-r1",
+      "fixture": "phase-owned disposable Cloudroom profile; no inference; macOS Node 24.21.0",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/reproducible-probe-r1.txt",
+          "sha256": "97b7a6b6f476cd879d691926df781b8491a99ba76fb41faece2b98d1392c9920"
+        },
+        {
+          "path": "logs/reproducible-probe-r1/result.json",
+          "sha256": "0df1406248892f654dcb65fe5eb8600e99ebaead23538009b2e9dd8e518c8a09"
+        },
+        {
+          "path": "logs/reproducible-probe-r1/before.txt",
+          "sha256": "2ed707c23ad1a3671f26db1711641d20cdea2ed7ec31b8e789765802e88dd6c3"
+        },
+        {
+          "path": "logs/reproducible-probe-r1/after.txt",
+          "sha256": "9f3ecd3e1b4a5ff2a588638ee24d8616da583a76deba47f3a93585900354d4ae"
+        },
+        {
+          "path": "logs/reproducible-probe-r1/queued.txt",
+          "sha256": "46e7f5aba47dbd1d9e7a92e252b9a5605f7a139c5ce60e8f5ad238aa4cdbc083"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC3",
+        "AC4"
+      ],
+      "command": "cargo test --locked --offline --lib cloudroom_",
+      "fixture": "phase-owned disposable Cloudroom profile; no inference; macOS Node 24.21.0",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/rust-contract-tests-final.txt",
+          "sha256": "768ee0b55d27695a52817e7752dd9c3ab6f5a7591d4396b192cca8763ddb81cb"
+        },
+        {
+          "path": "logs/rust-test-list-final.txt",
+          "sha256": "a4fb8b85b10ec63432e46317fa35bad076ae6fe4c8aa310e7ea1cb1773299245"
+        },
+        {
+          "path": "logs/test-move-map.json",
+          "sha256": "482f8e36c140192743064fb06d32c235c3b30ee5672eb39ca076b838078cdf7e"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC3",
+        "AC4"
+      ],
+      "command": "cargo check --locked --offline --all-targets",
+      "fixture": "phase-owned disposable Cloudroom profile; no inference; macOS Node 24.21.0",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/rust-check.txt",
+          "sha256": "936177ce54c6ee6fe8f8fd800f8cd0e83f3bdd0255da65e2d56371162b8c3a13"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC3",
+        "AC4"
+      ],
+      "command": "cargo fmt --all -- --check",
+      "fixture": "phase-owned disposable Cloudroom profile; no inference; macOS Node 24.21.0",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/format.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC1"
+      ],
+      "command": "TypeScript tsc --noEmit against bundled public SDK 0.6.50 declarations",
+      "fixture": "phase-owned disposable Cloudroom profile; no inference; macOS Node 24.21.0",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/probe-typecheck-r2.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": "logs/sdk-types-build.txt",
+          "sha256": "8958e9ca2eca016455962cd2e5e2f903e5b2c8aafcdcb618b53945195c2dddc3"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC2"
+      ],
+      "command": "Real-provider / actual UI / active-turn correlation / permission recovery / nonempty event replay",
+      "fixture": "phase-owned disposable Cloudroom profile; no inference; macOS Node 24.21.0",
+      "status": "NOT EXERCISED",
+      "files": [],
+      "reason": "Native provider account/project authorization requested; Linux environment unavailable. Queued-only probe has no turn execution events."
+    }
+  ]
+}

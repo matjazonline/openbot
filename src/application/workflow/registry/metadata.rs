@@ -60,7 +60,7 @@ pub(super) fn constraints(name: &str) -> ExecutionConstraints {
         "ai.classify" | "decision.agent" => (ModelInvocation, vec![ModelInvoke]),
         "jev.evaluate" => (ModelInvocation, vec![ModelInvoke, ResourceUse]),
         "agent.run" => (AgentActions, vec![AgentInvoke]),
-        "http.request" | "mcp.call" => (
+        "http.request" | "mcp.call" | "local_agent.run" => (
             EffectClass::SharedAction,
             vec![ResourceUse, CapabilityRequirement::SharedAction],
         ),

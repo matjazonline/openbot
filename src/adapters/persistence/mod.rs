@@ -25,6 +25,7 @@ pub mod delivery;
 pub mod inbound_event;
 pub mod integration;
 pub mod knowledge;
+pub mod local_agents;
 pub(crate) mod model_usage;
 pub mod notification;
 pub mod onboarding;

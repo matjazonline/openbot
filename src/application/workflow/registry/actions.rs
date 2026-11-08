@@ -2,6 +2,10 @@ use super::*;
 impl Registration<'_> {
     pub(super) fn action(&mut self) -> Result<Contract, Diagnostic> {
         let mut contract = match self.name() {
+            "local_agent.run" => Ok(Contract {
+                input: crate::application::local_agents::workflow::input_schema(),
+                output: crate::application::local_agents::workflow::result_schema(),
+            }),
             "http.request" => self.http(),
             "tool.call" | "mcp.call" => self.tool(),
             name @ ("message.send" | "message.reply" | "message.ask") => {
@@ -40,10 +44,7 @@ impl Registration<'_> {
             }
             self.check(InputCheck::Approval)?;
         }
-        contract.input["properties"]["approval"] = object(
-            json!({"reviewers":reviewers(),"deadline":text(MAX_DEADLINE)}),
-            &["reviewers", "deadline"],
-        );
+        contract.input["properties"]["approval"] = action_approval_schema();
         Ok(())
     }
     pub(super) fn resource(&mut self, kind: &str) -> Result<Value, Diagnostic> {
@@ -98,10 +99,12 @@ impl Registration<'_> {
                 "tool",
             ));
         };
-        if crate::application::workflow::message::is_builtin_message_tool(name) {
+        if crate::application::workflow::message::is_builtin_message_tool(name)
+            || name == crate::application::local_agents::workflow::KIND
+        {
             return Err(self.error(
                 "registry.tool",
-                "Built-in messaging is a step type, not a selectable tool",
+                "This built-in is a step type, not a selectable tool",
                 "tool",
             ));
         }
@@ -150,6 +153,13 @@ impl Registration<'_> {
             ))
         }
     }
+}
+
+pub(crate) fn action_approval_schema() -> Value {
+    object(
+        json!({"reviewers":reviewers(),"deadline":text(MAX_DEADLINE)}),
+        &["reviewers", "deadline"],
+    )
 }
 
 /// One definition for both the step contract and the trusted built-in tool snapshot.

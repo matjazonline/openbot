@@ -1,0 +1,19 @@
+{
+  "revision": "d8b3cc3a16bb4b06fc99d8e543d40f1087d1e815",
+  "patches": [
+    {
+      "sha256": "c201acedcbe1003a3867507e7fb4138c4171d7f5fa0c2971c4e182800cd58ca4",
+      "sourcePath": "gui/apps/app/src/components/Onboarding.tsx",
+      "sourceSha256": "d2aebaadf687bc3863f645acd2dff5add1fb943219afe0dec4f5a9ac2836496d"
+    },
+    {
+      "sha256": "1a8782db46c9450974cadede95d32c76ad1d3ffa6eb9bb53db97315df6228451",
+      "sourcePath": "gui/packages/sdk/src/areas/threads.ts",
+      "sourceSha256": "87c13f25884f240e7b94267d497d82fd1a8cc50398783e63185064aa846d8fe3"
+    }
+  ],
+  "artifactDigest": "5e39394f19f1a45fa500c3232fd3679bdfad5d421328e3410c4413974cd7c370",
+  "sdk": "0.6.50",
+  "declarationSha256": "ffd651ee904477892dbf957999243fb2d58b24e2a9e51029fde3afb98419bf60",
+  "source": "gui/packages/plugin-sdk/bundled-types/bb-plugin-sdk.d.ts"
+}

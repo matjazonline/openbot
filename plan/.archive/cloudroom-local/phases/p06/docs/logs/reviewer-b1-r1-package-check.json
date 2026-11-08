@@ -1,0 +1,8 @@
+{
+  "archive_sha256": "3df1730528eaae9087be9b51a07e249b3ea537e68fd3c4d9490362af4b4970fc",
+  "current_packaged_inputs_match": true,
+  "prior_smoke_runtime_equivalent": true,
+  "only_prior_smoke_package_delta": [
+    "package/README.md"
+  ]
+}

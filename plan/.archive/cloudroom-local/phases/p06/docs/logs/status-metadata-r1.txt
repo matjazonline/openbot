@@ -1,0 +1,9 @@
+   Compiling open_bots v0.1.0 (/Users/mac03/dev/openbot)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2m 11s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-50aeda0c9f5dbc3a)
+
+running 1 test
+test adapters::persistence::local_agents::retention_tests::cloudroom_management_durable_status_distinguishes_queue_permission_uncertainty_gaps_and_native_success ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3318 filtered out; finished in 0.69s
+

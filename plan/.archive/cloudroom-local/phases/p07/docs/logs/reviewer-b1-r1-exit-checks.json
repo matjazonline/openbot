@@ -1,0 +1,7 @@
+{
+  "artifact": "02c3f5520a7bc34e29b260adc6cda9b1d5c1f94a7e2e937f1a8811482a3f776f",
+  "authorityPinExact": true,
+  "decisionDigestExact": true,
+  "preliminaryEvidenceFilesValidated": 13,
+  "finalGate": "in progress; one observed revision overflow failure unresolved; no unrelated classification"
+}

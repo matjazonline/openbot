@@ -1,0 +1,17 @@
+{
+  "source_artifact": "94295971c7786ed757d259d0a6a7dbaf57056dcbae9e65ca5543f1d4bad325cf",
+  "decision_revision": "CL-P07-D01/r1",
+  "decision_sha256": "dc0193397f4e0435210249647dd3504199f0cc937f3a3b73c8eff84cbdf40dd0",
+  "authority_r34_equal": true,
+  "external_head": "d8b3cc3a16bb4b06fc99d8e543d40f1087d1e815",
+  "compaction_source": "gui/packages/db/src/data/events.ts",
+  "compaction_sha256": "5c5c8be1366862eab94db9fd5735f0646fc4671b8063352c6d1e0aa2f5a0bbe8",
+  "compaction_matches_pinned_commit": true,
+  "inspected_spans": [
+    "events.ts:1372-1458 ordered greater-than pagination",
+    "events.ts:3775-3861 resolved delta pruning retaining sequences",
+    "packages/db/test/data/events.test.ts:3560-3594 [1,4] sparse replay assertion",
+    "apps/server/src/services/system/event-pruning.ts:66-80,120-175 pruning invocation and types",
+    "packages/sdk/src/areas/threads.ts:404-412,906-918 public list query"
+  ]
+}

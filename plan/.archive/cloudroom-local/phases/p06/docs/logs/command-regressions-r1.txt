@@ -1,0 +1,19 @@
+
+running 14 tests
+test adapters::persistence::local_agents::protocol::command_tests::failures::cloudroom_commands_create_binds_once_and_logical_replay_survives_native_mapping ... ok
+test adapters::persistence::local_agents::protocol::command_tests::cloudroom_commands_competing_logical_invocations_reuse_frozen_operation ... ok
+test adapters::persistence::local_agents::protocol::command_tests::cloudroom_commands_competing_expiration_sweeps_leave_no_poison_batch ... ok
+test adapters::persistence::local_agents::protocol::capacity_tests::cloudroom_commands_uncertain_native_work_keeps_capacity_until_known_terminal_evidence ... ok
+test adapters::persistence::local_agents::protocol::command_tests::cloudroom_commands_readiness_stays_open_for_new_delivery_but_not_replacement ... ok
+test adapters::persistence::local_agents::protocol::command_tests::failures::cloudroom_commands_accepted_controls_still_bound_the_outstanding_queue ... ok
+test adapters::persistence::local_agents::protocol::capacity_tests::cloudroom_commands_capacity_sql_matches_command_kind_and_terminal_evidence_matrix ... ok
+test adapters::persistence::local_agents::protocol::command_tests::cloudroom_commands_competing_capacity_keeps_eight_control_slots ... ok
+test adapters::persistence::local_agents::protocol::command_tests::cloudroom_commands_withdrawal_refuses_untouched_but_reconciles_possible_delivery ... ok
+test adapters::persistence::local_agents::protocol::command_tests::failures::cloudroom_commands_foreign_session_and_observation_are_missing_to_an_authorized_manager ... ok
+test adapters::persistence::local_agents::protocol::command_tests::failures::cloudroom_commands_live_actor_withdrawal_races_first_dispatch_without_false_refusal ... ok
+test adapters::persistence::local_agents::protocol::operation_record_tests::cloudroom_commands_persisted_command_session_binding_is_checked_beyond_its_digest ... ok
+test adapters::persistence::local_agents::protocol::recovery_tests::cloudroom_commands_explicit_uncertainty_reconciles_before_new_effects ... ok
+test adapters::persistence::local_agents::protocol::recovery_tests::cloudroom_commands_expired_uncertain_work_reconciles_before_new_effects ... ok
+
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 3304 filtered out; finished in 7.88s
+

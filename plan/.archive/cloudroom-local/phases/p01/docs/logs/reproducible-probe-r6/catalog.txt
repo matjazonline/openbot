@@ -1,0 +1,1 @@
+{"catalog":[{"providerId":"codex","models":8,"error":null},{"providerId":"claude-code","models":16,"error":null},{"providerId":"acp-opencode","models":null,"error":"unavailable"}],"inference":"NOT EXERCISED"}

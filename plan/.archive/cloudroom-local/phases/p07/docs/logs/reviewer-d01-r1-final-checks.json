@@ -1,0 +1,10 @@
+{
+  "source_artifact": "94295971c7786ed757d259d0a6a7dbaf57056dcbae9e65ca5543f1d4bad325cf",
+  "head": "97e5d60dc538e26c7cb976a8d63772eed80baff2",
+  "entry_final_equal": true,
+  "authority_r34_equal": true,
+  "decision_revision": "CL-P07-D01/r1",
+  "decision_sha256": "dc0193397f4e0435210249647dd3504199f0cc937f3a3b73c8eff84cbdf40dd0",
+  "gate": "PASS",
+  "runtime_checks": "NOT RUN: architecture gate only"
+}

@@ -1,0 +1,149 @@
+[
+  {
+    "file": "native-r3/codex/diagnostics.json",
+    "commands": [
+      {
+        "kind": "refresh_catalog",
+        "stage": "terminal",
+        "sdkCalls": 0,
+        "cursor": 0,
+        "correlationConflict": 0,
+        "nativeState": null
+      },
+      {
+        "kind": "create",
+        "stage": "terminal",
+        "sdkCalls": 1,
+        "cursor": 30,
+        "correlationConflict": 0,
+        "nativeState": "completed"
+      },
+      {
+        "kind": "refresh_catalog",
+        "stage": "terminal",
+        "sdkCalls": 0,
+        "cursor": 0,
+        "correlationConflict": 0,
+        "nativeState": null
+      },
+      {
+        "kind": "send",
+        "stage": "terminal",
+        "sdkCalls": 1,
+        "cursor": 48,
+        "correlationConflict": 0,
+        "nativeState": "completed"
+      },
+      {
+        "kind": "stop_thread",
+        "stage": "terminal",
+        "sdkCalls": 1,
+        "cursor": 48,
+        "correlationConflict": 0,
+        "nativeState": null
+      },
+      {
+        "kind": "archive_thread",
+        "stage": "terminal",
+        "sdkCalls": 1,
+        "cursor": 48,
+        "correlationConflict": 0,
+        "nativeState": null
+      }
+    ],
+    "observed_event_gaps": [
+      [
+        21,
+        25
+      ],
+      [
+        39,
+        43
+      ]
+    ],
+    "event_count": 42
+  },
+  {
+    "file": "native-r4/acp-opencode/diagnostics.json",
+    "commands": [
+      {
+        "kind": "refresh_catalog",
+        "stage": "terminal",
+        "sdkCalls": 0,
+        "cursor": 0,
+        "correlationConflict": 0,
+        "nativeState": null
+      },
+      {
+        "kind": "create",
+        "stage": "uncertain",
+        "sdkCalls": 1,
+        "cursor": 19,
+        "correlationConflict": 1,
+        "nativeState": "running"
+      }
+    ],
+    "observed_event_gaps": [],
+    "event_count": 0
+  },
+  {
+    "file": "native-r4/claude-code/diagnostics.json",
+    "commands": [
+      {
+        "kind": "refresh_catalog",
+        "stage": "terminal",
+        "sdkCalls": 0,
+        "cursor": 0,
+        "correlationConflict": 0,
+        "nativeState": null
+      },
+      {
+        "kind": "create",
+        "stage": "terminal",
+        "sdkCalls": 1,
+        "cursor": 31,
+        "correlationConflict": 0,
+        "nativeState": "completed"
+      },
+      {
+        "kind": "refresh_catalog",
+        "stage": "terminal",
+        "sdkCalls": 0,
+        "cursor": 0,
+        "correlationConflict": 0,
+        "nativeState": null
+      },
+      {
+        "kind": "send",
+        "stage": "terminal",
+        "sdkCalls": 1,
+        "cursor": 48,
+        "correlationConflict": 0,
+        "nativeState": "completed"
+      },
+      {
+        "kind": "stop_thread",
+        "stage": "terminal",
+        "sdkCalls": 1,
+        "cursor": 49,
+        "correlationConflict": 0,
+        "nativeState": null
+      }
+    ],
+    "observed_event_gaps": [
+      [
+        16,
+        18
+      ],
+      [
+        24,
+        27
+      ],
+      [
+        40,
+        43
+      ]
+    ],
+    "event_count": 44
+  }
+]

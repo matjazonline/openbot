@@ -1,0 +1,25 @@
+   Compiling open_bots v0.1.0 (/Users/mac03/dev/openbot)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 26.70s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-3384251af61cfdaf)
+
+running 4 tests
+test application::local_agents::commands::tests::cloudroom_bounds_deadline_rejects_elapsed_and_above_maximum ... ok
+test application::local_agents::commands::tests::cloudroom_bounds_prompt_counts_utf8_bytes_and_redacts_debug ... ok
+test application::local_agents::commands::tests::cloudroom_contract_identities_validate_on_decode ... ok
+test application::local_agents::commands::tests::cloudroom_contract_commands_are_closed_and_controls_are_explicit ... FAILED
+
+failures:
+
+---- application::local_agents::commands::tests::cloudroom_contract_commands_are_closed_and_controls_are_explicit stdout ----
+
+thread 'application::local_agents::commands::tests::cloudroom_contract_commands_are_closed_and_controls_are_explicit' (16706780) panicked at src/application/local_agents/contract_tests.rs:28:5:
+assertion failed: serde_json::from_value::<LocalCommand>(json!({"kind":"refresh_catalog","company_id":"foreign"})).is_err()
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    application::local_agents::commands::tests::cloudroom_contract_commands_are_closed_and_controls_are_explicit
+
+test result: FAILED. 3 passed; 1 failed; 0 ignored; 0 measured; 3194 filtered out; finished in 0.05s
+
+error: test failed, to rerun pass `--lib`

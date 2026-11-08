@@ -43,6 +43,7 @@ pub fn is_io_kind(kind: &str) -> bool {
             | "ai.classify"
             | "jev.evaluate"
             | "agent.run"
+            | "local_agent.run"
             | "decision.agent"
             | "http.request"
             | "tool.call"

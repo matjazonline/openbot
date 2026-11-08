@@ -1,0 +1,172 @@
+diff --git a/integrations/cloudroom-plugin/src/connector.ts b/integrations/cloudroom-plugin/src/connector.ts
+index 96037045..0dbb79ec 100644
+--- a/integrations/cloudroom-plugin/src/connector.ts
++++ b/integrations/cloudroom-plugin/src/connector.ts
+@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
+ import { setTimeout as delay } from 'node:timers/promises';
+ import { Dispatcher } from './dispatcher.js';
+ import { ConfigurationRequired, type Paired } from './enrollment.js';
+-import { JournalCapacity, RecoveryRequired, type MappingCandidate } from './journal.js';
++import { JournalCapacity, RecoveryRequired, type MappingCandidate, type MappingCursor } from './journal.js';
+ import { encodeFrames, FrameAssembler, LIMITS, observationSequence, parseServer,
+   type Delivery, type Identity, type Observation } from './protocol.js';
+ 
+@@ -13,6 +13,7 @@ type Work = { delivery: Delivery; allowed: () => boolean; reply: (value: Observa
+ // The dispatcher outlives a socket. Network loss must not abandon native tracking
+ // or turn an ambiguous mutation into permission to submit it again.
+ export class Connector {
++  private mappingCursor: MappingCursor | undefined;
+   readonly dispatcher: Dispatcher;
+   status: ConnectionStatus = 'offline';
+   private readonly queue = new Map<string, Work>();
+@@ -116,7 +117,7 @@ export class Connector {
+           if (message.kind === 'ready') {
+             allowed = message.ready && !journal.recoveryRequired(); this.status = allowed ? 'connected' : 'recovering';
+           }
+-          if (message.kind === 'mappings_retired' && retirement?.nonce === message.nonce) {
++          if (message.kind === 'mappings_retired' && retirement?.nonce === message.nonce && performance.now() < retirement.expires) {
+             journal.retireMappings(retirement.candidates, message.sessions);
+             retirement = undefined;
+           }
+@@ -172,7 +173,12 @@ export class Connector {
+         for (const observation of cached.splice(0)) await write({ kind: 'observation', identity, observation });
+         if (now >= compaction) { journal.compactAcknowledged(); compaction = now + 60_000; }
+         if (allowed && now >= retention && !retirement) {
+-          const candidates = journal.mappingCandidates();
++          let candidates = journal.mappingCandidates(this.mappingCursor);
++          if (!candidates.length && this.mappingCursor) candidates = journal.mappingCandidates();
++          const last = candidates.at(-1);
++          // Advance even on rejection/lost replies, and across socket reconnects.
++          // Only a matching live response can delete a mapping; wrap revisits loss.
++          this.mappingCursor = last && { last_used_at: last.last_used_at, id: last.id };
+           if (candidates.length) {
+             retirement = { nonce: randomUUID(), candidates, expires: now + LIMITS.ioMs };
+             await write({ kind: 'retire_mappings', identity, request: {
+diff --git a/integrations/cloudroom-plugin/src/journal.ts b/integrations/cloudroom-plugin/src/journal.ts
+index 66781edd..50e5a256 100644
+--- a/integrations/cloudroom-plugin/src/journal.ts
++++ b/integrations/cloudroom-plugin/src/journal.ts
+@@ -42,6 +42,7 @@ export type CommandRecord = z.infer<typeof stored>;
+ export type Importance = 'progress' | 'critical' | 'terminal';
+ type Row = { id: string; digest: string; state: string; reserve: number; terminal: number };
+ export type MappingCandidate = { id: string; thread_id: string; selection: string; last_used_at: number };
++export type MappingCursor = Pick<MappingCandidate, 'last_used_at' | 'id'>;
+ const RETENTION_MS = 90 * 24 * 60 * 60 * 1000;
+ type Meta = { binding: string; allocated: number; acknowledged: number; recovery_required: number };
+ export class RecoveryRequired extends Error { constructor() { super('local journal recovery required'); } }
+@@ -268,11 +269,13 @@ export class Journal {
+         AND NOT EXISTS(SELECT 1 FROM outbox WHERE operation_id=command.id)
+       ORDER BY command.terminal_at,command.id LIMIT 128)`).run(Date.now() - RETENTION_MS, Date.now() - RETENTION_MS, Date.now()).changes)();
+   }
+-  mappingCandidates(): MappingCandidate[] {
++  mappingCandidates(after?: MappingCursor): MappingCandidate[] {
+     return this.db.prepare(`SELECT session.id,session.thread_id,session.selection,session.last_used_at
+       FROM sessions AS session WHERE session.last_used_at<?
++        AND (? IS NULL OR (session.last_used_at,session.id)>(?,?))
+         AND NOT EXISTS(SELECT 1 FROM commands WHERE commands.session_id=session.id)
+-      ORDER BY session.last_used_at,session.id LIMIT 100`).all(Date.now() - RETENTION_MS) as MappingCandidate[];
++      ORDER BY session.last_used_at,session.id LIMIT 100`).all(Date.now() - RETENTION_MS,
++        after?.last_used_at ?? null, after?.last_used_at ?? null, after?.id ?? null) as MappingCandidate[];
+   }
+   retireMappings(candidates: readonly MappingCandidate[], retired: readonly string[]): number {
+     if (candidates.length > 100 || retired.length > 100 || new Set(retired).size !== retired.length) throw new RecoveryRequired();
+diff --git a/integrations/cloudroom-plugin/test/retention.test.ts b/integrations/cloudroom-plugin/test/retention.test.ts
+index 112f4924..d1b6f368 100644
+--- a/integrations/cloudroom-plugin/test/retention.test.ts
++++ b/integrations/cloudroom-plugin/test/retention.test.ts
+@@ -2,17 +2,94 @@ import test from 'node:test';
+ import assert from 'node:assert/strict';
+ import { randomUUID } from 'node:crypto';
+ import { join } from 'node:path';
++import { setTimeout as delay } from 'node:timers/promises';
+ import type WebSocket from 'ws';
+ import Database from 'better-sqlite3';
+ import { Connector } from '../src/connector.js';
+ import { Dispatcher } from '../src/dispatcher.js';
+-import { Journal, RecoveryRequired } from '../src/journal.js';
++import { Journal, RecoveryRequired, type MappingCursor } from '../src/journal.js';
+ import { FrameAssembler, LIMITS, nativeInput, observationSequence, type Identity, type Observation } from '../src/protocol.js';
+ import { fixture, operation, send } from './support.js';
+ import { event, nativeFixture } from './native-fixture.js';
+ import { server, waitFor, write } from './connection-support.js';
+ 
+ const OLD = Date.now() - 100 * 86_400_000;
++
++test('bounded mapping traversal passes a retained oldest page and wraps after reclaiming full history', () => {
++  const f = fixture();
++  try {
++    f.journal.db.transaction(() => {
++      for (let i = 0; i < LIMITS.history; i++) f.journal.bindSession(randomUUID(), `thr_${i}`, f.selection);
++      f.journal.db.prepare('UPDATE sessions SET last_used_at=?').run(OLD);
++    })();
++    assert(f.journal.diagnostics().newSessionsPaused);
++    const retained = new Set(f.journal.mappingCandidates().map(candidate => candidate.id));
++    assert.equal(retained.size, 100);
++    let cursor: MappingCursor | undefined; const visited = new Set<string>(); let removed = 0;
++    for (let page = 0; page < Math.ceil(LIMITS.history / 100); page++) {
++      const candidates = f.journal.mappingCandidates(cursor);
++      assert(candidates.length > 0 && candidates.length <= 100);
++      for (const candidate of candidates) { assert(!visited.has(candidate.id)); visited.add(candidate.id); }
++      cursor = candidates.at(-1)!;
++      removed += f.journal.retireMappings(candidates, candidates.filter(candidate => !retained.has(candidate.id)).map(candidate => candidate.id));
++    }
++    assert.equal(visited.size, LIMITS.history); assert.equal(removed, LIMITS.history - retained.size);
++    assert.deepEqual(f.journal.mappingCandidates(cursor), []);
++    assert.deepEqual(new Set(f.journal.mappingCandidates().map(candidate => candidate.id)), retained);
++    assert.equal(f.journal.diagnostics().mappings, 100); assert.equal(f.journal.diagnostics().newSessionsPaused, false);
++  } finally { f.close(); }
++});
++
++for (const expected of [{ count: 4096, requests: 2, remaining: 3996 }, { count: 205, requests: 4, remaining: 100 }]) {
++  test(`real WSS mapping traversal preserves the oldest page across timeout/reconnect and visits later mappings (${expected.count})`, async () => {
++    const s = await server(); const f = fixture({ initialized: false });
++    f.binding.origin = s.origin; f.journal.initialize(f.binding);
++    f.journal.db.transaction(() => {
++      for (let i = 0; i < expected.count; i++) f.journal.bindSession(randomUUID(), `thr_${i}`, f.selection);
++      f.journal.db.prepare('UPDATE sessions SET last_used_at=?').run(OLD);
++    })();
++    const prefix = f.journal.mappingCandidates().map(candidate => candidate.id); const retained = new Set(prefix);
++    const n = nativeFixture(f.journal, f.selection); const stop = new AbortController();
++    const connector = new Connector(new Dispatcher(f.journal, n.sdk));
++    const requests: string[][] = []; const tasks: Promise<void>[] = []; let generation = 0; let removed = 0; let failure: unknown;
++    s.wss.on('connection', socket => {
++      const identity = { installation_id: f.binding.installation_id, credential_generation: 1, connection_generation: ++generation };
++      const assembler = new FrameAssembler();
++      socket.on('message', data => {
++        const message = assembler.push(data as Buffer) as Record<string, any> | undefined;
++        if (message?.kind === 'hello') write(socket, { kind: 'welcome', welcome: { identity, acknowledged_sequence: 0, recovery_required: false } });
++        if (message?.kind === 'ready') write(socket, { kind: 'ready', identity, ready: true });
++        if (message?.kind !== 'retire_mappings') return;
++        const query = message.request as { nonce: string; sessions: string[] };
++        requests.push(query.sessions); assert(query.sessions.length <= 100);
++        const task = (async () => {
++          if (requests.length === 1) {
++            assert.deepEqual(query.sessions, prefix);
++            await delay(LIMITS.ioMs + 150, undefined, { signal: stop.signal });
++            write(socket, { kind: 'mappings_retired', identity, nonce: query.nonce, sessions: [prefix[0]!] });
++            await delay(100, undefined, { signal: stop.signal });
++            assert(prefix.every(id => f.journal.session(id)), 'an expired response cannot retire its unchanged mapping');
++            socket.terminate(); return;
++          }
++          const retired = query.sessions.filter(id => !retained.has(id)); removed += retired.length;
++          write(socket, { kind: 'mappings_retired', identity, nonce: query.nonce, sessions: retired });
++          await waitFor(() => f.journal.diagnostics().mappings === expected.count - removed);
++          if (requests.length < expected.requests) socket.terminate();
++        })();
++        tasks.push(task); void task.catch(error => { if (!stop.signal.aborted) failure = error; });
++      });
++    });
++    const running = connector.run({ state: 'paired', version: 1, binding: f.binding, credential: 'a'.repeat(64) }, stop.signal);
++    try {
++      await waitFor(() => { if (failure) throw failure; return requests.length === expected.requests && f.journal.diagnostics().mappings === expected.remaining; }, 15_000);
++      assert(requests[1]!.every(id => !retained.has(id)), 'reconnect advances beyond a wholly retained/lost first page');
++      if (expected.remaining === retained.size) assert.deepEqual(requests.at(-1), prefix, 'traversal wraps and revisits retained mappings');
++      assert(prefix.every(id => f.journal.session(id))); assert.equal(n.calls.length, 0);
++      assert.equal(f.journal.diagnostics().newSessionsPaused, false);
++    } finally { stop.abort(); await running; await Promise.allSettled(tasks); await s.close(); f.close(); }
++  });
++}
++
+ function finishEvents(input: string) {
+   return [event(1, 'client/turn/requested', { input: [{ type: 'text', text: input }], source: 'tell', requestId: 'request_owned' }),
+     event(2, 'turn/input/accepted', { clientRequestId: 'request_owned' }, 'turn_owned'),

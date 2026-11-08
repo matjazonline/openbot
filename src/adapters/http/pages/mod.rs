@@ -187,6 +187,7 @@ pub(crate) const LOCAL_TIME_SCRIPT: &str = r##"
 #[cfg(test)]
 mod tests;
 
+pub mod local_agents;
 pub mod mcp;
 
 /// Render a native agent library validation failure in the same UI shell.

@@ -1,0 +1,10 @@
+{
+  "artifact": "bd92212d24d49b9d937eac2c52723eae45085cdb81abc36d12c262dcdf33cbe9",
+  "previousArtifact": "1b45290aa64d13e0a82057a37aeadeb99105ad8382e596aae1e30124088098be",
+  "changedPatchBlocks": [
+    "a/src/adapters/persistence/workflow/action_dispatch_resolution_tests.rs b/src/adapters/persistence/workflow/action_dispatch_resolution_tests.rs"
+  ],
+  "delta": "a/src/adapters/persistence/workflow/action_dispatch_resolution_tests.rs b/src/adapters/persistence/workflow/action_dispatch_resolution_tests.rs\nindex 10d8f5cb..74cf2a7c 100644\n--- a/src/adapters/persistence/workflow/action_dispatch_resolution_tests.rs\n+++ b/src/adapters/persistence/workflow/action_dispatch_resolution_tests.rs\n@@ -17,7 +17,7 @@ use tokio::time::Instant;\n async fn workflow_action_dispatch_resolution_stalled_local_effect_once() {\n     let _injected = Injected::mark();\n     for applies in [true, false] {\n-        let (f, request) = setup().await;\n+        let (f, request) = gated().await;\n         let lease = request.lease;\n         let (mut observer, _) = connect(&f).await;\n         let mut gate = Gate::arm(\n",
+  "exclusionsUnchanged": true,
+  "exportHashesMatch": true
+}

@@ -1,0 +1,164 @@
+--- p01/src/application/local_agents/contract_tests.rs
++++ src/application/local_agents/contract_tests.rs
+@@ -1,7 +1,8 @@
+ use super::*;
+ use crate::{application::local_agents::bounds::*, domain::local_agents::*};
+-use chrono::{Duration, Utc};
++use chrono::{Duration, Timelike, Utc};
+ use serde_json::json;
++use sha2::Digest;
+ 
+ #[test]
+ fn cloudroom_contract_identities_validate_on_decode() {
+@@ -170,7 +171,7 @@
+     assert_eq!(decoded.dispatch().delivery_state(), DeliveryState::Queued);
+     assert_eq!(decoded.outcome(), None);
+     let mut altered = stored.clone();
+-    altered["deadline"] = json!(deadline + Duration::seconds(1));
++    altered["deadline"] = json!(operation.deadline() + Duration::seconds(1));
+     assert!(serde_json::from_value::<LocalAgentOperation>(altered).is_err());
+     let mut false_success = stored.clone();
+     false_success["outcome"] = json!("succeeded");
+@@ -340,3 +341,63 @@
+     too_many["providers"][0]["models"][0]["reasoning_levels"] = json!(vec!["low"; 9]);
+     assert!(serde_json::from_value::<LocalCatalog>(too_many).is_err());
+ }
++
++fn forged_deadline_record(
++    operation: &LocalAgentOperation,
++    deadline: chrono::DateTime<Utc>,
++) -> serde_json::Value {
++    let mut record = serde_json::to_value(operation).unwrap();
++    record["deadline"] = json!(deadline);
++    // Supply an otherwise correct hash: representability must be checked independently.
++    record["payload_digest"] = json!(format!(
++        "{:x}",
++        sha2::Sha256::digest(serde_json::to_vec(&(operation.command(), deadline)).unwrap())
++    ));
++    record
++}
++
++#[test]
++fn cloudroom_contract_deadline_precision_is_frozen_before_hashing() {
++    let deadline = (Utc::now() + Duration::minutes(30))
++        .with_nanosecond(123_456_789)
++        .unwrap();
++    let operation = LocalAgentOperation::queued(
++        OperationId::new(uuid::Uuid::new_v4()).unwrap(),
++        LocalCommand::RefreshCatalog {},
++        deadline,
++    )
++    .unwrap();
++    assert_eq!(operation.deadline().timestamp_subsec_nanos(), 123_456_000);
++    assert!(operation.deadline() <= deadline);
++    let recovered: LocalAgentOperation =
++        serde_json::from_value(serde_json::to_value(&operation).unwrap()).unwrap();
++    assert_eq!(recovered.payload_digest(), operation.payload_digest());
++    assert!(
++        serde_json::from_value::<LocalAgentOperation>(forged_deadline_record(&operation, deadline))
++            .is_err()
++    );
++}
++
++#[test]
++fn cloudroom_contract_aligned_leap_seconds_are_not_representable_operation_deadlines() {
++    let leap: chrono::DateTime<Utc> = "2026-11-07T22:00:60.123456Z".parse().unwrap();
++    assert_eq!(leap.timestamp_subsec_nanos() % 1_000, 0);
++    assert!(
++        LocalAgentOperation::queued(
++            OperationId::new(uuid::Uuid::new_v4()).unwrap(),
++            LocalCommand::RefreshCatalog {},
++            leap
++        )
++        .is_err()
++    );
++    let operation = LocalAgentOperation::queued(
++        OperationId::new(uuid::Uuid::new_v4()).unwrap(),
++        LocalCommand::RefreshCatalog {},
++        Utc::now() + Duration::minutes(30),
++    )
++    .unwrap();
++    assert!(
++        serde_json::from_value::<LocalAgentOperation>(forged_deadline_record(&operation, leap))
++            .is_err()
++    );
++}
+--- p01/src/application/local_agents/mod.rs
++++ src/application/local_agents/mod.rs
+@@ -1,10 +1,14 @@
+ //! Ports and bounded inputs for company-owned Cloudroom execution.
+ pub mod bounds;
+ mod catalog;
++mod pairing;
+ pub mod ports;
++mod secrets;
+ 
+ pub use crate::domain::local_agents::{LocalAgentOperation, LocalCommand, LocalPrompt};
+ pub use catalog::*;
++pub use pairing::*;
++pub use secrets::*;
+ 
+ #[cfg(test)]
+ mod contract_tests;
+--- p01/src/domain/local_agents/identities.rs
++++ src/domain/local_agents/identities.rs
+@@ -36,7 +36,14 @@
+     )+};
+ }
+ 
+-uuid_identity!(MachineId, InstallationId, ProfileId, SessionId, OperationId);
++uuid_identity!(
++    MachineId,
++    InstallationId,
++    ProfileId,
++    SessionId,
++    OperationId,
++    PairingId
++);
+ 
+ macro_rules! external_identity {
+     ($($name:ident),+ $(,)?) => {$(
+--- p01/src/domain/local_agents/operations.rs
++++ src/domain/local_agents/operations.rs
+@@ -2,6 +2,7 @@
+     CloudroomThreadId, CloudroomTurnId, DeliveryState, EventSequence, ExecutionSelection,
+     OperationId, OperationOutcome, SessionId,
+ };
++use chrono::SubsecRound;
+ use serde::{Deserialize, Serialize};
+ use sha2::{Digest, Sha256};
+ 
+@@ -172,6 +173,9 @@
+ impl TryFrom<OperationRecord> for LocalAgentOperation {
+     type Error = String;
+     fn try_from(record: OperationRecord) -> Result<Self, Self::Error> {
++        if canonical_deadline(record.deadline)? != record.deadline {
++            return Err("operation deadline requires microsecond precision".into());
++        }
+         if record.payload_digest != PayloadDigest::calculate(&record.command, record.deadline)? {
+             return Err("operation payload digest mismatch".into());
+         }
+@@ -185,6 +189,15 @@
+             outcome: record.outcome,
+         })
+     }
++}
++
++fn canonical_deadline(
++    deadline: chrono::DateTime<chrono::Utc>,
++) -> Result<chrono::DateTime<chrono::Utc>, String> {
++    if deadline.timestamp_subsec_nanos() >= 1_000_000_000 {
++        return Err("leap-second operation deadlines are unsupported".into());
++    }
++    Ok(deadline.trunc_subsecs(6))
+ }
+ 
+ fn validate_dispatch(record: &OperationRecord) -> Result<(), String> {
+@@ -232,6 +245,7 @@
+         command: LocalCommand,
+         deadline: chrono::DateTime<chrono::Utc>,
+     ) -> Result<Self, String> {
++        let deadline = canonical_deadline(deadline)?;
+         let payload_digest = PayloadDigest::calculate(&command, deadline)?;
+         Ok(Self {
+             id,

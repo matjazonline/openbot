@@ -1,0 +1,89 @@
+[
+  {
+    "provider": "codex",
+    "status": "PASS",
+    "fileAccess": true,
+    "sameActualUi": true,
+    "outputRecoveryAfterRestart": true,
+    "permissionHuman": "PASS",
+    "isolatedLoggedOutWorkflow": "failed",
+    "originalNativeRequestsAfterRestart": 1,
+    "controls": [
+      {
+        "command": {
+          "kind": "stop"
+        },
+        "outcome": "succeeded",
+        "sdkCalls": 1
+      },
+      {
+        "command": {
+          "kind": "archive"
+        },
+        "outcome": "succeeded",
+        "sdkCalls": 1
+      }
+    ],
+    "matchingInterruptedTurn": true,
+    "actualArchived": true,
+    "linux": "NOT EXERCISED/user authorization I005"
+  },
+  {
+    "provider": "claude-code",
+    "status": "PASS",
+    "fileAccess": true,
+    "sameActualUi": true,
+    "outputRecoveryAfterRestart": true,
+    "permissionHuman": "PASS",
+    "isolatedLoggedOutWorkflow": "failed",
+    "originalNativeRequestsAfterRestart": 1,
+    "controls": [
+      {
+        "command": {
+          "kind": "stop"
+        },
+        "outcome": "uncertain",
+        "sdkCalls": 1
+      },
+      {
+        "command": {
+          "kind": "archive"
+        },
+        "outcome": "succeeded",
+        "sdkCalls": 1
+      }
+    ],
+    "matchingInterruptedTurn": true,
+    "actualArchived": true,
+    "linux": "NOT EXERCISED/user authorization I005"
+  },
+  {
+    "provider": "acp-opencode",
+    "status": "PASS",
+    "fileAccess": true,
+    "sameActualUi": true,
+    "outputRecoveryAfterRestart": true,
+    "permissionHuman": "PASS",
+    "isolatedLoggedOutWorkflow": "failed",
+    "originalNativeRequestsAfterRestart": 1,
+    "controls": [
+      {
+        "command": {
+          "kind": "stop"
+        },
+        "outcome": "succeeded",
+        "sdkCalls": 1
+      },
+      {
+        "command": {
+          "kind": "archive"
+        },
+        "outcome": "succeeded",
+        "sdkCalls": 1
+      }
+    ],
+    "matchingInterruptedTurn": true,
+    "actualArchived": true,
+    "linux": "NOT EXERCISED/user authorization I005"
+  }
+]

@@ -1,0 +1,10 @@
+{
+  "entry_digest_matches": true,
+  "coordination_pin_matches": true,
+  "decision_matches": true,
+  "vendored_declaration_matches": true,
+  "actual_external_generated_declaration_matches": true,
+  "patch_gui/apps/app/src/components/Onboarding.tsx": true,
+  "patch_gui/packages/sdk/src/areas/threads.ts": true,
+  "all_pass": true
+}

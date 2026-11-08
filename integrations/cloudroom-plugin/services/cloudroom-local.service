@@ -1,0 +1,25 @@
+[Unit]
+Description=Company local Cloudroom server and native host
+After=network-online.target
+Wants=network-online.target
+StartLimitIntervalSec=300
+StartLimitBurst=5
+
+[Service]
+Type=simple
+User=cloudroom
+Group=cloudroom
+WorkingDirectory=/opt/cloudroom/gui
+Environment=PATH=/opt/node-v24.21.0/bin:/home/cloudroom/.local/bin:/usr/local/bin:/usr/bin:/bin
+ExecStart=/opt/node-v24.21.0/bin/node /opt/openbot-plugin/services/run.mjs --source /opt/cloudroom --profile /home/cloudroom/.local/share/openbot-cloudroom
+UMask=0077
+Restart=on-failure
+RestartSec=10
+TimeoutStopSec=15
+KillMode=control-group
+NoNewPrivileges=true
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,177 @@
+[
+  {
+    "path": "Cargo.lock",
+    "before_lines": 5771,
+    "after_lines": 5805
+  },
+  {
+    "path": "Cargo.toml",
+    "before_lines": 70,
+    "after_lines": 72
+  },
+  {
+    "path": "migrations/20260817000000_init_schema.sql",
+    "before_lines": 13712,
+    "after_lines": 13732
+  },
+  {
+    "path": "src/adapters/http/app_state.rs",
+    "before_lines": 252,
+    "after_lines": 260
+  },
+  {
+    "path": "src/adapters/http/auth_admission.rs",
+    "before_lines": 729,
+    "after_lines": 750
+  },
+  {
+    "path": "src/adapters/http/routes/local_machine_connection/connection_failure_tests.rs",
+    "before_lines": 0,
+    "after_lines": 248
+  },
+  {
+    "path": "src/adapters/http/routes/local_machine_connection/connection_resource_tests.rs",
+    "before_lines": 0,
+    "after_lines": 201
+  },
+  {
+    "path": "src/adapters/http/routes/local_machine_connection/connection_tests.rs",
+    "before_lines": 0,
+    "after_lines": 419
+  },
+  {
+    "path": "src/adapters/http/routes/local_machine_connection/driver.rs",
+    "before_lines": 0,
+    "after_lines": 154
+  },
+  {
+    "path": "src/adapters/http/routes/local_machine_connection/framing.rs",
+    "before_lines": 0,
+    "after_lines": 156
+  },
+  {
+    "path": "src/adapters/http/routes/local_machine_connection/framing_tests.rs",
+    "before_lines": 0,
+    "after_lines": 146
+  },
+  {
+    "path": "src/adapters/http/routes/local_machine_connection/mod.rs",
+    "before_lines": 0,
+    "after_lines": 211
+  },
+  {
+    "path": "src/adapters/http/routes/local_machine_connection/tls_tests.rs",
+    "before_lines": 0,
+    "after_lines": 228
+  },
+  {
+    "path": "src/adapters/http/routes/mod.rs",
+    "before_lines": 276,
+    "after_lines": 278
+  },
+  {
+    "path": "src/adapters/persistence/local_agents/machine_tests.rs",
+    "before_lines": 511,
+    "after_lines": 473
+  },
+  {
+    "path": "src/adapters/persistence/local_agents/mod.rs",
+    "before_lines": 259,
+    "after_lines": 262
+  },
+  {
+    "path": "src/adapters/persistence/local_agents/protocol/admission_failure_tests.rs",
+    "before_lines": 0,
+    "after_lines": 198
+  },
+  {
+    "path": "src/adapters/persistence/local_agents/protocol/capacity_tests.rs",
+    "before_lines": 0,
+    "after_lines": 162
+  },
+  {
+    "path": "src/adapters/persistence/local_agents/protocol/command_tests.rs",
+    "before_lines": 0,
+    "after_lines": 190
+  },
+  {
+    "path": "src/adapters/persistence/local_agents/protocol/commands.rs",
+    "before_lines": 0,
+    "after_lines": 297
+  },
+  {
+    "path": "src/adapters/persistence/local_agents/protocol/mod.rs",
+    "before_lines": 0,
+    "after_lines": 251
+  },
+  {
+    "path": "src/adapters/persistence/local_agents/protocol/observation_failure_tests.rs",
+    "before_lines": 0,
+    "after_lines": 303
+  },
+  {
+    "path": "src/adapters/persistence/local_agents/protocol/observation_tests.rs",
+    "before_lines": 0,
+    "after_lines": 217
+  },
+  {
+    "path": "src/adapters/persistence/local_agents/protocol/observations.rs",
+    "before_lines": 0,
+    "after_lines": 346
+  },
+  {
+    "path": "src/adapters/persistence/local_agents/protocol/operation_record_tests.rs",
+    "before_lines": 0,
+    "after_lines": 120
+  },
+  {
+    "path": "src/adapters/persistence/local_agents/protocol/test_support.rs",
+    "before_lines": 0,
+    "after_lines": 171
+  },
+  {
+    "path": "src/adapters/persistence/local_agents/test_support.rs",
+    "before_lines": 182,
+    "after_lines": 220
+  },
+  {
+    "path": "src/adapters/persistence/workflow/association.rs",
+    "before_lines": 63,
+    "after_lines": 63
+  },
+  {
+    "path": "src/adapters/persistence/workflow/mod.rs",
+    "before_lines": 159,
+    "after_lines": 159
+  },
+  {
+    "path": "src/application/local_agents/mod.rs",
+    "before_lines": 14,
+    "after_lines": 15
+  },
+  {
+    "path": "src/application/local_agents/protocol.rs",
+    "before_lines": 0,
+    "after_lines": 227
+  },
+  {
+    "path": "src/domain/local_agents/observations.rs",
+    "before_lines": 67,
+    "after_lines": 83
+  },
+  {
+    "path": "src/domain/local_agents/operations.rs",
+    "before_lines": 278,
+    "after_lines": 285
+  },
+  {
+    "path": "src/infra/setup.rs",
+    "before_lines": 176,
+    "after_lines": 181
+  },
+  {
+    "path": "src/main.rs",
+    "before_lines": 594,
+    "after_lines": 616
+  }
+]

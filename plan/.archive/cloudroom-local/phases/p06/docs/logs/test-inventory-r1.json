@@ -1,0 +1,30 @@
+{
+  "beforeCount": 102,
+  "afterCount": 124,
+  "removed": [],
+  "added": [
+    "adapters::http::routes::local_agents::tests::ui::cloudroom_management_ui_foreign_selection_and_form_mutations_cannot_cross_company",
+    "adapters::http::routes::local_agents::tests::ui::cloudroom_management_ui_later_profile_page_and_selection_keep_authorized_start_conversation",
+    "adapters::http::routes::local_agents::tests::ui::cloudroom_management_ui_native_forms_parse_save_start_and_render_original_session",
+    "adapters::persistence::local_agents::protocol::command_tests::cloudroom_commands_readiness_stays_open_for_new_delivery_but_not_replacement",
+    "adapters::persistence::local_agents::retention_tests::cloudroom_lifecycle_mapping_retirement_is_bounded_read_only_and_current_installation_fenced",
+    "adapters::persistence::local_agents::retention_tests::cloudroom_retention_competing_collectors_remove_only_bounded_old_summaries_and_keep_unknown_work",
+    "adapters::persistence::local_agents::retention_tests::cloudroom_retention_new_manual_requests_require_current_timestamp_and_replay_current_identity",
+    "adapters::persistence::local_agents::retention_tests::cloudroom_retention_saved_old_manual_replay_survives_age_then_collected_id_cannot_create_again",
+    "adapters::persistence::local_agents::retention_tests::cloudroom_retention_unknown_native_work_survives_and_compacted_receipt_replays_under_current_fence",
+    "adapters::persistence::workflow::tests::local_agent_tests::continuation::cloudroom_workflow_call_origin_foreign_key_refuses_direct_link_even_without_immutable_guard",
+    "adapters::persistence::workflow::tests::local_agent_tests::continuation::cloudroom_workflow_continuation_refuses_other_profile_and_other_original_association",
+    "adapters::persistence::workflow::tests::local_agent_tests::continuation::cloudroom_workflow_continuation_refuses_withdrawn_original_private_access",
+    "adapters::persistence::workflow::tests::local_agent_tests::continuation::cloudroom_workflow_explicit_continuation_keeps_frozen_selection_and_approval_after_profile_edit",
+    "adapters::persistence::workflow::tests::local_agent_tests::continuation::cloudroom_workflow_first_delivery_role_withdrawal_race_refuses_new_and_reconciles_attempted_work",
+    "adapters::persistence::workflow::tests::local_agent_tests::corrections::cloudroom_workflow_actual_fair_poll_worker_discovers_native_result_and_completes_once",
+    "adapters::persistence::workflow::tests::local_agent_tests::corrections::cloudroom_workflow_competing_expiry_keeps_eight_attempted_native_effects_until_positive_evidence",
+    "adapters::persistence::workflow::tests::local_agent_tests::corrections::cloudroom_workflow_first_uncertain_disposition_survives_late_success_before_and_after_wake",
+    "adapters::persistence::workflow::tests::local_agent_tests::retention::cloudroom_retention_cancelled_workflow_needs_guarded_old_physical_proof_without_a_success_receipt",
+    "adapters::persistence::workflow::tests::local_agent_tests::retention::cloudroom_retention_prepared_and_queued_continuation_preserves_old_original_session",
+    "adapters::persistence::workflow::tests::local_agent_tests::retention::cloudroom_retention_two_terminal_roots_with_reciprocal_native_sessions_eventually_retire",
+    "adapters::persistence::workflow::tests::local_agent_tests::retention::peer::cloudroom_lifecycle_real_server_plugin_retention_preserves_prepared_and_unseen_queued_work_once",
+    "application::local_agents::lifecycle::tests::cloudroom_lifecycle_retention_shutdown_cancels_the_actual_pending_port_future"
+  ],
+  "note": "Original tests remain discoverable. p06 shared graph helper extraction moves no original test names. One additional status test compiled/discovered separately."
+}

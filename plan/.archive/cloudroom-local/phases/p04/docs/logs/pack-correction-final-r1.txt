@@ -1,0 +1,26 @@
+npm notice
+npm notice 📦  bb-plugin-openbot-local@0.1.0
+npm notice Tarball Contents
+npm notice 4.0kB README.md
+npm notice 6.9kB compatibility/manifest.json
+npm notice 3.1kB compatibility/patches/local-onboarding.patch
+npm notice 2.6kB compatibility/patches/sdk-mutation-abort.patch
+npm notice 5.9kB compatibility/README.md
+npm notice 71.0kB dist/server.js
+npm notice 128.7kB dist/server.js.map
+npm notice 1.3kB package.json
+npm notice 1.0MB types/bb-plugin-sdk.d.ts
+npm notice 849B types/manifest.json
+npm notice 11.4kB types/UPSTREAM-LICENSE
+npm notice 1.2kB types/UPSTREAM-NOTICE
+npm notice Tarball Details
+npm notice name: bb-plugin-openbot-local
+npm notice version: 0.1.0
+npm notice filename: bb-plugin-openbot-local-0.1.0.tgz
+npm notice package size: 215.9 kB
+npm notice unpacked size: 1.3 MB
+npm notice shasum: 78f66beed830635977f3e67d5a8f59f6ee20edbf
+npm notice integrity: sha512-xCoswRFTM1VRM[...]g24EHkq/ck/oQ==
+npm notice total files: 12
+npm notice
+bb-plugin-openbot-local-0.1.0.tgz

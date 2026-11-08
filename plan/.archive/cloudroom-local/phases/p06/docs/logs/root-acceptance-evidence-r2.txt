@@ -1,0 +1,2 @@
+plan/cloudroom-local/phases/p06/docs/logs/CL-P06-B1-R2.evidence.json: retained evidence valid {"FAIL": 0, "NOT EXERCISED": 2, "PASS": 15}
+1 evidence manifest(s) validated; declared results are not acceptance

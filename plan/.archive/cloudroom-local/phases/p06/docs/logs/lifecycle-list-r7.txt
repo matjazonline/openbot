@@ -1,0 +1,8 @@
+   Compiling open_bots v0.1.0 (/Users/mac03/dev/openbot)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1m 55s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-50aeda0c9f5dbc3a)
+adapters::persistence::local_agents::retention_tests::cloudroom_lifecycle_mapping_retirement_is_bounded_read_only_and_current_installation_fenced: test
+adapters::persistence::workflow::tests::local_agent_tests::retention::peer::cloudroom_lifecycle_real_server_plugin_retention_preserves_prepared_and_unseen_queued_work_once: test
+application::local_agents::lifecycle::tests::cloudroom_lifecycle_retention_shutdown_cancels_the_actual_pending_port_future: test
+
+3 tests, 0 benchmarks

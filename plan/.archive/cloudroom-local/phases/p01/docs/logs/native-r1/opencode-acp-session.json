@@ -1,0 +1,15 @@
+{
+  "initialize": {
+    "elapsedSeconds": 0.17,
+    "responded": true
+  },
+  "authMethodIds": [
+    "opencode-login"
+  ],
+  "newSession": {
+    "responded": false,
+    "elapsedSeconds": 20.19,
+    "resultKeys": [],
+    "errorCode": null
+  }
+}

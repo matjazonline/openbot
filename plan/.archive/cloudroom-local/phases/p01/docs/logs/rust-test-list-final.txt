@@ -1,0 +1,11 @@
+   Compiling open_bots v0.1.0 (/Users/mac03/dev/openbot)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1m 01s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-3384251af61cfdaf)
+application::local_agents::contract_tests::cloudroom_bounds_admission_preserves_control_capacity: test
+application::local_agents::contract_tests::cloudroom_bounds_deadline_rejects_elapsed_and_above_maximum: test
+application::local_agents::contract_tests::cloudroom_bounds_output_and_catalog_decode_at_their_limits: test
+application::local_agents::contract_tests::cloudroom_bounds_prompt_counts_utf8_bytes_and_redacts_debug: test
+application::local_agents::contract_tests::cloudroom_contract_commands_are_closed_and_controls_are_explicit: test
+application::local_agents::contract_tests::cloudroom_contract_identities_validate_on_decode: test
+
+6 tests, 0 benchmarks

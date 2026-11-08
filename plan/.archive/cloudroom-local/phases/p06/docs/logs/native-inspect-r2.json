@@ -1,0 +1,312 @@
+[
+  {
+    "id": "thr_zfavhunthk",
+    "status": "idle",
+    "events": [
+      {
+        "seq": 1,
+        "type": "client/turn/requested",
+        "scope": {
+          "kind": "thread"
+        },
+        "keys": [
+          "direction",
+          "requestId",
+          "source",
+          "initiator",
+          "senderThreadId",
+          "systemMessageKind",
+          "systemMessageSubject",
+          "input",
+          "target",
+          "request",
+          "execution"
+        ],
+        "markerPresent": false
+      },
+      {
+        "seq": 2,
+        "type": "client/thread/start",
+        "scope": {
+          "kind": "thread"
+        },
+        "keys": [
+          "direction",
+          "source",
+          "initiator",
+          "request"
+        ],
+        "markerPresent": false
+      },
+      {
+        "seq": 3,
+        "type": "system/thread-provisioning",
+        "scope": {
+          "kind": "thread"
+        },
+        "keys": [
+          "provisioningId",
+          "status",
+          "environmentId",
+          "entries"
+        ],
+        "terminalStatus": "active",
+        "markerPresent": false
+      },
+      {
+        "seq": 4,
+        "type": "system/thread-provisioning",
+        "scope": {
+          "kind": "thread"
+        },
+        "keys": [
+          "provisioningId",
+          "status",
+          "environmentId",
+          "entries"
+        ],
+        "terminalStatus": "active",
+        "markerPresent": false
+      },
+      {
+        "seq": 5,
+        "type": "system/thread-provisioning",
+        "scope": {
+          "kind": "thread"
+        },
+        "keys": [
+          "provisioningId",
+          "status",
+          "environmentId",
+          "entries"
+        ],
+        "terminalStatus": "active",
+        "markerPresent": false
+      },
+      {
+        "seq": 6,
+        "type": "system/thread-provisioning",
+        "scope": {
+          "kind": "thread"
+        },
+        "keys": [
+          "provisioningId",
+          "status",
+          "environmentId",
+          "entries"
+        ],
+        "terminalStatus": "active",
+        "markerPresent": false
+      },
+      {
+        "seq": 7,
+        "type": "system/thread-provisioning",
+        "scope": {
+          "kind": "thread"
+        },
+        "keys": [
+          "provisioningId",
+          "status",
+          "environmentId",
+          "entries"
+        ],
+        "terminalStatus": "active",
+        "markerPresent": false
+      },
+      {
+        "seq": 8,
+        "type": "system/thread-provisioning",
+        "scope": {
+          "kind": "thread"
+        },
+        "keys": [
+          "provisioningId",
+          "status",
+          "environmentId",
+          "entries"
+        ],
+        "terminalStatus": "completed",
+        "markerPresent": false
+      },
+      {
+        "seq": 9,
+        "type": "thread/identity",
+        "scope": {
+          "kind": "thread"
+        },
+        "keys": [
+          "providerThreadId"
+        ],
+        "markerPresent": false
+      },
+      {
+        "seq": 10,
+        "type": "provider.env-resolved",
+        "scope": {
+          "kind": "thread"
+        },
+        "keys": [
+          "providerThreadId",
+          "entries"
+        ],
+        "markerPresent": false
+      },
+      {
+        "seq": 11,
+        "type": "thread/started",
+        "scope": {
+          "kind": "thread"
+        },
+        "keys": [],
+        "markerPresent": false
+      },
+      {
+        "seq": 12,
+        "type": "thread/identity",
+        "scope": {
+          "kind": "thread"
+        },
+        "keys": [
+          "providerThreadId"
+        ],
+        "markerPresent": false
+      },
+      {
+        "seq": 13,
+        "type": "turn/started",
+        "scope": {
+          "kind": "turn",
+          "turnId": "daf185f928-t1"
+        },
+        "keys": [
+          "providerThreadId"
+        ],
+        "markerPresent": false
+      },
+      {
+        "seq": 14,
+        "type": "turn/input/accepted",
+        "scope": {
+          "kind": "turn",
+          "turnId": "daf185f928-t1"
+        },
+        "keys": [
+          "providerThreadId",
+          "clientRequestId"
+        ],
+        "markerPresent": false
+      },
+      {
+        "seq": 15,
+        "type": "item/started",
+        "scope": {
+          "kind": "turn",
+          "turnId": "daf185f928-t1"
+        },
+        "keys": [
+          "providerThreadId",
+          "item"
+        ],
+        "itemType": "agentMessage",
+        "answer": "",
+        "markerPresent": false
+      },
+      {
+        "seq": 16,
+        "type": "item/agentMessage/delta",
+        "scope": {
+          "kind": "turn",
+          "turnId": "daf185f928-t1"
+        },
+        "keys": [
+          "providerThreadId",
+          "itemId",
+          "delta"
+        ],
+        "markerPresent": false
+      },
+      {
+        "seq": 19,
+        "type": "item/completed",
+        "scope": {
+          "kind": "turn",
+          "turnId": "daf185f928-t1"
+        },
+        "keys": [
+          "providerThreadId",
+          "item"
+        ],
+        "itemType": "agentMessage",
+        "answer": "I can’t read the file in this environment.",
+        "markerPresent": false
+      },
+      {
+        "seq": 20,
+        "type": "thread/tokenUsage/updated",
+        "scope": {
+          "kind": "turn",
+          "turnId": "daf185f928-t1"
+        },
+        "keys": [
+          "providerThreadId",
+          "tokenUsage"
+        ],
+        "markerPresent": false
+      },
+      {
+        "seq": 21,
+        "type": "thread/contextWindowUsage/updated",
+        "scope": {
+          "kind": "turn",
+          "turnId": "daf185f928-t1"
+        },
+        "keys": [
+          "providerThreadId",
+          "contextWindowUsage"
+        ],
+        "markerPresent": false
+      },
+      {
+        "seq": 22,
+        "type": "provider/rateLimits/updated",
+        "scope": {
+          "kind": "thread"
+        },
+        "keys": [
+          "providerThreadId",
+          "rateLimits"
+        ],
+        "markerPresent": false
+      },
+      {
+        "seq": 23,
+        "type": "provider/unhandled",
+        "scope": {
+          "kind": "thread"
+        },
+        "keys": [
+          "providerThreadId",
+          "providerId",
+          "rawType",
+          "rawEvent"
+        ],
+        "markerPresent": false
+      },
+      {
+        "seq": 24,
+        "type": "turn/completed",
+        "scope": {
+          "kind": "turn",
+          "turnId": "daf185f928-t1"
+        },
+        "keys": [
+          "providerThreadId",
+          "status",
+          "providerCheckpointId"
+        ],
+        "terminalStatus": "completed",
+        "markerPresent": false
+      }
+    ]
+  }
+]

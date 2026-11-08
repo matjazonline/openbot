@@ -1,0 +1,41 @@
+
+> bb-plugin-openbot-local@0.1.0 test
+> node scripts/build.mjs --test && node --test build-tests/*.test.js
+
+built 2 test entries
+✔ configuration refuses non-origin URL http:// (0.45175ms)
+✔ configuration refuses non-origin URL https:// (0.047708ms)
+✔ configuration refuses non-origin URL https://path (0.037042ms)
+✔ configuration refuses non-origin URL https:// (0.035416ms)
+✔ configuration refuses non-origin URL https:// (0.04425ms)
+✔ configuration canonicalizes HTTPS and refuses arbitrary project paths/duplicates/bounds (0.669792ms)
+✔ user UTF8 prompt bound remains32KiB with fixed native operation header (2.686ms)
+✔ actual peer command decoder canonicalizes field order and rejects hash/date/field changes (0.314125ms)
+✔ chunk transport roundtrips the exact2MiB limit and rejects overflow before send (14.778542ms)
+✔ chunks reject interleaving, invalid UTF8/base64, unsafe integers and time expiry (1.256125ms)
+✔ real SQLite survives receipt/intent reopen and replay keeps immutable payloads (8.243417ms)
+✔ competing stale intent claimants have exactly one durable SDK entry marker (3.267875ms)
+✔ missing command under reconcile enters durable recovery without a fresh SDK claim (3.504292ms)
+✔ acknowledgment cannot forget an unknown future or restore an already-pruned cursor (2.742125ms)
+✔ preflight refusal is durable but cannot follow the SDK intent cut (3.727959ms)
+✔ fixed4096 history bound fails controlled admission and never allocates a dangling sequence (1237.481ms)
+✔ create freezes explicit local checkout/provider/model and duplicate concurrent delivery submits once (13.527709ms)
+✔ lost send response reopens intent and recovers exact turn without sending again (4.639583ms)
+✔ spawn gap recovers positive plugin metadata, while absent threads never recreate (4.0335ms)
+✔ human turn, idle thread and unrelated permission prompts cannot complete or take ownership (5.105625ms)
+✔ preflight model refusal is durable before any SDK mutation (2.893583ms)
+✔ preflight provider refusal is durable before any SDK mutation (3.128125ms)
+✔ preflight project refusal is durable before any SDK mutation (2.871292ms)
+✔ preflight expired refusal is durable before any SDK mutation (2.861209ms)
+✔ preflight gate refusal is durable before any SDK mutation (2.686166ms)
+✔ preflight foreign refusal is durable before any SDK mutation (2.752458ms)
+✔ unknown work consumes eight effect slots but explicit mapped-thread stop retains headroom (13.576417ms)
+✔ service abort cancels actual SDK wait and retains ambiguous intent without broad stop (5.451208ms)
+ℹ tests 28
+ℹ suites 0
+ℹ pass 28
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1340.60275

@@ -1,0 +1,28 @@
+{
+  "owner": "root/cloudroom-local/p07/image-verification",
+  "directory": "/private/tmp/ob7-dq_2z0jj",
+  "limaHome": "/private/tmp/ob7-dq_2z0jj/i",
+  "name": "img",
+  "command": [
+    "limactl",
+    "start",
+    "--tty=false",
+    "--name=img",
+    "--vm-type=vz",
+    "--arch=aarch64",
+    "--cpus=2",
+    "--memory=4",
+    "--disk=12",
+    "--mount-only=/Users/mac03/dev/openbot",
+    "--set",
+    ".mounts[0].writable=false | .ssh.forwardAgent=false | .ssh.loadDotSSHPubKeys=false",
+    "--set",
+    ".images = [{\"location\": \"https://cloud-images.ubuntu.com/releases/resolute/release-20260927/ubuntu-26.04-server-cloudimg-arm64.img\", \"arch\": \"aarch64\", \"digest\": \"sha256:63a93bd5a8d76e33b15ceb5daa3657bd79be804748051ab178e643b0f5da22e7\"}]",
+    "--timeout=10m",
+    "template:docker"
+  ],
+  "sourceDisposition": "Production inputs unchanged from artifact1b4529\u2026; current one-line test-only fixture correction pending final source identity",
+  "nativeLinuxInference": "NOT EXERCISED/user waived",
+  "memoryGiB": 6,
+  "reason": "Kernel confirmed rustc global OOM at 4GiB build-host RAM; production check remains2048MiB/1536MiB RSS and CI build remains bounded by runner memory."
+}

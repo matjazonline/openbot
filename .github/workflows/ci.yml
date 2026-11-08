@@ -32,10 +32,23 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24.21.0
           cache: npm
       - name: Install frontend dependencies
         run: npm ci
+      - name: Verify local-agent plugin and build counted test peers
+        run: |
+          npm --prefix integrations/cloudroom-plugin ci
+          npm --prefix integrations/cloudroom-plugin run typecheck
+          npm --prefix integrations/cloudroom-plugin run build
+          npm --prefix integrations/cloudroom-plugin test
+          npm --prefix integrations/cloudroom-plugin run test:guards
+      - name: Reproducible local-agent package and locked runtime installation
+        run: |
+          npm --prefix integrations/cloudroom-plugin run package
+          package_dir="$(mktemp -d)"
+          tar -xzf integrations/cloudroom-plugin/artifacts/bb-plugin-openbot-local-0.2.0.tgz -C "$package_dir" --strip-components=1
+          npm --prefix "$package_dir" ci --omit=dev
       - name: Generated CSS is current
         run: npm run check:css
       - name: Install browser for protocol tests
@@ -127,6 +140,12 @@ jobs:
         run: |
           cargo test --locked --offline --lib dump_autonomous_agent_authoring_browser_fixtures -- --ignored
           node --test scripts/tests/agent-authoring-browser.mjs
+      - name: Local agent management browser protocol
+        env:
+          CLOUDROOM_MANAGEMENT_BROWSER_FIXTURES: /tmp/cloudroom-management-browser
+        run: |
+          cargo test --locked --offline --lib dump_cloudroom_management_browser_fixtures -- --ignored
+          node --test scripts/tests/local-agents-browser.mjs
       - name: Workflow agent selection browser protocol
         env:
           WORKFLOW_AGENT_BROWSER_FIXTURES: /tmp/workflow-agent-browser

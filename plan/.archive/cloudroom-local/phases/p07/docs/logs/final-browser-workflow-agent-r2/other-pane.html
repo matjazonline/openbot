@@ -1,0 +1,113 @@
+<section id="workflow-pane" class="ui-pane-detail flex min-w-0 flex-1 flex-col bg-base-100">
+            <div class="border-b border-base-300 px-4 pt-4 sm:px-6">
+                <div class="flex flex-wrap items-center gap-2">
+                    <h2 class="min-w-0 truncate text-xl font-bold">Other workflow</h2>
+                    <a class="btn btn-ghost btn-xs ml-auto" href="/ui/workflow-runs?company_id=5ac3f4d0-15a0-493b-a198-eefc04fa576f&amp;view=board&amp;workflow_id=14fe32df-3716-4a23-b743-2fea454a89bf">Runs board</a>
+                </div>
+                <p class="mt-1 text-xs opacity-60">Draft revision 1 · 0 published versions</p>
+                <nav role="tablist" class="tabs tabs-border mt-3" aria-label="Workflow views"><a role="tab" class="tab tab-active" aria-selected="true"
+                href="/ui/workflows?company_id=5ac3f4d0-15a0-493b-a198-eefc04fa576f&amp;workflow_id=14fe32df-3716-4a23-b743-2fea454a89bf&amp;tab=editor"
+                hx-get="/ui/workflows/14fe32df-3716-4a23-b743-2fea454a89bf?company_id=5ac3f4d0-15a0-493b-a198-eefc04fa576f&amp;tab=editor"
+                hx-target="#workflow-pane" hx-swap="outerHTML" hx-sync="#workflow-pane:replace"
+                hx-push-url="/ui/workflows?company_id=5ac3f4d0-15a0-493b-a198-eefc04fa576f&amp;workflow_id=14fe32df-3716-4a23-b743-2fea454a89bf&amp;tab=editor">Editor</a><a role="tab" class="tab" aria-selected="false"
+                href="/ui/workflows?company_id=5ac3f4d0-15a0-493b-a198-eefc04fa576f&amp;workflow_id=14fe32df-3716-4a23-b743-2fea454a89bf&amp;tab=sample"
+                hx-get="/ui/workflows/14fe32df-3716-4a23-b743-2fea454a89bf?company_id=5ac3f4d0-15a0-493b-a198-eefc04fa576f&amp;tab=sample"
+                hx-target="#workflow-pane" hx-swap="outerHTML" hx-sync="#workflow-pane:replace"
+                hx-push-url="/ui/workflows?company_id=5ac3f4d0-15a0-493b-a198-eefc04fa576f&amp;workflow_id=14fe32df-3716-4a23-b743-2fea454a89bf&amp;tab=sample">Sample</a><a role="tab" class="tab" aria-selected="false"
+                href="/ui/workflows?company_id=5ac3f4d0-15a0-493b-a198-eefc04fa576f&amp;workflow_id=14fe32df-3716-4a23-b743-2fea454a89bf&amp;tab=versions"
+                hx-get="/ui/workflows/14fe32df-3716-4a23-b743-2fea454a89bf?company_id=5ac3f4d0-15a0-493b-a198-eefc04fa576f&amp;tab=versions"
+                hx-target="#workflow-pane" hx-swap="outerHTML" hx-sync="#workflow-pane:replace"
+                hx-push-url="/ui/workflows?company_id=5ac3f4d0-15a0-493b-a198-eefc04fa576f&amp;workflow_id=14fe32df-3716-4a23-b743-2fea454a89bf&amp;tab=versions">Versions and usage</a><a role="tab" class="tab" aria-selected="false"
+                href="/ui/workflows?company_id=5ac3f4d0-15a0-493b-a198-eefc04fa576f&amp;workflow_id=14fe32df-3716-4a23-b743-2fea454a89bf&amp;tab=bindings"
+                hx-get="/ui/workflows/14fe32df-3716-4a23-b743-2fea454a89bf?company_id=5ac3f4d0-15a0-493b-a198-eefc04fa576f&amp;tab=bindings"
+                hx-target="#workflow-pane" hx-swap="outerHTML" hx-sync="#workflow-pane:replace"
+                hx-push-url="/ui/workflows?company_id=5ac3f4d0-15a0-493b-a198-eefc04fa576f&amp;workflow_id=14fe32df-3716-4a23-b743-2fea454a89bf&amp;tab=bindings">Bindings</a></nav>
+            </div>
+            <div class="flex-1 overflow-y-auto px-4 py-4 sm:px-6">
+        <form id="workflow-editor" class="space-y-4" data-workflow-editor
+            hx-post="/ui/workflows/14fe32df-3716-4a23-b743-2fea454a89bf/save?company_id=5ac3f4d0-15a0-493b-a198-eefc04fa576f"
+            hx-target="#workflow-pane" hx-swap="outerHTML"
+            hx-disabled-elt="find button[type='submit']">
+            <input type="hidden" name="expected_revision" value="1">
+            <label class="fieldset">
+                <span class="fieldset-legend">Title</span>
+                <input class="input w-full" name="title" required maxlength="256" value="Other workflow">
+            </label>
+            <label class="fieldset">
+                <span class="fieldset-legend">Description</span>
+                <textarea class="textarea w-full" name="description" rows="2" maxlength="4096">
+</textarea>
+            </label>
+            <label class="fieldset">
+                <span class="fieldset-legend">Source (YAML)</span>
+                <textarea id="workflow-source" class="textarea w-full font-mono text-xs" name="source" rows="28"
+                    spellcheck="false" autocapitalize="off" autocomplete="off" wrap="off"
+                    aria-describedby="workflow-source-help">
+{
+  &quot;entry&quot;: &quot;start&quot;,
+  &quot;format_version&quot;: 1,
+  &quot;input_schema&quot;: true,
+  &quot;limits&quot;: {
+    &quot;max_context_bytes&quot;: 65536,
+    &quot;max_steps&quot;: 100
+  },
+  &quot;output_schema&quot;: true,
+  &quot;parameter_schema&quot;: true,
+  &quot;resources&quot;: [],
+  &quot;steps&quot;: {
+    &quot;start&quot;: {
+      &quot;routes&quot;: {
+        &quot;success&quot;: &quot;$end&quot;
+      },
+      &quot;type&quot;: &quot;data.map&quot;,
+      &quot;with&quot;: {
+        &quot;output_schema&quot;: {
+          &quot;literal&quot;: {
+            &quot;maxLength&quot;: 128,
+            &quot;type&quot;: &quot;string&quot;
+          }
+        },
+        &quot;value&quot;: {
+          &quot;literal&quot;: &quot;hello&quot;
+        }
+      }
+    }
+  },
+  &quot;workflow_id&quot;: &quot;14fe32df-3716-4a23-b743-2fea454a89bf&quot;
+}</textarea>
+                <span id="workflow-source-help" class="text-xs opacity-60">Saving keeps whatever you type, valid or not. Validation compiles the saved revision exactly as publishing would.</span>
+            </label>
+            
+            <div class="flex flex-wrap items-center gap-2 border-t border-base-300 pt-4">
+                <button type="submit" name="intent" value="validate" class="btn btn-primary">Save and validate</button>
+                <button type="submit" name="intent" value="save" class="btn btn-outline">Save draft</button>
+                <button type="button" class="btn btn-ghost" data-editor-reload
+                    hx-get="/ui/workflows/14fe32df-3716-4a23-b743-2fea454a89bf?company_id=5ac3f4d0-15a0-493b-a198-eefc04fa576f"
+                    hx-target="#workflow-pane" hx-swap="outerHTML" hx-sync="#workflow-pane:replace"
+                    hx-confirm="Discard unsaved changes and reload the saved draft?">Reload saved draft</button>
+                <span id="workflow-editor-status" class="text-sm" role="status" aria-live="polite"></span>
+            </div>
+        </form>
+        <section id="workflow-agent-picker" data-workflow-agent-picker class="rounded-box border border-base-300 p-4" hx-post="/ui/workflows/14fe32df-3716-4a23-b743-2fea454a89bf/agent-picker?company_id=5ac3f4d0-15a0-493b-a198-eefc04fa576f" hx-trigger="load" hx-include="#workflow-source" hx-params="source" hx-target="this" hx-swap="outerHTML" hx-sync="this:replace">Loading agent choices…</section>
+        
+        <details id="workflow-reference" class="mt-6 rounded-box border border-base-300 p-3"
+            hx-get="/ui/workflows/catalogue?company_id=5ac3f4d0-15a0-493b-a198-eefc04fa576f" hx-trigger="toggle once"
+            hx-target="#workflow-reference-body" hx-swap="outerHTML">
+            <summary class="cursor-pointer font-semibold">Step catalogue and agents reference</summary>
+            <div id="workflow-reference-body" class="mt-3 text-sm" aria-busy="true">
+                <span class="loading loading-spinner loading-sm"></span> Loading the reference…
+            </div>
+        </details>
+        <form class="mt-6 border-t border-base-300 pt-4"
+            hx-post="/ui/workflows/14fe32df-3716-4a23-b743-2fea454a89bf/archive?company_id=5ac3f4d0-15a0-493b-a198-eefc04fa576f"
+            hx-target="#workflow-pane" hx-swap="outerHTML"
+            hx-confirm="Archive this workflow? Its draft can no longer be saved or published; published versions keep serving their bindings."
+            hx-disabled-elt="find button[type='submit']">
+            <input type="hidden" name="expected_revision" value="1">
+            <button type="submit" class="btn btn-sm btn-error">
+                <span class="loading loading-spinner loading-xs hidden [.htmx-request_&]:inline-block"></span>
+                <span class="[.htmx-request_&]:hidden">Archive workflow</span>
+                <span class="hidden [.htmx-request_&]:inline">Archiving…</span>
+            </button>
+        </form></div>
+        </section>

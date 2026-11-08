@@ -1,0 +1,11 @@
+   Compiling open_bots v0.1.0 (/Users/mac03/dev/openbot)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1m 51s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-ed6f58dd3efb6ea2)
+
+running 3 tests
+test adapters::http::routes::local_machines::tests::cloudroom_pairing_http_response_loss_and_dedicated_header_recovery ... ok
+test adapters::http::routes::local_machines::tests::cloudroom_pairing_http_bounds_and_closed_payloads_reject_before_enrollment ... ok
+test adapters::http::routes::local_machines::tests::cloudroom_company_http_session_csrf_and_foreign_object_guards ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 3220 filtered out; finished in 1.40s
+

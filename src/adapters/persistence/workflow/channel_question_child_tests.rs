@@ -25,7 +25,7 @@ async fn child_question(s: &Intents) -> ChildQuestion {
         Preflight,
         s.p().clone(),
         WorkflowSourceDecoder,
-        message::MessagePublicationDirectory {
+        step_builtins::StepBuiltinPublicationDirectory {
             persistence: s.p().clone(),
         },
     );

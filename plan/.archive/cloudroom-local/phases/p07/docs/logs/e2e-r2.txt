@@ -1,0 +1,22 @@
+   Compiling open_bots v0.1.0 (/Users/mac03/dev/openbot)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2m 13s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-50aeda0c9f5dbc3a)
+
+running 2 tests
+
+thread 'adapters::persistence::workflow::tests::local_agent_tests::e2e::cloudroom_e2e_cut_points_reconstruct_server_plugin_and_workers_without_blind_native_retry' (18210353) panicked at src/adapters/persistence/workflow/local_agent_e2e_tests.rs:421:9:
+assertion `left == right` failed: failed/uncertain work cannot manufacture a success receipt at before_receipt
+  left: 1
+ right: 0
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test adapters::persistence::workflow::tests::local_agent_tests::e2e::cloudroom_e2e_cut_points_reconstruct_server_plugin_and_workers_without_blind_native_retry ... FAILED
+test adapters::persistence::workflow::tests::local_agent_tests::e2e::cloudroom_e2e_competing_workers_native_thread_followup_controls_and_company_fences ... ok
+
+failures:
+
+failures:
+    adapters::persistence::workflow::tests::local_agent_tests::e2e::cloudroom_e2e_cut_points_reconstruct_server_plugin_and_workers_without_blind_native_retry
+
+test result: FAILED. 1 passed; 1 failed; 0 ignored; 0 measured; 3319 filtered out; finished in 4.12s
+
+error: test failed, to rerun pass `--lib`

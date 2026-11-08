@@ -1,0 +1,78 @@
+
+running 1 test
+
+thread 'adapters::persistence::workflow::tests::local_agent_tests::retention::peer::cloudroom_lifecycle_real_server_plugin_retention_preserves_prepared_and_unseen_queued_work_once' (18079027) panicked at src/adapters/persistence/workflow/local_agent_retention_tests.rs:51:10:
+called `Result::unwrap()` on an `Err` value: WorkflowFailure { failure: StepFailure { knowledge_refusal: None, class: Terminal, code: FailureCode("local_agent.failed"), diagnostic: None }, safety: SafeToRetry }
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96/library/std/src/panicking.rs:689:5
+   1: core::panicking::panic_fmt
+             at /rustc/ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96/library/core/src/panicking.rs:80:14
+   2: core::result::unwrap_failed
+             at /rustc/ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96/library/core/src/result.rs:1867:5
+   3: core::result::Result<T,E>::unwrap
+             at /Users/mac03/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/core/src/result.rs:1233:23
+   4: open_bots::adapters::persistence::workflow::tests::local_agent_tests::retention::consume_local::{{closure}}
+             at ./src/adapters/persistence/workflow/local_agent_retention_tests.rs:51:10
+   5: open_bots::adapters::persistence::workflow::tests::local_agent_tests::retention::peer::cloudroom_lifecycle_real_server_plugin_retention_preserves_prepared_and_unseen_queued_work_once::{{closure}}
+             at ./src/adapters/persistence/workflow/local_agent_retention_peer_tests.rs:241:42
+   6: <core::pin::Pin<P> as core::future::future::Future>::poll
+             at /Users/mac03/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/core/src/future/future.rs:133:9
+   7: <core::pin::Pin<P> as core::future::future::Future>::poll
+             at /Users/mac03/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/core/src/future/future.rs:133:9
+   8: tokio::runtime::scheduler::current_thread::CoreGuard::block_on::{{closure}}::{{closure}}::{{closure}}
+             at /Users/mac03/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.50.0/src/runtime/scheduler/current_thread/mod.rs:769:70
+   9: tokio::task::coop::with_budget
+             at /Users/mac03/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.50.0/src/task/coop/mod.rs:167:5
+  10: tokio::task::coop::budget
+             at /Users/mac03/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.50.0/src/task/coop/mod.rs:133:5
+  11: tokio::runtime::scheduler::current_thread::CoreGuard::block_on::{{closure}}::{{closure}}
+             at /Users/mac03/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.50.0/src/runtime/scheduler/current_thread/mod.rs:769:25
+  12: tokio::runtime::scheduler::current_thread::Context::enter
+             at /Users/mac03/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.50.0/src/runtime/scheduler/current_thread/mod.rs:446:19
+  13: tokio::runtime::scheduler::current_thread::CoreGuard::block_on::{{closure}}
+             at /Users/mac03/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.50.0/src/runtime/scheduler/current_thread/mod.rs:768:44
+  14: tokio::runtime::scheduler::current_thread::CoreGuard::enter::{{closure}}
+             at /Users/mac03/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.50.0/src/runtime/scheduler/current_thread/mod.rs:856:68
+  15: tokio::runtime::context::scoped::Scoped<T>::set
+             at /Users/mac03/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.50.0/src/runtime/context/scoped.rs:40:9
+  16: tokio::runtime::context::set_scheduler::{{closure}}
+             at /Users/mac03/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.50.0/src/runtime/context.rs:176:38
+  17: std::thread::local::LocalKey<T>::try_with
+             at /Users/mac03/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/std/src/thread/local.rs:462:12
+  18: std::thread::local::LocalKey<T>::with
+             at /Users/mac03/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/std/src/thread/local.rs:426:20
+  19: tokio::runtime::context::set_scheduler
+             at /Users/mac03/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.50.0/src/runtime/context.rs:176:17
+  20: tokio::runtime::scheduler::current_thread::CoreGuard::enter
+             at /Users/mac03/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.50.0/src/runtime/scheduler/current_thread/mod.rs:856:27
+  21: tokio::runtime::scheduler::current_thread::CoreGuard::block_on
+             at /Users/mac03/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.50.0/src/runtime/scheduler/current_thread/mod.rs:756:24
+  22: tokio::runtime::scheduler::current_thread::CurrentThread::block_on::{{closure}}
+             at /Users/mac03/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.50.0/src/runtime/scheduler/current_thread/mod.rs:200:33
+  23: tokio::runtime::context::runtime::enter_runtime
+             at /Users/mac03/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.50.0/src/runtime/context/runtime.rs:65:16
+  24: tokio::runtime::scheduler::current_thread::CurrentThread::block_on
+             at /Users/mac03/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.50.0/src/runtime/scheduler/current_thread/mod.rs:188:9
+  25: tokio::runtime::runtime::Runtime::block_on_inner
+             at /Users/mac03/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.50.0/src/runtime/runtime.rs:371:52
+  26: tokio::runtime::runtime::Runtime::block_on
+             at /Users/mac03/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.50.0/src/runtime/runtime.rs:345:18
+  27: open_bots::adapters::persistence::workflow::tests::local_agent_tests::retention::peer::cloudroom_lifecycle_real_server_plugin_retention_preserves_prepared_and_unseen_queued_work_once
+             at ./src/adapters/persistence/workflow/local_agent_retention_peer_tests.rs:263:25
+  28: open_bots::adapters::persistence::workflow::tests::local_agent_tests::retention::peer::cloudroom_lifecycle_real_server_plugin_retention_preserves_prepared_and_unseen_queued_work_once::{{closure}}
+             at ./src/adapters/persistence/workflow/local_agent_retention_peer_tests.rs:167:107
+  29: core::ops::function::FnOnce::call_once
+             at /Users/mac03/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/core/src/ops/function.rs:250:5
+  30: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+test adapters::persistence::workflow::tests::local_agent_tests::retention::peer::cloudroom_lifecycle_real_server_plugin_retention_preserves_prepared_and_unseen_queued_work_once ... FAILED
+
+failures:
+
+failures:
+    adapters::persistence::workflow::tests::local_agent_tests::retention::peer::cloudroom_lifecycle_real_server_plugin_retention_preserves_prepared_and_unseen_queued_work_once
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 3316 filtered out; finished in 4.65s
+

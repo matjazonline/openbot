@@ -108,6 +108,22 @@ struct HttpComponents {
 fn http_state(f: foundation::Foundation, c: HttpComponents) -> anyhow::Result<AppState> {
     let p = f.persistence;
     Ok(AppState {
+        local_machine_connections: Arc::new(
+            crate::adapters::http::routes::local_machine_connection::LocalMachineConnections::new(
+                p.clone(),
+            ),
+        ),
+        local_machines: Arc::new(crate::application::local_agents::LocalMachineUseCases::new(
+            p.clone(),
+            p.clone(),
+            f.config.auth_attempt_secret.clone(),
+        )),
+        local_agents: Arc::new(
+            crate::application::local_agents::management::LocalAgentManagement::new(
+                p.clone(),
+                p.clone(),
+            ),
+        ),
         knowledge: f.knowledge,
         auth_admission: Arc::new(crate::adapters::http::auth_admission::AuthAdmission::from_env()?),
         workflow: c.workflow,

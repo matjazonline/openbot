@@ -113,7 +113,7 @@ impl SampleCapture {
             VersionId::new(Uuid::nil()),
         )
         .map_err(|error| AppError::BadRequest(error.message.to_string()))?;
-        let mut captured = message::message_builtins(target.company)?;
+        let mut captured = step_builtins::dependencies(target.company)?;
         // Samples need the metadata used by their STEP consumers. Unused global
         // message descriptors must not consume the declared agent universe budget.
         captured.snapshots.tools.retain(|tool| {

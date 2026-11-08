@@ -1,0 +1,65 @@
+
+  VITE v8.0.12  ready in 1248 ms
+
+  ➜  Local:   http://127.0.0.1:61571/
+12:08:19 PM [vite] (client) Pre-transform error: [BABEL] /private/tmp/openbot-cloudroom-d8b3cc3/gui/apps/app/src/main.tsx: Cannot find package 'babel-plugin-react-compiler' imported from /private/tmp/openbot-cloudroom-d8b3cc3/gui/babel-virtual-resolve-base.js
+  Plugin: @rolldown/plugin-babel
+  File: /private/tmp/openbot-cloudroom-d8b3cc3/gui/apps/app/src/main.tsx
+12:08:20 PM [vite] (client) [optimizer] bundling dependencies...
+12:08:22 PM [vite] (client) Pre-transform error: [BABEL] /private/tmp/openbot-cloudroom-d8b3cc3/gui/apps/app/src/main.tsx: Cannot find package 'babel-plugin-react-compiler' imported from /private/tmp/openbot-cloudroom-d8b3cc3/gui/babel-virtual-resolve-base.js
+  Plugin: @rolldown/plugin-babel
+  File: /private/tmp/openbot-cloudroom-d8b3cc3/gui/apps/app/src/main.tsx
+12:08:22 PM [vite] Internal server error: [BABEL] /private/tmp/openbot-cloudroom-d8b3cc3/gui/apps/app/src/main.tsx: Cannot find package 'babel-plugin-react-compiler' imported from /private/tmp/openbot-cloudroom-d8b3cc3/gui/babel-virtual-resolve-base.js
+  Plugin: @rolldown/plugin-babel
+  File: /private/tmp/openbot-cloudroom-d8b3cc3/gui/apps/app/src/main.tsx
+      at captureLargerStackTrace (/private/tmp/openbot-cloudroom-d8b3cc3/gui/node_modules/.pnpm/@babel+core@7.29.0/node_modules/@babel/core/src/vendor/import-meta-resolve.js:516:11)
+      at new NodeError (/private/tmp/openbot-cloudroom-d8b3cc3/gui/node_modules/.pnpm/@babel+core@7.29.0/node_modules/@babel/core/src/vendor/import-meta-resolve.js:460:5)
+      at packageResolve (/private/tmp/openbot-cloudroom-d8b3cc3/gui/node_modules/.pnpm/@babel+core@7.29.0/node_modules/@babel/core/src/vendor/import-meta-resolve.js:1970:9)
+      at moduleResolve (/private/tmp/openbot-cloudroom-d8b3cc3/gui/node_modules/.pnpm/@babel+core@7.29.0/node_modules/@babel/core/src/vendor/import-meta-resolve.js:2048:18)
+      at defaultResolve (/private/tmp/openbot-cloudroom-d8b3cc3/gui/node_modules/.pnpm/@babel+core@7.29.0/node_modules/@babel/core/src/vendor/import-meta-resolve.js:2224:15)
+      at resolve (/private/tmp/openbot-cloudroom-d8b3cc3/gui/node_modules/.pnpm/@babel+core@7.29.0/node_modules/@babel/core/src/vendor/import-meta-resolve.js:2262:12)
+      at tryImportMetaResolve (/private/tmp/openbot-cloudroom-d8b3cc3/gui/node_modules/.pnpm/@babel+core@7.29.0/node_modules/@babel/core/src/config/files/plugins.ts:154:51)
+      at resolveStandardizedNameForImport (/private/tmp/openbot-cloudroom-d8b3cc3/gui/node_modules/.pnpm/@babel+core@7.29.0/node_modules/@babel/core/src/config/files/plugins.ts:184:19)
+      at resolvePlugin (/private/tmp/openbot-cloudroom-d8b3cc3/gui/node_modules/.pnpm/@babel+core@7.29.0/node_modules/@babel/core/src/config/files/plugins.ts:200:22)
+      at loadPlugin (/private/tmp/openbot-cloudroom-d8b3cc3/gui/node_modules/.pnpm/@babel+core@7.29.0/node_modules/@babel/core/src/config/files/plugins.ts:38:32)
+      at loadPlugin.next (<anonymous>)
+      at createDescriptor (/private/tmp/openbot-cloudroom-d8b3cc3/gui/node_modules/.pnpm/@babel+core@7.29.0/node_modules/@babel/core/src/config/config-descriptors.ts:325:35)
+      at createDescriptor.next (<anonymous>)
+      at step (/private/tmp/openbot-cloudroom-d8b3cc3/gui/node_modules/.pnpm/gensync@1.0.0-beta.2/node_modules/gensync/index.js:261:32)
+      at evaluateAsync (/private/tmp/openbot-cloudroom-d8b3cc3/gui/node_modules/.pnpm/gensync@1.0.0-beta.2/node_modules/gensync/index.js:291:5)
+      at /private/tmp/openbot-cloudroom-d8b3cc3/gui/node_modules/.pnpm/gensync@1.0.0-beta.2/node_modules/gensync/index.js:44:11
+      at Array.forEach (<anonymous>)
+      at gensync.async (/private/tmp/openbot-cloudroom-d8b3cc3/gui/node_modules/.pnpm/gensync@1.0.0-beta.2/node_modules/gensync/index.js:43:15)
+      at gensync.all (/private/tmp/openbot-cloudroom-d8b3cc3/gui/node_modules/.pnpm/gensync@1.0.0-beta.2/node_modules/gensync/index.js:216:13)
+      at Generator.next (<anonymous>)
+      at createDescriptors (/private/tmp/openbot-cloudroom-d8b3cc3/gui/node_modules/.pnpm/@babel+core@7.29.0/node_modules/@babel/core/src/config/config-descriptors.ts:266:38)
+      at createDescriptors.next (<anonymous>)
+      at createPluginDescriptors (/private/tmp/openbot-cloudroom-d8b3cc3/gui/node_modules/.pnpm/@babel+core@7.29.0/node_modules/@babel/core/src/config/config-descriptors.ts:254:17)
+      at createPluginDescriptors.next (<anonymous>)
+      at <anonymous> (/private/tmp/openbot-cloudroom-d8b3cc3/gui/node_modules/.pnpm/@babel+core@7.29.0/node_modules/@babel/core/src/gensync-utils/functional.ts:30:46)
+      at Generator.next (<anonymous>)
+      at mergeChainOpts (/private/tmp/openbot-cloudroom-d8b3cc3/gui/node_modules/.pnpm/@babel+core@7.29.0/node_modules/@babel/core/src/config/config-chain.ts:726:34)
+      at mergeChainOpts.next (<anonymous>)
+      at chainWalker (/private/tmp/openbot-cloudroom-d8b3cc3/gui/node_modules/.pnpm/@babel+core@7.29.0/node_modules/@babel/core/src/config/config-chain.ts:663:14)
+      at chainWalker.next (<anonymous>)
+      at buildPresetChain (/private/tmp/openbot-cloudroom-d8b3cc3/gui/node_modules/.pnpm/@babel+core@7.29.0/node_modules/@babel/core/src/config/config-chain.ts:75:24)
+      at buildPresetChain.next (<anonymous>)
+      at loadPresetDescriptor (/private/tmp/openbot-cloudroom-d8b3cc3/gui/node_modules/.pnpm/@babel+core@7.29.0/node_modules/@babel/core/src/config/full.ts:487:35)
+      at loadPresetDescriptor.next (<anonymous>)
+      at recursePresetDescriptors (/private/tmp/openbot-cloudroom-d8b3cc3/gui/node_modules/.pnpm/@babel+core@7.29.0/node_modules/@babel/core/src/config/full.ts:118:33)
+      at recursePresetDescriptors.next (<anonymous>)
+      at <anonymous> (/private/tmp/openbot-cloudroom-d8b3cc3/gui/node_modules/.pnpm/@babel+core@7.29.0/node_modules/@babel/core/src/config/full.ts:224:21)
+      at Generator.next (<anonymous>)
+      at loadFullConfig (/private/tmp/openbot-cloudroom-d8b3cc3/gui/node_modules/.pnpm/@babel+core@7.29.0/node_modules/@babel/core/src/config/full.ts:166:4)
+      at loadFullConfig.next (<anonymous>)
+      at loadOptionsImpl (/private/tmp/openbot-cloudroom-d8b3cc3/gui/node_modules/.pnpm/@babel+core@7.29.0/node_modules/@babel/core/src/config/index.ts:78:39)
+      at loadOptionsImpl.next (<anonymous>)
+      at step (/private/tmp/openbot-cloudroom-d8b3cc3/gui/node_modules/.pnpm/gensync@1.0.0-beta.2/node_modules/gensync/index.js:269:25)
+      at /private/tmp/openbot-cloudroom-d8b3cc3/gui/node_modules/.pnpm/gensync@1.0.0-beta.2/node_modules/gensync/index.js:273:13
+      at async.call.result.err.err (/private/tmp/openbot-cloudroom-d8b3cc3/gui/node_modules/.pnpm/gensync@1.0.0-beta.2/node_modules/gensync/index.js:223:11)
+      at /private/tmp/openbot-cloudroom-d8b3cc3/gui/node_modules/.pnpm/gensync@1.0.0-beta.2/node_modules/gensync/index.js:189:28
+      at <anonymous> (/private/tmp/openbot-cloudroom-d8b3cc3/gui/node_modules/.pnpm/@babel+core@7.29.0/node_modules/@babel/core/src/gensync-utils/async.ts:90:7)
+      at /private/tmp/openbot-cloudroom-d8b3cc3/gui/node_modules/.pnpm/gensync@1.0.0-beta.2/node_modules/gensync/index.js:113:33
+      at step (/private/tmp/openbot-cloudroom-d8b3cc3/gui/node_modules/.pnpm/gensync@1.0.0-beta.2/node_modules/gensync/index.js:287:14)
+      at /private/tmp/openbot-cloudroom-d8b3cc3/gui/node_modules/.pnpm/gensync@1.0.0-beta.2/node_modules/gensync/index.js:273:13
+      at async.call.result.err.err (/private/tmp/openbot-cloudroom-d8b3cc3/gui/node_modules/.pnpm/gensync@1.0.0-beta.2/node_modules/gensync/index.js:223:11)

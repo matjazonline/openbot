@@ -66,6 +66,12 @@ pub(super) async fn check_readiness(
     let definition = configuration.bundle.compiled().graph().definition();
     for tool in &configuration.bundle.snapshots().tools {
         let slot = match tool.kind() {
+            ToolKind::LocalAgent => {
+                if !crate::application::local_agents::workflow::is_trusted_snapshot(tool)? {
+                    return Err(missing());
+                }
+                continue;
+            }
             ToolKind::Message => {
                 authority::builtin_message_tool(tool)?;
                 continue;

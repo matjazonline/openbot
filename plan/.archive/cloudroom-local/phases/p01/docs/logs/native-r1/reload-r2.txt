@@ -1,0 +1,4 @@
+openbot-compatibility-probe@0.1.0  running
+  source: path:/Users/mac03/dev/openbot/integrations/cloudroom-plugin/compatibility/probe
+  service openbot-proof: running
+  command: room-cli openbot-proof — Disposable, non-inference public SDK compatibility checks

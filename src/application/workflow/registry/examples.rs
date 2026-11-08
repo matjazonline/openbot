@@ -100,6 +100,9 @@ fn values(name: &str) -> Value {
         "agent.run" => {
             json!({"agent":"assistant","context":{"message":"hello"},"output_schema":schema})
         }
+        "local_agent.run" => {
+            json!({"profile_id":"00000000-0000-0000-0000-000000000006","prompt":"Inspect the selected local project and summarize its current state."})
+        }
         "decision.rule" => json!({"data":"review","data_schema":schema}),
         "decision.human" => {
             json!({"proposal":{"summary":"review"},"reviewers":[{"kind":"user","id":"00000000-0000-0000-0000-000000000006"}],"deadline":deadline,"data_schema":schema,"feedback_required":["revise"]})

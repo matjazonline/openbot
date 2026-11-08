@@ -1,0 +1,35 @@
+{
+  "threadId": "thr_3f7ej72rxx",
+  "ok": true,
+  "delivery": "queued",
+  "queuedMessage": {
+    "id": "qmsg_2avsxebf2f",
+    "initiator": "user",
+    "senderThreadId": null,
+    "threadId": "thr_3f7ej72rxx",
+    "content": [
+      {
+        "type": "text",
+        "text": "Reply exactly OPENBOT_HUMAN_SMOKE_84f0c0890e653205d8a964b5 without using tools or changing files.",
+        "mentions": []
+      }
+    ],
+    "model": "gpt-6-luna",
+    "reasoningLevel": "medium",
+    "permissionMode": "accept-edits",
+    "serviceTier": "default",
+    "hardQueue": false,
+    "sendAt": null,
+    "waitingOn": {
+      "kind": "thread-busy"
+    },
+    "failureReason": null,
+    "payload": {
+      "kind": "inline"
+    },
+    "editable": true,
+    "createdAt": 1794081264324,
+    "updatedAt": 1794081264324
+  },
+  "mode": "queue"
+}

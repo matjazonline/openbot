@@ -1,0 +1,8 @@
+npm warn install-scripts .npmrc allow-scripts setting is being ignored because package.json declares its own allowScripts field
+
+added 4 packages, and audited 5 packages in 3s
+
+1 package is looking for funding
+  run `npm fund` for details
+
+found 0 vulnerabilities

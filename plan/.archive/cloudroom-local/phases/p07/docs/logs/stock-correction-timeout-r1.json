@@ -1,0 +1,8 @@
+{
+  "status": "FAIL",
+  "failure": "verification_supervisor_timeout",
+  "timeoutSeconds": 1800,
+  "finalTestVerdict": "NOT AVAILABLE",
+  "outputFile": "stock-correction-full-r1.txt",
+  "supersededBy": "streamed fresh-database stock rerun; same2MiB/per-test bounds,3600s outer watchdog"
+}

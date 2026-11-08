@@ -1,0 +1,23 @@
+
+> @get-bb/plugin-sdk@0.6.50 build:types /private/tmp/openbot-cloudroom-d8b3cc3/gui/packages/plugin-sdk
+> node scripts/build-bundled-dts.mjs
+
+Unchanged bundled-types/bb-plugin-sdk.d.ts
+Unchanged bundled-types/bb-plugin-sdk-provider-bridge.d.ts
+Unchanged bundled-types/bb-plugin-sdk-ai-services.d.ts
+Unchanged bundled-types/bb-plugin-sdk-provider-bridge-testing.d.ts
+Unchanged bundled-types/bb-plugin-sdk-provider-bridge-acp.d.ts
+Unchanged bundled-types/bb-plugin-sdk-environment-provider.d.ts
+Unchanged bundled-types/bb-plugin-sdk-machine-provider.d.ts
+Unchanged bundled-types/bb-plugin-sdk-app.d.ts
+Unchanged bundled-types/bb-plugin-sdk-host.d.ts
+Unchanged bundled-types/bb-plugin-sdk-internal-composer-customization-validation.d.ts
+Unchanged bundled-types/bb-plugin-sdk-internal-composer-handle.d.ts
+Unchanged bundled-types/bb-plugin-sdk-internal-composer-view.d.ts
+Unchanged bundled-types/bb-plugin-sdk-internal-file-navigation-validation.d.ts
+Unchanged bundled-types/bb-plugin-sdk-internal-command-guard.d.ts
+Unchanged bundled-types/bb-plugin-sdk-internal-host-policy.d.ts
+Unchanged bundled-types/bb-plugin-sdk-internal-plugin-app-collector.d.ts
+Unchanged bundled-types/bb-plugin-sdk-testing.d.ts
+Unchanged bundled-types/bb-plugin-sdk-testing-app.d.ts
+Unchanged bundled-types/bb-plugin-sdk-testing-host.d.ts

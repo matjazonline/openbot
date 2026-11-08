@@ -1,0 +1,12 @@
+{
+  "status": "PASS",
+  "command": [
+    "npm",
+    "--prefix",
+    "/private/var/folders/n2/5y7x75r92zl0ll90154hxdzr0000gn/T/openbot-cloudroom-p07-final-package-uuw4ohc8",
+    "ci",
+    "--omit=dev"
+  ],
+  "comparison": "Same archive/directory as initial failed invocation; only canonical realpath prefix differs",
+  "sourceChanged": false
+}

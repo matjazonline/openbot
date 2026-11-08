@@ -1,0 +1,719 @@
+--- a/integrations/cloudroom-plugin/compatibility/verify-command-wire.mjs
++++ b/integrations/cloudroom-plugin/compatibility/verify-command-wire.mjs
+@@ -0,0 +1,27 @@
++// Cross-language contract proof. Input comes from actual Rust typed serialization.
++import assert from "node:assert/strict";
++import { createHash } from "node:crypto";
++import { readFileSync } from "node:fs";
++
++const digest = (command, deadline) => createHash("sha256")
++  .update(JSON.stringify([command, deadline]), "utf8").digest("hex");
++const fixtures = JSON.parse(readFileSync(0, "utf8"));
++assert.equal(fixtures.length, 6);
++assert.deepEqual(new Set(fixtures.map(({ command }) => command.kind)),
++  new Set(["create", "send", "inspect", "stop_thread", "archive_thread", "refresh_catalog"]));
++for (const operation of fixtures) {
++  const { command, deadline, payload_digest } = operation;
++  assert.match(deadline, /\.123456Z$/);
++  assert.equal(digest(command, deadline), payload_digest, `${command.kind}: preserve exact deadline string`);
++  assert.notEqual(digest(command, new Date(deadline).toISOString()), payload_digest,
++    `${command.kind}: Date round trip must demonstrate microsecond loss`);
++  assert.notEqual(digest({ ...command, kind: "changed" }, deadline), payload_digest,
++    `${command.kind}: changed command is rejected`);
++  assert.notEqual(digest(command, deadline.replace("123456", "123457")), payload_digest,
++    `${command.kind}: changed deadline is rejected`);
++  if (command.prompt !== undefined) {
++    assert(command.prompt.includes("é😀\n\t\r\"\\\u0001"));
++    assert.notEqual(digest({ ...command, prompt: `${command.prompt}!` }, deadline), payload_digest);
++  }
++}
++process.stdout.write("PASS Rust→Node command hashes: all 6 kinds, exact microseconds, escaping/Unicode, tampering and lossy Date negatives\n");
+--- a/src/adapters/http/routes/local_machine_connection/connection_recovery_tests.rs
++++ b/src/adapters/http/routes/local_machine_connection/connection_recovery_tests.rs
+@@ -0,0 +1,66 @@
++use super::*;
++
++#[tokio::test]
++async fn cloudroom_connection_uncertain_reconnect_withholds_new_effect_until_reconciled() {
++    let Some(c) = Context::new().await else {
++        return;
++    };
++    let server = Server::start(c.f.persistence.clone()).await;
++    let mut first = Peer::initialize(socket(&server, &c).await, &c, 2).await;
++    assert!(first.ready().await);
++    let operation =
++        c.f.persistence
++            .enqueue_operation(&c.admission(c.send()))
++            .await
++            .unwrap();
++    assert_eq!(
++        first.command(operation.id()).await.mode,
++        DeliveryMode::Dispatch
++    );
++    for evidence in [
++        LocalEvidence::Receipt {},
++        LocalEvidence::SubmissionIntent {},
++        LocalEvidence::Uncertain {},
++    ] {
++        first
++            .observe(agent(first.sequence + 1, operation.id(), evidence))
++            .await;
++    }
++    let sequence = first.sequence;
++    let queued =
++        c.f.persistence
++            .enqueue_operation(&c.admission(c.send()))
++            .await
++            .unwrap();
++    drop(first);
++    let mut next = Peer::initialize(socket(&server, &c).await, &c, sequence).await;
++    assert!(
++        !next.ready().await,
++        "an ended server wait does not prove native work settled"
++    );
++    let recovery = next.command(operation.id()).await;
++    assert_eq!(recovery.mode, DeliveryMode::Reconcile);
++    assert_eq!(
++        recovery.operation.outcome(),
++        Some(OperationOutcome::Uncertain)
++    );
++    let attempted: bool = sqlx::query_scalar("SELECT delivery_attempted_at IS NOT NULL FROM local_agent_operations WHERE company_id=$1 AND id=$2")
++        .bind(c.f.company).bind(queued.id().as_uuid()).fetch_one(&c.f.database.pool).await.unwrap();
++    assert!(
++        !attempted,
++        "new effect must remain untouched until current-generation recovery"
++    );
++    next.observe(
++        crate::adapters::persistence::local_agents::protocol_test_support::turn(
++            next.sequence + 1,
++            operation.id(),
++            "turn_ws_recovered",
++            TurnState::Completed,
++            Some("recovered through actual WebSocket"),
++        ),
++    )
++    .await;
++    assert!(next.ready().await);
++    assert_eq!(next.command(queued.id()).await.mode, DeliveryMode::Dispatch);
++    server.close().await;
++}
+--- a/src/adapters/http/routes/local_machine_connection/connection_tests.rs
++++ b/src/adapters/http/routes/local_machine_connection/connection_tests.rs
+@@ -16,6 +16,9 @@
+     WebSocketStream,
+     tungstenite::{Message, client::IntoClientRequest},
+ };
++
++#[path = "connection_recovery_tests.rs"]
++mod recovery;
+ 
+ #[path = "connection_failure_tests.rs"]
+ mod failures;
+--- a/src/adapters/persistence/local_agents/protocol/capacity_tests.rs
++++ b/src/adapters/persistence/local_agents/protocol/capacity_tests.rs
+@@ -145,9 +145,22 @@
+     let counts = capacity(&mut tx, c.f.company, c.paired.receipt.machine.id)
+         .await
+         .unwrap();
++    let row: OperationDb = sqlx::query_as(&format!(
++        "SELECT {} FROM local_agent_operations WHERE company_id=$1 AND id=$2",
++        operation_columns()
++    ))
++    .bind(c.f.company)
++    .bind(operation.id().as_uuid())
++    .fetch_one(&mut *tx)
++    .await
++    .unwrap();
+     let known_terminal = matches!(state, Some("completed" | "failed" | "stopped"));
+     let outstanding = outcome.is_none()
+         || (outcome == Some("uncertain") && command.is_effect() && !known_terminal);
++    assert_eq!(
++        row.outstanding, outstanding,
++        "derived delivery/Ready state agrees"
++    );
+     assert_eq!(
+         counts.queued,
+         i64::from(outstanding),
+--- a/src/adapters/persistence/local_agents/protocol/commands.rs
++++ b/src/adapters/persistence/local_agents/protocol/commands.rs
+@@ -127,7 +127,7 @@
+     )
+     .await?;
+     let machine = lock_machine(&mut tx, admission.company_id, admission.machine_id).await?;
+-    let existing=sqlx::query_as::<_,OperationDb>(&format!("SELECT {OPERATION_COLUMNS} FROM local_agent_operations WHERE company_id=$1 AND machine_id=$2 AND logical_key=$3"))
++    let existing=sqlx::query_as::<_,OperationDb>(&format!("SELECT {} FROM local_agent_operations WHERE company_id=$1 AND machine_id=$2 AND logical_key=$3", operation_columns()))
+         .bind(admission.company_id).bind(admission.machine_id.as_uuid()).bind(admission.logical_key.as_str()).fetch_optional(&mut *tx).await?;
+     if let Some(existing) = existing {
+         let original = existing.operation()?;
+@@ -182,8 +182,8 @@
+     if current.journal_generation != fence.generation.get() as i64 {
+         return Err(AppError::InvalidCredentials);
+     }
+-    let candidates:Vec<Uuid>=sqlx::query_scalar("SELECT id FROM local_agent_operations WHERE company_id=$1 AND machine_id=$2 AND outcome IS NULL \
+-        AND (delivery_attempted_at IS NULL OR last_observed_generation<>$3) ORDER BY delivery_attempted_at NULLS LAST,created_at,id LIMIT 8")
++    let candidates:Vec<Uuid>=sqlx::query_scalar(&format!("SELECT id FROM local_agent_operations WHERE company_id=$1 AND machine_id=$2 AND {OUTSTANDING_OPERATION_SQL} \
++        AND (delivery_attempted_at IS NULL OR last_observed_generation<>$3) ORDER BY delivery_attempted_at NULLS LAST,created_at,id LIMIT 8"))
+         .bind(fence.machine.company_id).bind(fence.machine.machine_id.as_uuid()).bind(fence.generation.get() as i64).fetch_all(&mut *tx).await?;
+     tx.commit().await?;
+     let mut deliveries = Vec::new();
+@@ -201,8 +201,16 @@
+     id: Uuid,
+ ) -> AppResult<Option<CommandDelivery>> {
+     let mut tx = begin(&p.pool).await?;
+-    let snapshot=sqlx::query_as::<_,OperationDb>(&format!("SELECT {OPERATION_COLUMNS} FROM local_agent_operations WHERE company_id=$1 AND machine_id=$2 AND id=$3"))
+-        .bind(fence.machine.company_id).bind(fence.machine.machine_id.as_uuid()).bind(id).fetch_optional(&mut *tx).await?.ok_or_else(missing)?;
++    let snapshot = sqlx::query_as::<_, OperationDb>(&format!(
++        "SELECT {} FROM local_agent_operations WHERE company_id=$1 AND machine_id=$2 AND id=$3",
++        operation_columns()
++    ))
++    .bind(fence.machine.company_id)
++    .bind(fence.machine.machine_id.as_uuid())
++    .bind(id)
++    .fetch_optional(&mut *tx)
++    .await?
++    .ok_or_else(missing)?;
+     let operation = snapshot.operation()?;
+     let authority = match snapshot.actor_id {
+         Some(actor) => match authorize(&mut tx, fence.machine.company_id, actor).await {
+@@ -236,8 +244,14 @@
+     if row.journal_generation != fence.generation.get() as i64 {
+         return Err(AppError::InvalidCredentials);
+     }
+-    let current=sqlx::query_as::<_,OperationDb>(&format!("SELECT {OPERATION_COLUMNS} FROM local_agent_operations WHERE company_id=$1 AND id=$2 FOR UPDATE"))
+-        .bind(fence.machine.company_id).bind(id).fetch_one(&mut *tx).await?;
++    let current = sqlx::query_as::<_, OperationDb>(&format!(
++        "SELECT {} FROM local_agent_operations WHERE company_id=$1 AND id=$2 FOR UPDATE",
++        operation_columns()
++    ))
++    .bind(fence.machine.company_id)
++    .bind(id)
++    .fetch_one(&mut *tx)
++    .await?;
+     let result = prepare_locked(&mut tx, fence, &row, &current, authority).await?;
+     commit_cursor(&mut tx, fence, row.acknowledged_sequence as u64).await?;
+     tx.commit().await?;
+@@ -251,7 +265,7 @@
+     row: &OperationDb,
+     authority: AppResult<()>,
+ ) -> AppResult<Option<CommandDelivery>> {
+-    if row.outcome.is_some() {
++    if !row.outstanding {
+         return Ok(None);
+     }
+     let operation = row.operation()?;
+--- a/src/adapters/persistence/local_agents/protocol/mod.rs
++++ b/src/adapters/persistence/local_agents/protocol/mod.rs
+@@ -55,9 +55,19 @@
+     session_id: Option<Uuid>,
+     actor_id: Option<Uuid>,
+     delivery_attempted_at: Option<DateTime<Utc>>,
+-}
+-const OPERATION_COLUMNS: &str =
+-    "id,command,deadline,payload_digest,dispatch,outcome,session_id,actor_id,delivery_attempted_at";
++    outstanding: bool,
++}
++// A server wait can end while native work remains physically unsettled. Every
++// queue, reconnect barrier and delivery read uses this same definition.
++const OUTSTANDING_OPERATION_SQL: &str = "(outcome IS NULL OR (outcome='uncertain' AND \
++    command->>'kind' IN ('create','send') AND COALESCE(observed_turn_state NOT IN ('completed','failed','stopped'),true)))";
++
++fn operation_columns() -> String {
++    format!(
++        "id,command,deadline,payload_digest,dispatch,outcome,session_id,actor_id,delivery_attempted_at, \
++        {OUTSTANDING_OPERATION_SQL} AS outstanding"
++    )
++}
+ impl OperationDb {
+     fn operation(&self) -> AppResult<LocalAgentOperation> {
+         let operation: LocalAgentOperation = decode(
+@@ -100,9 +110,8 @@
+ }
+ 
+ async fn capacity(db: &mut PgConnection, company: Uuid, machine: MachineId) -> AppResult<Capacity> {
+-    sqlx::query_as("SELECT count(*) FILTER(WHERE command->>'kind' IN ('create','send')) AS unsettled,count(*) AS queued \
+-        FROM local_agent_operations WHERE company_id=$1 AND machine_id=$2 AND (outcome IS NULL OR \
+-        (outcome='uncertain' AND command->>'kind' IN ('create','send') AND COALESCE(observed_turn_state NOT IN ('completed','failed','stopped'),true)))")
++    sqlx::query_as(&format!("SELECT count(*) FILTER(WHERE command->>'kind' IN ('create','send')) AS unsettled,count(*) AS queued \
++        FROM local_agent_operations WHERE company_id=$1 AND machine_id=$2 AND {OUTSTANDING_OPERATION_SQL}"))
+         .bind(company).bind(machine.as_uuid()).fetch_one(db).await.map_err(Into::into)
+ }
+ 
+@@ -166,8 +175,8 @@
+         if row.journal_id.is_none() || row.journal_generation != fence.generation.get() as i64 {
+             return Err(AppError::InvalidCredentials);
+         }
+-        let outstanding:bool=sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM local_agent_operations WHERE company_id=$1 AND machine_id=$2 AND outcome IS NULL \
+-            AND delivery_attempted_at IS NOT NULL AND last_observed_generation<>$3)")
++        let outstanding:bool=sqlx::query_scalar(&format!("SELECT EXISTS(SELECT 1 FROM local_agent_operations WHERE company_id=$1 AND machine_id=$2 AND {OUTSTANDING_OPERATION_SQL} \
++            AND delivery_attempted_at IS NOT NULL AND last_observed_generation<>$3)"))
+             .bind(fence.machine.company_id).bind(fence.machine.machine_id.as_uuid()).bind(fence.generation.get() as i64).fetch_one(&mut *tx).await?;
+         if !outstanding {
+             sqlx::query(
+@@ -224,6 +233,8 @@
+ mod observations;
+ #[cfg(test)]
+ mod operation_record_tests;
++#[cfg(test)]
++mod recovery_tests;
+ #[cfg(test)]
+ pub(crate) mod test_support;
+ 
+--- a/src/adapters/persistence/local_agents/protocol/observations.rs
++++ b/src/adapters/persistence/local_agents/protocol/observations.rs
+@@ -54,7 +54,7 @@
+     if sequence != acknowledged + 1 {
+         return Err(AppError::Conflict("journal sequence gap".into()));
+     }
+-    let row=sqlx::query_as::<_,OperationDb>(&format!("SELECT {OPERATION_COLUMNS} FROM local_agent_operations WHERE company_id=$1 AND machine_id=$2 AND installation_id=$3 AND id=$4 FOR UPDATE"))
++    let row=sqlx::query_as::<_,OperationDb>(&format!("SELECT {} FROM local_agent_operations WHERE company_id=$1 AND machine_id=$2 AND installation_id=$3 AND id=$4 FOR UPDATE", operation_columns()))
+         .bind(fence.machine.company_id).bind(fence.machine.machine_id.as_uuid()).bind(fence.machine.installation_id.as_uuid()).bind(operation.as_uuid())
+         .fetch_optional(&mut *tx).await?.ok_or_else(missing)?;
+     if row.delivery_attempted_at.is_none() {
+@@ -179,12 +179,12 @@
+             }
+         }
+         LocalEvidence::Refused { reason } => {
+-            if matches!(
++            if !matches!(
+                 mutation.dispatch,
+-                DispatchEvidence::NativeIdentity { .. } | DispatchEvidence::CatalogSnapshot { .. }
++                DispatchEvidence::NotDispatched {} | DispatchEvidence::AcceptedLocally { .. }
+             ) {
+                 return Err(AppError::BadRequest(
+-                    "native observation cannot become pre-dispatch refusal".into(),
++                    "possible SDK submission cannot become pre-dispatch refusal".into(),
+                 ));
+             }
+             mutation.definitive_refusal = true;
+--- a/src/adapters/persistence/local_agents/protocol/operation_record_tests.rs
++++ b/src/adapters/persistence/local_agents/protocol/operation_record_tests.rs
+@@ -8,6 +8,7 @@
+     let command = c.send();
+     let operation = c.admission(command.clone()).operation;
+     let record = OperationDb {
++        outstanding: true,
+         id: operation.id().as_uuid(),
+         command: encode(&command).unwrap(),
+         deadline: operation.deadline(),
+--- a/src/adapters/persistence/local_agents/protocol/recovery_tests.rs
++++ b/src/adapters/persistence/local_agents/protocol/recovery_tests.rs
+@@ -0,0 +1,325 @@
++use super::{test_support::*, *};
++
++#[derive(Clone, Copy)]
++enum Uncertainty {
++    Peer,
++    Deadline,
++}
++
++async fn expire(c: &Context, operation: &LocalAgentOperation) {
++    let wait = operation
++        .deadline()
++        .signed_duration_since(Utc::now())
++        .to_std()
++        .unwrap_or_default()
++        + std::time::Duration::from_millis(30);
++    tokio::time::sleep(wait).await;
++    assert_eq!(c.f.persistence.expire_operations(100).await.unwrap(), 1);
++}
++
++async fn admission(c: &Context, source: Uncertainty) -> LocalAgentOperation {
++    let mut request = c.admission(c.send());
++    if matches!(source, Uncertainty::Deadline) {
++        request.operation = LocalAgentOperation::queued(
++            request.operation.id(),
++            c.send(),
++            Utc::now() + chrono::Duration::seconds(2),
++        )
++        .unwrap();
++    }
++    let operation = c.f.persistence.enqueue_operation(&request).await.unwrap();
++    assert!(
++        c.f.persistence
++            .pending_commands(c.fence)
++            .await
++            .unwrap()
++            .iter()
++            .any(|d| d.operation.id() == operation.id())
++    );
++    for observation in [
++        agent(3, operation.id(), LocalEvidence::Receipt {}),
++        agent(4, operation.id(), LocalEvidence::SubmissionIntent {}),
++    ] {
++        c.f.persistence
++            .accept_observation(c.fence, &observation)
++            .await
++            .unwrap();
++    }
++    operation
++}
++
++async fn reconnect_uncertain(source: Uncertainty) {
++    let Some(c) = Context::new().await else {
++        return;
++    };
++    let operation = admission(&c, source).await;
++    let sequence = match source {
++        Uncertainty::Peer => {
++            c.f.persistence
++                .accept_observation(
++                    c.fence,
++                    &agent(5, operation.id(), LocalEvidence::Uncertain {}),
++                )
++                .await
++                .unwrap()
++        }
++        Uncertainty::Deadline => {
++            expire(&c, &operation).await;
++            4
++        }
++    };
++    let untouched =
++        c.f.persistence
++            .enqueue_operation(&c.admission(c.send()))
++            .await
++            .unwrap();
++    let (next, welcome) = c.reconnect(c.journal, sequence).await;
++    assert!(!welcome.recovery_required);
++    assert!(!c.f.persistence.finish_reconciliation(next).await.unwrap());
++    let deliveries = c.f.persistence.pending_commands(next).await.unwrap();
++    assert_eq!(
++        deliveries.len(),
++        1,
++        "no untouched effects or reads cross the recovery barrier"
++    );
++    assert_eq!(deliveries[0].operation.id(), operation.id());
++    assert_eq!(deliveries[0].mode, DeliveryMode::Reconcile);
++    assert_eq!(
++        deliveries[0].operation.outcome(),
++        Some(OperationOutcome::Uncertain)
++    );
++    let attempted: bool = sqlx::query_scalar("SELECT delivery_attempted_at IS NOT NULL FROM local_agent_operations WHERE company_id=$1 AND id=$2")
++        .bind(c.f.company).bind(untouched.id().as_uuid()).fetch_one(&c.f.database.pool).await.unwrap();
++    assert!(!attempted);
++    let done = sequence + 1;
++    accept_recovered(&c, next, &operation, source, done).await;
++    assert_next_generation(&c, operation.id(), untouched.id(), done).await;
++}
++
++async fn accept_recovered(
++    c: &Context,
++    next: ConnectionFence,
++    operation: &LocalAgentOperation,
++    source: Uncertainty,
++    done: u64,
++) {
++    c.f.persistence
++        .accept_observation(
++            next,
++            &turn(
++                done,
++                operation.id(),
++                "turn_recovered",
++                TurnState::Completed,
++                Some("recovered result"),
++            ),
++        )
++        .await
++        .unwrap();
++    assert!(c.f.persistence.finish_reconciliation(next).await.unwrap());
++    let saved: (String, String, String) = sqlx::query_as("SELECT outcome,observed_turn_state,output FROM local_agent_operations WHERE company_id=$1 AND id=$2")
++        .bind(c.f.company).bind(operation.id().as_uuid()).fetch_one(&c.f.database.pool).await.unwrap();
++    let outcome = match source {
++        Uncertainty::Peer => "succeeded",
++        Uncertainty::Deadline => "uncertain",
++    };
++    assert_eq!(
++        saved,
++        (
++            outcome.into(),
++            "completed".into(),
++            "recovered result".into()
++        )
++    );
++    let mut db = c.f.database.pool.acquire().await.unwrap();
++    assert_eq!(
++        capacity(&mut db, c.f.company, c.paired.receipt.machine.id)
++            .await
++            .unwrap()
++            .unsettled,
++        1,
++        "only the untouched effect occupies native capacity"
++    );
++}
++
++async fn assert_next_generation(
++    c: &Context,
++    recovered: OperationId,
++    untouched: OperationId,
++    done: u64,
++) {
++    let (again, _) = c.reconnect(c.journal, done).await;
++    assert!(
++        c.f.persistence.finish_reconciliation(again).await.unwrap(),
++        "known native completion must not block the next generation"
++    );
++    let deliveries = c.f.persistence.pending_commands(again).await.unwrap();
++    assert!(!deliveries.iter().any(|d| d.operation.id() == recovered));
++    assert!(
++        deliveries
++            .iter()
++            .any(|d| d.operation.id() == untouched && d.mode == DeliveryMode::Dispatch)
++    );
++}
++
++#[tokio::test]
++async fn cloudroom_commands_expired_uncertain_work_reconciles_before_new_effects() {
++    reconnect_uncertain(Uncertainty::Deadline).await;
++}
++
++#[tokio::test]
++async fn cloudroom_commands_explicit_uncertainty_reconciles_before_new_effects() {
++    reconnect_uncertain(Uncertainty::Peer).await;
++}
++
++fn refusals() -> [LocalRefusal; 7] {
++    [
++        LocalRefusal::ProjectUnavailable,
++        LocalRefusal::ProviderUnavailable,
++        LocalRefusal::ModelUnavailable,
++        LocalRefusal::ReasoningUnavailable,
++        LocalRefusal::Capacity,
++        LocalRefusal::Expired,
++        LocalRefusal::RecoveryRequired,
++    ]
++}
++
++async fn state(c: &Context, id: OperationId) -> Value {
++    sqlx::query_scalar("SELECT jsonb_build_object('operation',to_jsonb(operation),'cursor',machine.acknowledged_sequence,'inbox',(SELECT count(*) FROM local_agent_observations WHERE company_id=$1)) FROM local_agent_operations AS operation JOIN local_machines AS machine ON machine.company_id=operation.company_id AND machine.id=operation.machine_id WHERE operation.company_id=$1 AND operation.id=$2")
++        .bind(c.f.company).bind(id.as_uuid()).fetch_one(&c.f.database.pool).await.unwrap()
++}
++
++async fn reject_after_intent(c: &Context, operation: &LocalAgentOperation, sequence: u64) {
++    let before = state(c, operation.id()).await;
++    for reason in refusals() {
++        let rejected = agent(sequence, operation.id(), LocalEvidence::Refused { reason });
++        assert!(
++            matches!(
++                c.f.persistence.accept_observation(c.fence, &rejected).await,
++                Err(AppError::BadRequest(_))
++            ),
++            "post-entry refusal {reason:?} cannot establish nonexecution"
++        );
++        assert_eq!(
++            state(c, operation.id()).await,
++            before,
++            "refusal must not advance the inbox/cursor or mutate the operation"
++        );
++        let mut db = c.f.database.pool.acquire().await.unwrap();
++        assert_eq!(
++            capacity(&mut db, c.f.company, c.paired.receipt.machine.id)
++                .await
++                .unwrap()
++                .unsettled,
++            1
++        );
++    }
++    c.f.persistence
++        .accept_observation(
++            c.fence,
++            &turn(
++                sequence,
++                operation.id(),
++                "turn_valid_after_refusal",
++                TurnState::Completed,
++                Some("valid native result"),
++            ),
++        )
++        .await
++        .unwrap();
++    let mut db = c.f.database.pool.acquire().await.unwrap();
++    assert_eq!(
++        capacity(&mut db, c.f.company, c.paired.receipt.machine.id)
++            .await
++            .unwrap()
++            .unsettled,
++        0
++    );
++}
++
++#[tokio::test]
++async fn cloudroom_observations_every_preflight_refusal_rejects_after_possible_submission() {
++    let Some(c) = Context::new().await else {
++        return;
++    };
++    let operation = admission(&c, Uncertainty::Peer).await;
++    reject_after_intent(&c, &operation, 5).await;
++}
++
++#[tokio::test]
++async fn cloudroom_observations_every_preflight_refusal_preserves_explicit_uncertainty() {
++    let Some(c) = Context::new().await else {
++        return;
++    };
++    let operation = admission(&c, Uncertainty::Peer).await;
++    c.f.persistence
++        .accept_observation(
++            c.fence,
++            &agent(5, operation.id(), LocalEvidence::Uncertain {}),
++        )
++        .await
++        .unwrap();
++    reject_after_intent(&c, &operation, 6).await;
++}
++
++#[tokio::test]
++async fn cloudroom_observations_every_preflight_refusal_preserves_expired_uncertainty() {
++    let Some(c) = Context::new().await else {
++        return;
++    };
++    let operation = admission(&c, Uncertainty::Deadline).await;
++    expire(&c, &operation).await;
++    reject_after_intent(&c, &operation, 5).await;
++    let saved = state(&c, operation.id()).await;
++    assert_eq!(saved["operation"]["outcome"], "uncertain");
++    assert_eq!(saved["operation"]["observed_turn_state"], "completed");
++}
++
++#[tokio::test]
++async fn cloudroom_observations_preflight_refusals_before_intent_are_definitive() {
++    let Some(c) = Context::new().await else {
++        return;
++    };
++    let mut sequence = 2;
++    for reason in refusals() {
++        let operation =
++            c.f.persistence
++                .enqueue_operation(&c.admission(c.send()))
++                .await
++                .unwrap();
++        c.f.persistence.pending_commands(c.fence).await.unwrap();
++        sequence += 1;
++        c.f.persistence
++            .accept_observation(
++                c.fence,
++                &agent(sequence, operation.id(), LocalEvidence::Receipt {}),
++            )
++            .await
++            .unwrap();
++        sequence += 1;
++        c.f.persistence
++            .accept_observation(
++                c.fence,
++                &agent(sequence, operation.id(), LocalEvidence::Refused { reason }),
++            )
++            .await
++            .unwrap();
++        let saved = state(&c, operation.id()).await;
++        assert_eq!(
++            saved["operation"]["outcome"],
++            if reason == LocalRefusal::Expired {
++                "expired"
++            } else {
++                "failed"
++            }
++        );
++        let mut db = c.f.database.pool.acquire().await.unwrap();
++        assert_eq!(
++            capacity(&mut db, c.f.company, c.paired.receipt.machine.id)
++                .await
++                .unwrap()
++                .unsettled,
++            0
++        );
++    }
++}
+--- a/src/application/local_agents/mod.rs
++++ b/src/application/local_agents/mod.rs
+@@ -13,3 +13,6 @@
+ 
+ #[cfg(test)]
+ mod contract_tests;
++
++#[cfg(test)]
++mod wire_tests;
+--- a/src/application/local_agents/wire_tests.rs
++++ b/src/application/local_agents/wire_tests.rs
+@@ -0,0 +1,82 @@
++use crate::domain::local_agents::*;
++use tokio::io::AsyncWriteExt;
++
++#[tokio::test]
++async fn cloudroom_protocol_rust_node_command_hash_preserves_exact_deadline_and_text() {
++    let selection: ExecutionSelection = serde_json::from_value(serde_json::json!({
++        "machine_id":uuid::Uuid::new_v4(), "project_id":"proj_wire", "provider":"acp-opencode",
++        "model":"openai/gpt-6-luna", "policy":{
++            "workspace":"project_directory", "permissions":"provider_default", "reasoning":"low"
++        }
++    }))
++    .unwrap();
++    let session_id = SessionId::new(uuid::Uuid::new_v4()).unwrap();
++    let thread_id = CloudroomThreadId::try_from("thr_wire".to_owned()).unwrap();
++    let prompt = LocalPrompt::try_from("exact é😀\n\t\r\"\\\u{1}".to_owned()).unwrap();
++    let commands = [
++        LocalCommand::Create {
++            session_id,
++            selection,
++            prompt: prompt.clone(),
++        },
++        LocalCommand::Send {
++            session_id,
++            thread_id: thread_id.clone(),
++            prompt,
++        },
++        LocalCommand::Inspect {
++            session_id,
++            thread_id: thread_id.clone(),
++        },
++        LocalCommand::StopThread {
++            session_id,
++            thread_id: thread_id.clone(),
++        },
++        LocalCommand::ArchiveThread {
++            session_id,
++            thread_id,
++        },
++        LocalCommand::RefreshCatalog {},
++    ];
++    let deadline = "2030-01-02T03:04:05.123456Z"
++        .parse::<chrono::DateTime<chrono::Utc>>()
++        .unwrap();
++    let operations: Vec<_> = commands
++        .into_iter()
++        .map(|command| {
++            LocalAgentOperation::queued(
++                OperationId::new(uuid::Uuid::new_v4()).unwrap(),
++                command,
++                deadline,
++            )
++            .unwrap()
++        })
++        .collect();
++    let script = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
++        .join("integrations/cloudroom-plugin/compatibility/verify-command-wire.mjs");
++    let mut node = tokio::process::Command::new("node")
++        .arg(script)
++        .stdin(std::process::Stdio::piped())
++        .stdout(std::process::Stdio::piped())
++        .stderr(std::process::Stdio::piped())
++        .kill_on_drop(true)
++        .spawn()
++        .expect("Node is required for the Rust/Node wire contract proof");
++    let input = serde_json::to_vec(&operations).unwrap();
++    let mut stdin = node.stdin.take().unwrap();
++    stdin.write_all(&input).await.unwrap();
++    stdin.shutdown().await.unwrap();
++    drop(stdin);
++    let output = tokio::time::timeout(std::time::Duration::from_secs(10), node.wait_with_output())
++        .await
++        .expect("wire proof must terminate")
++        .unwrap();
++    assert!(
++        output.status.success(),
++        "Node wire proof failed: {}",
++        String::from_utf8_lossy(&output.stderr)
++    );
++    let result = String::from_utf8(output.stdout).unwrap();
++    assert!(result.starts_with("PASS Rust→Node command hashes: all 6 kinds"));
++    println!("{}", result.trim());
++}

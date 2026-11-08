@@ -1,0 +1,37 @@
+{
+  "threadId": "thr_fwvn2nwcw2",
+  "ok": true,
+  "delivery": "queued",
+  "queuedMessage": {
+    "id": "qmsg_dpvded6926",
+    "initiator": "user",
+    "senderThreadId": null,
+    "threadId": "thr_fwvn2nwcw2",
+    "content": [
+      {
+        "type": "text",
+        "text": "Independent CLI message",
+        "mentions": []
+      }
+    ],
+    "model": "gpt-5.1-codex",
+    "reasoningLevel": "medium",
+    "permissionMode": "full",
+    "serviceTier": "default",
+    "hardQueue": false,
+    "sendAt": null,
+    "waitingOn": {
+      "kind": "plugin",
+      "pluginId": "openbot-compatibility-probe",
+      "reason": "Disposable compatibility probe never runs inference"
+    },
+    "failureReason": null,
+    "payload": {
+      "kind": "inline"
+    },
+    "editable": true,
+    "createdAt": 1794050162684,
+    "updatedAt": 1794050162684
+  },
+  "mode": "auto"
+}

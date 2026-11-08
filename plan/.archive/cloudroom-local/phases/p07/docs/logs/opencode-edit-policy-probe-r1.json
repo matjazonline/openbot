@@ -1,0 +1,18 @@
+{
+  "status": "PASS",
+  "nativeVersion": "1.19.5",
+  "configured": {
+    "permission": {
+      "edit": "ask"
+    }
+  },
+  "effectiveEditRules": [
+    {
+      "permission": "edit",
+      "action": "ask",
+      "pattern": "*"
+    }
+  ],
+  "credentialConfiguration": "isolated temporary directory; no credential fields inspected",
+  "command": "opencode debug agent build"
+}

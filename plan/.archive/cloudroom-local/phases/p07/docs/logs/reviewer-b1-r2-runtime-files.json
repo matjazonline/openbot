@@ -1,0 +1,50 @@
+[
+  {
+    "name": "plugin-tests",
+    "command": [
+      "node",
+      "test/run.mjs"
+    ],
+    "status": "PASS",
+    "exit": 0,
+    "seconds": 16.48,
+    "file": "reviewer-b1-r2-plugin-tests.txt",
+    "sha256": "64f60cd1cffe1ec69ec6d2b074992b0008159815bb5b0d6a73cd2da9dbdf7a03"
+  },
+  {
+    "name": "e2e-inventory",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "--offline",
+      "--lib",
+      "cloudroom_e2e_",
+      "--",
+      "--list"
+    ],
+    "status": "PASS",
+    "exit": 0,
+    "seconds": 0.83,
+    "file": "reviewer-b1-r2-e2e-inventory.txt",
+    "sha256": "4dcfc0f283ccda05577d127161c0ea4791abb671eb0334a52a229fc93b223700"
+  },
+  {
+    "name": "e2e-tests",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "--offline",
+      "--lib",
+      "cloudroom_e2e_",
+      "--",
+      "--nocapture"
+    ],
+    "status": "PASS",
+    "exit": 0,
+    "seconds": 35.39,
+    "file": "reviewer-b1-r2-e2e-tests.txt",
+    "sha256": "7cf2e6a98ce660c49a94c0c0db76abd6b45f72b7851f7e9899c1aa7d03c76d0e"
+  }
+]

@@ -1,0 +1,140 @@
+{
+  "version": 1,
+  "round": "CL-P02-B1-R1",
+  "artifact": "21ef73d573a4e3ed67a7e809290aded3d9f0551b696752cd33fba541d816099a",
+  "checks": [
+    {
+      "criteria": [
+        "AC1",
+        "AC2",
+        "AC3",
+        "AC4",
+        "AC5"
+      ],
+      "command": "SQLX_OFFLINE=true cargo test --locked --offline --lib cloudroom_ -- --list; SQLX_OFFLINE=true cargo test --locked --offline --lib cloudroom_",
+      "fixture": "isolated PostgreSQL 18 loopback 56388; per-test own_database; test-list-r2 inventory nonzero 29",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/test-list-r2.txt",
+          "sha256": "4539ef49f8d60cd55717b38ce0d6f441f4fdc78c47ee1218ddf9421e760a6231"
+        },
+        {
+          "path": "logs/tests-r2.txt",
+          "sha256": "c36bd0c7b7b27b0bc99f92a105f85d32fb7c965a4f1a23a8a31ae3bb6a20587d"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC2",
+        "AC3",
+        "AC4"
+      ],
+      "command": "SQLX_OFFLINE=true cargo test --locked --offline --lib adapters::http::routes::local_machines",
+      "fixture": "isolated PostgreSQL 18 loopback 56388; real router/session/CSRF, after final HTTP correction",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/http-tests-r3.txt",
+          "sha256": "ff020d60a6d3fe709e1203465b4a78048bcad30ee43afb3e74c00ac6193458fd"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC4"
+      ],
+      "command": "SQLX_OFFLINE=true cargo test --locked --offline --lib adapters::http::auth_admission -- --list; SQLX_OFFLINE=true cargo test --locked --offline --lib adapters::http::auth_admission",
+      "fixture": "existing auth-admission focused tests, 9 nonzero",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/auth-admission-list-r1.txt",
+          "sha256": "08c6593cad4c222b67bf4682698856fe095c5d7a769687d4f1bc2dd2865dc577"
+        },
+        {
+          "path": "logs/auth-admission-tests-r1.txt",
+          "sha256": "f31940f4e4a0cfef792e65133cd52cc46554e75f74765fe5ed63631375d921a4"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC1"
+      ],
+      "command": "SQLX_OFFLINE=true cargo test --locked --offline --lib cloudroom_company_operation_deadline_round_trip_preserves_digest",
+      "fixture": "pre-fix actual PostgreSQL row; expected regression demonstration, superseded by passing tests-r2",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/deadline-roundtrip-before.txt",
+          "sha256": "bfe954ad12155b0f17a123d2949142d4f26f002679b2b9370e53f30001a490a8"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC6"
+      ],
+      "command": "cargo sqlx migrate run; cargo sqlx prepare -- --all-targets; SQLX_OFFLINE=true cargo check --locked --offline --all-targets",
+      "fixture": "owned fresh openbot_cloudroom_build on loopback 56388, final init schema",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/migrate-r3.txt",
+          "sha256": "ee603945516f77c0ca672bbb546a1de16b70884098ebee707dd23c6eb045e3da"
+        },
+        {
+          "path": "logs/sqlx-prepare-r2.txt",
+          "sha256": "b83047d7fd9c9ed54143080c6ad9332e8216a025551789b7613f3498eeff908c"
+        },
+        {
+          "path": "logs/check-r4.txt",
+          "sha256": "73596b79c23573c30ea3176cec2df235cf5a72cea804331b01f4aa027afa4a13"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC6"
+      ],
+      "command": "SQLX_OFFLINE=true cargo clippy --locked --offline --all-targets -- -D warnings",
+      "fixture": "whole offline compilation after final HTTP correction",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/clippy-r2.txt",
+          "sha256": "67ad6f7076763b0c050c469cc197ce7cdcf4650deb487d83444bdb20539b10db"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC6"
+      ],
+      "command": "cargo fmt --all -- --check; git diff --check",
+      "fixture": "current artifact",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/format-final-r1.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": "logs/whitespace-final-r1.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "CL-I005"
+      ],
+      "command": "native headless Linux smoke acceptance",
+      "fixture": "macOS host",
+      "status": "NOT EXERCISED",
+      "reason": "User explicitly chose Leave Linux acceptance unverified; platform implementation remains in scope."
+    }
+  ]
+}

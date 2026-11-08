@@ -1,0 +1,13 @@
+
+  VITE v8.0.12  ready in 1269 ms
+
+  ➜  Local:   http://127.0.0.1:61843/
+12:13:35 PM [vite] (client) [Unhandled error] ReferenceError: $RefreshSig$ is not defined
+ > ../../packages/shared-ui/src/components/ui/icon.tsx:10:10
+    8  |  import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/react";
+    9  |  import {
+    10 |    Alert02Icon,
+       |            ^
+    11 |    AlertCircleIcon,
+    12 |    Archive03Icon,
+

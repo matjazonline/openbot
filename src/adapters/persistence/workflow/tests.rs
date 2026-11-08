@@ -20,6 +20,8 @@ mod http_tests;
 #[path = "jev_tests.rs"]
 mod jev_tests;
 pub(crate) use http_tests::reconciliation_fixture;
+#[path = "local_agent_tests.rs"]
+mod local_agent_tests;
 #[path = "mcp_tests.rs"]
 mod mcp_tests;
 #[path = "message_tests.rs"]

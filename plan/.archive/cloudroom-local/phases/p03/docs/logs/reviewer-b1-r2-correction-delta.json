@@ -1,0 +1,20 @@
+{
+  "base": "97e5d60dc538e26c7cb976a8d63772eed80baff2",
+  "before": "1033301ab60d3c96e0e86148137a8255dc1b3156887ff7cdc3c7b30632e86916",
+  "after": "1e4f5b2148970677a7f1c388fa5a38cc52b1e7685061a4fac15857ea6b1325d9",
+  "changed": [
+    "integrations/cloudroom-plugin/compatibility/verify-command-wire.mjs",
+    "src/adapters/http/routes/local_machine_connection/connection_recovery_tests.rs",
+    "src/adapters/http/routes/local_machine_connection/connection_tests.rs",
+    "src/adapters/persistence/local_agents/protocol/capacity_tests.rs",
+    "src/adapters/persistence/local_agents/protocol/commands.rs",
+    "src/adapters/persistence/local_agents/protocol/mod.rs",
+    "src/adapters/persistence/local_agents/protocol/observations.rs",
+    "src/adapters/persistence/local_agents/protocol/operation_record_tests.rs",
+    "src/adapters/persistence/local_agents/protocol/recovery_tests.rs",
+    "src/application/local_agents/mod.rs",
+    "src/application/local_agents/wire_tests.rs"
+  ],
+  "current_bytes_match": true,
+  "patch_lines": 719
+}

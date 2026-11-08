@@ -1,0 +1,22 @@
+{
+  "binary": "target/debug/deps/open_bots-3384251af61cfdaf",
+  "sha256": "3a65c14ce7b55755a40691a2cf1c8616a454acaad884c1b2f7fed5dc456dab4d",
+  "tests": [
+    {
+      "test": "adapters::http::routes::local_machines::tests::cloudroom_company_http_foreign_mutations_preserve_pairing_projects_and_machine",
+      "exit": 0
+    },
+    {
+      "test": "adapters::persistence::local_agents::machine_tests::constraint_tests::cloudroom_company_machine_reference_constraints_reject_foreign_rows",
+      "exit": 0
+    },
+    {
+      "test": "adapters::persistence::local_agents::machine_tests::constraint_tests::cloudroom_company_session_operation_constraints_reject_foreign_rows",
+      "exit": 0
+    },
+    {
+      "test": "adapters::persistence::local_agents::machine_tests::constraint_tests::cloudroom_company_workflow_session_constraint_rejects_existing_foreign_run",
+      "exit": 0
+    }
+  ]
+}

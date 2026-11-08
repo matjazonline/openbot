@@ -1,0 +1,134 @@
+{
+  "pattern": "PollWork::Wait",
+  "filesSearched": 647,
+  "totalHits": 7,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/message_reconcile_tests.rs#workflow_message_reconcile_finality_breach_vetoes_resume_and_reopen",
+        "name": "workflow_message_reconcile_finality_breach_vetoes_resume_and_reopen",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/message_reconcile_tests.rs",
+        "span": "L639-L749"
+      },
+      "path": "src/adapters/persistence/workflow/message_reconcile_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 688,
+          "text": "assert_eq!(candidates(&setup).await, vec![PollWork::Wait]);"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/message_reconcile_veto_tests.rs#workflow_message_reconcile_finality_breach_then_every_destination_final_vetoes_the_receipt",
+        "name": "workflow_message_reconcile_finality_breach_then_every_destination_final_vetoes_the_receipt",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/message_reconcile_veto_tests.rs",
+        "span": "L45-L160"
+      },
+      "path": "src/adapters/persistence/workflow/message_reconcile_veto_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 92,
+          "text": "assert_eq!(candidates(&setup).await, vec![PollWork::Wait]);"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/message_tests.rs#workflow_message_wait_user_email_parks_then_resumes_on_accepted_receipt",
+        "name": "workflow_message_wait_user_email_parks_then_resumes_on_accepted_receipt",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/message_tests.rs",
+        "span": "L133-L214"
+      },
+      "path": "src/adapters/persistence/workflow/message_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 201,
+          "text": "assert_eq!(candidates(&setup).await, vec![PollWork::Wait]);"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/polling_integration_tests.rs#workflow_poll_complete_chain_and_competing_wait_consumption",
+        "name": "workflow_poll_complete_chain_and_competing_wait_consumption",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/polling_integration_tests.rs",
+        "span": "L57-L114"
+      },
+      "path": "src/adapters/persistence/workflow/polling_integration_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 86,
+          "text": "assert_eq!(candidate.work, PollWork::Wait);"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/polling.rs#candidate",
+        "name": "candidate",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/polling.rs",
+        "span": "L62-L80"
+      },
+      "path": "src/adapters/persistence/workflow/polling.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 75,
+          "text": "\"wait\" => PollWork::Wait,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/workflow_guard_tests.rs#workflow_guard_error_decision_timeout_fails_instead_of_deferring_to_itself",
+        "name": "workflow_guard_error_decision_timeout_fails_instead_of_deferring_to_itself",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/workflow_guard_tests.rs",
+        "span": "L167-L189"
+      },
+      "path": "src/adapters/persistence/workflow/workflow_guard_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 183,
+          "text": "assert_eq!(candidate.work, PollWork::Wait);"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/workflow_tool_tests.rs#workflow_tool_parent_cancel_cascades_and_a_restarted_worker_resumes_the_call",
+        "name": "workflow_tool_parent_cancel_cascades_and_a_restarted_worker_resumes_the_call",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/workflow_tool_tests.rs",
+        "span": "L409-L474"
+      },
+      "path": "src/adapters/persistence/workflow/workflow_tool_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 452,
+          "text": "assert_eq!(work, vec![PollWork::Wait]);"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 7,
+    "baselineChars": 132267
+  }
+}

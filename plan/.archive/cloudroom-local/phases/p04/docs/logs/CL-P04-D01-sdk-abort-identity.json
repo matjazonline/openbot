@@ -1,0 +1,8 @@
+{
+  "source": "gui/packages/sdk/src/areas/threads.ts",
+  "beforeSha256": "2fcd66e9c89af1bf288ac20d08d7c55bc67104b61e982d009cc517710df70413",
+  "afterSha256": "87c13f25884f240e7b94267d497d82fd1a8cc50398783e63185064aa846d8fe3",
+  "patchSha256": "1a8782db46c9450974cadede95d32c76ad1d3ffa6eb9bb53db97315df6228451",
+  "applied": false,
+  "note": "proposed architecture artifact only; upstream/product sources unchanged until gate PASS"
+}

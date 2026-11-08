@@ -1,0 +1,100 @@
+{
+  "pattern": "OUTSTANDING_OPERATION_SQL",
+  "filesSearched": 1626,
+  "totalHits": 5,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/local_agents/protocol/mod.rs#capacity",
+        "name": "capacity",
+        "kind": "function",
+        "path": "src/adapters/persistence/local_agents/protocol/mod.rs",
+        "span": "L120-L128"
+      },
+      "path": "src/adapters/persistence/local_agents/protocol/mod.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 126,
+          "text": "FROM local_agent_operations WHERE company_id=$1 AND machine_id=$2 AND {OUTSTANDING_OPERATION_SQL}\"))"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/local_agents/protocol/commands.rs#pending",
+        "name": "pending",
+        "kind": "function",
+        "path": "src/adapters/persistence/local_agents/protocol/commands.rs",
+        "span": "L211-L232"
+      },
+      "path": "src/adapters/persistence/local_agents/protocol/commands.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 221,
+          "text": "let candidates:Vec<Uuid>=sqlx::query_scalar(&format!(\"SELECT id FROM local_agent_operations WHERE company_id=$1 AND machine_id=$2 AND {OUTSTANDING_OPERATION_SQL"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/local_agents/protocol/mod.rs#OUTSTANDING_OPERATION_SQL",
+        "name": "OUTSTANDING_OPERATION_SQL",
+        "kind": "constant",
+        "path": "src/adapters/persistence/local_agents/protocol/mod.rs",
+        "span": "L63-L64"
+      },
+      "path": "src/adapters/persistence/local_agents/protocol/mod.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 63,
+          "text": "const OUTSTANDING_OPERATION_SQL: &str = \"(outcome IS NULL OR (outcome='uncertain' AND \\"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/local_agents/protocol/mod.rs#operation_columns",
+        "name": "operation_columns",
+        "kind": "function",
+        "path": "src/adapters/persistence/local_agents/protocol/mod.rs",
+        "span": "L69-L74"
+      },
+      "path": "src/adapters/persistence/local_agents/protocol/mod.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 72,
+          "text": "{OUTSTANDING_OPERATION_SQL} AS outstanding\""
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/local_agents/protocol/mod.rs#finish_reconciliation",
+        "name": "finish_reconciliation",
+        "kind": "function",
+        "path": "src/adapters/persistence/local_agents/protocol/mod.rs",
+        "span": "L208-L230"
+      },
+      "path": "src/adapters/persistence/local_agents/protocol/mod.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 214,
+          "text": "let outstanding:bool=sqlx::query_scalar(&format!(\"SELECT EXISTS(SELECT 1 FROM local_agent_operations WHERE company_id=$1 AND machine_id=$2 AND {OUTSTANDING_OPER"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 2,
+    "baselineChars": 27065
+  }
+}

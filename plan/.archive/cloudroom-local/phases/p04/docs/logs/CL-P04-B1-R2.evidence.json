@@ -1,0 +1,157 @@
+{
+  "version": 1,
+  "round": "CL-P04-B1-R2",
+  "artifact": "512b6e90ecf87aad7f0dc140e0afeb45532d67e2b4fedf5c15952685342cabda",
+  "checks": [
+    {
+      "criteria": [
+        "AC1"
+      ],
+      "command": "npm ci (unchanged lock reused); npm audit --json (unchanged lock reused); npm run typecheck; npm run build; npm pack --pack-destination /tmp",
+      "fixture": "Node24.21.0/npm11.19.0, exact patched dependency lock and generated SDK declaration",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/package-ci-patched-r1.txt",
+          "sha256": "6fef84af97b543c3b459d31d1c5182a556f2ed383f3857c896caae43c69fab51"
+        },
+        {
+          "path": "logs/package-audit-r2.json",
+          "sha256": "4591441a09ed4dfca378fd7693c094a127a3b8bca20422fcadd4aac09ca48d50"
+        },
+        {
+          "path": "logs/typecheck-correction-final-r1.txt",
+          "sha256": "b834a4b2a8e621f2a214d08b7d406bfe37882a9025ef3979f603f51afdc4dd64"
+        },
+        {
+          "path": "logs/build-correction-final-r1.txt",
+          "sha256": "b3dbf725919cdefbdb175132333c9f5cf0024f9c6b1887ae6a7ae8aacd657494"
+        },
+        {
+          "path": "logs/pack-correction-final-r1.txt",
+          "sha256": "25b940eb75fb6463658f3c94851161dfbba0b4dd5585181d275e8915a027c903"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC2",
+        "AC3",
+        "AC4",
+        "AC5",
+        "AC6",
+        "CL-P04-B1-F1",
+        "CL-P04-B1-F2",
+        "CL-P04-B1-F3",
+        "CL-P04-B1-F4"
+      ],
+      "command": "npm test",
+      "fixture": "72 nonzero tests, all49 retained+23 added: actual process crash cuts,SQLite/WSS/lifecycle; production SDK adapter with counted native queue fixture; native effects NOT established",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/plugin-correction-final-r1.txt",
+          "sha256": "b142502a6d313f25087d7fa1bc5a80671dc140b1d3186325f2bd1f92294dc659"
+        },
+        {
+          "path": "logs/plugin-inventory-r2.json",
+          "sha256": "0b30932f8cc4c4c993a963e222848f2133bf4c3ef25d6c61565b819d6d50bc71"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC1",
+        "AC6"
+      ],
+      "command": "npm run test:guards; node compatibility/prove-sdk-abort.mjs /tmp/openbot-cloudroom-d8b3cc3",
+      "fixture": "4 source/declaration/patch guards and real source-built public SDK abort over real held HTTP headers/body,5 methods/aliases",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/guard-correction-final-r1.txt",
+          "sha256": "c59ed1ae905e7fac8fbe8d39a749f631e1e9956f7229f6ed46531a719ea3b37d"
+        },
+        {
+          "path": "logs/sdk-abort-production-r1.txt",
+          "sha256": "53809b1fe329c928986c1e75b6f6a1c9f566d348c1984887d98f90e55342bd17"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC3",
+        "AC4",
+        "AC6"
+      ],
+      "command": "CARGO_INCREMENTAL=0 SQLX_OFFLINE=true cargo test --locked --offline --lib cloudroom_; cargo test --locked --offline --lib cloudroom_submission_; linked test binary cloudroom_ --list",
+      "fixture": "owned PostgreSQL18 loopback56388 and real WS/WSS; missingDB skip unset;77 retained names+5 new, all82 pass,5 affected after lint fix",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/rust-cloudroom-regression-r1.txt",
+          "sha256": "8c13cfc584a79b26f2c8ce265fa8536c4a4cc0aa44aec6c654fdaa674ef6ec4c"
+        },
+        {
+          "path": "logs/rust-submission-final-r1.txt",
+          "sha256": "8d0c7ab742a7163b09b096531e655e986e9ad860e134482863dc3fcb2c273d47"
+        },
+        {
+          "path": "logs/test-inventory-final-r1.txt",
+          "sha256": "771456f49cea95bf1a9c545abd6b5e6a1b3db26f40bbf0776a835c934e4b7a71"
+        },
+        {
+          "path": "logs/test-inventory-delta-r1.json",
+          "sha256": "86f5fa172a574acb426be18d5e25ecaceccb73cf2de7e950da19d1f7df38e1db"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC6"
+      ],
+      "command": "CARGO_INCREMENTAL=0 SQLX_OFFLINE=false cargo sqlx prepare -- --all-targets; CARGO_INCREMENTAL=0 SQLX_OFFLINE=true cargo clippy --locked --offline --all-targets -- -D warnings; cargo fmt --all -- --check; git diff --check",
+      "fixture": "owned build DB/schema, SQLx generation and offline compilation serialized, no schema/cache delta",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/sqlx-prepare-final-r1.txt",
+          "sha256": "a6ea4c5e4b8faae47e84bcb473bed508a0f06a286f10d21d13ec173b8288d284"
+        },
+        {
+          "path": "logs/clippy-final-r2.txt",
+          "sha256": "bfa111b89abc10820ccdbf8e23df6f2c5024869142617e293e6c4c8d37c2d77f"
+        },
+        {
+          "path": "logs/format-final-r2.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": "logs/whitespace-b1-r2.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC7"
+      ],
+      "command": "actual production plugin native macOS start/send/stop/resume",
+      "fixture": "phase07",
+      "status": "NOT EXERCISED",
+      "files": [],
+      "reason": "Final native plugin/platform acceptance belongs phase07, fixture proof does not establish it."
+    },
+    {
+      "criteria": [
+        "AC7",
+        "CL-I005"
+      ],
+      "command": "headless Linux native smoke",
+      "fixture": "macOS host",
+      "status": "NOT EXERCISED",
+      "files": [],
+      "reason": "User explicitly chose Leave Linux acceptance unverified; Linux implementation remains in scope."
+    }
+  ]
+}

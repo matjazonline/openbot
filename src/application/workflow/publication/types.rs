@@ -64,6 +64,8 @@ pub struct WorkflowToolPin {
 pub enum ToolKind<'a> {
     /// A trusted built-in `message.*` tool.
     Message,
+    /// A trusted local-agent workflow step; it is not a selectable generic tool.
+    LocalAgent,
     /// A trusted built-in provisioning tool (p08 D2.1). Only a name-only snapshot carries a
     /// provisioning name this way; an MCP tool of the same name stays a slot tool.
     Provisioning,
@@ -81,6 +83,11 @@ impl ToolSnapshot {
     pub fn kind(&self) -> ToolKind<'_> {
         if let Some(pin) = &self.workflow {
             return ToolKind::Workflow(pin);
+        }
+        if self.contract.connection.is_none()
+            && self.contract.name.as_str() == crate::application::local_agents::workflow::KIND
+        {
+            return ToolKind::LocalAgent;
         }
         if crate::application::workflow::message::is_builtin_message_tool(
             self.contract.name.as_str(),

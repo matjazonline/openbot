@@ -1,0 +1,55 @@
+    Checking open_bots v0.1.0 (/Users/mac03/dev/openbot)
+error[E0432]: unresolved imports `crate::application::local_agents::LogicalInvocationKey`, `crate::application::local_agents::OperationAdmission`
+ --> src/adapters/persistence/workflow/local_agents/admission.rs:2:40
+  |
+2 | use crate::application::local_agents::{LogicalInvocationKey, OperationAdmission};
+  |                                        ^^^^^^^^^^^^^^^^^^^^  ^^^^^^^^^^^^^^^^^^ no `OperationAdmission` in `application::local_agents`
+  |                                        |
+  |                                        no `LogicalInvocationKey` in `application::local_agents`
+  |
+  = help: consider importing this struct instead:
+          crate::application::local_agents::protocol::LogicalInvocationKey
+  = help: consider importing this struct instead:
+          crate::application::local_agents::protocol::OperationAdmission
+
+error[E0425]: cannot find type `DateTime` in this scope
+  --> src/adapters/persistence/workflow/local_agents/preparation.rs:29:19
+   |
+29 |     let deadline: DateTime<Utc> = sqlx::query_scalar(
+   |                   ^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find type `Utc` in this scope
+  --> src/adapters/persistence/workflow/local_agents/preparation.rs:29:28
+   |
+29 |     let deadline: DateTime<Utc> = sqlx::query_scalar(
+   |                            ^^^ not found in this scope
+   |
+help: you might be missing a type parameter
+   |
+ 5 | pub(super) async fn prepare_on<Utc>(
+   |                               +++++
+
+error[E0425]: cannot find type `ActivationRequest` in this scope
+   --> src/adapters/persistence/workflow/local_agents/mod.rs:105:24
+    |
+105 | fn action_scope(scope: ActivationRequest) -> ActionScope {
+    |                        ^^^^^^^^^^^^^^^^^
+    |
+   ::: src/application/workflow/actions/service.rs:12:1
+    |
+ 12 | pub struct ActionRequest {
+    | ------------------------ similarly named struct `ActionRequest` defined here
+    |
+help: a struct with a similar name exists
+    |
+105 - fn action_scope(scope: ActivationRequest) -> ActionScope {
+105 + fn action_scope(scope: ActionRequest) -> ActionScope {
+    |
+help: consider importing this struct
+    |
+  2 + use crate::application::workflow::activation::ActivationRequest;
+    |
+
+Some errors have detailed explanations: E0425, E0432.
+For more information about an error, try `rustc --explain E0425`.
+error: could not compile `open_bots` (lib) due to 4 previous errors

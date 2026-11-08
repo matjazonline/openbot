@@ -1,0 +1,8 @@
+{
+  "fullPatch": true,
+  "deltaPatch": true,
+  "coordinationPin": true,
+  "entryDigest": true,
+  "decision": true,
+  "head": true
+}

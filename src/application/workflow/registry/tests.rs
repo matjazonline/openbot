@@ -37,13 +37,13 @@ pub(super) fn context<'a>(
 }
 #[test]
 fn workflow_registry_exact_catalogue_and_help_examples_compile() {
-    let expected = "agent.run ai.classify channel.no_reply context.history data.map decision.agent decision.human decision.rule flow.repeat http.request jev.evaluate mcp.call memory.load memory.save message.ask message.reply message.send tool.call wait.event wait.timer workflow.call";
+    let expected = "agent.run ai.classify channel.no_reply context.history data.map decision.agent decision.human decision.rule flow.repeat http.request jev.evaluate local_agent.run mcp.call memory.load memory.save message.ask message.reply message.send tool.call wait.event wait.timer workflow.call";
     assert_eq!(
         TYPES.iter().copied().collect::<BTreeSet<_>>(),
         expected.split_whitespace().collect()
     );
-    assert_eq!(TYPES.len(), 21);
-    assert_eq!(TYPES.iter().collect::<BTreeSet<_>>().len(), 21);
+    assert_eq!(TYPES.len(), 22);
+    assert_eq!(TYPES.iter().collect::<BTreeSet<_>>().len(), 22);
     for name in TYPES {
         let example = example(name).unwrap();
         let compiled = compile_example(&example).unwrap_or_else(|e| panic!("{name}: {e:?}"));

@@ -1,0 +1,116 @@
+    Checking open_bots v0.1.0 (/Users/mac03/dev/openbot)
+error[E0364]: `resume_on` is private, and cannot be re-exported
+  --> src/adapters/persistence/workflow/local_agents/mod.rs:18:16
+   |
+18 | pub(super) use continuation::resume_on;
+   |                ^^^^^^^^^^^^^^^^^^^^^^^
+   |
+note: consider marking `resume_on` as `pub` in the imported module
+  --> src/adapters/persistence/workflow/local_agents/mod.rs:18:16
+   |
+18 | pub(super) use continuation::resume_on;
+   |                ^^^^^^^^^^^^^^^^^^^^^^^
+
+error[E0364]: `prelock_on` is private, and cannot be re-exported
+  --> src/adapters/persistence/workflow/local_agents/mod.rs:19:16
+   |
+19 | pub(super) use continuation::prelock_on as prelock_wait_on;
+   |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+note: consider marking `prelock_on` as `pub` in the imported module
+  --> src/adapters/persistence/workflow/local_agents/mod.rs:19:16
+   |
+19 | pub(super) use continuation::prelock_on as prelock_wait_on;
+   |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error[E0433]: cannot find type `CommitDisposition` in this scope
+  --> src/adapters/persistence/workflow/local_agents/continuation.rs:44:35
+   |
+44 |     wait_commit::saved(db, scope, CommitDisposition::Committed, true).await
+   |                                   ^^^^^^^^^^^^^^^^^ use of undeclared type `CommitDisposition`
+   |
+help: an enum with a similar name exists
+   |
+44 -     wait_commit::saved(db, scope, CommitDisposition::Committed, true).await
+44 +     wait_commit::saved(db, scope, ClaimedDisposition::Committed, true).await
+   |
+help: consider importing one of these enums
+   |
+ 1 + use crate::application::workflow::completion::CommitDisposition;
+   |
+ 1 + use crate::transport::CommitDisposition;
+   |
+
+error[E0603]: function import `prelock_wait_on` is private
+  --> src/adapters/persistence/workflow/wait_commit.rs:10:19
+   |
+10 |     local_agents::prelock_wait_on(db, scope).await?;
+   |                   ^^^^^^^^^^^^^^^ private function import
+   |
+note: the function import `prelock_wait_on` is defined here...
+  --> src/adapters/persistence/workflow/local_agents/mod.rs:19:16
+   |
+19 | pub(super) use continuation::prelock_on as prelock_wait_on;
+   |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+note: ...and refers to the function `prelock_on` which is defined here
+  --> src/adapters/persistence/workflow/local_agents/continuation.rs:5:1
+   |
+ 5 | pub(super) async fn prelock_on(db: &mut PgConnection, scope: ActivationRequest) -> AppResult<()> {
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error[E0603]: function import `resume_on` is private
+  --> src/adapters/persistence/workflow/wait_commit.rs:78:47
+   |
+78 |         if let Some(progress) = local_agents::resume_on(db, scope, wait.id).await? {
+   |                                               ^^^^^^^^^ private function import
+   |
+note: the function import `resume_on` is defined here...
+  --> src/adapters/persistence/workflow/local_agents/mod.rs:18:16
+   |
+18 | pub(super) use continuation::resume_on;
+   |                ^^^^^^^^^^^^^^^^^^^^^^^
+note: ...and refers to the function `resume_on` which is defined here
+  --> src/adapters/persistence/workflow/local_agents/continuation.rs:12:1
+   |
+12 | / pub(super) async fn resume_on(
+13 | |     tx: &mut Transaction<'_, Postgres>, scope: ActivationRequest, wait: Uuid,
+14 | | ) -> AppResult<Option<WaitProgress>> {
+15 | |     let due: Option<bool> = sqlx::query_scalar("SELECT call.ready_at IS NOT NULL OR operation.deadline<=clock_timestamp() FROM wor...
+...  |
+33 | |     wait_commit::continue_delivery(tx, scope, wait).await.map(Some)
+34 | | }
+   | |_^
+
+error[E0308]: mismatched types
+   --> src/adapters/persistence/local_agents/protocol/commands.rs:145:9
+    |
+141 |     validate_selection(
+    |     ------------------ arguments to this function are incorrect
+...
+145 |         op,
+    |         ^^ expected `&LocalCommand`, found `&LocalAgentOperation`
+    |
+    = note: expected reference `&operations::LocalCommand`
+               found reference `&operations::LocalAgentOperation`
+note: function defined here
+   --> src/adapters/persistence/local_agents/protocol/commands.rs:68:10
+    |
+ 68 | async fn validate_selection(
+    |          ^^^^^^^^^^^^^^^^^^
+...
+ 72 |     command: &LocalCommand,
+    |     ----------------------
+
+error[E0499]: cannot borrow `tx` as mutable more than once at a time
+  --> src/adapters/persistence/workflow/local_agents/mod.rs:67:43
+   |
+66 |                     if let Some(wait) = decisions::approvals::parked(&mut tx, &ActionDispatchRequest {
+   |                                         ---------------------------- ------- first mutable borrow occurs here
+   |                                         |
+   |                                         first borrow later used by call
+67 |                         subject: saved_on(&mut tx, action_scope(claim.fence.scope)).await?.ok_or_else(conflict)?.subject()?,
+   |                                           ^^^^^^^ second mutable borrow occurs here
+
+Some errors have detailed explanations: E0308, E0364, E0433, E0499, E0603.
+For more information about an error, try `rustc --explain E0308`.
+error: could not compile `open_bots` (lib) due to 7 previous errors

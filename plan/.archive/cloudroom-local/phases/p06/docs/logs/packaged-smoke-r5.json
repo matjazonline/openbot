@@ -1,0 +1,27 @@
+{
+  "status": "PASS",
+  "directory": "/var/folders/n2/5y7x75r92zl0ll90154hxdzr0000gn/T/openbot-packaged-smoke-MP7DPf",
+  "plugin": "/var/folders/n2/5y7x75r92zl0ll90154hxdzr0000gn/T/openbot-packaged-smoke-MP7DPf/plugin",
+  "profile": "/var/folders/n2/5y7x75r92zl0ll90154hxdzr0000gn/T/openbot-packaged-smoke-MP7DPf/profile",
+  "ports": [
+    52480,
+    52481,
+    52482
+  ],
+  "artifact": "/tmp/openbot-cloudroom-p06-artifacts-correction-r1/bb-plugin-openbot-local-0.2.0.tgz",
+  "sha256": "0418b3da0a5861c9a99c2a4b5ef51f7ca6f5c5d6b48dbe1da7309f0a70ec68e9",
+  "platform": "darwin",
+  "node": "v24.21.0",
+  "steps": [
+    "packaged wrapper booted API/daemon/UI on loopback",
+    "competing same-profile wrapper refused",
+    "packaged public CLI install/status",
+    "public CLI reload",
+    "graceful stop/restart preserves host identity and installed plugin",
+    "public CLI remove",
+    "shutdown joins launcher; host authentication retained"
+  ],
+  "nativeInference": "NOT EXERCISED by this lifecycle smoke",
+  "linux": "NOT EXERCISED",
+  "output": "{\"component\":\"cloudroom-local\",\"stage\":\"services\",\"state\":\"ready\"}\n{\"component\":\"cloudroom-local\",\"stage\":\"services\",\"state\":\"stopped\"}\n{\"component\":\"cloudroom-local\",\"stage\":\"services\",\"state\":\"ready\"}\n{\"component\":\"cloudroom-local\",\"stage\":\"services\",\"state\":\"stopped\"}\n"
+}

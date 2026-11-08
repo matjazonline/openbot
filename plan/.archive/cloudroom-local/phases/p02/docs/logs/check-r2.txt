@@ -1,0 +1,24 @@
+    Checking open_bots v0.1.0 (/Users/mac03/dev/openbot)
+warning: unused import: `use_cases::user::UserPersistence`
+  --> src/adapters/http/routes/local_machines_tests.rs:13:5
+   |
+13 |     use_cases::user::UserPersistence,
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+error[E0599]: no method named `get_user_by_id` found for struct `std::sync::Arc<persistence::PostgresPersistence>` in the current scope
+   --> src/adapters/http/routes/local_machines_tests.rs:186:30
+    |
+186 |     let user = f.persistence.get_user_by_id(user).await.unwrap().unwrap();
+    |                              ^^^^^^^^^^^^^^
+    |
+help: there is a method `get_thread_by_id` with a similar name
+    |
+186 -     let user = f.persistence.get_user_by_id(user).await.unwrap().unwrap();
+186 +     let user = f.persistence.get_thread_by_id(user).await.unwrap().unwrap();
+    |
+
+For more information about this error, try `rustc --explain E0599`.
+warning: `open_bots` (lib test) generated 1 warning
+error: could not compile `open_bots` (lib test) due to 1 previous error; 1 warning emitted

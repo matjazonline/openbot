@@ -1,0 +1,7 @@
+     Locking 2 packages to latest Rust 1.96.0 compatible versions
+      Adding tokio-tungstenite v0.26.2
+      Adding tungstenite v0.26.2
+error: failed to download `tokio-tungstenite v0.26.2`
+
+Caused by:
+  attempting to make an HTTP request, but --offline was specified

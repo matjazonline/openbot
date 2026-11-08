@@ -1,0 +1,2 @@
+# Preserve byte-exact historical review output and rendered fixtures.
+**/docs/logs/** -diff -whitespace

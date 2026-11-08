@@ -1,0 +1,8 @@
+
+running 3 tests
+test adapters::persistence::local_agents::retention_tests::cloudroom_retention_new_manual_requests_require_current_timestamp_and_replay_current_identity ... ok
+test adapters::persistence::local_agents::retention_tests::cloudroom_retention_unknown_native_work_survives_and_compacted_receipt_replays_under_current_fence ... ok
+test adapters::persistence::local_agents::retention_tests::cloudroom_retention_competing_collectors_remove_only_bounded_old_summaries_and_keep_unknown_work ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 3307 filtered out; finished in 1.48s
+

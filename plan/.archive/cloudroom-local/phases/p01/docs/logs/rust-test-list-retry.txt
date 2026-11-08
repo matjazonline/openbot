@@ -1,0 +1,117 @@
+   Compiling icu_locale_core v2.0.0
+   Compiling potential_utf v0.1.2
+   Compiling crossbeam-utils v0.8.21
+   Compiling system-configuration v0.6.1
+   Compiling either v1.15.0
+   Compiling strsim v0.11.1
+   Compiling ident_case v1.0.1
+   Compiling crossbeam-epoch v0.9.21
+   Compiling darling_core v0.20.11
+   Compiling icu_collections v2.0.0
+   Compiling hyper-util v0.1.16
+   Compiling errno v0.3.14
+   Compiling crossbeam-deque v0.8.8
+   Compiling nom v7.1.3
+   Compiling icu_provider v2.0.0
+   Compiling concurrent-queue v2.5.0
+   Compiling icu_properties v2.0.1
+   Compiling icu_normalizer v2.0.0
+   Compiling rustix v1.1.4
+   Compiling rayon-core v1.13.0
+   Compiling security-framework v3.7.0
+   Compiling idna_adapter v1.2.1
+   Compiling idna v1.1.0
+   Compiling event-listener v5.4.1
+   Compiling crossbeam-queue v0.3.12
+   Compiling onig_sys v69.9.3
+   Compiling url v2.5.8
+   Compiling darling_macro v0.20.11
+   Compiling matrixmultiply v0.3.11
+   Compiling foldhash v0.2.0
+   Compiling hashbrown v0.16.1
+   Compiling darling v0.20.11
+   Compiling sqlx-core v0.8.6
+   Compiling tower-http v0.6.11
+   Compiling rustls-platform-verifier v0.7.0
+   Compiling hyper-rustls v0.27.9
+   Compiling rand_core v0.9.5
+   Compiling esaxx-rs v0.1.10
+   Compiling paste v1.0.15
+   Compiling rawpointer v0.2.1
+   Compiling ort-sys v2.0.0-rc.13
+   Compiling rand_chacha v0.9.0
+   Compiling derive_builder_core v0.20.2
+   Compiling rayon v1.12.0
+   Compiling reqwest v0.13.4
+   Compiling castaway v0.2.4
+   Compiling itertools v0.14.0
+   Compiling monostate-impl v0.1.18
+   Compiling derive_builder_macro v0.20.2
+   Compiling pastey v0.2.3
+   Compiling base64 v0.13.1
+   Compiling unicode-segmentation v1.13.3
+   Compiling macro_rules_attribute-proc_macro v0.2.3
+   Compiling icu_casemap_data v2.0.0
+   Compiling static_assertions v1.1.0
+   Compiling compact_str v0.9.1
+   Compiling spm_precompiled v0.1.4
+   Compiling macro_rules_attribute v0.2.3
+   Compiling sqlx-postgres v0.8.6
+   Compiling rayon-cond v0.4.0
+   Compiling derive_builder v0.20.2
+   Compiling monostate v0.1.18
+   Compiling hickory-proto v0.24.4
+   Compiling ndarray v0.17.2
+   Compiling rand v0.9.5
+   Compiling tempfile v3.27.0
+   Compiling gethostname v1.1.0
+   Compiling eventsource-stream v0.2.3
+   Compiling unicode-normalization-alignments v0.1.12
+   Compiling dary_heap v0.3.9
+   Compiling libloading v0.9.0
+   Compiling daachorse v3.0.3
+   Compiling unicode_categories v0.1.1
+   Compiling rig-core v0.42.0
+   Compiling axum v0.8.4
+   Compiling png v0.18.1
+   Compiling mail-builder v0.4.4
+   Compiling sqlx-macros-core v0.8.6
+   Compiling hickory-resolver v0.24.4
+   Compiling ort v2.0.0-rc.13
+   Compiling safetensors v0.8.0
+   Compiling quick_cache v0.6.24
+   Compiling image v0.25.10
+   Compiling axum-extra v0.10.1
+   Compiling sqlx-macros v0.8.6
+   Compiling mail-auth v0.6.1
+   Compiling jsonschema v0.33.0
+   Compiling lettre v0.11.23
+   Compiling ammonia v4.1.4
+   Compiling onig v6.5.3
+   Compiling tokenizers v0.23.2
+   Compiling sqlx v0.8.6
+   Compiling rmcp v1.8.0
+   Compiling icu_casemap v2.0.0
+   Compiling fastembed v7.1.1
+   Compiling rig-agent v0.42.0
+   Compiling open_bots v0.1.0 (/Users/mac03/dev/openbot)
+warning: ambiguous glob re-exports
+  --> src/lib.rs:14:9
+   |
+14 | pub use application::*;
+   |         ^^^^^^^^^^^^^^ the name `local_agents` in the type namespace is first re-exported here
+15 | pub use domain::workflow;
+16 | pub use domain::*;
+   |         --------- but the name `local_agents` in the type namespace is also re-exported here
+   |
+   = note: `#[warn(ambiguous_glob_reexports)]` on by default
+
+warning: `open_bots` (lib test) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2m 32s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-3384251af61cfdaf)
+application::local_agents::commands::tests::cloudroom_bounds_deadline_rejects_elapsed_and_above_maximum: test
+application::local_agents::commands::tests::cloudroom_bounds_prompt_counts_utf8_bytes_and_redacts_debug: test
+application::local_agents::commands::tests::cloudroom_contract_commands_are_closed_and_controls_are_explicit: test
+application::local_agents::commands::tests::cloudroom_contract_identities_validate_on_decode: test
+
+4 tests, 0 benchmarks

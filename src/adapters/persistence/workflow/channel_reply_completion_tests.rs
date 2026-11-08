@@ -217,7 +217,7 @@ async fn publish_root(s: &Intents, source: Value, publication: FinalPublication)
         }
         FinalPublication::Messaging => {
             let directory =
-                crate::adapters::persistence::workflow::message::MessagePublicationDirectory {
+                crate::adapters::persistence::workflow::step_builtins::StepBuiltinPublicationDirectory {
                     persistence: s.p().clone(),
                 };
             let definitions =

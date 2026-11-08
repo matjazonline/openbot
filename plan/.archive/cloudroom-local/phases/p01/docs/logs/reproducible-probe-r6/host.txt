@@ -1,0 +1,156 @@
+[12:15:42] INFO: [host-daemon] Host daemon connecting {"serverUrl":"http://127.0.0.1:62029","dataDir":"/var/folders/n2/5y7x75r92zl0ll90154hxdzr0000gn/T/openbot-cloudroom-proof-DsrRZQ/profile"}
+[12:15:42] INFO: [host-daemon] Connected to server {"serverUrl":"http://127.0.0.1:62029","sessionId":"hses_7w2wuyfgfs"}
+[12:15:42] INFO: [host-daemon] Host daemon started {"serverUrl":"http://127.0.0.1:62029","identity":{"hostId":"host_xefy2egp3j","hostName":"openbot-p01-disposable","instanceId":"40fbcbc7-b08f-4426-8729-ebe6271a1237"}}
+[12:15:42] INFO: [host-daemon] Host plugin worker ready {"serverUrl":"http://127.0.0.1:62029","pluginId":"keep-awake","startupDurationMs":106}
+[12:15:43] WARN: [host-daemon] online host RPC failed {"serverUrl":"http://127.0.0.1:62029","type":"provider.list_models"}
+    err: {
+      "type": "JsonRpcResponseError",
+      "message": "Could not find the pi CLI on this host. Install @earendil-works/pi-coding-agent and retry.",
+      "stack":
+          JsonRpcResponseError: Could not find the pi CLI on this host. Install @earendil-works/pi-coding-agent and retry.
+              at jsonRpcResponseError (/private/tmp/openbot-cloudroom-d8b3cc3/gui/packages/provider-bridge-protocol/src/bridge-kit/runtime-json-rpc.ts:159:12)
+              at settleJsonRpcResponse (/private/tmp/openbot-cloudroom-d8b3cc3/gui/packages/provider-bridge-protocol/src/bridge-kit/runtime-json-rpc.ts:268:20)
+              at handleStdoutLine (/private/tmp/openbot-cloudroom-d8b3cc3/gui/packages/agent-runtime/src/runtime.ts:1318:7)
+              at Object.handleStdoutLine (/private/tmp/openbot-cloudroom-d8b3cc3/gui/packages/agent-runtime/src/runtime.ts:332:7)
+              at Object.onLine (/private/tmp/openbot-cloudroom-d8b3cc3/gui/packages/agent-runtime/src/runtime-provider-process.ts:421:19)
+              at emit (/private/tmp/openbot-cloudroom-d8b3cc3/gui/packages/provider-bridge-protocol/src/bridge-kit/bounded-line-reader.ts:60:10)
+              at Socket.<anonymous> (/private/tmp/openbot-cloudroom-d8b3cc3/gui/packages/provider-bridge-protocol/src/bridge-kit/bounded-line-reader.ts:33:9)
+              at Socket.emit (node:events:514:28)
+              at addChunk (node:internal/streams/readable:568:12)
+              at readableAddChunkPushByteMode (node:internal/streams/readable:519:3)
+      "code": -32000,
+      "recovery": null,
+      "name": "JsonRpcResponseError"
+    }
+[12:15:43] WARN: [host-daemon] online host RPC failed {"serverUrl":"http://127.0.0.1:62029","type":"provider.list_models"}
+    err: {
+      "type": "JsonRpcResponseError",
+      "message": "spawn cursor-agent ENOENT",
+      "stack":
+          JsonRpcResponseError: spawn cursor-agent ENOENT
+              at jsonRpcResponseError (/private/tmp/openbot-cloudroom-d8b3cc3/gui/packages/provider-bridge-protocol/src/bridge-kit/runtime-json-rpc.ts:159:12)
+              at settleJsonRpcResponse (/private/tmp/openbot-cloudroom-d8b3cc3/gui/packages/provider-bridge-protocol/src/bridge-kit/runtime-json-rpc.ts:268:20)
+              at handleStdoutLine (/private/tmp/openbot-cloudroom-d8b3cc3/gui/packages/agent-runtime/src/runtime.ts:1318:7)
+              at Object.handleStdoutLine (/private/tmp/openbot-cloudroom-d8b3cc3/gui/packages/agent-runtime/src/runtime.ts:332:7)
+              at Object.onLine (/private/tmp/openbot-cloudroom-d8b3cc3/gui/packages/agent-runtime/src/runtime-provider-process.ts:421:19)
+              at emit (/private/tmp/openbot-cloudroom-d8b3cc3/gui/packages/provider-bridge-protocol/src/bridge-kit/bounded-line-reader.ts:60:10)
+              at Socket.<anonymous> (/private/tmp/openbot-cloudroom-d8b3cc3/gui/packages/provider-bridge-protocol/src/bridge-kit/bounded-line-reader.ts:33:9)
+              at Socket.emit (node:events:514:28)
+              at addChunk (node:internal/streams/readable:568:12)
+              at readableAddChunkPushByteMode (node:internal/streams/readable:519:3)
+      "code": -32000,
+      "recovery": null,
+      "name": "JsonRpcResponseError"
+    }
+[12:15:44] INFO: [host-daemon] Host plugin worker ready {"serverUrl":"http://127.0.0.1:62029","pluginId":"provider-claude-code","startupDurationMs":599}
+[12:15:46] INFO: [host-daemon] Host plugin worker ready {"serverUrl":"http://127.0.0.1:62029","pluginId":"provider-acp","startupDurationMs":146}
+[12:16:03] INFO: [host-daemon] Disconnected from server {"serverUrl":"http://127.0.0.1:62029","code":1006,"reason":""}
+[12:16:04] INFO: [host-daemon] Disconnected from server {"serverUrl":"http://127.0.0.1:62029","code":1000,"reason":""}
+[12:16:04] WARN: [host-daemon] WebSocket error {"serverUrl":"http://127.0.0.1:62029"}
+    err: {
+      "type": "ErrorEvent",
+      "message": "fetch failed",
+      "error": {
+        "type": "Error",
+        "message": "fetch failed",
+        "stack":
+            Error: fetch failed
+                at <anonymous> (/private/tmp/openbot-cloudroom-d8b3cc3/gui/node_modules/.pnpm/partysocket@1.3.0_react@19.2.4/node_modules/partysocket/src/ws.ts:670:26)
+                at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      },
+      "target": null,
+      "currentTarget": null,
+      "srcElement": null,
+      "cancelable": false,
+      "defaultPrevented": false,
+      "timeStamp": 22165.508167,
+      "returnValue": true,
+      "bubbles": false,
+      "composed": false,
+      "eventPhase": 0,
+      "cancelBubble": false,
+      "isTrusted": false
+    }
+[12:16:06] INFO: [host-daemon] Connected to server {"serverUrl":"http://127.0.0.1:62029","sessionId":"hses_246nj6v9q4"}
+[12:16:06] INFO: [host-daemon] Host plugin worker stopped {"serverUrl":"http://127.0.0.1:62029","pluginId":"keep-awake","reason":"host generation is no longer active after reconnect","uptimeMs":24213,"exitCode":0,"signal":null,"forceKilled":false}
+[12:16:06] INFO: [host-daemon] Host plugin worker stopped {"serverUrl":"http://127.0.0.1:62029","pluginId":"provider-acp","reason":"host generation is no longer active after reconnect","uptimeMs":20644,"exitCode":0,"signal":null,"forceKilled":false}
+[12:16:06] INFO: [host-daemon] Host plugin worker stopped {"serverUrl":"http://127.0.0.1:62029","pluginId":"provider-claude-code","reason":"host generation is no longer active after reconnect","uptimeMs":23470,"exitCode":0,"signal":null,"forceKilled":false}
+[12:16:09] INFO: [host-daemon] Host plugin worker ready {"serverUrl":"http://127.0.0.1:62029","pluginId":"keep-awake","startupDurationMs":232}
+[12:16:09] INFO: [host-daemon] Host plugin worker ready {"serverUrl":"http://127.0.0.1:62029","pluginId":"provider-acp","startupDurationMs":149}
+[12:16:09] WARN: [host-daemon] online host RPC failed {"serverUrl":"http://127.0.0.1:62029","type":"provider.list_models"}
+    err: {
+      "type": "Error",
+      "message": "Runtime shutting down",
+      "stack":
+          Error: Runtime shutting down
+              at RuntimeProviderProcessManager.shutdown (/private/tmp/openbot-cloudroom-d8b3cc3/gui/packages/agent-runtime/src/runtime-provider-process.ts:339:24)
+              at Object.shutdown (/private/tmp/openbot-cloudroom-d8b3cc3/gui/packages/agent-runtime/src/runtime.ts:2596:31)
+              at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+              at async Promise.all (index 0)
+              at async RuntimeManager.shutdownProviderMaintenanceRuntime (/private/tmp/openbot-cloudroom-d8b3cc3/gui/apps/host-daemon/src/runtime-manager.ts:799:5)
+              at async RuntimeManager.replaceBaseShellEnv (/private/tmp/openbot-cloudroom-d8b3cc3/gui/apps/host-daemon/src/runtime-manager.ts:594:5)
+              at async <anonymous> (/private/tmp/openbot-cloudroom-d8b3cc3/gui/apps/host-daemon/src/app.ts:681:7)
+    }
+[12:16:10] INFO: [host-daemon] Host plugin worker stopped {"serverUrl":"http://127.0.0.1:62029","pluginId":"keep-awake","reason":"plugin disposed","uptimeMs":1480,"exitCode":0,"signal":null,"forceKilled":false}
+[12:16:10] INFO: [host-daemon] Host plugin worker stopped {"serverUrl":"http://127.0.0.1:62029","pluginId":"provider-acp","reason":"plugin disposed","uptimeMs":950,"exitCode":0,"signal":null,"forceKilled":false}
+[12:16:10] INFO: [host-daemon] Disconnected from server {"serverUrl":"http://127.0.0.1:62029","code":1001,"reason":"server-shutdown"}
+[12:16:14] INFO: [host-daemon] Connected to server {"serverUrl":"http://127.0.0.1:62029","sessionId":"hses_2dqg3kb26r"}
+[12:16:14] INFO: [host-daemon] Host plugin worker ready {"serverUrl":"http://127.0.0.1:62029","pluginId":"keep-awake","startupDurationMs":222}
+[12:16:15] INFO: [host-daemon] Host plugin worker stopped {"serverUrl":"http://127.0.0.1:62029","pluginId":"keep-awake","reason":"plugin disposed","uptimeMs":659,"exitCode":0,"signal":null,"forceKilled":false}
+[12:16:15] INFO: [host-daemon] Host plugin worker ready {"serverUrl":"http://127.0.0.1:62029","pluginId":"provider-acp","startupDurationMs":185}
+[12:16:15] INFO: [host-daemon] Host plugin worker stopped {"serverUrl":"http://127.0.0.1:62029","pluginId":"provider-acp","reason":"plugin disposed","uptimeMs":194,"exitCode":0,"signal":null,"forceKilled":false}
+[12:16:15] WARN: [host-daemon] online host RPC failed {"serverUrl":"http://127.0.0.1:62029","type":"plugin.host.call"}
+    err: {
+      "type": "Error",
+      "message": "host plugin worker exited (0)",
+      "stack":
+          Error: host plugin worker exited (0)
+              at PluginHostManager.rejectPendingCalls (/private/tmp/openbot-cloudroom-d8b3cc3/gui/apps/host-daemon/src/plugin-host-manager.ts:953:51)
+              at failWorker (/private/tmp/openbot-cloudroom-d8b3cc3/gui/apps/host-daemon/src/plugin-host-manager.ts:534:12)
+              at ChildProcess.<anonymous> (/private/tmp/openbot-cloudroom-d8b3cc3/gui/apps/host-daemon/src/plugin-host-manager.ts:653:7)
+              at ChildProcess.wrapper (node:events:639:12)
+              at ChildProcess.emit (node:events:514:28)
+              at ChildProcess._handle.onexit (node:internal/child_process:295:12)
+    }
+[12:16:15] WARN: [host-daemon] online host RPC failed {"serverUrl":"http://127.0.0.1:62029","type":"plugin.host.call"}
+    err: {
+      "type": "Error",
+      "message": "host plugin provider-acp generation 149673e3-36e2-4ee7-89f5-80940581673f is retired",
+      "stack":
+          Error: host plugin provider-acp generation 149673e3-36e2-4ee7-89f5-80940581673f is retired
+              at PluginHostManager.ensureWorkerNow (/private/tmp/openbot-cloudroom-d8b3cc3/gui/apps/host-daemon/src/plugin-host-manager.ts:414:13)
+              at <anonymous> (/private/tmp/openbot-cloudroom-d8b3cc3/gui/apps/host-daemon/src/plugin-host-manager.ts:404:12)
+              at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    }
+[12:16:15] INFO: [host-daemon] Disconnected from server {"serverUrl":"http://127.0.0.1:62029","code":1001,"reason":"server-shutdown"}
+[12:16:15] INFO: [host-daemon] Shutting down host daemon {"serverUrl":"http://127.0.0.1:62029","mode":"shutdown","reason":"SIGTERM"}
+[12:16:15] WARN: [host-daemon] Watcher child exited; respawning {"serverUrl":"http://127.0.0.1:62029","activeSubscriptions":1}
+[12:16:15] WARN: [host-daemon] online host RPC failed {"serverUrl":"http://127.0.0.1:62029","type":"provider.list_models"}
+    err: {
+      "type": "Error",
+      "message": "Runtime shutting down",
+      "stack":
+          Error: Runtime shutting down
+              at RuntimeProviderProcessManager.shutdown (/private/tmp/openbot-cloudroom-d8b3cc3/gui/packages/agent-runtime/src/runtime-provider-process.ts:339:24)
+              at Object.shutdown (/private/tmp/openbot-cloudroom-d8b3cc3/gui/packages/agent-runtime/src/runtime.ts:2596:31)
+              at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+              at async Promise.all (index 0)
+              at async RuntimeManager.shutdownProviderMaintenanceRuntime (/private/tmp/openbot-cloudroom-d8b3cc3/gui/apps/host-daemon/src/runtime-manager.ts:799:5)
+              at async RuntimeManager.shutdownAll (/private/tmp/openbot-cloudroom-d8b3cc3/gui/apps/host-daemon/src/runtime-manager.ts:1088:5)
+              at async Object.shutdownRuntimes (/private/tmp/openbot-cloudroom-d8b3cc3/gui/apps/host-daemon/src/app.ts:950:7)
+              at async <anonymous> (/private/tmp/openbot-cloudroom-d8b3cc3/gui/apps/host-daemon/src/daemon.ts:141:11)
+    }
+[12:16:15] WARN: [host-daemon] online host RPC failed {"serverUrl":"http://127.0.0.1:62029","type":"provider.list_models"}
+    err: {
+      "type": "Error",
+      "message": "Provider \"pi\" is not running",
+      "stack":
+          Error: Provider "pi" is not running
+              at RuntimeProviderProcessManager.requireProviderProcess (/private/tmp/openbot-cloudroom-d8b3cc3/gui/packages/agent-runtime/src/runtime-provider-process.ts:273:13)
+              at Object.listModels (/private/tmp/openbot-cloudroom-d8b3cc3/gui/packages/agent-runtime/src/runtime.ts:2364:38)
+              at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+              at async RuntimeManager.withProviderMaintenanceRuntime (/private/tmp/openbot-cloudroom-d8b3cc3/gui/apps/host-daemon/src/runtime-manager.ts:893:14)
+              at async dispatchOnlineRpcCommand (/private/tmp/openbot-cloudroom-d8b3cc3/gui/apps/host-daemon/src/command-dispatch.ts:814:12)
+              at async CommandRouter.handleOnlineRpcRequest (/private/tmp/openbot-cloudroom-d8b3cc3/gui/apps/host-daemon/src/command-router.ts:103:22)
+              at async Object.onHostRpcRequest (/private/tmp/openbot-cloudroom-d8b3cc3/gui/apps/host-daemon/src/app.ts:835:24)
+    }

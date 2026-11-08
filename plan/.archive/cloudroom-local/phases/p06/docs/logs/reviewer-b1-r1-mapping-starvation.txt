@@ -1,0 +1,1 @@
+{"status":"REPRODUCED","rounds":10,"repeatedRetainedIds":100,"absentMappingsNeverRequested":3996,"mappings":4096,"newCreateAdmitted":false}

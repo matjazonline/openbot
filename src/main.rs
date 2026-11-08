@@ -219,14 +219,14 @@ const NO_BACKWARD_COMPATIBILITY_NOTES: &[&str] = &[
     "plan/attribution-service/08-analytics-and-attribution-dashboard.md",
     "plan/attribution-service/09-operations-retention-and-separate-deployment.md",
     "plan/attribution-service/10-integration-verification-and-pilot.md",
-    "plan/cloudroom-local/README.md",
-    "plan/cloudroom-local/01-contracts-and-cloudroom-compatibility.md",
-    "plan/cloudroom-local/02-company-machines-and-pairing.md",
-    "plan/cloudroom-local/03-outbound-connection-and-durable-protocol.md",
-    "plan/cloudroom-local/04-cloudroom-plugin-and-session-recovery.md",
-    "plan/cloudroom-local/05-openbot-management-and-workflows.md",
-    "plan/cloudroom-local/06-local-setup-and-operations.md",
-    "plan/cloudroom-local/07-integration-and-verification.md",
+    "plan/.archive/cloudroom-local/README.md",
+    "plan/.archive/cloudroom-local/01-contracts-and-cloudroom-compatibility.md",
+    "plan/.archive/cloudroom-local/02-company-machines-and-pairing.md",
+    "plan/.archive/cloudroom-local/03-outbound-connection-and-durable-protocol.md",
+    "plan/.archive/cloudroom-local/04-cloudroom-plugin-and-session-recovery.md",
+    "plan/.archive/cloudroom-local/05-openbot-management-and-workflows.md",
+    "plan/.archive/cloudroom-local/06-local-setup-and-operations.md",
+    "plan/.archive/cloudroom-local/07-integration-and-verification.md",
     "plan/db_improve/05-deferred-until-traffic.md",
     "plan/db_improve/improve-key-credentials.md",
     "plan/db_improve/run-agent-link-table.md",
@@ -322,6 +322,10 @@ async fn serve() -> anyhow::Result<()> {
     };
     let mut knowledge_shutdown_handle =
         supervise_knowledge_shutdown(app_state.knowledge.clone(), shutdown_tx.subscribe());
+    let mut local_machine_shutdown_handle = supervise_local_machine_shutdown(
+        app_state.local_machine_connections.clone(),
+        shutdown_tx.subscribe(),
+    );
     let mut workflow_handles = workflow.spawn(&workflow_shutdown);
 
     // The runtime panel samples the workflow worker slots and the jobs they hold (p08 D4.8).
@@ -407,6 +411,10 @@ async fn serve() -> anyhow::Result<()> {
     let mut mailbox_listener_handle = mailbox_listener_handle;
     tokio::join!(
         join_background("knowledge indexing", &mut knowledge_shutdown_handle),
+        join_background(
+            "local machine connections",
+            &mut local_machine_shutdown_handle
+        ),
         join_background("runtime metric sampler", &mut runtime_sampler_handle),
         join_background("session cleanup", &mut session_cleanup_handle),
         join_background("inbound event worker", &mut inbound_event_worker_handle),
@@ -423,6 +431,20 @@ async fn serve() -> anyhow::Result<()> {
     );
 
     Ok(())
+}
+
+fn supervise_local_machine_shutdown(
+    connections: Arc<
+        open_bots::adapters::http::routes::local_machine_connection::LocalMachineConnections,
+    >,
+    mut shutdown: tokio::sync::broadcast::Receiver<()>,
+) -> tokio::task::JoinHandle<()> {
+    tokio::spawn(async move {
+        let _ = shutdown.recv().await;
+        if connections.shutdown().await.is_err() {
+            warn!("Local machine connections exceeded their shutdown drain");
+        }
+    })
 }
 
 fn supervise_knowledge_shutdown(

@@ -1,0 +1,44 @@
+[20:39:43] INFO: [server] Server listening {"bindHost":"127.0.0.1","port":46986,"dataDir":"/tmp/openbot-cloudroom-p01-profile"}
+[20:39:43] INFO: [server] plugin custom-instructions@0.1.0 loaded
+[20:39:43] INFO: [server] plugin machine-ssh@0.1.0 loaded
+[20:39:43] INFO: [server] plugin openbot-compatibility-probe@0.1.0 loaded
+[20:39:43] INFO: [server] plugin bb-guide@0.1.0 loaded
+[20:39:43] INFO: [server] plugin time-in-cloudroom@0.1.0 loaded
+[20:39:43] INFO: [server] plugin side-chat@0.1.0 loaded
+[20:39:43] INFO: [server] plugin drafts@0.1.0 loaded
+[20:39:43] INFO: [server] plugin pdf-preview@0.1.0 loaded
+[20:39:43] INFO: [server] plugin scheduled-send@0.1.0 loaded
+[20:39:43] INFO: [server] plugin push-notifications@0.1.0 loaded
+[20:39:43] INFO: [server] plugin provider-usage@0.1.0 loaded
+[20:39:43] INFO: [server] plugin accounts@0.1.0 loaded
+[20:39:43] INFO: [server] plugin inline-vis@0.1.0 loaded
+[20:39:43] INFO: [server] plugin gpu@0.1.0 loaded
+[20:39:43] INFO: [server] plugin secrets@0.1.0 loaded
+[20:39:43] INFO: [server] plugin provider-retry@0.1.0 loaded
+[20:39:43] INFO: [server] plugin monaco-editor@0.1.0 loaded
+[20:39:43] INFO: [server] plugin connect@0.1.0 loaded
+[20:39:43] INFO: [server] Session opened {"sessionId":"hses_2cgpt2qkzt","hostId":"host_x39f5jia3f","replacedSessionId":"hses_9iezccsttk"}
+[20:39:43] INFO: [server] Daemon WebSocket opened {"sessionId":"hses_2cgpt2qkzt","hostId":"host_x39f5jia3f"}
+[20:39:44] INFO: [server] plugin automations@0.1.0 loaded
+[20:39:44] WARN: [server] marketplace bb-community refresh dropped 1 catalog entry whose id matches a bundled plugin: provider-usage
+[20:39:46] INFO: [server] plugin keep-awake@0.1.0 loaded
+[20:39:46] INFO: [server] plugin environment-project-checkout@0.1.0 loaded
+[20:39:46] INFO: [server] plugin environment-git-worktree@0.1.0 loaded
+[20:39:46] INFO: [server] plugin environment-personal-workspace@0.1.0 loaded
+[20:39:46] INFO: [server] plugin computer-use@0.1.0 loaded
+[20:39:46] INFO: [server] plugin provider-codex@0.1.0 loaded
+[20:39:46] INFO: [server] plugin provider-pi@0.1.0 loaded
+[20:39:46] INFO: [server] plugin provider-acp@0.1.0 loaded
+[20:39:46] INFO: [server] plugin provider-claude-code@0.1.0 loaded
+[20:39:48] INFO: [server] Event loop stalled {"intervalMs":5000,"maxDelayMs":648.5,"meanDelayMs":26.8,"p99DelayMs":116.7,"resolutionMs":20,"thresholdMs":500,"currentWork":null,"lastWork":"ws:daemon host-rpc.response","lastWorkMs":0.2,"slowestWork":"ws:daemon host-rpc.response","slowestWorkMs":0.9,"cpuMs":2789.2,"gcMs":64.7,"maxGcMs":8.3,"heapUsedMb":418,"rssMb":711}
+[20:39:48] INFO: [server] Provider model catalog refresh settled {"hostId":"host_x39f5jia3f","providerId":"claude-code","scope":"host","durationMs":1035,"outcome":"success","modelCount":20,"changed":false}
+[20:39:48] WARN: [server] Provider model catalog refresh settled {"hostId":"host_x39f5jia3f","providerId":"pi","scope":"host","durationMs":164,"outcome":"failed","errorCode":"command_failed","errorMessage":"Could not find the pi CLI on this host. Install @earendil-works/pi-coding-agent and retry.","errorStatus":502,"errorRetryable":false,"changed":true}
+[20:39:49] WARN: [server] Provider model catalog refresh settled {"hostId":"host_x39f5jia3f","providerId":"acp-cursor","scope":"host","durationMs":178,"outcome":"missing_executable","errorCode":"missing_executable","errorMessage":"spawn cursor-agent ENOENT","errorStatus":502,"errorRetryable":false,"changed":true}
+[20:39:49] INFO: [server] Provider model catalog refresh settled {"hostId":"host_x39f5jia3f","providerId":"codex","scope":"host","durationMs":1988,"outcome":"success","modelCount":8,"changed":false}
+[20:39:59] WARN: [server] Provider model catalog refresh settled {"hostId":"host_x39f5jia3f","providerId":"acp-opencode","scope":"host","durationMs":10389,"outcome":"failed","errorCode":"command_failed","errorMessage":"Runtime shutting down","errorStatus":502,"errorRetryable":false,"changed":true}
+[20:39:59] INFO: [server] Provider model catalog prewarm pass finished {"hostId":"host_x39f5jia3f","providerCount":5,"durationMs":15663}
+[20:39:59] INFO: [server] Provider model catalog prewarm pass finished {"hostId":"host_x39f5jia3f","providerCount":5,"durationMs":3}
+[20:40:00] WARN: [server] [plugin:openbot-compatibility-probe] cli openbot-proof failed: provider catalog failed: failed
+[20:42:11] INFO: [server] plugin openbot-compatibility-probe@0.1.0 loaded
+[20:42:11] WARN: [server] [plugin:openbot-compatibility-probe] cli openbot-proof failed: HTTP 400: This provider does not support restarting model discovery.
+[20:42:49] INFO: [server] Daemon WebSocket closed {"sessionId":"hses_2cgpt2qkzt"}

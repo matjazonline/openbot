@@ -1,0 +1,124 @@
+    Checking open_bots v0.1.0 (/Users/mac03/dev/openbot)
+error: cannot find derive macro `FromRef` in this scope
+  --> src/adapters/http/routes/local_agents_tests.rs:12:17
+   |
+12 | #[derive(Clone, FromRef)]
+   |                 ^^^^^^^
+   |
+note: `FromRef` is imported here, but it is only a trait, without a derive macro
+  --> src/adapters/http/routes/local_agents_tests.rs:8:82
+   |
+ 8 | use axum::{body::{Body, to_bytes}, http::{Request, Method, header, HeaderValue}, extract::FromRef};
+   |                                                                                  ^^^^^^^^^^^^^^^^
+
+error[E0277]: the trait bound `Arc<LocalAgentManagement>: FromRef<State>` is not satisfied
+   --> src/adapters/http/routes/local_agents_tests.rs:22:6
+    |
+ 22 |     (router().route_layer(middleware::from_fn_with_state(authority.clone(),require_auth))
+    |      ^^^^^^^^ unsatisfied trait bound
+    |
+help: the trait `FromRef<adapters::http::routes::local_agents::tests::State>` is not implemented for `std::sync::Arc<application::local_agents::management::LocalAgentManagement>`
+      but trait `FromRef<app_state::AppState>` is implemented for it
+   --> src/adapters/http/app_state.rs:100:1
+    |
+100 | impl FromRef<AppState> for Arc<crate::application::local_agents::management::LocalAgentManagement> {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    = help: for that trait implementation, expected `app_state::AppState`, found `adapters::http::routes::local_agents::tests::State`
+note: required by a bound in `adapters::http::routes::local_agents::router`
+   --> src/adapters/http/routes/local_agents.rs:14:62
+    |
+ 13 | pub fn router<S>() -> Router<S>
+    |        ------ required by a bound in this function
+ 14 | where S: Clone+Send+Sync+'static, Arc<LocalAgentManagement>: FromRef<S>, Arc<LocalMachineUseCases>: FromRef<S> {
+    |                                                              ^^^^^^^^^^ required by this bound in `router`
+    = note: the full name for the type has been written to '/Users/mac03/dev/openbot/target/debug/deps/open_bots-5ab259e76904a6db.long-type-12511040964642938893.txt'
+    = note: consider using `--verbose` to print the full type name to the console
+
+error[E0277]: the trait bound `Arc<LocalMachineUseCases>: FromRef<State>` is not satisfied
+   --> src/adapters/http/routes/local_agents_tests.rs:22:6
+    |
+ 22 |     (router().route_layer(middleware::from_fn_with_state(authority.clone(),require_auth))
+    |      ^^^^^^^^ unsatisfied trait bound
+    |
+help: the trait `FromRef<adapters::http::routes::local_agents::tests::State>` is not implemented for `std::sync::Arc<pairing::LocalMachineUseCases>`
+      but trait `FromRef<app_state::AppState>` is implemented for it
+   --> src/adapters/http/app_state.rs:104:1
+    |
+104 | impl FromRef<AppState> for Arc<crate::application::local_agents::LocalMachineUseCases> {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    = help: for that trait implementation, expected `app_state::AppState`, found `adapters::http::routes::local_agents::tests::State`
+note: required by a bound in `adapters::http::routes::local_agents::router`
+   --> src/adapters/http/routes/local_agents.rs:14:101
+    |
+ 13 | pub fn router<S>() -> Router<S>
+    |        ------ required by a bound in this function
+ 14 | where S: Clone+Send+Sync+'static, Arc<LocalAgentManagement>: FromRef<S>, Arc<LocalMachineUseCases>: FromRef<S> {
+    |                                                                                                     ^^^^^^^^^^ required by this bound in `router`
+    = note: the full name for the type has been written to '/Users/mac03/dev/openbot/target/debug/deps/open_bots-5ab259e76904a6db.long-type-13092722929992508928.txt'
+    = note: consider using `--verbose` to print the full type name to the console
+
+error[E0599]: no method named `submit_decision` found for struct `persistence::PostgresPersistence` in the current scope
+   --> src/adapters/persistence/workflow/local_agent_tests.rs:269:27
+    |
+269 |     s.fixture.persistence.submit_decision(command.clone()).await.unwrap();
+    |                           ^^^^^^^^^^^^^^^
+    |
+   ::: src/adapters/persistence/mod.rs:46:1
+    |
+ 46 | pub struct PostgresPersistence {
+    | ------------------------------ method `submit_decision` not found for this struct
+    |
+   ::: src/application/workflow/decisions.rs:240:14
+    |
+240 |     async fn submit_decision(&self, command: SubmitDecision) -> AppResult<DecisionSubmission>;
+    |              --------------- the method is available for `persistence::PostgresPersistence` here
+    |
+    = help: items from traits can only be used if the trait is in scope
+help: there is a method `park_decision` with a similar name, but with different arguments
+   --> src/application/workflow/decisions.rs:234:5
+    |
+234 | /     async fn park_decision(
+235 | |         &self,
+236 | |         scope: ActivationRequest,
+237 | |         notices: &DecisionNotices,
+238 | |     ) -> AppResult<Option<ParkedWorkflow>>;
+    | |___________________________________________^
+help: trait `WorkflowDecisions` which provides `submit_decision` is implemented but not in scope; perhaps you want to import it
+    |
+  3 + use crate::application::workflow::decisions::WorkflowDecisions;
+    |
+
+error[E0599]: no method named `submit_decision` found for struct `persistence::PostgresPersistence` in the current scope
+   --> src/adapters/persistence/workflow/local_agent_tests.rs:274:27
+    |
+274 |     s.fixture.persistence.submit_decision(command).await.unwrap();
+    |                           ^^^^^^^^^^^^^^^
+    |
+   ::: src/adapters/persistence/mod.rs:46:1
+    |
+ 46 | pub struct PostgresPersistence {
+    | ------------------------------ method `submit_decision` not found for this struct
+    |
+   ::: src/application/workflow/decisions.rs:240:14
+    |
+240 |     async fn submit_decision(&self, command: SubmitDecision) -> AppResult<DecisionSubmission>;
+    |              --------------- the method is available for `persistence::PostgresPersistence` here
+    |
+    = help: items from traits can only be used if the trait is in scope
+help: there is a method `park_decision` with a similar name, but with different arguments
+   --> src/application/workflow/decisions.rs:234:5
+    |
+234 | /     async fn park_decision(
+235 | |         &self,
+236 | |         scope: ActivationRequest,
+237 | |         notices: &DecisionNotices,
+238 | |     ) -> AppResult<Option<ParkedWorkflow>>;
+    | |___________________________________________^
+help: trait `WorkflowDecisions` which provides `submit_decision` is implemented but not in scope; perhaps you want to import it
+    |
+  3 + use crate::application::workflow::decisions::WorkflowDecisions;
+    |
+
+Some errors have detailed explanations: E0277, E0599.
+For more information about an error, try `rustc --explain E0277`.
+error: could not compile `open_bots` (lib test) due to 5 previous errors

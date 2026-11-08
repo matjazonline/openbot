@@ -1,0 +1,15 @@
+
+running 1 test
+
+thread 'adapters::http::routes::local_agents::tests::ui::cloudroom_management_ui_later_profile_page_and_selection_keep_authorized_start_conversation' (17939340) panicked at src/adapters/http/routes/ui_local_agents_tests.rs:147:5:
+Expected rendered navigation link More profiles: Database error
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test adapters::http::routes::local_agents::tests::ui::cloudroom_management_ui_later_profile_page_and_selection_keep_authorized_start_conversation ... FAILED
+
+failures:
+
+failures:
+    adapters::http::routes::local_agents::tests::ui::cloudroom_management_ui_later_profile_page_and_selection_keep_authorized_start_conversation
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 3306 filtered out; finished in 1.03s
+

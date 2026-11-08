@@ -1,0 +1,39 @@
+{
+  "changed": [
+    "migrations/20260817000000_init_schema.sql",
+    "scripts/tests/local-agents-browser.mjs",
+    "src/adapters/http/pages/local_agents/mod.rs",
+    "src/adapters/http/pages/local_agents/profiles.rs",
+    "src/adapters/http/pages/local_agents/sessions.rs",
+    "src/adapters/http/routes/ui_local_agents_tests.rs",
+    "src/adapters/persistence/local_agents/management/tests.rs",
+    "src/adapters/persistence/local_agents/protocol/mod.rs",
+    "src/adapters/persistence/workflow/local_agent_continuation_tests.rs",
+    "src/adapters/persistence/workflow/local_agent_correction_tests.rs",
+    "src/adapters/persistence/workflow/local_agent_tests.rs",
+    "src/adapters/persistence/workflow/local_agents/continuation.rs",
+    "src/adapters/persistence/workflow/local_agents/mod.rs",
+    "src/adapters/persistence/workflow/polling.rs"
+  ],
+  "expected": [
+    "migrations/20260817000000_init_schema.sql",
+    "scripts/tests/local-agents-browser.mjs",
+    "src/adapters/http/pages/local_agents/mod.rs",
+    "src/adapters/http/pages/local_agents/profiles.rs",
+    "src/adapters/http/pages/local_agents/sessions.rs",
+    "src/adapters/http/routes/ui_local_agents_tests.rs",
+    "src/adapters/persistence/local_agents/management/tests.rs",
+    "src/adapters/persistence/local_agents/protocol/mod.rs",
+    "src/adapters/persistence/workflow/local_agent_continuation_tests.rs",
+    "src/adapters/persistence/workflow/local_agent_correction_tests.rs",
+    "src/adapters/persistence/workflow/local_agent_tests.rs",
+    "src/adapters/persistence/workflow/local_agents/continuation.rs",
+    "src/adapters/persistence/workflow/local_agents/mod.rs",
+    "src/adapters/persistence/workflow/polling.rs"
+  ],
+  "changed_matches": true,
+  "correction_sha256": "43e989eed2d8049de542c64aa32efd89bfa692463bbf38ce2fb425619fb26fa6",
+  "authority_equal": true,
+  "head": "97e5d60dc538e26c7cb976a8d63772eed80baff2",
+  "harness_note": "First comparison attempted git ls-files in non-git exported prior tree and failed; corrected to enumerate that exported tree."
+}

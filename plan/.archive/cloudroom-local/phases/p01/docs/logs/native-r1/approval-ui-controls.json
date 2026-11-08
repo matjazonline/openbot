@@ -1,0 +1,373 @@
+{
+  "buttons": [
+    {
+      "text": "",
+      "aria": "Go back"
+    },
+    {
+      "text": "",
+      "aria": "Go forward"
+    },
+    {
+      "text": "New thread",
+      "aria": "New thread (⇧ ⌘ O)"
+    },
+    {
+      "text": "Plugins",
+      "aria": null
+    },
+    {
+      "text": "Skills",
+      "aria": null
+    },
+    {
+      "text": "Loops",
+      "aria": null
+    },
+    {
+      "text": "",
+      "aria": "Loops panel options"
+    },
+    {
+      "text": "More",
+      "aria": "More sidebar navigation"
+    },
+    {
+      "text": "",
+      "aria": "Collapse Openbot public SDK proof section"
+    },
+    {
+      "text": "",
+      "aria": "New thread in Openbot public SDK proof"
+    },
+    {
+      "text": "",
+      "aria": "Openbot public SDK proof actions"
+    },
+    {
+      "text": "",
+      "aria": "Collapse Openbot codex smoke section"
+    },
+    {
+      "text": "",
+      "aria": "New thread in Openbot codex smoke"
+    },
+    {
+      "text": "",
+      "aria": "Openbot codex smoke actions"
+    },
+    {
+      "text": "",
+      "aria": "Archive thread"
+    },
+    {
+      "text": "",
+      "aria": "Thread actions"
+    },
+    {
+      "text": "",
+      "aria": "Collapse Openbot claude-code smoke section"
+    },
+    {
+      "text": "",
+      "aria": "New thread in Openbot claude-code smoke"
+    },
+    {
+      "text": "",
+      "aria": "Openbot claude-code smoke actions"
+    },
+    {
+      "text": "",
+      "aria": "Archive thread"
+    },
+    {
+      "text": "",
+      "aria": "Thread actions"
+    },
+    {
+      "text": "Cloudroom Connect",
+      "aria": "Cloudroom Connect"
+    },
+    {
+      "text": "Provider usage",
+      "aria": "Provider usage"
+    },
+    {
+      "text": "",
+      "aria": "Set up Cloudroom"
+    },
+    {
+      "text": "",
+      "aria": "Codex update available"
+    },
+    {
+      "text": "",
+      "aria": "Dismiss low disk warning"
+    },
+    {
+      "text": "",
+      "aria": "Thread actions"
+    },
+    {
+      "text": "Report a bug",
+      "aria": null
+    },
+    {
+      "text": "Share",
+      "aria": "Share thread"
+    },
+    {
+      "text": "",
+      "aria": "Side chat"
+    },
+    {
+      "text": "",
+      "aria": "Show right panel (⌘ J)"
+    },
+    {
+      "text": "",
+      "aria": "Copy message"
+    },
+    {
+      "text": "",
+      "aria": "Include context"
+    },
+    {
+      "text": "",
+      "aria": "Side chat"
+    },
+    {
+      "text": "",
+      "aria": "Message actions"
+    },
+    {
+      "text": "Provisioned thread",
+      "aria": null
+    },
+    {
+      "text": "",
+      "aria": "Copy message"
+    },
+    {
+      "text": "",
+      "aria": "Include context"
+    },
+    {
+      "text": "",
+      "aria": "Fork into new thread"
+    },
+    {
+      "text": "",
+      "aria": "Side chat"
+    },
+    {
+      "text": "",
+      "aria": "Message actions"
+    },
+    {
+      "text": "",
+      "aria": "Copy message"
+    },
+    {
+      "text": "",
+      "aria": "Include context"
+    },
+    {
+      "text": "",
+      "aria": "Side chat"
+    },
+    {
+      "text": "",
+      "aria": "Message actions"
+    },
+    {
+      "text": "",
+      "aria": "Copy message"
+    },
+    {
+      "text": "",
+      "aria": "Include context"
+    },
+    {
+      "text": "",
+      "aria": "Fork into new thread"
+    },
+    {
+      "text": "",
+      "aria": "Side chat"
+    },
+    {
+      "text": "",
+      "aria": "Message actions"
+    },
+    {
+      "text": "",
+      "aria": "Copy message"
+    },
+    {
+      "text": "",
+      "aria": "Include context"
+    },
+    {
+      "text": "",
+      "aria": "Side chat"
+    },
+    {
+      "text": "",
+      "aria": "Message actions"
+    },
+    {
+      "text": "",
+      "aria": "Copy message"
+    },
+    {
+      "text": "",
+      "aria": "Include context"
+    },
+    {
+      "text": "",
+      "aria": "Fork into new thread"
+    },
+    {
+      "text": "",
+      "aria": "Side chat"
+    },
+    {
+      "text": "",
+      "aria": "Copy message"
+    },
+    {
+      "text": "",
+      "aria": "Include context"
+    },
+    {
+      "text": "",
+      "aria": "Side chat"
+    },
+    {
+      "text": "Waiting for approval\nto run\nmkdir -p /var/folders/n2/5y7x75r92zl0ll90154hxdzr0000gn/T/openbot-permission-smoke-JsBlwJ && printf smoke > /var/folders/n2/5y7x75r92zl0ll90154hxdzr0000gn/T/openbot-permission-smoke-JsBlwJ/smoke.txt",
+      "aria": null
+    },
+    {
+      "text": "",
+      "aria": "Scroll to latest event"
+    },
+    {
+      "text": "Approval needed",
+      "aria": "Approval needed"
+    },
+    {
+      "text": "",
+      "aria": "Show details"
+    },
+    {
+      "text": "May I create the specified disposable file outside the project workspace?",
+      "aria": null
+    },
+    {
+      "text": "Deny",
+      "aria": null
+    },
+    {
+      "text": "Allow once",
+      "aria": null
+    },
+    {
+      "text": "",
+      "aria": "Collapse prompt box"
+    },
+    {
+      "text": "",
+      "aria": "Prompt actions"
+    },
+    {
+      "text": "6-Luna",
+      "aria": "Provider and model (⇧ ⌘ M)"
+    },
+    {
+      "text": "Medium",
+      "aria": "Reasoning effort: Medium"
+    },
+    {
+      "text": "",
+      "aria": "Start voice input"
+    },
+    {
+      "text": "",
+      "aria": "Submit (Enter)"
+    },
+    {
+      "text": "Environment: LocalLocal",
+      "aria": "Environment actions"
+    },
+    {
+      "text": "",
+      "aria": "New thread in this environment"
+    },
+    {
+      "text": "ManualManual",
+      "aria": "Permission mode"
+    },
+    {
+      "text": "",
+      "aria": "Context window 6% used"
+    },
+    {
+      "text": "",
+      "aria": "Thread table of contents"
+    },
+    {
+      "text": "Info",
+      "aria": "Show thread info panel"
+    },
+    {
+      "text": "",
+      "aria": "Open new tab (⌘ T)"
+    },
+    {
+      "text": "",
+      "aria": "Maximize pane"
+    },
+    {
+      "text": "",
+      "aria": "Hide right panel (⌘ J)"
+    },
+    {
+      "text": "None",
+      "aria": null
+    },
+    {
+      "text": "",
+      "aria": "New thread in this environment"
+    },
+    {
+      "text": "/var/folders/n2/5y7x75r92zl0ll90154hxdzr0000gn/T/openbot-native-smoke-TQMA3V",
+      "aria": "Copy directory"
+    },
+    {
+      "text": "Toggle Sidebar",
+      "aria": "Toggle sidebar (⌘ B)"
+    },
+    {
+      "text": "01\nSign in\nIn progress",
+      "aria": null
+    },
+    {
+      "text": "02\nConnect an agent\nClaude Code or Codex",
+      "aria": null
+    },
+    {
+      "text": "03\nConnect GitHub\nFor private repos",
+      "aria": null
+    },
+    {
+      "text": "04\nImport your work\nLast step",
+      "aria": null
+    },
+    {
+      "text": "Sign in with browser",
+      "aria": null
+    }
+  ],
+  "body": "New thread\nPlugins\nSkills\nLoops\nMore\nOpenbot public SDK proof\n\nNo threads\n\nOpenbot codex smoke\nOpenbot codex smoke\nOpenbot claude-code smoke\nOpenbot claude-code smoke\nSettings\nCloudroom Connect\nProvider usage\nYour disk is almost full: 5.4 GB free. Archive finished threads to free space.\n\nOpenbot codex smoke\n\nReport a bug\nShare\n\nThis is an authorized disposable integration smoke test. Reply with exactly OPENBOT_SMOKE_fd1dbad52d4390a5398841d3. Do not use tools, change files, or start subagents.\n\n8:39 PM\nProvisioned thread\n\nOPENBOT_SMOKE_fd1dbad52d4390a5398841d3\n\n8:40 PM\n\nThis is an authorized disposable integration smoke test. Reply with exactly OPENBOT_SMOKE_683ab977f88dd0987a76a8a9. Do not use tools, change files, or start subagents.\n\n8:40 PM\n\nOPENBOT_SMOKE_683ab977f88dd0987a76a8a9\n\n8:40 PM\n\nThis is an authorized disposable integration smoke test. Reply with exactly OPENBOT_SMOKE_6f8dbb85360f857c005569a0. Do not use tools, change files, or start subagents.\n\n8:44 PM\n\nOPENBOT_SMOKE_6f8dbb85360f857c005569a0\n\n8:44 PM\n\nDisposable permission test: use your shell tool to write the single word smoke to exactly /var/folders/n2/5y7x75r92zl0ll90154hxdzr0000gn/T/openbot-permission-smoke-JsBlwJ/smoke.txt. This target is a fresh directory owned by this test, outside the project to exercise permission handling. If permission is required, ask; do not work around the boundary or use another path. Then reply exactly OPENBOT_SMOKE_ac1b670a9acc1db0088859b4. Do not access any other files, network, or subagents.\n\n8:51 PM\nWaiting for approval\nto run\nmkdir -p /var/folders/n2/5y7x75r92zl0ll90154hxdzr0000gn/T/openbot-permission-smoke-JsBlwJ && printf smoke > /var/folders/n2/5y7x75r92zl0ll90154hxdzr0000gn/T/openbot-permission-smoke-JsBlwJ/smoke.txt\nWorking...\nApproval needed\nInfo\nParent\nNone\nEnvironment\nLocal\nDirectory\n/var/folders/n2/5y7x75r92zl0ll90154hxdzr0000gn/T/openbot-native-smoke-TQMA3V\nToggle Sidebar\ncloudroom\n\nSETUP\n\n01\nSign in\nIn progress\n02\nConnect an agent\nClaude Code or Codex\n03\nConnect GitHub\nFor private repos\n04\nImport your work\nLast step\n\nReopen setup anytime from the account button in the sidebar.\n\nStep 1 of 4\n\nSign in to Cloudroom\n\nUse the account you made on cloudroom.dev.\n\nSign in with browser\n\nAlready signed in there? You come right back."
+}

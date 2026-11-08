@@ -18,7 +18,7 @@ use std::time::Duration;
 
 pub(super) const APP_DOMAIN: &str = "agents.test";
 
-pub(super) fn lease() -> LeasePolicy {
+pub(in crate::adapters::persistence::workflow::tests) fn lease() -> LeasePolicy {
     LeasePolicy::new(Duration::from_secs(30)).unwrap()
 }
 
@@ -153,11 +153,15 @@ pub(super) async fn setup_with_owner(
     }
 }
 
-pub(super) async fn published(fixture: &Fixture, kind: &str, with: Value) -> VersionId {
+pub(in crate::adapters::persistence::workflow::tests) async fn published(
+    fixture: &Fixture,
+    kind: &str,
+    with: Value,
+) -> VersionId {
     let p = &fixture.persistence;
     let mut source: Value = serde_json::from_str(&registry::example(kind).unwrap().source).unwrap();
     source["steps"]["start"]["with"] = with;
-    let directory = message::MessagePublicationDirectory {
+    let directory = step_builtins::StepBuiltinPublicationDirectory {
         persistence: p.clone(),
     };
     let definitions =
@@ -170,7 +174,10 @@ pub(super) async fn published(fixture: &Fixture, kind: &str, with: Value) -> Ver
     publication.version
 }
 
-pub(super) async fn bound(fixture: &Fixture, version: VersionId) -> BindingTarget {
+pub(in crate::adapters::persistence::workflow::tests) async fn bound(
+    fixture: &Fixture,
+    version: VersionId,
+) -> BindingTarget {
     let p = &fixture.persistence;
     let target = BindingTarget {
         company: fixture.target.company,
@@ -216,7 +223,7 @@ pub(super) async fn admitted(
     .await
 }
 
-pub(super) async fn admitted_as(
+pub(in crate::adapters::persistence::workflow::tests) async fn admitted_as(
     fixture: &Fixture,
     target: BindingTarget,
     association: RelatedAssociation,

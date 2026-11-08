@@ -1,0 +1,9 @@
+{
+  "archive_sha256": "0418b3da0a5861c9a99c2a4b5ef51f7ca6f5c5d6b48dbe1da7309f0a70ec68e9",
+  "current_packaged_inputs_match": true,
+  "prior_package_changes": [
+    "package/dist/server.js",
+    "package/dist/server.js.map"
+  ],
+  "native_wrapper_helpers_source_unchanged": true
+}

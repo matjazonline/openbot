@@ -1,0 +1,1 @@
+PASS: packaged wrapper booted API/daemon/UI on loopback; competing same-profile wrapper refused; packaged public CLI install/status; public CLI reload; graceful stop/restart preserves host identity and installed plugin; public CLI remove; shutdown joins launcher; host authentication retained

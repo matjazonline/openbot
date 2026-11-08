@@ -82,7 +82,7 @@ async fn workflow_agent_message_tool_parks_on_delivery_and_continues_with_its_re
         WorkflowSourceDecoder,
         AgentPublicationDirectory {
             persistence: p.clone(),
-            inner: message::MessagePublicationDirectory {
+            inner: step_builtins::StepBuiltinPublicationDirectory {
                 persistence: p.clone(),
             },
         },

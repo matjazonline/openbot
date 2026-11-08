@@ -1,0 +1,103 @@
+
+> bb-plugin-openbot-local@0.2.0 test
+> node scripts/build.mjs && node scripts/build.mjs --test && node test/run.mjs
+
+built 1 plugin entry
+built 9 test entries
+✔ real trusted WSS reconnect rewraps immutable outbox and native tracking continues offline without duplicate SDK calls (978.671ms)
+✔ authorization rejection stops reconnect attempts and never enters the SDK (5.640666ms)
+✔ shutdown during a stalled TLS handshake joins network and dispatcher within the host drain (13.574791ms)
+✔ real WSS rejects stale_identity before journal receipt or SDK entry (25.673875ms)
+✔ real WSS rejects changed_digest before journal receipt or SDK entry (28.699167ms)
+✔ real WSS rejects binary before journal receipt or SDK entry (26.401209ms)
+✔ real WSS rejects unknown_field before journal receipt or SDK entry (27.1245ms)
+✔ public plugin service reload joins SDK work before storage closes and settings changes stop admission (311.846833ms)
+✔ configuration refuses non-origin URL http:// (1.307375ms)
+✔ configuration refuses non-origin URL https:// (0.17925ms)
+✔ configuration refuses non-origin URL https://path (0.10625ms)
+✔ configuration refuses non-origin URL https:// (0.089542ms)
+✔ configuration refuses non-origin URL https:// (0.1535ms)
+✔ configuration canonicalizes HTTPS and refuses arbitrary project paths/duplicates/bounds (1.462709ms)
+✔ user UTF8 prompt bound remains32KiB with fixed native operation header (5.875792ms)
+✔ actual peer command decoder canonicalizes field order and rejects hash/date/field changes (1.123541ms)
+✔ chunk transport roundtrips the exact2MiB limit and rejects overflow before send (29.195333ms)
+✔ chunks reject interleaving, invalid UTF8/base64, unsafe integers and time expiry (7.457667ms)
+✔ real SQLite survives receipt/intent reopen and replay keeps immutable payloads (18.693833ms)
+✔ competing stale intent claimants have exactly one durable SDK entry marker (5.941084ms)
+✔ missing command under reconcile enters durable recovery without a fresh SDK claim (5.843167ms)
+✔ acknowledgment cannot forget an unknown future or restore an already-pruned cursor (4.853625ms)
+✔ preflight refusal is durable but cannot follow the SDK intent cut (6.184167ms)
+✔ fixed4096 history bound fails controlled admission and never allocates a dangling sequence (1493.603708ms)
+✔ real process interruption at enrollment before-pending recovers the same durable claim (155.027292ms)
+✔ real process interruption at enrollment pending recovers the same durable claim (69.696042ms)
+✔ real process interruption at enrollment server-commit recovers the same durable claim (74.130125ms)
+✔ real process interruption at enrollment receipt recovers the same durable claim (141.127542ms)
+✔ real process interruption at enrollment journal recovers the same durable claim (77.347042ms)
+✔ real process interruption at enrollment paired recovers the same durable claim (78.157834ms)
+✔ real process interruption at enrollment cleaned recovers the same durable claim (77.920083ms)
+✔ changed origin never receives a saved pending credential or pairing claim (2.661083ms)
+✔ complete initial pairing 400 clears rejected input and explicit replacement starts a fresh attempt (3.942125ms)
+✔ complete initial pairing 401 clears rejected input and explicit replacement starts a fresh attempt (3.936166ms)
+✔ complete initial pairing 403 clears rejected input and explicit replacement starts a fresh attempt (3.835458ms)
+✔ complete initial pairing 404 clears rejected input and explicit replacement starts a fresh attempt (3.982042ms)
+✔ transport retains original pending secrets and ignores replacement input until outcome is resolved (3.238292ms)
+✔ incomplete_rejection retains original pending secrets and ignores replacement input until outcome is resolved (3.29475ms)
+✔ actual process interruption during definitive rejection cleaned cannot enroll stale input as a new identity (72.832417ms)
+✔ actual process interruption during definitive rejection rejected cannot enroll stale input as a new identity (71.808167ms)
+✔ a complete rejection cannot clear a Pending record or secret input once its journal is initialized (2.499625ms)
+✔ real competing connector processes exclude each other and OS releases graceful and killed owners (432.681041ms)
+✔ native idle admission preserves prompt order, queue identity and separate originating turns (32.888875ms)
+✔ native human admission preserves prompt order, queue identity and separate originating turns (16.276958ms)
+✔ native openbot admission preserves prompt order, queue identity and separate originating turns (12.398542ms)
+✔ native queue idle_to_busy race is decided at admission without steering or a second SDK call (11.947083ms)
+✔ native queue busy_to_idle race is decided at admission without steering or a second SDK call (9.09075ms)
+✔ accepted native queue work survives lost SDK response and replay with one mutation and original order (9.427875ms)
+✖ same-point journal restore retains mapping while SQL-only history rollback cannot reconstruct it at an equal cursor (18.606709ms)
+✔ terminal receipts remain for90days after ACK and old compacted effects cannot enter the SDK again (11.548375ms)
+✔ uncertainty and pending local references survive compaction and only unchanged confirmed mappings retire (6.650083ms)
+✔ 64MiB outbox pressure coalesces progress and preserves its reserved unacknowledged terminal summary (100.563917ms)
+✔ real WSS retirement requires current nonce and unchanged binding after server confirmation (347.386416ms)
+✔ real WSS mapping retirement rejects a stale connection before deleting local ownership (62.362667ms)
+✔ full mapping history pauses new creates while existing native work completes and ACKs drain (636.664ms)
+✔ lost read-only deliveries reconcile without poisoning native admission (19.859458ms)
+✔ create freezes explicit local checkout/provider/model and duplicate concurrent delivery submits once (7.301291ms)
+✔ lost send response reopens intent and recovers exact turn without sending again (5.186667ms)
+✔ spawn gap recovers positive plugin metadata, while absent threads never recreate (8.427375ms)
+✔ human turn, idle thread and unrelated permission prompts cannot complete or take ownership (10.819083ms)
+✔ persistent missing native thread coalesces evidence and retains effect capacity (17.869416ms)
+✔ resolved matching permission updates running without item event across journal reopen (10.371ms)
+✔ preflight model refusal is durable before any SDK mutation (6.59125ms)
+✔ preflight provider refusal is durable before any SDK mutation (6.591209ms)
+✔ preflight project refusal is durable before any SDK mutation (5.30925ms)
+✔ preflight expired refusal is durable before any SDK mutation (4.69075ms)
+✔ preflight gate refusal is durable before any SDK mutation (3.201708ms)
+✔ preflight foreign refusal is durable before any SDK mutation (5.109667ms)
+✔ unknown work consumes eight effect slots but explicit mapped-thread stop retains headroom (18.20275ms)
+✔ service abort cancels actual SDK wait and retains ambiguous intent without broad stop (7.693792ms)
+✔ matching terminal output stays within UTF8 bound and unknown usage remains null (15.567958ms)
+✔ ambiguous duplicate matching requests cannot attribute a human or second turn (2.360458ms)
+✔ native event history gaps retain durable correlation uncertainty across restart (3.888125ms)
+✔ startup paired selectedProjects change prevents connector and native admission (15.616083ms)
+✔ startup paired openbotOrigin change prevents connector and native admission (4.559459ms)
+✔ startup paired enrollment change prevents connector and native admission (5.079208ms)
+✔ startup enrolling selectedProjects change prevents connector and native admission (31.761708ms)
+✔ startup enrolling openbotOrigin change prevents connector and native admission (4.46675ms)
+✔ startup enrolling enrollment change prevents connector and native admission (3.447375ms)
+✔ legitimate internal Pending to Paired secret writes do not cancel connector startup (4.837542ms)
+✔ profile ownership excludes competing processes and refuses unsafe directory/symlink (99.155209ms)
+✔ supervisor observes failure, stops siblings and joins real children (52.381334ms)
+✔ shutdown escalates a child which ignores TERM and joins it within the fixed drain (5048.706792ms)
+ℹ tests 83
+ℹ suites 0
+ℹ pass 82
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 5273.083
+
+✖ failing tests:
+
+test at build-tests/retention.test.js:1612:1
+✖ same-point journal restore retains mapping while SQL-only history rollback cannot reconstruct it at an equal cursor (18.606709ms)
+  { code: 'SQLITE_CANTOPEN' }

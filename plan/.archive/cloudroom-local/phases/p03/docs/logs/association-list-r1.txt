@@ -1,0 +1,5 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.16s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-27a3d10d41cba73d)
+adapters::persistence::workflow::tests::binding_association_tests::workflow_binding_sql_association_matches_domain_visibility_and_management: test
+
+1 test, 0 benchmarks

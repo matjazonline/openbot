@@ -1,0 +1,8 @@
+
+> bb-plugin-openbot-local@0.1.0 typecheck
+> tsc --noEmit
+
+test/core.test.ts(24,47): error TS2345: Argument of type '{ prompt: string; kind: "create"; session_id: string; selection: { machine_id: string; project_id: string; provider: "claude-code" | "codex" | "acp-opencode"; model: string; policy: { workspace: "project_directory"; permissions: "provider_default"; reasoning: "none" | ... 6 more ... | "ultracode"; }; }; } | ... 4 mo...' is not assignable to parameter of type '{ kind: "create"; session_id: string; selection: { machine_id: string; project_id: string; provider: "claude-code" | "codex" | "acp-opencode"; model: string; policy: { workspace: "project_directory"; permissions: "provider_default"; reasoning: "none" | ... 6 more ... | "ultracode"; }; }; prompt: string; } | ... 5 mo...'.
+  Object literal may only specify known properties, and 'prompt' does not exist in type '{ kind: "inspect"; session_id: string; thread_id: string; }'.
+test/core.test.ts(24,66): error TS2339: Property 'prompt' does not exist on type '{ kind: "create"; session_id: string; selection: { machine_id: string; project_id: string; provider: "claude-code" | "codex" | "acp-opencode"; model: string; policy: { workspace: "project_directory"; permissions: "provider_default"; reasoning: "none" | ... 6 more ... | "ultracode"; }; }; prompt: string; } | ... 4 mo...'.
+  Property 'prompt' does not exist on type '{ kind: "inspect"; session_id: string; thread_id: string; }'.

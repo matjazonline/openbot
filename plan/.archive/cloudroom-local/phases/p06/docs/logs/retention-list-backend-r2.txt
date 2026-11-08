@@ -1,0 +1,8 @@
+   Compiling open_bots v0.1.0 (/Users/mac03/dev/openbot)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1m 57s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-50aeda0c9f5dbc3a)
+adapters::persistence::local_agents::retention_tests::cloudroom_retention_competing_collectors_remove_only_bounded_old_summaries_and_keep_unknown_work: test
+adapters::persistence::local_agents::retention_tests::cloudroom_retention_new_manual_requests_require_current_timestamp_and_replay_current_identity: test
+adapters::persistence::local_agents::retention_tests::cloudroom_retention_unknown_native_work_survives_and_compacted_receipt_replays_under_current_fence: test
+
+3 tests, 0 benchmarks

@@ -1,0 +1,16 @@
+{
+  "before": 104,
+  "after": 113,
+  "removed": [],
+  "added": [
+    "adapters::http::routes::local_agents::tests::ui::cloudroom_management_ui_later_profile_page_and_selection_keep_authorized_start_conversation",
+    "adapters::persistence::workflow::tests::local_agent_tests::continuation::cloudroom_workflow_call_origin_foreign_key_refuses_direct_link_even_without_immutable_guard",
+    "adapters::persistence::workflow::tests::local_agent_tests::continuation::cloudroom_workflow_continuation_refuses_other_profile_and_other_original_association",
+    "adapters::persistence::workflow::tests::local_agent_tests::continuation::cloudroom_workflow_continuation_refuses_withdrawn_original_private_access",
+    "adapters::persistence::workflow::tests::local_agent_tests::continuation::cloudroom_workflow_explicit_continuation_keeps_frozen_selection_and_approval_after_profile_edit",
+    "adapters::persistence::workflow::tests::local_agent_tests::continuation::cloudroom_workflow_first_delivery_role_withdrawal_race_refuses_new_and_reconciles_attempted_work",
+    "adapters::persistence::workflow::tests::local_agent_tests::corrections::cloudroom_workflow_actual_fair_poll_worker_discovers_native_result_and_completes_once",
+    "adapters::persistence::workflow::tests::local_agent_tests::corrections::cloudroom_workflow_competing_expiry_keeps_eight_attempted_native_effects_until_positive_evidence",
+    "adapters::persistence::workflow::tests::local_agent_tests::corrections::cloudroom_workflow_first_uncertain_disposition_survives_late_success_before_and_after_wake"
+  ]
+}

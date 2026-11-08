@@ -34,6 +34,10 @@ use crate::{
 
 #[derive(Clone)]
 pub struct AppState {
+    pub local_machine_connections:
+        Arc<super::routes::local_machine_connection::LocalMachineConnections>,
+    pub local_machines: Arc<crate::application::local_agents::LocalMachineUseCases>,
+    pub local_agents: Arc<crate::application::local_agents::management::LocalAgentManagement>,
     pub knowledge: Arc<crate::application::knowledge::KnowledgeLibrary>,
     pub auth_admission: Arc<AuthAdmission>,
     /// Workflow commands and read models, without worker handlers or spawn capability.
@@ -91,6 +95,24 @@ pub struct AppState {
     pub deliveries: Arc<dyn DeliveryReader>,
     /// Committed messages, for the mailbox's live message stream.
     pub events: MailboxEvents,
+}
+
+impl FromRef<AppState> for Arc<crate::application::local_agents::management::LocalAgentManagement> {
+    fn from_ref(state: &AppState) -> Self {
+        state.local_agents.clone()
+    }
+}
+
+impl FromRef<AppState> for Arc<crate::application::local_agents::LocalMachineUseCases> {
+    fn from_ref(state: &AppState) -> Self {
+        state.local_machines.clone()
+    }
+}
+
+impl FromRef<AppState> for Arc<super::routes::local_machine_connection::LocalMachineConnections> {
+    fn from_ref(state: &AppState) -> Self {
+        state.local_machine_connections.clone()
+    }
 }
 
 impl FromRef<AppState> for PgPool {

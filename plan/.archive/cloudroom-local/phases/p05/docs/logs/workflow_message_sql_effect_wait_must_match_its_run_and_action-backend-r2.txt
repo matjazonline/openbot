@@ -1,0 +1,8 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.69s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-27a3d10d41cba73d)
+
+running 1 test
+test adapters::persistence::workflow::tests::message_tests::sql_tests::workflow_message_sql_effect_wait_must_match_its_run_and_action ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3277 filtered out; finished in 0.94s
+

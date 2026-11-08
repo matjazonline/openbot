@@ -1,0 +1,3 @@
+npm warn install-scripts .npmrc allow-scripts setting is being ignored because package.json declares its own allowScripts field
+npm warn rebuild 1 package has install scripts not yet covered by allowScripts. Run `npm install-scripts ls` to review.
+rebuilt dependencies successfully

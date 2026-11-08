@@ -1,0 +1,55 @@
+Scope: all 97 workspace projects
+Lockfile is up to date, resolution step is skipped
+Already up to date
+
+   ╭──────────────────────────────────────────────────────────────────────╮
+   │                                                                      │
+   │                 Update available! 10.34.9 → 12.18.0.                 │
+   │                 Changelog: https://pnpm.io/v/12.18.0                 │
+   │   To update, run: curl -fsSL https://get.pnpm.io/install.sh | sh -   │
+   │                                                                      │
+   ╰──────────────────────────────────────────────────────────────────────╯
+
+ WARN  Failed to create bin at /private/tmp/openbot-cloudroom-d8b3cc3/gui/apps/host-daemon/node_modules/.bin/bb-script-reset-bb-data. ENOENT: no such file or directory, open '/private/tmp/openbot-cloudroom-d8b3cc3/gui/packages/scripts/dist/commands/reset-bb-data.js'
+ WARN  Failed to create bin at /private/tmp/openbot-cloudroom-d8b3cc3/gui/apps/host-daemon/node_modules/.bin/bb-script-archive-codex-tmp-bb-sessions. ENOENT: no such file or directory, open '/private/tmp/openbot-cloudroom-d8b3cc3/gui/packages/scripts/dist/commands/archive-codex-tmp-bb-sessions.js'
+ WARN  Failed to create bin at /private/tmp/openbot-cloudroom-d8b3cc3/gui/apps/host-daemon/node_modules/.bin/bb-script-seed-perf-db. ENOENT: no such file or directory, open '/private/tmp/openbot-cloudroom-d8b3cc3/gui/packages/scripts/dist/commands/seed-perf-db.js'
+ WARN  Failed to create bin at /private/tmp/openbot-cloudroom-d8b3cc3/gui/apps/host-daemon/node_modules/.bin/bb-script-request-dev-restart. ENOENT: no such file or directory, open '/private/tmp/openbot-cloudroom-d8b3cc3/gui/packages/scripts/dist/commands/request-dev-restart.js'
+ WARN  Failed to create bin at /private/tmp/openbot-cloudroom-d8b3cc3/gui/apps/host-daemon/node_modules/.bin/bb-script-run-host-daemon. ENOENT: no such file or directory, open '/private/tmp/openbot-cloudroom-d8b3cc3/gui/packages/scripts/dist/commands/run-host-daemon.js'
+ WARN  Failed to create bin at /private/tmp/openbot-cloudroom-d8b3cc3/gui/apps/host-daemon/node_modules/.bin/bb-script-run-cli. ENOENT: no such file or directory, open '/private/tmp/openbot-cloudroom-d8b3cc3/gui/packages/scripts/dist/commands/run-cli.js'
+ WARN  Failed to create bin at /private/tmp/openbot-cloudroom-d8b3cc3/gui/apps/server/node_modules/.bin/bb-script-archive-codex-tmp-bb-sessions. ENOENT: no such file or directory, open '/private/tmp/openbot-cloudroom-d8b3cc3/gui/packages/scripts/dist/commands/archive-codex-tmp-bb-sessions.js'
+ WARN  Failed to create bin at /private/tmp/openbot-cloudroom-d8b3cc3/gui/apps/server/node_modules/.bin/bb-script-request-dev-restart. ENOENT: no such file or directory, open '/private/tmp/openbot-cloudroom-d8b3cc3/gui/packages/scripts/dist/commands/request-dev-restart.js'
+ WARN  Failed to create bin at /private/tmp/openbot-cloudroom-d8b3cc3/gui/apps/server/node_modules/.bin/bb-script-reset-bb-data. ENOENT: no such file or directory, open '/private/tmp/openbot-cloudroom-d8b3cc3/gui/packages/scripts/dist/commands/reset-bb-data.js'
+ WARN  Failed to create bin at /private/tmp/openbot-cloudroom-d8b3cc3/gui/apps/server/node_modules/.bin/bb-script-run-cli. ENOENT: no such file or directory, open '/private/tmp/openbot-cloudroom-d8b3cc3/gui/packages/scripts/dist/commands/run-cli.js'
+ WARN  Failed to create bin at /private/tmp/openbot-cloudroom-d8b3cc3/gui/apps/server/node_modules/.bin/bb-script-run-host-daemon. ENOENT: no such file or directory, open '/private/tmp/openbot-cloudroom-d8b3cc3/gui/packages/scripts/dist/commands/run-host-daemon.js'
+ WARN  Failed to create bin at /private/tmp/openbot-cloudroom-d8b3cc3/gui/apps/server/node_modules/.bin/bb-script-seed-perf-db. ENOENT: no such file or directory, open '/private/tmp/openbot-cloudroom-d8b3cc3/gui/packages/scripts/dist/commands/seed-perf-db.js'
+ WARN  Failed to create bin at /private/tmp/openbot-cloudroom-d8b3cc3/gui/apps/desktop/node_modules/.bin/room-cli. ENOENT: no such file or directory, open '/private/tmp/openbot-cloudroom-d8b3cc3/gui/packages/bb-app/dist/room-cli.js'
+ WARN  Failed to create bin at /private/tmp/openbot-cloudroom-d8b3cc3/gui/apps/desktop/node_modules/.bin/bb-app. ENOENT: no such file or directory, open '/private/tmp/openbot-cloudroom-d8b3cc3/gui/packages/bb-app/dist/bb-app.js'
+ WARN  Failed to create bin at /private/tmp/openbot-cloudroom-d8b3cc3/gui/apps/desktop/node_modules/.bin/bb-server. ENOENT: no such file or directory, open '/private/tmp/openbot-cloudroom-d8b3cc3/gui/packages/bb-app/dist/bb-server.js'
+ WARN  Failed to create bin at /private/tmp/openbot-cloudroom-d8b3cc3/gui/apps/desktop/node_modules/.bin/bb-host-daemon. ENOENT: no such file or directory, open '/private/tmp/openbot-cloudroom-d8b3cc3/gui/packages/bb-app/dist/bb-host-daemon.js'
+
+. prepare$ turbo run generate:templates generate:plugin-scaffold generate generate:bb-official-marketplace --filter=@cloudroom/templates --filter=@cloudroom/plugin-build --filter=@cloudroom/server --output-logs=errors-only --summarize=false
+. prepare: • turbo 2.10.12
+. prepare:    • Packages in scope: @cloudroom/plugin-build, @cloudroom/server, @cloudroom/templates
+. prepare:    • Running generate:templates, generate:plugin-scaffold, generate, generate:bb-official-marketplace in 3 packages
+. prepare:    • Remote caching disabled
+. prepare:  Tasks:    4 successful, 4 total
+. prepare: Cached:    4 cached, 4 total
+. prepare:   Time:    44ms >>> FULL TURBO
+. prepare: Done
+ WARN  Failed to create bin at /private/tmp/openbot-cloudroom-d8b3cc3/gui/apps/desktop/node_modules/.bin/bb-app. ENOENT: no such file or directory, open '/private/tmp/openbot-cloudroom-d8b3cc3/gui/apps/desktop/node_modules/bb-app/dist/bb-app.js'
+ WARN  Failed to create bin at /private/tmp/openbot-cloudroom-d8b3cc3/gui/apps/desktop/node_modules/.bin/room-cli. ENOENT: no such file or directory, open '/private/tmp/openbot-cloudroom-d8b3cc3/gui/apps/desktop/node_modules/bb-app/dist/room-cli.js'
+ WARN  Failed to create bin at /private/tmp/openbot-cloudroom-d8b3cc3/gui/apps/desktop/node_modules/.bin/bb-host-daemon. ENOENT: no such file or directory, open '/private/tmp/openbot-cloudroom-d8b3cc3/gui/apps/desktop/node_modules/bb-app/dist/bb-host-daemon.js'
+ WARN  Failed to create bin at /private/tmp/openbot-cloudroom-d8b3cc3/gui/apps/desktop/node_modules/.bin/bb-server. ENOENT: no such file or directory, open '/private/tmp/openbot-cloudroom-d8b3cc3/gui/apps/desktop/node_modules/bb-app/dist/bb-server.js'
+ WARN  Failed to create bin at /private/tmp/openbot-cloudroom-d8b3cc3/gui/apps/host-daemon/node_modules/.bin/bb-script-archive-codex-tmp-bb-sessions. ENOENT: no such file or directory, open '/private/tmp/openbot-cloudroom-d8b3cc3/gui/apps/host-daemon/node_modules/@cloudroom/scripts/dist/commands/archive-codex-tmp-bb-sessions.js'
+ WARN  Failed to create bin at /private/tmp/openbot-cloudroom-d8b3cc3/gui/apps/host-daemon/node_modules/.bin/bb-script-request-dev-restart. ENOENT: no such file or directory, open '/private/tmp/openbot-cloudroom-d8b3cc3/gui/apps/host-daemon/node_modules/@cloudroom/scripts/dist/commands/request-dev-restart.js'
+ WARN  Failed to create bin at /private/tmp/openbot-cloudroom-d8b3cc3/gui/apps/host-daemon/node_modules/.bin/bb-script-reset-bb-data. ENOENT: no such file or directory, open '/private/tmp/openbot-cloudroom-d8b3cc3/gui/apps/host-daemon/node_modules/@cloudroom/scripts/dist/commands/reset-bb-data.js'
+ WARN  Failed to create bin at /private/tmp/openbot-cloudroom-d8b3cc3/gui/apps/host-daemon/node_modules/.bin/bb-script-run-cli. ENOENT: no such file or directory, open '/private/tmp/openbot-cloudroom-d8b3cc3/gui/apps/host-daemon/node_modules/@cloudroom/scripts/dist/commands/run-cli.js'
+ WARN  Failed to create bin at /private/tmp/openbot-cloudroom-d8b3cc3/gui/apps/host-daemon/node_modules/.bin/bb-script-run-host-daemon. ENOENT: no such file or directory, open '/private/tmp/openbot-cloudroom-d8b3cc3/gui/apps/host-daemon/node_modules/@cloudroom/scripts/dist/commands/run-host-daemon.js'
+ WARN  Failed to create bin at /private/tmp/openbot-cloudroom-d8b3cc3/gui/apps/host-daemon/node_modules/.bin/bb-script-seed-perf-db. ENOENT: no such file or directory, open '/private/tmp/openbot-cloudroom-d8b3cc3/gui/apps/host-daemon/node_modules/@cloudroom/scripts/dist/commands/seed-perf-db.js'
+ WARN  Failed to create bin at /private/tmp/openbot-cloudroom-d8b3cc3/gui/apps/server/node_modules/.bin/bb-script-archive-codex-tmp-bb-sessions. ENOENT: no such file or directory, open '/private/tmp/openbot-cloudroom-d8b3cc3/gui/apps/server/node_modules/@cloudroom/scripts/dist/commands/archive-codex-tmp-bb-sessions.js'
+ WARN  Failed to create bin at /private/tmp/openbot-cloudroom-d8b3cc3/gui/apps/server/node_modules/.bin/bb-script-request-dev-restart. ENOENT: no such file or directory, open '/private/tmp/openbot-cloudroom-d8b3cc3/gui/apps/server/node_modules/@cloudroom/scripts/dist/commands/request-dev-restart.js'
+ WARN  Failed to create bin at /private/tmp/openbot-cloudroom-d8b3cc3/gui/apps/server/node_modules/.bin/bb-script-reset-bb-data. ENOENT: no such file or directory, open '/private/tmp/openbot-cloudroom-d8b3cc3/gui/apps/server/node_modules/@cloudroom/scripts/dist/commands/reset-bb-data.js'
+ WARN  Failed to create bin at /private/tmp/openbot-cloudroom-d8b3cc3/gui/apps/server/node_modules/.bin/bb-script-run-cli. ENOENT: no such file or directory, open '/private/tmp/openbot-cloudroom-d8b3cc3/gui/apps/server/node_modules/@cloudroom/scripts/dist/commands/run-cli.js'
+ WARN  Failed to create bin at /private/tmp/openbot-cloudroom-d8b3cc3/gui/apps/server/node_modules/.bin/bb-script-run-host-daemon. ENOENT: no such file or directory, open '/private/tmp/openbot-cloudroom-d8b3cc3/gui/apps/server/node_modules/@cloudroom/scripts/dist/commands/run-host-daemon.js'
+ WARN  Failed to create bin at /private/tmp/openbot-cloudroom-d8b3cc3/gui/apps/server/node_modules/.bin/bb-script-seed-perf-db. ENOENT: no such file or directory, open '/private/tmp/openbot-cloudroom-d8b3cc3/gui/apps/server/node_modules/@cloudroom/scripts/dist/commands/seed-perf-db.js'
+Done in 3.4s using pnpm v10.34.9

@@ -66,7 +66,7 @@ async fn channel_reply_terminal_preserves_an_explicit_published_message() {
 }
 
 async fn published_terminal(fixture: &Fixture, source: Value) -> VersionId {
-    let directory = message::MessagePublicationDirectory {
+    let directory = step_builtins::StepBuiltinPublicationDirectory {
         persistence: fixture.persistence.clone(),
     };
     let definitions = DefinitionService::new(

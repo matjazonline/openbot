@@ -1,0 +1,87 @@
+--- a/gui/packages/sdk/src/areas/threads.ts
++++ b/gui/packages/sdk/src/areas/threads.ts
+@@ -222,6 +222,7 @@
+   CreateThreadRequest,
+   "input" | "origin" | "originKind" | "startedOnBehalfOf"
+ > {
++  signal?: AbortSignal;
+   origin?: CreateThreadRequest["origin"];
+   originKind?: CreateThreadRequest["originKind"];
+   startedOnBehalfOf?: CreateThreadRequest["startedOnBehalfOf"];
+@@ -274,6 +275,7 @@
+ }
+ 
+ export interface ThreadSendArgs extends SendMessageRequest {
++  signal?: AbortSignal;
+   threadId: string;
+ }
+ 
+@@ -739,6 +741,7 @@
+     originKind,
+     prompt: _prompt,
+     startedOnBehalfOf,
++    signal: _signal,
+     ...request
+   } = args;
+   return {
+@@ -892,10 +895,13 @@
+     input: ThreadArchiveAllArgs,
+   ): Promise<ThreadArchiveAllResult> =>
+     transport.readJson(
+-      transport.api.v1.threads[":id"]["archive-all"].$post({
+-        param: { id: input.threadId },
+-        ...(input.includeLive ? { query: { includeLive: "true" } } : {}),
+-      }),
++      transport.api.v1.threads[":id"]["archive-all"].$post(
++        {
++          param: { id: input.threadId },
++          ...(input.includeLive ? { query: { includeLive: "true" } } : {}),
++        },
++        ...signalRequestArgs(input.signal),
++      ),
+     );
+   const events: ThreadEventsArea = {
+     async list(input) {
+@@ -1299,10 +1305,13 @@
+     },
+     async send(input) {
+       return transport.readJson(
+-        transport.api.v1.threads[":id"].send.$post({
+-          param: { id: input.threadId },
+-          json: sendJson(input),
+-        }),
++        transport.api.v1.threads[":id"].send.$post(
++          {
++            param: { id: input.threadId },
++            json: sendJson(input),
++          },
++          ...signalRequestArgs(input.signal),
++        ),
+       );
+     },
+     async retry(input) {
+@@ -1315,16 +1324,18 @@
+     },
+     async spawn(input) {
+       return transport.readJson(
+-        transport.api.v1.threads.$post({
+-          json: spawnJson(input),
+-        }),
++        transport.api.v1.threads.$post(
++          { json: spawnJson(input) },
++          ...signalRequestArgs(input.signal),
++        ),
+       );
+     },
+     async stop(input) {
+       const result: { cancelledRetries?: number } = await transport.readJson(
+-        transport.api.v1.threads[":id"].stop.$post({
+-          param: { id: input.threadId },
+-        }),
++        transport.api.v1.threads[":id"].stop.$post(
++          { param: { id: input.threadId } },
++          ...signalRequestArgs(input.signal),
++        ),
+       );
+       return { ok: true, cancelledRetries: result.cancelledRetries ?? 0 };
+     },

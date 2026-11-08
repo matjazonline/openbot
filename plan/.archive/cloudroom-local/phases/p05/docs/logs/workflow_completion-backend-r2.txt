@@ -1,0 +1,21 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.16s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-27a3d10d41cba73d)
+
+running 14 tests
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::completion_tests::workflow_completion_competing_results_lost_ack_and_saved_replay ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::completion_tests::refusal_tests::workflow_completion_mixed_existing_id_refusal_before_and_after_commit ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::completion_tests::race_tests::workflow_completion_final_write_expiry_rolls_back_attempt_and_result ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::completion_tests::race_tests::workflow_completion_reclaim_competes_without_stale_progression ... ok
+test application::workflow::completion::tests::workflow_completion_declared_choice_and_terminal_schema ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::completion_tests::workflow_completion_pure_io_supervision_and_terminal_io ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::completion_tests::workflow_completion_reclaimed_generation_refuses ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::completion_tests::race_tests::workflow_completion_deferred_expiry_and_deadline_commit_guard ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::completion_tests::workflow_completion_rejects_wrong_fences ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::completion_tests::race_tests::workflow_completion_cancel_competes_without_stale_progression ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::completion_tests::refusal_tests::workflow_completion_unclaimed_pure_and_unknown_job_refuse ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::completion_tests::workflow_completion_invalid_outputs_and_activation_budget_settle ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::completion_tests::race_tests::workflow_completion_inactive_run_and_lock_contention_refuse ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::completion_tests::workflow_completion_rolls_back_every_write_boundary ... ok
+
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 3264 filtered out; finished in 14.06s
+

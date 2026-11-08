@@ -81,7 +81,7 @@ impl<A, L> PostgresActionDispatch<A, L> {
     }
 }
 
-impl<A: SqlActionAuthority, L: SqlLocalAction> PostgresActionDispatch<A, L> {
+impl<A: SqlActionAuthority, L> PostgresActionDispatch<A, L> {
     pub(super) async fn authorize_on(
         &self,
         tx: &mut Transaction<'_, Postgres>,
@@ -126,6 +126,7 @@ impl<A: SqlActionAuthority, L: SqlLocalAction> PostgresActionDispatch<A, L> {
             request.scope(),
             &request.subject,
             actor,
+            action_authority::RunPhase::Claimed,
         ))
         .await?;
         validate_run_authority(request.scope(), &request.subject, &authority)?;

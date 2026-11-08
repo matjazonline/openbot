@@ -27,7 +27,7 @@ mod agent_manifest;
 mod agent_origin;
 mod agent_preparation;
 pub mod agent_publication;
-mod association;
+pub(super) mod association;
 mod authoring_reads;
 pub(crate) mod authority;
 mod batch;
@@ -71,6 +71,7 @@ pub(crate) mod knowledge;
 mod knowledge_release;
 mod lease;
 mod lease_claim;
+pub mod local_agents;
 pub mod mcp;
 pub mod message;
 mod message_intents;
@@ -86,6 +87,7 @@ mod run_views;
 #[cfg(test)]
 pub(crate) mod schedule_test_support;
 mod schedules;
+pub mod step_builtins;
 #[cfg(test)]
 mod tests;
 /// The uncertain HTTP action the reconciliation route tests start from (P08-D3).

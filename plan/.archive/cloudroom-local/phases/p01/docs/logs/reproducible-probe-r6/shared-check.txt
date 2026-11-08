@@ -1,0 +1,1 @@
+{"clients":["public plugin SDK","Cloudroom CLI"],"queueOrder":"PASS","activeTurnCorrelation":"NOT EXERCISED"}

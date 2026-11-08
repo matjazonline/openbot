@@ -138,6 +138,9 @@ pub struct ProductionHandler {
     mcp: Arc<McpRuntime>,
     message: Arc<MessageRuntime>,
     history: WorkflowHistoryRuntime<PostgresPersistence>,
+    local_agent: crate::application::local_agents::workflow::LocalAgentHandler<
+        crate::adapters::persistence::workflow::local_agents::PostgresLocalAgentWorkflow,
+    >,
 }
 
 impl ProductionHandler {
@@ -145,12 +148,13 @@ impl ProductionHandler {
         if self.jev.supports(kind) {
             return Some(&self.jev);
         }
-        let handlers: [&dyn WorkflowHandler; 5] = [
+        let handlers: [&dyn WorkflowHandler; 6] = [
             &self.agent,
             self.http.as_ref(),
             self.mcp.as_ref(),
             self.message.as_ref(),
             &self.history,
+            &self.local_agent,
         ];
         handlers.into_iter().find(|handler| handler.supports(kind))
     }
@@ -283,6 +287,13 @@ fn compose_handler(
         mcp: tools.mcp,
         message: tools.message,
         history: WorkflowHistoryRuntime::new(persistence.clone()),
+        local_agent: crate::application::local_agents::workflow::LocalAgentHandler::new(
+            crate::adapters::persistence::workflow::local_agents::PostgresLocalAgentWorkflow::new(
+                persistence.clone(),
+                Some(notices.clone()),
+            ),
+            lease,
+        ),
     }))
 }
 
@@ -431,6 +442,18 @@ impl WorkflowEngine {
         handles.push((
             "workflow final reply publisher",
             tokio::spawn(async move { publisher.run(&publisher_shutdown).await }),
+        ));
+        let local_persistence = self.services.persistence.clone();
+        let local_shutdown = shutdown.clone();
+        handles.push((
+            "local-agent retention",
+            tokio::spawn(async move {
+                crate::application::local_agents::lifecycle::run(
+                    &local_persistence,
+                    &local_shutdown,
+                )
+                .await;
+            }),
         ));
         handles.push(self.spawn_storage(shutdown));
         let materializer = self.services.schedule_materializer();
@@ -736,8 +759,8 @@ mod tests {
                 .unwrap();
         }
         assert_eq!(
-            task_count, 6,
-            "one slot, metrics, intent, final publication, schedule and storage workers"
+            task_count, 7,
+            "one slot, metrics, intent, final publication, schedule, workflow storage and local-agent storage workers"
         );
     }
 

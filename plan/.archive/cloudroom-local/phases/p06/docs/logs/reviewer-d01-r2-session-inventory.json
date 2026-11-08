@@ -1,0 +1,66 @@
+{
+  "pattern": "insert_session_on",
+  "filesSearched": 1626,
+  "totalHits": 3,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/local_agents/shared.rs#insert_session_on",
+        "name": "insert_session_on",
+        "kind": "function",
+        "path": "src/adapters/persistence/local_agents/shared.rs",
+        "span": "L114-L133"
+      },
+      "path": "src/adapters/persistence/local_agents/shared.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 114,
+          "text": "pub(in crate::adapters::persistence) async fn insert_session_on("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/local_agents/admission.rs#session_on",
+        "name": "session_on",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/local_agents/admission.rs",
+        "span": "L136-L172"
+      },
+      "path": "src/adapters/persistence/workflow/local_agents/admission.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 170,
+          "text": "shared::insert_session_on(db, &session).await?;"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/local_agents/management/writes.rs#start",
+        "name": "start",
+        "kind": "function",
+        "path": "src/adapters/persistence/local_agents/management/writes.rs",
+        "span": "L56-L129"
+      },
+      "path": "src/adapters/persistence/local_agents/management/writes.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 122,
+          "text": "shared::insert_session_on(&mut tx, &session).await?;"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 3,
+    "baselineChars": 23306
+  }
+}
