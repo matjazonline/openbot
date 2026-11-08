@@ -1,6 +1,6 @@
 ---
 name: implement-2.2-system-improvement
-description: "Distill implement-astra-reviewed-2.2 phase records from a supplied directory into scoped AGENTS.md rules and evidence-backed 2.2 workflow improvements. Use for retrospective lesson extraction and instruction consolidation, with bounded cleanup of analyzed phase artifacts; not for implementation or ordinary code review."
+description: "Distill implement-astra-reviewed-2-2 phase records from a supplied directory into scoped AGENTS.md rules and evidence-backed 2.2 workflow improvements. Use for retrospective lesson extraction and instruction consolidation, with bounded cleanup of analyzed phase artifacts; not for implementation or ordinary code review."
 ---
 
 # Implement 2.2 System Improvement
@@ -14,7 +14,7 @@ variants. This skill is self-contained; do not load the v3 retrospective workflo
 
 ## Resolve the supplied directory
 
-Accept the records directory passed by the user from `implement-astra-reviewed-2.2`,
+Accept the records directory passed by the user from `implement-astra-reviewed-2-2`,
 normally `<plan-dir>/phases/<phase-id>/docs/`. Also accept its containing phase
 directory when it identifies exactly one records directory. Use the resolved paths
 in TASK/HANDOFF for adopted legacy layouts; do not assume all phases use the
@@ -70,8 +70,10 @@ conclusions, not private reasoning transcripts or copied archives.
   implementation/caller/test paths. Filesystem ancestry determines coverage:
   `feature/AGENTS.md` does not cover sibling `feature.rs` or tests elsewhere.
   Keep caller obligations where callers load them; root rules must apply broadly.
-- Workflow obligations belong in the installed
-  [2.2 skill](../implement-astra-reviewed-2.2/SKILL.md) or its responsible reference.
+- Workflow obligations belong in the globally installed
+  `implement-astra-reviewed-2-2` skill or its responsible reference. Resolve its
+  directory from the skill catalog or `$CODEX_HOME/skills/implement-astra-reviewed-2-2`
+  (default `~/.codex/skills/implement-astra-reviewed-2-2`).
   Read the current affected instructions before editing. Improve author/reviewer
   assignments, gate selection, evidence capture, verification, acceptance, or
   concurrent-phase ownership only where the evidence supports a reusable change.

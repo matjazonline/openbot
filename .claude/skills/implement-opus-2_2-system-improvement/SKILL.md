@@ -84,8 +84,9 @@ conclusions, not private reasoning transcripts or copied archives.
   determines coverage: `feature/AGENTS.md` does not cover sibling `feature.rs` or
   tests elsewhere. Keep caller obligations where callers load them; root rules must
   apply broadly.
-- Workflow obligations belong in the installed
-  [Opus 2.2 skill](../implement-opus-reviewed-2_2/SKILL.md) or its responsible
+- Workflow obligations belong in the globally installed
+  `implement-opus-reviewed-2_2` skill
+  (`~/.claude/skills/implement-opus-reviewed-2_2/SKILL.md`) or its responsible
   reference. If several copies are installed, edit the one the user names or ask,
   and report copies left unsynchronized. Read the current affected instructions
   before editing. Improve author/reviewer assignments, gate selection, evidence
