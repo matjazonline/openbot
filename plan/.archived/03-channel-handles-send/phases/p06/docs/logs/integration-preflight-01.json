@@ -1,0 +1,17 @@
+{
+  "at": "2026-11-07T08:52:31.813826+00:00",
+  "read_only": true,
+  "primary_head": "97e5d60dc538e26c7cb976a8d63772eed80baff2",
+  "initial_export_paths": 31,
+  "primary_owned_path_drift": [],
+  "external_files": {
+    "scripts/check-workflow-evidence.py": "3309f8594f61e34955b86d968e0f27d017149ea6b51d8b7865bfd4311290375d",
+    "tests/source_modules.rs": "ace9b7a36c5a93992941fd09dac217be773ac8021b21fb3d7dedc5b185679379",
+    "Cargo.lock": "25dabaf49c1397a65e9f1cf2620d32a39b30bc731becccef9feee09f2dcb8ba5",
+    "scripts/check.sh": "2c512f86450d897e03f6f6525c2d665787872562412ba37288dfb6b1b18ba61a",
+    "scripts/tests/workflow-evidence.py": "9009f2fa720ac53e88130e3211bed517c58bb13d48483501f21d01355eef66f9",
+    "Cargo.toml": "5481a604271f5e87240611fafbff9c5007b765d20d8def40789e27ce53797a30",
+    ".github/workflows/ci.yml": "875e1e55213f9ec2b0707a6993d1c9de226e41fe76d68760ea181c361d5739f5"
+  },
+  "mutation_performed": false
+}

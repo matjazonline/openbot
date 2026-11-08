@@ -1,0 +1,22 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.21s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-048b7abd3ed0c794)
+adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::bounds::integration_renewal_core_ten_second_provider_budget_drops_an_uncooperative_future: test
+adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::bounds::integration_renewal_transaction_settings_are_local_and_match_the_request_budget: test
+adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::cache::integration_renewal_api_key_injection_needs_no_refresh_token_or_oauth: test
+adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::cache::integration_renewal_generation_drift_cannot_enter_a_cache_update: test
+adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::cache::integration_renewal_initial_generation_must_match_the_durable_entry: test
+adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::cache::integration_renewal_shared_app_cannot_change_the_authorizations_protocol: test
+adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::google::integration_renewal_static_accounts_have_no_renewal_protocol: test
+adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::strict::commit::integration_renewal_strict_lost_reservation_or_replacement_commit_ack_is_reread: test
+adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::strict::integration_renewal_strict_active_pending_is_not_an_interrupted_claimant: test
+adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::strict::integration_renewal_strict_backend_crash_keeps_the_committed_pending_marker: test
+adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::strict::integration_renewal_strict_cancellation_keeps_durable_ambiguity_for_recovery: test
+adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::strict::integration_renewal_strict_competing_live_services_share_one_rotation: test
+adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::strict::integration_renewal_strict_delayed_claim_after_delete_cannot_contact_provider: test
+adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::strict::integration_renewal_strict_delayed_claim_after_disconnect_cannot_contact_provider: test
+adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::strict::integration_renewal_strict_expired_pending_requires_reconnect_without_an_endpoint_retry: test
+adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::strict::integration_renewal_strict_lost_response_preserves_pending_instead_of_retrying_refresh: test
+adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::strict::integration_renewal_strict_omitted_replacement_does_not_inherit_google_reuse: test
+adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::strict::integration_renewal_strict_workspace_rotates_and_reuses_without_an_email: test
+
+18 tests, 0 benchmarks

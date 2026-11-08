@@ -27,6 +27,8 @@ use crate::services::test_support::{
 };
 
 const HTTP_OK: &str = "HTTP/1.1 200 OK\r\ncontent-type: application/json\r\ncontent-length: 11\r\nconnection: close\r\n\r\n{\"ok\":true}";
+#[path = "vault_gmail_journey.rs"]
+mod vault_gmail;
 
 /// A caller-supplied (forged) agent snapshot: the SQL owner must refuse it at publish.
 struct ForgedAgents {
@@ -891,3 +893,9 @@ mod origin_schema;
 
 #[path = "autonomous_agent_view_tests.rs"]
 mod autonomous_views;
+
+#[path = "agent_history_identity_tests.rs"]
+mod history_identity;
+
+#[path = "agent_history_storage_tests.rs"]
+mod history_storage;

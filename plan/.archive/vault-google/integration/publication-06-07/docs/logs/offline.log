@@ -1,0 +1,6 @@
+   Compiling proc-macro2 v1.0.101
+    Checking unicode-ident v1.0.18
+   Compiling quote v1.0.47
+    Checking open_bots v0.1.0 (/private/tmp/vault-google-publish-a95937f128)
+    Checking syn v2.0.119
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1m 31s

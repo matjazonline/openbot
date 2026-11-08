@@ -1,0 +1,13 @@
+browserType.launch: Executable doesn't exist at /Users/mac02/Library/Caches/ms-playwright/chromium_headless_shell-1193/chrome-mac/headless_shell
+╔═════════════════════════════════════════════════════════════════════════╗
+║ Looks like Playwright Test or Playwright was just installed or updated. ║
+║ Please run the following command to download new browsers:              ║
+║                                                                         ║
+║     npx playwright install                                              ║
+║                                                                         ║
+║ <3 Playwright Team                                                      ║
+╚═════════════════════════════════════════════════════════════════════════╝
+    at /Users/mac02/.codex/worktrees/1133/openbot/plan/vault-google/phases/p02/docs/logs/VG-P02-R3-delete-browser.cjs:4:31
+    at Object.<anonymous> (/Users/mac02/.codex/worktrees/1133/openbot/plan/vault-google/phases/p02/docs/logs/VG-P02-R3-delete-browser.cjs:24:3) {
+  name: 'Error'
+}

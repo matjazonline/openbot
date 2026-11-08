@@ -38,6 +38,8 @@ struct ConfigurationIdentity<'a> {
     company: CompanyId,
     agents: &'a [SampleAgentSelection],
     workflows: &'a [SampleWorkflowSelection],
+    response_contract: &'a Option<super::super::channel_reply::ChannelReplyContract>,
+    response_approval_policy: &'a Option<super::super::channel_reply::ReplyApprovalPolicy>,
 }
 
 pub struct PreparedSample {
@@ -67,6 +69,7 @@ impl PreparedSample {
         if extra.len() > MAX_AGENT_DEPENDENCIES {
             return Err(refused("Too many sample workflows"));
         }
+        validate_response(&root, &request)?;
         let mut agents = BTreeMap::new();
         for agent in std::mem::take(&mut request.agents) {
             agent.validate()?;
@@ -103,10 +106,12 @@ impl PreparedSample {
             })
             .collect();
         let identity = serde_json::to_value(ConfigurationIdentity {
-            kind: "sample-only-v1",
+            kind: "sample-only-v2",
             company: root.company_id(),
             agents: &agent_selections,
             workflows: &workflow_selections,
+            response_contract: &request.response_contract,
+            response_approval_policy: &request.response_approval_policy,
         })
         .map_err(|_| refused("Invalid sample identity"))?;
         let configuration_hash = SampleConfigurationHash(format!(
@@ -124,6 +129,23 @@ impl PreparedSample {
             agent_selections,
             workflow_selections,
         })
+    }
+}
+
+fn validate_response(root: &PublishedBundle, request: &SampleRequest) -> AppResult<()> {
+    match &request.response_contract {
+        Some(contract) => contract.validate(
+            root.compiled()
+                .graph()
+                .definition()
+                .output_schema
+                .as_ref()
+                .unwrap_or(&Value::Bool(true)),
+        ),
+        None if request.response_approval_policy.is_some() => Err(refused(
+            "A sample final approval policy needs an explicit response contract",
+        )),
+        None => Ok(()),
     }
 }
 fn collect_workflows(

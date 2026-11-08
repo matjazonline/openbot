@@ -241,6 +241,7 @@ fn waiting_reason(state: RunState) -> Option<&'static str> {
             WaitingReason::ChildRun => "child_run",
             WaitingReason::Effect => "effect",
             WaitingReason::Reconciliation => "reconciliation",
+            WaitingReason::AgentTurn => "agent_turn",
         }),
         _ => None,
     }

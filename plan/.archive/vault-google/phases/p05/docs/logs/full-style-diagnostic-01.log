@@ -1,0 +1,17 @@
+
+running 1 test
+
+thread 'adapters::http::pages::tests::rendered_markup_carries_no_inline_javascript' (35556483) panicked at src/adapters/http/pages/tests.rs:4664:5:
+inline JavaScript is blocked by the page CSP and will never run:
+/Users/mac02/.codex/worktrees/1133/openbot/src/adapters/http/routes/vault_management_tests.rs:157: inline <script> block
+/Users/mac02/.codex/worktrees/1133/openbot/src/adapters/http/routes/vault_management_tests.rs:162: inline <script> block
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test adapters::http::pages::tests::rendered_markup_carries_no_inline_javascript ... FAILED
+
+failures:
+
+failures:
+    adapters::http::pages::tests::rendered_markup_carries_no_inline_javascript
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 3347 filtered out; finished in 0.12s
+

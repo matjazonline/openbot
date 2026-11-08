@@ -1,0 +1,12 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+   Compiling open_bots v0.1.0 (/private/tmp/openbot-agent-history-h_82_5pw/worktree)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 49.08s
+     Running unittests src/lib.rs (/private/tmp/openbot-chs-p06-3f43t2k7/worktree/target/debug/deps/open_bots-8b80d02f0b6cf2e6)
+
+running 3 tests
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::level::agent_history_level_classified_current_input_allows_unchanged_team_audience ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::agent_history_selection_second_real_call_sees_complete_pair_and_current_input_last ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::level::agent_history_level_classified_current_input_empty_seed_refuses_initial_and_restarted_entry ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 3320 filtered out; finished in 2.19s
+

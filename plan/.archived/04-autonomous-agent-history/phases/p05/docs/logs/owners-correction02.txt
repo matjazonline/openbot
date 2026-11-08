@@ -1,0 +1,52 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+   Compiling open_bots v0.1.0 (/private/tmp/openbot-agent-history-h_82_5pw/worktree)
+error[E0603]: module `workflow_runs` is private
+   --> src/adapters/persistence/workflow/channel_reply_knowledge_tests.rs:305:39
+    |
+305 |     use crate::adapters::http::pages::workflow_runs::{RunPaneView, run_pane};
+    |                                       ^^^^^^^^^^^^^ private module
+    |
+note: the module `workflow_runs` is defined here
+   --> src/adapters/http/pages/mod.rs:76:1
+    |
+ 76 | mod workflow_runs;
+    | ^^^^^^^^^^^^^^^^^^
+
+error[E0308]: mismatched types
+   --> src/adapters/persistence/workflow/channel_reply_knowledge_tests.rs:309:22
+    |
+309 |             company: f.scope.company.as_uuid(),
+    |                      ^^^^^^^^^^^^^^^^^^^^^^^^^ expected `CompanyId`, found `Uuid`
+    |
+help: try removing the method call
+    |
+309 -             company: f.scope.company.as_uuid(),
+309 +             company: f.scope.company,
+    |
+
+error[E0308]: mismatched types
+   --> src/adapters/persistence/workflow/channel_reply_knowledge_tests.rs:310:21
+    |
+310 |             viewer: f.s.owner().user_id(),
+    |                     ^^^^^^^^^^^^^^^^^^^^^ expected `WorkflowActor`, found `Uuid`
+    |
+help: try wrapping the expression in `application::workflow::authorization::WorkflowActor` (its field is private, but it's local to this crate and its privacy can be changed)
+    |
+310 |             viewer: application::workflow::authorization::WorkflowActor { user_id: f.s.owner().user_id() },
+    |                     ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++                       +
+
+error[E0308]: mismatched types
+   --> src/adapters/persistence/workflow/channel_reply_knowledge_tests.rs:311:18
+    |
+311 |             run: f.scope.run.as_uuid(),
+    |                  ^^^^^^^^^^^^^^^^^^^^^ expected `RunId`, found `Uuid`
+    |
+help: try removing the method call
+    |
+311 -             run: f.scope.run.as_uuid(),
+311 +             run: f.scope.run,
+    |
+
+Some errors have detailed explanations: E0308, E0603.
+For more information about an error, try `rustc --explain E0308`.
+error: could not compile `open_bots` (lib test) due to 4 previous errors

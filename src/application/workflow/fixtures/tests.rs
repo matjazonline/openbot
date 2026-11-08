@@ -215,7 +215,7 @@ fn workflow_fixtures_review_routes_human_edits_and_requires_rejection_feedback()
         .unwrap();
     outputs.insert(step("review"), edited);
     assert_eq!(
-        prepare(&bundle, "reply", &outputs).value()["content"]["body"],
+        prepare(&bundle, "reply", &outputs).value()["value"]["body"],
         "Edited"
     );
     assert_eq!(outputs[&step("draft")]["body"], "Original");
@@ -231,7 +231,7 @@ fn workflow_fixtures_review_routes_human_edits_and_requires_rejection_feedback()
     let source: Value = serde_yaml::from_str(Fixture::ReviewedSupport.source()).unwrap();
     assert_eq!(
         source["steps"]["review"]["routes"]["choices"]["reject"],
-        "$end"
+        "review_rejected"
     );
 }
 
@@ -626,3 +626,6 @@ fn workflow_fixtures_nested_defaults_and_allof_keep_compile_work_bounded() {
         }
     }
 }
+
+#[path = "agent_history_tests.rs"]
+mod agent_history;

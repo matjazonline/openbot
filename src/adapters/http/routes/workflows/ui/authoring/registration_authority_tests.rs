@@ -83,10 +83,13 @@ async fn autonomous_agent_authoring_workflow_registration_revocation_refuses_adm
             f.company,
             actor,
             binding,
-            None,
-            json!({"text":"Registration authority probe"}),
-            Uuid::new_v4().to_string(),
-            None,
+            json_bindings::StartDetails {
+                association: None,
+                input: json!({"text":"Registration authority probe"}),
+                key: Uuid::new_v4().to_string(),
+                rerun_of: None,
+                history_session: None,
+            },
         )
     };
     let original = start().await.unwrap().0;

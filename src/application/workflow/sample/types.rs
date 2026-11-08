@@ -11,6 +11,10 @@ pub(super) const MAX_TOOL_CALLS: usize = 64;
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct SampleRequest {
+    #[serde(default)]
+    pub response_contract: Option<super::super::channel_reply::ChannelReplyContract>,
+    #[serde(default)]
+    pub response_approval_policy: Option<super::super::channel_reply::ReplyApprovalPolicy>,
     pub agents: Vec<crate::application::agent::ResolvedAgentDefinition>,
     pub input: Value,
     pub params: Value,
@@ -72,6 +76,15 @@ pub struct SampleStep {
     pub kind: crate::domain::workflow::TypeName,
     pub inputs: Value,
     pub output: Value,
+    pub history: Option<SampleAgentHistory>,
+}
+
+/// Scripted, sample-local context. It never names a production conversation.
+#[derive(Debug, Clone, Serialize)]
+pub struct SampleAgentHistory {
+    pub agent: crate::entities::agent_capability::AgentId,
+    pub seed: crate::application::services::harness::runs::LogicalSeed,
+    pub omitted_pairs: usize,
 }
 #[derive(Debug, Clone, Copy, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
@@ -98,6 +111,7 @@ pub struct SampleUsage {
 }
 #[derive(Debug, Serialize)]
 pub struct SampleReport {
+    pub response: Option<SampleResponse>,
     pub content_hash: super::super::publication::ContentHash,
     pub configuration_hash: super::SampleConfigurationHash,
     pub agent_selections: Vec<super::SampleAgentSelection>,
@@ -109,4 +123,42 @@ pub struct SampleReport {
     pub usage: SampleUsage,
     pub unused_responses: usize,
     pub diagnostic: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum SampleResponse {
+    AutomaticUnmapped,
+    Automatic {
+        content: SampleResponseContent,
+        approval_required: bool,
+    },
+    Suppressed,
+    Waiting {
+        stage: SampleWaitStage,
+        preview: Value,
+    },
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SampleWaitStage {
+    HumanReply,
+    FormalReview,
+    QuestionApproval,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SampleResponseContent {
+    pub subject: String,
+    pub body: String,
+}
+
+impl From<crate::application::transport::CanonicalContent> for SampleResponseContent {
+    fn from(content: crate::application::transport::CanonicalContent) -> Self {
+        Self {
+            subject: content.subject().to_owned(),
+            body: content.body_text().to_owned(),
+        }
+    }
 }

@@ -348,7 +348,7 @@ async fn channels_an_admin_cannot_see_stay_out_of_the_tab_the_form_and_the_card(
     ));
     let quiet = card(f.admin, open).await.unwrap();
     assert!(
-        quiet.contains("No active workflow answers this channel's messages"),
+        quiet.contains("No responding workflow is selected"),
         "{quiet}"
     );
     assert!(quiet.contains("No workflow is bound to this channel."));
@@ -374,7 +374,7 @@ async fn channels_an_admin_cannot_see_stay_out_of_the_tab_the_form_and_the_card(
     assert!(active.contains("Activated binding"), "{active}");
     let answering = card(f.admin, open).await.unwrap();
     assert!(
-        answering.contains("An active workflow answers"),
+        answering.contains("No responding workflow is selected"),
         "{answering}"
     );
     assert!(answering.contains("message trigger direct") && answering.contains("Support"));
@@ -764,3 +764,6 @@ async fn params_the_fields_cannot_carry_open_as_json_and_save_unchanged() {
     assert!(saved.contains("Saved binding"), "{saved}");
     assert_eq!(f.usage(workflow).await[0].binding.params, stored);
 }
+
+#[path = "channel_response_tests.rs"]
+mod channel_response_tests;

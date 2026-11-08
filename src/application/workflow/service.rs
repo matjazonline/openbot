@@ -180,6 +180,13 @@ fn verify_binding(binding: &ConfiguredBinding, request: &AdmitWorkflowRequest) -
 /// Children are created only by their parent's runtime step (07-D1 §D1.2a), and only a manual
 /// start can link a rerun original. Both are request-shape rules, checked before any lookup.
 fn admissible_trigger(request: &AdmitWorkflowRequest) -> AppResult<()> {
+    if request.history_session.is_some()
+        && !matches!(request.trigger.source(), TriggerSource::Manual)
+    {
+        return Err(AppError::BadRequest(
+            "Only a manual start can reuse an agent session".into(),
+        ));
+    }
     match (request.trigger.source(), request.rerun_of) {
         (TriggerSource::Child { .. }, _) => Err(AppError::BadRequest(
             "Child workflow runs are created only by their parent's workflow step".into(),

@@ -1,0 +1,22 @@
+{
+  "command": [
+    "env",
+    "RUST_MIN_STACK=2097152",
+    "RUST_TEST_THREADS=4",
+    "bash",
+    "scripts/test-network-isolation.sh",
+    "cargo",
+    "test",
+    "--locked",
+    "--offline",
+    "--lib",
+    "vault_",
+    "--",
+    "--list"
+  ],
+  "cwd": "/Users/mac02/.codex/worktrees/1133/openbot",
+  "database": "vault_google_1133_41402e4b8104_test",
+  "exit": 0,
+  "seconds": 17.7,
+  "log": "/Users/mac02/.codex/worktrees/1133/openbot/plan/vault-google/phases/p03/docs/logs/vault-list-07.log"
+}

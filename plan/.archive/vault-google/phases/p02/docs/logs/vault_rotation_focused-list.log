@@ -1,0 +1,9 @@
+$ cargo test --locked --offline --lib vault_rotation_ -- --list
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.21s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-048b7abd3ed0c794)
+adapters::persistence::integrations::tests::rotation_tests::vault_rotation_inventory_keysets_reconnect_rows_and_retirement: test
+adapters::persistence::integrations::tests::rotation_tests::vault_rotation_real_managed_cache_write_defeats_waiting_stale_cas: test
+adapters::persistence::integrations::tests::rotation_tests::vault_rotation_real_owner_replacement_defeats_waiting_stale_cas: test
+adapters::persistence::integrations::tests::rotation_tests::vault_rotation_unavailable_key_blocks_convergence_without_plaintext_fallback: test
+
+4 tests, 0 benchmarks

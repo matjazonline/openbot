@@ -1,0 +1,7 @@
+{
+  "result": "assertion failed",
+  "assertion": "each parent step body exactly equals merged step body",
+  "parent": "22c94cf6fcb9d7bcce14eda2a59df58223699e7f",
+  "step": "Transport abstraction boundary",
+  "disposition": "This existing step legitimately gains the accepted vault boundary/mutation/docs commands. Verify original commands remain ordered and every other body equals its parent; inspect explicit diff. No source change."
+}

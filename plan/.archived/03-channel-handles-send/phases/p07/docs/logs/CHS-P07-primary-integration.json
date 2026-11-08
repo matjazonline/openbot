@@ -1,0 +1,13 @@
+{
+  "at": "2026-11-07T10:32:17.758056+00:00",
+  "status": "accepted source integrated into primary; scoped staging/commit/push pending",
+  "source_digest": "cb9845d3593414402b1834fe230e14d9adb4361df98c96ee88434d3a035c338c",
+  "root_verified_owned_paths": 80,
+  "external34_other_paths_unchanged": true,
+  "shared2_files": "equal exact accepted combined blobs; pre-existing hunks preserved in worktree, only own browser hunks to be staged",
+  "original31_initial_export_reconciled": true,
+  "source_check_manifest": "CHS-P07-scoped-source.json",
+  "primary": "/Users/mac02/dev/openbot",
+  "retained_local_combined_evidence": "/private/tmp/openbot-chs-p06-3f43t2k7/worktree/plan/03-channel-handles-send/phases/p07/docs/logs",
+  "no_other_session_source_modified": true
+}

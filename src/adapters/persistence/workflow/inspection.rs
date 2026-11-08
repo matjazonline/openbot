@@ -80,6 +80,7 @@ pub(super) fn run_state(state: &str, waiting_reason: Option<&str>) -> AppResult<
             Some("child_run") => WaitingReason::ChildRun,
             Some("effect") => WaitingReason::Effect,
             Some("reconciliation") => WaitingReason::Reconciliation,
+            Some("agent_turn") => WaitingReason::AgentTurn,
             _ => return Err(invalid()),
         }),
         _ => return Err(invalid()),

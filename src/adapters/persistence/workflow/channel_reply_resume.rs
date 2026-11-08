@@ -90,7 +90,10 @@ async fn complete_saved_on(
         decision: DecisionId(decision),
         continuation: run.continuation_count,
     };
-    let progress = match Box::pin(batch_commit::complete(
+    sqlx::query("SAVEPOINT channel_saved_completion")
+        .execute(&mut *db)
+        .await?;
+    let result = Box::pin(batch_commit::complete(
         db,
         scope,
         &activation,
@@ -99,22 +102,41 @@ async fn complete_saved_on(
         owner,
         notices,
     ))
-    .await
-    {
+    .await;
+    let progress = match result {
         Ok(progress) => progress,
-        Err(AppError::NotFound(_) | AppError::Conflict(_) | AppError::KnowledgeRelease { .. }) => {
-            completion_job::finish(db, scope, owner).await?;
-            let failure = StepFailure::new(
-                FailureClass::Terminal,
-                FailureCode::parse("message.final_response_refused").map_err(|_| invalid())?,
-                None,
-            )
-            .map_err(|_| invalid())?;
-            recovery::route_parked_failure(db, scope, &failure).await?;
+        Err(
+            error @ (AppError::NotFound(_)
+            | AppError::Conflict(_)
+            | AppError::KnowledgeRelease { .. }),
+        ) => {
+            sqlx::query("ROLLBACK TO SAVEPOINT channel_saved_completion")
+                .execute(&mut *db)
+                .await?;
+            Box::pin(channel_reply_refusal::settle_on(
+                db,
+                scope,
+                owner,
+                channel_reply_refusal::knowledge_refusal(&error),
+            ))
+            .await?;
+            sqlx::query("RELEASE SAVEPOINT channel_saved_completion")
+                .execute(&mut *db)
+                .await?;
             return Ok(FinalizationProgress::Refused);
         }
         Err(error) => return Err(error),
     };
+    sqlx::query("RELEASE SAVEPOINT channel_saved_completion")
+        .execute(&mut *db)
+        .await?;
+    saved_result(progress, completion)
+}
+
+fn saved_result(
+    progress: batch_commit::CompletionProgress,
+    completion: PureCompletion,
+) -> AppResult<FinalizationProgress> {
     if matches!(progress, batch_commit::CompletionProgress::Refused) {
         return Ok(FinalizationProgress::Refused);
     }

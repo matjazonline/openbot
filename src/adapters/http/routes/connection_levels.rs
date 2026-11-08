@@ -35,7 +35,16 @@ impl axum::extract::FromRef<AppState> for ConnectionServices {
 
 pub(super) fn router() -> Router<AppState> {
     Router::new()
-        .route("/api/companies/{company}/http-connections", get(http_list))
+        .route(
+            "/api/companies/{company}/http-connections",
+            get(http_list)
+                .post(authoring::create)
+                .layer(DefaultBodyLimit::max(65_536)),
+        )
+        .route(
+            "/api/companies/{company}/http-connections/{id}/operations",
+            post(authoring::register).layer(DefaultBodyLimit::max(65_536)),
+        )
         .route(
             "/api/companies/{company}/http-connections/{id}",
             get(http_get),
@@ -66,6 +75,7 @@ pub(super) fn router() -> Router<AppState> {
         )
         .layer(DefaultBodyLimit::max(4096))
 }
+mod authoring;
 #[derive(Deserialize)]
 struct ConnectionPath {
     company: Uuid,

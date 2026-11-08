@@ -1,0 +1,27 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+   Compiling open_bots v0.1.0 (/private/tmp/openbot-agent-history-h_82_5pw/worktree)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2m 11s
+     Running unittests src/lib.rs (/private/tmp/openbot-chs-p06-3f43t2k7/worktree/target/debug/deps/open_bots-8b80d02f0b6cf2e6)
+
+running 5 tests
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::retention_capacity::agent_history_retention_actual_last_payload_slot_has_one_competing_producer_and_replay_survives_capacity ... FAILED
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::views::agent_history_views_private_admin_positive_restricted_member_customer_foreign_scope_cursor_and_sample_denials ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::retention::agent_history_retention_competing_collectors_expire_json_null_once_and_keep_checkpoint_proof ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::views::agent_history_level_history_reader_rechecks_demotion_and_inflight_raise_after_payload_fetch ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::views::agent_history_views_maximum_page_reaches_last_source_outside_page_and_keeps_exact_frozen_copy_after_expiry ... ok
+
+failures:
+
+---- adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::retention_capacity::agent_history_retention_actual_last_payload_slot_has_one_competing_producer_and_replay_survives_capacity stdout ----
+
+thread 'adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::retention_capacity::agent_history_retention_actual_last_payload_slot_has_one_competing_producer_and_replay_survives_capacity' (36132817) panicked at src/application/services/test_support/scenario.rs:120:5:
+assertion failed: exchanges.len() <= MAX_EXCHANGES
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::retention_capacity::agent_history_retention_actual_last_payload_slot_has_one_competing_producer_and_replay_survives_capacity
+
+test result: FAILED. 4 passed; 1 failed; 0 ignored; 0 measured; 3368 filtered out; finished in 3.49s
+
+error: test failed, to rerun pass `--lib`

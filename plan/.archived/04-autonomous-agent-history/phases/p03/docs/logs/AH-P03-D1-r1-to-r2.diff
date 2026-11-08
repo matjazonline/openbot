@@ -1,0 +1,90 @@
+--- AH-P03-D1-r1.md
++++ AH-P03-D1-r2.md
+@@ -1,4 +1,4 @@
+-# AH-P03-D1/r1 — exclusive logical turns in the existing workflow owner
++# AH-P03-D1/r2 — exclusive logical turns in the existing workflow owner
+ 
+ Proposed cohesive architecture for original03A/B, based on accepted02 source
+ c24664b2 / archivebfea3a87 and coordination6 C002/r5,C003/r2. No dependent code yet.
+@@ -48,23 +48,54 @@
+ Decreases need no tenant admission lock: a racing terminal commit can only make a
+ count conservative. No cached mutable count, reconciliation task or quota backfill.
+ 
+-The concrete order is existing global account/company/association/agent authority
+-(where the operation checks it), own run → own execution/job/fence → conversation
+-→ tenant admission lock for an increase → insertion/update of the own exchange.
+-An update already owns its exchange tuple; source run ownership serializes normal
+-same-execution writers, and accepted02's failed-row DELETE uses run SHARE NOWAIT.
+-Native admission triggers follow conversation→tenant admission lock as well.
+-
+-The tenant admission lock is a leaf: while holding it, acquire no *new* source run,
+-job or conversation lock. Reentrant writes to the already held own conversation
+-(counter/pointer) are allowed. Terminal pointer release takes only its own source
+-and conversation, never this tenant lock. This avoids a three-way parent-cancel
+-cycle: parent holds its shared conversation and then cancels a child; the child can
+-finish its private-branch preparation because another root waiting on the parent's
+-conversation has not yet acquired the admission lock. Child branches remain
+-private by accepted01 constraints; never lock another source run/job from a held
+-conversation. No provider or another turn is awaited while any DB lock/connection
+-or workflow worker slot remains held.
++The concrete protocol starts with existing global account/company/association/
++agent authority wherever that operation checks it, then the **own run** lock that
++serializes its source writers. Before the conversation, take the same-run subordinate
++locks required by the operation: its execution/job/fence, its existing wait or
++checkpoint, and its own existing exchange tuple. These are scoped to that locked
++run; no unrelated checkpoint or job is acquired. New turn-wait resume explicitly
++locks its own waiting job before reserving the conversation.
++
++In particular, ordinary checkpoint open, execution/model admission, mutation and
++model settlement follow source/fence → own checkpoint row FOR UPDATE (or insert)
++→ own exchange transition → conversation. The existing own run lock serializes
++checkpoint writers against run terminal/control owners; a terminal hook may read
++its own checkpoint without taking a new checkpoint row lock. Preparation has no
++checkpoint yet: after source/fence it locks the conversation, then the tenant
++admission leaf for membership increase, then inserts the new own exchange. Native
++control retry already owns its exchange tuple before conversation → admission leaf.
++The accepted02 failed-row DELETE uses source SHARE NOWAIT instead of waiting in
++reverse order. Do not add a late global agent/association lock after the own run.
++
++The tenant admission lock is a leaf: while holding it, acquire no **new** source
++run, job, checkpoint or conversation lock. Native insertion/counter/pointer checks
++may reenter locks already held for this same source/conversation. Terminal release
++takes its own conversation but never the tenant admission lock, and never locks a
++successor or unrelated source run/job/checkpoint to wake it. Durable readiness,
++not a cross-source release writer, makes successors eligible.
++
++There is one explicit existing hierarchy exception to the otherwise source-local
++protocol: bounded parent→child cancellation/guard cleanup may retain the parent's
++conversation while the existing controls/guard owner locks and settles descendants.
++It follows the existing ancestor→descendant order/depth/resource bounds; it is not
++permission to walk an arbitrary queued successor. Accepted01 requires each child's
++actual private branch, including same-agent children, so a child cannot need its
++parent's shared conversation. The leaf order prevents the three-way cycle: a root
++blocked on the parent's conversation has not yet acquired admission; the child can
++finish its private conversation→admission work and release its source before the
++parent's existing cascade proceeds. Keep a real parent-cancel/private-child/other-
++root admission contender test. No new child or checkpoint owner is introduced.
++
++Resource lifetimes are distinct. No DB transaction, connection, process mutex or
++conversation lock survives into provider I/O or waiting for another turn. A blocked
++Queued turn commits its native park and releases the workflow worker slot. A Ready
++provider call intentionally occupies the existing bounded, supervised I/O worker
++until completion/suspension; preserve its heartbeat, cancellation, deadline and
++fairness ownership. This is the coherent interpretation of original03A2 alongside
++its existing-owner/no-second-runtime rules, not a promise of zero worker occupancy
++during real execution. Do not detach provider work or add another dispatcher to
++satisfy that overbroad wording. Tests prove parked turns free slots and independent
++Ready conversations use the existing bounded workers without held DB resources.
+ 
+ Every membership increase, including native Failed→Queued control retry, uses the
+ same caps. A transient full queue refuses retry atomically with a controlled
+@@ -193,7 +224,8 @@
+ provider boundary (automatic model seed injection is P04, proved end-to-end in07),
+ 32/256 cap refusal with no partial allocation, queued cancellation,
+ older safe reopen behind a newer owner, exact retained checkpoint/budgets and no
+-permanent watermark. Use real native claimant/row-lock contenders and OwnDatabase.
++permanent watermark. Use real native claimant/row-lock contenders and OwnDatabase. Include actual
++checkpoint-versus-turn serialization and the bounded parent-cascade exception above.
+ 
+ Exercise crash/reconstruct after enqueue/acquire and before checkpoint, real
+ commit ambiguity for Ready/Parked/reopen/release, fast wake versus park receipt,

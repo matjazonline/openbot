@@ -2,11 +2,14 @@
 //! only its admitted root run owns an automatic final response.
 mod approval;
 mod contract;
+pub mod examples;
 mod finalization;
+mod outcomes;
 mod publication;
 mod publication_io;
 mod publisher;
 pub use finalization::*;
+pub use outcomes::*;
 pub use publication::*;
 pub use publication_io::*;
 pub use publisher::ChannelReplyPublisher;

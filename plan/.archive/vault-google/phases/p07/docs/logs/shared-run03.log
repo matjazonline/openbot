@@ -1,0 +1,21 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+   Compiling open_bots v0.1.0 (/Users/mac02/.codex/worktrees/1133/openbot)
+error[E0599]: no method named `complete_io` found for reference `&persistence::PostgresPersistence` in the current scope
+   --> src/adapters/persistence/workflow/vault_tests/shared_runtime.rs:168:11
+    |
+168 |         p.complete_io(crate::application::workflow::lease::FencedWorkflowResult {
+    |         --^^^^^^^^^^^
+    |
+    = help: items from traits can only be used if the trait is in scope
+help: trait `WorkflowCompletion` which provides `complete_io` is implemented but not in scope; perhaps you want to import it
+    |
+  1 + use crate::application::workflow::completion::WorkflowCompletion;
+    |
+help: there is a method `complete_inbound_event` with a similar name
+    |
+168 -         p.complete_io(crate::application::workflow::lease::FencedWorkflowResult {
+168 +         p.complete_inbound_event(crate::application::workflow::lease::FencedWorkflowResult {
+    |
+
+For more information about this error, try `rustc --explain E0599`.
+error: could not compile `open_bots` (lib test) due to 1 previous error

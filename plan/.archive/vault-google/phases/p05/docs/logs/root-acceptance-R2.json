@@ -1,0 +1,21 @@
+{
+  "phase": "p05",
+  "head": "97e5d60dc538e26c7cb976a8d63772eed80baff2",
+  "digest": "9d561a9cd7b6e4662d859bca78e70b0739b985b1dad6d8e75e5f30b68311088b",
+  "excludes": [
+    "plan/vault-google/COORDINATION.md",
+    "plan/vault-google/phases/p01/docs",
+    "plan/vault-google/phases/p02/docs",
+    "plan/vault-google/phases/p03/docs",
+    "plan/vault-google/phases/p04/docs",
+    "plan/vault-google/phases/p05/docs",
+    "plan/vault-google/integration/channel-p05/docs"
+  ],
+  "review": "VG-P05-B1-R2 PASS, whole-phase R1 plus three-path R2 correction",
+  "findings": "No open actionable phase05 findings; VF1 fixed; VF2 confirmed unrelated baseline failure left unchanged",
+  "verification": "checks-R2.json244 distinct focused tests with explicit reuse; fresh current scanner1/UI3/main5, offline alltargets/Clippy/fmt/transport/graftPASS; R1 SQLx/migration/13green full gates unchanged",
+  "full_suite": "NOT GREEN: scripts/check.sh exit1. Normal and stock library runs each3337PASS/2FAIL/9ignored. Scanner failure now fixed and independently rerun; remaining overflow setup55006 reproduced at clean baselineHEAD97e5d60d. No stackoverflow; main5 tests subsequently passed. No full-suite pass claim.",
+  "coordination_review_revision": 9,
+  "accepted_by": "/root",
+  "status": "accepted affected03\u201305 integration; stop before06/07"
+}

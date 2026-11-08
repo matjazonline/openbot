@@ -66,7 +66,7 @@ fn notes(name: &str) -> &'static str {
             "The selected agent's model and instructions classify the context into a finite label set; no tools or skills. Invalid labels get bounded repair, then fail terminally."
         }
         "agent.run" => {
-            "Runs the selected agent with exactly its saved tools and skills, frozen at publication; current revocation still applies. Context is untrusted data; output follows output_schema with bounded repair."
+            "Runs the selected agent with exactly its saved tools and skills, frozen at publication; current revocation still applies. Context is untrusted data; output follows output_schema with bounded repair. Automatic history stores the exact supplied context and accepted logical output per actual agent and thread/private session. The prompt uses a bounded, level-filtered recent suffix, frozen once for retries and human continuation. Child calls have private branch history. Inspect Agent history in the run step for exact context, omissions and expiry. Produced output and message delivery have separate states; history inspection never reruns the model."
         }
         "local_agent.run" => {
             "Runs an authorized company local profile through Cloudroom. Input is a bounded prompt and optional explicit session; exact project/provider/model and deadline freeze before approval. The workflow parks without holding a worker lease. Native permissions are answered in Cloudroom; output cannot grant approval or publish a message. Unknown native outcomes require recovery and never silently retry or fail over."

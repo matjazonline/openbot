@@ -77,6 +77,11 @@ async fn review(d: &Deployment, source_message: Uuid) {
     assert_eq!(after.revision, before.revision);
     assert_eq!(after.comments.len(), 1);
     assert!(replies(d).await.is_empty());
+    assert_eq!(
+        d.count("SELECT count(*) FROM channel_reply_decisions WHERE company_id=$1")
+            .await,
+        0
+    );
     let command = SubmitDecision {
         company: d.fixture.target.company,
         actor: d.fixture.target.actor,
@@ -148,6 +153,7 @@ async fn deliver_reviewed(d: &Deployment) {
         d.count("SELECT count(*) FROM workflow_runs WHERE company_id = $1 AND state = 'succeeded'")
             .await
             == 1
+            && d.count("SELECT count(*) FROM channel_reply_decisions AS response JOIN message_deliveries AS delivery ON delivery.company_id=response.company_id AND delivery.id=response.delivery_id WHERE response.company_id=$1 AND response.state='published' AND delivery.status='delivered'").await==1
     })
     .await;
     shutdown.send(()).unwrap();
@@ -178,11 +184,15 @@ async fn workflow_cutover_reviewed_email_delivers_exact_accepted_artifact() {
     let empty = d.p().workflow_metrics().await.unwrap();
     assert_eq!(empty.active_runs, 0.0);
     assert_eq!(empty.open_decisions, 0.0);
-    Box::pin(d.bind(
+    let binding = Box::pin(d.bind(
         reviewed_source(d.fixture.target.actor.user_id()),
         Some(MessageTrigger::Direct),
     ))
     .await;
+    let contract = serde_json::from_value(json!({"format_version":1,
+        "subject":{"literal":"Response"},"body":{"ref":"/input/body"}}))
+    .unwrap();
+    d.configure_response(binding, contract, None).await;
     let inbound = Box::pin(d.email(customer_email(&d, "reviewed", None))).await;
     Box::pin(d.run_until("human review", async || {
         d.count("SELECT count(*) FROM workflow_decisions WHERE company_id = $1")

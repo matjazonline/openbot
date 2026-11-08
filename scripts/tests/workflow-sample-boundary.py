@@ -40,6 +40,14 @@ class BoundaryTests(unittest.TestCase):
         ]: self.check(source,False)
     def test_missing_root_fails_closed(self):
         with TemporaryDirectory() as temporary:self.assertTrue(boundary.violations(Path(temporary)))
+    def test_seed_values_are_allowed_without_live_harness_capabilities(self):
+        self.check('use crate::application::services::harness::runs::{LogicalSeed, LogicalSeedPair, MAX_LOGICAL_SEED_BYTES, MAX_LOGICAL_SEED_PAIRS}; fn size(){usize::from(true);}',True)
+        for source in [
+            'use crate::application::services::harness::runs::*;',
+            'use crate::application::services::harness::runs::RunCheckpoint;',
+            'use crate::application::services::harness::WorkflowHarnessStore;',
+            'fn run(){crate::application::services::harness::runs::advance();}',
+        ]:self.check(source,False)
     def test_pure_contracts_and_explicit_test_handling(self):
         self.check('use crate::application::workflow::{batch::{execute_pure, PureCompletion}}; use std::sync::Arc;',True)
         with TemporaryDirectory() as temporary:

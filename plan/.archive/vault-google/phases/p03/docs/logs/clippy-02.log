@@ -1,0 +1,22 @@
+    Checking open_bots v0.1.0 (/Users/mac02/.codex/worktrees/1133/openbot)
+error: redundant field names in struct initialization
+   --> src/adapters/http/routes/vault_binding_route_tests.rs:133:13
+    |
+133 |             user: user,
+    |             ^^^^^^^^^^ help: replace it with: `user`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#redundant_field_names
+    = note: `-D clippy::redundant-field-names` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::redundant_field_names)]`
+
+error: this expression creates a reference which is immediately dereferenced by the compiler
+   --> src/adapters/http/routes/vault_binding_route_tests.rs:207:51
+    |
+207 |     let sessions = Arc::new(SessionAuthority::new(&config, Arc::new(p.clone())));
+    |                                                   ^^^^^^^ help: change this to: `config`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#needless_borrow
+    = note: `-D clippy::needless-borrow` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::needless_borrow)]`
+
+error: could not compile `open_bots` (lib test) due to 2 previous errors

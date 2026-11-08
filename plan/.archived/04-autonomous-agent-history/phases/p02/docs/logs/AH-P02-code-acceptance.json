@@ -1,0 +1,50 @@
+{
+  "at": "2026-11-07T14:37:50.395041+00:00",
+  "phase": "p02",
+  "round": "AH-P02-B1-R2",
+  "source": "c24664b28aed5506158d3a2e709ae3c5ec1228567e03fdff06bd15c146a08147",
+  "head": "4ab45555f8316ec7a8b1b64e8c05b77ff7d9a29d",
+  "review_base": "4ab45555f8316ec7a8b1b64e8c05b77ff7d9a29d",
+  "reviewer": "/root/channel_reply_review_recovery",
+  "verdict": "accepted in phase after independent PASS and root exact verification",
+  "findings": {
+    "AH-P02-B1-F1": "FIXED",
+    "AH-P02-B1-F2": "FIXED"
+  },
+  "coordination_checked": 5,
+  "notices": [
+    "AH-I001/r1",
+    "AH-I002/r1",
+    "AH-I003/r1",
+    "AH-I004/r1",
+    "AH-I005/r1",
+    "AH-I006/r1",
+    "AH-C001/r1",
+    "AH-C002/r4",
+    "AH-C003/r1"
+  ],
+  "targeted_tests_passed": 257,
+  "history_tests": 58,
+  "checks_pass": [
+    "migrations-main-findings-02",
+    "migrations-test-findings-02",
+    "findings-affected-runtime-04",
+    "findings-history-runtime-03",
+    "sqlx-prepare-findings-02",
+    "sqlx-check-findings-02",
+    "offline-all-targets-findings-02",
+    "clippy-findings-02",
+    "fmt-findings-02",
+    "diff-findings-02",
+    "graft-findings-02"
+  ],
+  "scope": "/private/tmp/openbot-agent-history-h_82_5pw/worktree/plan/04-autonomous-agent-history/phases/p02/docs/logs/author-scope-findings-02.json",
+  "owned_count": 82,
+  "owned_archive": "/private/tmp/openbot-agent-history-h_82_5pw/worktree/plan/04-autonomous-agent-history/phases/p02/docs/logs/AH-P02-B1-R2-owned-source.tar.gz",
+  "owned_archive_sha256": "bfea3a87c7f347549e52ace9857fd1b4084a8780765430c0adab8de42e931c53",
+  "reviewer_runtime": "source and actual receipts inspected; no runtime reruns by B",
+  "full_suite": false,
+  "integrated_to_primary": false,
+  "history_pushed": false,
+  "remaining": "p03\u2013p07 required, ordered; source freeze lifted after acceptance and coordination publication"
+}

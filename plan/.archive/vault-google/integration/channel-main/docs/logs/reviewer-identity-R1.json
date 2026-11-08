@@ -1,0 +1,51 @@
+{
+  "round": "VG-INT-MAIN-R1",
+  "head": "4ab45555f8316ec7a8b1b64e8c05b77ff7d9a29d",
+  "digest": "f2bd7d430aa1f4eff0289a6006fa64deeb9fa189def2e9ae74fa427f232b7926",
+  "excludes": [
+    "plan/vault-google/COORDINATION.md",
+    "plan/vault-google/phases/p01/docs",
+    "plan/vault-google/phases/p02/docs",
+    "plan/vault-google/phases/p03/docs",
+    "plan/vault-google/phases/p04/docs",
+    "plan/vault-google/phases/p05/docs",
+    "plan/vault-google/integration/channel-p05/docs",
+    "plan/vault-google/integration/channel-main/docs"
+  ],
+  "vault_coordination_revision": 12,
+  "channel_authority_revision": 28,
+  "both_live_pins_match": true,
+  "successful_author_receipt_hashes_verified": [
+    "migrate-01.log",
+    "offline-early-01.log",
+    "vault-authority-01.log",
+    "vault-bindings-01.log",
+    "vault-storage-01.log",
+    "vault-rotation-01.log",
+    "renewal-races-01.log",
+    "channel-completion-01.log",
+    "channel-e2e-01.log",
+    "provisioning-01.log",
+    "supervision-01.log",
+    "sample-escaping-01.log",
+    "sqlx-prepare-01.log",
+    "sqlx-check-01.log",
+    "clippy-01.log",
+    "format-01.log",
+    "diff-01.log",
+    "sample-01.log",
+    "channel-authoring-02.log",
+    "css-01.log",
+    "graft-01.log"
+  ],
+  "author_rust_distinct_passed": 131,
+  "author_browser_passed": 1,
+  "independent_channel_completion_passed": 34,
+  "known_failures": [
+    "VG-INT-MAIN-F1 upstream markup source scanner",
+    "VG-INT-MAIN-F2 upstream transport source scanner"
+  ],
+  "full_suite_run": false,
+  "overflow_test_run": false,
+  "verdict": "PASS scoped integration with inherited check failures; not all-checks-green"
+}

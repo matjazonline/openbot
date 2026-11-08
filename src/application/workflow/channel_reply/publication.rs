@@ -45,6 +45,7 @@ pub enum ReplyPublicationFailure {
     AuthorityRevoked,
     PolicyChanged,
     SourceUnavailable,
+    #[serde(rename = "knowledge.audience_below_content")]
     ReleaseDenied,
     InvalidProposal,
     PublicationFailed,
@@ -56,7 +57,7 @@ impl ReplyPublicationFailure {
             Self::AuthorityRevoked => "authority_revoked",
             Self::PolicyChanged => "policy_changed",
             Self::SourceUnavailable => "source_unavailable",
-            Self::ReleaseDenied => "release_denied",
+            Self::ReleaseDenied => crate::domain::workflow::KNOWLEDGE_AUDIENCE_BELOW_CONTENT,
             Self::InvalidProposal => "invalid_proposal",
             Self::PublicationFailed => "publication_failed",
         }

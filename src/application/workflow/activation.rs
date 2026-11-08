@@ -1,7 +1,9 @@
 //! Freeze logical activation inputs once. This is not a worker ownership grant.
 use super::{CompanyId, publication::PublishedBundle};
 use crate::application::app_error::{AppError, AppResult};
-use crate::domain::workflow::{Binding, ChoiceName, Context, ExecutionId, RunId, StepId};
+use crate::domain::workflow::{
+    Binding, ChoiceName, Context, ContextReference, ExecutionId, RunId, StepId,
+};
 use async_trait::async_trait;
 use serde_json::Value;
 use std::collections::BTreeSet;
@@ -32,6 +34,17 @@ pub struct ActivatedExecution {
 /// Include optional/defaulted references too; missing committed values retain
 /// their normal binding semantics when the compiler resolves the inputs.
 pub fn input_dependencies(bundle: &PublishedBundle, step: &StepId) -> AppResult<BTreeSet<StepId>> {
+    Ok(input_references(bundle, step)?
+        .into_iter()
+        .filter_map(|reference| reference.step_id().cloned())
+        .collect())
+}
+
+/// The same bounded compiled expression walk serves activation and audience provenance.
+pub fn input_references(
+    bundle: &PublishedBundle,
+    step: &StepId,
+) -> AppResult<Vec<ContextReference>> {
     let definition = bundle
         .compiled()
         .graph()
@@ -39,11 +52,22 @@ pub fn input_dependencies(bundle: &PublishedBundle, step: &StepId) -> AppResult<
         .steps
         .get(step)
         .ok_or_else(|| AppError::Database("Unknown stored workflow step".into()))?;
-    let mut pending: Vec<_> = definition.inputs.values().collect();
+    Ok(step_binding_references(
+        bundle,
+        step,
+        definition.inputs.values(),
+    ))
+}
+
+pub(crate) fn step_binding_references<'a>(
+    bundle: &'a PublishedBundle,
+    step: &StepId,
+    bindings: impl IntoIterator<Item = &'a Binding>,
+) -> Vec<ContextReference> {
+    let mut pending: Vec<_> = bindings.into_iter().collect();
     if let Some(rule) = bundle.compiled().rule(step) {
         pending.extend(rule.cases.iter().map(|case| &case.when));
     }
-    // A repeat round reads its deferred bindings against the same earlier outputs (07-D1 §D1.1).
     if let Some(repeat) = bundle
         .compiled()
         .child_control(step)
@@ -51,7 +75,14 @@ pub fn input_dependencies(bundle: &PublishedBundle, step: &StepId) -> AppResult<
     {
         pending.extend([&repeat.next_input, &repeat.exit_when]);
     }
-    let mut references = BTreeSet::new();
+    binding_references(pending)
+}
+
+pub fn binding_references<'a>(
+    bindings: impl IntoIterator<Item = &'a Binding>,
+) -> Vec<ContextReference> {
+    let mut pending: Vec<_> = bindings.into_iter().collect();
+    let mut references = Vec::new();
     while let Some(binding) = pending.pop() {
         let reference = match binding {
             Binding::Reference(reference) | Binding::Exists(reference) => Some(reference),
@@ -87,11 +118,11 @@ pub fn input_dependencies(bundle: &PublishedBundle, step: &StepId) -> AppResult<
             }
             Binding::Literal(_) => None,
         };
-        if let Some(step) = reference.and_then(|reference| reference.step_id()) {
-            references.insert(step.clone());
+        if let Some(reference) = reference {
+            references.push(reference.clone());
         }
     }
-    Ok(references)
+    references
 }
 
 /// Pure preparation uses only a frozen bundle and committed run context.

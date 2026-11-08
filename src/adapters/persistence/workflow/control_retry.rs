@@ -35,6 +35,25 @@ pub(super) async fn retry_on(
     if !eligible {
         return Ok(false);
     }
+    let conversation: Option<Uuid> = sqlx::query_scalar(
+        "SELECT conversation_id FROM agent_history_exchanges WHERE company_id=$1 AND run_id=$2 \
+         AND execution_id=$3 AND state='failed' FOR UPDATE",
+    )
+    .bind(command.company_id.as_uuid())
+    .bind(command.run_id.as_uuid())
+    .bind(execution)
+    .fetch_optional(&mut *db)
+    .await?;
+    if let Some(conversation) = conversation {
+        let available: bool = sqlx::query_scalar("SELECT agent_history_admit($1,$2)")
+            .bind(command.company_id.as_uuid())
+            .bind(conversation)
+            .fetch_one(&mut *db)
+            .await?;
+        if !available {
+            return Err(AppError::Conflict("Agent history queue is full".into()));
+        }
+    }
     sqlx::query("UPDATE background_tasks SET status='pending',run_at=clock_timestamp(),updated_at=clock_timestamp() WHERE company_id=$1 AND id=$2")
         .bind(command.company_id.as_uuid()).bind(job).execute(&mut *db).await?;
     sqlx::query("UPDATE workflow_runs SET state='running',waiting_reason=NULL,terminal_execution_id=NULL WHERE company_id=$1 AND id=$2")

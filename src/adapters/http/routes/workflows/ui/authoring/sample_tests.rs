@@ -261,6 +261,8 @@ fn capture_target(
 }
 fn capture_request(workflow: Uuid) -> crate::application::workflow::sample::SampleRequest {
     crate::application::workflow::sample::SampleRequest {
+        response_contract: None,
+        response_approval_policy: None,
         agents: vec![],
         input: json!({}),
         params: json!({}),

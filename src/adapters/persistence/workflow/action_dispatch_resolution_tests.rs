@@ -236,6 +236,9 @@ fn exists(result: &AppResult<RemoteDispatchObservation>) -> bool {
 /// For failure messages: the observation has no Debug.
 fn describe(result: &AppResult<RemoteDispatchObservation>) -> String {
     match result {
+        Ok(RemoteDispatchObservation::PreparationFailed(reason)) => {
+            format!("PreparationFailed({reason:?})")
+        }
         Ok(RemoteDispatchObservation::Committed(_)) => "Committed".into(),
         Ok(RemoteDispatchObservation::PossibleDispatchExists) => "PossibleDispatchExists".into(),
         Ok(RemoteDispatchObservation::ApprovalParked(_)) => "ApprovalParked".into(),

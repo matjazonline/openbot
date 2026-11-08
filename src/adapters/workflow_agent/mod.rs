@@ -193,6 +193,9 @@ impl AgentToolDispatch for AgentActionTools {
 
 fn remote(observation: RemoteDispatchObservation) -> AppResult<AgentToolObservation> {
     match observation {
+        RemoteDispatchObservation::PreparationFailed(_) => Err(AppError::ServiceUnavailable(
+            "Integration preparation failed".into(),
+        )),
         RemoteDispatchObservation::Committed(receipt) => {
             Ok(AgentToolObservation::Completed(receipt.result))
         }

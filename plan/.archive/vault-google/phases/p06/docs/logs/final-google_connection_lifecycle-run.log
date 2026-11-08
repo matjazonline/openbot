@@ -1,0 +1,13 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.18s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-048b7abd3ed0c794)
+
+running 5 tests
+test adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::management::google_connection_lifecycle_delete_competes_with_refresh_without_restoring_old_authority ... ok
+test adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::cache::google_connection_lifecycle_owner_controls_keep_consent_revision_after_cache_update ... ok
+test adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::reconnect::google_connection_lifecycle_reconnect_ignores_routine_cache_revision_but_stales_old_grants ... ok
+test adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::management::google_connection_lifecycle_disconnect_competes_with_refresh_and_provider_failure ... ok
+test adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::reconnect::google_connection_lifecycle_stale_invalid_grant_after_crash_cannot_invalidate_new_consent ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 3571 filtered out; finished in 2.33s
+

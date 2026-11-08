@@ -31,6 +31,8 @@ async fn both_runs_reconcile_on_connect_wakeup_and_reconnect() {
                 run_ids: vec![first, second],
                 direction: crate::entities::message::MessageDirection::Inbound,
             }],
+            response_outcomes: vec![],
+            responses_truncated: false,
         },
     );
     // This wakeup predates subscription; the first read still recovers both identities.

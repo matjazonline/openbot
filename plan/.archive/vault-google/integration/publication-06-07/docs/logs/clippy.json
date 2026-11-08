@@ -1,0 +1,17 @@
+{
+  "command": [
+    "cargo",
+    "clippy",
+    "--locked",
+    "--offline",
+    "--all-targets",
+    "--",
+    "-D",
+    "warnings"
+  ],
+  "cwd": "/private/tmp/vault-google-publish-a95937f128",
+  "exit": 0,
+  "seconds": 103.09,
+  "fixture": "no database required; owned cache serialized",
+  "log": "/private/tmp/vault-google-publish-a95937f128/plan/.archive/vault-google/integration/publication-06-07/docs/logs/clippy.log"
+}

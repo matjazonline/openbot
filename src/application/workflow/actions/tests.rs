@@ -32,6 +32,7 @@ pub(crate) fn request(scope: ActionScope) -> ActionRequest {
         },
         arguments: json!({"value":1}),
         context: ActionPolicyContext {
+            integration: None,
             origin: crate::application::agent::ToolCallOrigin::Workflow,
             actor: Uuid::new_v4(),
             capability_ceiling: vec![TypeName::parse("fixture.write").unwrap()],

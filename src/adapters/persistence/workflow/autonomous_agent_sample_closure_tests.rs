@@ -5,6 +5,9 @@ use crate::application::workflow::sample_capture::SampleDefinitionCapture;
 #[path = "autonomous_agent_sample_bounds_tests.rs"]
 mod bounds;
 
+#[path = "agent_history_sample_tests.rs"]
+mod history;
+
 fn capture_service(setup: &AgentSetup) -> crate::adapters::persistence::workflow::SampleCapture {
     crate::adapters::persistence::workflow::SampleCapture {
         persistence: setup.fixture.persistence.clone(),
@@ -23,6 +26,8 @@ fn target(setup: &AgentSetup, graph: &GraphWorkflow) -> DefinitionTarget {
 
 fn sample_request(responses: Vec<Value>) -> SampleRequest {
     SampleRequest {
+        response_contract: None,
+        response_approval_policy: None,
         input: json!({}),
         params: json!({}),
         scripts: serde_json::from_value(Value::Array(responses)).unwrap(),

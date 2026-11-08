@@ -1,0 +1,54 @@
+✖ vault dark: native picker progress, escaped private metadata and recoverable consent (6787.442625ms)
+✖ vault light: native picker progress, escaped private metadata and recoverable consent (6664.138625ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 0
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 13629.290833
+
+✖ failing tests:
+
+test at scripts/tests/vault-authoring-browser.mjs:12:40
+✖ vault dark: native picker progress, escaped private metadata and recoverable consent (6787.442625ms)
+  Error: expect(locator).toHaveAttribute(expected) failed
+  
+  Locator: locator('form[data-submit="busy-once"]')
+  Expected string: "true"
+  Received string: ""
+  Timeout: 5000ms
+  
+  Call log:
+  [2m  - Expect "to.have.attribute.value" with timeout 5000ms[22m
+  [2m  - waiting for locator('form[data-submit="busy-once"]')[22m
+  [2m    - waiting for" http://127.0.0.1:61141/ui/profile/vault/binding-proposals" navigation to finish...[22m
+  
+      at Proxy.<anonymous> (/Users/mac02/.codex/worktrees/1133/openbot/node_modules/playwright/lib/matchers/expect.js:221:24)
+      at TestContext.<anonymous> (file:///Users/mac02/.codex/worktrees/1133/openbot/scripts/tests/vault-authoring-browser.mjs:42:24)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    matcherResult: { name: 'toHaveAttribute', expected: 'true', message: `expect(locator).toHaveAttribute(expected) failed\n\nLocator: locator('form[data-submit="busy-once"]')\nExpected string: "true"\nReceived string: ""\nTimeout: 5000ms\n\nCall log:\n\x1B[2m  - Expect "to.have.attribute.value" with timeout 5000ms\x1B[22m\n\x1B[2m  - waiting for locator('form[data-submit="busy-once"]')\x1B[22m\n\x1B[2m    - waiting for" http://127.0.0.1:61141/ui/profile/vault/binding-proposals" navigation to finish...\x1B[22m\n`, pass: false, actual: undefined, log: [ '  - Expect "to.have.attribute.value" with timeout 5000ms', `  - waiting for locator('form[data-submit="busy-once"]')`, '    - waiting for" http://127.0.0.1:61141/ui/profile/vault/binding-proposals" navigation to finish...' ], timeout: 5000 }
+  }
+
+test at scripts/tests/vault-authoring-browser.mjs:12:40
+✖ vault light: native picker progress, escaped private metadata and recoverable consent (6664.138625ms)
+  Error: expect(locator).toHaveAttribute(expected) failed
+  
+  Locator: locator('form[data-submit="busy-once"]')
+  Expected string: "true"
+  Received string: ""
+  Timeout: 5000ms
+  
+  Call log:
+  [2m  - Expect "to.have.attribute.value" with timeout 5000ms[22m
+  [2m  - waiting for locator('form[data-submit="busy-once"]')[22m
+  [2m    - waiting for" http://127.0.0.1:61160/ui/profile/vault/binding-proposals" navigation to finish...[22m
+  
+      at Proxy.<anonymous> (/Users/mac02/.codex/worktrees/1133/openbot/node_modules/playwright/lib/matchers/expect.js:221:24)
+      at TestContext.<anonymous> (file:///Users/mac02/.codex/worktrees/1133/openbot/scripts/tests/vault-authoring-browser.mjs:42:24)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {
+    matcherResult: { name: 'toHaveAttribute', expected: 'true', message: `expect(locator).toHaveAttribute(expected) failed\n\nLocator: locator('form[data-submit="busy-once"]')\nExpected string: "true"\nReceived string: ""\nTimeout: 5000ms\n\nCall log:\n\x1B[2m  - Expect "to.have.attribute.value" with timeout 5000ms\x1B[22m\n\x1B[2m  - waiting for locator('form[data-submit="busy-once"]')\x1B[22m\n\x1B[2m    - waiting for" http://127.0.0.1:61160/ui/profile/vault/binding-proposals" navigation to finish...\x1B[22m\n`, pass: false, actual: undefined, log: [ '  - Expect "to.have.attribute.value" with timeout 5000ms', `  - waiting for locator('form[data-submit="busy-once"]')`, '    - waiting for" http://127.0.0.1:61160/ui/profile/vault/binding-proposals" navigation to finish...' ], timeout: 5000 }
+  }

@@ -1,0 +1,286 @@
+--- a/migrations/20260817000000_init_schema.sql
++++ b/migrations/20260817000000_init_schema.sql
+@@ -13542,16 +13542,16 @@
+     END LOOP;
+ END $$;
+ 
+-CREATE FUNCTION public.notify_channel_reply_decision_changed() RETURNS trigger LANGUAGE plpgsql AS $$
++CREATE FUNCTION public.notify_channel_response_decision_changed() RETURNS trigger LANGUAGE plpgsql AS $$
+ BEGIN
+     PERFORM public.notify_channel_response_run(NEW.company_id,NEW.run_id);
+     RETURN NULL;
+ END $$;
+ CREATE TRIGGER channel_reply_decision_notify_inserted AFTER INSERT ON public.channel_reply_decisions
+-    FOR EACH ROW EXECUTE FUNCTION public.notify_channel_reply_decision_changed();
++    FOR EACH ROW EXECUTE FUNCTION public.notify_channel_response_decision_changed();
+ CREATE TRIGGER channel_reply_decision_notify_changed AFTER UPDATE OF state ON public.channel_reply_decisions
+     FOR EACH ROW WHEN (OLD.state IS DISTINCT FROM NEW.state)
+-    EXECUTE FUNCTION public.notify_channel_reply_decision_changed();
++    EXECUTE FUNCTION public.notify_channel_response_decision_changed();
+ 
+ CREATE FUNCTION public.notify_channel_response_delivery_changed() RETURNS trigger LANGUAGE plpgsql AS $$
+ DECLARE owner_run uuid;
+@@ -13567,3 +13567,11 @@
+ CREATE TRIGGER channel_response_delivery_notify_changed AFTER UPDATE OF status ON public.message_deliveries
+     FOR EACH ROW WHEN (OLD.status IS DISTINCT FROM NEW.status)
+     EXECUTE FUNCTION public.notify_channel_response_delivery_changed();
++
++-- A nested formal review leaves ancestors parked for child_run. Wake the real
++-- budget root so its already-open pane re-reads, without exposing the decision.
++CREATE TRIGGER channel_response_review_notify_inserted AFTER INSERT ON public.workflow_decisions
++    FOR EACH ROW EXECUTE FUNCTION public.notify_channel_response_decision_changed();
++CREATE TRIGGER channel_response_review_notify_changed AFTER UPDATE OF state ON public.workflow_waits
++    FOR EACH ROW WHEN (NEW.reason='decision' AND OLD.state IS DISTINCT FROM NEW.state)
++    EXECUTE FUNCTION public.notify_channel_response_decision_changed();
+--- a/src/adapters/persistence/workflow/channel_reply_continuation_views_support.rs
++++ b/src/adapters/persistence/workflow/channel_reply_continuation_views_support.rs
+@@ -214,13 +214,13 @@
+     final_answer.next
+ }
+ 
+-async fn parked_child(fixture: &FinalFixture) -> ActivationRequest {
++async fn parked_child(fixture: &FinalFixture, parent: ActivationRequest) -> ActivationRequest {
+     use crate::application::workflow::children::WorkflowChildren;
+-    fixture.p.park_child(fixture.scope).await.unwrap().unwrap();
++    fixture.p.park_child(parent).await.unwrap().unwrap();
+     let row: ScopeRow=sqlx::query_as("SELECT child.id AS run_id,execution.id AS execution_id,job.id AS job_id FROM workflow_runs AS child JOIN workflow_executions AS execution ON execution.company_id=child.company_id AND execution.run_id=child.id JOIN background_tasks AS job ON job.company_id=execution.company_id AND job.workflow_execution_id=execution.id WHERE child.company_id=$1 AND child.parent_run_id=$2")
+-        .bind(fixture.scope.company.as_uuid()).bind(fixture.scope.run.as_uuid()).fetch_one(fixture.p.pool()).await.unwrap();
++        .bind(parent.company.as_uuid()).bind(parent.run.as_uuid()).fetch_one(fixture.p.pool()).await.unwrap();
+     ActivationRequest {
+-        company: fixture.scope.company,
++        company: parent.company,
+         run: RunId::new(row.run_id),
+         execution: ExecutionId::new(row.execution_id),
+         job: WorkflowJobId(row.job_id),
+@@ -232,7 +232,16 @@
+     pub(super) child: ActivationRequest,
+ }
+ 
+-pub(super) async fn child_review(s: Intents, deadline: chrono::DateTime<Utc>) -> ChildReview {
++pub(super) enum ReviewDepth {
++    Direct,
++    Grandchild,
++}
++
++pub(super) async fn child_review(
++    s: Intents,
++    deadline: chrono::DateTime<Utc>,
++    depth: ReviewDepth,
++) -> ChildReview {
+     let workflow = WorkflowId::new(Uuid::new_v4());
+     let mut child: Value =
+         serde_json::from_str(&registry::example("decision.human").unwrap().source).unwrap();
+@@ -240,6 +249,18 @@
+         json!({"literal":[{"kind":"user","id":s.owner().user_id()}]});
+     child["steps"]["start"]["with"]["deadline"] = json!({"literal":deadline.to_rfc3339()});
+     let version = Box::pin(s.fixture.publish_workflow(workflow, child)).await;
++    let (workflow, version) = match depth {
++        ReviewDepth::Direct => (workflow, version),
++        ReviewDepth::Grandchild => {
++            let middle = WorkflowId::new(Uuid::new_v4());
++            let mut source = final_source("workflow.call");
++            source["input_schema"] = json!(true);
++            source["steps"]["start"] = json!({"type":"workflow.call","child_workflow_id":workflow,
++                "child_version_id":version,"with":{"input":{"literal":{}}},"routes":{"success":"$end"}});
++            let version = Box::pin(s.fixture.publish_workflow(middle, source)).await;
++            (middle, version)
++        }
++    };
+     let mut parent = final_source("workflow.call");
+     parent["steps"]["start"] = json!({"type":"workflow.call","child_workflow_id":workflow,
+         "child_version_id":version,"with":{"input":{"literal":{}}},"routes":{"success":"$end"}});
+@@ -250,7 +271,10 @@
+         false,
+     ))
+     .await;
+-    let child = Box::pin(parked_child(&fixture)).await;
++    let mut child = Box::pin(parked_child(&fixture, fixture.scope)).await;
++    if matches!(depth, ReviewDepth::Grandchild) {
++        child = Box::pin(parked_child(&fixture, child)).await;
++    }
+     ChildReview { fixture, child }
+ }
+ 
+@@ -276,6 +300,24 @@
+         },
+     ))
+     .await;
+-    let child = Box::pin(parked_child(&fixture)).await;
++    let child = Box::pin(parked_child(&fixture, fixture.scope)).await;
+     ChildReview { fixture, child }
+ }
++
++pub(super) async fn decision_wakes(
++    events: &mut sqlx::postgres::PgListener,
++) -> Vec<(String, Value)> {
++    let mut wakes = Vec::new();
++    for _ in 0..4 {
++        let Ok(result) = tokio::time::timeout(Duration::from_millis(300), events.recv()).await
++        else {
++            break;
++        };
++        let event = result.unwrap();
++        wakes.push((
++            event.channel().to_owned(),
++            serde_json::from_str::<Value>(event.payload()).unwrap(),
++        ));
++    }
++    wakes
++}
+--- a/src/adapters/persistence/workflow/channel_reply_continuation_views_tests.rs
++++ b/src/adapters/persistence/workflow/channel_reply_continuation_views_tests.rs
+@@ -27,12 +27,27 @@
+     assert_eq!(completed.label(), "Completed without automatic reply");
+ }
+ 
++fn assert_private_review_summary(
++    waiting: &ChannelResponseOutcome,
++    company: Uuid,
++    view: &DecisionView,
++) {
++    let html = crate::adapters::http::pages::channel_response_panel(
++        waiting,
++        company,
++        crate::adapters::http::pages::RunLinkAccess::Inspect,
++    );
++    assert!(html.contains("Waiting for reviewer"));
++    assert!(!html.contains(&view.decision.0.to_string()) && !html.contains(&view.artifact_digest));
++}
++
+ #[tokio::test]
+ async fn channel_reply_views_child_review_wakes_and_reconciles_the_unchanged_parent() {
+     for choice in ["continue", "revise"] {
+         let case = Box::pin(child_review(
+             Box::pin(Intents::new()).await,
+             Utc::now() + chrono::Duration::minutes(10),
++            ReviewDepth::Direct,
+         ))
+         .await;
+         let f = &case.fixture;
+@@ -43,7 +58,7 @@
+                 .await
+                 .unwrap()
+                 .unwrap();
+-        let wakes = notifications(&mut events).await;
++        let wakes = decision_wakes(&mut events).await;
+         assert!(
+             wakes
+                 .iter()
+@@ -67,12 +82,6 @@
+         let waiting = outcome(f).await;
+         assert!(waiting.waiting_for_review);
+         assert_eq!(waiting.label(), "Waiting for reviewer");
+-        let html = crate::adapters::http::pages::channel_response_panel(
+-            &waiting,
+-            f.scope.company.as_uuid(),
+-            crate::adapters::http::pages::RunLinkAccess::Inspect,
+-        );
+-        assert!(html.contains("Waiting for reviewer"));
+         let decision: Uuid = sqlx::query_scalar(
+             "SELECT id FROM workflow_decisions WHERE company_id=$1 AND execution_id=$2",
+         )
+@@ -85,9 +94,7 @@
+             f.p.read_decision(f.scope.company, f.s.owner(), DecisionId(decision))
+                 .await
+                 .unwrap();
+-        assert!(
+-            !html.contains(&view.decision.0.to_string()) && !html.contains(&view.artifact_digest)
+-        );
++        assert_private_review_summary(&waiting, f.scope.company.as_uuid(), &view);
+         let foreign = channel_reply_views::read(
+             &f.p,
+             CompanyId::new(Uuid::new_v4()),
+@@ -124,6 +131,7 @@
+     let case = Box::pin(child_review(
+         Box::pin(classified_intents()).await,
+         Utc::now() + chrono::Duration::minutes(10),
++        ReviewDepth::Direct,
+     ))
+     .await;
+     let f = &case.fixture;
+@@ -165,7 +173,7 @@
+ async fn channel_reply_views_expired_child_review_advances_parent_without_stale_wait_label() {
+     let s = Box::pin(Intents::new()).await;
+     let deadline = Utc::now() + chrono::Duration::seconds(3);
+-    let case = Box::pin(child_review(s, deadline)).await;
++    let case = Box::pin(child_review(s, deadline, ReviewDepth::Direct)).await;
+     let f = &case.fixture;
+     f.p.park_decision(case.child, &approval_test_support::notices(&f.p))
+         .await
+@@ -205,3 +213,76 @@
+     assert!(!done.prompt.as_ref().unwrap().waiting);
+     assert_eq!(done.label(), "Work completed; reply pending");
+ }
++
++#[tokio::test]
++async fn channel_reply_views_nested_review_emits_a_root_wakeup_without_an_ancestor_state_change() {
++    let case = Box::pin(child_review(
++        Box::pin(Intents::new()).await,
++        Utc::now() + chrono::Duration::minutes(10),
++        ReviewDepth::Grandchild,
++    ))
++    .await;
++    let f = &case.fixture;
++    let mut events = listener(f).await;
++    assert_eq!(outcome(f).await.label(), "Processing");
++    f.p.park_decision(case.child, &approval_test_support::notices(&f.p))
++        .await
++        .unwrap()
++        .unwrap();
++    let wakes = decision_wakes(&mut events).await;
++    assert!(
++        wakes
++            .iter()
++            .any(|(kind, payload)| kind == "workflow_run_changed"
++                && payload["run_id"] == json!(f.scope.run.as_uuid())),
++        "An open root pane subscribes to its root/direct children, so a grandchild review must wake the actual root: {wakes:?}"
++    );
++    let waiting_ancestors: i64=sqlx::query_scalar("SELECT count(*) FROM workflow_runs AS run JOIN workflow_run_budgets AS budget ON budget.company_id=run.company_id AND budget.run_id=run.id WHERE budget.company_id=$1 AND budget.root_run_id=$2 AND run.id<>$3 AND run.waiting_reason='child_run'")
++        .bind(f.scope.company.as_uuid()).bind(f.scope.run.as_uuid()).bind(case.child.run.as_uuid()).fetch_one(f.p.pool()).await.unwrap();
++    assert_eq!(waiting_ancestors, 2);
++    let read = outcome(f).await;
++    assert!(read.waiting_for_review);
++    assert_eq!(read.label(), "Waiting for reviewer");
++    assert!(
++        wakes
++            .iter()
++            .all(|(_, payload)| payload.get("proposal").is_none()
++                && payload.get("reviewers").is_none()
++                && payload.get("decision_id").is_none())
++    );
++    let decision: Uuid = sqlx::query_scalar(
++        "SELECT id FROM workflow_decisions WHERE company_id=$1 AND execution_id=$2",
++    )
++    .bind(f.scope.company.as_uuid())
++    .bind(case.child.execution.as_uuid())
++    .fetch_one(f.p.pool())
++    .await
++    .unwrap();
++    let view =
++        f.p.read_decision(f.scope.company, f.s.owner(), DecisionId(decision))
++            .await
++            .unwrap();
++    let mut settled = listener(f).await;
++    f.p.submit_decision(SubmitDecision {
++        company: f.scope.company,
++        actor: f.s.owner(),
++        decision: view.decision,
++        command_key: DecisionCommandKey::parse("nested-close").unwrap(),
++        expected_revision: view.revision,
++        expected_artifact: view.artifact_digest,
++        choice: "continue".into(),
++        feedback: "Private".into(),
++        data: json!("edited"),
++    })
++    .await
++    .unwrap();
++    let closed_wakes = decision_wakes(&mut settled).await;
++    assert!(
++        closed_wakes
++            .iter()
++            .any(|(kind, payload)| kind == "workflow_run_changed"
++                && payload["run_id"] == json!(f.scope.run.as_uuid())),
++        "Settlement must also refresh the root's stale waiting summary: {closed_wakes:?}"
++    );
++    assert!(!outcome(f).await.waiting_for_review);
++}

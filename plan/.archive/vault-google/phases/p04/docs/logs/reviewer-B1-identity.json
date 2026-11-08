@@ -1,0 +1,28 @@
+{
+  "review": "VG-P04-B1-R1",
+  "verdict": "CHANGES REQUIRED",
+  "findings": [
+    "VG-P04-B1-F1",
+    "VG-P04-B1-F2",
+    "VG-P04-B1-F3"
+  ],
+  "head": "97e5d60dc538e26c7cb976a8d63772eed80baff2",
+  "digest": "3ec6bd6cc3aec69cb198832777f0aefa969b0563cf754514ceb5f7a5a96e5e05",
+  "excludes": [
+    "plan/vault-google/COORDINATION.md",
+    "plan/vault-google/phases/p01/docs",
+    "plan/vault-google/phases/p02/docs",
+    "plan/vault-google/phases/p03/docs",
+    "plan/vault-google/phases/p04/docs",
+    "plan/vault-google/phases/p05/docs",
+    "plan/vault-google/integration/channel-p05/docs"
+  ],
+  "decision": "D1/r2",
+  "decision_sha256": "2c54c90221f2201b0b8e9bc740581e41092a176fecc62d059ff3047137a4efad",
+  "coordination_revision": 6,
+  "coordination_sha256": "8db2f8e0d7d381cbc8015c932a639469164ef6f47cec72efe793a8debf9e373d",
+  "entry_exit_match": true,
+  "coordination_pin_match": true,
+  "independent_tests": "37 passed,0 failed,0 ignored",
+  "time": "2026-11-07T11:47:42.064409+00:00"
+}

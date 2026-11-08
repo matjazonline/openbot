@@ -1,0 +1,9 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.29s
+     Running unittests src/lib.rs (/private/tmp/openbot-chs-p06-3f43t2k7/worktree/target/debug/deps/open_bots-8b80d02f0b6cf2e6)
+
+running 1 test
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::history_storage::agent_history_storage_capture_precedes_checkpoint_and_replays_one_original_input ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3268 filtered out; finished in 0.83s
+

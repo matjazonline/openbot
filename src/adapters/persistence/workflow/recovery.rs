@@ -99,6 +99,51 @@ pub(super) async fn retire_on(
     Ok(())
 }
 
+/// Classify from the frozen step kind, then let retirement's native action predicate
+/// override safety when an earlier effect marker exists. A refusal proves no effect outcome.
+pub(super) async fn classify_final_refusal_on(
+    db: &mut PgConnection,
+    scope: ActivationRequest,
+    refusal: crate::domain::workflow::KnowledgeRefusal,
+) -> AppResult<WorkflowFailure> {
+    let binding_id: Uuid =
+        sqlx::query_scalar("SELECT binding_id FROM workflow_runs WHERE company_id=$1 AND id=$2")
+            .bind(scope.company.as_uuid())
+            .bind(scope.run.as_uuid())
+            .fetch_one(&mut *db)
+            .await?;
+    let binding = admission_binding::read_saved_binding(
+        db,
+        scope.company,
+        WorkflowBindingId::new(binding_id),
+        scope.run.as_uuid(),
+    )
+    .await?;
+    let step: String = sqlx::query_scalar(
+        "SELECT step_id FROM workflow_executions WHERE company_id=$1 AND run_id=$2 AND id=$3",
+    )
+    .bind(scope.company.as_uuid())
+    .bind(scope.run.as_uuid())
+    .bind(scope.execution.as_uuid())
+    .fetch_one(db)
+    .await?;
+    let step = StepId::parse(step).map_err(|_| invalid())?;
+    let definition = binding
+        .bundle()
+        .compiled()
+        .graph()
+        .definition()
+        .steps
+        .get(&step)
+        .ok_or_else(invalid)?;
+    let mut classified = report(
+        &Retirement::Interrupted(LeaseReleaseCause::InvalidResult),
+        definition.step_type.as_str(),
+    )?;
+    classified.failure = StepFailure::from_knowledge_refusal(refusal);
+    Ok(classified)
+}
+
 fn recovery_decision(
     job: &LeaseJob,
     run: &Snapshot,

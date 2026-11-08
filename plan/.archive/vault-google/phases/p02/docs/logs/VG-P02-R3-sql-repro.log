@@ -1,0 +1,14 @@
+BEGIN
+ metadata 
+----------
+ {}
+(1 row)
+
+INSERT 0 1
+                               external_identity                               | authorization_key 
+-------------------------------------------------------------------------------+-------------------
+ {"kind":"google-subject-client","subject":"fixture","authorization_key":null} | canonical-fixture
+(1 row)
+
+INSERT 0 1
+ROLLBACK

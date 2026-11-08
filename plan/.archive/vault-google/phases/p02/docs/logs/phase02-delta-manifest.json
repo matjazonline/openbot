@@ -1,0 +1,192 @@
+[
+  {
+    "path": "docs/deploy.md",
+    "before": "f1a12b29b9c7a74117894de874dd23fe0512cd74efe7d159b8731d173541c91d",
+    "after": "3e311b5e24dfb0c9bca24b795c466720eeee4eeb42e8ac05173af524acf40905"
+  },
+  {
+    "path": "migrations/20260817000000_init_schema.sql",
+    "before": "98a66467dff595a318aae051606ac4de9c07e8f0d2b28965ba246ef60c40bbf3",
+    "after": "cbb8804452542910ccc7067734943e7c5149d9baaa99a29cac01421a140e7c44"
+  },
+  {
+    "path": "plan/vault-google/README.md",
+    "before": "da203bc373a621d0d6a2113874f6b0c59fd60c9139a2a5fdacb6bf47ae901819",
+    "after": "a560f9b427a160f98384293c512e6036a51b60f80bbfc369bb561715f454bd7b"
+  },
+  {
+    "path": "src/adapters/http/app_state.rs",
+    "before": "6dcd2eed6e0fd80f22f68c87d7be63a3c1f1df64b9569a7e766da1f0f4869825",
+    "after": "7325318aa84e5e5dae3fdc8984c92e406a0530652670f139bdaeec98e05da825"
+  },
+  {
+    "path": "src/adapters/http/pages/mod.rs",
+    "before": "65ec5fc61926b4736edf51824baab419761bf4ee77138c387409749863ff4888",
+    "after": "92c6badbbbfa943ca1dc60b983ef35236e1687c8b848ba08cb35db50c03fd64e"
+  },
+  {
+    "path": "src/adapters/http/pages/profile.rs",
+    "before": "3bb123866b4ce34733cb3df4664ae7f1d7b4f41d501bce6e968b198c0f0a4a5a",
+    "after": "a6e4859d0a254bdf81ef7f3eb5ddaaf6e0d72cb56d29a8a4d5be9f8a7646b51a"
+  },
+  {
+    "path": "src/adapters/http/pages/vault.rs",
+    "before": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "after": "dee6abf013d2237101104b9f06eeecad8816f3e9fd808e5e25d8224103e70a85"
+  },
+  {
+    "path": "src/adapters/http/routes/mod.rs",
+    "before": "983cb7168145e9cfec9ff6e6ef842f8b39618dd343e64ca88b0510b12c1f154d",
+    "after": "619aad46fb4759a68cdc9c45ea5d1ae3587221c858d21acfa8018d5cd20828d5"
+  },
+  {
+    "path": "src/adapters/http/routes/ui_vault.rs",
+    "before": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "after": "be3b723cf33fdc9d4c5bb6593ad09e67173108a0639caa4c5dafe693bcade9e2"
+  },
+  {
+    "path": "src/adapters/http/routes/vault_management_tests.rs",
+    "before": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "after": "b563885b63ea4ccb41c1efcad9b46d719a3dbc9a20c2ef1328e4229167735058"
+  },
+  {
+    "path": "src/adapters/integrations/mod.rs",
+    "before": "5808f88b42927b7e57f7c8a37f767dcd8a7ecd242e8845da65c3274ad231d644",
+    "after": "8ebaef36d482fad397e7539fc7bbc3e0d8a03e51d63098deeffd7f273a08aea6"
+  },
+  {
+    "path": "src/adapters/integrations/owner.rs",
+    "before": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "after": "0be9e8e8811f1be371779cc5145339c9fd93f4b72c09f25a96ebd81565ca06e3"
+  },
+  {
+    "path": "src/adapters/persistence/company.rs",
+    "before": "c681ad5a42031d7b193db9eb680482d0bc5116a35d2476d61b7ffd600a072c6b",
+    "after": "81d3741319f77e3f6242198bf5fe5231766bebda4ba5acc07aa68f53e15740e3"
+  },
+  {
+    "path": "src/adapters/persistence/company_invite.rs",
+    "before": "70079e31f0e34e91faafe6ff9e904ec083c75d141027d1e5bed086fd0ca67cf1",
+    "after": "e39d82380cd03948f236d0ef4f43ebf9e00dc6a95d858864a2e5091d669b680b"
+  },
+  {
+    "path": "src/adapters/persistence/credential_rotation.rs",
+    "before": "a2a1305807af2830e59d993d277289c53c316fd5e2779083c8c2aeeca3ac913e",
+    "after": "6879df80b2e09dc27c48e2675e5645f5b1a540fab408444950ffede0d9cbf2ca"
+  },
+  {
+    "path": "src/adapters/persistence/credential_rotation_tests.rs",
+    "before": "d28227f1c75cdb582739e7c07a76c1534a40a8f9a6805d624c6ffb721fbe0c6f",
+    "after": "1afd753fd084a01f6ba051e52111e29c66c9042a38a8203f16010b43de09dad5"
+  },
+  {
+    "path": "src/adapters/persistence/credentials/envelope.rs",
+    "before": "aac67bd79ce265a235109203b0a31bf2952535dd2923fd0aee9db0d74cb49993",
+    "after": "e57ad42b19d768116a4983fc7ccbc2b20e4e7d87c5bee70ab0130a27019d22d1"
+  },
+  {
+    "path": "src/adapters/persistence/integrations/accounts.rs",
+    "before": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "after": "dca11c563f38bf75513c1d91cfb55a1a982c1175235a100ea700a2d9a617cc2e"
+  },
+  {
+    "path": "src/adapters/persistence/integrations/inventory.rs",
+    "before": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "after": "7c6b270f9f91d0b4d490eced683ed835cf7ddebb1bf806843c086b8e49db30de"
+  },
+  {
+    "path": "src/adapters/persistence/integrations/lifecycle.rs",
+    "before": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "after": "b79b8190ca8edc8c1104af32c4d295fb5a116ceef45ab0d4b11fe59194b9aefc"
+  },
+  {
+    "path": "src/adapters/persistence/integrations/lifecycle_tests.rs",
+    "before": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "after": "2a14aad96efaef5aaa1840550f42bb96fb9bd0e4423413261f898e93f071034b"
+  },
+  {
+    "path": "src/adapters/persistence/integrations/mod.rs",
+    "before": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "after": "7b6b13f90ccfc5964526967a9564687b0e9ceaddd78e12b371c3289fbf1bd448"
+  },
+  {
+    "path": "src/adapters/persistence/integrations/rotation_tests.rs",
+    "before": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "after": "0323cbf5b649aae3806214cd0688942e9b6c12a7f5d2d6cadf3e6070f9e00a2e"
+  },
+  {
+    "path": "src/adapters/persistence/integrations/rows.rs",
+    "before": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "after": "c292633feeac72a779dda7c1ce9d137b2238fa9cef5a6559129deca9153cadd1"
+  },
+  {
+    "path": "src/adapters/persistence/integrations/storage_tests.rs",
+    "before": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "after": "19256abb56f0090dcf51bf812d15f8669024d61aab6930b48e6d756620976e5b"
+  },
+  {
+    "path": "src/adapters/persistence/integrations/tests.rs",
+    "before": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "after": "4eed4a09dc9a46b791568bda8786caae05e5b9d0cdc086df23f82a4a40e762a7"
+  },
+  {
+    "path": "src/adapters/persistence/mod.rs",
+    "before": "5edb7bb5a6780701e29f5fa9de31ad2b8bfc80112c4e8df8ff669051ca86fe31",
+    "after": "0a1a9995014d39c5768dd01d59dfe58c13b696ffc61fe377640aa579fc2638ac"
+  },
+  {
+    "path": "src/adapters/persistence/user_lifecycle.rs",
+    "before": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "after": "5e1ba6919852c70f964468fdd38be9ae92ed9b5940ae8a1a77ede9a1c3a23926"
+  },
+  {
+    "path": "src/application/integrations/gateway.rs",
+    "before": "5fcfe54e726f357a24f1ae5002213dff66089647633457faf8f1041e1c442457",
+    "after": "b6f48f1bfebb56b154f9d118b8a868ec06a8685b2a077bd664a99dfe39729079"
+  },
+  {
+    "path": "src/application/integrations/lifecycle.rs",
+    "before": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "after": "230adecc7b0beaf1ba94f9e8db9457420ebd849f38a18058c0f58a69f63d1afd"
+  },
+  {
+    "path": "src/application/integrations/management.rs",
+    "before": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "after": "a716a6c82baea99445f0b503f754df4f7d9ca6b88dec969058538d31bd161a85"
+  },
+  {
+    "path": "src/application/integrations/mod.rs",
+    "before": "e2a0f4d471536c1f1eb32d789b955d0be11a6ceba9af6ef4e7801dbcef1b0697",
+    "after": "d4cd254fd3c060460b477a17a1c5bb79f0346edd619928fe2e9fa626298c2d66"
+  },
+  {
+    "path": "src/application/integrations/registry.rs",
+    "before": "40b16286622b67b9e55c27993a3c6a33c956ea0d32b917872293c2517bddd682",
+    "after": "d4896974cd22c032001c47a445d5ee81fa40e591c0dcb9ff9777c2b46bd7f475"
+  },
+  {
+    "path": "src/application/integrations/unavailable.rs",
+    "before": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "after": "c6baec489e6baf8ceb43be67236dcaacaa17b400303e791d19da5c905cc4dfc8"
+  },
+  {
+    "path": "src/application/ports/account_deletion.rs",
+    "before": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "after": "05bd4d6248319a73461fffe8bbb06de5d4a8b7746ed046841a41053496c3cf7f"
+  },
+  {
+    "path": "src/application/ports/mod.rs",
+    "before": "a46ef28c442541fc27cb64033951a12e3c784237e300e744184794cf8294fe29",
+    "after": "00be57e620842a28de1867fed08a91417f677de6e84259e93f434b4d228afa30"
+  },
+  {
+    "path": "src/infra/setup.rs",
+    "before": "a94f6bf58140aa4b084c6a32f70a80a082dbab5a80c3bd66f701a34589410354",
+    "after": "fe13fc987f4aaa1ff65d0d4c6b35a53ae6719c961cce4759a35125e4a518858e"
+  },
+  {
+    "path": "src/infra/workflow.rs",
+    "before": "e77f68bf5122a61e80b3e8e8a9c279ecf45e5e354dcaaa78455b9f5cac0bea62",
+    "after": "ed263c225087512b842c65e7e1965a40f872579f862cd5c5ca9098d8aa591439"
+  }
+]

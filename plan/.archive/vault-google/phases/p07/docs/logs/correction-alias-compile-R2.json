@@ -1,0 +1,22 @@
+{
+  "command": [
+    "rustc",
+    "--edition=2024",
+    "--crate-type=lib",
+    "/Users/mac02/.codex/worktrees/1133/openbot/scripts/tests/fixtures/integration-boundary-alias.rs",
+    "--emit=metadata",
+    "-L",
+    "dependency=/Users/mac02/.codex/worktrees/1133/openbot/target/debug/deps",
+    "-o",
+    "/Users/mac02/.codex/worktrees/1133/openbot/plan/vault-google/phases/p07/docs/logs/correction-alias-negative.rmeta",
+    "--extern",
+    "secrecy=/Users/mac02/.codex/worktrees/1133/openbot/target/debug/deps/libsecrecy-2b55b78a2c9b0a62.rlib",
+    "--extern",
+    "serde=/Users/mac02/.codex/worktrees/1133/openbot/target/debug/deps/libserde-340aa8bf57bba01b.rlib"
+  ],
+  "cwd": "/Users/mac02/.codex/worktrees/1133/openbot",
+  "database": "vault_google_p07_1133_a3bcb2497b",
+  "exit": 0,
+  "seconds": 0.11,
+  "log": "/Users/mac02/.codex/worktrees/1133/openbot/plan/vault-google/phases/p07/docs/logs/correction-alias-compile-R2.log"
+}

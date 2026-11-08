@@ -38,6 +38,8 @@ pub(crate) struct RemoteReservation {
     pub(crate) provider: ProviderInvocation,
 }
 pub(crate) enum RemoteReservationResult {
+    /// A host preflight observation, never a dispatch permit or a remote marker.
+    Prepared(Box<FrozenAction>),
     Reserved(Box<RemoteReservation>),
     Committed(ActionReceipt),
     ApprovalRequired,
@@ -107,6 +109,8 @@ pub trait RemoteAction: Send + Sync {
 
 /// Only committed receipts are accepted step/tool output.
 pub enum RemoteDispatchObservation {
+    /// Integration preparation rejected before a native remote marker could be written.
+    PreparationFailed(crate::application::integrations::PreDispatchFailure),
     ApprovalRequired,
     ApprovalParked(crate::domain::workflow::WaitId),
     PossibleDispatchExists,
@@ -145,6 +149,11 @@ pub(crate) async fn supervise_remote(
         .reserve_remote(request, provider.replay_contract())
         .await?
     {
+        RemoteReservationResult::Prepared(_) => {
+            return Err(AppError::Internal(
+                "Dispatch requires a remote reservation".into(),
+            ));
+        }
         RemoteReservationResult::Reserved(reservation) => reservation,
         RemoteReservationResult::Committed(receipt) => {
             if cancel.is_cancelled() {

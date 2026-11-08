@@ -49,3 +49,119 @@ and pinned git revisions remain in force, and the production container remains n
 The context graph could not be refreshed in this workspace: `graft`, indexed graph files and a
 graft connector were unavailable. Phase10 used the scoped source/owner inventory archived with its review records instead;
 run `graft build` in an environment with the repository's graph tool before relying on graph spans.
+
+
+## Channel response verification
+
+Use disposable PostgreSQL18 databases and the loopback network guard. The focused response groups
+are `channel_reply_e2e_`, `channel_reply_authoring_`, `channel_reply_views_` and
+`channel_reply_controls_`:
+
+```sh
+scripts/test-network-isolation.sh cargo test --locked --offline --lib channel_reply_e2e_
+scripts/test-network-isolation.sh cargo test --locked --offline --lib channel_reply_authoring_
+scripts/test-network-isolation.sh cargo test --locked --offline --lib channel_reply_views_
+scripts/test-network-isolation.sh cargo test --locked --offline --lib channel_reply_controls_
+```
+
+The end-to-end group uses the production workflow composition, real PostgreSQL and delivery
+worker, and a counted scripted provider. It checks independent automatic replies with observers,
+silent completion and explicit replies, safe retry without another model call, quarantined
+uncertainty, human rounds and concurrent waits, child continuation, frozen contracts, exact final
+approval, quiet ingress and in-app publication. Recovery cases reconstruct the engine with a
+committed final intent and interrupt a provider after remote acceptance before its receipt returns.
+These checks establish the stored identities and scripted effects, not live provider readiness.
+Existing focused database races and transaction fault tests retain coverage of finalization,
+publication acknowledgements, cancellation, current authority and decision settlement.
+
+Authoring coverage includes settings authorization/CAS, invalid projection, preserved and escaped
+stale input, native create replay after explicit clear, competing create claimants, rollback of
+invalid custom terminal routes, edited approval/rejection, all five compiling/executing examples,
+and sealed sample response identity. Views cover independent execution/publication/transport states,
+source identity outside the message window, response pagination, current classification/tenant
+visibility and real transaction-only delivery wakeups. Controls retain accepted/unknown truth and
+provide no blind resend or completed-business retry button.
+Nested local questions and formal reviews wake the actual root even while intermediate runs
+remain parked for their children; their notifications carry identifiers and state only. Readers
+recheck current visibility and reread the stored question/review before rendering it.
+
+Affected checks also include native provisioning/onboarding, template/fixture composition, registry
+terminal routes, authoring/sample/run/conversation/decision browser protocols, capability-boundary
+checks, `npm run check:css`, formatting, locked offline compilation/Clippy, fresh migrations and
+actual `cargo sqlx prepare` followed by `cargo sqlx prepare --check -- --all-targets`. Set owned
+`DATABASE_URL` and `TEST_DATABASE_URL`; never use a development/production reset for this purpose.
+Keep stock2MiB test stacks for focused runtime evidence. Run only affected tests during this task,
+including final integration, per the explicit targeted-only instruction; do not claim a full-suite
+pass. Exact executed commands, nonzero selected counts, failures and independent review identities
+belong in plan03 phase records. A test name in this map alone is not passing evidence.
+
+## Autonomous agent history verification
+
+History verification uses fresh PostgreSQL fixtures and targeted test filters. Naming a test here
+is not a claim of release acceptance; current commands, failures, rechecks and immutable evidence
+are in `plan/.archived/04-autonomous-agent-history/phases/`. No full-suite run is implied by these focused checks.
+
+- `agent_history_views_`: native pages reach the actual last exchange, one selected source is
+  outside the first 16-item page, private other-admin access matches current Inspect, restricted
+  projection omits payload/source/revision/omission data, and the actual API query handler encodes
+  only the projected resource. Frozen owning context survives selected-source payload expiry.
+- `agent_history_level_history_reader_`: one-shot pauses after the actual payload fetch allow
+  member-level demotion and current in-flight classification rise before final projection.
+- `agent_history_retention_`: real competing collectors, real 127-call approach to a 128-record
+  final-slot race, replay at capacity, JSON-null output proof, truthful hole/prefix boundaries,
+  source cascades, transaction rollback and deferred commit abort. Clock setup is confined to each
+  OwnDatabase and restores native guards before testing expiry/retirement. Strict model scripts
+  stay within their existing per-scenario bound; no test/runtime limit was raised.
+- The other actual storage limits (2048 company payloads, 4096/32768 metadata and 2048
+  conversations) have competing native boundary checks. Historical cancelled prefixes keep real
+  FKs/CHECKs and the actual policy constants; USER lifecycle triggers are disabled only while
+  loading that prefix in an OwnDatabase transaction, then restored before genuine producers.
+  These are count/pressure fixtures, not a claim of 32768 live end-to-end model journeys. Sparse
+  streams exercise pressure expiry down to the real 1536 soft ceiling. Empty identity fixtures
+  use real native agents/scopes with all guards enabled and protect live resolved identities.
+- Native owner-race checks pause actual preparation, expiry, retry and human submission transactions
+  inside their OwnDatabase. Advisory-gate arrival and a conflicting company NOWAIT claim prove
+  the production owner holds the shared mutex. They exercise both selection orderings and exact
+  human replay after a selected source expires. A counted65-call recent-window case verifies that
+  produced output in a failed own job remains pinned before its original deadline, native safe
+  retry changes no preparation/output/order/charged call, and real job completion removes the pin.
+- `agent_history_e2e_`: actual child processes run the production workflow worker against a
+  parent-owned disposable database and counted loopback provider. Parents verify SIGKILL and
+  recover through native polling/lease expiry at enqueue, in-flight acquisition, frozen
+  preparation, settled model response, final checkpoint, and before successor wakeup. The
+  acquisition transaction is deliberately uncommitted; these checks do not claim that a remote
+  provider invocation is exactly once under an unknown outcome. Existing lost-COMMIT and
+  unknown-effect cases separately retain their reconciliation assertions.
+- The real knowledge journey uploads `0_sales.md` and `5_sales.md`, uses native search, then adds
+  a customer CC and removes that participant before a third call. Actual requests, delivery
+  payloads, frozen seeds and the current restricted inspection projection are asserted together.
+  Its transport is counted test delivery, not proof of external mailbox receipt.
+- `.github/workflows/agent-history.yml` runs the native journey and emits actual inspection
+  markup for the browser protocol in a fresh PostgreSQL 18.6 job. CI execution is distinct from
+  local execution of those commands. The ignored child entry is a technical process driver:
+  required parents invoke it explicitly with an owned fixture, never as a standalone release test.
+- Existing history continuation/retry/channel/source-retention tests retain their discovered names.
+  Direct history deletion is now refused: old pruning fixtures use native payload expiry followed
+  by eligible source-tree retirement, preserving the original replay and rollback assertions.
+
+The actual native pagination test can emit browser fixtures without a live production account:
+
+```sh
+AGENT_HISTORY_BROWSER_FIXTURES=/tmp/openbot-history-browser \
+  scripts/test-network-isolation.sh cargo test --locked --offline --lib \
+  agent_history_views_maximum_page_reaches_last_source_outside_page_and_keeps_exact_frozen_copy_after_expiry
+AGENT_HISTORY_BROWSER_FIXTURES=/tmp/openbot-history-browser \
+  node --test scripts/tests/agent-history-browser.mjs
+```
+
+Set the existing test database environment before running database tests. If Playwright's bundled
+Chromium is unavailable, `CHROME_PATH` selects an installed browser executable. The browser protocol
+uses actual Rust-rendered native fixtures, vendored htmx and shared request progress/error scripts;
+it checks both themes, keyboard pagination through the real last record, exact escaped input,
+independent Produced/workflow status, competing reads completing out of order and failed-read
+recovery. Its local response harness does not establish live server/session deployment readiness.
+
+Keep formatting, actual SQLx prepare/check after SQL changes, locked offline compilation, fresh
+migrations, source module discovery and the affected native/runtime/route/browser checks with
+release evidence. Cleanup uses owned databases for global discovery/sweeps; preserve competing
+claimants and post-read authority races when changing its protocol.

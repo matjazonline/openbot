@@ -1,0 +1,7 @@
+{
+  "conflict_blocks": 1,
+  "history_block_lines": 1019,
+  "vault_block_lines": 236,
+  "resolution": "Concatenate exact independent append-only suffixes, history then vault; all earlier automatic merges retained; no definitions edited or removed.",
+  "both_parent_blocks_verified_byteexact": true
+}

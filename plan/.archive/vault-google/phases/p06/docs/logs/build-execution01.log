@@ -1,0 +1,339 @@
+    Checking open_bots v0.1.0 (/Users/mac02/.codex/worktrees/1133/openbot)
+error[E0425]: cannot find value `c` in this scope
+  --> src/infra/setup/mail.rs:31:27
+   |
+31 |             integrations: c.integrations.clone(),
+   |                           ^
+   |
+help: a local variable with a similar name exists
+   |
+31 -             integrations: c.integrations.clone(),
+31 +             integrations: f.integrations.clone(),
+   |
+
+error: cannot find macro `json` in this scope
+   --> src/adapters/workflow_http/tests.rs:236:39
+    |
+236 |     let request = HttpRequest::parse(&json!({"method":"GET","path":"/"})).unwrap();
+    |                                       ^^^^
+
+error: cannot find macro `json` in this scope
+   --> src/adapters/workflow_http/tests.rs:203:39
+    |
+203 |     let request = HttpRequest::parse(&json!({"method":"POST","path":"/"})).unwrap();
+    |                                       ^^^^
+
+error: cannot find macro `json` in this scope
+  --> src/adapters/workflow_http/tests.rs:83:29
+   |
+83 |         HttpRequest::parse(&json!({"method":"POST","path":"/","body":"x".repeat(MAX_HTTP_BODY)}))
+   |                             ^^^^
+
+error: cannot find macro `json` in this scope
+  --> src/adapters/workflow_http/tests.rs:79:29
+   |
+79 |         HttpRequest::parse(&json!({"method":"GET","path":"/","origin":"https://evil.test"}))
+   |                             ^^^^
+
+error: cannot find macro `json` in this scope
+  --> src/adapters/workflow_http/tests.rs:74:33
+   |
+74 |             HttpRequest::parse(&json!({"method":"GET","path":"/","headers":{header:"secret"}}))
+   |                                 ^^^^
+
+error: cannot find macro `json` in this scope
+  --> src/adapters/workflow_http/tests.rs:59:37
+   |
+59 |         assert!(HttpRequest::parse(&json!({"method":"GET","path":path})).is_err());
+   |                                     ^^^^
+
+error: cannot find macro `json` in this scope
+  --> src/adapters/workflow_http/tests.rs:34:39
+   |
+34 |     let request = HttpRequest::parse(&json!({"method":"GET","path":"/safe?key=value"})).unwrap();
+   |                                       ^^^^
+
+error[E0425]: cannot find type `SecretString` in this scope
+  --> src/adapters/workflow_http/tests.rs:30:53
+   |
+30 | async fn exchange(response: Vec<u8>, secret: Option<SecretString>) -> (AppResult<Value>, String) {
+   |                                                     ^^^^^^^^^^^^ not found in this scope
+   |
+help: you might be missing a type parameter
+   |
+30 | async fn exchange<SecretString>(response: Vec<u8>, secret: Option<SecretString>) -> (AppResult<Value>, String) {
+   |                  ++++++++++++++
+
+error[E0308]: mismatched types
+   --> src/adapters/persistence/workflow/action_dispatch.rs:573:16
+    |
+571 |           match super::knowledge_release::evaluate_on(tx, action,
+    |  _______________-
+572 | |             super::knowledge_release::MessageRecipients::Current).await {
+    | |_______________________________________________________________________- this expression has type `std::result::Result<ReleaseLevels, application::app_error::AppError>`
+573 |               Ok(()) => Ok(true),
+    |                  ^^ expected `ReleaseLevels`, found `()`
+
+error[E0277]: the trait bound `UnavailableIntegrations: gateway::IntegrationGateway` is not satisfied
+   --> src/adapters/workflow_http/mod.rs:54:70
+    |
+ 54 | ...ices, std::sync::Arc::new(crate::application::integrations::unavailable::UnavailableIntegrations))
+    |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ unsatisfied trait bound
+    |
+help: the trait `gateway::ManagementGateway` is not implemented for `UnavailableIntegrations`
+   --> src/application/integrations/unavailable.rs:5:1
+    |
+  5 | pub(crate) struct UnavailableIntegrations;
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+help: the following other types implement trait `gateway::ManagementGateway`
+   --> src/application/integrations/gateway.rs:361:1
+    |
+361 | impl ManagementGateway for LocalIntegrationGateway {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `gateway::LocalIntegrationGateway`
+    |
+   ::: src/application/integrations/management.rs:94:1
+    |
+ 94 | impl ManagementGateway for VaultManagement {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `VaultManagement`
+note: required for `UnavailableIntegrations` to implement `gateway::IntegrationGateway`
+   --> src/application/integrations/gateway.rs:333:79
+    |
+333 | impl<T: ManagementGateway + ConnectGateway + GrantGateway + ExecutionGateway> IntegrationGateway
+    |         ----------------- unsatisfied trait bound introduced here             ^^^^^^^^^^^^^^^^^^
+334 |     for T
+    |         ^
+    = note: required for the cast from `std::sync::Arc<UnavailableIntegrations>` to `std::sync::Arc<(dyn gateway::IntegrationGateway + 'static)>`
+
+error[E0277]: the trait bound `UnavailableIntegrations: gateway::IntegrationGateway` is not satisfied
+   --> src/adapters/workflow_mcp/mod.rs:48:70
+    |
+ 48 | ...e, notices, Arc::new(crate::application::integrations::unavailable::UnavailableIntegrations))
+    |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ unsatisfied trait bound
+    |
+help: the trait `gateway::ManagementGateway` is not implemented for `UnavailableIntegrations`
+   --> src/application/integrations/unavailable.rs:5:1
+    |
+  5 | pub(crate) struct UnavailableIntegrations;
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+help: the following other types implement trait `gateway::ManagementGateway`
+   --> src/application/integrations/gateway.rs:361:1
+    |
+361 | impl ManagementGateway for LocalIntegrationGateway {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `gateway::LocalIntegrationGateway`
+    |
+   ::: src/application/integrations/management.rs:94:1
+    |
+ 94 | impl ManagementGateway for VaultManagement {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `VaultManagement`
+note: required for `UnavailableIntegrations` to implement `gateway::IntegrationGateway`
+   --> src/application/integrations/gateway.rs:333:79
+    |
+333 | impl<T: ManagementGateway + ConnectGateway + GrantGateway + ExecutionGateway> IntegrationGateway
+    |         ----------------- unsatisfied trait bound introduced here             ^^^^^^^^^^^^^^^^^^
+334 |     for T
+    |         ^
+    = note: required for the cast from `std::sync::Arc<UnavailableIntegrations>` to `std::sync::Arc<(dyn gateway::IntegrationGateway + 'static)>`
+
+error[E0308]: mismatched types
+  --> src/adapters/workflow_http/tests.rs:33:34
+   |
+33 |     let client = client(&policy, &connection).await.unwrap();
+   |                  ------          ^^^^^^^^^^^ expected `&HttpOrigin`, found `&HttpConnection`
+   |                  |
+   |                  arguments to this function are incorrect
+   |
+   = note: expected reference `&application::workflow::http::HttpOrigin`
+              found reference `&application::workflow::http::HttpConnection`
+note: function defined here
+  --> src/adapters/guarded_http.rs:23:21
+   |
+23 | pub(crate) async fn client(
+   |                     ^^^^^^
+24 |     policy: &HttpDestinationPolicy,
+25 |     origin: &HttpOrigin,
+   |     -------------------
+
+Some errors have detailed explanations: E0277, E0308, E0425.
+For more information about an error, try `rustc --explain E0277`.
+error: could not compile `open_bots` (lib) due to 4 previous errors
+warning: build failed, waiting for other jobs to finish...
+error[E0277]: the trait bound `UnavailableIntegrations: gateway::IntegrationGateway` is not satisfied
+   --> src/adapters/persistence/workflow/message_ingress_composition.rs:23:27
+    |
+ 23 |             integrations: Arc::new(crate::application::integrations::unavailable::UnavailableIntegrations),
+    |                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ unsatisfied trait bound
+    |
+help: the trait `gateway::ManagementGateway` is not implemented for `UnavailableIntegrations`
+   --> src/application/integrations/unavailable.rs:5:1
+    |
+  5 | pub(crate) struct UnavailableIntegrations;
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+help: the following other types implement trait `gateway::ManagementGateway`
+   --> src/application/integrations/gateway.rs:361:1
+    |
+361 | impl ManagementGateway for LocalIntegrationGateway {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `gateway::LocalIntegrationGateway`
+    |
+   ::: src/application/integrations/management.rs:94:1
+    |
+ 94 | impl ManagementGateway for VaultManagement {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `VaultManagement`
+note: required for `UnavailableIntegrations` to implement `gateway::IntegrationGateway`
+   --> src/application/integrations/gateway.rs:333:79
+    |
+333 | impl<T: ManagementGateway + ConnectGateway + GrantGateway + ExecutionGateway> IntegrationGateway
+    |         ----------------- unsatisfied trait bound introduced here             ^^^^^^^^^^^^^^^^^^
+334 |     for T
+    |         ^
+    = note: required for the cast from `std::sync::Arc<UnavailableIntegrations>` to `std::sync::Arc<(dyn gateway::IntegrationGateway + 'static)>`
+
+error[E0277]: the trait bound `UnavailableIntegrations: gateway::IntegrationGateway` is not satisfied
+   --> src/adapters/persistence/workflow/knowledge_e2e_mcp_tests.rs:30:27
+    |
+ 30 |             integrations: Arc::new(crate::application::integrations::unavailable::UnavailableIntegrations),
+    |                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ unsatisfied trait bound
+    |
+help: the trait `gateway::ManagementGateway` is not implemented for `UnavailableIntegrations`
+   --> src/application/integrations/unavailable.rs:5:1
+    |
+  5 | pub(crate) struct UnavailableIntegrations;
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+help: the following other types implement trait `gateway::ManagementGateway`
+   --> src/application/integrations/gateway.rs:361:1
+    |
+361 | impl ManagementGateway for LocalIntegrationGateway {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `gateway::LocalIntegrationGateway`
+    |
+   ::: src/application/integrations/management.rs:94:1
+    |
+ 94 | impl ManagementGateway for VaultManagement {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `VaultManagement`
+note: required for `UnavailableIntegrations` to implement `gateway::IntegrationGateway`
+   --> src/application/integrations/gateway.rs:333:79
+    |
+333 | impl<T: ManagementGateway + ConnectGateway + GrantGateway + ExecutionGateway> IntegrationGateway
+    |         ----------------- unsatisfied trait bound introduced here             ^^^^^^^^^^^^^^^^^^
+334 |     for T
+    |         ^
+    = note: required for the cast from `std::sync::Arc<UnavailableIntegrations>` to `std::sync::Arc<(dyn gateway::IntegrationGateway + 'static)>`
+
+error[E0308]: mismatched types
+   --> src/adapters/workflow_http/tests.rs:106:55
+    |
+106 |             client(&HttpDestinationPolicy::default(), &connection)
+    |             ------                                    ^^^^^^^^^^^ expected `&HttpOrigin`, found `&HttpConnection`
+    |             |
+    |             arguments to this function are incorrect
+    |
+    = note: expected reference `&application::workflow::http::HttpOrigin`
+               found reference `&application::workflow::http::HttpConnection`
+note: function defined here
+   --> src/adapters/guarded_http.rs:23:21
+    |
+ 23 | pub(crate) async fn client(
+    |                     ^^^^^^
+ 24 |     policy: &HttpDestinationPolicy,
+ 25 |     origin: &HttpOrigin,
+    |     -------------------
+
+error[E0308]: mismatched types
+   --> src/adapters/workflow_http/tests.rs:115:25
+    |
+115 |         client(&policy, &connection("http://127.0.0.1:8081"))
+    |         ------          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `&HttpOrigin`, found `&HttpConnection`
+    |         |
+    |         arguments to this function are incorrect
+    |
+    = note: expected reference `&application::workflow::http::HttpOrigin`
+               found reference `&application::workflow::http::HttpConnection`
+note: function defined here
+   --> src/adapters/guarded_http.rs:23:21
+    |
+ 23 | pub(crate) async fn client(
+    |                     ^^^^^^
+ 24 |     policy: &HttpDestinationPolicy,
+ 25 |     origin: &HttpOrigin,
+    |     -------------------
+
+error[E0433]: cannot find type `SecretString` in this scope
+   --> src/adapters/workflow_http/tests.rs:130:14
+    |
+130 |         Some(SecretString::from("shh-secret")),
+    |              ^^^^^^^^^^^^ use of undeclared type `SecretString`
+
+error[E0433]: cannot find type `SecretString` in this scope
+   --> src/adapters/workflow_http/tests.rs:180:64
+    |
+180 |         let (result, _) = exchange(response.into_bytes(), Some(SecretString::from(secret))).await;
+    |                                                                ^^^^^^^^^^^^ use of undeclared type `SecretString`
+
+error[E0308]: mismatched types
+   --> src/adapters/workflow_http/tests.rs:193:34
+    |
+193 |     let client = client(&policy, &connection).await.unwrap();
+    |                  ------          ^^^^^^^^^^^ expected `&HttpOrigin`, found `&HttpConnection`
+    |                  |
+    |                  arguments to this function are incorrect
+    |
+    = note: expected reference `&application::workflow::http::HttpOrigin`
+               found reference `&application::workflow::http::HttpConnection`
+note: function defined here
+   --> src/adapters/guarded_http.rs:23:21
+    |
+ 23 | pub(crate) async fn client(
+    |                     ^^^^^^
+ 24 |     policy: &HttpDestinationPolicy,
+ 25 |     origin: &HttpOrigin,
+    |     -------------------
+
+error[E0308]: mismatched types
+   --> src/adapters/workflow_http/tests.rs:222:34
+    |
+222 |     let client = client(&policy, &connection).await.unwrap();
+    |                  ------          ^^^^^^^^^^^ expected `&HttpOrigin`, found `&HttpConnection`
+    |                  |
+    |                  arguments to this function are incorrect
+    |
+    = note: expected reference `&application::workflow::http::HttpOrigin`
+               found reference `&application::workflow::http::HttpConnection`
+note: function defined here
+   --> src/adapters/guarded_http.rs:23:21
+    |
+ 23 | pub(crate) async fn client(
+    |                     ^^^^^^
+ 24 |     policy: &HttpDestinationPolicy,
+ 25 |     origin: &HttpOrigin,
+    |     -------------------
+
+error[E0277]: the trait bound `UnavailableIntegrations: gateway::IntegrationGateway` is not satisfied
+   --> src/infra/workflow.rs:523:31
+    |
+523 |                 integrations: Arc::new(crate::application::integrations::unavailable::UnavailableIntegrations),
+    |                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ unsatisfied trait bound
+    |
+help: the trait `gateway::ManagementGateway` is not implemented for `UnavailableIntegrations`
+   --> src/application/integrations/unavailable.rs:5:1
+    |
+  5 | pub(crate) struct UnavailableIntegrations;
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+help: the following other types implement trait `gateway::ManagementGateway`
+   --> src/application/integrations/gateway.rs:361:1
+    |
+361 | impl ManagementGateway for LocalIntegrationGateway {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `gateway::LocalIntegrationGateway`
+    |
+   ::: src/application/integrations/management.rs:94:1
+    |
+ 94 | impl ManagementGateway for VaultManagement {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `VaultManagement`
+note: required for `UnavailableIntegrations` to implement `gateway::IntegrationGateway`
+   --> src/application/integrations/gateway.rs:333:79
+    |
+333 | impl<T: ManagementGateway + ConnectGateway + GrantGateway + ExecutionGateway> IntegrationGateway
+    |         ----------------- unsatisfied trait bound introduced here             ^^^^^^^^^^^^^^^^^^
+334 |     for T
+    |         ^
+    = note: required for the cast from `std::sync::Arc<UnavailableIntegrations>` to `std::sync::Arc<(dyn gateway::IntegrationGateway + 'static)>`
+
+Some errors have detailed explanations: E0277, E0308, E0425, E0433.
+error: could not compile `open_bots` (lib test) due to 22 previous errors

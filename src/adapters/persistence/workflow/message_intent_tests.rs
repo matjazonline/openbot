@@ -1234,6 +1234,7 @@ async fn message_intent_admission_replay_with_another_delivery_policy_conflicts(
     let trigger = TriggerId::new(Uuid::new_v4());
     let correlation = crate::entities::correlation::CorrelationId::new();
     let request = |policy| AdmitWorkflowRequest {
+        history_session: None,
         company_id: company,
         actor: s.owner(),
         association: RelatedAssociation::Channel(RelatedChannelId::new(s.channel)),
@@ -1817,3 +1818,6 @@ async fn link_visibility_loads_only_requested_source_channels() {
             .is_empty()
     );
 }
+
+#[path = "agent_history_thread_tests.rs"]
+mod agent_history_threads;

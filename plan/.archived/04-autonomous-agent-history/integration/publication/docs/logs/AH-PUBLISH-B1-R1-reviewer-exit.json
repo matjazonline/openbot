@@ -1,0 +1,19 @@
+{
+  "digest": true,
+  "head": true,
+  "branch": true,
+  "scope": true,
+  "owned_archive": true,
+  "evidence": true,
+  "case_inventory": true,
+  "skill": true,
+  "coordination": true,
+  "owned_mismatch": [],
+  "external_mismatch": [],
+  "archive_content": true,
+  "merge_head": true,
+  "common_base": true,
+  "vault_authority": true,
+  "primary77_preserved": true,
+  "checked_at": "2026-11-08T04:05:47.418549+00:00"
+}

@@ -1,0 +1,12 @@
+{
+  "at": "2026-11-07T10:27:27.523080+00:00",
+  "branch": "codex/chs-p06-3f43t2k7",
+  "HEAD": "97e5d60dc538e26c7cb976a8d63772eed80baff2",
+  "digest_matches": true,
+  "source_mismatches": [],
+  "coordination_matches": true,
+  "isolated_coordination_matches": true,
+  "pin_hash_matches": true,
+  "archive_hash_matches": true,
+  "evidence_hash_matches": true
+}

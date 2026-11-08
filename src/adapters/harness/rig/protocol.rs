@@ -218,9 +218,20 @@ fn assistant(calls: &[SavedToolCall], blocks: &[ContinuationBlock]) -> AppResult
 }
 
 pub(super) fn history(run: &RunCheckpoint) -> AppResult<Vec<Message>> {
+    run.seed.validate()?;
     // The checkpoint keeps one assistant message per turn, in turn order.
     let mut turns = run.turns.iter();
-    let mut history = Vec::with_capacity(run.messages.len() + 1);
+    let mut history = Vec::with_capacity(run.seed.pairs().len() * 2 + run.messages.len() + 1);
+    for pair in run.seed.pairs() {
+        history.push(Message::user(untrusted_context_prompt(&pair.input)?));
+        history.push(Message::Assistant {
+            id: None,
+            content: vec![AssistantContent::Text(Text {
+                text: pair.output.to_string(),
+                additional_params: None,
+            })],
+        });
+    }
     for message in &run.messages {
         match message {
             ConversationMessage::User { text } => history.push(Message::user(text)),

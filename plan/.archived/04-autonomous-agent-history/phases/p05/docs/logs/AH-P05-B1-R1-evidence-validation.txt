@@ -1,0 +1,2 @@
+/private/tmp/openbot-agent-history-h_82_5pw/worktree/plan/04-autonomous-agent-history/phases/p05/docs/logs/AH-P05-B1-R1.evidence.json: retained evidence valid {"FAIL": 0, "NOT EXERCISED": 0, "PASS": 17}
+1 evidence manifest(s) validated; declared results are not acceptance

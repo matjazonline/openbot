@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "round": "VG-PUB67-RELEASE",
+  "artifact": "b0ae9af5c07980a42dac601855f7998facb8c431e8b978f8df8980dd7823f02a",
+  "checks": [
+    {
+      "criteria": [
+        "PUB4"
+      ],
+      "command": "git push origin HEAD:main; git ls-remote origin refs/heads/main",
+      "fixture": "authorized origin main; ordinary fast-forward publication",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/push-publication.log",
+          "sha256": "0c852cf746ec8ee1b807bc5c6c033b9126f119f49dd77d4ad80c276e1efa3472"
+        },
+        {
+          "path": "logs/remote-publication.log",
+          "sha256": "022f2cad96261b7ea01c9eaa274afa6e77fc7b86b9c65b8d5c0ed25c9e288562"
+        },
+        {
+          "path": "logs/release-publication.json",
+          "sha256": "f4f30c084ee7c12d926672eb5148ee029798135c76f3a16365817e5d3a54cca5"
+        }
+      ]
+    }
+  ]
+}

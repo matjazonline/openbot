@@ -1,0 +1,17 @@
+{
+  "command": [
+    "bash",
+    "scripts/test-network-isolation.sh",
+    "cargo",
+    "test",
+    "--locked",
+    "--offline",
+    "--lib",
+    "channel_reply_publication_"
+  ],
+  "cwd": "/Users/mac02/.codex/worktrees/1133/openbot",
+  "database": "vault_google_1133_41402e4b8104_test",
+  "exit": 0,
+  "seconds": 8.95,
+  "log": "/Users/mac02/.codex/worktrees/1133/openbot/plan/vault-google/integration/channel-p05/docs/logs/channel-publication-tests.log"
+}

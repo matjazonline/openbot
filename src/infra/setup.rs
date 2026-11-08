@@ -124,6 +124,8 @@ fn http_state(f: foundation::Foundation, c: HttpComponents) -> anyhow::Result<Ap
                 p.clone(),
             ),
         ),
+        integrations: c.clients.integrations,
+        integration_bindings: c.clients.integration_bindings,
         knowledge: f.knowledge,
         auth_admission: Arc::new(crate::adapters::http::auth_admission::AuthAdmission::from_env()?),
         workflow: c.workflow,
@@ -177,9 +179,17 @@ pub fn init_tracing() {
 
     tracing_subscriber::registry()
         .with(filter)
+        .with(tracing_subscriber::filter::filter_fn(permitted_log_target))
         .with(console_layer)
         .try_init()
         .ok();
+}
+
+/// rmcp logs untrusted peer information and protocol messages with Debug. Those fields
+/// can echo credentials before application redaction. Reject its events independently
+/// of RUST_LOG (including more-specific directives); our bounded adapter observations remain.
+pub(crate) fn permitted_log_target(metadata: &tracing::Metadata<'_>) -> bool {
+    metadata.target() != "rmcp" && !metadata.target().starts_with("rmcp::")
 }
 
 #[cfg(test)]

@@ -1,0 +1,15 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.19s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-048b7abd3ed0c794)
+
+running 7 tests
+test adapters::persistence::delivery::tests::tenant_tests::notification_delivery_tenant_part_company_must_match_its_delivery ... ok
+test adapters::persistence::delivery::tests::tenant_tests::notification_delivery_tenant_member_removal_cancels_pending_notices ... ok
+test adapters::persistence::delivery::tests::tenant_tests::notification_delivery_tenant_company_deletion_removes_notices_and_parts ... ok
+test adapters::protocols::email::egress::tests::notification_delivery_tenant_notice_uses_the_deployment_relay ... ok
+test adapters::persistence::delivery::tests::tenant_tests::notification_delivery_tenant_removal_first_producer_finds_no_member ... ok
+test adapters::persistence::delivery::tests::tenant_tests::notification_delivery_tenant_removal_waits_for_a_producer_and_cancels_its_notice ... ok
+test adapters::persistence::workflow::tests::admission_tests::decision_tests::provenance_tests::notification_delivery_tenant_company_deletion_removes_parked_decision_notices ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 3246 filtered out; finished in 2.09s
+

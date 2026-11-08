@@ -30,6 +30,7 @@ pub enum ActionTarget {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ActionPolicyContext {
+    pub integration: Option<crate::domain::integrations::authority::AuthorizationSnapshot>,
     pub actor: Uuid,
     pub capability_ceiling: Vec<TypeName>,
     pub approval_required: bool,

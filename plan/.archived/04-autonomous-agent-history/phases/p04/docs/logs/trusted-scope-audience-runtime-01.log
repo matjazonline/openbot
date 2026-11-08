@@ -1,0 +1,16 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+   Compiling open_bots v0.1.0 (/private/tmp/openbot-agent-history-h_82_5pw/worktree)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1m 05s
+     Running unittests src/lib.rs (/private/tmp/openbot-chs-p06-3f43t2k7/worktree/target/debug/deps/open_bots-8b80d02f0b6cf2e6)
+
+running 7 tests
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_graph::descendants::history_identity::agent_history_identity_same_agent_child_has_private_branch_and_keeps_actual_actor ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::agent_history_level_private_thread_anchor_keeps_authorized_member_above_public_anchor ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::history_resume::agent_history_level_later_real_knowledge_then_human_wait_allows_unchanged_audience ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::history_resume::agent_history_level_later_real_knowledge_then_human_wait_refuses_downgraded_resume_before_provider ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::agent_history_level_private_thread_anchor_checks_current_acting_member_on_resume ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::level::agent_history_level_classified_current_input_allows_unchanged_team_audience ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::level::agent_history_level_classified_current_input_empty_seed_refuses_initial_and_restarted_entry ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 3331 filtered out; finished in 3.63s
+

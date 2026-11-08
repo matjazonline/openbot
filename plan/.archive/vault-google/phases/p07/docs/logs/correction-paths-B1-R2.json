@@ -1,0 +1,8 @@
+[
+  "scripts/integration-boundary.py",
+  "scripts/tests/fixtures/integration-boundary-alias.rs",
+  "scripts/tests/integration-boundary.py",
+  "src/adapters/persistence/integrations/connect_tests/control_wire.rs",
+  "src/adapters/persistence/workflow/vault_tests/native_control.rs",
+  "src/application/integrations/wire/control_transport.rs"
+]

@@ -56,7 +56,7 @@ jobs:
       - name: Run counts browser protocol
         run: npm run test:run-counts
       - name: SSE navigation lifecycle
-        run: node --test scripts/tests/sse-navigation.mjs scripts/tests/agent-runtime.mjs scripts/tests/workflow-runs.mjs scripts/tests/workflow-conversations.mjs scripts/tests/workflow-samples.mjs
+        run: node --test scripts/tests/sse-navigation.mjs scripts/tests/agent-runtime.mjs scripts/tests/channel-response-authoring.mjs scripts/tests/workflow-runs.mjs scripts/tests/workflow-conversations.mjs scripts/tests/workflow-samples.mjs
       - name: Deployment script tests
         run: |
           scripts/tests/deploy.sh
@@ -77,8 +77,17 @@ jobs:
           scripts/transport-boundary-check.sh
           python3 scripts/tests/workflow-sample-boundary.py
           python3 scripts/workflow-sample-boundary.py
+          python3 scripts/tests/integration-boundary.py
+          python3 scripts/integration-boundary.py
+          python3 scripts/check-integration-docs.py
       - name: Fetch locked Rust dependencies
         run: cargo fetch --locked
+      - name: Workflow evidence retention
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: |
+          python3 scripts/tests/workflow-evidence.py
+          python3 scripts/check-workflow-evidence.py --tracked-manifests --require-tracked
       - name: Offline compilation
         run: cargo check --locked --offline --all-targets
       - name: Clippy
@@ -121,6 +130,22 @@ jobs:
         run: cargo sqlx prepare --check -- --all-targets
       - name: Compile tests before denying network access
         run: cargo test --locked --offline --all-targets --no-run
+      - name: Integration conformance families are registered
+        run: |
+          for family in integration_portability_ integration_service_contract_ vault_google_e2e_; do
+            cargo test --locked --offline --lib "$family" -- --list > /tmp/integration-conformance-list
+            grep -Eq ': test$' /tmp/integration-conformance-list
+          done
+      - name: Vault authoring browser protocol
+        env:
+          TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5432/open_bots_test
+          VAULT_AUTHORING_BROWSER_FIXTURES: /tmp/vault-authoring-browser
+        run: |
+          cargo test --locked --offline --lib vault_authoring_picker_is_owner_scoped_and_only_exposes_approved_metadata
+          cargo test --locked --offline --lib vault_authoring_owner_forms_and_reconnect_states_emit_real_browser_markup
+          node --test scripts/tests/vault-authoring-browser.mjs
+      - name: Rust source module reachability
+        run: cargo test --locked --offline --test source_modules
       - name: HTML rendering and team autocomplete browser protocol
         env:
           HTML_INJECTION_BROWSER_FIXTURES: /tmp/html-injection-browser

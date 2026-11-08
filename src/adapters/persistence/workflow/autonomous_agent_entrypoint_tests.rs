@@ -7,6 +7,9 @@ use crate::application::workflow::{
 };
 use crate::domain::entities::schedule::{ScheduleTimezone, ScheduleType, ScheduleWrite};
 
+#[path = "agent_history_entrypoint_tests.rs"]
+mod history;
+
 #[derive(Debug, PartialEq, Eq, sqlx::FromRow)]
 struct SelectedRun {
     manifest: Uuid,
@@ -44,6 +47,7 @@ fn model_source() -> Value {
 
 fn manual_request(d: &Deployment, binding: BindingTarget, key: &str) -> StartRun {
     StartRun {
+        history_session: None,
         company_id: d.fixture.target.company,
         actor: d.fixture.target.actor,
         binding_id: binding.binding,

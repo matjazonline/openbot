@@ -9,6 +9,7 @@ pub(super) const ADMISSION_DEADLINE_SECONDS: i32 = 24 * 60 * 60;
 impl WorkflowAdmission for PostgresPersistence {
     #[tracing::instrument(skip_all, fields(company=%command.company_id().as_uuid(), run=%command.proposed_run_id().as_uuid(), correlation=%command.causality().correlation_id().as_uuid()))]
     async fn admit(&self, command: &PreparedAdmission) -> AppResult<AdmissionResult> {
+        agent_history_sessions::check_manual(command)?;
         let mut tx = self.pool.begin().await?;
         if command.admission_claim().is_some() {
             sqlx::query("SET LOCAL lock_timeout = '5s'")

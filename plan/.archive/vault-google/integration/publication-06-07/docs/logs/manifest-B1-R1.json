@@ -1,0 +1,15 @@
+{
+  "phase": "publication-06-07",
+  "round": "VG-PUB67-B1-R1",
+  "digest": "b0ae9af5c07980a42dac601855f7998facb8c431e8b978f8df8980dd7823f02a",
+  "head": "83b493e203e43bbd956f47326e17ee407b4dcc96",
+  "review_base": "22c94cf6fcb9d7bcce14eda2a59df58223699e7f",
+  "source_review_digest": "ad2cae3d8ce497444a91a39bf14fb21f8ecdc27ed547a842a97dbee4cbf9cd48",
+  "exclusions": [
+    "plan/.archive/vault-google/COORDINATION.md",
+    "plan/.archive/vault-google/integration/publication-06-07/docs"
+  ],
+  "coordination_revision": 25,
+  "coordination_sha256": "c437e97c1ada56e93b54556e1a266a924bd7aa93dd1f7f433fb5292dbdfcfae2",
+  "pending_merge_parent": "22c94cf6fcb9d7bcce14eda2a59df58223699e7f"
+}

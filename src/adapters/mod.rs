@@ -21,4 +21,7 @@ pub mod workflow_message;
 pub mod workflow_provisioning;
 pub mod workflow_source;
 
+pub(crate) mod integrations;
 pub mod workflow_jev;
+
+pub(crate) mod guarded_http;

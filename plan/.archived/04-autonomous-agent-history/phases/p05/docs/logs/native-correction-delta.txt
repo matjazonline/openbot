@@ -1,0 +1,331 @@
+--- gate/src/adapters/persistence/workflow/channel_reply_refusal.rs
++++ current/src/adapters/persistence/workflow/channel_reply_refusal.rs
+@@ -1,37 +1,48 @@
+ use super::*;
+ use crate::application::workflow::{activation::ActivationRequest, lease::LeaseReleaseCause};
++use crate::domain::workflow::KnowledgeRefusal;
+ 
+-/// A refused final projection fails through the original step's existing owner and error route.
++/// Preserve the release cause through the original step owner. Knowledge failures never route.
+ pub(super) async fn settle_on(
+     db: &mut PgConnection,
+     scope: ActivationRequest,
+     owner: completion_job::CompletionOwner,
++    refusal: Option<KnowledgeRefusal>,
+ ) -> AppResult<()> {
+     match owner {
+         completion_job::CompletionOwner::Pure => {
+-            pending_recovery::settle(db, scope, pending_recovery::PendingFailure::InvalidOutput)
+-                .await?
++            let failure = refusal.map_or(pending_recovery::PendingFailure::InvalidOutput, |_| {
++                pending_recovery::PendingFailure::KnowledgeRefused
++            });
++            pending_recovery::settle(db, scope, failure).await?
+         }
+         completion_job::CompletionOwner::Fenced(fence) => {
+-            recovery::retire_on(
+-                db,
+-                fence,
+-                lease::Retirement::Interrupted(LeaseReleaseCause::InvalidResult),
+-            )
+-            .await?
++            let cause = match refusal {
++                Some(refusal) => LeaseReleaseCause::Classified(
++                    recovery::classify_final_refusal_on(db, scope, refusal).await?,
++                ),
++                None => LeaseReleaseCause::InvalidResult,
++            };
++            recovery::retire_on(db, fence, lease::Retirement::Interrupted(cause)).await?
+         }
+         completion_job::CompletionOwner::Parked(_)
+         | completion_job::CompletionOwner::Approved { .. } => {
+             if matches!(owner, completion_job::CompletionOwner::Approved { .. }) {
+                 completion_job::finish(db, scope, owner).await?;
+             }
+-            let failure = StepFailure::new(
+-                FailureClass::Terminal,
+-                FailureCode::parse("message.final_response_refused").map_err(|_| invalid())?,
+-                None,
+-            )
+-            .map_err(|_| invalid())?;
++            let failure = match refusal {
++                Some(refusal) => StepFailure::from_knowledge_refusal(refusal),
++                None => StepFailure::new(
++                    FailureClass::Terminal,
++                    FailureCode::parse("message.final_response_refused").map_err(|_| invalid())?,
++                    None,
++                )
++                .map_err(|_| invalid())?,
++            };
+             recovery::route_parked_failure(db, scope, &failure).await?;
++            if refusal.is_some() {
++                waits::audit(db, scope, failure.code().as_str()).await?;
++            }
+         }
+         completion_job::CompletionOwner::Recovered => return Err(invalid()),
+     }
+@@ -58,12 +69,14 @@
+     let prepared = match staged {
+         Ok(prepared) => Some(prepared),
+         Err(
+-            AppError::BadRequest(_) | AppError::NotFound(_) | AppError::KnowledgeRelease { .. },
++            error @ (AppError::BadRequest(_)
++            | AppError::NotFound(_)
++            | AppError::KnowledgeRelease { .. }),
+         ) => {
+             sqlx::query("ROLLBACK TO SAVEPOINT channel_final_stage")
+                 .execute(&mut *db)
+                 .await?;
+-            Box::pin(settle_on(db, scope, owner)).await?;
++            Box::pin(settle_on(db, scope, owner, knowledge_refusal(&error))).await?;
+             None
+         }
+         Err(error) => return Err(error),
+@@ -73,3 +86,16 @@
+         .await?;
+     Ok(prepared)
+ }
++
++pub(super) fn knowledge_refusal(error: &AppError) -> Option<KnowledgeRefusal> {
++    match error {
++        AppError::KnowledgeRelease {
++            content,
++            destination,
++        } => Some(KnowledgeRefusal {
++            content: *content,
++            destination: *destination,
++        }),
++        _ => None,
++    }
++}
+--- gate/src/adapters/persistence/workflow/channel_reply_resume.rs
++++ current/src/adapters/persistence/workflow/channel_reply_resume.rs
+@@ -90,7 +90,10 @@
+         decision: DecisionId(decision),
+         continuation: run.continuation_count,
+     };
+-    let progress = match Box::pin(batch_commit::complete(
++    sqlx::query("SAVEPOINT channel_saved_completion")
++        .execute(&mut *db)
++        .await?;
++    let result = Box::pin(batch_commit::complete(
+         db,
+         scope,
+         &activation,
+@@ -99,22 +102,34 @@
+         owner,
+         notices,
+     ))
+-    .await
+-    {
++    .await;
++    let progress = match result {
+         Ok(progress) => progress,
+-        Err(AppError::NotFound(_) | AppError::Conflict(_) | AppError::KnowledgeRelease { .. }) => {
+-            completion_job::finish(db, scope, owner).await?;
+-            let failure = StepFailure::new(
+-                FailureClass::Terminal,
+-                FailureCode::parse("message.final_response_refused").map_err(|_| invalid())?,
+-                None,
+-            )
+-            .map_err(|_| invalid())?;
+-            recovery::route_parked_failure(db, scope, &failure).await?;
++        Err(
++            error @ (AppError::NotFound(_)
++            | AppError::Conflict(_)
++            | AppError::KnowledgeRelease { .. }),
++        ) => {
++            sqlx::query("ROLLBACK TO SAVEPOINT channel_saved_completion")
++                .execute(&mut *db)
++                .await?;
++            Box::pin(channel_reply_refusal::settle_on(
++                db,
++                scope,
++                owner,
++                channel_reply_refusal::knowledge_refusal(&error),
++            ))
++            .await?;
++            sqlx::query("RELEASE SAVEPOINT channel_saved_completion")
++                .execute(&mut *db)
++                .await?;
+             return Ok(FinalizationProgress::Refused);
+         }
+         Err(error) => return Err(error),
+     };
++    sqlx::query("RELEASE SAVEPOINT channel_saved_completion")
++        .execute(&mut *db)
++        .await?;
+     if matches!(progress, batch_commit::CompletionProgress::Refused) {
+         return Ok(FinalizationProgress::Refused);
+     }
+--- gate/src/adapters/persistence/workflow/pending_recovery.rs
++++ current/src/adapters/persistence/workflow/pending_recovery.rs
+@@ -6,6 +6,7 @@
+ pub(super) enum PendingFailure {
+     InvalidInput,
+     InvalidOutput,
++    KnowledgeRefused,
+     ActivationLimit,
+     AttemptsExhausted,
+     RootBudgetExhausted,
+@@ -19,6 +20,7 @@
+         match self {
+             Self::InvalidInput => "workflow.invalid_input",
+             Self::InvalidOutput => "workflow.invalid_output",
++            Self::KnowledgeRefused => crate::domain::workflow::KNOWLEDGE_AUDIENCE_BELOW_CONTENT,
+             Self::ActivationLimit => "workflow.activation_limit",
+             Self::AttemptsExhausted => "workflow.attempts_exhausted",
+             Self::RootBudgetExhausted => "workflow.root_budget_exhausted",
+@@ -70,10 +72,14 @@
+     scope: ActivationRequest,
+     failure: PendingFailure,
+ ) -> AppResult<()> {
+-    let failure = token_budget::refusal_on(db, scope)
+-        .await?
+-        .map(PendingFailure::TokenRefused)
+-        .unwrap_or(failure);
++    let failure = if matches!(failure, PendingFailure::KnowledgeRefused) {
++        failure
++    } else {
++        token_budget::refusal_on(db, scope)
++            .await?
++            .map(PendingFailure::TokenRefused)
++            .unwrap_or(failure)
++    };
+     // Pre-activation failures cannot fabricate frozen inputs. Already activated
+     // failures can take their immutable error edge through the one progression writer.
+     let action_safe: Option<bool> = sqlx::query_scalar("SELECT workflow_action_retry_safe($1,$2)")
+--- gate/src/adapters/persistence/workflow/recovery.rs
++++ current/src/adapters/persistence/workflow/recovery.rs
+@@ -97,6 +97,51 @@
+         .await?;
+     }
+     Ok(())
++}
++
++/// Classify from the frozen step kind, then let retirement's native action predicate
++/// override safety when an earlier effect marker exists. A refusal proves no effect outcome.
++pub(super) async fn classify_final_refusal_on(
++    db: &mut PgConnection,
++    scope: ActivationRequest,
++    refusal: crate::domain::workflow::KnowledgeRefusal,
++) -> AppResult<WorkflowFailure> {
++    let binding_id: Uuid =
++        sqlx::query_scalar("SELECT binding_id FROM workflow_runs WHERE company_id=$1 AND id=$2")
++            .bind(scope.company.as_uuid())
++            .bind(scope.run.as_uuid())
++            .fetch_one(&mut *db)
++            .await?;
++    let binding = admission_binding::read_saved_binding(
++        db,
++        scope.company,
++        WorkflowBindingId::new(binding_id),
++        scope.run.as_uuid(),
++    )
++    .await?;
++    let step: String = sqlx::query_scalar(
++        "SELECT step_id FROM workflow_executions WHERE company_id=$1 AND run_id=$2 AND id=$3",
++    )
++    .bind(scope.company.as_uuid())
++    .bind(scope.run.as_uuid())
++    .bind(scope.execution.as_uuid())
++    .fetch_one(db)
++    .await?;
++    let step = StepId::parse(step).map_err(|_| invalid())?;
++    let definition = binding
++        .bundle()
++        .compiled()
++        .graph()
++        .definition()
++        .steps
++        .get(&step)
++        .ok_or_else(invalid)?;
++    let mut classified = report(
++        &Retirement::Interrupted(LeaseReleaseCause::InvalidResult),
++        definition.step_type.as_str(),
++    )?;
++    classified.failure = StepFailure::from_knowledge_refusal(refusal);
++    Ok(classified)
+ }
+ 
+ fn recovery_decision(
+--- gate/src/application/workflow/channel_reply/publication.rs
++++ current/src/application/workflow/channel_reply/publication.rs
+@@ -45,6 +45,7 @@
+     AuthorityRevoked,
+     PolicyChanged,
+     SourceUnavailable,
++    #[serde(rename = "knowledge.audience_below_content")]
+     ReleaseDenied,
+     InvalidProposal,
+     PublicationFailed,
+@@ -56,7 +57,7 @@
+             Self::AuthorityRevoked => "authority_revoked",
+             Self::PolicyChanged => "policy_changed",
+             Self::SourceUnavailable => "source_unavailable",
+-            Self::ReleaseDenied => "release_denied",
++            Self::ReleaseDenied => crate::domain::workflow::KNOWLEDGE_AUDIENCE_BELOW_CONTENT,
+             Self::InvalidProposal => "invalid_proposal",
+             Self::PublicationFailed => "publication_failed",
+         }
+--- gate/src/adapters/http/pages/workflow_runs/detail.rs
++++ current/src/adapters/http/pages/workflow_runs/detail.rs
+@@ -502,19 +502,7 @@
+         });
+     }
+     for event in &run.events {
+-        entries.push(Entry {
+-            at: event.created_at,
+-            text: format!(
+-                "{}{} by {}",
+-                event.kind.replace('_', " "),
+-                event
+-                    .terminal_state
+-                    .as_deref()
+-                    .map(|state| format!(" ({state})"))
+-                    .unwrap_or_default(),
+-                person(view.people, event.actor)
+-            ),
+-        });
++        entries.push(event_entry(event, view.people));
+     }
+     entries.sort_by_key(|entry| entry.at);
+     let rows: String = entries
+@@ -781,3 +769,26 @@
+         },
+     )
+ }
++
++fn event_entry(
++    event: &crate::application::workflow::run_views::RunEvent,
++    people: &HashMap<Uuid, String>,
++) -> Entry {
++    Entry {
++        at: event.created_at,
++        text: format!(
++            "{}{} by {}",
++            if event.kind.contains('.') {
++                event.kind.clone()
++            } else {
++                event.kind.replace('_', " ")
++            },
++            event
++                .terminal_state
++                .as_deref()
++                .map(|state| format!(" ({state})"))
++                .unwrap_or_default(),
++            person(people, event.actor)
++        ),
++    }
++}
+--- gate/migrations/20260817000000_init_schema.sql
++++ current/migrations/20260817000000_init_schema.sql
+@@ -12967,7 +12967,7 @@
+     message_id uuid,
+     delivery_id uuid,
+     diagnostic_code text CHECK (diagnostic_code IN ('attempts_exhausted','authority_revoked','policy_changed',
+-        'source_unavailable','release_denied','invalid_proposal','publication_failed')),
++        'source_unavailable','knowledge.audience_below_content','invalid_proposal','publication_failed')),
+     created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
+     updated_at timestamptz NOT NULL DEFAULT clock_timestamp(),
+     PRIMARY KEY (company_id,run_id),

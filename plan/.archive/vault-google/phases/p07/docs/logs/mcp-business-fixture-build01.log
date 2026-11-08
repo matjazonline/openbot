@@ -1,0 +1,38 @@
+    Checking open_bots v0.1.0 (/Users/mac02/.codex/worktrees/1133/openbot)
+warning: type `persistence::workflow::tests::mcp_tests::support::McpSetup` is more private than the item `persistence::workflow::tests::mcp_tests::support::renewal::configured_setup`
+   --> src/adapters/persistence/workflow/mcp_renewal_support.rs:49:1
+    |
+ 49 | / pub(in crate::adapters::persistence::workflow::tests) async fn configured_setup(
+ 50 | |     original: &Fixture,
+ 51 | |     vault: &PostgresVault,
+ 52 | |     account: &ConnectedAccount,
+ 53 | |     app: AppId,
+ 54 | | ) -> McpSetup {
+    | |_____________^ function `persistence::workflow::tests::mcp_tests::support::renewal::configured_setup` is reachable at visibility `pub(in crate::adapters::persistence::workflow::tests)`
+    |
+note: but type `persistence::workflow::tests::mcp_tests::support::McpSetup` is only usable at visibility `pub(in crate::adapters::persistence::workflow::tests::mcp_tests)`
+   --> src/adapters/persistence/workflow/mcp_test_support.rs:283:1
+    |
+283 | pub(super) struct McpSetup {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^
+    = note: `#[warn(private_interfaces)]` on by default
+
+warning: struct `PinnedFixture` is never constructed
+ --> src/adapters/mcp/pinned_fixture.rs:7:19
+  |
+7 | pub(crate) struct PinnedFixture {
+  |                   ^^^^^^^^^^^^^
+  |
+  = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: associated function `business` is never used
+   --> src/adapters/mcp/preparation_test_server.rs:104:18
+    |
+ 80 | impl Server {
+    | ----------- associated function in this implementation
+...
+104 |     pub async fn business(
+    |                  ^^^^^^^^
+
+warning: `open_bots` (lib test) generated 3 warnings
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1m 17s

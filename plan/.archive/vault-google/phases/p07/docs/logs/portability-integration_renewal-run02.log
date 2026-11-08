@@ -1,0 +1,26 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.18s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-048b7abd3ed0c794)
+
+running 18 tests
+test adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::cache::integration_renewal_generation_drift_cannot_enter_a_cache_update ... ok
+test adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::bounds::integration_renewal_transaction_settings_are_local_and_match_the_request_budget ... ok
+test adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::cache::integration_renewal_shared_app_cannot_change_the_authorizations_protocol ... ok
+test adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::cache::integration_renewal_api_key_injection_needs_no_refresh_token_or_oauth ... ok
+test adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::cache::integration_renewal_initial_generation_must_match_the_durable_entry ... ok
+test adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::google::integration_renewal_static_accounts_have_no_renewal_protocol ... ok
+test adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::strict::integration_renewal_strict_active_pending_is_not_an_interrupted_claimant ... ok
+test adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::strict::integration_renewal_strict_backend_crash_keeps_the_committed_pending_marker ... ok
+test adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::strict::commit::integration_renewal_strict_lost_reservation_or_replacement_commit_ack_is_reread ... ok
+test adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::strict::integration_renewal_strict_cancellation_keeps_durable_ambiguity_for_recovery ... ok
+test adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::strict::integration_renewal_strict_delayed_claim_after_delete_cannot_contact_provider ... ok
+test adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::strict::integration_renewal_strict_competing_live_services_share_one_rotation ... ok
+test adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::strict::integration_renewal_strict_delayed_claim_after_disconnect_cannot_contact_provider ... ok
+test adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::strict::integration_renewal_strict_lost_response_preserves_pending_instead_of_retrying_refresh ... ok
+test adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::strict::integration_renewal_strict_expired_pending_requires_reconnect_without_an_endpoint_retry ... ok
+test adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::strict::integration_renewal_strict_omitted_replacement_does_not_inherit_google_reuse ... ok
+test adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::strict::integration_renewal_strict_workspace_rotates_and_reuses_without_an_email ... ok
+test adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::bounds::integration_renewal_core_ten_second_provider_budget_drops_an_uncooperative_future ... ok
+
+test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 3587 filtered out; finished in 11.44s
+

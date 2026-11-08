@@ -96,6 +96,8 @@ pub struct AdmitWorkflowRequest {
     /// A manual start that reruns this top-level run of the same workflow with changed input or
     /// definition. The link is for inspection only (07-D1 §D1.7).
     pub rerun_of: Option<RunId>,
+    /// Trusted manual admission metadata, never part of the workflow input.
+    pub history_session: Option<super::agent_history::AgentHistorySessionRef>,
     pub delivery_policy: DeliveryPolicy,
     /// The binding configuration revision the caller evaluated (an automatic trigger's
     /// eligibility). A fresh admission under any other current revision is `Stale`; a replay of
@@ -131,6 +133,7 @@ pub struct PreparedAdmission {
     first_step: StepCausality,
     input: Value,
     rerun_of: Option<RunId>,
+    history_session: Option<super::agent_history::AgentHistorySessionRef>,
     delivery_policy: DeliveryPolicy,
     expected_binding_revision: Option<BindingRevision>,
     admission_claim: Option<AdmissionClaim>,
@@ -172,6 +175,7 @@ impl PreparedAdmission {
             first_step,
             input: snapshots.input,
             rerun_of: request.rerun_of,
+            history_session: request.history_session,
             delivery_policy: request.delivery_policy,
             expected_binding_revision: request.expected_binding_revision,
             admission_claim: request.admission_claim,
@@ -237,6 +241,9 @@ impl PreparedAdmission {
     /// Part of replay equivalence; the admission owner authorizes the linked original.
     pub fn rerun_of(&self) -> Option<RunId> {
         self.rerun_of
+    }
+    pub fn history_session(&self) -> Option<super::agent_history::AgentHistorySessionRef> {
+        self.history_session
     }
     /// Part of replay equivalence and inherited by runtime children.
     pub fn delivery_policy(&self) -> DeliveryPolicy {

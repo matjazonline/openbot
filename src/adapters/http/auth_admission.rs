@@ -110,7 +110,9 @@ fn kind(method: &Method, path: &str) -> Option<Kind> {
             | "/auth/google/callback",
         )
         | (&Method::GET, "/auth/apple/register" | "/auth/apple/login" | "/auth/apple/connect")
-        | (&Method::POST, "/auth/apple/callback") => Some(Kind::Oauth),
+        | (&Method::POST, "/auth/apple/callback")
+        | (&Method::POST, "/ui/profile/vault/apps/{app}/connect")
+        | (&Method::GET, "/auth/integrations/{provider}/callback") => Some(Kind::Oauth),
         (&Method::PUT, "/ui/profile" | "/ui/profile/password" | "/ui/profile/password/setup")
         | (&Method::POST | &Method::DELETE, "/ui/profile/changes/{kind}")
         | (
@@ -606,6 +608,21 @@ mod tests {
             (Method::GET, "/auth/apple/login", Kind::Oauth),
             (Method::GET, "/auth/apple/connect", Kind::Oauth),
             (Method::POST, "/auth/apple/callback", Kind::Oauth),
+            (
+                Method::POST,
+                "/ui/profile/vault/apps/{app}/connect",
+                Kind::Oauth,
+            ),
+            (
+                Method::GET,
+                "/auth/integrations/{provider}/callback",
+                Kind::Oauth,
+            ),
+            (
+                Method::HEAD,
+                "/auth/integrations/{provider}/callback",
+                Kind::Oauth,
+            ),
         ] {
             assert_eq!(kind(&method, path), Some(expected), "{method} {path}");
         }

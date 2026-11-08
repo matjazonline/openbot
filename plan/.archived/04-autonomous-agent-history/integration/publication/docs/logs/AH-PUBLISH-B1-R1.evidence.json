@@ -1,0 +1,406 @@
+{
+  "version": 1,
+  "round": "AH-PUBLISH-B1-R1",
+  "artifact": "b1f1194ed9a2672c731a7ee4c9a20861c9a386aa77bb39193afb1e925ea99d9a",
+  "checks": [
+    {
+      "criteria": [
+        "PUB2",
+        "PUB4"
+      ],
+      "command": "cargo sqlx migrate run",
+      "fixture": "Fresh publication PG18.6 pair65037, clean publishedCargo, stock2MiB/networkguard, countedproviders/nativeHTML/installedChrome; exact current case map",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/pub-migrate-main-01.json",
+          "sha256": "ce65b37b083f600ee20ad75c97ca1a3936b1664ad4d70ac7d3bd074f25996162"
+        },
+        {
+          "path": "logs/pub-migrate-main-01.txt",
+          "sha256": "391c21c8360794ccb67ea76325050dfe17619aa976bbf395b1ed8c58ecf44c8b"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "PUB2",
+        "PUB4"
+      ],
+      "command": "env DATABASE_URL=postgres://mac02@127.0.0.1:65037/openbot_ah_publish_pc5qkluy_test cargo sqlx migrate run",
+      "fixture": "Fresh publication PG18.6 pair65037, clean publishedCargo, stock2MiB/networkguard, countedproviders/nativeHTML/installedChrome; exact current case map",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/pub-migrate-test-01.json",
+          "sha256": "aaf028ad548753421afa30b772c2de06318ab107810a9ee6ab30194938802f2f"
+        },
+        {
+          "path": "logs/pub-migrate-test-01.txt",
+          "sha256": "914b6cba42090ed5c01ac55cf5ccfe8f544143d159b6447501af89c5badcc809"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "PUB2",
+        "PUB4"
+      ],
+      "command": "npm run build:css",
+      "fixture": "Fresh publication PG18.6 pair65037, clean publishedCargo, stock2MiB/networkguard, countedproviders/nativeHTML/installedChrome; exact current case map",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/pub-css-build-01.json",
+          "sha256": "7efd30027d87330e0c2ae3dcdad114864e569023a06ce06434f1d2f1b30ff936"
+        },
+        {
+          "path": "logs/pub-css-build-01.txt",
+          "sha256": "05c11ea9cabfb749645ab938ec57d470236b1cdffc20dcb7992e42ab4d6ec212"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "PUB2",
+        "PUB4"
+      ],
+      "command": "npm run check:css",
+      "fixture": "Fresh publication PG18.6 pair65037, clean publishedCargo, stock2MiB/networkguard, countedproviders/nativeHTML/installedChrome; exact current case map",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/pub-css-check-01.json",
+          "sha256": "c903eded616e39948545cea5fac3ebdb650ea728fd00ba02003cc4f727e6d5ba"
+        },
+        {
+          "path": "logs/pub-css-check-01.txt",
+          "sha256": "9f85d9b5ee835bc74ecf1f1645ed74d2e168bd64fbc4e4192b659856862be55f"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "PUB2",
+        "PUB4"
+      ],
+      "command": "cargo check --locked --offline --all-targets",
+      "fixture": "Fresh publication PG18.6 pair65037, clean publishedCargo, stock2MiB/networkguard, countedproviders/nativeHTML/installedChrome; exact current case map",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/pub-offline-01.json",
+          "sha256": "221ef232c51ab4e38dd290b7fa85a73338000c92ed4cd6e21365587727e029d6"
+        },
+        {
+          "path": "logs/pub-offline-01.txt",
+          "sha256": "8f6bd036f1ab4ba872271098318e99e8d1f6e4826c4b876bd9f88c529de95edd"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "PUB2",
+        "PUB3"
+      ],
+      "command": "scripts/test-network-isolation.sh cargo test --locked --offline --lib -- --list agent_history_e2e_ agent_history_children_same_agent_private_branch_completes_without_parent_transcript agent_history_continuation_two_real_approval_rounds_and_competing_reviewers_preserve_one_exchange agent_history_continuation_real_thread_reply_reaches_child_before_parent_owned_turn_queue agent_history_level_lower_private_session_reuse_filters_hidden_pairs_without_raising_ceiling agent_history_retention_actual_preparation_owner_skips_competing_cleanup_and_replays_exact_copy agent_history_retention_actual_expiry_owner_precedes_blocked_fresh_selection_without_mixed_seed agent_history_level_later_real_knowledge_then_human_wait_refuses_downgraded_resume_before_provider agent_history_recovery_revoked_wait_head_reaches_normal_terminal_owner_and_frees_successor agent_history_views_maximum_page_reaches_last_source_outside_page_and_keeps_exact_frozen_copy_after_expiry agent_history_channel_projection_is_not_the_saved_output_or_next_seed agent_history_channel_no_reply_and_explicit_send_retain_agent_output_independently agent_history_channel_delivery_retry_keeps_one_exchange_output_and_model_call agent_history_channel_terminal_delivery_failure_preserves_business_success_and_accepted_exchange agent_history_protocol_new_revision_provider_and_schema_keep_prior_pairs_as_data application::services::test_support:: agent_history_identity_ vault_dispatch_authority_ vault_binding_ vault_storage_ vault_lifecycle_ vault_rotation_ google_refresh_race_ integration_renewal_ channel_reply_completion_ channel_reply_e2e_ provisioning_ production_workers_stop_on_the_shutdown_token",
+      "fixture": "Fresh publication PG18.6 pair65037, clean publishedCargo, stock2MiB/networkguard, countedproviders/nativeHTML/installedChrome; exact current case map",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/pub-discovery-01.json",
+          "sha256": "af176f1f7446bea8bdce54e5726f37cc5212db7f92c9a4ca9719a48067c7d891"
+        },
+        {
+          "path": "logs/pub-discovery-01.txt",
+          "sha256": "7555baac35cd50f813d12312a0f4c8d498605c2e49fadb7c55fae76d8edf41e1"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "PUB2",
+        "PUB3"
+      ],
+      "command": "env AGENT_HISTORY_BROWSER_FIXTURES=/private/var/folders/qc/f8s9x42x5sz6vbh79sb0cfth0000gn/T/openbot-history-publication-pc5qkluy/worktree/plan/04-autonomous-agent-history/integration/publication/docs/logs/browser-fixtures-01 scripts/test-network-isolation.sh cargo test --locked --offline --lib -- agent_history_e2e_ agent_history_children_same_agent_private_branch_completes_without_parent_transcript agent_history_continuation_two_real_approval_rounds_and_competing_reviewers_preserve_one_exchange agent_history_continuation_real_thread_reply_reaches_child_before_parent_owned_turn_queue agent_history_level_lower_private_session_reuse_filters_hidden_pairs_without_raising_ceiling agent_history_retention_actual_preparation_owner_skips_competing_cleanup_and_replays_exact_copy agent_history_retention_actual_expiry_owner_precedes_blocked_fresh_selection_without_mixed_seed agent_history_level_later_real_knowledge_then_human_wait_refuses_downgraded_resume_before_provider agent_history_recovery_revoked_wait_head_reaches_normal_terminal_owner_and_frees_successor agent_history_views_maximum_page_reaches_last_source_outside_page_and_keeps_exact_frozen_copy_after_expiry agent_history_channel_projection_is_not_the_saved_output_or_next_seed agent_history_channel_no_reply_and_explicit_send_retain_agent_output_independently agent_history_channel_delivery_retry_keeps_one_exchange_output_and_model_call agent_history_channel_terminal_delivery_failure_preserves_business_success_and_accepted_exchange agent_history_protocol_new_revision_provider_and_schema_keep_prior_pairs_as_data application::services::test_support:: agent_history_identity_ vault_dispatch_authority_ vault_binding_ vault_storage_ vault_lifecycle_ vault_rotation_ google_refresh_race_ integration_renewal_ channel_reply_completion_ channel_reply_e2e_ provisioning_ production_workers_stop_on_the_shutdown_token --nocapture",
+      "fixture": "Fresh publication PG18.6 pair65037, clean publishedCargo, stock2MiB/networkguard, countedproviders/nativeHTML/installedChrome; exact current case map",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/pub-runtime-01.json",
+          "sha256": "21eddbbe8065f342e27ff67d09615d86b382c80874f010fc9deb7597b24f7d5f"
+        },
+        {
+          "path": "logs/pub-runtime-01.txt",
+          "sha256": "d3ad1ad71d94947d7eaec172703aa4cbe05ac9522980fbd94a461cd8fccf0c45"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "PUB2",
+        "PUB4"
+      ],
+      "command": "cargo sqlx prepare -- --all-targets",
+      "fixture": "Fresh publication PG18.6 pair65037, clean publishedCargo, stock2MiB/networkguard, countedproviders/nativeHTML/installedChrome; exact current case map",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/pub-sqlx-prepare-01.json",
+          "sha256": "8bcb655d1f96b914bd54f75bd9ef68c31f6d218ab24005dc50fd1bb60710788d"
+        },
+        {
+          "path": "logs/pub-sqlx-prepare-01.txt",
+          "sha256": "621f559e6ca694986330231d19af32fafe3fbff12891fa58a4173363ebe22d44"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "PUB2",
+        "PUB4"
+      ],
+      "command": "cargo sqlx prepare --check -- --all-targets",
+      "fixture": "Fresh publication PG18.6 pair65037, clean publishedCargo, stock2MiB/networkguard, countedproviders/nativeHTML/installedChrome; exact current case map",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/pub-sqlx-check-01.json",
+          "sha256": "fb1f047afb12007a20b2188218f6a216ea2b932b6f63abc0ed3e9f28cf5e7858"
+        },
+        {
+          "path": "logs/pub-sqlx-check-01.txt",
+          "sha256": "e031bfb5574f5a65924cfe9cd0fc4f35b655353434965731bfe0e3ead2c3d9d7"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "PUB2",
+        "PUB4"
+      ],
+      "command": "cargo clippy --locked --offline --all-targets -- -D warnings",
+      "fixture": "Fresh publication PG18.6 pair65037, clean publishedCargo, stock2MiB/networkguard, countedproviders/nativeHTML/installedChrome; exact current case map",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/pub-clippy-01.json",
+          "sha256": "8a24b859b3ef7f02ea3687524cfb008287886cbb00d5afa9e24c50d0e550c34f"
+        },
+        {
+          "path": "logs/pub-clippy-01.txt",
+          "sha256": "b6b7a5654031cad0df8a3da7e5915a7199bc036ad8e1a23f57176763296033fd"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "PUB2",
+        "PUB4"
+      ],
+      "command": "cargo fmt --all -- --check",
+      "fixture": "Fresh publication PG18.6 pair65037, clean publishedCargo, stock2MiB/networkguard, countedproviders/nativeHTML/installedChrome; exact current case map",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/pub-fmt-01.json",
+          "sha256": "6a0fb2bb3c7df65e49919e25331e42ab60d6b17569dec69659f489cbcc75fbdb"
+        },
+        {
+          "path": "logs/pub-fmt-01.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "PUB2",
+        "PUB4"
+      ],
+      "command": "git diff HEAD --check -- . :(glob,exclude)plan/**/docs/**",
+      "fixture": "Fresh publication PG18.6 pair65037, clean publishedCargo, stock2MiB/networkguard, countedproviders/nativeHTML/installedChrome; exact current case map",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/pub-diff-02.json",
+          "sha256": "56fdc4ec9e910428870f923f1675be8ea6f5a8ea0067733655b5f1b54f632cc2"
+        },
+        {
+          "path": "logs/pub-diff-02.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "PUB2",
+        "PUB4"
+      ],
+      "command": "python3 scripts/workflow-sample-boundary.py",
+      "fixture": "Fresh publication PG18.6 pair65037, clean publishedCargo, stock2MiB/networkguard, countedproviders/nativeHTML/installedChrome; exact current case map",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/pub-sample-01.json",
+          "sha256": "4b9d6a37cb0ec5ad1eb1248b0f81691a372aa279a46d4b195218cfbb2903a452"
+        },
+        {
+          "path": "logs/pub-sample-01.txt",
+          "sha256": "228c0f0f23407594379b257a3e3684550f2f3eb1741d27acbc9be312e22e6d2d"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "PUB2",
+        "PUB4"
+      ],
+      "command": "graft build",
+      "fixture": "Fresh publication PG18.6 pair65037, clean publishedCargo, stock2MiB/networkguard, countedproviders/nativeHTML/installedChrome; exact current case map",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/pub-graft-01.json",
+          "sha256": "7d35fe4eba22a6859c3e6fdda011f643d11cb4d1c6f05887731ca80389583906"
+        },
+        {
+          "path": "logs/pub-graft-01.txt",
+          "sha256": "80ace2e28e8cdd25fe1a2a9d120503eec7eaf99e5b03ed31b781f63191003f75"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "PUB2",
+        "PUB4"
+      ],
+      "command": "env CHROME_PATH=/Applications/Google Chrome.app/Contents/MacOS/Google Chrome AGENT_HISTORY_BROWSER_FIXTURES=plan/04-autonomous-agent-history/integration/publication/docs/logs/browser-fixtures-01 node --test scripts/tests/agent-history-browser.mjs",
+      "fixture": "Fresh publication PG18.6 pair65037, clean publishedCargo, stock2MiB/networkguard, countedproviders/nativeHTML/installedChrome; exact current case map",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/pub-browser-01.json",
+          "sha256": "6f10d24abcb3f6e81bf6b140419d76c272b0bebc236273b87b7444094c9271f6"
+        },
+        {
+          "path": "logs/pub-browser-01.txt",
+          "sha256": "147f80f5114d3f856c0e438455cd8d4e5d9bc2bb6f8cf6245f3b61dc0752afc5"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "PUB2",
+        "PUB4"
+      ],
+      "command": "env CHROME_PATH=/Applications/Google Chrome.app/Contents/MacOS/Google Chrome node --test scripts/tests/channel-response-authoring.mjs",
+      "fixture": "Fresh publication PG18.6 pair65037, clean publishedCargo, stock2MiB/networkguard, countedproviders/nativeHTML/installedChrome; exact current case map",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/pub-channel-browser-01.json",
+          "sha256": "3f342ff0cc3a1bdf2f4fd7219d4ee194d2c76245271cdb0edf090b95553acaf2"
+        },
+        {
+          "path": "logs/pub-channel-browser-01.txt",
+          "sha256": "2b1c33bc577d532e5009babe51c43e47ce97a9ae302e5f0059ba736cf516c40c"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "PUB2",
+        "PUB3"
+      ],
+      "command": "python3 plan/04-autonomous-agent-history/integration/publication/docs/logs/verify-cases.py",
+      "fixture": "Fresh publication PG18.6 pair65037, clean publishedCargo, stock2MiB/networkguard, countedproviders/nativeHTML/installedChrome; exact current case map",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/pub-case-evidence-02.json",
+          "sha256": "dd1d8eb9ed75eb4d4b2eed3666a2c9a7310f8eb9a4ca43e22352160ac9912dbb"
+        },
+        {
+          "path": "logs/pub-case-evidence-02.txt",
+          "sha256": "92aca617e1ff5b87cc3bcb1914bc409283f6e1afe6f5a0f717200f98907ad004"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "PUB1",
+        "PUB5"
+      ],
+      "command": "parent and schema-block hash comparison; current198 exact-name discovery audit",
+      "fixture": "211historybytes exact,5shared files preservebothinputs,647remote paths exact; actual198PASS/0ignored and28nonzero selectors after redundant-name disposition",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/parent-assembly-audit.json",
+          "sha256": "445a15ebf7ad0d3f96bc6ac60493a51fd28ffb5e2d04923850f249d796043a7b"
+        },
+        {
+          "path": "logs/schema-merge-disposition.json",
+          "sha256": "11754dfcc6dd4154e817b3f0afaa40273167c9259ce7f53d11997bc6ed677d22"
+        },
+        {
+          "path": "logs/case-inventory.json",
+          "sha256": "dcbbacb7facfeec055dca99675d2078859a59e5baa76cfb97ef0521bc6929790"
+        },
+        {
+          "path": "logs/selector-disposition.json",
+          "sha256": "14d716f9c398bed021db32334ea868cf2f95af14ad78dd685ab32cba18a6fb1a"
+        },
+        {
+          "path": "logs/vault-authority-check.json",
+          "sha256": "535526d84133d372c98b11726d7b0f92041a39f362c5a9d31246c338fd8aac85"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "PUB5"
+      ],
+      "command": "python3 plan/04-autonomous-agent-history/integration/publication/docs/logs/verify-cases.py",
+      "fixture": "Redundant vault_lifecycle_ selector matched0; all5 actual lifecycle cases already executed under vault_storage_; corrected actual named selector and currentcaseaudit02 passes without changing selected tests.",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/pub-case-evidence-01.json",
+          "sha256": "a1ac95bfd583730ca200b00a540513a349c2aa0b6f54b9464803aff3550b7946"
+        },
+        {
+          "path": "logs/pub-case-evidence-01.txt",
+          "sha256": "b553e32bee12e779ef87d5ef0fca44503dc26390ac5df208b47d3846abb5bc5c"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "PUB5"
+      ],
+      "command": "git diff HEAD --check",
+      "fixture": "Raw imported immutable Vault review captures/diffs carry historical whitespace; actual implementation/deliverable source check02 PASS. No historical evidence rewritten.",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/pub-diff-01.json",
+          "sha256": "0300faf93194247e15505bf8c57400e4ea72a7125baeddb3237fab7ef858f21f"
+        },
+        {
+          "path": "logs/pub-diff-01.txt",
+          "sha256": "c96f92ed26df4530c0efbb49bb64812f0de9031c5a0aa6eb7e0fe819aa5c662a"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "PUB5"
+      ],
+      "command": "full/stack/lease/overflow/liveprovider/deployment and unchanged known inherited scanners",
+      "fixture": "Usertargeted-only; upstreamVault explicitly retained knownbaseline source-markup/transport scanner findings",
+      "status": "NOT EXERCISED",
+      "reason": "No newcode affects those diagnosed baseline fixtures; preserveoriginal accepted proofs and do not claim green fullsuite or fixunrelatedcode."
+    }
+  ]
+}

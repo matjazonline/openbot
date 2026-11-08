@@ -1,0 +1,19 @@
+{
+  "command": [
+    "env",
+    "RUST_MIN_STACK=2097152",
+    "bash",
+    "scripts/test-network-isolation.sh",
+    "cargo",
+    "test",
+    "--locked",
+    "--offline",
+    "--test",
+    "source_modules"
+  ],
+  "cwd": "/private/tmp/vault-google-publish-a95937f128",
+  "exit": 0,
+  "seconds": 5.4,
+  "fixture": "no database required; owned cache serialized",
+  "log": "/private/tmp/vault-google-publish-a95937f128/plan/.archive/vault-google/integration/publication-06-07/docs/logs/reviewer-source-modules.log"
+}

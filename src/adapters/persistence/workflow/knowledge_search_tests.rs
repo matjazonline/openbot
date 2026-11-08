@@ -21,6 +21,9 @@ mod atomic;
 #[path = "knowledge_search_lease_tests.rs"]
 mod ownership;
 
+#[path = "agent_history_knowledge_resume_tests.rs"]
+mod history_resume;
+
 #[tokio::test]
 async fn knowledge_search_driver_persists_observation_and_classification_before_continuing() {
     let f = Box::pin(SearchFixture::new(AccessLevel::L5)).await;

@@ -47,6 +47,17 @@ pub(super) async fn resume_on(
         "waiting" => {}
         _ => return Err(invalid()),
     }
+    // Keep the wait continuation behind a boxed seam rather than growing the worker frame.
+    Box::pin(resume_waiting(db, scope, run, wait, notices)).await
+}
+
+async fn resume_waiting(
+    db: &mut Transaction<'_, Postgres>,
+    scope: ActivationRequest,
+    run: waits::WaitRun,
+    wait: waits::WaitRow,
+    notices: Option<&crate::application::workflow::decisions::DecisionNotices>,
+) -> AppResult<WaitProgress> {
     let now = waits::now(db).await?;
     if run.deadline <= now && maintenance::expire_on(db, scope).await? {
         return Ok(WaitProgress::Expired(CommitDisposition::Committed));
@@ -62,6 +73,9 @@ pub(super) async fn resume_on(
         };
     if run.state != "waiting" || (event_due && !answered_in_time) {
         return expire(db, scope, &run.state).await;
+    }
+    if wait.reason == "agent_turn" {
+        return Box::pin(agent_history::turn_waits::resume_on(db, scope, wait.id)).await;
     }
     if wait.reason == "child_run" {
         // Box the child continuation: it may start the next round's child (07-D1 §D1.4).

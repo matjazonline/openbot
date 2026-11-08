@@ -1,0 +1,26 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+   Compiling open_bots v0.1.0 (/private/tmp/openbot-agent-history-h_82_5pw/worktree)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 48.50s
+     Running unittests src/lib.rs (/private/tmp/openbot-chs-p06-3f43t2k7/worktree/target/debug/deps/open_bots-8b80d02f0b6cf2e6)
+
+running 1 test
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::channel_reply_e2e::history::release::agent_history_channel_customer_cc_after_output_refuses_release_and_retains_classified_exchange ... FAILED
+
+failures:
+
+---- adapters::persistence::workflow::tests::message_tests::ingress_tests::channel_reply_e2e::history::release::agent_history_channel_customer_cc_after_output_refuses_release_and_retains_classified_exchange stdout ----
+2026-11-07T20:44:27.215930Z  WARN open_bots::adapters::persistence::workflow::knowledge_release: Workflow release refused company_id=7922931c-cc5d-49d3-80b1-2995e851de00 run_id=85d55924-bcb3-4ca7-b740-ace9bc6b78f7 execution_id=77b61c94-6f2f-422e-a04c-d8f89b424742 step_id=start content_level=5 destination_level=0 code="knowledge.audience_below_content"
+
+thread 'adapters::persistence::workflow::tests::message_tests::ingress_tests::channel_reply_e2e::history::release::agent_history_channel_customer_cc_after_output_refuses_release_and_retains_classified_exchange' (35977339) panicked at src/adapters/persistence/workflow/agent_history_channel_release_tests.rs:138:5:
+assertion `left == right` failed
+  left: None
+ right: Some(Object {"code": String("knowledge.audience_below_content"), "content": Number(5), "destination": Number(0)})
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    adapters::persistence::workflow::tests::message_tests::ingress_tests::channel_reply_e2e::history::release::agent_history_channel_customer_cc_after_output_refuses_release_and_retains_classified_exchange
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 3356 filtered out; finished in 7.66s
+
+error: test failed, to rerun pass `--lib`

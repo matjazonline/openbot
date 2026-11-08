@@ -1,0 +1,7 @@
+   Compiling open_bots v0.1.0 (/Users/mac02/.codex/worktrees/1133/openbot)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 19.92s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-048b7abd3ed0c794)
+adapters::persistence::integrations::tests::cache_update_tests::vault_storage_cache_updates_preserve_each_providers_authorization_facts: test
+adapters::persistence::integrations::tests::cache_update_tests::vault_storage_sql_required_json_fields_cannot_evaluate_to_null: test
+
+2 tests, 0 benchmarks

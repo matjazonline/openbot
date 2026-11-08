@@ -1,0 +1,10 @@
+Traceback (most recent call last):
+  File "/private/tmp/openbot-agent-history-h_82_5pw/worktree/plan/04-autonomous-agent-history/phases/p06/docs/logs/verify-case-evidence-r2.py", line 16, in <module>
+    old=json.loads((l.parents[2]/'p05/docs/logs/verification-case-inventory-r2.json').read_text())['cases']
+  File "/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/pathlib.py", line 1256, in read_text
+    with self.open(mode='r', encoding=encoding, errors=errors) as f:
+  File "/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/pathlib.py", line 1242, in open
+    return io.open(self, mode, buffering, encoding, errors, newline,
+  File "/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/pathlib.py", line 1110, in _opener
+    return self._accessor.open(self, flags, mode)
+FileNotFoundError: [Errno 2] No such file or directory: '/private/tmp/openbot-agent-history-h_82_5pw/worktree/plan/04-autonomous-agent-history/phases/p05/docs/logs/verification-case-inventory-r2.json'

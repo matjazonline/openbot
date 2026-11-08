@@ -20,6 +20,7 @@ struct ConnectionRow {
     endpoint_url: String,
     enabled: bool,
     auth_type: String,
+    integration: Option<serde_json::Value>,
     revision: i64,
     credential_revision: i64,
     discovery_json: serde_json::Value,
@@ -27,7 +28,8 @@ struct ConnectionRow {
     tool_grants: Vec<String>,
 }
 const CONNECTION_SELECT: &str = "SELECT connection.company_id, connection.id, connection.access_level::smallint AS access_level, connection.slug,
-    connection.endpoint_url, connection.enabled, connection.auth_type, connection.revision,
+    connection.endpoint_url, connection.enabled, connection.auth_type,
+    CASE WHEN connection.integration_grant_id IS NOT NULL THEN jsonb_build_object('account',connection.integration_account_id,'grant',connection.integration_grant_id,'authorization',connection.integration_authorization,'grant_revision',connection.integration_grant_revision) END AS integration, connection.revision,
     connection.credential_revision, connection.discovery_json,
     EXISTS(SELECT 1 FROM company_mcp_credentials AS credential WHERE credential.company_id = connection.company_id AND credential.connection_id = connection.id) AS secret_set,
     ARRAY(SELECT grant_row.tool_name FROM company_mcp_tool_grants AS grant_row WHERE grant_row.company_id = connection.company_id AND grant_row.connection_id = connection.id AND grant_row.revoked_at IS NULL ORDER BY grant_row.tool_name) AS tool_grants
@@ -38,13 +40,24 @@ impl TryFrom<ConnectionRow> for CompanyMcpConnection {
         let auth = match row.auth_type.as_str() {
             "none" => McpAuth::None,
             "bearer" => McpAuth::Bearer,
+            "integration" => McpAuth::Integration(
+                serde_json::from_value(
+                    row.integration
+                        .ok_or_else(|| invalid("Missing integration reference"))?,
+                )
+                .map_err(|_| invalid("Invalid integration reference"))?,
+            ),
             _ => return Err(invalid("Stored MCP auth is invalid")),
         };
         let mut write = McpConnectionWrite {
             slug: row.slug.into(),
             endpoint: row.endpoint_url.try_into().map_err(AppError::BadRequest)?,
             enabled: row.enabled,
-            auth: auth.clone(),
+            auth: if matches!(auth, McpAuth::Integration(_)) {
+                McpAuth::None
+            } else {
+                auth.clone()
+            },
             discovered_tools: Vec::new(),
             tool_grants: Vec::new(),
         };
@@ -206,6 +219,9 @@ impl McpPersistence for PostgresPersistence {
         write: McpConnectionWrite,
     ) -> AppResult<CompanyMcpConnection> {
         write.validate()?;
+        if matches!(write.auth, McpAuth::Integration(_)) {
+            return Err(invalid("Confirm an integration binding through its owner"));
+        }
         let mut tx = self.pool.begin().await?;
         lock_company(&mut tx, company_id).await?;
         let count: i64 = sqlx::query_scalar("SELECT count(*) FROM company_mcp_connections WHERE company_id = $1 AND deleted_at IS NULL")
@@ -231,31 +247,9 @@ impl McpPersistence for PostgresPersistence {
         expected_revision: i64,
         write: McpConnectionWrite,
     ) -> AppResult<CompanyMcpConnection> {
-        write.validate()?;
         let mut tx = self.pool.begin().await?;
         lock_company(&mut tx, company_id).await?;
-        let old = get_connection(&mut tx, company_id, id).await?;
-        if old.revision != expected_revision {
-            return Err(conflict());
-        }
-        if old.endpoint != write.endpoint {
-            return Err(crate::use_cases::mcp::endpoint_fixed());
-        }
-        let rebind = old.auth != write.auth;
-        if rebind {
-            sqlx::query(
-                "DELETE FROM company_mcp_credentials WHERE company_id = $1 AND connection_id = $2",
-            )
-            .bind(company_id)
-            .bind(id)
-            .execute(&mut *tx)
-            .await?;
-        }
-        sqlx::query("UPDATE company_mcp_connections SET slug = $3, endpoint_url = $4, enabled = $5, auth_type = $6, discovery_json = $7, revision = revision + 1, credential_revision = credential_revision + $8 WHERE company_id = $1 AND id = $2")
-            .bind(company_id).bind(id).bind(write.slug.as_str()).bind(write.endpoint.as_str()).bind(write.enabled).bind(write.auth.as_str())
-            .bind(serde_json::to_value(&write.discovered_tools).map_err(|_| invalid("Invalid discovery"))?).bind(i64::from(rebind)).execute(&mut *tx).await?;
-        replace_grants(&mut tx, company_id, id, &write.tool_grants).await?;
-        let result = get_connection(&mut tx, company_id, id).await?;
+        let result = Box::pin(update_on(&mut tx, company_id, id, expected_revision, write)).await?;
         tx.commit().await?;
         Ok(result)
     }
@@ -351,6 +345,11 @@ impl McpCredentialPersistence for PostgresPersistence {
         if connection.revision != expected_revision {
             return Err(conflict());
         }
+        if matches!(connection.auth, McpAuth::Integration(_)) {
+            return Err(AppError::ServiceUnavailable(
+                "Integration discovery requires its owner configuration context".into(),
+            ));
+        }
         let envelope: Option<String> = sqlx::query_scalar("SELECT envelope FROM company_mcp_credentials WHERE company_id = $1 AND connection_id = $2")
             .bind(company_id).bind(id).fetch_optional(&mut *tx).await?;
         let token = envelope
@@ -365,3 +364,41 @@ impl McpCredentialPersistence for PostgresPersistence {
         Ok(token)
     }
 }
+
+async fn update_on(
+    tx: &mut Transaction<'_, Postgres>,
+    company_id: Uuid,
+    id: Uuid,
+    expected_revision: i64,
+    write: McpConnectionWrite,
+) -> AppResult<CompanyMcpConnection> {
+    write.validate()?;
+    let old = get_connection(tx, company_id, id).await?;
+    if matches!(write.auth, McpAuth::Integration(_)) && write.auth != old.auth {
+        return Err(invalid("Confirm an integration binding through its owner"));
+    }
+    if old.revision != expected_revision {
+        return Err(conflict());
+    }
+    if old.endpoint != write.endpoint {
+        return Err(crate::use_cases::mcp::endpoint_fixed());
+    }
+    let rebind = old.auth != write.auth;
+    if rebind {
+        sqlx::query(
+            "DELETE FROM company_mcp_credentials WHERE company_id = $1 AND connection_id = $2",
+        )
+        .bind(company_id)
+        .bind(id)
+        .execute(&mut **tx)
+        .await?;
+    }
+    sqlx::query("UPDATE company_mcp_connections SET slug = $3, endpoint_url = $4, enabled = $5, auth_type = $6, integration_account_id=CASE WHEN $6='integration' THEN integration_account_id ELSE NULL END,integration_grant_id=CASE WHEN $6='integration' THEN integration_grant_id ELSE NULL END,integration_authorization=CASE WHEN $6='integration' THEN integration_authorization ELSE NULL END,integration_grant_revision=CASE WHEN $6='integration' THEN integration_grant_revision ELSE NULL END, discovery_json = $7, revision = revision + 1, credential_revision = credential_revision + $8 WHERE company_id = $1 AND id = $2")
+            .bind(company_id).bind(id).bind(write.slug.as_str()).bind(write.endpoint.as_str()).bind(write.enabled).bind(write.auth.as_str())
+            .bind(serde_json::to_value(&write.discovered_tools).map_err(|_| invalid("Invalid discovery"))?).bind(i64::from(rebind)).execute(&mut **tx).await?;
+    replace_grants(tx, company_id, id, &write.tool_grants).await?;
+    let result = get_connection(tx, company_id, id).await?;
+    Ok(result)
+}
+
+pub(crate) mod discovery;

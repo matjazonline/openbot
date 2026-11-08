@@ -1,0 +1,3302 @@
+--- accepted04/migrations/20260817000000_init_schema.sql
++++ migrations/20260817000000_init_schema.sql
+@@ -12967,7 +12967,7 @@
+     message_id uuid,
+     delivery_id uuid,
+     diagnostic_code text CHECK (diagnostic_code IN ('attempts_exhausted','authority_revoked','policy_changed',
+-        'source_unavailable','release_denied','invalid_proposal','publication_failed')),
++        'source_unavailable','knowledge.audience_below_content','invalid_proposal','publication_failed')),
+     created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
+     updated_at timestamptz NOT NULL DEFAULT clock_timestamp(),
+     PRIMARY KEY (company_id,run_id),
+--- accepted04/scripts/tests/workflow-sample-boundary.py
++++ scripts/tests/workflow-sample-boundary.py
+@@ -40,6 +40,14 @@
+         ]: self.check(source,False)
+     def test_missing_root_fails_closed(self):
+         with TemporaryDirectory() as temporary:self.assertTrue(boundary.violations(Path(temporary)))
++    def test_seed_values_are_allowed_without_live_harness_capabilities(self):
++        self.check('use crate::application::services::harness::runs::{LogicalSeed, LogicalSeedPair, MAX_LOGICAL_SEED_BYTES, MAX_LOGICAL_SEED_PAIRS}; fn size(){usize::from(true);}',True)
++        for source in [
++            'use crate::application::services::harness::runs::*;',
++            'use crate::application::services::harness::runs::RunCheckpoint;',
++            'use crate::application::services::harness::WorkflowHarnessStore;',
++            'fn run(){crate::application::services::harness::runs::advance();}',
++        ]:self.check(source,False)
+     def test_pure_contracts_and_explicit_test_handling(self):
+         self.check('use crate::application::workflow::{batch::{execute_pure, PureCompletion}}; use std::sync::Arc;',True)
+         with TemporaryDirectory() as temporary:
+--- accepted04/scripts/workflow-sample-boundary.py
++++ scripts/workflow-sample-boundary.py
+@@ -27,6 +27,13 @@
+ }
+ EXTERNAL = {'serde', 'serde_json', 'uuid', 'chrono', 'sha2'}
+ SAMPLE = 'crate::application::workflow::sample'
++# Only inert cross-execution values and their fixed bounds, never the live harness.
++SEED_TYPES = {
++    'crate::application::services::harness::runs::LogicalSeed',
++    'crate::application::services::harness::runs::LogicalSeedPair',
++    'crate::application::services::harness::runs::MAX_LOGICAL_SEED_BYTES',
++    'crate::application::services::harness::runs::MAX_LOGICAL_SEED_PAIRS',
++}
+ 
+ 
+ def code_only(source):
+@@ -66,6 +73,7 @@
+ 
+ 
+ def permitted(path):
++    if path in SEED_TYPES:return True
+     if path==SAMPLE or path.startswith(SAMPLE+'::'):return True
+     if path.startswith('crate::application::agent::dependency::'):return True
+     if path in ('crate::application::agent::MAX_AGENT_DEPENDENCIES','crate::application::agent::MAX_AGENT_DEPENDENCY_DEPTH','crate::application::agent::MAX_AGENT_MANIFEST_BYTES','crate::entities::agent_capability::AgentBindingSource::Workflow','std::mem::take'):return True
+@@ -79,7 +87,7 @@
+     prefix='crate::application::workflow::'
+     if path.startswith(prefix):return path[len(prefix):] in PURE
+     if path.split('::')[0] in EXTERNAL:return True
+-    if path.startswith('std::collections::') or path in ('std::sync::Arc','std::fmt::Display','u64::from'):return True
++    if path.startswith('std::collections::') or path in ('std::sync::Arc','std::fmt::Display','u64::from','usize::from'):return True
+     return False
+ 
+ 
+--- accepted04/src/adapters/http/pages/workflow_authoring/sample.rs
++++ src/adapters/http/pages/workflow_authoring/sample.rs
+@@ -104,6 +104,7 @@
+         r#"<section id="sample-report" class="space-y-3" aria-label="Sample report"><h3 role="status" class="font-semibold">{status}</h3>
+         <p class="text-xs opacity-70">Exact frozen content: <span class="font-mono">{hash}</span></p>
+         <p class="text-xs opacity-70">Frozen configuration: <span class="font-mono">{configuration}</span></p>
++        <p class="text-sm">Agent history is local to this sample. Repeated calls share history; workflow children keep private history. Model context token limits are not simulated.</p>
+         {diagnostic}{response}<p class="text-sm">{unused} unused scripted responses. Execution paths below are sample identities.</p>{body}</section>"#,
+         hash = escape_html_text(report.content_hash.as_str()),
+         configuration = escape_html_text(report.configuration_hash.as_str()),
+--- accepted04/src/adapters/http/pages/workflow_runs/detail.rs
++++ src/adapters/http/pages/workflow_runs/detail.rs
+@@ -502,19 +502,7 @@
+         });
+     }
+     for event in &run.events {
+-        entries.push(Entry {
+-            at: event.created_at,
+-            text: format!(
+-                "{}{} by {}",
+-                event.kind.replace('_', " "),
+-                event
+-                    .terminal_state
+-                    .as_deref()
+-                    .map(|state| format!(" ({state})"))
+-                    .unwrap_or_default(),
+-                person(view.people, event.actor)
+-            ),
+-        });
++        entries.push(event_entry(event, view.people));
+     }
+     entries.sort_by_key(|entry| entry.at);
+     let rows: String = entries
+@@ -781,3 +769,26 @@
+         },
+     )
+ }
++
++fn event_entry(
++    event: &crate::application::workflow::run_views::RunEvent,
++    people: &HashMap<Uuid, String>,
++) -> Entry {
++    Entry {
++        at: event.created_at,
++        text: format!(
++            "{}{} by {}",
++            if event.kind.contains('.') {
++                event.kind.clone()
++            } else {
++                event.kind.replace('_', " ")
++            },
++            event
++                .terminal_state
++                .as_deref()
++                .map(|state| format!(" ({state})"))
++                .unwrap_or_default(),
++            person(people, event.actor)
++        ),
++    }
++}
+--- accepted04/src/adapters/persistence/workflow/agent_history_caller_tests.rs
++++ src/adapters/persistence/workflow/agent_history_caller_tests.rs
+@@ -0,0 +1,138 @@
++use super::*;
++use crate::entities::access_level::AccessLevel;
++
++async fn finish(f: &ManualHistory, claim: &ClaimedWorkflow, output: Value) {
++    assert_eq!(
++        Box::pin(runtime(&f.f).execute(&WorkflowStepKind("agent.run".into()), claim))
++            .await
++            .completed_result()
++            .unwrap(),
++        output
++    );
++    cancel(
++        &f.f,
++        claim,
++        &format!("finish-caller-{}", claim.fence.scope.run.as_uuid()),
++    )
++    .await;
++}
++
++async fn conversation(f: &ManualHistory, claim: &ClaimedWorkflow) -> Uuid {
++    sqlx::query_scalar("SELECT conversation_id FROM agent_history_exchanges WHERE company_id=$1 AND execution_id=$2")
++        .bind(claim.fence.scope.company.as_uuid()).bind(claim.fence.scope.execution.as_uuid())
++        .fetch_one(f.f.s.pool()).await.unwrap()
++}
++
++#[tokio::test]
++async fn agent_history_level_lower_private_session_reuse_filters_hidden_pairs_without_raising_ceiling()
++ {
++    let mut f = Box::pin(ManualHistory::new()).await;
++    let admin = crate::adapters::persistence::workflow::tests::message_tests::support::member(
++        &f.f.s.fixture,
++        "admin",
++    )
++    .await;
++    let company = f.f.s.fixture.target.company.as_uuid();
++    sqlx::query("UPDATE company_members SET access_level=5 WHERE company_id=$1 AND user_id=$2")
++        .bind(company)
++        .bind(admin)
++        .execute(f.f.s.pool())
++        .await
++        .unwrap();
++    f.actor = WorkflowActor::authenticated(admin).unwrap();
++    let mut llm = scripted_llm(vec![
++        LlmTurn::text("\"public accepted\""),
++        LlmTurn::text("\"private accepted\""),
++        LlmTurn::text("\"lower member answer\""),
++    ])
++    .await;
++    register_scripted_agent_base_url(f.f.agent, &llm.base_url);
++    let public = f
++        .complete(json!("public supplied input"), json!("public accepted"))
++        .await;
++    let private = f.start(json!("PRIVATE prior task")).await;
++    // This case exercises history classification/reuse; actual knowledge observation
++    // and repeated human submission are separately exercised by history_resume tests.
++    level::raise(&f.f, &private, AccessLevel::L5).await;
++    finish(&f, &private, json!("private accepted")).await;
++    let private_preparation = frozen(&f.f, &private).await;
++    assert_eq!(private_preparation["history"]["content_level"], 5);
++    sqlx::query("UPDATE company_members SET access_level=0 WHERE company_id=$1 AND user_id=$2")
++        .bind(company)
++        .bind(admin)
++        .execute(f.f.s.pool())
++        .await
++        .unwrap();
++    let lower = f.start(json!({"question":"next public task"})).await;
++    finish(&f, &lower, json!("lower member answer")).await;
++    let selected = frozen(&f.f, &lower).await;
++    assert_eq!(
++        selected["history"]["seed"],
++        json!([{
++        "input":"public supplied input","output":"public accepted"}])
++    );
++    assert_eq!(selected["history"]["omitted_eligible"], 0);
++    assert_eq!(
++        selected["history"]["selected"][0]["id"],
++        json!(AgentExchangeId::for_execution(public.fence.scope.execution))
++    );
++    let levels:Value = sqlx::query_scalar("SELECT jsonb_build_object('actor',actor_id,'ceiling',knowledge_ceiling,'content',content_level) FROM workflow_runs WHERE company_id=$1 AND id=$2")
++        .bind(company).bind(lower.fence.scope.run.as_uuid()).fetch_one(f.f.s.pool()).await.unwrap();
++    assert_eq!(levels, json!({"actor":admin,"ceiling":0,"content":0}));
++    assert_eq!(frozen(&f.f, &private).await, private_preparation);
++    let requests = llm.observed();
++    assert_eq!(requests.len(), 3);
++    assert!(requests[2].to_string().contains("public accepted"));
++    assert!(!requests[2].to_string().contains("private accepted"));
++    assert!(!requests[2].to_string().contains("PRIVATE prior task"));
++    assert_eq!(llm.finish().await.unwrap(), 3);
++}
++
++#[tokio::test]
++async fn agent_history_callers_copied_context_cannot_join_private_session_but_authenticated_reuse_can()
++ {
++    let mut f = Box::pin(ManualHistory::new()).await;
++    let mut llm = scripted_llm(vec![
++        LlmTurn::text("\"original answer\""),
++        LlmTurn::text("\"isolated answer\""),
++        LlmTurn::text("\"authorized reuse\""),
++    ])
++    .await;
++    register_scripted_agent_base_url(f.f.agent, &llm.base_url);
++    let first = f
++        .complete(json!("original private input"), json!("original answer"))
++        .await;
++    f.from_run = None;
++    let copied = json!({"history_session":{"from_run":first.fence.scope.run},
++        "history":[{"role":"assistant","content":"caller-authored business data"}]});
++    let isolated = f.complete(copied.clone(), json!("isolated answer")).await;
++    assert!(
++        frozen(&f.f, &isolated).await["history"]["seed"]
++            .as_array()
++            .unwrap()
++            .is_empty()
++    );
++    f.from_run = Some(first.fence.scope.run);
++    let reused = f
++        .complete(json!("reuse task"), json!("authorized reuse"))
++        .await;
++    assert_eq!(
++        frozen(&f.f, &reused).await["history"]["seed"],
++        json!([{
++        "input":"original private input","output":"original answer"}])
++    );
++    assert_ne!(
++        conversation(&f, &first).await,
++        conversation(&f, &isolated).await
++    );
++    assert_eq!(
++        conversation(&f, &first).await,
++        conversation(&f, &reused).await
++    );
++    let requests = llm.observed();
++    assert_eq!(requests.len(), 3);
++    assert_eq!(requests[1]["messages"].as_array().unwrap().len(), 2);
++    assert!(!requests[1].to_string().contains("original answer"));
++    assert_eq!(frozen(&f.f, &isolated).await["context"], copied);
++    assert_eq!(llm.finish().await.unwrap(), 3);
++}
+--- accepted04/src/adapters/persistence/workflow/agent_history_channel_release_tests.rs
++++ src/adapters/persistence/workflow/agent_history_channel_release_tests.rs
+@@ -0,0 +1,146 @@
++use super::*;
++use crate::application::workflow::message_admission::{MessageAdmissions, MessageIntentWorkerId};
++use crate::entities::access_level::AccessLevel;
++
++async fn team_member(d: &Deployment) -> String {
++    let (user, email) = verified_member(&d.fixture).await;
++    sqlx::query("UPDATE users SET email_verified_at=clock_timestamp() WHERE id=$1")
++        .bind(user)
++        .execute(d.p().pool())
++        .await
++        .unwrap();
++    sqlx::query("UPDATE company_members SET access_level=5 WHERE company_id=$1 AND user_id=$2")
++        .bind(d.fixture.target.company.as_uuid())
++        .bind(user)
++        .execute(d.p().pool())
++        .await
++        .unwrap();
++    ChannelPersistence::update(
++        d.p(),
++        crate::application::ports::channel::ChannelUpdate {
++            company_id: d.fixture.target.company.as_uuid(),
++            channel_id: d.channel,
++            write: ChannelWrite {
++                name: "Support".into(),
++                slug: "support".into(),
++                enabled: true,
++                add_3rd_party: true,
++                participant_emails: None,
++                ..Default::default()
++            },
++        },
++    )
++    .await
++    .unwrap();
++    email
++}
++
++pub(super) async fn materialize(d: &Deployment, payload: RawInboundPayload) -> RunId {
++    let incoming = d.email(payload).await;
++    assert_eq!(incoming.intent_ids.len(), 1);
++    let admissions =
++        MessageAdmissions::new(d.p().clone(), d.engine.services().service(), d.p().clone());
++    let intents = admissions
++        .claim(MessageIntentWorkerId(Uuid::new_v4()), 4)
++        .await
++        .unwrap();
++    assert_eq!(intents.len(), 1);
++    admissions.process(intents[0].clone()).await.unwrap();
++    let run: Uuid =
++        sqlx::query_scalar("SELECT id FROM workflow_runs WHERE company_id=$1 AND trigger_id=$2")
++            .bind(d.fixture.target.company.as_uuid())
++            .bind(incoming.intent_ids[0])
++            .fetch_one(d.p().pool())
++            .await
++            .unwrap();
++    RunId::new(run)
++}
++
++fn from_member(d: &Deployment, member: &str, key: &str) -> RawInboundPayload {
++    let mut email = customer_email(d, key, None);
++    email.from = member.into();
++    email.spf = crate::entities::auth::AuthVerdict::Pass;
++    email.dkim = crate::entities::auth::AuthVerdict::Pass;
++    email.dmarc = crate::entities::auth::AuthVerdict::Pass;
++    email
++}
++
++#[tokio::test]
++async fn agent_history_channel_customer_cc_after_output_refuses_release_and_retains_classified_exchange()
++ {
++    let d = Box::pin(Deployment::new(vec![LlmTurn::text(
++        r#"{"body":"PRIVATE accepted agent output"}"#,
++    )]))
++    .await;
++    let member = team_member(&d).await;
++    let mut selected = example(3);
++    prepend_agent(&mut selected);
++    Box::pin(bind(&d, selected)).await;
++    let run = materialize(&d, from_member(&d, &member, "history-member")).await;
++    let mut tx = d.p().pool().begin().await.unwrap();
++    // This case isolates native classified-output/release ownership. Actual knowledge
++    // acquisition is covered by the genuine search/human-resume cases and final journey.
++    crate::adapters::persistence::workflow::knowledge::raise_content_level_on(
++        &mut tx,
++        d.fixture.target.company,
++        run,
++        AccessLevel::L5,
++    )
++    .await
++    .unwrap();
++    tx.commit().await.unwrap();
++    let delivery = Delivery::start(&d, ProviderCase::Accept);
++    Box::pin(d.run_until(
++        "classified output accepted before actual human question",
++        async || waiting(&d, 1).await && delivered(&d, 1).await,
++    ))
++    .await;
++    let before = exchanges(&d).await;
++    assert_eq!(before.len(), 1);
++    assert_eq!(before[0]["state"], "completed");
++    assert_eq!(before[0]["level"], 5);
++    assert_eq!(
++        before[0]["output"],
++        json!({"body":"PRIVATE accepted agent output"})
++    );
++    let (_, rfc) = prompt(&d, 0).await;
++    let mut response = from_member(&d, &member, "history-member-answer");
++    response.cc = Some(CUSTOMER.into());
++    response.headers = Some(format!(
++        "Message-ID: <history-member-answer@partner.test>\nIn-Reply-To: {rfc}\nReferences: {rfc}\n"
++    ));
++    response.text = Some("Please proceed".into());
++    d.email(response).await;
++    Box::pin(d.run_until(
++        "current public audience refuses final publication",
++        async || {
++            let state: String =
++                sqlx::query_scalar("SELECT state FROM workflow_runs WHERE company_id=$1 AND id=$2")
++                    .bind(d.fixture.target.company.as_uuid())
++                    .bind(run.as_uuid())
++                    .fetch_one(d.p().pool())
++                    .await
++                    .unwrap();
++            state == "failed"
++        },
++    ))
++    .await;
++    let provider = delivery.stop().await;
++    assert_eq!(exchanges(&d).await, before);
++    assert_eq!(
++        d.count("SELECT count(*) FROM workflow_runs WHERE company_id=$1")
++            .await,
++        1
++    );
++    assert!(responses_published(&d, 0).await);
++    let refusals:i64=sqlx::query_scalar("SELECT count(*) FROM workflow_run_events WHERE company_id=$1 AND run_id=$2 AND event_kind='knowledge.audience_below_content'")
++        .bind(d.fixture.target.company.as_uuid()).bind(run.as_uuid()).fetch_one(d.p().pool()).await.unwrap();
++    assert_eq!(refusals, 1);
++    let fabricated:i64=sqlx::query_scalar("SELECT count(*) FROM task_attempts AS attempt JOIN background_tasks AS job ON job.id=attempt.task_id JOIN workflow_run_events AS event ON event.company_id=job.company_id AND event.execution_id=job.workflow_execution_id WHERE event.company_id=$1 AND event.run_id=$2 AND event.event_kind='knowledge.audience_below_content'")
++        .bind(d.fixture.target.company.as_uuid()).bind(run.as_uuid()).fetch_one(d.p().pool()).await.unwrap();
++    assert_eq!(fabricated, 0);
++    let messages = provider.messages();
++    assert_eq!(messages.len(), 1);
++    assert!(!messages[0].email.body_text.contains("PRIVATE accepted"));
++    assert_eq!(d.llm.finish().await.unwrap(), 1);
++}
+--- accepted04/src/adapters/persistence/workflow/agent_history_channel_tests.rs
++++ src/adapters/persistence/workflow/agent_history_channel_tests.rs
+@@ -0,0 +1,199 @@
++use super::*;
++
++#[path = "agent_history_channel_release_tests.rs"]
++mod release;
++
++#[path = "agent_history_thread_continuation_tests.rs"]
++mod continuation;
++
++async fn exchanges(d: &Deployment) -> Vec<Value> {
++    sqlx::query_scalar("SELECT jsonb_build_object('id',exchange.id,'run',exchange.run_id,'state',exchange.state,'output',exchange.output,'level',exchange.access_level,'preparation',exchange.frozen_preparation,'conversation',exchange.conversation_id,'scope',conversation.scope_kind,'thread',conversation.thread_id) FROM agent_history_exchanges AS exchange JOIN agent_history_conversations AS conversation ON conversation.company_id=exchange.company_id AND conversation.id=exchange.conversation_id WHERE exchange.company_id=$1 ORDER BY exchange.position,exchange.id")
++        .bind(d.fixture.target.company.as_uuid()).fetch_all(d.p().pool()).await.unwrap()
++}
++
++fn prepend_agent(selected: &mut ResponseExample) {
++    let mut agent = example(0);
++    model(&mut agent);
++    let mut step = agent.source["steps"]["start"].clone();
++    step["with"]["output_schema"] = json!({"literal":selected.source["output_schema"]});
++    step["routes"]["success"] = selected.source["entry"].clone();
++    selected.source["entry"] = json!("history_agent");
++    selected.source["steps"]["history_agent"] = step;
++}
++
++#[tokio::test]
++async fn agent_history_channel_projection_is_not_the_saved_output_or_next_seed() {
++    let mut d = Box::pin(Deployment::new(vec![
++        LlmTurn::text(r#"{"body":"Original accepted agent value"}"#),
++        LlmTurn::text(r#"{"body":"Second accepted agent value"}"#),
++    ]))
++    .await;
++    let mut selected = example(0);
++    model(&mut selected);
++    selected.contract.body = crate::application::workflow::channel_reply::ReplyText::Literal {
++        literal: "Projected publication".into(),
++    };
++    Box::pin(bind(&d, selected)).await;
++    d.email(customer_email(&d, "history-project-first", None))
++        .await;
++    let delivery = Delivery::start(&d, ProviderCase::Accept);
++    Box::pin(d.run_until("first projected reply", async || {
++        responses_published(&d, 1).await && delivered(&d, 1).await
++    }))
++    .await;
++    let first = exchanges(&d).await;
++    assert_eq!(first.len(), 1);
++    assert_eq!(
++        first[0]["output"],
++        json!({"body":"Original accepted agent value"})
++    );
++    let sent = delivery.provider.messages()[0].email.message_id.clone();
++    answer(&d, "history-project-second", &sent, "Second customer task").await;
++    Box::pin(d.run_until("second projected reply", async || {
++        responses_published(&d, 2).await && delivered(&d, 2).await
++    }))
++    .await;
++    let provider = delivery.stop().await;
++    let rows = exchanges(&d).await;
++    assert_eq!(rows.len(), 2);
++    let original = rows.iter().find(|row| row["id"] == first[0]["id"]).unwrap();
++    assert_eq!(*original, first[0]);
++    let next = rows.iter().find(|row| row["id"] != first[0]["id"]).unwrap();
++    assert_eq!(
++        original["conversation"], next["conversation"],
++        "actual scope/thread facts: {rows:?}"
++    );
++    let seed = &next["preparation"]["history"]["seed"];
++    assert_eq!(seed.as_array().unwrap().len(), 1);
++    assert_eq!(
++        seed[0]["output"],
++        json!({"body":"Original accepted agent value"})
++    );
++    let sent = provider.messages();
++    assert_eq!(sent.len(), 2);
++    assert!(
++        sent.iter()
++            .all(|s| s.email.body_text == "Projected publication")
++    );
++    let requests = d.llm.observed();
++    assert_eq!(requests.len(), 2);
++    assert!(
++        requests[1]["messages"][2]["content"]
++            .to_string()
++            .contains("Original accepted agent value")
++    );
++    assert!(
++        !requests[1]["messages"][2]["content"]
++            .to_string()
++            .contains("Projected publication")
++    );
++    assert_eq!(d.llm.finish().await.unwrap(), 2);
++}
++
++#[tokio::test]
++async fn agent_history_channel_no_reply_and_explicit_send_retain_agent_output_independently() {
++    for index in [1, 2] {
++        let d = Box::pin(Deployment::new(vec![LlmTurn::text(
++            r#"{"body":"Accepted agent output"}"#,
++        )]))
++        .await;
++        let mut selected = example(index);
++        prepend_agent(&mut selected);
++        Box::pin(bind(&d, selected)).await;
++        let mut incoming = customer_email(&d, "history-suppressed", None);
++        incoming.text = Some("ignore".into());
++        d.email(incoming).await;
++        let delivery = Delivery::start(&d, ProviderCase::Accept);
++        Box::pin(
++            d.run_until("suppressed result retains agent output", async || {
++                let rows = finals(&d).await;
++                rows.len() == 1
++                    && rows[0].state == "suppressed"
++                    && delivered(&d, if index == 1 { 0 } else { 1 }).await
++            }),
++        )
++        .await;
++        let provider = delivery.stop().await;
++        let rows = exchanges(&d).await;
++        assert_eq!(rows.len(), 1);
++        assert_eq!(rows[0]["state"], "completed");
++        assert_eq!(rows[0]["output"], json!({"body":"Accepted agent output"}));
++        let final_rows = finals(&d).await;
++        assert_ne!(final_rows[0].output, rows[0]["output"]);
++        assert!(final_rows[0].message.is_none() && final_rows[0].delivery.is_none());
++        let sent = provider.messages();
++        assert_eq!(sent.len(), if index == 1 { 0 } else { 1 });
++        if index == 2 {
++            assert_eq!(sent[0].email.body_text, "Sent explicitly");
++        }
++        assert_eq!(d.llm.finish().await.unwrap(), 1);
++    }
++}
++
++#[tokio::test]
++async fn agent_history_channel_delivery_retry_keeps_one_exchange_output_and_model_call() {
++    let d = Box::pin(Deployment::new(vec![LlmTurn::text(
++        r#"{"body":"One accepted model effect"}"#,
++    )]))
++    .await;
++    let mut selected = example(0);
++    model(&mut selected);
++    Box::pin(bind(&d, selected)).await;
++    d.email(customer_email(&d, "history-retry", None)).await;
++    let delivery = Delivery::start(&d, ProviderCase::Retry);
++    Box::pin(d.run_until("retried delivery only", async || {
++        responses_published(&d, 1).await && delivered(&d, 1).await
++    }))
++    .await;
++    let provider = delivery.stop().await;
++    let sent = provider.messages();
++    assert_eq!(sent.len(), 2);
++    assert_eq!(sent[0].delivery, sent[1].delivery);
++    assert_eq!(sent[0].email.message_id, sent[1].email.message_id);
++    let rows = exchanges(&d).await;
++    assert_eq!(rows.len(), 1);
++    assert_eq!(rows[0]["state"], "completed");
++    assert_eq!(
++        rows[0]["output"],
++        json!({"body":"One accepted model effect"})
++    );
++    assert_eq!(d.llm.finish().await.unwrap(), 1);
++}
++
++#[tokio::test]
++async fn agent_history_channel_terminal_delivery_failure_preserves_business_success_and_accepted_exchange()
++ {
++    let d = Box::pin(Deployment::new(vec![LlmTurn::text(
++        r#"{"body":"Accepted before terminal transport failure"}"#,
++    )]))
++    .await;
++    let mut selected = example(0);
++    model(&mut selected);
++    Box::pin(bind(&d, selected)).await;
++    d.email(customer_email(&d, "history-terminal-transport", None))
++        .await;
++    let delivery = Delivery::start(&d, ProviderCase::Terminal);
++    Box::pin(d.run_until("terminal delivery after committed agent output",async|| {
++        responses_published(&d,1).await && d.count("SELECT count(*) FROM message_deliveries WHERE company_id=$1 AND status='dead_letter'").await==1
++    })).await;
++    let provider = delivery.stop().await;
++    assert_eq!(provider.messages().len(), 1);
++    let before = exchanges(&d).await;
++    assert_eq!(before.len(), 1);
++    assert_eq!(before[0]["state"], "completed");
++    assert_eq!(
++        before[0]["output"],
++        json!({"body":"Accepted before terminal transport failure"})
++    );
++    assert_eq!(
++        d.count("SELECT count(*) FROM workflow_runs WHERE company_id=$1 AND state='succeeded'")
++            .await,
++        1
++    );
++    let replacement = Delivery::start(&d, ProviderCase::Accept);
++    // Let a reconstructed worker perform a real queue poll past its normal interval.
++    tokio::time::sleep(Duration::from_millis(1200)).await;
++    assert!(replacement.stop().await.messages().is_empty());
++    assert_eq!(exchanges(&d).await, before);
++    assert_eq!(d.llm.finish().await.unwrap(), 1);
++}
+--- accepted04/src/adapters/persistence/workflow/agent_history_children_integration_tests.rs
++++ src/adapters/persistence/workflow/agent_history_children_integration_tests.rs
+@@ -0,0 +1,357 @@
++use super::*;
++use crate::application::workflow::{
++    activation::ActivationRequest,
++    waits::{WaitProgress, WorkflowWaits},
++};
++use crate::entities::access_level::AccessLevel;
++
++async fn graph(setup: &AgentSetup) -> GraphWorkflow {
++    let key = AgentKey::parse("assistant").unwrap();
++    let mut child = model_source(&key, ModelStep::AgentRun);
++    child["steps"]["start"]["with"]["context"] = json!({"literal":"CHILD PRIVATE INPUT"});
++    let child = publish_graph(setup, child, json!({})).await;
++    let mut parent = model_source(&key, ModelStep::AgentRun);
++    let mut again = parent["steps"]["start"].clone();
++    again["with"]["context"] = json!({"literal":"parent next task"});
++    parent["steps"]["again"] = again;
++    parent["steps"]["start"]["routes"]["success"] = json!("child");
++    let call: Value =
++        serde_json::from_str(&registry::example("workflow.call").unwrap().source).unwrap();
++    parent["steps"]["child"] = call["steps"]["start"].clone();
++    parent["steps"]["child"]["child_workflow_id"] = json!(child.workflow);
++    parent["steps"]["child"]["child_version_id"] = json!(child.version);
++    parent["steps"]["child"]["with"]["input"] = json!({"literal":{}});
++    parent["steps"]["child"]["with"]["params"] = json!({"literal":{}});
++    parent["steps"]["child"]["routes"]["success"] = json!("again");
++    publish_graph(setup, parent, json!({})).await
++}
++
++async fn stamp(setup: &AgentSetup, claim: &ClaimedWorkflow, level: AccessLevel) {
++    let mut tx = setup.fixture.persistence.pool().begin().await.unwrap();
++    crate::adapters::persistence::workflow::knowledge::raise_content_level_on(
++        &mut tx,
++        claim.fence.scope.company,
++        claim.fence.scope.run,
++        level,
++    )
++    .await
++    .unwrap();
++    tx.commit().await.unwrap();
++}
++
++struct Branch {
++    parent: ActivationRequest,
++    child: ClaimedWorkflow,
++}
++
++async fn begin(setup: &AgentSetup, graph: &GraphWorkflow, level: AccessLevel) -> Branch {
++    let p = &setup.fixture.persistence;
++    let AdmissionResult::Created(run) = admit_graph(setup, graph, "history-child-journey")
++        .await
++        .unwrap()
++    else {
++        panic!("new root")
++    };
++    let first = claim_run(setup, run).await;
++    stamp(setup, &first, level).await;
++    let output =
++        Box::pin(agent_runtime(setup).execute(&WorkflowStepKind("agent.run".into()), &first))
++            .await
++            .completed_result()
++            .unwrap();
++    assert_eq!(output, json!("parent accepted"));
++    let parent = p
++        .complete_io(crate::application::workflow::lease::FencedWorkflowResult {
++            fence: first.fence,
++            output,
++            policy: lease(),
++        })
++        .await
++        .unwrap()
++        .unwrap()
++        .successor
++        .unwrap();
++    p.park_child(parent).await.unwrap().unwrap();
++    let child: Uuid =
++        sqlx::query_scalar("SELECT id FROM workflow_runs WHERE company_id=$1 AND parent_run_id=$2")
++            .bind(parent.company.as_uuid())
++            .bind(run.as_uuid())
++            .fetch_one(p.pool())
++            .await
++            .unwrap();
++    Branch {
++        parent,
++        child: claim_run(setup, RunId::new(child)).await,
++    }
++}
++
++async fn finish_child(setup: &AgentSetup, branch: Branch) -> ClaimedWorkflow {
++    let p = &setup.fixture.persistence;
++    let output = Box::pin(
++        agent_runtime(setup).execute(&WorkflowStepKind("agent.run".into()), &branch.child),
++    )
++    .await
++    .completed_result()
++    .unwrap();
++    assert_eq!(output, json!("CHILD PRIVATE ANSWER"));
++    p.complete_io(crate::application::workflow::lease::FencedWorkflowResult {
++        fence: branch.child.fence,
++        output,
++        policy: lease(),
++    })
++    .await
++    .unwrap()
++    .unwrap();
++    let WaitProgress::Completed(done) = p.resume_wait(branch.parent).await.unwrap() else {
++        panic!("actual child result completes parent call")
++    };
++    p.claim_io(
++        done.successor.unwrap(),
++        crate::application::workflow::lease::WorkflowWorkerId(Uuid::new_v4()),
++        lease(),
++    )
++    .await
++    .unwrap()
++    .unwrap()
++}
++
++async fn journey(initial: AccessLevel) {
++    let setup = Box::pin(agent_setup("http://127.0.0.1:1")).await;
++    let graph = graph(&setup).await;
++    let mut llm = scripted_llm(vec![
++        LlmTurn::text("\"parent accepted\""),
++        LlmTurn::text("\"CHILD PRIVATE ANSWER\""),
++        LlmTurn::text("\"parent done\""),
++    ])
++    .await;
++    register_scripted_agent_base_url(setup.agent, &llm.base_url);
++    let branch = begin(&setup, &graph, initial).await;
++    let root_run = branch.parent.run;
++    let child_run = branch.child.fence.scope.run;
++    let p = &setup.fixture.persistence;
++    let inherited:Value=sqlx::query_scalar("SELECT jsonb_build_object('ceiling',knowledge_ceiling,'content',content_level,'actor',actor_id) FROM workflow_runs WHERE company_id=$1 AND id=$2")
++        .bind(branch.child.fence.scope.company.as_uuid()).bind(branch.child.fence.scope.run.as_uuid())
++        .fetch_one(p.pool()).await.unwrap();
++    assert_eq!(
++        inherited,
++        json!({"ceiling":9,"content":initial.as_i16(),"actor":setup.fixture.target.actor.user_id()})
++    );
++    let child = p
++        .prepare_agent(&branch.child, lease())
++        .await
++        .unwrap()
++        .expect_ready();
++    assert!(
++        child
++            .prepared
++            .frozen_history()
++            .unwrap()
++            .seed
++            .pairs()
++            .is_empty()
++    );
++    assert_eq!(
++        child.prepared.frozen_history().unwrap().content_level,
++        initial
++    );
++    stamp(&setup, &branch.child, AccessLevel::L5).await;
++    let last = finish_child(&setup, branch).await;
++    let prepared = p
++        .prepare_agent(&last, lease())
++        .await
++        .unwrap()
++        .expect_ready();
++    let history = prepared.prepared.frozen_history().unwrap();
++    assert_eq!(history.content_level, AccessLevel::L5);
++    assert_eq!(history.seed.pairs().len(), 1);
++    assert_eq!(history.seed.pairs()[0].output, json!("parent accepted"));
++    assert_eq!(
++        Box::pin(agent_runtime(&setup).execute(&WorkflowStepKind("agent.run".into()), &last))
++            .await
++            .completed_result()
++            .unwrap(),
++        json!("parent done")
++    );
++    assert_branches(&setup, root_run, child_run).await;
++    let requests = llm.observed();
++    assert_eq!(requests.len(), 3);
++    assert_eq!(requests[1]["messages"].as_array().unwrap().len(), 2);
++    assert!(!requests[1].to_string().contains("parent accepted"));
++    assert!(requests[2].to_string().contains("parent accepted"));
++    assert!(!requests[2].to_string().contains("CHILD PRIVATE"));
++    assert_eq!(llm.finish().await.unwrap(), 3);
++}
++
++async fn assert_branches(setup: &AgentSetup, root: RunId, child_run: RunId) {
++    let rows:Vec<Value>=sqlx::query_scalar("SELECT jsonb_build_object('scope',conversation.scope_kind,'conversation',exchange.conversation_id,'state',exchange.state,'level',exchange.access_level,'agent',conversation.agent_id) FROM agent_history_exchanges AS exchange JOIN agent_history_conversations AS conversation ON conversation.company_id=exchange.company_id AND conversation.id=exchange.conversation_id WHERE exchange.company_id=$1 AND exchange.run_id=ANY($2) ORDER BY exchange.position,exchange.id")
++        .bind(setup.fixture.target.company.as_uuid()).bind(vec![root.as_uuid(),child_run.as_uuid()])
++        .fetch_all(setup.fixture.persistence.pool()).await.unwrap();
++    assert_eq!(rows.len(), 3);
++    let child = rows.iter().find(|r| r["scope"] == "child_branch").unwrap();
++    let roots: Vec<_> = rows
++        .iter()
++        .filter(|r| r["scope"] == "private_session")
++        .collect();
++    assert_eq!(roots.len(), 2);
++    assert_eq!(roots[0]["conversation"], roots[1]["conversation"]);
++    assert_ne!(roots[0]["conversation"], child["conversation"]);
++    assert!(
++        rows.iter()
++            .all(|r| r["agent"] == json!(setup.agent) && r["state"] == "completed")
++    );
++    assert_eq!(child["level"], 5);
++}
++
++#[tokio::test]
++async fn agent_history_children_same_agent_private_branch_completes_without_parent_transcript() {
++    journey(AccessLevel::PUBLIC).await;
++}
++
++#[tokio::test]
++async fn agent_history_level_child_branch_inherits_content_and_result_taints_parent() {
++    journey(AccessLevel::L5).await;
++}
++
++#[tokio::test]
++async fn agent_history_callers_repeated_activation_replay_keeps_outputs_after_later_workflow_failure()
++ {
++    let setup = Box::pin(agent_setup("http://127.0.0.1:1")).await;
++    let run = repeat_run(&setup).await;
++    let mut llm = scripted_llm(vec![
++        LlmTurn::text("\"first repeat\""),
++        LlmTurn::text("\"second repeat\""),
++    ])
++    .await;
++    register_scripted_agent_base_url(setup.agent, &llm.base_url);
++    let p = &setup.fixture.persistence;
++    let first = claim_run(&setup, run).await;
++    let kind = WorkflowStepKind("agent.run".into());
++    let output = Box::pin(agent_runtime(&setup).execute(&kind, &first))
++        .await
++        .completed_result()
++        .unwrap();
++    // Box fixture progression to keep the repeated-call test on the stock debug stack.
++    let second = Box::pin(claim_after_first(&setup, &first, output)).await;
++    assert_ne!(first.fence.scope.execution, second.fence.scope.execution);
++    assert_ne!(first.activation.step, second.activation.step);
++    let prepared = p
++        .prepare_agent(&second, lease())
++        .await
++        .unwrap()
++        .expect_ready();
++    assert_eq!(
++        prepared.prepared.frozen_history().unwrap().seed.pairs()[0].output,
++        "first repeat"
++    );
++    let output = Box::pin(agent_runtime(&setup).execute(&kind, &second))
++        .await
++        .completed_result()
++        .unwrap();
++    assert_eq!(output, json!("second repeat"));
++    assert_eq!(
++        Box::pin(agent_runtime(&setup).execute(&kind, &second))
++            .await
++            .completed_result()
++            .unwrap(),
++        output
++    );
++    let terminal = p
++        .complete_io(crate::application::workflow::lease::FencedWorkflowResult {
++            fence: second.fence,
++            output,
++            policy: lease(),
++        })
++        .await
++        .unwrap();
++    assert!(
++        terminal.is_none(),
++        "the third activation hits the existing step budget"
++    );
++    assert_retained_repeats(
++        &setup,
++        run,
++        RepeatedCalls {
++            first: first.fence.scope.execution,
++            second: second.fence.scope.execution,
++        },
++    )
++    .await;
++    assert_eq!(llm.observed().len(), 2);
++    assert_eq!(llm.finish().await.unwrap(), 2);
++}
++
++struct RepeatedCalls {
++    first: ExecutionId,
++    second: ExecutionId,
++}
++
++async fn assert_retained_repeats(setup: &AgentSetup, run: RunId, calls: RepeatedCalls) {
++    let p = &setup.fixture.persistence;
++    let state: String =
++        sqlx::query_scalar("SELECT state FROM workflow_runs WHERE company_id=$1 AND id=$2")
++            .bind(setup.fixture.target.company.as_uuid())
++            .bind(run.as_uuid())
++            .fetch_one(p.pool())
++            .await
++            .unwrap();
++    assert_eq!(
++        state, "failed",
++        "next activation exceeds original max_steps2 after accepted output"
++    );
++    let exchanges:Vec<Value>=sqlx::query_scalar("SELECT jsonb_build_object('execution',execution_id,'position',position,'state',state,'output',output) FROM agent_history_exchanges WHERE company_id=$1 AND run_id=$2 ORDER BY position")
++        .bind(setup.fixture.target.company.as_uuid()).bind(run.as_uuid()).fetch_all(p.pool()).await.unwrap();
++    assert_eq!(
++        exchanges,
++        json!([
++                {"execution":calls.first,"position":1,"state":"completed","output":"first repeat"},
++                {"execution":calls.second,"position":2,"state":"completed","output":"second repeat"}
++        ])
++        .as_array()
++        .unwrap()
++        .clone()
++    );
++}
++
++async fn repeat_run(setup: &AgentSetup) -> RunId {
++    let mut source = model_source(&AgentKey::parse("assistant").unwrap(), ModelStep::AgentRun);
++    source["steps"]["repeat"] = source["steps"]["start"].clone();
++    source["steps"]["start"]["routes"]["success"] = json!("repeat");
++    source["steps"]["repeat"]["routes"]["success"] = json!("after");
++    let after: Value =
++        serde_json::from_str(&registry::example("data.map").unwrap().source).unwrap();
++    source["steps"]["after"] = after["steps"]["start"].clone();
++    source["limits"]["max_steps"] = json!(2);
++    let graph = publish_graph(setup, source, json!({})).await;
++    let AdmissionResult::Created(run) = admit_graph(setup, &graph, "history-repeat").await.unwrap()
++    else {
++        panic!("new root")
++    };
++    run
++}
++
++async fn claim_after_first(
++    setup: &AgentSetup,
++    first: &ClaimedWorkflow,
++    output: Value,
++) -> ClaimedWorkflow {
++    let p = &setup.fixture.persistence;
++    let next = p
++        .complete_io(crate::application::workflow::lease::FencedWorkflowResult {
++            fence: first.fence,
++            output,
++            policy: lease(),
++        })
++        .await
++        .unwrap()
++        .unwrap()
++        .successor
++        .unwrap();
++    p.claim_io(
++        next,
++        crate::application::workflow::lease::WorkflowWorkerId(Uuid::new_v4()),
++        lease(),
++    )
++    .await
++    .unwrap()
++    .unwrap()
++}
+--- accepted04/src/adapters/persistence/workflow/agent_history_continuation_tests.rs
++++ src/adapters/persistence/workflow/agent_history_continuation_tests.rs
+@@ -0,0 +1,203 @@
++use super::*;
++use crate::application::workflow::decisions::{
++    DecisionCommandKey, DecisionId, SubmitDecision, WorkflowDecisions,
++};
++use tokio::sync::Barrier;
++
++struct Reviewers {
++    setup: Box<AgentSetup>,
++    admin: Uuid,
++}
++
++async fn reviewed(origin: &str) -> Reviewers {
++    let mut setup = Box::new(Box::pin(agent_setup_full(origin, None, true)).await);
++    let admin = crate::adapters::persistence::workflow::tests::message_tests::support::member(
++        &setup.fixture,
++        "admin",
++    )
++    .await;
++    let mut source = model_source(&AgentKey::parse("assistant").unwrap(), ModelStep::AgentRun);
++    source["steps"]["task"] = source["steps"]["start"].clone();
++    source["steps"]["start"]["with"]["context"] = json!({"literal":"prior task"});
++    source["steps"]["start"]["routes"]["success"] = json!("task");
++    source["steps"]["task"]["with"]["context"] = json!({"literal":"current task"});
++    source["steps"]["task"]["with"]["approval"] = json!({"literal":{
++        "reviewers":[{"kind":"user","id":setup.fixture.target.actor.user_id()},
++            {"kind":"user","id":admin}],
++        "deadline":(chrono::Utc::now()+chrono::Duration::minutes(20)).to_rfc3339()}});
++    let graph = publish_graph(&setup, source, json!({})).await;
++    let AdmissionResult::Created(run) = admit_graph(&setup, &graph, "history-human-rounds")
++        .await
++        .unwrap()
++    else {
++        panic!("new reviewed root")
++    };
++    setup.claim = claim_run(&setup, run).await;
++    Reviewers { setup, admin }
++}
++
++async fn pending_command(setup: &AgentSetup, actor: WorkflowActor, key: &str) -> SubmitDecision {
++    let scope = setup.claim.fence.scope;
++    let id:Uuid=sqlx::query_scalar("SELECT decision.id FROM workflow_decisions AS decision JOIN workflow_waits AS wait ON wait.company_id=decision.company_id AND wait.id=decision.wait_id WHERE decision.company_id=$1 AND decision.execution_id=$2 AND wait.state='waiting' AND decision.submitted_at IS NULL")
++        .bind(scope.company.as_uuid()).bind(scope.execution.as_uuid()).fetch_one(setup.fixture.persistence.pool()).await.unwrap();
++    let view = setup
++        .fixture
++        .persistence
++        .read_decision(scope.company, actor, DecisionId(id))
++        .await
++        .unwrap();
++    SubmitDecision {
++        company: scope.company,
++        actor,
++        decision: view.decision,
++        command_key: DecisionCommandKey::parse(key).unwrap(),
++        expected_revision: view.revision,
++        expected_artifact: view.artifact_digest,
++        choice: "approve".into(),
++        feedback: String::new(),
++        data: json!({}),
++    }
++}
++
++async fn competing_approval(reviewers: &Reviewers) {
++    let setup = &reviewers.setup;
++    let owner = pending_command(setup, setup.fixture.target.actor, "history-owner-choice").await;
++    let admin = pending_command(
++        setup,
++        WorkflowActor::authenticated(reviewers.admin).unwrap(),
++        "history-admin-choice",
++    )
++    .await;
++    let p = &setup.fixture.persistence;
++    let barrier = Barrier::new(2);
++    let first = async {
++        barrier.wait().await;
++        p.submit_decision(owner).await
++    };
++    let second = async {
++        barrier.wait().await;
++        p.submit_decision(admin).await
++    };
++    let (first, second) = tokio::join!(first, second);
++    let outcomes = [first, second];
++    assert_eq!(outcomes.iter().filter(|o| o.is_ok()).count(), 1);
++    for outcome in outcomes {
++        if let Err(error) = outcome {
++            assert!(matches!(error, AppError::Conflict(_)), "{error:?}");
++        }
++    }
++}
++
++async fn frozen(setup: &AgentSetup) -> Value {
++    sqlx::query_scalar("SELECT frozen_preparation FROM agent_history_exchanges WHERE company_id=$1 AND execution_id=$2")
++        .bind(setup.claim.fence.scope.company.as_uuid()).bind(setup.claim.fence.scope.execution.as_uuid())
++        .fetch_one(setup.fixture.persistence.pool()).await.unwrap()
++}
++
++async fn start_task(setup: &mut AgentSetup) {
++    let output =
++        Box::pin(agent_runtime(setup).execute(&WorkflowStepKind("agent.run".into()), &setup.claim))
++            .await
++            .completed_result()
++            .unwrap();
++    assert_eq!(output, json!("prior accepted"));
++    let next = setup
++        .fixture
++        .persistence
++        .complete_io(crate::application::workflow::lease::FencedWorkflowResult {
++            fence: setup.claim.fence,
++            output,
++            policy: lease(),
++        })
++        .await
++        .unwrap()
++        .unwrap()
++        .successor
++        .unwrap();
++    setup.claim = setup
++        .fixture
++        .persistence
++        .claim_io(
++            next,
++            crate::application::workflow::lease::WorkflowWorkerId(Uuid::new_v4()),
++            lease(),
++        )
++        .await
++        .unwrap()
++        .unwrap();
++}
++
++#[tokio::test]
++async fn agent_history_continuation_two_real_approval_rounds_and_competing_reviewers_preserve_one_exchange()
++ {
++    let (origin, server) = servers(2).await;
++    let mut reviewers = Box::pin(reviewed(&origin)).await;
++    let mut llm = scripted_llm(vec![
++        LlmTurn::text("\"prior accepted\""),
++        LlmTurn::tool_call(
++            "registered__request",
++            json!({"method":"POST","path":"/first"}),
++        ),
++        LlmTurn::tool_call(
++            "registered__request",
++            json!({"method":"POST","path":"/second"}),
++        ),
++        LlmTurn::text("\"both accepted\""),
++    ])
++    .await;
++    register_scripted_agent_base_url(reviewers.setup.agent, &llm.base_url);
++    start_task(&mut reviewers.setup).await;
++    let kind = WorkflowStepKind("agent.run".into());
++    assert!(matches!(
++        Box::pin(agent_runtime(&reviewers.setup).execute(&kind, &reviewers.setup.claim)).await,
++        WorkflowHandlerOutcome::Suspended(_)
++    ));
++    let before = frozen(&reviewers.setup).await;
++    assert_eq!(
++        before["history"]["seed"],
++        json!([{"input":"prior task","output":"prior accepted"}])
++    );
++    competing_approval(&reviewers).await;
++    let second = reclaim(&reviewers.setup).await;
++    assert_eq!(
++        second.fence.scope.execution,
++        reviewers.setup.claim.fence.scope.execution
++    );
++    assert!(matches!(
++        Box::pin(agent_runtime(&reviewers.setup).execute(&kind, &second)).await,
++        WorkflowHandlerOutcome::Suspended(_)
++    ));
++    assert_eq!(frozen(&reviewers.setup).await, before);
++    approve_open(&reviewers.setup, "history-second-round").await;
++    let third = reclaim(&reviewers.setup).await;
++    assert_eq!(third.fence.scope.execution, second.fence.scope.execution);
++    assert_eq!(
++        Box::pin(agent_runtime(&reviewers.setup).execute(&kind, &third))
++            .await
++            .completed_result()
++            .unwrap(),
++        json!("both accepted")
++    );
++    assert_eq!(frozen(&reviewers.setup).await, before);
++    let sent = server.await.unwrap();
++    assert_eq!(sent.len(), 2);
++    assert!(sent[0].starts_with("POST /first") && sent[1].starts_with("POST /second"));
++    assert_history_counts(&reviewers.setup).await;
++    let requests = llm.observed();
++    assert_eq!(requests.len(), 4);
++    assert_eq!(requests[3].to_string().matches("prior accepted").count(), 1);
++    assert_eq!(requests[3].to_string().matches("current task").count(), 1);
++    assert_eq!(llm.finish().await.unwrap(), 4);
++}
++
++async fn assert_history_counts(setup: &AgentSetup) {
++    let scope = setup.claim.fence.scope;
++    let p = &setup.fixture.persistence;
++    let facts:Value=sqlx::query_scalar("SELECT jsonb_build_object('exchanges',(SELECT count(*) FROM agent_history_exchanges WHERE company_id=$1 AND run_id=$2),'completed',(SELECT count(*) FROM agent_history_exchanges WHERE company_id=$1 AND run_id=$2 AND state='completed'),'decisions',(SELECT count(*) FROM workflow_decisions WHERE company_id=$1 AND execution_id=$3 AND submitted_at IS NOT NULL),'dispatches',(SELECT count(*) FROM workflow_action_dispatches WHERE company_id=$1 AND execution_id=$3))")
++        .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(scope.execution.as_uuid())
++        .fetch_one(p.pool()).await.unwrap();
++    assert_eq!(
++        facts,
++        json!({"exchanges":2,"completed":2,"decisions":2,"dispatches":2})
++    );
++}
+--- accepted04/src/adapters/persistence/workflow/agent_history_entrypoint_tests.rs
++++ src/adapters/persistence/workflow/agent_history_entrypoint_tests.rs
+@@ -0,0 +1,293 @@
++use super::*;
++use crate::application::workflow::lifecycle::BindingLifecycle;
++
++async fn dynamic_binding(d: &Deployment) -> BindingTarget {
++    let other = AgentPersistence::create(
++        d.p(),
++        d.fixture.target.company.as_uuid(),
++        AgentWrite {
++            name: "Other agent".into(),
++            slug: "other".into(),
++            provider: Some(SCRIPTED_PROVIDER.into()),
++            model: Some(SCRIPTED_MODEL.into()),
++            system_prompt: Some("Other actual agent instructions".into()),
++            ..Default::default()
++        },
++    )
++    .await
++    .unwrap();
++    d.fixture.publish_agent(other.id).await;
++    crate::services::test_support::register_scripted_agent_base_url(other.id, &d.llm.base_url);
++    let mut source = model_source();
++    source["parameter_schema"] = json!({"type":"object","properties":{"agent":{"type":"string","enum":["assistant","other"]}},"required":["agent"],"additionalProperties":false});
++    source["steps"]["start"]["with"]["agent"] = json!({"ref":"/params/agent"});
++    d.bind_source(SourceBinding {
++        source,
++        params: json!({"agent":"assistant"}),
++        trigger: Some(MessageTrigger::Any),
++    })
++    .await
++}
++
++async fn choose(d: &Deployment, binding: BindingTarget, key: crate::application::agent::AgentKey) {
++    let state = d
++        .p()
++        .binding(binding.company, binding.binding)
++        .await
++        .unwrap()
++        .unwrap();
++    d.engine
++        .services()
++        .bindings()
++        .configure(ConfigureBinding {
++            target: binding,
++            expected: Some(state.revision),
++            association: state.association,
++            version: state
++                .configuration
++                .bundle()
++                .compiled()
++                .graph()
++                .definition()
++                .version_id,
++            params: json!({"agent":key.as_str()}),
++            resources: state.configuration.resources().clone(),
++            run_as: None,
++            message_trigger: Some(MessageTrigger::Any),
++        })
++        .await
++        .unwrap();
++}
++
++#[tokio::test]
++async fn agent_history_callers_dynamic_selection_uses_actual_agent_and_returns_to_its_own_thread_stream()
++ {
++    let mut d = Box::pin(Deployment::new(vec![
++        LlmTurn::text("\"alpha\""),
++        LlmTurn::text("\"beta\""),
++        LlmTurn::text("\"gamma\""),
++    ]))
++    .await;
++    let binding = dynamic_binding(&d).await;
++    d.email(customer_email(&d, "dynamic-first", None)).await;
++    Box::pin(d.run_until("first dynamic agent completed", async || {
++        d.count("SELECT count(*) FROM workflow_runs WHERE company_id=$1 AND state='succeeded'")
++            .await
++            == 1
++    }))
++    .await;
++    choose(
++        &d,
++        binding,
++        crate::application::agent::AgentKey::parse("other").unwrap(),
++    )
++    .await;
++    d.email(customer_email(&d, "dynamic-second", Some("dynamic-first")))
++        .await;
++    Box::pin(d.run_until("other dynamic agent completed", async || {
++        d.count("SELECT count(*) FROM workflow_runs WHERE company_id=$1 AND state='succeeded'")
++            .await
++            == 2
++    }))
++    .await;
++    choose(
++        &d,
++        binding,
++        crate::application::agent::AgentKey::parse("assistant").unwrap(),
++    )
++    .await;
++    d.email(customer_email(&d, "dynamic-third", Some("dynamic-first")))
++        .await;
++    Box::pin(
++        d.run_until("original dynamic agent completed again", async || {
++            d.count("SELECT count(*) FROM workflow_runs WHERE company_id=$1 AND state='succeeded'")
++                .await
++                == 3
++        }),
++    )
++    .await;
++    let rows:Vec<Value>=sqlx::query_scalar("SELECT jsonb_build_object('agent',conversation.agent_id,'conversation',exchange.conversation_id,'scope',conversation.scope_kind,'output',exchange.output,'seed',exchange.frozen_preparation->'history'->'seed') FROM agent_history_exchanges AS exchange JOIN agent_history_conversations AS conversation ON conversation.company_id=exchange.company_id AND conversation.id=exchange.conversation_id WHERE exchange.company_id=$1")
++        .bind(d.fixture.target.company.as_uuid()).fetch_all(d.p().pool()).await.unwrap();
++    assert_eq!(rows.len(), 3);
++    let first = rows.iter().find(|r| r["output"] == "alpha").unwrap();
++    let other = rows.iter().find(|r| r["output"] == "beta").unwrap();
++    let third = rows.iter().find(|r| r["output"] == "gamma").unwrap();
++    assert_eq!(first["agent"], third["agent"]);
++    assert_ne!(first["agent"], other["agent"]);
++    assert_eq!(first["conversation"], third["conversation"]);
++    assert_ne!(first["conversation"], other["conversation"]);
++    assert!(rows.iter().all(|r| r["scope"] == "thread"));
++    assert_eq!(other["seed"], json!([]));
++    assert_eq!(third["seed"].as_array().unwrap().len(), 1);
++    assert_eq!(third["seed"][0]["output"], "alpha");
++    let requests = d.llm.observed();
++    assert_eq!(requests.len(), 3);
++    assert_eq!(requests[1]["messages"].as_array().unwrap().len(), 2);
++    assert_eq!(requests[2]["messages"].as_array().unwrap().len(), 4);
++    assert!(requests[2].to_string().contains("alpha"));
++    assert!(!requests[2].to_string().contains("beta"));
++    assert_eq!(d.llm.finish().await.unwrap(), 3);
++}
++
++async fn configure_actor(d: &Deployment, binding: BindingTarget, admin: Uuid) {
++    ChannelPersistence::update(
++        d.p(),
++        crate::application::ports::channel::ChannelUpdate {
++            company_id: d.fixture.target.company.as_uuid(),
++            channel_id: d.channel,
++            write: ChannelWrite {
++                name: "Support".into(),
++                slug: "support".into(),
++                enabled: true,
++                participant_emails: None,
++                ..Default::default()
++            },
++        },
++    )
++    .await
++    .unwrap();
++    let state = d
++        .p()
++        .binding(binding.company, binding.binding)
++        .await
++        .unwrap()
++        .unwrap();
++    d.engine
++        .services()
++        .bindings()
++        .configure(ConfigureBinding {
++            target: binding,
++            expected: Some(state.revision),
++            association: state.association,
++            version: state
++                .configuration
++                .bundle()
++                .compiled()
++                .graph()
++                .definition()
++                .version_id,
++            params: state.configuration.params().clone(),
++            resources: state.configuration.resources().clone(),
++            run_as: Some(WorkflowActor::authenticated(admin).unwrap()),
++            message_trigger: None,
++        })
++        .await
++        .unwrap();
++}
++
++async fn materialize_next(d: &Deployment) -> RunId {
++    let materializer = ScheduleMaterializer::new(d.p().clone(), d.engine.services().service());
++    let worker = ScheduleWorkerId(Uuid::new_v4());
++    let claimed = materializer.claim(worker).await.unwrap();
++    assert_eq!(claimed.len(), 1);
++    materializer.materialize(worker, &claimed[0]).await.unwrap();
++    let run = scheduled_run(d, claimed[0].id).await;
++    assert!(materializer.claim(worker).await.unwrap().is_empty());
++    run
++}
++
++#[tokio::test]
++async fn agent_history_callers_schedule_uses_current_configured_actor_and_manual_starter_keeps_own_level()
++ {
++    let mut d = Box::pin(Deployment::new(vec![
++        LlmTurn::text("\"accepted\""),
++        LlmTurn::text("\"accepted\""),
++        LlmTurn::text("\"accepted\""),
++    ]))
++    .await;
++    let admin = crate::adapters::persistence::workflow::tests::message_tests::support::member(
++        &d.fixture, "admin",
++    )
++    .await;
++    let company = d.fixture.target.company.as_uuid();
++    sqlx::query("UPDATE company_members SET access_level=5 WHERE company_id=$1 AND user_id=$2")
++        .bind(company)
++        .bind(admin)
++        .execute(d.p().pool())
++        .await
++        .unwrap();
++    let binding = d.bind(model_source(), None).await;
++    configure_actor(&d, binding, admin).await;
++    let schedule = schedule(&d, binding).await;
++    let high = materialize_next(&d).await;
++    sqlx::query("UPDATE company_members SET access_level=0 WHERE company_id=$1 AND user_id=$2")
++        .bind(company)
++        .bind(admin)
++        .execute(d.p().pool())
++        .await
++        .unwrap();
++    due(&d, schedule).await;
++    let low = materialize_next(&d).await;
++    let service = d.engine.services().service();
++    let manual = manual::start(
++        &service,
++        manual_request(&d, binding, "history-manual-owner"),
++    )
++    .await
++    .unwrap();
++    let replay = manual::start(
++        &service,
++        manual_request(&d, binding, "history-manual-owner"),
++    )
++    .await
++    .unwrap();
++    assert!(replay.replayed);
++    assert_eq!(manual.run, replay.run);
++    let runs = vec![high.as_uuid(), low.as_uuid(), manual.run.as_uuid()];
++    Box::pin(d.run_until("all native producer calls accepted",async||{
++        let count:i64=sqlx::query_scalar("SELECT count(*) FROM workflow_runs WHERE company_id=$1 AND id=ANY($2) AND state='succeeded'")
++            .bind(company).bind(&runs).fetch_one(d.p().pool()).await.unwrap();
++        count==3
++    })).await;
++    let rows:Vec<Value>=sqlx::query_scalar("SELECT jsonb_build_object('run',run.id,'actor',run.actor_id,'ceiling',run.knowledge_ceiling,'session',mapping.session_id,'scope',conversation.scope_kind,'seed',exchange.frozen_preparation->'history'->'seed') FROM workflow_runs AS run JOIN workflow_agent_sessions AS mapping ON mapping.company_id=run.company_id AND mapping.run_id=run.id JOIN agent_history_exchanges AS exchange ON exchange.company_id=run.company_id AND exchange.run_id=run.id JOIN agent_history_conversations AS conversation ON conversation.company_id=exchange.company_id AND conversation.id=exchange.conversation_id WHERE run.company_id=$1 AND run.id=ANY($2)")
++        .bind(company).bind(&runs).fetch_all(d.p().pool()).await.unwrap();
++    assert_eq!(rows.len(), 3);
++    assert_producer_rows(
++        &d,
++        &rows,
++        ScheduledRuns {
++            high,
++            low,
++            manual: manual.run,
++        },
++        admin,
++    );
++    let requests = d.llm.observed();
++    assert_eq!(requests.len(), 3);
++    assert!(
++        requests
++            .iter()
++            .all(|r| r["messages"].as_array().unwrap().len() == 2)
++    );
++    assert_eq!(d.llm.finish().await.unwrap(), 3);
++}
++
++struct ScheduledRuns {
++    high: RunId,
++    low: RunId,
++    manual: RunId,
++}
++
++fn assert_producer_rows(d: &Deployment, rows: &[Value], runs: ScheduledRuns, admin: Uuid) {
++    let high = rows.iter().find(|r| r["run"] == json!(runs.high)).unwrap();
++    let low = rows.iter().find(|r| r["run"] == json!(runs.low)).unwrap();
++    let manual = rows
++        .iter()
++        .find(|r| r["run"] == json!(runs.manual))
++        .unwrap();
++    assert_eq!(high["actor"], json!(admin));
++    assert_eq!(high["ceiling"], 5);
++    assert_eq!(low["actor"], json!(admin));
++    assert_eq!(low["ceiling"], 0);
++    assert_eq!(manual["actor"], json!(d.fixture.target.actor.user_id()));
++    assert_eq!(manual["ceiling"], 9);
++    let sessions: std::collections::BTreeSet<_> = rows
++        .iter()
++        .map(|r| r["session"].as_str().unwrap())
++        .collect();
++    assert_eq!(sessions.len(), 3);
++    assert!(
++        rows.iter()
++            .all(|r| r["scope"] == "private_session" && r["seed"] == json!([]))
++    );
++}
+--- accepted04/src/adapters/persistence/workflow/agent_history_private_context_tests.rs
++++ src/adapters/persistence/workflow/agent_history_private_context_tests.rs
+@@ -3,6 +3,9 @@
+ #[path = "agent_history_private_fixture.rs"]
+ mod fixture;
+ use fixture::ManualHistory;
++
++#[path = "agent_history_caller_tests.rs"]
++mod callers;
+ 
+ #[tokio::test]
+ async fn agent_history_selection_private_session_preserves_json_pairs_without_recursive_current_input()
+--- accepted04/src/adapters/persistence/workflow/agent_history_sample_tests.rs
++++ src/adapters/persistence/workflow/agent_history_sample_tests.rs
+@@ -0,0 +1,74 @@
++use super::*;
++
++async fn history_snapshot(setup: &AgentSetup) -> Value {
++    sqlx::query_scalar("SELECT jsonb_build_object('sessions',(SELECT count(*) FROM agent_history_sessions WHERE company_id=$1),'mappings',(SELECT count(*) FROM workflow_agent_sessions WHERE company_id=$1),'conversations',(SELECT count(*) FROM agent_history_conversations WHERE company_id=$1),'exchanges',(SELECT jsonb_agg(jsonb_build_object('id',id,'state',state,'output',output,'preparation',frozen_preparation) ORDER BY id) FROM agent_history_exchanges WHERE company_id=$1))")
++        .bind(setup.fixture.target.company.as_uuid()).fetch_one(setup.fixture.persistence.pool()).await.unwrap()
++}
++
++#[tokio::test]
++async fn agent_history_samples_sealed_capture_cannot_load_production_history_or_advance_turns() {
++    let setup = Box::pin(agent_setup_source(
++        "http://127.0.0.1:1",
++        None,
++        false,
++        |source, _| {
++            source["input_schema"] = json!({"type":"object"});
++            source["steps"]["start"]["with"]["context"] = json!({"ref":"/input"});
++        },
++    ))
++    .await;
++    let mut llm = scripted_llm(vec![LlmTurn::text("\"PRODUCTION PRIVATE ANSWER\"")]).await;
++    register_scripted_agent_base_url(setup.agent, &llm.base_url);
++    assert_eq!(
++        Box::pin(
++            agent_runtime(&setup).execute(&WorkflowStepKind("agent.run".into()), &setup.claim)
++        )
++        .await
++        .completed_result()
++        .unwrap(),
++        json!("PRODUCTION PRIVATE ANSWER")
++    );
++    let counts = production_counts(&setup).await;
++    let before = history_snapshot(&setup).await;
++    assert_eq!(before["exchanges"].as_array().unwrap().len(), 1);
++    assert_eq!(
++        before["exchanges"][0]["output"],
++        "PRODUCTION PRIVATE ANSWER"
++    );
++    let make_request = || {
++        let mut request = sample_request(vec![json!({"workflow_id":setup.fixture.target.workflow,
++            "step":"start","responses":[{"output":"sample accepted"}]})]);
++        request.input = json!({"history_session":{"from_run":setup.claim.fence.scope.run},
++            "history":[{"id":before["exchanges"][0]["id"]}]});
++        request
++    };
++    for _ in 0..2 {
++        let captured = capture_service(&setup)
++            .capture(
++                setup.fixture.target,
++                DraftRevision::new(1).unwrap(),
++                make_request(),
++            )
++            .await
++            .unwrap();
++        let report = crate::application::workflow::sample::execute(captured).unwrap();
++        assert_eq!(
++            report.status,
++            crate::application::workflow::sample::SampleStatus::Completed,
++            "{report:?}"
++        );
++        assert_eq!(report.output, Some(json!("sample accepted")));
++        let history = report.steps[0].history.as_ref().unwrap();
++        assert!(history.seed.pairs().is_empty());
++        assert_eq!(history.omitted_pairs, 0);
++        assert!(
++            !serde_json::to_string(&report)
++                .unwrap()
++                .contains("PRODUCTION PRIVATE ANSWER")
++        );
++        assert_eq!(production_counts(&setup).await, counts);
++        assert_eq!(history_snapshot(&setup).await, before);
++    }
++    assert_eq!(llm.observed().len(), 1);
++    assert_eq!(llm.finish().await.unwrap(), 1);
++}
+--- accepted04/src/adapters/persistence/workflow/agent_history_thread_continuation_tests.rs
++++ src/adapters/persistence/workflow/agent_history_thread_continuation_tests.rs
+@@ -0,0 +1,168 @@
++use super::*;
++use crate::application::workflow::{
++    lifecycle::BindingLifecycle,
++    tools::{WorkflowToolWrite, WorkflowTools},
++};
++use crate::entities::agent_capability::{
++    AgentBindingId, AgentBindingSource, AgentToolAlias, AgentToolBinding,
++};
++
++async fn with_question_child(d: &Deployment) -> Uuid {
++    let mut child = example(3).source;
++    child["steps"]["start"]["type"] = json!("channel.no_reply");
++    let bound = d.bind(child, None).await;
++    let state = d
++        .p()
++        .binding(bound.company, bound.binding)
++        .await
++        .unwrap()
++        .unwrap();
++    let child = state.configuration.bundle().compiled().graph().definition();
++    let name = crate::domain::workflow::TypeName::parse("history.ask").unwrap();
++    d.p()
++        .register_workflow_tool(
++            bound.company,
++            bound.actor,
++            WorkflowToolWrite {
++                name: name.clone(),
++                workflow: child.workflow_id,
++                version: child.version_id,
++                params: json!({}),
++                expected: None,
++            },
++        )
++        .await
++        .unwrap();
++    let tool = AgentToolBinding {
++        id: AgentBindingId::new(Uuid::new_v4()),
++        alias: AgentToolAlias::parse("ask").unwrap(),
++        source: AgentBindingSource::Workflow {
++            registration: name,
++            workflow: child.workflow_id,
++            version: child.version_id,
++            params: json!({}),
++        },
++    };
++    let agent: Uuid =
++        sqlx::query_scalar("SELECT id FROM agents WHERE company_id=$1 AND slug='assistant'")
++            .bind(d.fixture.target.company.as_uuid())
++            .fetch_one(d.p().pool())
++            .await
++            .unwrap();
++    AgentPersistence::update(
++        d.p(),
++        agent,
++        AgentWrite {
++            name: "Assistant".into(),
++            slug: "assistant".into(),
++            provider: Some(SCRIPTED_PROVIDER.into()),
++            model: Some(SCRIPTED_MODEL.into()),
++            system_prompt: Some("Ask the registered child, then answer.".into()),
++            tool_bindings: Some(vec![tool]),
++            ..Default::default()
++        },
++    )
++    .await
++    .unwrap();
++    d.fixture.publish_agent(agent).await;
++    let mut parent = example(0);
++    model(&mut parent);
++    Box::pin(bind(d, parent)).await;
++    agent
++}
++
++#[tokio::test]
++async fn agent_history_continuation_real_thread_reply_reaches_child_before_parent_owned_turn_queue()
++{
++    let d = Box::pin(Deployment::new(vec![])).await;
++    let agent = with_question_child(&d).await;
++    let run =
++        super::release::materialize(&d, customer_email(&d, "history-active-parent", None)).await;
++    let input: Value =
++        sqlx::query_scalar("SELECT input FROM workflow_runs WHERE company_id=$1 AND id=$2")
++            .bind(d.fixture.target.company.as_uuid())
++            .bind(run.as_uuid())
++            .fetch_one(d.p().pool())
++            .await
++            .unwrap();
++    let mut llm = scripted_llm(vec![
++        LlmTurn::tool_call("ask", input),
++        LlmTurn::text(r#"{"body":"Parent accepted answer"}"#),
++    ])
++    .await;
++    crate::services::test_support::register_scripted_agent_base_url(agent, &llm.base_url);
++    let delivery = Delivery::start(&d, ProviderCase::Accept);
++    Box::pin(
++        d.run_until("child question while parent owns active turn", async || {
++            waiting(&d, 1).await && delivered(&d, 1).await
++        }),
++    )
++    .await;
++    let before = active_parent_turn(&d, run).await;
++    let (_, rfc) = prompt(&d, 0).await;
++    let accepted = answer(&d, "history-active-answer", &rfc, "Authorized human result").await;
++    let reply_intents = accepted.intent_ids;
++    Box::pin(d.run_until(
++        "parent continues once after real child answer",
++        async || responses_published(&d, 1).await && delivered(&d, 2).await,
++    ))
++    .await;
++    let provider = delivery.stop().await;
++    let after = exchanges(&d).await;
++    assert_eq!(after.len(), 1);
++    assert_eq!(after[0]["id"], before["id"]);
++    assert_eq!(after[0]["state"], "completed");
++    assert_eq!(after[0]["preparation"], before["preparation"]);
++    assert_eq!(after[0]["output"], json!({"body":"Parent accepted answer"}));
++    assert_eq!(
++        d.count("SELECT count(*) FROM workflow_runs WHERE company_id=$1")
++            .await,
++        2
++    );
++    let new_work: i64 = sqlx::query_scalar(
++        "SELECT count(*) FROM workflow_runs WHERE company_id=$1 AND trigger_id=ANY($2)",
++    )
++    .bind(d.fixture.target.company.as_uuid())
++    .bind(reply_intents)
++    .fetch_one(d.p().pool())
++    .await
++    .unwrap();
++    assert_eq!(
++        new_work, 0,
++        "a correlated human reply cannot admit another ordinary root"
++    );
++    assert_eq!(provider.messages().len(), 2);
++    let requests = llm.observed();
++    assert_eq!(requests.len(), 2);
++    assert!(requests[1].to_string().contains("Authorized human result"));
++    assert_eq!(llm.finish().await.unwrap(), 2);
++    assert_eq!(d.llm.finish().await.unwrap(), 0);
++}
++
++async fn active_parent_turn(d: &Deployment, run: RunId) -> Value {
++    let before = exchanges(d).await;
++    assert_eq!(before.len(), 1);
++    assert_eq!(before[0]["state"], "active");
++    assert_eq!(before[0]["run"], json!(run));
++    let active: Uuid = sqlx::query_scalar(
++        "SELECT active_exchange_id FROM agent_history_conversations WHERE company_id=$1 AND id=$2",
++    )
++    .bind(d.fixture.target.company.as_uuid())
++    .bind(
++        before[0]["conversation"]
++            .as_str()
++            .unwrap()
++            .parse::<Uuid>()
++            .unwrap(),
++    )
++    .fetch_one(d.p().pool())
++    .await
++    .unwrap();
++    assert_eq!(json!(active), before[0]["id"]);
++    assert_eq!(
++        d.count("SELECT count(*) FROM workflow_runs WHERE company_id=$1")
++            .await,
++        2
++    );
++    before[0].clone()
++}
+--- accepted04/src/adapters/persistence/workflow/autonomous_agent_child_selection_tests.rs
++++ src/adapters/persistence/workflow/autonomous_agent_child_selection_tests.rs
+@@ -158,3 +158,9 @@
+ 
+ #[path = "agent_history_child_tests.rs"]
+ mod history_identity;
++
++#[path = "agent_history_children_integration_tests.rs"]
++mod history_integration;
++
++#[path = "agent_history_continuation_tests.rs"]
++mod history_continuation;
+--- accepted04/src/adapters/persistence/workflow/autonomous_agent_entrypoint_tests.rs
++++ src/adapters/persistence/workflow/autonomous_agent_entrypoint_tests.rs
+@@ -6,6 +6,9 @@
+     schedule_admission::{ScheduleMaterializer, ScheduleWorkerId},
+ };
+ use crate::domain::entities::schedule::{ScheduleTimezone, ScheduleType, ScheduleWrite};
++
++#[path = "agent_history_entrypoint_tests.rs"]
++mod history;
+ 
+ #[derive(Debug, PartialEq, Eq, sqlx::FromRow)]
+ struct SelectedRun {
+--- accepted04/src/adapters/persistence/workflow/autonomous_agent_sample_closure_tests.rs
++++ src/adapters/persistence/workflow/autonomous_agent_sample_closure_tests.rs
+@@ -4,6 +4,9 @@
+ 
+ #[path = "autonomous_agent_sample_bounds_tests.rs"]
+ mod bounds;
++
++#[path = "agent_history_sample_tests.rs"]
++mod history;
+ 
+ fn capture_service(setup: &AgentSetup) -> crate::adapters::persistence::workflow::SampleCapture {
+     crate::adapters::persistence::workflow::SampleCapture {
+--- accepted04/src/adapters/persistence/workflow/channel_reply_completion_tests.rs
++++ src/adapters/persistence/workflow/channel_reply_completion_tests.rs
+@@ -4,6 +4,8 @@
+ use crate::application::workflow::{activation::*, batch::*, channel_reply::*, decisions::*};
+ #[path = "channel_reply_intent_schema_tests.rs"]
+ mod intent_schema_tests;
++#[path = "channel_reply_knowledge_tests.rs"]
++mod knowledge_tests;
+ #[path = "channel_reply_completion_owner_tests.rs"]
+ mod owner_tests;
+ #[path = "channel_reply_completion_policy_runtime_tests.rs"]
+--- accepted04/src/adapters/persistence/workflow/channel_reply_e2e_support.rs
++++ src/adapters/persistence/workflow/channel_reply_e2e_support.rs
+@@ -68,6 +68,7 @@
+ pub(super) enum ProviderCase {
+     Accept,
+     Retry,
++    Terminal,
+     Unknown,
+     LostReceipt,
+ }
+@@ -86,6 +87,10 @@
+                 retry_after: Duration::ZERO,
+                 class: FailureClass::Timeout,
+                 detail: FailureDetail::parse("Definitely refused; retry allowed").unwrap(),
++            }]),
++            ProviderCase::Terminal => VecDeque::from([ProviderSendOutcome::Terminal {
++                class: FailureClass::InvalidPayload,
++                detail: FailureDetail::parse("Definitively rejected").unwrap(),
+             }]),
+             ProviderCase::Unknown => VecDeque::from([ProviderSendOutcome::OutcomeUnknown {
+                 class: FailureClass::Timeout,
+--- accepted04/src/adapters/persistence/workflow/channel_reply_e2e_tests.rs
++++ src/adapters/persistence/workflow/channel_reply_e2e_tests.rs
+@@ -9,6 +9,9 @@
+ 
+ #[path = "channel_reply_e2e_recovery_tests.rs"]
+ mod recovery;
++
++#[path = "agent_history_channel_tests.rs"]
++mod history;
+ 
+ #[tokio::test]
+ async fn channel_reply_e2e_selected_binding_manual_and_schedule_runs_never_inherit_destination() {
+--- accepted04/src/adapters/persistence/workflow/channel_reply_knowledge_tests.rs
++++ src/adapters/persistence/workflow/channel_reply_knowledge_tests.rs
+@@ -0,0 +1,337 @@
++use super::*;
++use crate::application::workflow::{completion::*, waits::*};
++use crate::entities::access_level::AccessLevel;
++
++fn source(kind: &str) -> Value {
++    let mut source = if kind == "data.map" {
++        final_source(kind)
++    } else {
++        serde_json::from_str(&registry::example(kind).unwrap().source).unwrap()
++    };
++    source["output_schema"] = json!(true);
++    source["steps"]["start"]["routes"]["error"] = json!("recover");
++    source["steps"]["recover"] = json!({"type":"channel.no_reply",
++        "with":{"value":{"literal":null},"output_schema":{"literal":true}},
++        "routes":{"success":"$end"}});
++    if kind == "wait.timer" {
++        source["steps"]["start"]["with"]["deadline"] =
++            json!({"literal":(chrono::Utc::now()-chrono::Duration::seconds(1)).to_rfc3339()});
++    }
++    source
++}
++
++enum Review {
++    Automatic,
++    Required,
++}
++
++struct Classified {
++    finalization: FinalFixture,
++    recipient: Uuid,
++}
++impl Classified {
++    async fn new(kind: &str, review: Review) -> Self {
++        let s = Intents::new().await;
++        let recipient = policy_runtime_tests::verified_recipient(&s).await;
++        let finalization = Box::pin(FinalFixture::configured(
++            s,
++            source(kind),
++            literal_contract("Classified"),
++            matches!(review, Review::Required),
++        ))
++        .await;
++        let mut tx = finalization.p.pool().begin().await.unwrap();
++        crate::adapters::persistence::workflow::knowledge::raise_content_level_on(
++            &mut tx,
++            finalization.scope.company,
++            finalization.scope.run,
++            AccessLevel::L5,
++        )
++        .await
++        .unwrap();
++        tx.commit().await.unwrap();
++        Self {
++            finalization,
++            recipient,
++        }
++    }
++    async fn lower_audience(&self) {
++        sqlx::query("UPDATE company_members SET access_level=0 WHERE company_id=$1 AND user_id=$2")
++            .bind(self.finalization.scope.company.as_uuid())
++            .bind(self.recipient)
++            .execute(self.finalization.p.pool())
++            .await
++            .unwrap();
++    }
++}
++
++async fn facts(f: &FinalFixture) -> Value {
++    sqlx::query_scalar("SELECT jsonb_build_object('state',run.state,'level',run.content_level,
++        'events',(SELECT count(*) FROM workflow_run_events WHERE company_id=$1 AND run_id=$2
++            AND event_kind='knowledge.audience_below_content'),
++        'executions',(SELECT count(*) FROM workflow_executions WHERE company_id=$1 AND run_id=$2),
++        'attempts',(SELECT count(*) FROM task_attempts WHERE task_id=$3),
++        'retry',job.retry_count,'ordinal',job.attempt_ordinal,'continuations',job.continuation_count,
++        'job',job.status,'proposals',(SELECT count(*) FROM channel_reply_proposals WHERE company_id=$1 AND run_id=$2),
++        'decisions',(SELECT count(*) FROM channel_reply_decisions WHERE company_id=$1 AND run_id=$2))
++        FROM workflow_runs AS run JOIN background_tasks AS job ON job.company_id=run.company_id AND job.id=$3
++        WHERE run.company_id=$1 AND run.id=$2")
++        .bind(f.scope.company.as_uuid()).bind(f.scope.run.as_uuid()).bind(f.scope.job.0)
++        .fetch_one(f.p.pool()).await.unwrap()
++}
++
++async fn assert_refused(f: &FinalFixture, attempts: i64, audit: i64) {
++    let actual = facts(f).await;
++    assert_eq!(actual["state"], "failed", "{actual}");
++    assert_eq!(actual["level"], 5);
++    assert_eq!(actual["job"], "failed");
++    assert_eq!(actual["events"], audit);
++    assert_eq!(
++        actual["executions"], 1,
++        "knowledge must never take the configured error edge"
++    );
++    assert_eq!(actual["attempts"], attempts, "no synthetic owner attempt");
++    assert_eq!(
++        actual["retry"], attempts,
++        "only the real fenced failure consumes an attempt"
++    );
++    assert_eq!(actual["decisions"], 0);
++}
++
++#[tokio::test]
++async fn channel_reply_knowledge_pure_owner_and_allowed_control() {
++    for denied in [false, true] {
++        let classified = Box::pin(Classified::new("data.map", Review::Automatic)).await;
++        let f = &classified.finalization;
++        if denied {
++            classified.lower_audience().await;
++        }
++        let result = f.advance().await;
++        if denied {
++            assert_eq!(result.disposition, BatchDisposition::Failed);
++            assert_refused(f, 0, 1).await;
++            assert_run_view_code(f).await;
++            assert_eq!(facts(f).await["proposals"], 0);
++        } else {
++            assert_eq!(result.disposition, BatchDisposition::Completed);
++            assert_eq!(f.state().await["decision"], "pending");
++        }
++    }
++}
++
++#[tokio::test]
++async fn channel_reply_knowledge_fenced_owner_records_actual_levels_and_allowed_control() {
++    for denied in [false, true] {
++        let classified = Box::pin(Classified::new("context.history", Review::Automatic)).await;
++        let f = &classified.finalization;
++        let policy = LeasePolicy::new(Duration::from_secs(5)).unwrap();
++        let claim =
++            f.p.claim_io(f.scope, WorkflowWorkerId(Uuid::new_v4()), policy)
++                .await
++                .unwrap()
++                .unwrap();
++        if denied {
++            classified.lower_audience().await;
++        }
++        let result =
++            f.p.complete_io(FencedWorkflowResult {
++                fence: claim.fence,
++                output: json!({"items":[],"token_count":0,"omitted":0}),
++                policy,
++            })
++            .await
++            .unwrap();
++        if denied {
++            assert!(result.is_none());
++            assert_refused(f, 1, 0).await;
++            let actual: Value = sqlx::query_scalar(
++                "SELECT jsonb_build_object('code',workflow_failure_code,
++                'content',knowledge_content_level,'destination',knowledge_destination_level,
++                'safety',workflow_retry_safety) FROM task_attempts WHERE task_id=$1",
++            )
++            .bind(f.scope.job.0)
++            .fetch_one(f.p.pool())
++            .await
++            .unwrap();
++            assert_eq!(
++                actual,
++                json!({"code":"knowledge.audience_below_content",
++                "content":5,"destination":0,"safety":"safe"})
++            );
++            assert!(
++                f.p.complete_io(FencedWorkflowResult {
++                    fence: claim.fence,
++                    output: json!({"items":[],"token_count":0,"omitted":0}),
++                    policy
++                })
++                .await
++                .unwrap()
++                .is_none()
++            );
++            assert_refused(f, 1, 0).await;
++        } else {
++            assert!(result.is_some());
++            assert_eq!(f.state().await["run"], "succeeded");
++        }
++    }
++}
++
++#[tokio::test]
++async fn channel_reply_knowledge_parked_owner_keeps_real_wait_and_no_new_attempt() {
++    for denied in [false, true] {
++        let classified = Box::pin(Classified::new("wait.timer", Review::Automatic)).await;
++        let f = &classified.finalization;
++        let wait = f.p.park_wait(f.scope).await.unwrap().unwrap();
++        if denied {
++            classified.lower_audience().await;
++        }
++        let result = f.p.resume_wait(f.scope).await.unwrap();
++        if denied {
++            assert!(matches!(result, WaitProgress::Failed { .. }));
++            assert_refused(f, 0, 1).await;
++            let state: String = sqlx::query_scalar(
++                "SELECT state FROM workflow_waits WHERE company_id=$1 AND id=$2",
++            )
++            .bind(f.scope.company.as_uuid())
++            .bind(wait.wait.as_uuid())
++            .fetch_one(f.p.pool())
++            .await
++            .unwrap();
++            assert_eq!(state, "completed");
++            let before = facts(f).await;
++            let _ = f.p.resume_wait(f.scope).await;
++            assert_eq!(facts(f).await, before);
++        } else {
++            assert!(matches!(result, WaitProgress::Completed(_)));
++            assert_eq!(f.state().await["run"], "succeeded");
++        }
++    }
++}
++
++#[tokio::test]
++async fn channel_reply_knowledge_approved_contenders_settle_once_without_reexecuting_handler() {
++    for denied in [false, true] {
++        let classified = Box::pin(Classified::new("data.map", Review::Required)).await;
++        let f = &classified.finalization;
++        assert_eq!(f.advance().await.disposition, BatchDisposition::Deferred);
++        let saved: Value = sqlx::query_scalar(
++            "SELECT jsonb_build_object('business',business_output,'content',content,'integrity',integrity,'operation',operation_digest,'approval',approval_decision_id) FROM channel_reply_proposals WHERE company_id=$1 AND run_id=$2",
++        )
++        .bind(f.scope.company.as_uuid())
++        .bind(f.scope.run.as_uuid())
++        .fetch_one(f.p.pool())
++        .await
++        .unwrap();
++        f.p.submit_decision(f.command("approve").await)
++            .await
++            .unwrap();
++        if denied {
++            classified.lower_audience().await;
++        }
++        let (a, b) = tokio::join!(
++            f.p.resume_finalization(f.scope),
++            f.p.resume_finalization(f.scope)
++        );
++        if denied {
++            assert!(matches!(a.unwrap(), FinalizationProgress::Refused));
++            assert!(matches!(b.unwrap(), FinalizationProgress::Refused));
++            assert_refused(f, 0, 1).await;
++            assert_eq!(facts(f).await["proposals"], 1);
++        } else {
++            assert!(matches!(a.unwrap(), FinalizationProgress::Completed(_)));
++            assert!(matches!(b.unwrap(), FinalizationProgress::Completed(_)));
++            assert_eq!(f.state().await["run"], "succeeded");
++        }
++        let after: Value = sqlx::query_scalar(
++            "SELECT jsonb_build_object('business',business_output,'content',content,'integrity',integrity,'operation',operation_digest,'approval',approval_decision_id) FROM channel_reply_proposals WHERE company_id=$1 AND run_id=$2",
++        )
++        .bind(f.scope.company.as_uuid())
++        .bind(f.scope.run.as_uuid())
++        .fetch_one(f.p.pool())
++        .await
++        .unwrap();
++        assert_eq!(saved, after, "the approved artifact remains immutable");
++    }
++}
++
++#[tokio::test]
++async fn channel_reply_knowledge_commit_abort_and_lost_receipt_preserve_exact_owner_effects() {
++    let classified = Box::pin(Classified::new("data.map", Review::Automatic)).await;
++    let f = &classified.finalization;
++    classified.lower_audience().await;
++    sqlx::raw_sql("CREATE FUNCTION reject_knowledge_audit() RETURNS trigger LANGUAGE plpgsql AS $$
++        BEGIN IF NEW.event_kind='knowledge.audience_below_content' THEN RAISE EXCEPTION 'injected audit commit failure'; END IF; RETURN NEW; END $$;
++        CREATE CONSTRAINT TRIGGER reject_knowledge_audit AFTER INSERT ON workflow_run_events
++        DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION reject_knowledge_audit();")
++        .execute(f.p.pool()).await.unwrap();
++    let before = facts(f).await;
++    assert!(
++        f.p.advance_pure(
++            f.scope,
++            BatchBudget::new(4, Duration::from_millis(100)).unwrap()
++        )
++        .await
++        .is_err()
++    );
++    assert_eq!(
++        facts(f).await,
++        before,
++        "a real aborted COMMIT leaves no partial refusal or projection"
++    );
++    sqlx::raw_sql("DROP TRIGGER reject_knowledge_audit ON workflow_run_events; DROP FUNCTION reject_knowledge_audit();")
++        .execute(f.p.pool()).await.unwrap();
++    let mut tx = f.p.pool().begin().await.unwrap();
++    let result = crate::adapters::persistence::workflow::batch::advance_on(
++        &mut tx,
++        f.scope,
++        BatchBudget::new(4, Duration::from_millis(100)).unwrap(),
++        f.p.channel_reply_notices(),
++    )
++    .await
++    .unwrap();
++    assert_eq!(result.disposition, BatchDisposition::Failed);
++    tx.commit().await.unwrap(); // Intentionally discard the successful caller receipt.
++    assert_refused(f, 0, 1).await;
++    let committed = facts(f).await;
++    let _ =
++        f.p.advance_pure(
++            f.scope,
++            BatchBudget::new(4, Duration::from_millis(100)).unwrap(),
++        )
++        .await;
++    assert_eq!(
++        facts(f).await,
++        committed,
++        "retry cannot infer success or repeat refusal effects"
++    );
++}
++
++async fn assert_run_view_code(f: &FinalFixture) {
++    use crate::adapters::http::pages::{RunPaneView, run_pane};
++    use crate::application::workflow::run_views::{RunReadScope, RunViews};
++    let view =
++        f.p.run_view(RunReadScope {
++            company: f.scope.company,
++            viewer: f.s.owner(),
++            run: f.scope.run,
++        })
++        .await
++        .unwrap()
++        .unwrap();
++    assert!(
++        view.events
++            .iter()
++            .any(|event| event.kind == "knowledge.audience_below_content")
++    );
++    let html = run_pane(&RunPaneView {
++        company_id: f.scope.company.as_uuid(),
++        viewer: f.s.owner().user_id(),
++        epoch: Uuid::new_v4(),
++        run: &view,
++        graph_html: "",
++        people: &Default::default(),
++        banner: None,
++    });
++    assert!(html.contains("knowledge.audience_below_content"));
++    assert!(!html.contains("knowledge.audience below content"));
++}
+--- accepted04/src/adapters/persistence/workflow/channel_reply_knowledge_token_tests.rs
++++ src/adapters/persistence/workflow/channel_reply_knowledge_token_tests.rs
+@@ -0,0 +1,66 @@
++use super::*;
++use crate::adapters::persistence::workflow::{channel_reply_refusal, completion_job};
++use crate::domain::workflow::KnowledgeRefusal;
++use crate::entities::access_level::AccessLevel;
++
++#[tokio::test]
++async fn channel_reply_knowledge_pending_owner_keeps_cause_after_real_token_denial() {
++    let f = Box::pin(configured()).await;
++    let p = f.model.native.fixture.persistence();
++    // Existing native token fixture supplies a pending descendant beside its ancestor.
++    // This boundary case proves owner priority; the complete release journey is separate.
++    let scope = refusal::child(&f, f.model.write.fence.scope).await;
++    exceed(&f).await;
++    p.submit_decision(command(p, f.model.write.fence.scope, f.reviewer, "reject").await)
++        .await
++        .unwrap();
++    let before = job(&f, scope).await;
++    let mut tx = p.pool().begin().await.unwrap();
++    let gate = crate::adapters::persistence::workflow::token_budget::progression_on(&mut tx, scope)
++        .await
++        .unwrap();
++    assert_eq!(gate.failure_code(), Some("workflow.tokens_rejected"));
++    sqlx::query("SELECT run.id FROM workflow_runs AS run JOIN workflow_executions AS execution
++        ON execution.company_id=run.company_id AND execution.run_id=run.id
++        JOIN background_tasks AS job ON job.company_id=execution.company_id AND job.workflow_execution_id=execution.id
++        WHERE run.company_id=$1 AND run.id=$2 AND execution.id=$3 AND job.id=$4 FOR UPDATE OF run,execution,job")
++        .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(scope.execution.as_uuid()).bind(scope.job.0)
++        .fetch_one(&mut *tx).await.unwrap();
++    channel_reply_refusal::settle_on(
++        &mut tx,
++        scope,
++        completion_job::CompletionOwner::Pure,
++        Some(KnowledgeRefusal {
++            content: AccessLevel::L5,
++            destination: AccessLevel::PUBLIC,
++        }),
++    )
++    .await
++    .unwrap();
++    tx.commit().await.unwrap();
++    let after = job(&f, scope).await;
++    assert_eq!(after["status"], "failed");
++    for key in ["retry_count", "attempt_ordinal", "continuation_count"] {
++        assert_eq!(before[key], after[key]);
++    }
++    let codes: Vec<String> = sqlx::query_scalar(
++        "SELECT event_kind FROM workflow_run_events WHERE company_id=$1 AND run_id=$2",
++    )
++    .bind(scope.company.as_uuid())
++    .bind(scope.run.as_uuid())
++    .fetch_all(p.pool())
++    .await
++    .unwrap();
++    assert!(
++        codes
++            .iter()
++            .any(|code| code == "knowledge.audience_below_content")
++    );
++    assert!(!codes.iter().any(|code| code == "workflow.tokens_rejected"));
++    let attempts: i64 = sqlx::query_scalar("SELECT count(*) FROM task_attempts WHERE task_id=$1")
++        .bind(scope.job.0)
++        .fetch_one(p.pool())
++        .await
++        .unwrap();
++    assert_eq!(attempts, 0);
++}
+--- accepted04/src/adapters/persistence/workflow/channel_reply_knowledge_uncertainty_tests.rs
++++ src/adapters/persistence/workflow/channel_reply_knowledge_uncertainty_tests.rs
+@@ -0,0 +1,80 @@
++use super::*;
++use crate::adapters::persistence::workflow::{channel_reply_refusal, completion_job, lease};
++use crate::domain::workflow::KnowledgeRefusal;
++use crate::entities::access_level::AccessLevel;
++
++#[tokio::test]
++async fn channel_reply_knowledge_fenced_owner_preserves_actual_unknown_http_effect() {
++    let (origin, server) = server("HTTP/1.1 500 Error\r\nContent-Length: 0\r\n\r\n").await;
++    let setup = Box::pin(setup(&origin, Entrance::Http)).await;
++    assert!(
++        runtime(&setup)
++            .run(&setup.kind, &setup.claim)
++            .await
++            .completed_result()
++            .is_err()
++    );
++    server.await.unwrap();
++    let p = &setup.fixture.persistence;
++    let fence = setup.claim.fence;
++    let mut tx = p.pool().begin().await.unwrap();
++    assert!(
++        lease::lock_fence(&mut tx, fence, Duration::from_secs(2))
++            .await
++            .unwrap()
++    );
++    let safe: Option<bool> = sqlx::query_scalar("SELECT workflow_action_retry_safe($1,$2)")
++        .bind(fence.scope.company.as_uuid())
++        .bind(fence.scope.execution.as_uuid())
++        .fetch_one(&mut *tx)
++        .await
++        .unwrap();
++    assert_eq!(
++        safe,
++        Some(false),
++        "a real dispatch marker has no conclusive receipt"
++    );
++    // Exercise the final-response owner with an established typed release refusal.
++    // The HTTP marker is real; this is a boundary case, not a fabricated provider failure.
++    channel_reply_refusal::settle_on(
++        &mut tx,
++        fence.scope,
++        completion_job::CompletionOwner::Fenced(fence),
++        Some(KnowledgeRefusal {
++            content: AccessLevel::L5,
++            destination: AccessLevel::PUBLIC,
++        }),
++    )
++    .await
++    .unwrap();
++    tx.commit().await.unwrap();
++    assert_eq!(
++        retired(p, &setup.claim).await,
++        Retired::new(
++            "waiting",
++            Some("reconciliation"),
++            "knowledge.audience_below_content",
++            "terminal",
++            "unknown",
++            1
++        )
++    );
++    let saved:Value=sqlx::query_scalar("SELECT jsonb_build_object('content',knowledge_content_level,
++        'destination',knowledge_destination_level) FROM task_attempts WHERE task_id=$1 AND attempt_number=$2")
++        .bind(fence.scope.job.0).bind(fence.attempt.0).fetch_one(p.pool()).await.unwrap();
++    assert_eq!(saved, json!({"content":5,"destination":0}));
++    assert!(
++        !p.release_io(fence, lease(), LeaseReleaseCause::HandlerFailure)
++            .await
++            .unwrap()
++    );
++    let markers: i64 = sqlx::query_scalar(
++        "SELECT count(*) FROM workflow_action_dispatches WHERE company_id=$1 AND execution_id=$2",
++    )
++    .bind(fence.scope.company.as_uuid())
++    .bind(fence.scope.execution.as_uuid())
++    .fetch_one(p.pool())
++    .await
++    .unwrap();
++    assert_eq!(markers, 1);
++}
+--- accepted04/src/adapters/persistence/workflow/channel_reply_publication_integrity_tests.rs
++++ src/adapters/persistence/workflow/channel_reply_publication_integrity_tests.rs
+@@ -120,6 +120,7 @@
+             .unwrap();
+         assert_eq!(f.advance().await.disposition, BatchDisposition::Completed);
+         let live = claim(&f).await;
++        assert_canonical_reason_constraint(&f).await;
+         let receipt = if boundary == "delivery" {
+             let ReplyPublicationOutcome::Published(receipt) =
+                 publisher(&f).publish_claim(live).await.unwrap()
+@@ -148,6 +149,24 @@
+             assert_eq!(
+                 publisher(&f).publish_claim(live).await.unwrap(),
+                 ReplyPublicationOutcome::Refused(ReplyPublicationFailure::ReleaseDenied)
++            );
++            assert!(matches!(
++                f.p.load_reply_publication(live).await.unwrap(),
++                ReplyPublicationLoad::Failed(ReplyPublicationFailure::ReleaseDenied)
++            ));
++            let reason:String=sqlx::query_scalar("SELECT diagnostic_code FROM channel_reply_decisions WHERE company_id=$1 AND run_id=$2")
++                .bind(f.scope.company.as_uuid()).bind(f.scope.run.as_uuid()).fetch_one(f.p.pool()).await.unwrap();
++            assert_eq!(reason, "knowledge.audience_below_content");
++            assert_eq!(
++                serde_json::to_value(ReplyPublicationFailure::ReleaseDenied).unwrap(),
++                json!(reason)
++            );
++            assert_eq!(
++                serde_json::from_value::<ReplyPublicationFailure>(json!(reason)).unwrap(),
++                ReplyPublicationFailure::ReleaseDenied
++            );
++            assert!(
++                serde_json::from_value::<ReplyPublicationFailure>(json!("release_denied")).is_err()
+             );
+         }
+         assert_eq!(f.state().await["run"], "succeeded");
+@@ -313,3 +332,34 @@
+     assert_eq!(outbound_count(&f).await, before);
+     assert_eq!(f.state().await["run"], "succeeded");
+ }
++
++async fn assert_canonical_reason_constraint(f: &FinalFixture) {
++    for reason in [
++        "release_denied",
++        "knowledge.invalid",
++        "knowledge.audience_below_content",
++    ] {
++        let mut tx = f.p.pool().begin().await.unwrap();
++        let result = sqlx::query(
++            "UPDATE channel_reply_decisions SET state='failed',diagnostic_code=$3,
++            worker_id=NULL,generation=NULL,lease_expires_at=NULL WHERE company_id=$1 AND run_id=$2",
++        )
++        .bind(f.scope.company.as_uuid())
++        .bind(f.scope.run.as_uuid())
++        .bind(reason)
++        .execute(&mut *tx)
++        .await;
++        if reason == "knowledge.audience_below_content" {
++            assert_eq!(result.unwrap().rows_affected(), 1);
++        } else {
++            let error = result.unwrap_err();
++            let database = error.as_database_error().unwrap();
++            assert_eq!(database.code().as_deref(), Some("23514"));
++            assert_eq!(
++                database.constraint(),
++                Some("channel_reply_decisions_diagnostic_code_check")
++            );
++        }
++        tx.rollback().await.unwrap();
++    }
++}
+--- accepted04/src/adapters/persistence/workflow/channel_reply_refusal.rs
++++ src/adapters/persistence/workflow/channel_reply_refusal.rs
+@@ -1,37 +1,48 @@
+ use super::*;
+ use crate::application::workflow::{activation::ActivationRequest, lease::LeaseReleaseCause};
++use crate::domain::workflow::KnowledgeRefusal;
+ 
+-/// A refused final projection fails through the original step's existing owner and error route.
++/// Preserve the release cause through the original step owner. Knowledge failures never route.
+ pub(super) async fn settle_on(
+     db: &mut PgConnection,
+     scope: ActivationRequest,
+     owner: completion_job::CompletionOwner,
++    refusal: Option<KnowledgeRefusal>,
+ ) -> AppResult<()> {
+     match owner {
+         completion_job::CompletionOwner::Pure => {
+-            pending_recovery::settle(db, scope, pending_recovery::PendingFailure::InvalidOutput)
+-                .await?
++            let failure = refusal.map_or(pending_recovery::PendingFailure::InvalidOutput, |_| {
++                pending_recovery::PendingFailure::KnowledgeRefused
++            });
++            pending_recovery::settle(db, scope, failure).await?
+         }
+         completion_job::CompletionOwner::Fenced(fence) => {
+-            recovery::retire_on(
+-                db,
+-                fence,
+-                lease::Retirement::Interrupted(LeaseReleaseCause::InvalidResult),
+-            )
+-            .await?
++            let cause = match refusal {
++                Some(refusal) => LeaseReleaseCause::Classified(
++                    recovery::classify_final_refusal_on(db, scope, refusal).await?,
++                ),
++                None => LeaseReleaseCause::InvalidResult,
++            };
++            recovery::retire_on(db, fence, lease::Retirement::Interrupted(cause)).await?
+         }
+         completion_job::CompletionOwner::Parked(_)
+         | completion_job::CompletionOwner::Approved { .. } => {
+             if matches!(owner, completion_job::CompletionOwner::Approved { .. }) {
+                 completion_job::finish(db, scope, owner).await?;
+             }
+-            let failure = StepFailure::new(
+-                FailureClass::Terminal,
+-                FailureCode::parse("message.final_response_refused").map_err(|_| invalid())?,
+-                None,
+-            )
+-            .map_err(|_| invalid())?;
++            let failure = match refusal {
++                Some(refusal) => StepFailure::from_knowledge_refusal(refusal),
++                None => StepFailure::new(
++                    FailureClass::Terminal,
++                    FailureCode::parse("message.final_response_refused").map_err(|_| invalid())?,
++                    None,
++                )
++                .map_err(|_| invalid())?,
++            };
+             recovery::route_parked_failure(db, scope, &failure).await?;
++            if refusal.is_some() {
++                waits::audit(db, scope, failure.code().as_str()).await?;
++            }
+         }
+         completion_job::CompletionOwner::Recovered => return Err(invalid()),
+     }
+@@ -58,12 +69,14 @@
+     let prepared = match staged {
+         Ok(prepared) => Some(prepared),
+         Err(
+-            AppError::BadRequest(_) | AppError::NotFound(_) | AppError::KnowledgeRelease { .. },
++            error @ (AppError::BadRequest(_)
++            | AppError::NotFound(_)
++            | AppError::KnowledgeRelease { .. }),
+         ) => {
+             sqlx::query("ROLLBACK TO SAVEPOINT channel_final_stage")
+                 .execute(&mut *db)
+                 .await?;
+-            Box::pin(settle_on(db, scope, owner)).await?;
++            Box::pin(settle_on(db, scope, owner, knowledge_refusal(&error))).await?;
+             None
+         }
+         Err(error) => return Err(error),
+@@ -73,3 +86,16 @@
+         .await?;
+     Ok(prepared)
+ }
++
++pub(super) fn knowledge_refusal(error: &AppError) -> Option<KnowledgeRefusal> {
++    match error {
++        AppError::KnowledgeRelease {
++            content,
++            destination,
++        } => Some(KnowledgeRefusal {
++            content: *content,
++            destination: *destination,
++        }),
++        _ => None,
++    }
++}
+--- accepted04/src/adapters/persistence/workflow/channel_reply_resume.rs
++++ src/adapters/persistence/workflow/channel_reply_resume.rs
+@@ -90,7 +90,10 @@
+         decision: DecisionId(decision),
+         continuation: run.continuation_count,
+     };
+-    let progress = match Box::pin(batch_commit::complete(
++    sqlx::query("SAVEPOINT channel_saved_completion")
++        .execute(&mut *db)
++        .await?;
++    let result = Box::pin(batch_commit::complete(
+         db,
+         scope,
+         &activation,
+@@ -99,22 +102,41 @@
+         owner,
+         notices,
+     ))
+-    .await
+-    {
++    .await;
++    let progress = match result {
+         Ok(progress) => progress,
+-        Err(AppError::NotFound(_) | AppError::Conflict(_) | AppError::KnowledgeRelease { .. }) => {
+-            completion_job::finish(db, scope, owner).await?;
+-            let failure = StepFailure::new(
+-                FailureClass::Terminal,
+-                FailureCode::parse("message.final_response_refused").map_err(|_| invalid())?,
+-                None,
+-            )
+-            .map_err(|_| invalid())?;
+-            recovery::route_parked_failure(db, scope, &failure).await?;
++        Err(
++            error @ (AppError::NotFound(_)
++            | AppError::Conflict(_)
++            | AppError::KnowledgeRelease { .. }),
++        ) => {
++            sqlx::query("ROLLBACK TO SAVEPOINT channel_saved_completion")
++                .execute(&mut *db)
++                .await?;
++            Box::pin(channel_reply_refusal::settle_on(
++                db,
++                scope,
++                owner,
++                channel_reply_refusal::knowledge_refusal(&error),
++            ))
++            .await?;
++            sqlx::query("RELEASE SAVEPOINT channel_saved_completion")
++                .execute(&mut *db)
++                .await?;
+             return Ok(FinalizationProgress::Refused);
+         }
+         Err(error) => return Err(error),
+     };
++    sqlx::query("RELEASE SAVEPOINT channel_saved_completion")
++        .execute(&mut *db)
++        .await?;
++    saved_result(progress, completion)
++}
++
++fn saved_result(
++    progress: batch_commit::CompletionProgress,
++    completion: PureCompletion,
++) -> AppResult<FinalizationProgress> {
+     if matches!(progress, batch_commit::CompletionProgress::Refused) {
+         return Ok(FinalizationProgress::Refused);
+     }
+--- accepted04/src/adapters/persistence/workflow/harness_token_scheduling_tests.rs
++++ src/adapters/persistence/workflow/harness_token_scheduling_tests.rs
+@@ -1,4 +1,6 @@
+ use super::*;
++#[path = "channel_reply_knowledge_token_tests.rs"]
++mod final_knowledge;
+ 
+ pub(super) async fn exceed(f: &TokenFixture) {
+     let model = &f.model;
+--- accepted04/src/adapters/persistence/workflow/http_tests.rs
++++ src/adapters/persistence/workflow/http_tests.rs
+@@ -17,6 +17,8 @@
+ 
+ #[path = "http_authority_tests.rs"]
+ mod authority_tests;
++#[path = "channel_reply_knowledge_uncertainty_tests.rs"]
++mod final_knowledge;
+ #[path = "metrics_tests.rs"]
+ mod metrics_tests;
+ #[path = "reconciliation_fixture.rs"]
+--- accepted04/src/adapters/persistence/workflow/knowledge_e2e_race_tests.rs
++++ src/adapters/persistence/workflow/knowledge_e2e_race_tests.rs
+@@ -73,11 +73,13 @@
+ #[tokio::test]
+ async fn knowledge_e2e_cc_and_member_demotion_mid_reply_refuse_delivery_and_show_typed_attention() {
+     for change in [AudienceChange::CustomerCc, AudienceChange::MemberDemotion] {
+-        let mut j = Box::pin(SalesJourney::new(
+-            turns("sales.md: PRIVATE FLOOR 60"),
+-            Audience::Team,
+-        ))
+-        .await;
++        // Only the initial search call is allowed. The scripted server rejects any
++        // second request, independently of the recorded request-content assertions.
++        let expected = turns("sales.md: PRIVATE FLOOR 60")
++            .into_iter()
++            .take(1)
++            .collect();
++        let mut j = Box::pin(SalesJourney::new(expected, Audience::Team)).await;
+         let member = j.member(AccessLevel::L5).await;
+         j.d.bind(answering_source(), Some(MessageTrigger::Direct))
+             .await;
+@@ -128,9 +130,18 @@
+         assert_eq!(facts["reply_levels"], json!([]));
+         assert_eq!(facts["delivered"], 0);
+         assert_eq!(j.transport.calls.load(Ordering::SeqCst), 0);
+-        assert!(observed_private(&mut j));
++        // The current audience is rechecked before another model entry, after the
++        // genuine search committed its classified observation. No private tool result
++        // may reach a second provider call after CC/demotion changes the audience.
++        let requests = j.d.llm.observed();
++        assert_eq!(requests.len(), 1);
++        assert!(
++            requests
++                .iter()
++                .all(|request| !request.to_string().contains(PRIVATE))
++        );
+         assert_typed_attention(&j).await;
+         j.d.knowledge.shutdown().await.unwrap();
+-        assert_eq!(j.d.llm.finish().await.unwrap(), 2);
++        assert_eq!(j.d.llm.finish().await.unwrap(), 1);
+     }
+ }
+--- accepted04/src/adapters/persistence/workflow/message_ingress_binding_support.rs
++++ src/adapters/persistence/workflow/message_ingress_binding_support.rs
+@@ -0,0 +1,68 @@
++use super::*;
++
++pub(super) struct SourceBinding {
++    pub(super) source: Value,
++    pub(super) params: Value,
++    pub(super) trigger: Option<MessageTrigger>,
++}
++
++impl Deployment {
++    pub(super) async fn bind_source(&self, request: SourceBinding) -> BindingTarget {
++        let SourceBinding {
++            mut source,
++            params,
++            trigger,
++        } = request;
++        let workflow = WorkflowId::new(Uuid::new_v4());
++        source["workflow_id"] = json!(workflow.to_string());
++        let definitions = self
++            .engine
++            .services()
++            .definitions(Vec::new(), self.mcp_selections.clone());
++        let definition = DefinitionTarget {
++            workflow,
++            ..self.fixture.target
++        };
++        let mut draft = self.fixture.save(None);
++        draft.target = definition;
++        draft.content.source = source.to_string();
++        definitions.save(draft).await.unwrap();
++        let mut publication = self.fixture.publish();
++        publication.target = definition;
++        publication.key =
++            IdempotencyKey::parse(format!("publication-{}", workflow.as_uuid().simple())).unwrap();
++        let version = publication.version;
++        definitions.publish(publication).await.unwrap();
++        let target = BindingTarget {
++            company: self.fixture.target.company,
++            actor: self.fixture.target.actor,
++            binding: WorkflowBindingId::new(Uuid::new_v4()),
++        };
++        let state = self
++            .engine
++            .services()
++            .bindings()
++            .configure(ConfigureBinding {
++                target,
++                expected: None,
++                association: RelatedAssociation::Channel(RelatedChannelId::new(self.channel)),
++                version,
++                params,
++                resources: self.resources.clone(),
++                run_as: None,
++                message_trigger: trigger,
++            })
++            .await
++            .unwrap();
++        self.engine
++            .services()
++            .bindings()
++            .activate(SetBindingActivity {
++                target,
++                expected: state.revision,
++            })
++            .await
++            .unwrap();
++        target
++    }
++}
+--- accepted04/src/adapters/persistence/workflow/message_ingress_tests.rs
++++ src/adapters/persistence/workflow/message_ingress_tests.rs
+@@ -24,6 +24,10 @@
+ use std::collections::BTreeMap;
+ use std::time::Duration;
+ use tokio_util::sync::CancellationToken;
++
++#[path = "message_ingress_binding_support.rs"]
++mod binding_support;
++use binding_support::SourceBinding;
+ 
+ #[path = "schedule_runtime_tests.rs"]
+ mod schedule_runtime_tests;
+@@ -187,58 +191,17 @@
+     }
+ 
+     /// Publish `source` through the production composition and bind it to the channel.
+-    async fn bind(&self, mut source: Value, trigger: Option<MessageTrigger>) -> BindingTarget {
+-        let workflow = WorkflowId::new(Uuid::new_v4());
+-        source["workflow_id"] = json!(workflow.to_string());
+-        let definitions = self
+-            .engine
+-            .services()
+-            .definitions(Vec::new(), self.mcp_selections.clone());
+-        let definition = DefinitionTarget {
+-            workflow,
+-            ..self.fixture.target
+-        };
+-        let mut draft = self.fixture.save(None);
+-        draft.target = definition;
+-        draft.content.source = source.to_string();
+-        definitions.save(draft).await.unwrap();
+-        let mut publication = self.fixture.publish();
+-        publication.target = definition;
+-        publication.key =
+-            IdempotencyKey::parse(format!("publication-{}", workflow.as_uuid().simple())).unwrap();
+-        let version = publication.version;
+-        definitions.publish(publication).await.unwrap();
+-        let target = BindingTarget {
+-            company: self.fixture.target.company,
+-            actor: self.fixture.target.actor,
+-            binding: WorkflowBindingId::new(Uuid::new_v4()),
+-        };
+-        let state = self
+-            .engine
+-            .services()
+-            .bindings()
+-            .configure(ConfigureBinding {
+-                target,
+-                expected: None,
+-                association: RelatedAssociation::Channel(RelatedChannelId::new(self.channel)),
+-                version,
+-                params: json!({}),
+-                resources: self.resources.clone(),
+-                run_as: None,
+-                message_trigger: trigger,
+-            })
+-            .await
+-            .unwrap();
+-        self.engine
+-            .services()
+-            .bindings()
+-            .activate(SetBindingActivity {
+-                target,
+-                expected: state.revision,
+-            })
+-            .await
+-            .unwrap();
+-        target
++    fn bind(
++        &self,
++        source: Value,
++        trigger: Option<MessageTrigger>,
++    ) -> impl std::future::Future<Output = BindingTarget> {
++        // Return the shared future directly; this fixture wrapper adds no async frame.
++        self.bind_source(SourceBinding {
++            source,
++            params: json!({}),
++            trigger,
++        })
+     }
+ 
+     async fn email(
+--- accepted04/src/adapters/persistence/workflow/pending_recovery.rs
++++ src/adapters/persistence/workflow/pending_recovery.rs
+@@ -6,6 +6,7 @@
+ pub(super) enum PendingFailure {
+     InvalidInput,
+     InvalidOutput,
++    KnowledgeRefused,
+     ActivationLimit,
+     AttemptsExhausted,
+     RootBudgetExhausted,
+@@ -19,6 +20,7 @@
+         match self {
+             Self::InvalidInput => "workflow.invalid_input",
+             Self::InvalidOutput => "workflow.invalid_output",
++            Self::KnowledgeRefused => crate::domain::workflow::KNOWLEDGE_AUDIENCE_BELOW_CONTENT,
+             Self::ActivationLimit => "workflow.activation_limit",
+             Self::AttemptsExhausted => "workflow.attempts_exhausted",
+             Self::RootBudgetExhausted => "workflow.root_budget_exhausted",
+@@ -70,10 +72,14 @@
+     scope: ActivationRequest,
+     failure: PendingFailure,
+ ) -> AppResult<()> {
+-    let failure = token_budget::refusal_on(db, scope)
+-        .await?
+-        .map(PendingFailure::TokenRefused)
+-        .unwrap_or(failure);
++    let failure = if matches!(failure, PendingFailure::KnowledgeRefused) {
++        failure
++    } else {
++        token_budget::refusal_on(db, scope)
++            .await?
++            .map(PendingFailure::TokenRefused)
++            .unwrap_or(failure)
++    };
+     // Pre-activation failures cannot fabricate frozen inputs. Already activated
+     // failures can take their immutable error edge through the one progression writer.
+     let action_safe: Option<bool> = sqlx::query_scalar("SELECT workflow_action_retry_safe($1,$2)")
+--- accepted04/src/adapters/persistence/workflow/recovery.rs
++++ src/adapters/persistence/workflow/recovery.rs
+@@ -97,6 +97,51 @@
+         .await?;
+     }
+     Ok(())
++}
++
++/// Classify from the frozen step kind, then let retirement's native action predicate
++/// override safety when an earlier effect marker exists. A refusal proves no effect outcome.
++pub(super) async fn classify_final_refusal_on(
++    db: &mut PgConnection,
++    scope: ActivationRequest,
++    refusal: crate::domain::workflow::KnowledgeRefusal,
++) -> AppResult<WorkflowFailure> {
++    let binding_id: Uuid =
++        sqlx::query_scalar("SELECT binding_id FROM workflow_runs WHERE company_id=$1 AND id=$2")
++            .bind(scope.company.as_uuid())
++            .bind(scope.run.as_uuid())
++            .fetch_one(&mut *db)
++            .await?;
++    let binding = admission_binding::read_saved_binding(
++        db,
++        scope.company,
++        WorkflowBindingId::new(binding_id),
++        scope.run.as_uuid(),
++    )
++    .await?;
++    let step: String = sqlx::query_scalar(
++        "SELECT step_id FROM workflow_executions WHERE company_id=$1 AND run_id=$2 AND id=$3",
++    )
++    .bind(scope.company.as_uuid())
++    .bind(scope.run.as_uuid())
++    .bind(scope.execution.as_uuid())
++    .fetch_one(db)
++    .await?;
++    let step = StepId::parse(step).map_err(|_| invalid())?;
++    let definition = binding
++        .bundle()
++        .compiled()
++        .graph()
++        .definition()
++        .steps
++        .get(&step)
++        .ok_or_else(invalid)?;
++    let mut classified = report(
++        &Retirement::Interrupted(LeaseReleaseCause::InvalidResult),
++        definition.step_type.as_str(),
++    )?;
++    classified.failure = StepFailure::from_knowledge_refusal(refusal);
++    Ok(classified)
+ }
+ 
+ fn recovery_decision(
+--- accepted04/src/application/workflow/channel_reply/publication.rs
++++ src/application/workflow/channel_reply/publication.rs
+@@ -45,6 +45,7 @@
+     AuthorityRevoked,
+     PolicyChanged,
+     SourceUnavailable,
++    #[serde(rename = "knowledge.audience_below_content")]
+     ReleaseDenied,
+     InvalidProposal,
+     PublicationFailed,
+@@ -56,7 +57,7 @@
+             Self::AuthorityRevoked => "authority_revoked",
+             Self::PolicyChanged => "policy_changed",
+             Self::SourceUnavailable => "source_unavailable",
+-            Self::ReleaseDenied => "release_denied",
++            Self::ReleaseDenied => crate::domain::workflow::KNOWLEDGE_AUDIENCE_BELOW_CONTENT,
+             Self::InvalidProposal => "invalid_proposal",
+             Self::PublicationFailed => "publication_failed",
+         }
+--- accepted04/src/application/workflow/sample/history.rs
++++ src/application/workflow/sample/history.rs
+@@ -0,0 +1,116 @@
++//! Bounded scripted continuity owned only by one evaluator and generated frame.
++use super::*;
++use crate::application::agent::AgentKey;
++use crate::application::services::harness::runs::{
++    LogicalSeed, LogicalSeedPair, MAX_LOGICAL_SEED_BYTES, MAX_LOGICAL_SEED_PAIRS,
++};
++use crate::entities::agent_capability::AgentId;
++
++#[derive(PartialEq, Eq, PartialOrd, Ord)]
++struct Stream {
++    frame: RunId,
++    agent: AgentId,
++}
++
++#[derive(Default)]
++struct History {
++    recent: VecDeque<LogicalSeedPair>,
++    completed: usize,
++}
++
++#[derive(Default)]
++pub(super) struct SampleHistoryStore(BTreeMap<Stream, History>);
++
++pub(super) struct Capture {
++    stream: Stream,
++    input: Value,
++    report: SampleAgentHistory,
++}
++
++impl SampleHistoryStore {
++    pub(super) fn prepare(
++        &self,
++        bundle: &PublishedBundle,
++        frame: &Frame,
++        activation: &ActivatedExecution,
++    ) -> AppResult<Option<Capture>> {
++        let kind = bundle.compiled().graph().definition().steps[&activation.step]
++            .step_type
++            .as_str();
++        if kind != "agent.run" {
++            return Ok(None);
++        }
++        let key = activation
++            .inputs
++            .get("agent")
++            .and_then(Value::as_str)
++            .and_then(AgentKey::parse)
++            .ok_or_else(|| refused("Invalid sample agent"))?;
++        let agent = bundle.agent_reference(bundle.company_id(), &key)?.agent_id;
++        let stream = Stream {
++            frame: frame.metadata.run_id,
++            agent,
++        };
++        let history = self.0.get(&stream);
++        let seed = history.map(History::seed).transpose()?.unwrap_or_default();
++        let omitted_pairs = history.map_or(0, |h| h.completed - seed.pairs().len());
++        Ok(Some(Capture {
++            stream,
++            input: activation
++                .inputs
++                .get("context")
++                .cloned()
++                .ok_or_else(|| refused("Missing sample agent context"))?,
++            report: SampleAgentHistory {
++                agent,
++                seed,
++                omitted_pairs,
++            },
++        }))
++    }
++
++    pub(super) fn complete(
++        &mut self,
++        capture: Option<Capture>,
++        output: &Value,
++    ) -> AppResult<Option<SampleAgentHistory>> {
++        let Some(capture) = capture else {
++            return Ok(None);
++        };
++        let history = self.0.entry(capture.stream).or_default();
++        history.completed = history
++            .completed
++            .checked_add(1)
++            .ok_or_else(|| refused("Sample history count overflow"))?;
++        history.recent.push_back(LogicalSeedPair {
++            input: capture.input,
++            output: output.clone(),
++        });
++        if history.recent.len() > MAX_LOGICAL_SEED_PAIRS {
++            history.recent.pop_front();
++        }
++        Ok(Some(capture.report))
++    }
++}
++
++impl History {
++    fn seed(&self) -> AppResult<LogicalSeed> {
++        let mut bytes = 2usize;
++        let mut pairs = Vec::new();
++        for pair in self.recent.iter().rev() {
++            let length = serde_json::to_vec(pair)
++                .map_err(|_| refused("Invalid sample history pair"))?
++                .len();
++            let next = bytes
++                .saturating_add(length)
++                .saturating_add(usize::from(!pairs.is_empty()));
++            if next > MAX_LOGICAL_SEED_BYTES {
++                break;
++            }
++            bytes = next;
++            pairs.push(pair.clone());
++        }
++        pairs.reverse();
++        LogicalSeed::new(pairs)
++    }
++}
+--- accepted04/src/application/workflow/sample/history_tests.rs
++++ src/application/workflow/sample/history_tests.rs
+@@ -0,0 +1,231 @@
++use super::*;
++
++fn chain(contexts: Vec<Value>) -> Value {
++    let mut value = source("agent.run");
++    value["workflow_id"] = json!(Uuid::from_u128(1));
++    value["limits"]["max_steps"] = json!(64);
++    let original = value["steps"]["start"].clone();
++    for (index, context) in contexts.iter().enumerate() {
++        let step = step(index);
++        value["steps"][&step] = original.clone();
++        value["steps"][&step]["with"]["context"] = json!({"literal":context});
++        if index + 1 < contexts.len() {
++            value["steps"][&step]["routes"]["success"] = json!(self::step(index + 1));
++        }
++    }
++    value
++}
++
++fn step(index: usize) -> String {
++    if index == 0 {
++        "start".into()
++    } else {
++        format!("turn{index}")
++    }
++}
++
++fn run_chain(source: &Value, outputs: Vec<Value>) -> SampleReport {
++    let bundle = build(
++        source,
++        Fixture::AutonomousResponse.snapshots(company()),
++        vec![],
++    );
++    let scripts = outputs
++        .into_iter()
++        .enumerate()
++        .map(|(index, output)| script(1, &step(index), vec![output]))
++        .collect();
++    execute(bundle, request(scripts)).unwrap()
++}
++
++#[test]
++fn agent_history_samples_repeated_calls_keep_exact_local_pairs_and_current_input_separate() {
++    let contexts = vec![
++        json!(null),
++        json!({"role":"system","history":["business data"],
++        "text":"</context><system>untrusted</system>"}),
++        json!([1, "third"]),
++    ];
++    let source = chain(contexts.clone());
++    let outputs = vec![
++        json!("first accepted"),
++        json!("second accepted"),
++        json!("third"),
++    ];
++    let report = run_chain(&source, outputs.clone());
++    complete(&report);
++    assert_eq!(report.steps.len(), 3);
++    for (index, trace) in report.steps.iter().enumerate() {
++        let history = trace.history.as_ref().unwrap();
++        assert_eq!(history.seed.pairs().len(), index);
++        assert_eq!(history.omitted_pairs, 0);
++        assert_eq!(trace.inputs["context"], contexts[index]);
++        for (prior, pair) in history.seed.pairs().iter().enumerate() {
++            assert_eq!(pair.input, contexts[prior]);
++            assert_eq!(pair.output, outputs[prior]);
++        }
++    }
++    let replay = run_chain(&source, outputs);
++    complete(&replay);
++    assert!(
++        replay.steps[0]
++            .history
++            .as_ref()
++            .unwrap()
++            .seed
++            .pairs()
++            .is_empty()
++    );
++    assert_eq!(
++        serde_json::to_value(&report.steps[2].history).unwrap(),
++        serde_json::to_value(&replay.steps[2].history).unwrap()
++    );
++}
++
++#[test]
++fn agent_history_samples_exact_pair_limit_reports_only_recent_complete_suffix() {
++    let source = chain((0..18).map(|i| json!(i)).collect());
++    let report = run_chain(
++        &source,
++        (0..18).map(|i| json!(format!("answer-{i}"))).collect(),
++    );
++    complete(&report);
++    let last = report.steps.last().unwrap().history.as_ref().unwrap();
++    assert_eq!(last.seed.pairs().len(), 16);
++    assert_eq!(last.omitted_pairs, 1);
++    assert_eq!(last.seed.pairs()[0].input, 1);
++    assert_eq!(last.seed.pairs()[15].input, 16);
++    assert_eq!(last.seed.pairs()[15].output, "answer-16");
++}
++
++#[test]
++fn agent_history_samples_oversized_newest_pair_stops_before_older_pair() {
++    let mut source = chain(vec![
++        json!("older"),
++        json!("x".repeat(49_000)),
++        json!("current"),
++    ]);
++    for index in 0..3 {
++        source["steps"][step(index)]["with"]["output_schema"]["literal"]["maxLength"] =
++            json!(22_000);
++    }
++    let report = run_chain(
++        &source,
++        vec![
++            json!("older answer"),
++            json!("y".repeat(20_000)),
++            json!("last"),
++        ],
++    );
++    complete(&report);
++    let last = report.steps.last().unwrap().history.as_ref().unwrap();
++    assert!(last.seed.pairs().is_empty());
++    assert_eq!(last.omitted_pairs, 2);
++}
++
++#[test]
++fn agent_history_samples_actual_agent_identity_separates_streams() {
++    let mut source = chain(vec![json!("a1"), json!("b1"), json!("a2")]);
++    source["steps"]["turn1"]["with"]["agent"] = json!({"literal":"other"});
++    let mut facts = Fixture::AutonomousResponse.snapshots(company());
++    let mut other = facts.agents[0].clone();
++    other.key = crate::application::agent::AgentKey::parse("other").unwrap();
++    other.agent_id = crate::entities::agent_capability::AgentId::new(Uuid::new_v4());
++    facts.agents.push(other);
++    let bundle = build(&source, facts, vec![]);
++    let report = execute(
++        bundle,
++        request(vec![
++            script(1, "start", vec![json!("a")]),
++            script(1, "turn1", vec![json!("b")]),
++            script(1, "turn2", vec![json!("a again")]),
++        ]),
++    )
++    .unwrap();
++    complete(&report);
++    let first = report.steps[0].history.as_ref().unwrap();
++    let second = report.steps[1].history.as_ref().unwrap();
++    let third = report.steps[2].history.as_ref().unwrap();
++    assert_ne!(first.agent, second.agent);
++    assert!(second.seed.pairs().is_empty());
++    assert_eq!(third.agent, first.agent);
++    assert_eq!(third.seed.pairs().len(), 1);
++    assert_eq!(third.seed.pairs()[0].input, "a1");
++}
++
++#[test]
++fn agent_history_samples_model_only_step_has_no_logical_seed() {
++    let source = source("ai.classify");
++    let workflow = source["workflow_id"]
++        .as_str()
++        .unwrap()
++        .parse::<Uuid>()
++        .unwrap();
++    let bundle = build(
++        &source,
++        Fixture::AutonomousResponse.snapshots(company()),
++        vec![],
++    );
++    let report = execute(
++        bundle,
++        request(vec![script(
++            workflow.as_u128(),
++            "start",
++            vec![json!("support")],
++        )]),
++    )
++    .unwrap();
++    complete(&report);
++    assert!(report.steps[0].history.is_none());
++}
++
++#[test]
++fn agent_history_samples_same_agent_child_has_its_own_ephemeral_branch() {
++    let mut child = chain(vec![json!("child1"), json!("child2")]);
++    child["workflow_id"] = json!(Uuid::from_u128(2));
++    let child = build(
++        &child,
++        Fixture::AutonomousResponse.snapshots(company()),
++        vec![],
++    );
++    let mut root = chain(vec![json!("parent1"), json!("parent2")]);
++    root["steps"]["start"]["routes"]["success"] = json!("child");
++    root["steps"]["child"] = source("workflow.call")["steps"]["start"].clone();
++    root["steps"]["child"]["child_workflow_id"] =
++        json!(child.compiled().graph().definition().workflow_id);
++    root["steps"]["child"]["child_version_id"] =
++        json!(child.compiled().graph().definition().version_id);
++    root["steps"]["child"]["with"]["input"] = json!({"literal":{}});
++    root["steps"]["child"]["with"]["params"] = json!({"literal":{}});
++    root["steps"]["child"]["routes"]["success"] = json!("turn1");
++    let bundle = build(
++        &root,
++        Fixture::AutonomousResponse.snapshots(company()),
++        vec![child],
++    );
++    let report = execute(
++        bundle,
++        request(vec![
++            script(1, "start", vec![json!("parent answer")]),
++            script(1, "turn1", vec![json!("parent done")]),
++            script(2, "start", vec![json!("child answer")]),
++            script(2, "turn1", vec![json!("child done")]),
++        ]),
++    )
++    .unwrap();
++    complete(&report);
++    let child: Vec<_> = report
++        .steps
++        .iter()
++        .filter(|s| s.workflow_id == WorkflowId::new(Uuid::from_u128(2)))
++        .collect();
++    assert!(child[0].history.as_ref().unwrap().seed.pairs().is_empty());
++    assert_eq!(
++        child[1].history.as_ref().unwrap().seed.pairs()[0].input,
++        "child1"
++    );
++    let parent = report.steps.last().unwrap().history.as_ref().unwrap();
++    assert_eq!(parent.seed.pairs().len(), 1);
++    assert_eq!(parent.seed.pairs()[0].input, "parent1");
++    assert_eq!(parent.seed.pairs()[0].output, "parent answer");
++}
+--- accepted04/src/application/workflow/sample/mod.rs
++++ src/application/workflow/sample/mod.rs
+@@ -22,6 +22,7 @@
+     PreparedSample, SampleAgentSelection, SampleConfigurationHash, SampleWorkflowSelection,
+ };
+ mod dispatch;
++mod history;
+ mod responses;
+ mod tools;
+ mod types;
+@@ -33,6 +34,7 @@
+     step: StepId,
+ }
+ struct Session {
++    history: self::history::SampleHistoryStore,
+     response_contract: Option<super::channel_reply::ChannelReplyContract>,
+     response_approval_policy: Option<super::channel_reply::ReplyApprovalPolicy>,
+     agents: BTreeMap<
+@@ -96,6 +98,7 @@
+     } = sample;
+     let scripts = script_queues(request.scripts)?;
+     let mut session = Session {
++        history: self::history::SampleHistoryStore::default(),
+         response_contract: request.response_contract,
+         response_approval_policy: request.response_approval_policy,
+         agents,
+@@ -212,6 +215,7 @@
+                 choice: prepared.choice,
+             };
+             let path = frame.path.child(format!("{}:{ordinal}", step.as_str()));
++            let history = self.history.prepare(&bundle, &frame, &activation)?;
+             let completion = self
+                 .step(&bundle, &frame, &activation, &path)
+                 .map_err(|error| {
+@@ -221,6 +225,7 @@
+                         definition.steps[&step].step_type
+                     ))
+                 })?;
++            let history = self.history.complete(history, &completion.output)?;
+             let trace = SampleStep {
+                 path,
+                 workflow_id: definition.workflow_id,
+@@ -228,6 +233,7 @@
+                 kind: definition.steps[&step].step_type.clone(),
+                 inputs: activation.inputs,
+                 output: completion.output.clone(),
++                history,
+             };
+             self.charge_report(&trace)?;
+             self.report.steps.push(trace);
+--- accepted04/src/application/workflow/sample/tests.rs
++++ src/application/workflow/sample/tests.rs
+@@ -8,6 +8,8 @@
+ mod channel_reply_preview_tests;
+ #[path = "channel_reply_terminal_tests.rs"]
+ mod channel_reply_terminal_tests;
++#[path = "history_tests.rs"]
++mod history_tests;
+ #[path = "tools_tests.rs"]
+ mod tools_tests;
+ fn company() -> CompanyId {
+--- accepted04/src/application/workflow/sample/types.rs
++++ src/application/workflow/sample/types.rs
+@@ -76,6 +76,15 @@
+     pub kind: crate::domain::workflow::TypeName,
+     pub inputs: Value,
+     pub output: Value,
++    pub history: Option<SampleAgentHistory>,
++}
++
++/// Scripted, sample-local context. It never names a production conversation.
++#[derive(Debug, Clone, Serialize)]
++pub struct SampleAgentHistory {
++    pub agent: crate::entities::agent_capability::AgentId,
++    pub seed: crate::application::services::harness::runs::LogicalSeed,
++    pub omitted_pairs: usize,
+ }
+ #[derive(Debug, Clone, Copy, Serialize, PartialEq, Eq)]
+ #[serde(rename_all = "snake_case")]

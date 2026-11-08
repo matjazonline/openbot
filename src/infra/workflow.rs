@@ -196,6 +196,7 @@ pub struct WorkflowEngine {
 
 /// Named composition inputs keep the shared model explicit and avoid positional domain/URL arguments.
 pub struct WorkflowEngineSetup<'a> {
+    pub integrations: Arc<dyn crate::application::integrations::ExecutionGateway>,
     pub config: &'a crate::infra::config::AppConfig,
     pub composer: DeliveryComposer,
     pub mcp_client: Arc<dyn McpClient>,
@@ -218,17 +219,19 @@ fn compose_tools(
     templates: &ProvisioningDeployment,
     lease: LeasePolicy,
 ) -> ToolRuntimes {
-    let http = Arc::new(HttpRuntime::with_approvals(
+    let http = Arc::new(HttpRuntime::with_integrations(
         persistence.clone(),
         HttpDestinationPolicy::default(),
         lease,
         Some(notices.clone()),
+        setup.integrations.clone(),
     ));
-    let mcp = Arc::new(McpRuntime::with_approvals(
+    let mcp = Arc::new(McpRuntime::with_integrations(
         persistence.clone(),
         setup.mcp_client.clone(),
         lease,
         Some(notices.clone()),
+        setup.integrations.clone(),
     ));
     let message = Arc::new(MessageRuntime::with_approvals(
         persistence.clone(),
@@ -377,7 +380,18 @@ impl WorkflowEngine {
     /// Start workflow slots, the intent worker, schedule materializer and metrics sampler
     /// under `shutdown`. The caller keeps the handles and joins them on shutdown.
     pub fn spawn(&self, shutdown: &CancellationToken) -> Vec<(&'static str, JoinHandle<()>)> {
-        let mut handles = Vec::with_capacity(self.slots + 5);
+        let mut handles = Vec::with_capacity(self.slots + 7);
+        let vault = crate::adapters::persistence::integrations::PostgresVault::new(
+            self.services.persistence.clone(),
+        );
+        let vault_stop = shutdown.clone();
+        handles.push((
+            "integration teardown",
+            tokio::spawn(async move {
+                crate::application::integrations::lifecycle::run(&vault, &vault_stop).await;
+            }),
+        ));
+
         let metric_persistence = self.services.persistence.clone();
         let monitoring = self.monitoring.clone();
         let metric_shutdown = shutdown.clone();
@@ -505,6 +519,15 @@ impl WorkflowEngine {
         self
     }
     pub(crate) fn for_tests(persistence: PostgresPersistence) -> Self {
+        Self::for_tests_with_integrations(
+            persistence,
+            Arc::new(crate::application::integrations::unavailable::UnavailableIntegrations),
+        )
+    }
+    pub(crate) fn for_tests_with_integrations(
+        persistence: PostgresPersistence,
+        integrations: Arc<dyn crate::application::integrations::ExecutionGateway>,
+    ) -> Self {
         use crate::adapters::protocols::email::EmailRenderer;
         use crate::application::transport::ports::TransportRenderers;
         let renderers = Arc::new(
@@ -529,6 +552,7 @@ impl WorkflowEngine {
         Self::new(
             persistence,
             WorkflowEngineSetup {
+                integrations,
                 config: &config,
                 composer,
                 mcp_client: client,
@@ -718,6 +742,7 @@ mod tests {
             .services()
             .service()
             .admit(AdmitWorkflowRequest {
+                history_session: None,
                 company_id: target.company,
                 actor: target.actor,
                 association: RelatedAssociation::Company,
@@ -747,6 +772,11 @@ mod tests {
         let (_database, engine, _) = composed().await;
         let shutdown = CancellationToken::new();
         let handles = engine.spawn(&shutdown);
+        assert!(
+            handles
+                .iter()
+                .any(|(name, _)| *name == "integration teardown")
+        );
         let task_count = handles.len();
         engine.intent_wakeups.notify_waiters();
         engine.worker_wakeups.notify_waiters();
@@ -759,8 +789,8 @@ mod tests {
                 .unwrap();
         }
         assert_eq!(
-            task_count, 7,
-            "one slot, metrics, intent, final publication, schedule, workflow storage and local-agent storage workers"
+            task_count, 8,
+            "one slot, metrics, intent, final publication, schedule, workflow storage, local-agent storage and integration teardown workers"
         );
     }
 

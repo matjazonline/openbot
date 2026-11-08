@@ -98,7 +98,8 @@ fn values(name: &str) -> Value {
             json!({"agent":"assistant","context":{"message":"hello"},"output_schema":{"type":"string","enum":["support","sales"]}})
         }
         "agent.run" => {
-            json!({"agent":"assistant","context":{"message":"hello"},"output_schema":schema})
+            // Supply the current task only. Native history is selected independently of business JSON.
+            json!({"agent":"assistant","context":{"message":"hello","task":"Answer the current request using the retained conversation context"},"output_schema":schema})
         }
         "local_agent.run" => {
             json!({"profile_id":"00000000-0000-0000-0000-000000000006","prompt":"Inspect the selected local project and summarize its current state."})

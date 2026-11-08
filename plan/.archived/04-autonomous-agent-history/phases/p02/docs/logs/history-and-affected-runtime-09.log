@@ -1,0 +1,305 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.24s
+     Running unittests src/lib.rs (/private/tmp/openbot-chs-p06-3f43t2k7/worktree/target/debug/deps/open_bots-8b80d02f0b6cf2e6)
+
+running 247 tests
+test adapters::http::routes::workflows::ui::authoring::tests::agent_picker_tests::dump_autonomous_workflow_agent_picker_browser_fixtures ... ignored, exports native workflow agent picker responses for the browser gate
+test adapters::persistence::workflow::sample_capture::bounds::autonomous_agent_samples_workflow_payload_limit_covers_adapter_cache_and_sealed_input ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::sample_tests::autonomous_agent_samples_release_rechecks_admin_after_competing_role_revocation ... ok
+test adapters::persistence::workflow::tests::admission_tests::agent_history_sessions::agent_history_identity_competing_admissions_allocate_one_private_session ... ok
+test adapters::persistence::workflow::tests::admission_tests::agent_history_sessions::agent_history_identity_automatic_producer_cannot_supply_private_session_reference ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::sample_tests::autonomous_agent_samples_keep_old_capture_and_hash_after_draft_changes ... ok
+test adapters::persistence::workflow::tests::admission_tests::agent_history_sessions::agent_history_identity_foreign_and_changed_association_reuse_refuse_without_writes ... ok
+test adapters::persistence::knowledge::tests::search::knowledge_search_sql_filters_company_model_and_ceiling_before_both_ranks ... ok
+test adapters::persistence::workflow::tests::admission_tests::admission_source_tests::workflow_control_head_restores_real_message_and_schedule_causality ... ok
+test adapters::persistence::knowledge::tests::search::knowledge_search_sql_simple_exact_terms_and_digit_fallback_work_in_non_english_text ... ok
+test adapters::persistence::workflow::tests::admission_tests::admission_authority_tests::workflow_control_allowlist_revocation_checks_current_access_before_replay ... ok
+test adapters::persistence::workflow::tests::admission_tests::agent_history_sessions::agent_history_identity_manual_starter_owns_session_and_ceiling_not_binding_actor ... ok
+test adapters::persistence::workflow::tests::admission_tests::agent_history_sessions::agent_history_identity_native_mapping_and_creator_are_immutable ... ok
+test adapters::persistence::workflow::tests::admission_tests::agent_history_sessions::agent_history_identity_private_fresh_reuse_and_replay_are_admission_owned ... ok
+test adapters::persistence::knowledge::tests::search_quota::knowledge_search_company_chunk_cap_competing_writes_override_delete_and_corruption_guard ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::eligibility_tests::claim_sql_tests::storage_reconciliation_tests::run_retention_consumed_old_proof_cannot_close_a_later_remote_entry ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::eligibility_tests::claim_sql_tests::storage_reconciliation_tests::run_retention_evidence_conflict_keeps_terminal_tree_even_with_exact_receipt ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::acceptance_tests::revision_tests::workflow_control_direct_retry_without_receipt_fails_own_guard ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::acceptance_tests::revision_tests::workflow_control_cancel_commit_crossing_lease_expiry_preserves_retirement ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::acceptance_tests::revision_tests::workflow_control_revision_overflow_refuses_without_partial_writes ... FAILED
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::acceptance_tests::wait_order_tests::workflow_control_cancel_first_competing_resume_refuses_without_writes ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::acceptance_tests::wait_order_tests::workflow_control_resume_first_competing_cancel_preserves_completion ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::eligibility_tests::claim_sql_tests::storage_reconciliation_tests::run_retention_historical_not_applied_closure_survives_retry_grant_expiry ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::eligibility_tests::claim_sql_tests::storage_reconciliation_tests::run_retention_unknown_effect_is_protected_while_complete_not_applied_proof_closes_it ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::acceptance_tests::revision_tests::workflow_control_revision_material_transitions_and_heartbeat_noops ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::acceptance_tests::workflow_control_foreign_scope_and_conflicting_authorized_actor_run_keys ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::acceptance_tests::workflow_control_ordinary_retry_owner_cascade_keeps_witness_updates_guarded ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::acceptance_tests::workflow_control_owner_cascade_removes_immutable_receipt ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::acceptance_tests::workflow_control_cancel_and_child_creation_both_deterministic_orders ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::acceptance_tests::workflow_control_principal_revocation_and_authority_locks ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::guard_tests::workflow_control_authority_lock_allows_runtime_fk_and_fences_owner_mutation ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::guard_tests::workflow_control_receipt_delete_and_deferred_fault_preserve_all_writes ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::workflow_control_competing_cancel_replay_closes_exact_expired_attempt ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::acceptance_tests::workflow_control_cancel_claim_competitors_have_one_owner_and_disposition ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::workflow_control_cancel_actual_handler_future_is_dropped_by_heartbeat ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::acceptance_tests::workflow_control_cancel_deferred_faults_roll_back_complete_state ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::acceptance_tests::workflow_control_wait_and_retry_deferred_faults_roll_back_complete_state ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::acceptance_tests::workflow_control_cancel_failure_competitors_close_attempt_once ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::acceptance_tests::workflow_control_cancel_resume_competitors_preserve_event_and_notification ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::workflow_control_competing_retry_preserves_identity_facts_and_remaining_allowance ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::workflow_control_current_authority_is_checked_even_on_replay ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::workflow_control_revision_covers_claim_and_stale_caller_cannot_cancel ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::authority_order::autonomous_agent_authority_checkpoint_model_reservation_serializes_with_preview ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::authority_order::autonomous_agent_authority_checkpoint_saved_call_serializes_with_preview ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::history_completion::agent_history_completion_competing_finalizers_and_lost_ack_keep_one_answer ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::history_completion::agent_history_completion_rollback_keeps_checkpoint_and_exchange_active ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::history_completion::agent_history_level_competing_observation_commit_precedes_the_output_stamp ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::history_completion::agent_history_level_enqueue_and_final_acceptance_only_raise_the_stamp ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::workflow_control_cancel_completion_competitors_preserve_winning_result ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::history_completion::agent_history_storage_repeated_step_admission_has_new_activation_in_same_private_conversation ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::history_completion::lifecycle::agent_history_completion_cancel_after_acceptance_preserves_the_accepted_exchange ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::history_completion::lifecycle::agent_history_completion_cancel_before_acceptance_has_input_and_no_answer ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::history_completion::lifecycle::agent_history_completion_safe_control_retry_reactivates_same_checkpoint_without_refunding ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::history_completion::lifecycle::agent_history_completion_workflow_failure_and_control_retry_preserve_accepted_output ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::storage_checkpoint_tests::run_retention_native_checkpoint_and_model_usage_delete_with_only_owned_jobs ... FAILED
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::guard_tests::workflow_control_cancel_competes_with_child_creation ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::storage_checkpoint_tests::run_retention_native_checkpoint_model_usage_and_tree_rollback_then_retry ... FAILED
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::tokens::atomic::workflow_harness_token_approval_commit_failure_rolls_back_allowance_and_reopen ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::tokens::atomic::workflow_harness_token_notification_commit_failure_rolls_back_pause ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::tokens::atomic::workflow_harness_token_reviewer_revocation_wins_before_approval_commit ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::tokens::atomic::workflow_harness_token_sql_cannot_change_proposal_or_grant_allowance ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::tokens::refusal::workflow_harness_token_approved_request_reparks_when_usage_itself_exceeds_allowance ... FAILED
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::acceptance_tests::revision_tests::workflow_control_forged_cancellation_retirement_fails_own_guard ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::tokens::refusal::workflow_harness_token_cancel_and_approval_contend_without_late_resurrection ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::tokens::refusal::workflow_harness_token_expiry_is_terminal_and_late_approval_cannot_clear_refusal ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::tokens::refusal::workflow_harness_token_inflight_settlement_retains_truth_after_sibling_denial ... FAILED
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::tokens::refusal::workflow_harness_token_refusal_stops_admitted_descendants_and_inflight_output ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::tokens::refusal::workflow_harness_token_sibling_usage_reparks_exact_request_without_debit ... FAILED
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::workflow_control_retry_refuses_agent_failures_a_resume_would_repeat ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::tokens::scheduling::workflow_harness_token_competing_deferred_claims_do_not_lock_ancestor ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::tokens::scheduling::workflow_harness_token_deferral_is_capped_by_run_deadline ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::tokens::scheduling::workflow_harness_token_deferred_sibling_retires_after_denial ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::tokens::scheduling::workflow_harness_token_pause_cannot_replace_hard_model_budget_failure ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::tokens::scheduling::workflow_harness_token_pause_last_attempt_terminalizes ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::tokens::scheduling::workflow_harness_token_pending_pause_preserves_attempts_and_approval_releases ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::tokens::scheduling::workflow_harness_token_processing_pause_charges_one_failure_only ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::tokens::scheduling::workflow_harness_token_pure_pending_reports_deferral_and_resumes ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::tokens::updates::workflow_harness_update_cannot_consume_reservation_approval ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::tokens::updates::workflow_harness_update_retains_result_after_refusal_but_cannot_prepare_next ... FAILED
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::tokens::updates::workflow_harness_update_settlement_approval_finishes_without_new_model_call ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::workflow_control_retry_refuses_unknown_exhaustion_deadline_completed_and_child ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::tokens::workflow_harness_token_approval_never_admits_and_claim_consumes_exact_request ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::tokens::workflow_harness_token_rejection_preserves_zero_usage_and_cannot_reopen ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::tokens::workflow_harness_token_settlement_records_excess_before_parking ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::tokens::workflow_harness_token_unavailable_review_replay_cannot_grant_progression ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::workflow_harness_model_store_competing_admission_and_settlement ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::workflow_harness_model_store_lost_request_stays_charged_and_cannot_reenter ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::workflow_harness_model_store_projection_failure_rolls_back_all_admission ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::workflow_harness_model_owner_competing_admissions_keep_one_slot ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::workflow_harness_model_owner_new_claim_releases_slot_without_refunding ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::workflow_harness_model_owner_requires_reservation_and_exact_settlement ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::store_tests::workflow_harness_owner_store_competing_open_and_execution_replay ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::store_tests::workflow_harness_owner_store_deferred_failure_rolls_back_open_and_debit ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::store_tests::workflow_harness_owner_store_fence_and_actor_revocation ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::store_tests::workflow_harness_owner_store_new_claim_retains_checkpoint_and_debits_execution ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::workflow_harness_owner_competing_open_has_one_execution_identity ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::workflow_harness_owner_exact_scope_and_workflow_owner_only ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::workflow_harness_owner_existing_foreign_agent_is_not_a_valid_owner ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::workflow_harness_owner_mutation_and_expired_fence_refuse ... ok
+test adapters::persistence::workflow::tests::admission_tests::storage_tests::protection_tests::run_retention_deferred_job_provenance_still_rejects_native_commit ... ok
+test adapters::persistence::workflow::tests::admission_tests::storage_tests::protection_tests::run_retention_external_rerun_blocks_referent_until_independent_root_is_removed ... ok
+test adapters::persistence::workflow::tests::admission_tests::storage_tests::protection_tests::run_retention_protects_open_decision_until_its_wait_closes ... ok
+test adapters::persistence::workflow::tests::admission_tests::storage_tests::protection_tests::run_retention_shutdown_rolls_back_the_actual_inflight_archive_and_delete ... ok
+test adapters::persistence::workflow::tests::admission_tests::storage_tests::report_tests::run_retention_reports_preserve_categories_filters_time_prices_and_live_union ... ok
+test adapters::persistence::workflow::tests::admission_tests::storage_tests::retry_tests::run_retention_first_fences_waiting_production_retry_without_partial_archive ... ok
+test adapters::persistence::workflow::tests::admission_tests::storage_tests::retry_tests::run_retention_retry_first_revival_owns_and_preserves_live_work ... ok
+test adapters::persistence::workflow::tests::admission_tests::storage_tests::run_retention_archive_guards_refuse_forgery_duplicates_and_mutation ... ok
+test adapters::persistence::workflow::tests::admission_tests::storage_tests::run_retention_competing_collectors_delete_exactly_once ... ok
+test adapters::persistence::workflow::tests::admission_tests::storage_tests::report_tests::run_retention_report_global_scan_cap_applies_before_filters_across_sources ... ok
+test adapters::persistence::workflow::tests::admission_tests::storage_tests::run_retention_complete_tree_jobs_usage_and_idempotent_retry ... ok
+test adapters::persistence::workflow::tests::admission_tests::storage_tests::run_retention_global_cursor_skips_protected_prefix_and_keeps_young_live ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_admission::autonomous_agent_authority_checkpoint_requires_the_exact_selected_agent_identity ... ok
+test adapters::persistence::workflow::tests::admission_tests::storage_tests::run_retention_rollback_after_runs_before_jobs_preserves_every_owner ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_graph::descendants::history_identity::agent_history_identity_same_agent_child_has_private_branch_and_keeps_actual_actor ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_graph::samples::bounds::autonomous_agent_samples_aggregate_draft_bytes_are_bounded_without_publication ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_graph::samples::bounds::autonomous_agent_samples_combined_capture_depth_accepts_32_and_refuses_34 ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_graph::samples::bounds::autonomous_agent_samples_draft_cycle_is_refused_without_activation_or_production_effects ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_graph::samples::autonomous_agent_samples_nested_aliases_and_model_only_leaf_keep_exact_sealed_configuration ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_graph::samples::bounds::autonomous_agent_samples_message_steps_keep_metadata_and_generic_message_tools_stay_forbidden ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::driver::workflow_agent_run_repairs_invalid_output_once ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::driver::workflow_agent_run_refuses_rebound_tool_target ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_graph::samples::bounds::autonomous_agent_samples_unique_draft_selections_accept_256_and_refuse_257 ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::history_storage::agent_history_completion_driver_keeps_exact_json_and_replays_without_provider ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::history_identity::agent_history_identity_competing_fenced_resolvers_converge_and_stale_fence_refuses ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::history_identity::agent_history_identity_current_agent_revocation_refuses_existing_conversation ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::driver::workflow_agent_run_protected_tool_waits_for_approval_and_dispatches_once ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::driver::workflow_agent_run_token_pause_resumes_with_the_saved_request ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::driver::workflow_agent_run_refuses_model_invented_tool_without_dispatch ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::history_identity::agent_history_identity_principal_deletion_preserves_audit_and_refuses_current_use ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::history_storage::agent_history_completion_invalid_candidates_never_become_an_answer ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::driver::workflow_agent_run_two_approval_cycles_dispatch_each_call_once ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::history_storage::agent_history_completion_json_null_is_an_accepted_value_in_storage ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::history_identity::agent_history_identity_model_only_steps_allocate_no_conversation ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::history_storage::agent_history_storage_capture_precedes_checkpoint_and_replays_one_original_input ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::history_storage::agent_history_storage_checkpoint_requires_exact_server_owned_exchange_reference ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::history_storage::agent_history_completion_repair_accepts_only_the_repaired_value ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::history_storage::agent_history_level_enqueue_uses_current_content_and_refuses_lower_or_out_of_domain ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::history_storage::agent_history_storage_native_identity_order_and_source_pins_are_enforced ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::history_storage::agent_history_storage_competing_preparations_share_position_and_reject_changed_replay ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::atomic::knowledge_search_busy_model_is_retryable_without_saving_an_empty_observation ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::atomic::knowledge_search_competing_observers_keep_one_canonical_result_and_its_exact_stamp ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::atomic::knowledge_search_current_grant_revocation_blocks_saved_invocation_before_embedding ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::atomic::knowledge_search_empty_corpus_saves_empty_observation_without_classification_rise ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::atomic::knowledge_search_failure_after_result_and_rise_rolls_back_the_entire_observation ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::atomic::knowledge_search_forged_fences_and_changed_arguments_fail_before_embedding ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::atomic::knowledge_search_generic_checkpoint_result_cannot_bypass_classification ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::atomic::knowledge_search_level_argument_is_a_saved_tool_error_without_embedding_or_rise ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::atomic::knowledge_search_model_token_limit_is_a_saved_tool_error_without_empty_success_or_rise ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::atomic::knowledge_search_observation_above_actual_immutable_ceiling_cannot_commit ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::knowledge_search_driver_persists_observation_and_classification_before_continuing ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::knowledge_search_low_ceiling_never_observes_private_exact_content_or_raises ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::knowledge_search_replay_uses_the_canonical_result_without_embedding_again ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::ownership::knowledge_search_real_replacement_claim_replays_original_and_fences_stale_competitor ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::model_steps::workflow_classify_answers_a_declared_label_with_a_tool_free_request ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::model_steps::workflow_classify_repairs_an_undeclared_label_then_fails_terminally ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::model_steps::workflow_decision_agent_chooses_only_a_declared_route_with_valid_data ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::model_steps::workflow_decision_agent_data_schema_local_references_resolve ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::ownership::knowledge_search_expired_database_lease_or_deadline_refuses_before_embedding ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::ownership::knowledge_search_proof_rewrite_delete_and_cross_company_insert_are_rejected ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::recovery::workflow_agent_run_crash_during_effect_is_indeterminate_and_reconciled ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::recovery::workflow_agent_run_dynamic_selection_runs_the_bound_agent ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::recovery::workflow_agent_run_invalid_output_after_repairs_is_terminal ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::model_steps::workflow_classify_token_pause_and_restart_use_the_shared_driver ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::recovery::workflow_agent_run_reservation_without_provider_io_retries_with_a_new_request ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::recovery::workflow_agent_run_restart_after_provider_entry_charges_a_new_request ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::model_steps::workflow_model_steps_check_only_the_capabilities_they_use ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::recovery::workflow_agent_run_restart_after_receipt_reuses_the_saved_effect ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::recovery::workflow_agent_run_token_denial_never_enters_the_provider ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::recovery::workflow_agent_run_settlement_pause_and_second_pause_resume_exact_requests ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::recovery::workflow_agent_run_unanswered_effect_is_terminal_and_reconciled ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::workflow_agent_capability_sql_shape_matches_type_names ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::ownership::knowledge_search_unknown_commit_ack_returns_no_content_then_reconstruction_reads_truth ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::workflow_agent_capability_writers_preserve_unsupplied_lists ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::workflow_agent_publication_refuses_forged_snapshot_and_keeps_frozen_version ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::workflow_agent_run_competing_revocation_refuses_admission ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::workflow_agent_run_refuses_removed_tool_grant_before_provider_entry ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::ownership::knowledge_search_actual_statement_and_commit_expiry_roll_back_payload_rise_and_proof ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::workflow_agent_run_refuses_revoked_model_connection_before_provider_entry ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::workflow_agent_run_refuses_unlinked_skill_before_provider_entry ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::workflow_agent_run_saves_tool_call_dispatches_once_and_replays_final_output ... ok
+test adapters::persistence::workflow::tests::mcp_tests::agent_tests::autonomous_agent_samples_mcp_without_slots_never_opens_the_server ... ok
+test adapters::persistence::workflow::tests::mcp_tests::agent_tests::isolation::authority::autonomous_agent_authority_mcp_binding_revocation_during_discovery_has_no_effect ... ok
+test adapters::persistence::workflow::tests::mcp_tests::agent_tests::isolation::authority::autonomous_agent_authority_mcp_credential_rotation_before_open_keeps_binding_and_replay ... ok
+test adapters::persistence::workflow::tests::message_tests::agent_tests::workflow_agent_message_tool_parks_on_delivery_and_continues_with_its_receipt ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::channel_reply_e2e::channel_reply_e2e_quiet_ingress_has_no_owner_and_in_app_reply_has_no_transport ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::channel_reply_e2e::channel_reply_e2e_provider_retry_keeps_execution_and_wire_identity ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::channel_reply_e2e::channel_reply_e2e_automatic_replies_each_message_once_with_observers ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::channel_reply_e2e::channel_reply_e2e_provider_unknown_survives_worker_reconstruction_without_resend ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::channel_reply_e2e::channel_reply_e2e_selected_binding_manual_and_schedule_runs_never_inherit_destination ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::agent_history_identity_actual_agents_in_same_thread_remain_distinct ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::channel_reply_e2e::recovery::channel_reply_e2e_committed_intent_survives_reconstruction_without_its_wakeup ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::agent_history_identity_manual_thread_attachment_is_private_and_scope_updates_refuse ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::agent_history_identity_native_cross_tenant_agent_and_thread_anchors_refuse ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::agent_history_identity_real_message_roots_share_thread_across_agent_revisions ... ok
+test application::knowledge::search::query::tests::knowledge_search_exact_terms_extract_codes_unicode_digits_and_deduplicate ... ok
+test application::knowledge::search::query::tests::knowledge_search_input_rejects_levels_unknown_fields_and_invalid_bounds ... ok
+test application::knowledge::search::query::tests::knowledge_search_limit_is_bounded_and_defaults_to_five ... ok
+test application::knowledge::search::ranking::tests::knowledge_search_discarded_high_passage_does_not_raise_classification ... ok
+test application::knowledge::search::ranking::tests::knowledge_search_exact_hits_survive_below_the_meaning_threshold ... ok
+test application::knowledge::search::ranking::tests::knowledge_search_invalid_vectors_fail_without_fabricating_an_empty_result ... ok
+test application::knowledge::search::ranking::tests::knowledge_search_result_bound_counts_escaped_json_and_preserves_utf8 ... ok
+test application::knowledge::search::ranking::tests::knowledge_search_result_omits_levels_ids_and_filename_prefixes ... ok
+test application::knowledge::search::ranking::tests::knowledge_search_rrf_promotes_the_exact_code_when_meaning_is_tied ... ok
+test application::knowledge::search::ranking::tests::knowledge_search_threshold_drops_weak_matches_and_does_not_raise_empty_results ... ok
+test application::knowledge::search::ranking::tests::knowledge_search_top_k_and_score_ties_are_deterministic ... ok
+test application::knowledge::service::tests::queries::knowledge_search_cancellation_retains_the_actual_shared_native_slot ... ok
+test application::knowledge::service::tests::queries::knowledge_search_query_boundary_rejects_oversized_input_and_invalid_model_outputs ... ok
+test application::knowledge::service::tests::queries::knowledge_search_registration_competes_with_shutdown_without_late_consumption ... ok
+test application::knowledge::service::tests::queries::knowledge_search_result_holds_the_slot_through_consumption_and_releases_on_drop ... ok
+test application::knowledge::service::tests::queries::knowledge_search_timeout_is_an_error_and_retains_the_slot_until_native_completion ... ok
+test application::workflow::agent_history::tests::agent_history_contract_accepted_null_is_distinct_from_failure_and_cancellation ... ok
+test application::workflow::agent_history::tests::agent_history_contract_exact_structured_values_roundtrip_without_prompt_expansion ... ok
+test application::workflow::agent_history::tests::agent_history_contract_only_agent_run_is_eligible ... ok
+test application::workflow::agent_history::tests::agent_history_contract_order_is_positive_bounded_and_survives_decode ... ok
+test application::workflow::agent_history::tests::agent_history_contract_schema_and_revision_remain_original_provenance ... ok
+test application::workflow::agent_history::tests::agent_history_contract_terminal_states_do_not_follow_workflow_or_delivery_state ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::channel_reply_e2e::hitl::channel_reply_e2e_protected_final_requires_exact_current_approval ... ok
+test application::workflow::agent_history::tests::agent_history_identity_activation_is_stable_across_attempts_and_distinct_for_repeats ... ok
+test application::workflow::agent_history::tests::agent_history_level_visibility_changes_without_forking_or_hidden_pair_markers ... ok
+test application::workflow::fixtures::tests::agent_history::agent_history_identity_private_params_and_transitive_inputs_never_use_thread_stream ... ok
+test application::workflow::fixtures::tests::agent_history::agent_history_identity_provenance_rejects_unknown_and_over_budget_execution_sets ... ok
+test application::workflow::agent_history::tests::agent_history_contract_value_budget_is_enforced_at_construction_and_decode ... ok
+test application::workflow::knowledge::builtin::tests::knowledge_search_description_requires_exact_terms_citations_and_dont_have_that ... ok
+test application::workflow::knowledge::builtin::tests::knowledge_search_schema_rejects_level_extra_fields_and_exact_term_bounds ... ok
+test application::workflow::knowledge::builtin::tests::knowledge_search_snapshot_is_reserved_and_exactly_trusted_without_external_targets ... ok
+test application::workflow::publication::tests::agent_tests::history_preparation::agent_history_contract_preparation_retains_original_json_and_one_untrusted_prompt ... ok
+test application::workflow::publication::tests::agent_tests::workflow_agent_preparation_declares_provider_safe_names_and_delimits_context ... ok
+test application::workflow::publication::tests::agent_tests::workflow_agent_preparation_refuses_unsupported_or_colliding_bindings ... ok
+test application::workflow::fixtures::tests::agent_history::agent_history_identity_public_lineage_is_closed_and_does_not_include_future_reviews ... ok
+test application::workflow::sample::tests::tools_tests::approvals::autonomous_agent_samples_protected_http_binding_requires_explicit_simulated_approval ... ok
+test domain::workflow::recovery::tests::workflow_recovery_backoff_is_positive_capped_and_deterministic ... ok
+test domain::workflow::recovery::tests::workflow_recovery_configuration_and_attempt_boundaries ... ok
+test domain::workflow::recovery::tests::workflow_recovery_limits_cannot_be_bypassed_by_retry_or_error_route ... ok
+test domain::workflow::recovery::tests::workflow_recovery_terminal_and_spent_attempts_use_final_error ... ok
+test domain::workflow::recovery::tests::workflow_recovery_unknown_effect_never_becomes_retry_or_final_error ... ok
+test infra::config::tests::knowledge_search_config_limit_defaults_to_five_and_rejects_invalid_bounds ... ok
+test application::workflow::sample::tests::tools_tests::approvals::autonomous_agent_samples_protected_child_binding_requires_explicit_simulated_approval ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::channel_reply_e2e::hitl::channel_reply_e2e_current_transport_revocation_blocks_final_after_human_wait ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::agent_history_level_thread_stream_survives_audience_drop_and_restore ... ok
+test adapters::persistence::workflow::tests::message_tests::storage_message_tests::run_retention_pending_message_consumption_keeps_terminal_tree ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::channel_reply_e2e::recovery::channel_reply_e2e_remote_acceptance_before_receipt_keeps_unknown_after_shutdown ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_revocation_tests::current_authority::autonomous_agent_authority_workflow_repoint_requires_new_binding_publication ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::channel_reply_e2e::channel_reply_e2e_silence_preserves_result_and_explicit_final_has_no_duplicate ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::channel_reply_e2e::hitl::channel_reply_e2e_two_waits_in_one_thread_route_answers_without_new_runs ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::channel_reply_e2e::hitl::channel_reply_e2e_question_rounds_resume_same_owner_with_frozen_contract ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::channel_reply_e2e::hitl::channel_reply_e2e_grandchild_human_wait_returns_to_the_only_response_owner ... ok
+test adapters::persistence::workflow::tests::admission_tests::storage_tests::boundary_tests::run_retention_native_schema_100001_members_reaches_delete_without_activation_cutoff has been running for over 60 seconds
+test adapters::persistence::workflow::tests::admission_tests::storage_tests::boundary_tests::run_retention_native_schema_100001_members_reaches_delete_without_activation_cutoff ... ok
+
+failures:
+
+---- adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::acceptance_tests::revision_tests::workflow_control_revision_overflow_refuses_without_partial_writes stdout ----
+
+thread 'adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::acceptance_tests::revision_tests::workflow_control_revision_overflow_refuses_without_partial_writes' (35466963) panicked at src/adapters/persistence/workflow/control_revision_tests.rs:85:48:
+called `Result::unwrap()` on an `Err` value: Database(PgDatabaseError { severity: Error, code: "55006", message: "cannot ALTER TABLE \"workflow_runs\" because it has pending trigger events", detail: None, hint: None, position: None, where: None, schema: None, table: None, column: None, data_type: None, constraint: None, file: Some("tablecmds.c"), line: Some(4444), routine: Some("CheckTableNotInUse") })
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::storage_checkpoint_tests::run_retention_native_checkpoint_and_model_usage_delete_with_only_owned_jobs stdout ----
+
+thread 'adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::storage_checkpoint_tests::run_retention_native_checkpoint_and_model_usage_delete_with_only_owned_jobs' (35467648) panicked at src/adapters/persistence/workflow/storage_checkpoint_tests.rs:84:10:
+called `Result::unwrap()` on an `Err` value: Database("Invalid stored workflow record")
+
+---- adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::storage_checkpoint_tests::run_retention_native_checkpoint_model_usage_and_tree_rollback_then_retry stdout ----
+
+thread 'adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::storage_checkpoint_tests::run_retention_native_checkpoint_model_usage_and_tree_rollback_then_retry' (35467672) panicked at src/adapters/persistence/workflow/storage_checkpoint_tests.rs:84:10:
+called `Result::unwrap()` on an `Err` value: Database("Invalid stored workflow record")
+
+---- adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::tokens::refusal::workflow_harness_token_approved_request_reparks_when_usage_itself_exceeds_allowance stdout ----
+
+thread 'adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::tokens::refusal::workflow_harness_token_approved_request_reparks_when_usage_itself_exceeds_allowance' (35467769) panicked at src/adapters/persistence/workflow/harness_token_refusal_tests.rs:47:10:
+called `Result::unwrap()` on an `Err` value: Database("Invalid stored workflow record")
+
+---- adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::tokens::refusal::workflow_harness_token_inflight_settlement_retains_truth_after_sibling_denial stdout ----
+
+thread 'adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::tokens::refusal::workflow_harness_token_inflight_settlement_retains_truth_after_sibling_denial' (35467812) panicked at src/adapters/persistence/workflow/harness_token_refusal_tests.rs:47:10:
+called `Result::unwrap()` on an `Err` value: Database("Invalid stored workflow record")
+
+---- adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::tokens::refusal::workflow_harness_token_sibling_usage_reparks_exact_request_without_debit stdout ----
+
+thread 'adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::tokens::refusal::workflow_harness_token_sibling_usage_reparks_exact_request_without_debit' (35467833) panicked at src/adapters/persistence/workflow/harness_token_refusal_tests.rs:47:10:
+called `Result::unwrap()` on an `Err` value: Database("Invalid stored workflow record")
+
+---- adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::tokens::updates::workflow_harness_update_retains_result_after_refusal_but_cannot_prepare_next stdout ----
+
+thread 'adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::tokens::updates::workflow_harness_update_retains_result_after_refusal_but_cannot_prepare_next' (35467983) panicked at src/adapters/persistence/workflow/harness_token_refusal_tests.rs:47:10:
+called `Result::unwrap()` on an `Err` value: Database("Invalid stored workflow record")
+
+
+failures:
+    adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::acceptance_tests::revision_tests::workflow_control_revision_overflow_refuses_without_partial_writes
+    adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::storage_checkpoint_tests::run_retention_native_checkpoint_and_model_usage_delete_with_only_owned_jobs
+    adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::storage_checkpoint_tests::run_retention_native_checkpoint_model_usage_and_tree_rollback_then_retry
+    adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::tokens::refusal::workflow_harness_token_approved_request_reparks_when_usage_itself_exceeds_allowance
+    adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::tokens::refusal::workflow_harness_token_inflight_settlement_retains_truth_after_sibling_denial
+    adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::tokens::refusal::workflow_harness_token_sibling_usage_reparks_exact_request_without_debit
+    adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::tokens::updates::workflow_harness_update_retains_result_after_refusal_but_cannot_prepare_next
+
+test result: FAILED. 239 passed; 7 failed; 1 ignored; 0 measured; 3039 filtered out; finished in 201.65s
+
+error: test failed, to rerun pass `--lib`

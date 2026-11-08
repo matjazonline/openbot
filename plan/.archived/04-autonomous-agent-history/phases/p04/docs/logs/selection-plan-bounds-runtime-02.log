@@ -1,0 +1,24 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+   Compiling open_bots v0.1.0 (/private/tmp/openbot-agent-history-h_82_5pw/worktree)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 53.40s
+     Running unittests src/lib.rs (/private/tmp/openbot-chs-p06-3f43t2k7/worktree/target/debug/deps/open_bots-8b80d02f0b6cf2e6)
+
+running 3 tests
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::agent_history_preparation_mandatory_current_budget_refusal_has_no_provider_snapshot_or_order ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::native::agent_history_preparation_native_first_freeze_attests_sources_content_order_and_level ... ok
+
+thread 'adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::native::agent_history_level_hidden_rows_are_filtered_before_candidate_limit_and_omission_count' (35840679) panicked at src/adapters/persistence/workflow/agent_history_freeze_guard_tests.rs:322:5:
+assertion `left == right` failed
+  left: Number(2.0)
+ right: 2
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::native::agent_history_level_hidden_rows_are_filtered_before_candidate_limit_and_omission_count ... FAILED
+
+failures:
+
+failures:
+    adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::native::agent_history_level_hidden_rows_are_filtered_before_candidate_limit_and_omission_count
+
+test result: FAILED. 2 passed; 1 failed; 0 ignored; 0 measured; 3332 filtered out; finished in 4.36s
+
+error: test failed, to rerun pass `--lib`

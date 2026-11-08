@@ -1,0 +1,50 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.20s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-048b7abd3ed0c794)
+adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::bounds::google_refresh_caller_deadline_caps_the_actual_request_and_never_returns_a_token: test
+adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::bounds::google_refresh_five_second_lock_wait_is_retryable_and_cancel_releases_the_account: test
+adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::bounds::integration_renewal_core_ten_second_provider_budget_drops_an_uncooperative_future: test
+adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::bounds::integration_renewal_transaction_settings_are_local_and_match_the_request_budget: test
+adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::cache::google_connection_lifecycle_owner_controls_keep_consent_revision_after_cache_update: test
+adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::cache::google_refresh_absent_cache_uses_the_same_authorized_resolution_path: test
+adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::cache::google_refresh_missing_encryption_key_fails_closed_before_the_endpoint: test
+adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::cache::integration_renewal_api_key_injection_needs_no_refresh_token_or_oauth: test
+adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::cache::integration_renewal_generation_drift_cannot_enter_a_cache_update: test
+adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::cache::integration_renewal_initial_generation_must_match_the_durable_entry: test
+adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::cache::integration_renewal_shared_app_cannot_change_the_authorizations_protocol: test
+adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::commit::google_refresh_ambiguous_ack_cannot_restore_authority_after_newer_disconnect: test
+adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::commit::google_refresh_lost_commit_acknowledgement_rereads_committed_cache_before_return: test
+adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::commit::google_refresh_lost_cooldown_commit_ack_preserves_shared_backoff: test
+adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::failures::google_refresh_actual_cancellation_rolls_back_and_keeps_no_detached_renewal: test
+adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::failures::google_refresh_invalid_client_is_configuration_and_does_not_revoke_the_owner: test
+adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::failures::google_refresh_invalid_grant_locally_requires_fresh_consent_and_erases_tokens: test
+adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::failures::google_refresh_lost_response_releases_lock_and_persists_shared_backoff: test
+adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::failures::google_refresh_malformed_oversized_short_or_unsafe_tokens_do_not_partially_write: test
+adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::failures::google_refresh_scope_drift_requires_reconnect_without_silently_upgrading_grants: test
+adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::failures::google_refresh_transient_failure_has_shared_bounded_cooldown_without_consent_change: test
+adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::google::google_refresh_omitted_refresh_is_preserved_and_cache_updates_do_not_change_consent: test
+adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::google::google_refresh_race_http_and_mcp_apps_share_the_same_account_lock: test
+adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::google::google_refresh_race_http_requests_with_distinct_dispatches_share_one_refresh: test
+adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::google::google_refresh_valid_cache_reuses_without_endpoint_and_keeps_private_boundary: test
+adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::google::integration_renewal_static_accounts_have_no_renewal_protocol: test
+adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::isolation::google_refresh_race_an_independent_user_is_not_blocked_by_another_account: test
+adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::isolation::google_refresh_race_same_owner_different_accounts_reach_provider_independently: test
+adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::management::google_connection_lifecycle_delete_competes_with_refresh_without_restoring_old_authority: test
+adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::management::google_connection_lifecycle_disconnect_competes_with_refresh_and_provider_failure: test
+adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::management::google_refresh_worker_connection_crash_releases_locks_and_cannot_apply_a_stale_error: test
+adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::reconnect::google_connection_lifecycle_reconnect_ignores_routine_cache_revision_but_stales_old_grants: test
+adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::reconnect::google_connection_lifecycle_stale_invalid_grant_after_crash_cannot_invalidate_new_consent: test
+adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::rotation::vault_rotation_competing_cas_cannot_overwrite_a_real_provider_refresh: test
+adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::strict::commit::integration_renewal_strict_lost_reservation_or_replacement_commit_ack_is_reread: test
+adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::strict::integration_renewal_strict_active_pending_is_not_an_interrupted_claimant: test
+adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::strict::integration_renewal_strict_backend_crash_keeps_the_committed_pending_marker: test
+adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::strict::integration_renewal_strict_cancellation_keeps_durable_ambiguity_for_recovery: test
+adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::strict::integration_renewal_strict_competing_live_services_share_one_rotation: test
+adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::strict::integration_renewal_strict_delayed_claim_after_delete_cannot_contact_provider: test
+adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::strict::integration_renewal_strict_delayed_claim_after_disconnect_cannot_contact_provider: test
+adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::strict::integration_renewal_strict_expired_pending_requires_reconnect_without_an_endpoint_retry: test
+adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::strict::integration_renewal_strict_lost_response_preserves_pending_instead_of_retrying_refresh: test
+adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::strict::integration_renewal_strict_omitted_replacement_does_not_inherit_google_reuse: test
+adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::strict::integration_renewal_strict_workspace_rotates_and_reuses_without_an_email: test
+
+45 tests, 0 benchmarks

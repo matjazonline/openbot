@@ -1,0 +1,15 @@
+{
+  "acceptance": "AH-P05-architecture-acceptance",
+  "at": "2026-11-07T21:15:33.831220+00:00",
+  "result": "architecture accepted ONLY; implementation open/not exercised",
+  "review": "AH-P05-AG1-R1 PASS",
+  "decision_sha256": "866faa753436570cb925df7e35fd819a0a63686fedafe7f341b6fc0c74e1f0e0",
+  "source_digest": "fe3570f5b3ed1bc73158bdc98a155f73f1a3fb9c820d20ffebc17b61f3266837",
+  "owned": 146,
+  "external": 36,
+  "archive_sha256": "81a587ff3b5acc2a4aa36932fdd1ee79961239cde36b063fde7a9c764061b5ec",
+  "coordination_revision": 20,
+  "records": "root read complete REVIEW/notes/findings/entry/exit; F1 addressed in architecture, current implementation OPEN; F2 reached-assertion limitation acknowledged; final delivery/provider counts NOT EXERCISED in failed repro",
+  "validator": "PASS retention/schema/hashes only; evidence FAIL1 NOT_EXERCISED1",
+  "next": "activate C006r1 then implement correction and whole P05 verification/review"
+}

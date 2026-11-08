@@ -1,0 +1,161 @@
+--- accepted-p02/src/adapters/persistence/mod.rs
++++ combined/src/adapters/persistence/mod.rs
+@@ -46,6 +46,7 @@
+ pub struct PostgresPersistence {
+     pool: PgPool,
+     credential_cipher: Option<Arc<credentials::CredentialCipher>>,
++    channel_reply_notices: Option<Arc<crate::application::workflow::decisions::DecisionNotices>>,
+ }
+ 
+ impl PostgresPersistence {
+@@ -53,6 +54,7 @@
+         PostgresPersistence {
+             pool,
+             credential_cipher: None,
++            channel_reply_notices: None,
+         }
+     }
+ 
+@@ -63,11 +65,28 @@
+         Self {
+             pool,
+             credential_cipher: Some(Arc::new(credential_cipher)),
++            channel_reply_notices: None,
+         }
+     }
+ 
+     pub fn pool(&self) -> &PgPool {
+         &self.pool
++    }
++
++    /// Configure the completion owner before cloning it into runtime services.
++    /// The composer is built from the original persistence, so it cannot retain this value.
++    pub fn with_channel_reply_notices(
++        mut self,
++        notices: crate::application::workflow::decisions::DecisionNotices,
++    ) -> Self {
++        self.channel_reply_notices = Some(Arc::new(notices));
++        self
++    }
++
++    pub(crate) fn channel_reply_notices(
++        &self,
++    ) -> Option<&crate::application::workflow::decisions::DecisionNotices> {
++        self.channel_reply_notices.as_deref()
+     }
+ 
+     /// The configured cipher, or an error naming the missing configuration.
+--- accepted-p02/src/infra/workflow.rs
++++ combined/src/infra/workflow.rs
+@@ -29,12 +29,14 @@
+ use crate::application::services::mcp_client::McpClient;
+ use crate::application::services::runtime_metrics::ActiveWorkflowJobs;
+ use crate::application::transport::DeliveryComposer;
++use crate::application::workflow::channel_reply::ChannelReplyPublisher;
+ use crate::application::workflow::decisions::DecisionNotices;
+ use crate::application::workflow::history::WorkflowHistoryRuntime;
+ use crate::application::workflow::lease::{
+     ClaimedWorkflow, LeasePolicy, WorkflowHandlerOutcome, WorkflowWorkerId,
+ };
+ use crate::application::workflow::lifecycle::{BindingService, DefinitionService};
++use crate::application::workflow::message::MessagePlanner;
+ use crate::application::workflow::message_admission::{
+     MessageAdmissionWorker, MessageAdmissions, MessageIntentWorkerId,
+ };
+@@ -57,11 +59,12 @@
+ 
+ /// The default and bounds of `WORKFLOW_WORKER_SLOTS`, and the database connections everything
+ /// else `serve` runs needs (listener, HTTP headroom, task, delivery, notification and inbound
+-/// workers, the intent worker, the schedule materializer, metrics sampler and storage maintenance). Each slot needs
++/// workers, the intent worker, the schedule materializer, metrics sampler, storage maintenance,
++/// and two concurrent final publishers). Each slot needs
+ /// two: its claim or handler transaction and its lease renewal.
+ pub const DEFAULT_WORKFLOW_WORKER_SLOTS: usize = 2;
+ pub const MAX_WORKFLOW_WORKER_SLOTS: usize = 16;
+-pub const RESERVED_DATABASE_CONNECTIONS: u32 = 10;
++pub const RESERVED_DATABASE_CONNECTIONS: u32 = 12;
+ 
+ const LEASE: Duration = Duration::from_secs(30);
+ const POLL: Duration = Duration::from_secs(1);
+@@ -176,6 +179,7 @@
+ pub struct WorkflowEngine {
+     services: Arc<WorkflowServices>,
+     handler: Arc<ProductionHandler>,
++    reply_publisher: Arc<ChannelReplyPublisher<PostgresPersistence>>,
+     slots: usize,
+     /// The jobs the worker slots are executing, for the runtime panel's sampler.
+     active_jobs: ActiveWorkflowJobs,
+@@ -294,6 +298,7 @@
+             &setup.config.public_base_url(),
+             &setup.config.app_domain_name,
+         );
++        let persistence = persistence.with_channel_reply_notices(notices.clone());
+         let catalogue = TemplateCatalogue::shipped(&WorkflowSourceDecoder)
+             .map_err(|error| anyhow::anyhow!("shipped workflow templates: {error:?}"))?;
+         let templates = ProvisioningDeployment::new(
+@@ -302,6 +307,13 @@
+             &setup.config.app_domain_name,
+         );
+         let handler = compose_handler(&persistence, &setup, &notices, &templates, lease)?;
++        let reply_publisher = Arc::new(
++            ChannelReplyPublisher::new(
++                persistence.clone(),
++                MessagePlanner::new(setup.composer.clone(), setup.config.app_domain_name.clone()),
++            )
++            .with_monitoring(setup.monitoring.clone()),
++        );
+         let worker_wakeups = Arc::new(Notify::new());
+         let services = Arc::new(WorkflowServices {
+             persistence,
+@@ -313,6 +325,7 @@
+         Ok(Self {
+             services,
+             handler,
++            reply_publisher,
+             slots: setup.slots,
+             active_jobs: ActiveWorkflowJobs::default(),
+             monitoring: setup.monitoring,
+@@ -353,7 +366,7 @@
+     /// Start workflow slots, the intent worker, schedule materializer and metrics sampler
+     /// under `shutdown`. The caller keeps the handles and joins them on shutdown.
+     pub fn spawn(&self, shutdown: &CancellationToken) -> Vec<(&'static str, JoinHandle<()>)> {
+-        let mut handles = Vec::with_capacity(self.slots + 5);
++        let mut handles = Vec::with_capacity(self.slots + 6);
+         let vault = crate::adapters::persistence::integrations::PostgresVault::new(
+             self.services.persistence.clone(),
+         );
+@@ -424,6 +437,12 @@
+                 worker.run(&intent_wakeup, &intent_shutdown).await;
+             }),
+         ));
++        let publisher = self.reply_publisher.clone();
++        let publisher_shutdown = shutdown.clone();
++        handles.push((
++            "workflow final reply publisher",
++            tokio::spawn(async move { publisher.run(&publisher_shutdown).await }),
++        ));
+         handles.push(self.spawn_storage(shutdown));
+         let materializer = self.services.schedule_materializer();
+         let schedule_shutdown = shutdown.clone();
+@@ -733,8 +752,8 @@
+                 .unwrap();
+         }
+         assert_eq!(
+-            task_count, 6,
+-            "one slot, metrics, intent, schedule, storage and integration teardown workers"
++            task_count, 7,
++            "one slot, metrics, intent, final publication, schedule, storage and integration teardown workers"
+         );
+     }
+ 
+@@ -749,8 +768,8 @@
+             worker_slots(None, crate::infra::db::DEFAULT_DATABASE_MAX_CONNECTIONS).unwrap(),
+             2
+         );
+-        assert_eq!(worker_slots(Some("4"), 18).unwrap(), 4);
+-        assert!(worker_slots(Some("4"), 17).is_err());
++        assert_eq!(worker_slots(Some("4"), 20).unwrap(), 4);
++        assert!(worker_slots(Some("4"), 19).is_err());
+         assert!(worker_slots(Some("5"), 18).is_err());
+         assert!(worker_slots(Some("0"), 64).is_err());
+         assert!(worker_slots(Some("17"), 64).is_err());

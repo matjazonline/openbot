@@ -4,6 +4,8 @@ use crate::application::workflow::DeliveryPolicy;
 use crate::application::workflow::{activation::*, batch::*, channel_reply::*, decisions::*};
 #[path = "channel_reply_intent_schema_tests.rs"]
 mod intent_schema_tests;
+#[path = "channel_reply_knowledge_tests.rs"]
+mod knowledge_tests;
 #[path = "channel_reply_completion_owner_tests.rs"]
 mod owner_tests;
 #[path = "channel_reply_completion_policy_runtime_tests.rs"]

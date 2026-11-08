@@ -1,0 +1,44 @@
+{
+  "id": "AH-P01-AG1-R3",
+  "phase": "p01",
+  "stage": "reopened architecture gate for creator principal deletion lifecycle only, no correction implemented",
+  "head": "4ab45555f8316ec7a8b1b64e8c05b77ff7d9a29d",
+  "phase_start_commit": "4ab45555f8316ec7a8b1b64e8c05b77ff7d9a29d",
+  "review_base": "4ab45555f8316ec7a8b1b64e8c05b77ff7d9a29d",
+  "worktree": "/private/tmp/openbot-agent-history-h_82_5pw/worktree",
+  "branch": "codex/autonomous-agent-history-h_82_5pw",
+  "digest": "fd81283df217c677856979928e35b5f2a31a7805b7547a24d95f75fa3efa006a",
+  "exclusions": [
+    "plan/04-autonomous-agent-history/COORDINATION.md",
+    "plan/04-autonomous-agent-history/phases/p01/docs",
+    "plan/04-autonomous-agent-history/phases/p02/docs",
+    "plan/04-autonomous-agent-history/phases/p03/docs",
+    "plan/04-autonomous-agent-history/phases/p04/docs",
+    "plan/04-autonomous-agent-history/phases/p05/docs",
+    "plan/04-autonomous-agent-history/phases/p06/docs",
+    "plan/04-autonomous-agent-history/phases/p07/docs",
+    "plan/04-autonomous-agent-history/integration/final/docs"
+  ],
+  "decision": "AH-P01-D1/r3",
+  "decision_path": "/private/tmp/openbot-agent-history-h_82_5pw/worktree/plan/04-autonomous-agent-history/phases/p01/docs/logs/AH-P01-D1-r3.md",
+  "decision_sha256": "ccdc36a566d74d5703c7c6e6d506b11167185a2c4a4882810ea018fb36a4a170",
+  "coordination_authority": "/Users/mac02/dev/openbot/plan/04-autonomous-agent-history/COORDINATION.md",
+  "coordination_revision": 2,
+  "coordination_pin": "/private/tmp/openbot-agent-history-h_82_5pw/worktree/plan/04-autonomous-agent-history/phases/p01/docs/logs/coordination-r2.md",
+  "coordination_sha256": "587f7a7910aeab7076774edde3e33fd6c1c030c45fe95797cda3180df9895762",
+  "preserved_external_setup": "/private/tmp/openbot-agent-history-h_82_5pw/worktree/plan/04-autonomous-agent-history/phases/p01/docs/logs/setup.json",
+  "full_suite": false,
+  "source_frozen": true,
+  "checks_pending": [
+    "proposed correction not yet implemented",
+    "whole phase01 code review/acceptance pending"
+  ],
+  "recheck_findings": [],
+  "prior_decision_sha256": "2a2001b0889b9d586a077ebd69ea5aa4728ccfdc62005ceef3c69add824fdc3a",
+  "changed_decision_scope": "creator historical principal snapshot plus nullable live principal FK, preserving native revocation/deletion and retained identities",
+  "at": "2026-11-07T12:07:10.006609+00:00",
+  "evidence_receipts": [
+    "history-and-affected-runtime-05.json",
+    "focused-selection-05.json"
+  ]
+}

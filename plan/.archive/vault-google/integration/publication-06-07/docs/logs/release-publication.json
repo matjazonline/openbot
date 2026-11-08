@@ -1,0 +1,10 @@
+{
+  "published_implementation_and_archive": "b8e6b32ebcaa01c3bda659b3a6464c518e92ac06",
+  "review": "VG-PUB67-B1-R1",
+  "reviewed_artifact": "b0ae9af5c07980a42dac601855f7998facb8c431e8b978f8df8980dd7823f02a",
+  "protected_tree_sha256": "6d5daf5a9ce546606c4c0854600cdbabcd6881dfd8aef2f8f274832253f4400f",
+  "remote_verified": true,
+  "archive": "plan/.archive/vault-google",
+  "main_contains_accepted_source": "83b493e203e43bbd956f47326e17ee407b4dcc96",
+  "time_utc": "2026-11-08T14:28:02.459400+00:00"
+}

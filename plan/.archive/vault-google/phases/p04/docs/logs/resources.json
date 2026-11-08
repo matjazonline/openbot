@@ -1,0 +1,10 @@
+{
+  "database": "vault_google_1133_41402e4b8104_test",
+  "database_url": "postgresql://localhost/vault_google_1133_41402e4b8104_test",
+  "test_database_url": "postgresql://localhost/vault_google_1133_41402e4b8104_test",
+  "owned": true,
+  "worktree": "/Users/mac02/.codex/worktrees/1133/openbot",
+  "head": "97e5d60dc538e26c7cb976a8d63772eed80baff2",
+  "stash": "c6cf2a088ef25fe678a8458e5db190eb6bffd73f",
+  "cargo_target": "/Users/mac02/.codex/worktrees/1133/openbot/target"
+}

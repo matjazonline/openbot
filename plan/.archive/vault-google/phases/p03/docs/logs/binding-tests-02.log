@@ -1,0 +1,45 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.93s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-048b7abd3ed0c794)
+
+running 6 tests
+test adapters::persistence::workflow::tests::http_tests::integration_authority_tests::vault_binding_owner_confirmation_and_admin_cannot_use_another_owners_account ... FAILED
+test adapters::persistence::workflow::tests::http_tests::integration_authority_tests::vault_binding_database_rejects_partial_sources_and_cross_owner_references ... FAILED
+test adapters::persistence::workflow::tests::http_tests::integration_authority_tests::vault_binding_member_removal_readdition_repeated_teardown_and_owner_unbind ... FAILED
+test adapters::persistence::workflow::tests::http_tests::integration_authority_tests::vault_binding_same_private_account_has_separate_http_and_mcp_grants ... FAILED
+test adapters::persistence::workflow::tests::http_tests::integration_authority_tests::vault_binding_missing_consent_destination_and_shape_denials_are_non_mutating ... ok
+test adapters::persistence::workflow::tests::http_tests::integration_authority_tests::vault_binding_cap_competing_creators_reconfirmation_and_pagination ... ok
+
+failures:
+
+---- adapters::persistence::workflow::tests::http_tests::integration_authority_tests::vault_binding_owner_confirmation_and_admin_cannot_use_another_owners_account stdout ----
+
+thread 'adapters::persistence::workflow::tests::http_tests::integration_authority_tests::vault_binding_owner_confirmation_and_admin_cannot_use_another_owners_account' (34974295) panicked at src/adapters/persistence/workflow/integration_authority_tests.rs:178:10:
+called `Result::unwrap()` on an `Err` value: Forbidden("Connection consent is unavailable or changed")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- adapters::persistence::workflow::tests::http_tests::integration_authority_tests::vault_binding_database_rejects_partial_sources_and_cross_owner_references stdout ----
+
+thread 'adapters::persistence::workflow::tests::http_tests::integration_authority_tests::vault_binding_database_rejects_partial_sources_and_cross_owner_references' (34974292) panicked at src/adapters/persistence/workflow/integration_authority_tests.rs:98:6:
+called `Result::unwrap()` on an `Err` value: ServiceUnavailable("Vault storage unavailable")
+
+---- adapters::persistence::workflow::tests::http_tests::integration_authority_tests::vault_binding_member_removal_readdition_repeated_teardown_and_owner_unbind stdout ----
+
+thread 'adapters::persistence::workflow::tests::http_tests::integration_authority_tests::vault_binding_member_removal_readdition_repeated_teardown_and_owner_unbind' (34974293) panicked at src/adapters/persistence/workflow/integration_authority_tests.rs:98:6:
+called `Result::unwrap()` on an `Err` value: Forbidden("Connection consent is unavailable or changed")
+
+---- adapters::persistence::workflow::tests::http_tests::integration_authority_tests::vault_binding_same_private_account_has_separate_http_and_mcp_grants stdout ----
+
+thread 'adapters::persistence::workflow::tests::http_tests::integration_authority_tests::vault_binding_same_private_account_has_separate_http_and_mcp_grants' (34974296) panicked at src/adapters/persistence/workflow/integration_authority_tests.rs:98:6:
+called `Result::unwrap()` on an `Err` value: ServiceUnavailable("Vault storage unavailable")
+
+
+failures:
+    adapters::persistence::workflow::tests::http_tests::integration_authority_tests::vault_binding_database_rejects_partial_sources_and_cross_owner_references
+    adapters::persistence::workflow::tests::http_tests::integration_authority_tests::vault_binding_member_removal_readdition_repeated_teardown_and_owner_unbind
+    adapters::persistence::workflow::tests::http_tests::integration_authority_tests::vault_binding_owner_confirmation_and_admin_cannot_use_another_owners_account
+    adapters::persistence::workflow::tests::http_tests::integration_authority_tests::vault_binding_same_private_account_has_separate_http_and_mcp_grants
+
+test result: FAILED. 2 passed; 4 failed; 0 ignored; 0 measured; 3234 filtered out; finished in 3.88s
+
+error: test failed, to rerun pass `--lib`

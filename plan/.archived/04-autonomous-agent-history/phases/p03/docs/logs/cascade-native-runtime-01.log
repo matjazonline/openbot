@@ -1,0 +1,98 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+   Compiling open_bots v0.1.0 (/private/tmp/openbot-agent-history-h_82_5pw/worktree)
+error[E0422]: cannot find struct, variant or union type `ActivationRequest` in this scope
+   --> src/adapters/persistence/workflow/agent_history_cascade_tests.rs:105:9
+    |
+105 |         ActivationRequest {
+    |         ^^^^^^^^^^^^^^^^^ not found in this scope
+    |
+help: consider importing this struct
+    |
+  2 + use crate::application::workflow::activation::ActivationRequest;
+    |
+
+error[E0425]: cannot find function, tuple struct or tuple variant `WorkflowJobId` in this scope
+   --> src/adapters/persistence/workflow/agent_history_cascade_tests.rs:109:18
+    |
+109 |             job: WorkflowJobId(job.job),
+    |                  ^^^^^^^^^^^^^ not found in this scope
+    |
+help: consider importing this tuple struct
+    |
+  2 + use crate::application::workflow::activation::WorkflowJobId;
+    |
+
+error[E0433]: cannot find type `Duration` in this scope
+   --> src/adapters/persistence/workflow/agent_history_cascade_tests.rs:125:26
+    |
+125 |     tokio::time::timeout(Duration::from_secs(3),async {
+    |                          ^^^^^^^^ use of undeclared type `Duration`
+    |
+    = note: struct `crate::infra::workflow::tests::Duration` exists but is inaccessible
+help: consider importing this struct
+    |
+  2 + use std::time::Duration;
+    |
+
+error[E0433]: cannot find type `Duration` in this scope
+   --> src/adapters/persistence/workflow/agent_history_cascade_tests.rs:130:32
+    |
+130 |             tokio::time::sleep(Duration::from_millis(5)).await;
+    |                                ^^^^^^^^ use of undeclared type `Duration`
+    |
+    = note: struct `crate::infra::workflow::tests::Duration` exists but is inaccessible
+help: consider importing this struct
+    |
+  2 + use std::time::Duration;
+    |
+
+error[E0425]: cannot find type `ActivationRequest` in this scope
+   --> src/adapters/persistence/workflow/agent_history_cascade_tests.rs:135:51
+    |
+135 | async fn cancel_command(setup: &ToolSetup, scope: ActivationRequest) -> CancelCommand {
+    |                                                   ^^^^^^^^^^^^^^^^^ not found in this scope
+    |
+help: consider importing this struct
+    |
+  2 + use crate::application::workflow::activation::ActivationRequest;
+    |
+
+error[E0433]: cannot find type `Duration` in this scope
+   --> src/adapters/persistence/workflow/agent_history_cascade_tests.rs:212:45
+    |
+212 |     let child_result = tokio::time::timeout(Duration::from_secs(5), child_prepare)
+    |                                             ^^^^^^^^ use of undeclared type `Duration`
+    |
+    = note: struct `crate::infra::workflow::tests::Duration` exists but is inaccessible
+help: consider importing this struct
+    |
+  2 + use std::time::Duration;
+    |
+
+error[E0433]: cannot find type `Duration` in this scope
+   --> src/adapters/persistence/workflow/agent_history_cascade_tests.rs:219:30
+    |
+219 |         tokio::time::timeout(Duration::from_secs(5), cancel)
+    |                              ^^^^^^^^ use of undeclared type `Duration`
+    |
+    = note: struct `crate::infra::workflow::tests::Duration` exists but is inaccessible
+help: consider importing this struct
+    |
+  2 + use std::time::Duration;
+    |
+
+error[E0433]: cannot find type `Duration` in this scope
+   --> src/adapters/persistence/workflow/agent_history_cascade_tests.rs:227:30
+    |
+227 |         tokio::time::timeout(Duration::from_secs(5), other_prepare)
+    |                              ^^^^^^^^ use of undeclared type `Duration`
+    |
+    = note: struct `crate::infra::workflow::tests::Duration` exists but is inaccessible
+help: consider importing this struct
+    |
+  2 + use std::time::Duration;
+    |
+
+Some errors have detailed explanations: E0422, E0425, E0433.
+For more information about an error, try `rustc --explain E0422`.
+error: could not compile `open_bots` (lib test) due to 8 previous errors

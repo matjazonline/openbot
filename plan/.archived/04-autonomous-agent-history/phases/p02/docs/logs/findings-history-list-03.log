@@ -1,0 +1,63 @@
+   Compiling open_bots v0.1.0 (/private/tmp/openbot-agent-history-h_82_5pw/worktree)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1m 00s
+     Running unittests src/lib.rs (/private/tmp/openbot-chs-p06-3f43t2k7/worktree/target/debug/deps/open_bots-8b80d02f0b6cf2e6)
+adapters::persistence::workflow::tests::admission_tests::agent_history_sessions::agent_history_identity_automatic_producer_cannot_supply_private_session_reference: test
+adapters::persistence::workflow::tests::admission_tests::agent_history_sessions::agent_history_identity_competing_admissions_allocate_one_private_session: test
+adapters::persistence::workflow::tests::admission_tests::agent_history_sessions::agent_history_identity_foreign_and_changed_association_reuse_refuse_without_writes: test
+adapters::persistence::workflow::tests::admission_tests::agent_history_sessions::agent_history_identity_manual_starter_owns_session_and_ceiling_not_binding_actor: test
+adapters::persistence::workflow::tests::admission_tests::agent_history_sessions::agent_history_identity_native_mapping_and_creator_are_immutable: test
+adapters::persistence::workflow::tests::admission_tests::agent_history_sessions::agent_history_identity_private_fresh_reuse_and_replay_are_admission_owned: test
+adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::history_completion::agent_history_completion_competing_finalizers_and_durable_replay_keep_one_answer: test
+adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::history_completion::agent_history_completion_rollback_keeps_checkpoint_and_exchange_active: test
+adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::history_completion::agent_history_level_competing_observation_commit_precedes_the_output_stamp: test
+adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::history_completion::agent_history_level_enqueue_and_final_acceptance_only_raise_the_stamp: test
+adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::history_completion::agent_history_storage_repeated_step_admission_has_new_activation_in_same_private_conversation: test
+adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::history_completion::lifecycle::agent_history_completion_cancel_after_acceptance_preserves_the_accepted_exchange: test
+adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::history_completion::lifecycle::agent_history_completion_cancel_before_acceptance_has_input_and_no_answer: test
+adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::history_completion::lifecycle::agent_history_completion_safe_control_retry_reactivates_same_checkpoint_without_refunding: test
+adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::history_completion::lifecycle::agent_history_completion_workflow_failure_and_control_retry_preserve_accepted_output: test
+adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::history_completion::lifecycle::ambiguity::agent_history_completion_ambiguous_reopen_aborted_reports_missing_effect_and_recovers: test
+adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::history_completion::lifecycle::ambiguity::agent_history_completion_ambiguous_reopen_committed_proves_reactivation_and_current_refusal: test
+adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::history_completion::lifecycle::deletion::agent_history_storage_company_teardown_removes_even_retryable_failed_exchange: test
+adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::history_completion::lifecycle::deletion::agent_history_storage_expired_failed_exchange_can_release_its_source_pin: test
+adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::history_completion::lifecycle::deletion::agent_history_storage_failed_exchange_delete_and_actual_control_retry_do_not_deadlock: test
+adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::history_completion::lifecycle::deletion::agent_history_storage_nonresumable_failed_exchange_can_be_deleted_before_deadline: test
+adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_graph::descendants::history_identity::agent_history_identity_same_agent_child_has_private_branch_and_keeps_actual_actor: test
+adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::history_identity::agent_history_identity_competing_fenced_resolvers_converge_and_stale_fence_refuses: test
+adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::history_identity::agent_history_identity_current_agent_revocation_refuses_existing_conversation: test
+adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::history_identity::agent_history_identity_model_only_steps_allocate_no_conversation: test
+adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::history_identity::agent_history_identity_principal_deletion_preserves_audit_and_refuses_current_use: test
+adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::history_storage::acknowledgement::agent_history_completion_actual_final_commit_ack_loss_replays_without_another_provider_call: test
+adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::history_storage::acknowledgement::agent_history_storage_ambiguous_enqueue_aborted_keeps_counter_available_for_recovery: test
+adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::history_storage::acknowledgement::agent_history_storage_ambiguous_enqueue_committed_reuses_one_position_before_checkpoint: test
+adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::history_storage::agent_history_completion_cancel_before_checkpoint_keeps_the_captured_input: test
+adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::history_storage::agent_history_completion_driver_keeps_exact_json_and_replays_without_provider: test
+adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::history_storage::agent_history_completion_invalid_candidates_never_become_an_answer: test
+adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::history_storage::agent_history_completion_json_null_is_an_accepted_value_in_storage: test
+adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::history_storage::agent_history_completion_repair_accepts_only_the_repaired_value: test
+adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::history_storage::agent_history_level_enqueue_uses_current_content_and_refuses_lower_or_out_of_domain: test
+adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::history_storage::agent_history_storage_capture_precedes_checkpoint_and_replays_one_original_input: test
+adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::history_storage::agent_history_storage_checkpoint_requires_exact_server_owned_exchange_reference: test
+adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::history_storage::agent_history_storage_competing_preparations_share_position_and_reject_changed_replay: test
+adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::history_storage::agent_history_storage_native_identity_order_and_source_pins_are_enforced: test
+adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::atomic::agent_history_level_accepted_checkpoint_contains_the_real_classified_observation: test
+adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::agent_history_identity_actual_agents_in_same_thread_remain_distinct: test
+adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::agent_history_identity_manual_thread_attachment_is_private_and_scope_updates_refuse: test
+adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::agent_history_identity_native_cross_tenant_agent_and_thread_anchors_refuse: test
+adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::agent_history_identity_real_message_roots_share_thread_across_agent_revisions: test
+adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::agent_history_level_thread_stream_survives_audience_drop_and_restore: test
+application::workflow::agent_history::tests::agent_history_contract_accepted_null_is_distinct_from_failure_and_cancellation: test
+application::workflow::agent_history::tests::agent_history_contract_exact_structured_values_roundtrip_without_prompt_expansion: test
+application::workflow::agent_history::tests::agent_history_contract_only_agent_run_is_eligible: test
+application::workflow::agent_history::tests::agent_history_contract_order_is_positive_bounded_and_survives_decode: test
+application::workflow::agent_history::tests::agent_history_contract_schema_and_revision_remain_original_provenance: test
+application::workflow::agent_history::tests::agent_history_contract_terminal_states_do_not_follow_workflow_or_delivery_state: test
+application::workflow::agent_history::tests::agent_history_contract_value_budget_is_enforced_at_construction_and_decode: test
+application::workflow::agent_history::tests::agent_history_identity_activation_is_stable_across_attempts_and_distinct_for_repeats: test
+application::workflow::agent_history::tests::agent_history_level_visibility_changes_without_forking_or_hidden_pair_markers: test
+application::workflow::fixtures::tests::agent_history::agent_history_identity_private_params_and_transitive_inputs_never_use_thread_stream: test
+application::workflow::fixtures::tests::agent_history::agent_history_identity_provenance_rejects_unknown_and_over_budget_execution_sets: test
+application::workflow::fixtures::tests::agent_history::agent_history_identity_public_lineage_is_closed_and_does_not_include_future_reviews: test
+application::workflow::publication::tests::agent_tests::history_preparation::agent_history_contract_preparation_retains_original_json_and_one_untrusted_prompt: test
+
+58 tests, 0 benchmarks

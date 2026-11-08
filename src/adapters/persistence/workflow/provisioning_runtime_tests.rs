@@ -9,6 +9,9 @@ use crate::application::workflow::provisioning::*;
 #[path = "provisioning_requester_lock_tests.rs"]
 mod requester_locks;
 
+#[path = "channel_reply_native_runtime_tests.rs"]
+mod channel_reply_native_runtime_tests;
+
 /// The Agent Builder on the scripted model, granted the provisioning tools, answering its team
 /// channel `builder` through the shipped autonomous template ("Create assistant channel", run
 /// by the owner). Returns the Builder channel's binding.
@@ -118,8 +121,10 @@ async fn replied(d: &Deployment, binding: Uuid) -> i64 {
     d.count(&format!(
         "SELECT count(*) FROM workflow_runs AS run WHERE run.company_id = $1 \
          AND run.binding_id = '{binding}' AND run.state <> 'failed' \
-         AND EXISTS (SELECT 1 FROM workflow_message_destinations AS reply \
-           WHERE reply.company_id = run.company_id AND reply.run_id = run.id AND reply.kind = 'reply')"
+         AND (EXISTS (SELECT 1 FROM workflow_message_destinations AS reply \
+           WHERE reply.company_id = run.company_id AND reply.run_id = run.id AND reply.kind = 'reply') \
+           OR EXISTS (SELECT 1 FROM channel_reply_decisions AS final \
+           WHERE final.company_id=run.company_id AND final.run_id=run.id AND final.state='published'))"
     ))
     .await
 }
@@ -167,7 +172,7 @@ async fn builder_provisions_an_assistant_for_a_signed_in_admin() {
     )
     .await;
     d.run_until("the Builder's run finished", async || {
-        finished_runs(&d, builder).await == 1
+        replied(&d, builder).await == 1
     })
     .await;
 
@@ -233,12 +238,12 @@ async fn builder_provisions_an_assistant_for_a_signed_in_admin() {
     )
     .await;
     d.run_until("the helper answered", async || {
-        finished_runs(&d, binding).await == 1
+        replied(&d, binding).await == 1
     })
     .await;
     assert_eq!(replied(&d, binding).await, 1, "the helper's run replies");
     assert_eq!(
-        replies(&d).await.len(),
+        reply_count(&d).await,
         2,
         "the Builder's reply and the helper's"
     );
@@ -266,10 +271,8 @@ async fn builder_sees_the_conversation_so_far() {
         format!("Message-ID: <{first}>\n"),
     )
     .await;
-    d.run_until("the first answer", async || {
-        finished_runs(&d, builder).await == 1
-    })
-    .await;
+    d.run_until("the first answer", async || replied(&d, builder).await == 1)
+        .await;
     write_with(
         &d,
         &email,
@@ -283,7 +286,7 @@ async fn builder_sees_the_conversation_so_far() {
     )
     .await;
     d.run_until("the follow-up answer", async || {
-        finished_runs(&d, builder).await == 2
+        replied(&d, builder).await == 2
     })
     .await;
 
@@ -321,7 +324,7 @@ async fn builder_adds_custom_steps_to_the_new_agents_workflow() {
             "with": {"data": {"ref": "/steps/topic/output"}, "data_schema": labels},
             "rule": {"cases": [{"when": {"eq": [{"ref": "/steps/topic/output"},
                 {"literal": "billing"}]}, "choice": "send"}], "default": "hold"},
-            "routes": {"choices": {"send": "$next", "hold": "$end"}}}
+            "routes": {"choices": {"send": "$next", "hold": "$next"}}}
     ]);
     let mut d = Deployment::new(vec![
         LlmTurn::tool_call(CREATE_AGENT_CHANNEL, spec),
@@ -341,7 +344,7 @@ async fn builder_adds_custom_steps_to_the_new_agents_workflow() {
     )
     .await;
     d.run_until("the Builder's run finished", async || {
-        finished_runs(&d, builder).await == 1
+        replied(&d, builder).await == 1
     })
     .await;
     let created = receipts(&d, builder).await.remove(0);
@@ -361,7 +364,7 @@ async fn builder_adds_custom_steps_to_the_new_agents_workflow() {
     )
     .await;
     d.run_until("the helper answered", async || {
-        finished_runs(&d, binding).await == 1
+        replied(&d, binding).await == 1
     })
     .await;
     assert_eq!(replied(&d, binding).await, 1, "billing passes the rule");
@@ -482,7 +485,7 @@ async fn builder_refuses_members_and_emailed_requests() {
     )
     .await;
     d.run_until("the member's run finished", async || {
-        finished_runs(&d, builder).await == 1
+        replied(&d, builder).await == 1
     })
     .await;
     let (_, admin) = person(&d, "admin").await;
@@ -495,7 +498,7 @@ async fn builder_refuses_members_and_emailed_requests() {
     )
     .await;
     d.run_until("the emailed run finished", async || {
-        finished_runs(&d, builder).await == 2
+        replied(&d, builder).await == 2
     })
     .await;
 
@@ -544,7 +547,7 @@ async fn reviewed_assistants_park_their_answer_until_the_run_deadline() {
     )
     .await;
     d.run_until("the Builder's run finished", async || {
-        finished_runs(&d, builder).await == 1
+        replied(&d, builder).await == 1
     })
     .await;
     let created = receipts(&d, builder).await.remove(0);
@@ -597,4 +600,10 @@ struct ListingLoopFailure {
 struct ListingLoopWork {
     turns: i32,
     invocations: i32,
+}
+
+async fn reply_count(d: &Deployment) -> usize {
+    replies(d).await.len() + d.count(
+        "SELECT count(*) FROM channel_reply_decisions WHERE company_id=$1 AND state='published'"
+    ).await as usize
 }

@@ -1,0 +1,23 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+   Compiling open_bots v0.1.0 (/Users/mac02/.codex/worktrees/1133/openbot)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 59.56s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-048b7abd3ed0c794)
+
+running 1 test
+test adapters::persistence::workflow::tests::http_tests::vault_tests::membership_race::vault_binding_membership_revocation_covers_consent_created_while_delete_waits ... FAILED
+
+failures:
+
+---- adapters::persistence::workflow::tests::http_tests::vault_tests::membership_race::vault_binding_membership_revocation_covers_consent_created_while_delete_waits stdout ----
+
+thread 'adapters::persistence::workflow::tests::http_tests::vault_tests::membership_race::vault_binding_membership_revocation_covers_consent_created_while_delete_waits' (35078340) panicked at src/adapters/persistence/workflow/vault_tests/membership_race.rs:98:5:
+a later committed revocation must retire this consent
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    adapters::persistence::workflow::tests::http_tests::vault_tests::membership_race::vault_binding_membership_revocation_covers_consent_created_while_delete_waits
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 3249 filtered out; finished in 1.15s
+
+error: test failed, to rerun pass `--lib`

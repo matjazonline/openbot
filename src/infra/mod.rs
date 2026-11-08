@@ -32,3 +32,5 @@ pub async fn postgres_persistence() -> anyhow::Result<PostgresPersistence> {
 pub fn argon2_password_hasher() -> ArgonPasswordHasher {
     ArgonPasswordHasher::default()
 }
+
+mod integrations;

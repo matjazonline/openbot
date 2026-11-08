@@ -1,0 +1,10 @@
+{
+  "browser": "156.0.8078.80",
+  "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; form-action 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'",
+  "posted": 1,
+  "reached": 0,
+  "url": "http://127.0.0.1:55132/",
+  "errors": [
+    "Sending form data to 'http://127.0.0.1:55132/ui/profile/vault/apps/gmail/connect' violates the following Content Security Policy directive: \"form-action 'self'\". The request has been blocked.\n"
+  ]
+}

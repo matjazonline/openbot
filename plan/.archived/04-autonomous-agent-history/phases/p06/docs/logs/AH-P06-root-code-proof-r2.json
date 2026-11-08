@@ -1,0 +1,10 @@
+{
+  "source_digest": "f36a749426ec84d0dc5755380bb05312c34677bb49d1101316b2c66094d3ad20",
+  "owned": 202,
+  "external": 36,
+  "archive_exact": true,
+  "decision_scope_evidence_producer_previous_delta_hashes": true,
+  "coordination_revision": 29,
+  "case_passes": 866,
+  "result": "PASS exact retained artifact; root full B records read separately"
+}

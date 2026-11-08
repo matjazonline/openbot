@@ -5,7 +5,6 @@ use crate::application::{
 };
 use crate::domain::workflow::ResourceName;
 use crate::entities::mcp::McpEndpoint;
-use secrecy::SecretString;
 use std::sync::{Arc, Mutex};
 use tokio_util::sync::CancellationToken;
 
@@ -49,7 +48,7 @@ pub trait McpActionPreparation: Send + Sync {
 /// grant: reservation re-decides under its locks.
 pub struct McpUse {
     pub endpoint: McpEndpoint,
-    pub token: Option<SecretString>,
+    pub authentication: crate::application::workflow::http::PreparedAuthentication,
     pub credential_revision: i64,
     pub approval_required: bool,
 }
@@ -164,7 +163,7 @@ where
             client: self.client.clone(),
             opened: Mutex::new(None),
         };
-        if state == ActionEffectState::Prepared {
+        if state == ActionEffectState::Prepared && request.context.integration.is_none() {
             tokio::select! {
                 biased;
                 _ = cancel.cancelled() => return Ok(RemoteDispatchObservation::Interrupted),
@@ -218,6 +217,9 @@ where
     ) -> WorkflowHandlerOutcome {
         use ActionStepOutcome as Outcome;
         let result = match self.step(kind, claim).await {
+            Ok(RemoteDispatchObservation::PreparationFailed(failure)) => {
+                Err(integration_pre_dispatch_failure(ActionFamily::Mcp, failure))
+            }
             Ok(RemoteDispatchObservation::Committed(receipt)) => {
                 if mcp_result_is_error(&receipt.result) {
                     // The receipt keeps the bounded error result; a tool error never proves
@@ -288,7 +290,13 @@ async fn connect_checked(
     request: &ActionRequest,
 ) -> Result<Opened, Failure> {
     let session = client
-        .connect(&usage.endpoint, usage.token)
+        .connect(
+            &usage.endpoint,
+            usage
+                .authentication
+                .into_owned()
+                .map_err(Failure::Preparation)?,
+        )
         .await
         .map_err(|_| Failure::Unavailable)?;
     match session.discover().await {

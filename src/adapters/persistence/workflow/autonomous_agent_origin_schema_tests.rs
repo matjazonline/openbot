@@ -179,10 +179,23 @@ async fn old_root(f: &support::OriginHistory) -> RetentionRoot {
     assert!(matches!(result, CancelResult::Applied { .. }));
     let finished_at=sqlx::query_scalar("UPDATE workflow_runs SET finished_at=clock_timestamp()-interval '91 days' WHERE company_id=$1 AND id=$2 RETURNING finished_at")
         .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).fetch_one(p.pool()).await.unwrap();
-    RetentionRoot {
+    let retained = RetentionRoot {
         company: scope.company,
         run: scope.run,
         finished_at,
+    };
+    assert!(p.retire_tree(retained).await.unwrap().is_none());
+    crate::adapters::persistence::workflow::agent_history_retention_fixture::expire(p, scope).await;
+    let finished_at =
+        sqlx::query_scalar("SELECT finished_at FROM workflow_runs WHERE company_id=$1 AND id=$2")
+            .bind(scope.company.as_uuid())
+            .bind(scope.run.as_uuid())
+            .fetch_one(p.pool())
+            .await
+            .unwrap();
+    RetentionRoot {
+        finished_at,
+        ..retained
     }
 }
 

@@ -1,0 +1,14 @@
+   Compiling open_bots v0.1.0 (/private/tmp/openbot-agent-history-h_82_5pw/worktree)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1m 04s
+     Running unittests src/lib.rs (/private/tmp/openbot-chs-p06-3f43t2k7/worktree/target/debug/deps/open_bots-8b80d02f0b6cf2e6)
+adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::history_completion::agent_history_storage_repeated_step_admission_has_new_activation_in_same_private_conversation: test
+adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::history_completion::lifecycle::deletion::agent_history_storage_company_teardown_removes_even_retryable_failed_exchange: test
+adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::history_completion::lifecycle::deletion::agent_history_storage_expired_failed_exchange_can_release_its_source_pin: test
+adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::history_completion::lifecycle::deletion::agent_history_storage_failed_exchange_delete_and_actual_control_retry_do_not_deadlock: test
+adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::history_completion::lifecycle::deletion::agent_history_storage_nonresumable_failed_exchange_can_be_deleted_before_deadline: test
+adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::history_storage::agent_history_storage_capture_precedes_checkpoint_and_replays_one_original_input: test
+adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::history_storage::agent_history_storage_checkpoint_requires_exact_server_owned_exchange_reference: test
+adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::history_storage::agent_history_storage_competing_preparations_share_position_and_reject_changed_replay: test
+adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::history_storage::agent_history_storage_native_identity_order_and_source_pins_are_enforced: test
+
+9 tests, 0 benchmarks

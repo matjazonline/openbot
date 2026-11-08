@@ -1,0 +1,214 @@
+{
+  "format-final01": {
+    "command": [
+      "cargo",
+      "fmt",
+      "--all",
+      "--",
+      "--check"
+    ],
+    "cwd": "/Users/mac02/.codex/worktrees/1133/openbot",
+    "database": "vault_google_p06_1133_baa6bd7114",
+    "exit": 0,
+    "seconds": 2.43,
+    "log": "/Users/mac02/.codex/worktrees/1133/openbot/plan/vault-google/phases/p06/docs/logs/format-final01.log"
+  },
+  "diff-final01": {
+    "command": [
+      "git",
+      "diff",
+      "--check"
+    ],
+    "cwd": "/Users/mac02/.codex/worktrees/1133/openbot",
+    "database": "vault_google_p06_1133_baa6bd7114",
+    "exit": 0,
+    "seconds": 0.03,
+    "log": "/Users/mac02/.codex/worktrees/1133/openbot/plan/vault-google/phases/p06/docs/logs/diff-final01.log"
+  },
+  "offline-final02": {
+    "command": [
+      "cargo",
+      "check",
+      "--locked",
+      "--offline",
+      "--all-targets"
+    ],
+    "cwd": "/Users/mac02/.codex/worktrees/1133/openbot",
+    "database": "vault_google_p06_1133_baa6bd7114",
+    "exit": 0,
+    "seconds": 0.24,
+    "log": "/Users/mac02/.codex/worktrees/1133/openbot/plan/vault-google/phases/p06/docs/logs/offline-final02.log"
+  },
+  "clippy-final02": {
+    "command": [
+      "cargo",
+      "clippy",
+      "--locked",
+      "--offline",
+      "--all-targets",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "cwd": "/Users/mac02/.codex/worktrees/1133/openbot",
+    "database": "vault_google_p06_1133_baa6bd7114",
+    "exit": 0,
+    "seconds": 93.53,
+    "log": "/Users/mac02/.codex/worktrees/1133/openbot/plan/vault-google/phases/p06/docs/logs/clippy-final02.log"
+  },
+  "migrate-final01": {
+    "command": [
+      "env",
+      "SQLX_OFFLINE=false",
+      "cargo",
+      "sqlx",
+      "migrate",
+      "run"
+    ],
+    "cwd": "/Users/mac02/.codex/worktrees/1133/openbot",
+    "database": "vault_google_p06_1133_baa6bd7114",
+    "exit": 0,
+    "seconds": 0.03,
+    "log": "/Users/mac02/.codex/worktrees/1133/openbot/plan/vault-google/phases/p06/docs/logs/migrate-final01.log"
+  },
+  "sqlx-prepare-final01": {
+    "command": [
+      "env",
+      "SQLX_OFFLINE=false",
+      "cargo",
+      "sqlx",
+      "prepare",
+      "--",
+      "--all-targets"
+    ],
+    "cwd": "/Users/mac02/.codex/worktrees/1133/openbot",
+    "database": "vault_google_p06_1133_baa6bd7114",
+    "exit": 0,
+    "seconds": 17.51,
+    "log": "/Users/mac02/.codex/worktrees/1133/openbot/plan/vault-google/phases/p06/docs/logs/sqlx-prepare-final01.log"
+  },
+  "sqlx-check-final01": {
+    "command": [
+      "env",
+      "SQLX_OFFLINE=false",
+      "cargo",
+      "sqlx",
+      "prepare",
+      "--check",
+      "--",
+      "--all-targets"
+    ],
+    "cwd": "/Users/mac02/.codex/worktrees/1133/openbot",
+    "database": "vault_google_p06_1133_baa6bd7114",
+    "exit": 0,
+    "seconds": 15.39,
+    "log": "/Users/mac02/.codex/worktrees/1133/openbot/plan/vault-google/phases/p06/docs/logs/sqlx-check-final01.log"
+  },
+  "authoring-list-final01": {
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "--offline",
+      "--lib",
+      "vault_authoring_",
+      "--",
+      "--list"
+    ],
+    "cwd": "/Users/mac02/.codex/worktrees/1133/openbot",
+    "database": "vault_google_p06_1133_baa6bd7114",
+    "exit": 0,
+    "seconds": 63.01,
+    "log": "/Users/mac02/.codex/worktrees/1133/openbot/plan/vault-google/phases/p06/docs/logs/authoring-list-final01.log"
+  },
+  "authoring-run-final01": {
+    "command": [
+      "env",
+      "RUST_MIN_STACK=2097152",
+      "RUST_TEST_THREADS=4",
+      "bash",
+      "scripts/test-network-isolation.sh",
+      "cargo",
+      "test",
+      "--locked",
+      "--offline",
+      "--lib",
+      "vault_authoring_"
+    ],
+    "cwd": "/Users/mac02/.codex/worktrees/1133/openbot",
+    "database": "vault_google_p06_1133_baa6bd7114",
+    "exit": 0,
+    "seconds": 2.54,
+    "log": "/Users/mac02/.codex/worktrees/1133/openbot/plan/vault-google/phases/p06/docs/logs/authoring-run-final01.log"
+  },
+  "renewal-borrow-final01": {
+    "command": [
+      "env",
+      "RUST_MIN_STACK=2097152",
+      "RUST_TEST_THREADS=4",
+      "bash",
+      "scripts/test-network-isolation.sh",
+      "cargo",
+      "test",
+      "--locked",
+      "--offline",
+      "--lib",
+      "integration_renewal_"
+    ],
+    "cwd": "/Users/mac02/.codex/worktrees/1133/openbot",
+    "database": "vault_google_p06_1133_baa6bd7114",
+    "exit": 0,
+    "seconds": 12.49,
+    "log": "/Users/mac02/.codex/worktrees/1133/openbot/plan/vault-google/phases/p06/docs/logs/renewal-borrow-final01.log"
+  },
+  "browser-final05": {
+    "command": [
+      "env",
+      "VAULT_AUTHORING_BROWSER_FIXTURES=plan/vault-google/phases/p06/docs/logs/browser-fixtures",
+      "CHROME_PATH=/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+      "node",
+      "--test",
+      "scripts/tests/vault-authoring-browser.mjs",
+      "scripts/tests/workflow-samples.mjs"
+    ],
+    "cwd": "/Users/mac02/.codex/worktrees/1133/openbot",
+    "database": "vault_google_p06_1133_baa6bd7114",
+    "exit": 0,
+    "seconds": 4.44,
+    "log": "/Users/mac02/.codex/worktrees/1133/openbot/plan/vault-google/phases/p06/docs/logs/browser-final05.log"
+  },
+  "css-final01": {
+    "command": [
+      "npm",
+      "run",
+      "check:css"
+    ],
+    "cwd": "/Users/mac02/.codex/worktrees/1133/openbot",
+    "database": "vault_google_p06_1133_baa6bd7114",
+    "exit": 0,
+    "seconds": 0.52,
+    "log": "/Users/mac02/.codex/worktrees/1133/openbot/plan/vault-google/phases/p06/docs/logs/css-final01.log"
+  },
+  "sample-boundary-final01": {
+    "command": [
+      "python3",
+      "scripts/workflow-sample-boundary.py"
+    ],
+    "cwd": "/Users/mac02/.codex/worktrees/1133/openbot",
+    "database": "vault_google_p06_1133_baa6bd7114",
+    "exit": 0,
+    "seconds": 0.04,
+    "log": "/Users/mac02/.codex/worktrees/1133/openbot/plan/vault-google/phases/p06/docs/logs/sample-boundary-final01.log"
+  },
+  "graph-final01": {
+    "command": [
+      "graft",
+      "build"
+    ],
+    "cwd": "/Users/mac02/.codex/worktrees/1133/openbot",
+    "database": "vault_google_p06_1133_baa6bd7114",
+    "exit": 0,
+    "seconds": 2.48,
+    "log": "/Users/mac02/.codex/worktrees/1133/openbot/plan/vault-google/phases/p06/docs/logs/graph-final01.log"
+  }
+}

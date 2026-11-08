@@ -1,0 +1,5 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.18s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-048b7abd3ed0c794)
+infra::setup::tests::security_session_metrics_export_under_startup_fly_and_example_filters: test
+
+1 test, 0 benchmarks

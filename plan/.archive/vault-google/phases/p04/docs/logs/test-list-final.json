@@ -1,0 +1,15 @@
+{
+  "command": [
+    "env",
+    "RUST_MIN_STACK=2097152",
+    "bash",
+    "scripts/test-network-isolation.sh",
+    "target/debug/deps/open_bots-048b7abd3ed0c794",
+    "--list"
+  ],
+  "cwd": "/Users/mac02/.codex/worktrees/1133/openbot",
+  "database": "vault_google_1133_41402e4b8104_test",
+  "exit": 0,
+  "seconds": 0.06,
+  "log": "/Users/mac02/.codex/worktrees/1133/openbot/plan/vault-google/phases/p04/docs/logs/test-list-final.log"
+}

@@ -1,0 +1,34 @@
+{
+  "distinct_verified": 232,
+  "missing_pass_lines": [],
+  "counts_by_passing_cohort": {
+    "authoring-tests-04": 17,
+    "samples-tests-02": 20,
+    "templates-tests-02": 16,
+    "http-authoring-tests-01": 54,
+    "native-runtime-tests-03": 8,
+    "fixtures-tests-01": 15,
+    "graph-tests-01": 9,
+    "views-tests-03": 7,
+    "views-tests-04": 12,
+    "nested-review-regression-green-02": 13,
+    "controls-tests-01": 1,
+    "http-csrf-tests-02": 1,
+    "source-browser-fixtures-01": 1,
+    "decision-browser-fixtures-01": 1,
+    "run-views-tests-01": 27,
+    "conversation-tests-01": 2,
+    "conversation-stream-tests-01": 2,
+    "onboarding-tests-01": 16,
+    "onboarding-tests-02": 17,
+    "continuation-regressions-green-04": 5,
+    "formal-decision-tests-03": 38
+  },
+  "archive_source_mismatches": [],
+  "correction_paths": [
+    "migrations/20260817000000_init_schema.sql",
+    "src/adapters/persistence/workflow/channel_reply_continuation_views_support.rs",
+    "src/adapters/persistence/workflow/channel_reply_continuation_views_tests.rs"
+  ],
+  "archive_sha256": "e12c438f2ce859215f6d475e5e664fc9b6c74d16eaf2b36d93ee4ff24dbb9234"
+}

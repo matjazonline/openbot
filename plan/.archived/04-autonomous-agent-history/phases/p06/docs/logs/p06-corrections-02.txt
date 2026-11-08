@@ -1,0 +1,14 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+   Compiling open_bots v0.1.0 (/private/tmp/openbot-agent-history-h_82_5pw/worktree)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 59.53s
+     Running unittests src/lib.rs (/private/tmp/openbot-chs-p06-3f43t2k7/worktree/target/debug/deps/open_bots-8b80d02f0b6cf2e6)
+
+running 5 tests
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::owner_races::agent_history_retention_actual_expiry_owner_precedes_blocked_fresh_selection_without_mixed_seed ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::owner_races::agent_history_retention_actual_preparation_owner_skips_competing_cleanup_and_replays_exact_copy ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_graph::descendants::history_continuation::agent_history_retention_actual_human_submission_owner_competes_with_cleanup_and_replays_expired_selected_source ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_graph::descendants::history_continuation::agent_history_continuation_two_real_approval_rounds_and_competing_reviewers_preserve_one_exchange ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::retry_retention::agent_history_retention_completed_output_failed_job_pressure_competes_with_native_retry_without_model_reentry ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 3382 filtered out; finished in 9.17s
+

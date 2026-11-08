@@ -1,0 +1,26 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+   Compiling open_bots v0.1.0 (/private/tmp/openbot-agent-history-h_82_5pw/worktree)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 53.20s
+     Running unittests src/lib.rs (/private/tmp/openbot-chs-p06-3f43t2k7/worktree/target/debug/deps/open_bots-8b80d02f0b6cf2e6)
+
+running 2 tests
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::acknowledgement::agent_history_recovery_park_commit_ack_loss_proves_retired_attempt_and_survives_fast_wake ... FAILED
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::acknowledgement::agent_history_recovery_aborted_park_commit_has_no_receipt_and_retries_same_frozen_activation ... ok
+
+failures:
+
+---- adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::acknowledgement::agent_history_recovery_park_commit_ack_loss_proves_retired_attempt_and_survives_fast_wake stdout ----
+observed gated transaction pids=[89996] blocker=90002 elapsed_ms=33
+observed resolution pids=[89994] blocker=89996 elapsed_ms=1990
+
+thread 'adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::acknowledgement::agent_history_recovery_park_commit_ack_loss_proves_retired_attempt_and_survives_fast_wake' (35699034) panicked at src/adapters/persistence/workflow/agent_history_turn_ack_tests.rs:69:23:
+park receipt was not proven: Conflict: Workflow agent_history.prepare commit outcome unknown
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::acknowledgement::agent_history_recovery_park_commit_ack_loss_proves_retired_attempt_and_survives_fast_wake
+
+test result: FAILED. 1 passed; 1 failed; 0 ignored; 0 measured; 3303 filtered out; finished in 3.22s
+
+error: test failed, to rerun pass `--lib`

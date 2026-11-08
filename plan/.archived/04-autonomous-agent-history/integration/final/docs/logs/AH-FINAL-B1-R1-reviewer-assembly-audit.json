@@ -1,0 +1,72 @@
+{
+  "checked_at": "2026-11-08T03:11:59.713727+00:00",
+  "phase_acceptances": {
+    "p01": {
+      "source": "e62ebc6c7dac3ec2e34ca3ddce727df87b3d70f780154eb5b581b710a394aa91",
+      "input_sha256": "a9603dabe6eecdab4507df181bc2fbcd9350396d2fba14a2ddcf87bd91b18981",
+      "archive_sha256": "4ba0fd3c1cf929754c4ac463bd9699bb8bd5fea7d33bb15e8fe21640b2b75822",
+      "acceptance_sha256": "4b832eefedb51700d3e5a197d80f7cc7217ceaf99aa4fdb9ab10ea82dda14551",
+      "review_sha256": "ea884b9db4e40aaed6a6c1385338a0e7935685539726a71fb2624e18bad40301",
+      "copied_review_identical": true
+    },
+    "p02": {
+      "source": "c24664b28aed5506158d3a2e709ae3c5ec1228567e03fdff06bd15c146a08147",
+      "input_sha256": "bc73f999d3c89bb313dbf0c9a67f1e7abb0fea00626d870a5576c601546d1837",
+      "archive_sha256": "bfea3a87c7f347549e52ace9857fd1b4084a8780765430c0adab8de42e931c53",
+      "acceptance_sha256": "bd36f589b897112fe62c1deda7c18be44598ad39feac69d7f234fa6d95dc353a",
+      "review_sha256": "a8521961113f0c4590278027338826bca5075014ed62e704716d32843db1860e",
+      "copied_review_identical": true
+    },
+    "p03": {
+      "source": "fd507b5bb5be7ca2d7661a002528e10a1a04a33b999ff0303dcf493b70077473",
+      "input_sha256": "76611a0054e1f75a5b05e8dd9db432f8fd1ab693e8b06cec5e898d8b400d4491",
+      "archive_sha256": "c94b8b0bcf893d6e0227c28ef92be7b98ed5865909f093d14824c17df77a1373",
+      "acceptance_sha256": "025eb647da714ff6617bcd49b7530d2770fbfc4c09d9aceaad04d67cd9f0bdbc",
+      "review_sha256": "79cc5d6274681c6c14ed2bb3e9c78b46b516cae8fb26fbea99f1126e6e1f6afb",
+      "copied_review_identical": true
+    },
+    "p04": {
+      "source": "12de390114bb49391c9b20a091795450ee4aac280ff195fe3848032af17b7a4d",
+      "input_sha256": "714a673610c7ec9befd87eac920a4f84a13733942e5d583b97f6b5b3bd8f22a9",
+      "archive_sha256": "54fa5e45d05859f8f03107cd83a67661981c0006dee4675ec0a6b52f90522d13",
+      "acceptance_sha256": "7822eb2cef9741fd2498785277c606e496788011e866daee095f3fd16b0d4f08",
+      "review_sha256": "d2d5bcd8e2eb220529f33ee5326d088f373b8c6baadfcfe78f640bd1fec10fe5",
+      "copied_review_identical": true
+    },
+    "p05": {
+      "source": "998dd158c6878b33e0fccb06405452843fbfc0ba257ef747efeb84a653cd4c9c",
+      "input_sha256": "ff7792f172b5f51f42eda5bfd476782a1b31b20815b4139d57bac6755b96c5c0",
+      "archive_sha256": "fce1ff02a48b668574ba41c944112cc2f2223e41e7f4c7cfd156ca51c2fa41b3",
+      "acceptance_sha256": "86ba4b8e75b86ffa5f34b966d8b01006d2b0145e1a160751f545ddbbb113e8fa",
+      "review_sha256": "c4747ec9c2ad8d95f0853033225b204412f9690b5e51ecc34ce84100e3356d2f",
+      "copied_review_identical": true
+    },
+    "p06": {
+      "source": "f36a749426ec84d0dc5755380bb05312c34677bb49d1101316b2c66094d3ad20",
+      "input_sha256": "42459343d1e78f65bfedfd0bea2fc2cba14d873ba5bb06ac6d2b87d6538c09f3",
+      "archive_sha256": "254555371ef2b0c071b96dad670b2cc48c9f60c9d6390eba5cd970c0fbfd2a0b",
+      "acceptance_sha256": "2f0ca4df5e77c6735bf3cee72632a8d33e740ff8dde72803d6c30bbb98810631",
+      "review_sha256": "52cb416efec35d4b04e6d6811c7bca35a62187b9e034123cff28cee9ae09a413",
+      "copied_review_identical": true
+    },
+    "p07": {
+      "source": "f1b34ff7555d888bdb14a4ec9209a06c481a1a56013dd6b2895fea9af4f8f2b7",
+      "input_sha256": "2339b5cb61edbb478a16312d67d94e99ba649b2acdb8c30b704e29bc11b5b558",
+      "archive_sha256": "a5f88decc79e5ab8237bab3e7eeec9bca1f288f322bd6bc41436c20e3eaa2c23",
+      "acceptance_sha256": "b52028019fb80cd072a8e7fbeb659b80b60c0357347b15ff2db8a72a3d248c30",
+      "review_sha256": "12b70af6d323beca7f418bed05df7203648993f8ba1f35d003dc3d8bff4e7237",
+      "copied_review_identical": true
+    }
+  },
+  "archive_content_equal": true,
+  "integration_delta": 0,
+  "all_changed_paths_accounted": 293,
+  "owned": 216,
+  "preserved": 77,
+  "additional41_records_only": true,
+  "staged_entries_exact": true,
+  "copied_phase_record_files": 1391,
+  "record_mismatches": [],
+  "owned_modes_and_symlink_types_equal": true,
+  "dependency_and_stack_configuration_equal": true
+}

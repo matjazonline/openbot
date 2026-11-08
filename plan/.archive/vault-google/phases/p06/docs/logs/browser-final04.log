@@ -1,0 +1,19 @@
+✖ vault dark: native picker progress, escaped private metadata and recoverable consent (6960.340542ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 7142.540709
+
+✖ failing tests:
+
+test at scripts/tests/vault-authoring-browser.mjs:12:40
+✖ vault dark: native picker progress, escaped private metadata and recoverable consent (6960.340542ms)
+  Error: Timeout 5000ms exceeded while waiting on the predicate
+      at pollMatcher (/Users/mac02/.codex/worktrees/1133/openbot/node_modules/playwright/lib/matchers/expect.js:312:11)
+      at async TestContext.<anonymous> (file:///Users/mac02/.codex/worktrees/1133/openbot/scripts/tests/vault-authoring-browser.mjs:46:5)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)

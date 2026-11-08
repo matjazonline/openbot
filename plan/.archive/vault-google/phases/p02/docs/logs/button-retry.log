@@ -1,0 +1,1 @@
+PASS: actual shared HTMX button script shows progress, restores failed requests, and accepts retry

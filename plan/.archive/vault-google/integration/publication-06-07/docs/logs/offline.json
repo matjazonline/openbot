@@ -1,0 +1,14 @@
+{
+  "command": [
+    "cargo",
+    "check",
+    "--locked",
+    "--offline",
+    "--all-targets"
+  ],
+  "cwd": "/private/tmp/vault-google-publish-a95937f128",
+  "exit": 0,
+  "seconds": 91.99,
+  "fixture": "no database required; owned cache serialized",
+  "log": "/private/tmp/vault-google-publish-a95937f128/plan/.archive/vault-google/integration/publication-06-07/docs/logs/offline.log"
+}

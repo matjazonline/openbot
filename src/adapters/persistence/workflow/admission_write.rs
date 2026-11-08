@@ -59,7 +59,8 @@ pub(super) async fn create(
         command.proposed_run_id(),
         command.actor().user_id(),
     )
-    .await
+    .await?;
+    agent_history_sessions::capture(tx, command).await
 }
 
 /// When a new run must finish. External admission opens a fresh window; a runtime child

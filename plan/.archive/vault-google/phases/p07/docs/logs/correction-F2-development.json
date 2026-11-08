@@ -1,0 +1,17 @@
+{
+  "finding": "VG-P07-B1-F2",
+  "retained_exploration": [
+    {
+      "command": "python3 scripts/integration-boundary.py",
+      "result": "unbalanced Rust item in workflow_jev/mod.rs when experimentally merging all production declarations",
+      "resolution": "Corrected cfg(test) named-field removal, with regression mutation, to preserve following module items for alias traversal."
+    },
+    {
+      "command": "python3 scripts/integration-boundary.py",
+      "result": "False taint collisions for unrelated Failure/Reply/Response types under experimental global declaration merging",
+      "resolution": "Retained original public-DTO declaration scope; propagate import/re-export aliases from all reached production modules. No allowlist expansion. Actual and cross-file alias regressions pass."
+    }
+  ],
+  "current": "22 mutations PASS/current production gate PASS; exact reviewer negative fixture retained under scripts/tests/fixtures and recompiles successfully (correction-alias-compile-R2.json).",
+  "limits": "Source policy supplements negative trait compilation and runtime sentinel tests; not a general Rust type checker or arbitrary serializer data-flow proof."
+}

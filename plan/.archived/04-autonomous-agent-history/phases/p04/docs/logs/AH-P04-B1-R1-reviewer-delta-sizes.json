@@ -1,0 +1,254 @@
+[
+  {
+    "path": "migrations/20260817000000_init_schema.sql",
+    "old_lines": 14362,
+    "new_lines": 14460,
+    "diff_lines": 156
+  },
+  {
+    "path": "src/adapters/harness/rig/diagnostics.rs",
+    "old_lines": 86,
+    "new_lines": 85,
+    "diff_lines": 20
+  },
+  {
+    "path": "src/adapters/harness/rig/final_response.rs",
+    "old_lines": 129,
+    "new_lines": 128,
+    "diff_lines": 20
+  },
+  {
+    "path": "src/adapters/harness/rig/logical_seed_tests.rs",
+    "old_lines": 0,
+    "new_lines": 186,
+    "diff_lines": 189
+  },
+  {
+    "path": "src/adapters/harness/rig/protocol.rs",
+    "old_lines": 278,
+    "new_lines": 289,
+    "diff_lines": 24
+  },
+  {
+    "path": "src/adapters/harness/rig/protocol_tests.rs",
+    "old_lines": 229,
+    "new_lines": 232,
+    "diff_lines": 12
+  },
+  {
+    "path": "src/adapters/harness/rig/workflow.rs",
+    "old_lines": 487,
+    "new_lines": 506,
+    "diff_lines": 72
+  },
+  {
+    "path": "src/adapters/persistence/workflow/agent_history/checkpoint.rs",
+    "old_lines": 277,
+    "new_lines": 279,
+    "diff_lines": 52
+  },
+  {
+    "path": "src/adapters/persistence/workflow/agent_history/frozen.rs",
+    "old_lines": 0,
+    "new_lines": 104,
+    "diff_lines": 107
+  },
+  {
+    "path": "src/adapters/persistence/workflow/agent_history/mod.rs",
+    "old_lines": 202,
+    "new_lines": 209,
+    "diff_lines": 16
+  },
+  {
+    "path": "src/adapters/persistence/workflow/agent_history/preparation.rs",
+    "old_lines": 215,
+    "new_lines": 223,
+    "diff_lines": 32
+  },
+  {
+    "path": "src/adapters/persistence/workflow/agent_history/selection.rs",
+    "old_lines": 0,
+    "new_lines": 150,
+    "diff_lines": 153
+  },
+  {
+    "path": "src/adapters/persistence/workflow/agent_history/selection_candidates.sql",
+    "old_lines": 0,
+    "new_lines": 10,
+    "diff_lines": 13
+  },
+  {
+    "path": "src/adapters/persistence/workflow/agent_history/selection_count.sql",
+    "old_lines": 0,
+    "new_lines": 4,
+    "diff_lines": 7
+  },
+  {
+    "path": "src/adapters/persistence/workflow/agent_history/selection_payload.sql",
+    "old_lines": 0,
+    "new_lines": 8,
+    "diff_lines": 11
+  },
+  {
+    "path": "src/adapters/persistence/workflow/agent_history_context_level_tests.rs",
+    "old_lines": 0,
+    "new_lines": 147,
+    "diff_lines": 150
+  },
+  {
+    "path": "src/adapters/persistence/workflow/agent_history_freeze_fixture.rs",
+    "old_lines": 0,
+    "new_lines": 169,
+    "diff_lines": 172
+  },
+  {
+    "path": "src/adapters/persistence/workflow/agent_history_freeze_guard_tests.rs",
+    "old_lines": 0,
+    "new_lines": 336,
+    "diff_lines": 339
+  },
+  {
+    "path": "src/adapters/persistence/workflow/agent_history_knowledge_resume_tests.rs",
+    "old_lines": 0,
+    "new_lines": 155,
+    "diff_lines": 158
+  },
+  {
+    "path": "src/adapters/persistence/workflow/agent_history_ordering_tests.rs",
+    "old_lines": 273,
+    "new_lines": 276,
+    "diff_lines": 9
+  },
+  {
+    "path": "src/adapters/persistence/workflow/agent_history_private_context_tests.rs",
+    "old_lines": 0,
+    "new_lines": 437,
+    "diff_lines": 440
+  },
+  {
+    "path": "src/adapters/persistence/workflow/agent_history_private_fixture.rs",
+    "old_lines": 0,
+    "new_lines": 108,
+    "diff_lines": 111
+  },
+  {
+    "path": "src/adapters/persistence/workflow/agent_history_selection_tests.rs",
+    "old_lines": 0,
+    "new_lines": 86,
+    "diff_lines": 89
+  },
+  {
+    "path": "src/adapters/persistence/workflow/agent_history_thread_tests.rs",
+    "old_lines": 340,
+    "new_lines": 361,
+    "diff_lines": 40
+  },
+  {
+    "path": "src/adapters/persistence/workflow/agent_model_step_tests.rs",
+    "old_lines": 289,
+    "new_lines": 338,
+    "diff_lines": 55
+  },
+  {
+    "path": "src/adapters/persistence/workflow/checkpoint_models.rs",
+    "old_lines": 262,
+    "new_lines": 271,
+    "diff_lines": 18
+  },
+  {
+    "path": "src/adapters/persistence/workflow/checkpoints.rs",
+    "old_lines": 557,
+    "new_lines": 577,
+    "diff_lines": 52
+  },
+  {
+    "path": "src/adapters/persistence/workflow/harness_model_store_tests.rs",
+    "old_lines": 228,
+    "new_lines": 229,
+    "diff_lines": 10
+  },
+  {
+    "path": "src/adapters/persistence/workflow/harness_owner_tests.rs",
+    "old_lines": 317,
+    "new_lines": 317,
+    "diff_lines": 11
+  },
+  {
+    "path": "src/adapters/persistence/workflow/harness_store_tests.rs",
+    "old_lines": 360,
+    "new_lines": 361,
+    "diff_lines": 10
+  },
+  {
+    "path": "src/adapters/persistence/workflow/knowledge_search_support.rs",
+    "old_lines": 328,
+    "new_lines": 337,
+    "diff_lines": 43
+  },
+  {
+    "path": "src/adapters/persistence/workflow/knowledge_search_tests.rs",
+    "old_lines": 129,
+    "new_lines": 132,
+    "diff_lines": 12
+  },
+  {
+    "path": "src/application/services/harness/runs/mod.rs",
+    "old_lines": 203,
+    "new_lines": 205,
+    "diff_lines": 11
+  },
+  {
+    "path": "src/application/services/harness/runs/seed.rs",
+    "old_lines": 0,
+    "new_lines": 60,
+    "diff_lines": 63
+  },
+  {
+    "path": "src/application/services/harness/runs/state.rs",
+    "old_lines": 810,
+    "new_lines": 823,
+    "diff_lines": 43
+  },
+  {
+    "path": "src/application/services/response_contract.rs",
+    "old_lines": 92,
+    "new_lines": 101,
+    "diff_lines": 18
+  },
+  {
+    "path": "src/application/workflow/agent.rs",
+    "old_lines": 397,
+    "new_lines": 397,
+    "diff_lines": 85
+  },
+  {
+    "path": "src/application/workflow/agent_context.rs",
+    "old_lines": 0,
+    "new_lines": 80,
+    "diff_lines": 83
+  },
+  {
+    "path": "src/application/workflow/agent_history/mod.rs",
+    "old_lines": 11,
+    "new_lines": 13,
+    "diff_lines": 15
+  },
+  {
+    "path": "src/application/workflow/agent_history/selection.rs",
+    "old_lines": 0,
+    "new_lines": 76,
+    "diff_lines": 79
+  },
+  {
+    "path": "src/application/workflow/agent_history_preparation_tests.rs",
+    "old_lines": 31,
+    "new_lines": 67,
+    "diff_lines": 51
+  },
+  {
+    "path": "src/application/workflow/checkpoints.rs",
+    "old_lines": 162,
+    "new_lines": 163,
+    "diff_lines": 21
+  }
+]

@@ -1,0 +1,29 @@
+{
+  "round": "VG-INT-MAIN-R1",
+  "digest": "f2bd7d430aa1f4eff0289a6006fa64deeb9fa189def2e9ae74fa427f232b7926",
+  "head": "4ab45555f8316ec7a8b1b64e8c05b77ff7d9a29d",
+  "accepted_vault_source_files_compared": 146,
+  "changed_paths": [
+    "migrations/20260817000000_init_schema.sql",
+    "plan/vault-google/README.md",
+    "src/adapters/persistence/workflow/channel_reply_completion.rs",
+    "src/adapters/persistence/workflow/mod.rs",
+    "src/adapters/persistence/workflow/provisioning_dispatch_tests.rs"
+  ],
+  "dirty_paths_outside_accepted_vault_manifest": [],
+  "schema_byte_proofs": [
+    "Upstream notify block matches canonicalHEAD",
+    "Vault append matches accepted05R2archive",
+    "HTTP identity guard matches accepted05R2archive"
+  ],
+  "caller_inspection": [
+    "final_action and channel_final trusted local reply construction",
+    "provisioning_tool_request ChannelFinal denial and native bootstrap",
+    "agent publication/http runtime Integration source denials",
+    "sealed sample external steps use scripted replies only",
+    "channel_reply_views authorized bounded observations",
+    "spawn retains final reply publisher and integration teardown with shared shutdown"
+  ],
+  "coordination": "vault12 and live externalchannel28 match immutable pins",
+  "runtime": "Awaiting root release; no B Cargo/database checks yet"
+}

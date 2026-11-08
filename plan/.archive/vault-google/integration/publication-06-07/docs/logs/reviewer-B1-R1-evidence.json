@@ -1,0 +1,36 @@
+{
+  "round": "VG-PUB67-B1-R1",
+  "utc": "2026-11-08T14:26:22.283929+00:00",
+  "head": "83b493e203e43bbd956f47326e17ee407b4dcc96",
+  "review_base": "22c94cf6fcb9d7bcce14eda2a59df58223699e7f",
+  "pending_merge_parent": "22c94cf6fcb9d7bcce14eda2a59df58223699e7f",
+  "artifact": "b0ae9af5c07980a42dac601855f7998facb8c431e8b978f8df8980dd7823f02a",
+  "coordination_revision": 25,
+  "coordination_sha256": "c437e97c1ada56e93b54556e1a266a924bd7aa93dd1f7f433fb5292dbdfcfae2",
+  "verdict": "PASS technical integration/archive; PUB4 release pending",
+  "exclusions": [
+    "plan/.archive/vault-google/COORDINATION.md",
+    "plan/.archive/vault-google/integration/publication-06-07/docs"
+  ],
+  "author_manifest_sha256": "72e0b05fc1b2a466bc40b69a8f891a22172b48b1422495f16e3be91d49368175",
+  "evidence_sha256": {
+    "reviewer-B1-R1-entry.txt": "3e58023144924e9aa78c82ad98ddc767325864c3190ce1a621eaa407301b3599",
+    "reviewer-B1-R1-exit.txt": "3e58023144924e9aa78c82ad98ddc767325864c3190ce1a621eaa407301b3599",
+    "reviewer-archive-tracked.json": "2b91b397bdad1bcb9e5889dc1d8bc0160430efc6cb390e5fdf7714ffa0fe6d77",
+    "reviewer-boundary.json": "d2e89adfb9aee08ba5f2f6a5436105b33b299eb61e38410495d1b9c9e08b09ec",
+    "reviewer-boundary.log": "9f55dabd846b9377bfba6441b555d4ae8090f5b38d967ea08d6c338e9346f00a",
+    "reviewer-ci-comparison-initial.json": "b10b5ee00ff246e381f09d66e889524cee33613e9a43a2252242e3f37d38919b",
+    "reviewer-docs.json": "fe6c6a1dbdf4a7c4ea241449de792b187caa0fc689f681cb5544e4eb6aea92c1",
+    "reviewer-docs.log": "b0b02f4660be8d4a391486646f7a9898d0cc7c8544cb640fcca196cb3414d43c",
+    "reviewer-evidence.json": "170219e726a452ded59a6b965ba0e3127377763159d7a31f033814c75d0f10af",
+    "reviewer-evidence.log": "bfddae42447f847b48bddf539eac695456c974230cf85942e523d6c0efbdb9ad",
+    "reviewer-independent-preservation.json": "001af4cbe5248c4dd3ef62cd50552e2ee8867641c7e99d84e58b18c12b07c823",
+    "reviewer-preservation.json": "a59bb8e95de2938a128e66c4b9ea771244df7ea4ed65ccc520a84274db8eb5c1",
+    "reviewer-preservation.log": "53ecef36742d3a41af521f4f58123cfc0a68249c2c592a154abe4fd95e24ff5d",
+    "reviewer-runtime-preservation.json": "1f9de3478fddd61ce33fa5cc4dc6d36105cc5ae37a9bc8a388bec0ea770ffde7",
+    "reviewer-source-modules.json": "247dd21beeb966e95f5568735341a161974ccf6490cdc3a8fb512793afe00a9e",
+    "reviewer-source-modules.log": "af56d12c28d3c356e9efd16e8f65a1195e33ed1ac2c4028687c941d5dc5c5b4d",
+    "reviewer-tracked-evidence.json": "b7b781bbfcc69d3c1ddcd81a466e114479d1e5dd9ff617289f3e72c86643fe5f",
+    "reviewer-tracked-evidence.log": "20b7d49808b91fb425195fb9581d6aecce7ea915660906511fa992e12ba176dc"
+  }
+}

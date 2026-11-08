@@ -100,6 +100,31 @@ pub enum ActionStepOutcome<'a> {
     ActionLimit,
 }
 
+pub fn integration_pre_dispatch_failure(
+    family: ActionFamily,
+    failure: crate::application::integrations::PreDispatchFailure,
+) -> WorkflowFailure {
+    use crate::application::integrations::PreDispatchFailure as P;
+    let (class, suffix) = match failure {
+        P::Denied => (FailureClass::Terminal, "integration_denied"),
+        P::Invalid => (FailureClass::Terminal, "integration_invalid"),
+        P::ReconnectRequired => (FailureClass::Terminal, "integration_reconnect"),
+        P::Configuration => (FailureClass::Terminal, "integration_configuration"),
+        P::Retry => (FailureClass::Retryable, "integration_retry"),
+        P::Cancelled => (FailureClass::Retryable, "interrupted"),
+    };
+    WorkflowFailure {
+        failure: StepFailure::new(
+            class,
+            FailureCode::parse(format!("{}.{suffix}", family.prefix()))
+                .expect("bounded static failure code"),
+            None,
+        )
+        .expect("bounded static failure"),
+        safety: RetrySafety::SafeToRetry,
+    }
+}
+
 pub fn action_step_failure(
     family: ActionFamily,
     outcome: ActionStepOutcome<'_>,

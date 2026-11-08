@@ -88,6 +88,7 @@ pub struct RunView {
     pub channel_name: Option<String>,
     /// The inbound message whose admission started the run, if a message did.
     pub trigger_message: Option<Uuid>,
+    pub response: Option<super::channel_reply::ChannelResponseOutcome>,
     pub input: Value,
     pub params: Value,
     pub lineage: Option<Lineage>,
@@ -233,6 +234,20 @@ pub trait RunViews: Send + Sync {
     ) -> AppResult<Option<crate::application::knowledge::PayloadVisibility>>;
     async fn run_view(&self, scope: RunReadScope) -> AppResult<Option<RunView>>;
     async fn step_view(&self, scope: RunReadScope, execution: Uuid) -> AppResult<Option<StepView>>;
+    /// Current Inspect authorization and bounded metadata, derived from this genuine step.
+    async fn agent_history_page(
+        &self,
+        scope: RunReadScope,
+        execution: Uuid,
+        request: super::agent_history_views::HistoryPageRequest,
+    ) -> AppResult<Option<super::agent_history_views::HistoryPage>>;
+    /// One retained payload with a fresh authority/stamp/expiry projection after its fetch.
+    async fn agent_history_exchange(
+        &self,
+        scope: RunReadScope,
+        execution: Uuid,
+        exchange: super::agent_history::AgentExchangeId,
+    ) -> AppResult<Option<super::agent_history_views::HistoryDetail>>;
     /// The titles of these workflows of the company, by id (the run list names each run's).
     async fn workflow_titles(
         &self,
@@ -260,6 +275,7 @@ impl RunView {
             return;
         }
         self.payload_restricted = true;
+        self.response = None;
         self.dependencies = None;
         for child in &mut self.children {
             child.dependency = None;

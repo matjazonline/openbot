@@ -167,6 +167,7 @@ pub fn run_body(view: &RunPaneView<'_>) -> String {
             </div>
             <div class="flex-1 space-y-6 overflow-y-auto px-4 py-4 sm:px-6">
                 {facts}
+                {response}
                 {dependencies}
                 {controls}
                 <section class="space-y-2"><h3 class="font-semibold">Graph</h3>{graph}</section>
@@ -197,6 +198,18 @@ pub fn run_body(view: &RunPaneView<'_>) -> String {
         deadline = format_date_time(summary.deadline),
         dependencies = super::provenance::dependencies(run),
         facts = facts(view),
+        response = run
+            .response
+            .as_ref()
+            .map(|response| {
+                let ids = std::collections::HashSet::from([id]);
+                super::channel_response_panel(
+                    response,
+                    company_id,
+                    super::RunLinkAccess::Authorized(&ids),
+                )
+            })
+            .unwrap_or_default(),
         controls = controls(view),
         graph = view.graph_html,
         timeline = timeline(view),
@@ -489,19 +502,7 @@ fn timeline(view: &RunPaneView<'_>) -> String {
         });
     }
     for event in &run.events {
-        entries.push(Entry {
-            at: event.created_at,
-            text: format!(
-                "{}{} by {}",
-                event.kind.replace('_', " "),
-                event
-                    .terminal_state
-                    .as_deref()
-                    .map(|state| format!(" ({state})"))
-                    .unwrap_or_default(),
-                person(view.people, event.actor)
-            ),
-        });
+        entries.push(event_entry(event, view.people));
     }
     entries.sort_by_key(|entry| entry.at);
     let rows: String = entries
@@ -767,4 +768,27 @@ fn children(view: &RunPaneView<'_>) -> String {
             ""
         },
     )
+}
+
+fn event_entry(
+    event: &crate::application::workflow::run_views::RunEvent,
+    people: &HashMap<Uuid, String>,
+) -> Entry {
+    Entry {
+        at: event.created_at,
+        text: format!(
+            "{}{} by {}",
+            if event.kind.contains('.') {
+                event.kind.clone()
+            } else {
+                event.kind.replace('_', " ")
+            },
+            event
+                .terminal_state
+                .as_deref()
+                .map(|state| format!(" ({state})"))
+                .unwrap_or_default(),
+            person(people, event.actor)
+        ),
+    }
 }

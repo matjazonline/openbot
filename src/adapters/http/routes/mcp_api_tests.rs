@@ -15,6 +15,7 @@ use crate::{
 use std::sync::Arc;
 
 struct Fixture {
+    sessions: Arc<crate::adapters::http::session::SessionAuthority>,
     service: Arc<McpUseCases>,
     user: Uuid,
     company: Uuid,
@@ -50,11 +51,16 @@ async fn fixture() -> Option<Fixture> {
         );
     }
     Some(Fixture {
+        sessions: Arc::new(crate::adapters::http::session::SessionAuthority::new(
+            &crate::infra::config::AppConfig::for_test(),
+            persistence.clone(),
+        )),
         service: Arc::new(McpUseCases::new(
             persistence.clone(),
             persistence.clone(),
             persistence,
             Arc::new(HttpMcpClient::new(EndpointPolicy::default())),
+            Arc::new(crate::application::use_cases::mcp::UnavailableMcpDiscovery),
         )),
         user,
         company: companies[0],
@@ -100,6 +106,8 @@ async fn mcp_api_scopes_objects_even_when_the_actor_manages_both_companies() {
         refresh(
             State(f.service.clone()),
             actor(),
+            State(f.sessions.clone()),
+            axum::http::HeaderMap::new(),
             Path((f.other, id)),
             Json(Revision {
                 expected_revision: 1

@@ -1,0 +1,14 @@
+{
+  "acceptance": "AH-P06-architecture-r2",
+  "at": "2026-11-07T22:42:57.026026+00:00",
+  "result": "architecture accepted ONLY; implementation and all P06 behavior checks remain open",
+  "review": "AH-P06-AG1-R2 PASS",
+  "decision_sha256": "e84717256a4920161e05dc85477d47feb49f3db83a10170d54e0195f0e30a00b",
+  "source_digest": "998dd158c6878b33e0fccb06405452843fbfc0ba257ef747efeb84a653cd4c9c",
+  "owned": 162,
+  "archive_sha256": "fce1ff02a48b668574ba41c944112cc2f2223e41e7f4c7cfd156ca51c2fa41b3",
+  "coordination_revision": 26,
+  "records": "root read complete R1/R2 notes/findings/REVIEW/proofs; F1 fixed design, unchanged coverage reused; all source/archive/decision/evidence/currentcoord verified",
+  "validator": "retention/schema PASS; behavior NOT EXERCISED1",
+  "next": "activateC007r2; implement entire06A/B then targeted checks and whole-code review"
+}

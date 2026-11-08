@@ -1,5 +1,7 @@
 use super::*;
 use crate::domain::workflow::CompanyId;
+use secrecy::SecretString;
+use serde_json::json;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use uuid::Uuid;
 
@@ -10,7 +12,7 @@ fn connection(origin: &str) -> HttpConnection {
         id: Uuid::new_v4(),
         origin: HttpOrigin::parse(origin).unwrap(),
         enabled: true,
-        bearer: false,
+        credential_source: crate::domain::integrations::authority::CredentialSource::None,
         secret_set: false,
         revision: 1,
     }
@@ -30,11 +32,38 @@ async fn endpoint(response: Vec<u8>) -> (HttpConnection, tokio::task::JoinHandle
 async fn exchange(response: Vec<u8>, secret: Option<SecretString>) -> (AppResult<Value>, String) {
     let (connection, task) = endpoint(response).await;
     let policy = HttpDestinationPolicy::new([connection.origin.as_str().to_owned()]).unwrap();
-    let client = client(&policy, &connection).await.unwrap();
+    let client = client(&policy, &connection.origin).await.unwrap();
     let request = HttpRequest::parse(&json!({"method":"GET","path":"/safe?key=value"})).unwrap();
     let result = send(client, &connection, secret.as_ref(), request).await;
     let request = task.await.unwrap();
     (result, request)
+}
+
+#[tokio::test]
+async fn integration_gateway_shared_http_injects_fixed_api_key_and_redacts_its_echo() {
+    let secret = SecretString::from("api-key-private-sentinel");
+    let body = r#"{"echo":"api-key-private-sentinel","accepted":true}"#;
+    let response = format!(
+        "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+        body.len()
+    );
+    let (connection, task) = endpoint(response.into_bytes()).await;
+    let policy = HttpDestinationPolicy::new([connection.origin.as_str().to_owned()]).unwrap();
+    let client = client(&policy, &connection.origin).await.unwrap();
+    let request = HttpRequest::parse(&json!({"method":"GET","path":"/safe"})).unwrap();
+    let result = crate::adapters::guarded_http::send_authenticated(
+        client,
+        &connection.origin,
+        crate::adapters::guarded_http::HttpAuthentication::Header("X-API-Key", &secret),
+        request,
+    )
+    .await
+    .unwrap();
+    let outgoing = task.await.unwrap().to_ascii_lowercase();
+    assert!(outgoing.contains("x-api-key: api-key-private-sentinel"));
+    assert!(!outgoing.contains("authorization:"));
+    assert!(!result.to_string().contains("api-key-private-sentinel"));
+    assert_eq!(result["body"]["accepted"], true);
 }
 
 #[test]
@@ -103,7 +132,7 @@ async fn workflow_http_default_denies_special_addresses_and_operator_scope_is_ex
     ] {
         let connection = connection(&format!("https://{host}"));
         assert!(
-            client(&HttpDestinationPolicy::default(), &connection)
+            client(&HttpDestinationPolicy::default(), &connection.origin)
                 .await
                 .is_err(),
             "{host}"
@@ -112,7 +141,7 @@ async fn workflow_http_default_denies_special_addresses_and_operator_scope_is_ex
     assert!(HttpDestinationPolicy::new(["http://localhost:8080".into()]).is_err());
     let policy = HttpDestinationPolicy::new(["http://127.0.0.1:8080".into()]).unwrap();
     assert!(
-        client(&policy, &connection("http://127.0.0.1:8081"))
+        client(&policy, &connection("http://127.0.0.1:8081").origin)
             .await
             .is_err()
     );
@@ -190,7 +219,7 @@ async fn workflow_http_pending_actual_request_is_dropped_on_cancellation() {
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let connection = connection(&format!("http://{}", listener.local_addr().unwrap()));
     let policy = HttpDestinationPolicy::new([connection.origin.as_str().to_owned()]).unwrap();
-    let client = client(&policy, &connection).await.unwrap();
+    let client = client(&policy, &connection.origin).await.unwrap();
     let task = tokio::spawn(async move {
         let (mut socket, _) = listener.accept().await.unwrap();
         let mut bytes = [0; 4096];
@@ -219,7 +248,7 @@ async fn workflow_http_stalled_body_hits_read_deadline() {
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let connection = connection(&format!("http://{}", listener.local_addr().unwrap()));
     let policy = HttpDestinationPolicy::new([connection.origin.as_str().to_owned()]).unwrap();
-    let client = client(&policy, &connection).await.unwrap();
+    let client = client(&policy, &connection.origin).await.unwrap();
     let task = tokio::spawn(async move {
         let (mut socket, _) = listener.accept().await.unwrap();
         let mut bytes = [0; 4096];

@@ -1,0 +1,32 @@
+[
+  {
+    "original": "plan/vault-google/phases/p02/docs/logs/VG-P02-R3-scope-projection",
+    "retained": "/private/tmp/vault-main-pull-rtehstpa/local-validation-binaries/plan/vault-google/phases/p02/docs/logs/VG-P02-R3-scope-projection",
+    "sha256": "db3100e38c36292398ec972ea4b225e612f1254b472bb35a1beb511e368a2b78",
+    "reason": "local compiled verification probe; text source and run evidence remain in repository"
+  },
+  {
+    "original": "plan/vault-google/phases/p02/docs/logs/VG-P02-R3-delete-extractor",
+    "retained": "/private/tmp/vault-main-pull-rtehstpa/local-validation-binaries/plan/vault-google/phases/p02/docs/logs/VG-P02-R3-delete-extractor",
+    "sha256": "08603ef17752b9497aeb5d3d0ae3d653a91fa3dab1addb5e293a4daf66e3526c",
+    "reason": "local compiled verification probe; text source and run evidence remain in repository"
+  },
+  {
+    "original": "plan/vault-google/phases/p04/docs/logs/reviewer-admission-repro",
+    "retained": "/private/tmp/vault-main-pull-rtehstpa/local-validation-binaries/plan/vault-google/phases/p04/docs/logs/reviewer-admission-repro",
+    "sha256": "7a1c5b26d68644c003a69707801faf0a35e9aa486266bcd0ecf5cb9f819d389e",
+    "reason": "local compiled verification probe; text source and run evidence remain in repository"
+  },
+  {
+    "original": "plan/vault-google/phases/p01/docs/logs/VG-P01-R2-repro",
+    "retained": "/private/tmp/vault-main-pull-rtehstpa/local-validation-binaries/plan/vault-google/phases/p01/docs/logs/VG-P01-R2-repro",
+    "sha256": "63188ce72fdbd7c1f70f1ea64d143187273af228f56680151de17f79a6bf773a",
+    "reason": "local compiled verification probe; text source and run evidence remain in repository"
+  },
+  {
+    "original": "plan/vault-google/phases/p01/docs/logs/VG-P01-R3-recheck",
+    "retained": "/private/tmp/vault-main-pull-rtehstpa/local-validation-binaries/plan/vault-google/phases/p01/docs/logs/VG-P01-R3-recheck",
+    "sha256": "520b9ef2e58989dd38e95ae4f8117df5c06847ccab402557eee77a353727aa08",
+    "reason": "local compiled verification probe; text source and run evidence remain in repository"
+  }
+]

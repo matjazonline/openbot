@@ -1,0 +1,11 @@
+/private/tmp/vault-google-publish-a95937f128/plan/.archived/04-autonomous-agent-history/integration/final/docs/logs/AH-FINAL-B1-R1.evidence.json: retained evidence valid {"FAIL": 0, "NOT EXERCISED": 1, "PASS": 20}
+/private/tmp/vault-google-publish-a95937f128/plan/.archived/04-autonomous-agent-history/integration/publication/docs/logs/AH-PUBLISH-B1-R1.evidence.json: retained evidence valid {"FAIL": 2, "NOT EXERCISED": 1, "PASS": 18}
+/private/tmp/vault-google-publish-a95937f128/plan/.archived/04-autonomous-agent-history/phases/p05/docs/logs/AH-P05-AG1-R1.evidence.json: retained evidence valid {"FAIL": 1, "NOT EXERCISED": 1, "PASS": 0}
+/private/tmp/vault-google-publish-a95937f128/plan/.archived/04-autonomous-agent-history/phases/p05/docs/logs/AH-P05-B1-R1.evidence.json: retained evidence valid {"FAIL": 0, "NOT EXERCISED": 0, "PASS": 17}
+/private/tmp/vault-google-publish-a95937f128/plan/.archived/04-autonomous-agent-history/phases/p06/docs/logs/AH-P06-AG1-R1.evidence.json: retained evidence valid {"FAIL": 0, "NOT EXERCISED": 1, "PASS": 0}
+/private/tmp/vault-google-publish-a95937f128/plan/.archived/04-autonomous-agent-history/phases/p06/docs/logs/AH-P06-AG1-R2.evidence.json: retained evidence valid {"FAIL": 0, "NOT EXERCISED": 1, "PASS": 0}
+/private/tmp/vault-google-publish-a95937f128/plan/.archived/04-autonomous-agent-history/phases/p06/docs/logs/AH-P06-AG1-R3.evidence.json: retained evidence valid {"FAIL": 0, "NOT EXERCISED": 1, "PASS": 0}
+/private/tmp/vault-google-publish-a95937f128/plan/.archived/04-autonomous-agent-history/phases/p06/docs/logs/AH-P06-B1-R1.evidence.json: retained evidence valid {"FAIL": 3, "NOT EXERCISED": 0, "PASS": 17}
+/private/tmp/vault-google-publish-a95937f128/plan/.archived/04-autonomous-agent-history/phases/p06/docs/logs/AH-P06-B1-R2.evidence.json: retained evidence valid {"FAIL": 5, "NOT EXERCISED": 0, "PASS": 17}
+/private/tmp/vault-google-publish-a95937f128/plan/.archived/04-autonomous-agent-history/phases/p07/docs/logs/AH-P07-B1-R1.evidence.json: retained evidence valid {"FAIL": 10, "NOT EXERCISED": 1, "PASS": 24}
+10 evidence manifest(s) validated; declared results are not acceptance

@@ -135,6 +135,13 @@ impl<P: HttpActionPreparation + ActionIntents + Clone, D: ActionDispatch, R: Rem
     ) -> WorkflowHandlerOutcome {
         use ActionStepOutcome as Outcome;
         let outcome = match self.step(kind, claim).await {
+            Ok(RemoteDispatchObservation::PreparationFailed(failure)) => {
+                return Err(integration_pre_dispatch_failure(
+                    ActionFamily::Http,
+                    failure,
+                ))
+                .into();
+            }
             Ok(RemoteDispatchObservation::Committed(receipt)) => return Ok(receipt.result).into(),
             Ok(RemoteDispatchObservation::ApprovalParked(wait)) => {
                 return WorkflowHandlerOutcome::Suspended(SuspendedWorkflow { wait });

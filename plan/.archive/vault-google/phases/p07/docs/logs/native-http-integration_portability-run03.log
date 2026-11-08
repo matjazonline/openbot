@@ -1,0 +1,15 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.21s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-048b7abd3ed0c794)
+
+running 7 tests
+test adapters::persistence::integrations::connect_tests::portability::integration_portability_installation_and_client_identity_encoding_has_no_separator_collision ... ok
+test adapters::persistence::integrations::connect_tests::portability::integration_portability_missing_custom_scope_never_creates_an_account_or_replays_exchange ... ok
+test adapters::persistence::integrations::connect_tests::portability::integration_portability_scope_upgrade_requires_consent_and_retires_older_app_grants ... ok
+test infra::integrations::tests::integration_portability_production_composition_registers_no_test_provider_or_app ... ok
+test adapters::persistence::integrations::connect_tests::portability::integration_portability_custom_oauth_scope_pkce_and_installation_identity_need_no_email ... ok
+test adapters::persistence::integrations::connect_tests::portability::integration_portability_workspace_accounts_and_oauth_clients_keep_separate_authorizations ... ok
+test adapters::persistence::workflow::tests::http_tests::vault_tests::execution::native_portability::integration_portability_all_auth_methods_use_native_http_headers_and_unchanged_workflow_contract ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 3600 filtered out; finished in 6.00s
+

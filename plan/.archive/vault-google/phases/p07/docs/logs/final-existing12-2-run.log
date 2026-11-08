@@ -1,0 +1,30 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.18s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-048b7abd3ed0c794)
+
+running 22 tests
+test adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::cache::google_refresh_absent_cache_uses_the_same_authorized_resolution_path ... ok
+test adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::cache::google_refresh_missing_encryption_key_fails_closed_before_the_endpoint ... ok
+test adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::commit::google_refresh_ambiguous_ack_cannot_restore_authority_after_newer_disconnect ... ok
+test adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::commit::google_refresh_lost_commit_acknowledgement_rereads_committed_cache_before_return ... ok
+test adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::bounds::google_refresh_caller_deadline_caps_the_actual_request_and_never_returns_a_token ... ok
+test adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::commit::google_refresh_lost_cooldown_commit_ack_preserves_shared_backoff ... ok
+test adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::failures::google_refresh_actual_cancellation_rolls_back_and_keeps_no_detached_renewal ... ok
+test adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::failures::google_refresh_invalid_client_is_configuration_and_does_not_revoke_the_owner ... ok
+test adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::failures::google_refresh_invalid_grant_locally_requires_fresh_consent_and_erases_tokens ... ok
+test adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::failures::google_refresh_lost_response_releases_lock_and_persists_shared_backoff ... ok
+test adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::failures::google_refresh_scope_drift_requires_reconnect_without_silently_upgrading_grants ... ok
+test adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::failures::google_refresh_transient_failure_has_shared_bounded_cooldown_without_consent_change ... ok
+test adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::bounds::google_refresh_five_second_lock_wait_is_retryable_and_cancel_releases_the_account ... ok
+test adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::google::google_refresh_omitted_refresh_is_preserved_and_cache_updates_do_not_change_consent ... ok
+test adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::google::google_refresh_race_http_requests_with_distinct_dispatches_share_one_refresh ... ok
+test adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::google::google_refresh_race_http_and_mcp_apps_share_the_same_account_lock ... ok
+test adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::google::google_refresh_valid_cache_reuses_without_endpoint_and_keeps_private_boundary ... ok
+test adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::isolation::google_refresh_race_an_independent_user_is_not_blocked_by_another_account ... ok
+test adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::failures::google_refresh_malformed_oversized_short_or_unsafe_tokens_do_not_partially_write ... ok
+test adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::isolation::google_refresh_race_same_owner_different_accounts_reach_provider_independently ... ok
+test adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::management::google_refresh_worker_connection_crash_releases_locks_and_cannot_apply_a_stale_error ... ok
+test adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::gateway::vault_workflow_http_google_refresh_waits_for_approval_then_keeps_native_receipt ... ok
+
+test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 3605 filtered out; finished in 12.16s
+

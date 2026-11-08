@@ -64,7 +64,7 @@ pub fn thread_activity_strip(
     company_id: Uuid,
     access: RunLinkAccess<'_>,
 ) -> String {
-    if runs.items.is_empty() {
+    if runs.items.is_empty() && runs.response_outcomes.is_empty() && !runs.responses_truncated {
         return String::new();
     }
     let entries: String = runs.items.iter().map(|run| {
@@ -81,7 +81,8 @@ pub fn thread_activity_strip(
         ""
     };
     format!(
-        r#"<ul aria-label="Thread runs" class="space-y-1 border-t border-base-300 px-6 py-2 text-xs">{entries}{more}</ul>"#
+        r#"<ul aria-label="Thread runs" class="space-y-1 border-t border-base-300 px-6 py-2 text-xs">{entries}{more}</ul>{responses}"#,
+        responses = thread_response_outcomes(runs, company_id, access),
     )
 }
 

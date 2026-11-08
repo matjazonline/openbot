@@ -1,0 +1,41 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+   Compiling open_bots v0.1.0 (/Users/mac02/.codex/worktrees/1133/openbot)
+error[E0308]: mismatched types
+  --> src/application/workflow/sample/gmail_tests.rs:31:9
+   |
+31 |         assert_eq!(report.usage.model_calls, u64::from(name == "read"));
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `u32`, found `u64`
+
+error[E0277]: can't compare `u32` with `u64`
+   --> src/application/workflow/sample/gmail_tests.rs:31:9
+    |
+ 31 |         assert_eq!(report.usage.model_calls, u64::from(name == "read"));
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ no implementation for `u32 == u64`
+    |
+    = help: the trait `PartialEq<u64>` is not implemented for `u32`
+help: the following other types implement trait `PartialEq<Rhs>`
+   --> /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/cmp.rs:1876:12
+    |
+    = note: `u32` implements `PartialEq`
+   ::: /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/cmp.rs:1900:5
+    |
+    = note: in this macro invocation
+    |
+   ::: /Users/mac02/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde_json-1.0.151/src/value/partial_eq.rs:76:13
+    |
+ 76 |               impl PartialEq<Value> for $ty {
+    |               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `u32` implements `PartialEq<JsonValue>`
+...
+ 97 | / partialeq_numeric! {
+ 98 | |     eq_i64[i8 i16 i32 i64 isize]
+ 99 | |     eq_u64[u8 u16 u32 u64 usize]
+100 | |     eq_f32[f32]
+101 | |     eq_f64[f64]
+102 | |     eq_bool[bool]
+103 | | }
+    | |_- in this macro invocation
+    = note: this error originates in the macro `assert_eq` which comes from the expansion of the macro `partialeq_numeric` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+Some errors have detailed explanations: E0277, E0308.
+For more information about an error, try `rustc --explain E0277`.
+error: could not compile `open_bots` (lib test) due to 2 previous errors

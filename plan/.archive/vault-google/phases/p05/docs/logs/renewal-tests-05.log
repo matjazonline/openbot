@@ -1,0 +1,33 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+   Compiling open_bots v0.1.0 (/Users/mac02/.codex/worktrees/1133/openbot)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2m 03s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-048b7abd3ed0c794)
+
+running 24 tests
+test adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::failures::google_refresh_actual_cancellation_rolls_back_and_keeps_no_detached_renewal ... ok
+test adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::commit::google_refresh_lost_cooldown_commit_ack_preserves_shared_backoff ... ok
+test adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::commit::google_refresh_lost_commit_acknowledgement_rereads_committed_cache_before_return ... ok
+test adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::commit::google_refresh_ambiguous_ack_cannot_restore_authority_after_newer_disconnect ... ok
+test adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::failures::google_refresh_invalid_client_is_configuration_and_does_not_revoke_the_owner ... ok
+test adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::failures::google_refresh_invalid_grant_locally_requires_fresh_consent_and_erases_tokens ... ok
+test adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::failures::google_refresh_lost_response_releases_lock_and_persists_shared_backoff ... ok
+test adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::failures::google_refresh_scope_drift_requires_reconnect_without_silently_upgrading_grants ... ok
+test adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::failures::google_refresh_transient_failure_has_shared_bounded_cooldown_without_consent_change ... ok
+test adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::google::google_refresh_omitted_refresh_is_preserved_and_cache_updates_do_not_change_consent ... ok
+test adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::google::google_refresh_race_http_requests_with_distinct_dispatches_share_one_refresh ... ok
+test adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::google::google_refresh_valid_cache_reuses_without_endpoint_and_keeps_private_boundary ... ok
+test adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::google::google_refresh_race_http_and_mcp_apps_share_the_same_account_lock ... ok
+test adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::google::integration_renewal_static_accounts_have_no_renewal_protocol ... ok
+test adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::strict::integration_renewal_strict_active_pending_is_not_an_interrupted_claimant ... ok
+test adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::strict::integration_renewal_strict_cancellation_keeps_durable_ambiguity_for_recovery ... ok
+test adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::strict::integration_renewal_strict_delayed_claim_after_delete_cannot_contact_provider ... ok
+test adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::strict::commit::integration_renewal_strict_lost_reservation_or_replacement_commit_ack_is_reread ... ok
+test adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::strict::integration_renewal_strict_delayed_claim_after_disconnect_cannot_contact_provider ... ok
+test adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::strict::integration_renewal_strict_expired_pending_requires_reconnect_without_an_endpoint_retry ... ok
+test adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::strict::integration_renewal_strict_lost_response_preserves_pending_instead_of_retrying_refresh ... ok
+test adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::failures::google_refresh_malformed_oversized_short_or_unsafe_tokens_do_not_partially_write ... ok
+test adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::strict::integration_renewal_strict_omitted_replacement_does_not_inherit_google_reuse ... ok
+test adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::strict::integration_renewal_strict_workspace_rotates_and_reuses_without_an_email ... ok
+
+test result: ok. 24 passed; 0 failed; 0 ignored; 0 measured; 3303 filtered out; finished in 11.40s
+

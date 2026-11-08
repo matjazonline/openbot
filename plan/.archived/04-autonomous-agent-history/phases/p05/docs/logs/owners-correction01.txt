@@ -1,0 +1,30 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+   Compiling open_bots v0.1.0 (/private/tmp/openbot-agent-history-h_82_5pw/worktree)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 53.49s
+     Running unittests src/lib.rs (/private/tmp/openbot-chs-p06-3f43t2k7/worktree/target/debug/deps/open_bots-8b80d02f0b6cf2e6)
+
+running 6 tests
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::knowledge_tests::channel_reply_knowledge_commit_abort_and_lost_receipt_preserve_exact_owner_effects ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::knowledge_tests::channel_reply_knowledge_approved_contenders_settle_once_without_reexecuting_handler ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::integrity::channel_reply_publication_release_rechecked_after_success_and_before_provider ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::knowledge_tests::channel_reply_knowledge_pure_owner_and_allowed_control ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::knowledge_tests::channel_reply_knowledge_fenced_owner_records_actual_levels_and_allowed_control ... FAILED
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::knowledge_tests::channel_reply_knowledge_parked_owner_keeps_real_wait_and_no_new_attempt ... ok
+
+failures:
+
+---- adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::knowledge_tests::channel_reply_knowledge_fenced_owner_records_actual_levels_and_allowed_control stdout ----
+
+thread 'adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::knowledge_tests::channel_reply_knowledge_fenced_owner_records_actual_levels_and_allowed_control' (36013773) panicked at src/adapters/persistence/workflow/channel_reply_knowledge_tests.rs:89:5:
+assertion `left == right` failed
+  left: Number(1)
+ right: 0
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::knowledge_tests::channel_reply_knowledge_fenced_owner_records_actual_levels_and_allowed_control
+
+test result: FAILED. 5 passed; 1 failed; 0 ignored; 0 measured; 3357 filtered out; finished in 4.44s
+
+error: test failed, to rerun pass `--lib`

@@ -1,0 +1,47 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.18s
+     Running unittests src/lib.rs (/private/tmp/openbot-chs-p06-3f43t2k7/worktree/target/debug/deps/open_bots-8b80d02f0b6cf2e6)
+
+running 31 tests
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::guards::agent_history_recovery_revoked_wait_head_reaches_normal_terminal_owner_and_frees_successor ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::knowledge_e2e::agent_history_human_cc::agent_history_e2e_real_search_human_wait_and_customer_cc_refuse_resume_without_provider ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::history_resume::agent_history_level_later_real_knowledge_then_human_wait_refuses_downgraded_resume_before_provider ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::channel_reply_e2e::history::agent_history_channel_delivery_retry_keeps_one_exchange_output_and_model_call ... ok
+2026-11-08T03:05:33.998648Z  WARN open_bots::application::services::delivery_worker: A delivery finished in a state that needs a human delivery_id=f5dc62fa-1198-4e72-bb2b-7ca3cac3455b correlation_id=4707fb64-1aad-45da-84a8-5716c98087ad transport=email status=dead_letter
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_graph::descendants::history_integration::agent_history_children_same_agent_private_branch_completes_without_parent_transcript ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::agent_history_protocol_new_revision_provider_and_schema_keep_prior_pairs_as_data ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::channel_reply_e2e::history::agent_history_channel_projection_is_not_the_saved_output_or_next_seed ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_graph::descendants::history_continuation::agent_history_continuation_two_real_approval_rounds_and_competing_reviewers_preserve_one_exchange ... ok
+test application::services::test_support::scenario::inheritance::tests::inherited_listener_capability_is_one_use_and_rejects_a_second_registration ... ok
+test application::services::test_support::scenario::inheritance::tests::inherited_listener_forged_proof_registers_no_agent_and_fails_the_actual_owner ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::channel_reply_e2e::history::agent_history_channel_terminal_delivery_failure_preserves_business_success_and_accepted_exchange ... ok
+test application::services::test_support::scenario::inheritance::tests::inherited_listener_refuses_external_origin_before_connection_or_registration ... ok
+test application::services::test_support::scenario::inheritance::tests::inherited_listener_rejects_a_reflecting_listener_without_disclosing_its_secret ... ok
+test application::services::test_support::scenario::inheritance::tests::inherited_listener_proof_does_not_consume_or_capture_a_model_exchange ... ok
+test application::services::test_support::scenario::lifecycle_tests::declared_disconnect_and_retry_are_counted_without_a_fallback_response ... ok
+test application::services::test_support::scenario::lifecycle_tests::malformed_framing_fails_completion_without_capturing_authentication ... ok
+test application::services::test_support::scenario::lifecycle_tests::dropping_a_fixture_cancels_its_listener_and_removes_registration ... ok
+test application::services::test_support::scenario::lifecycle_tests::registration_is_scoped_and_missing_external_endpoints_fail_locally ... ok
+test application::services::test_support::scenario::lifecycle_tests::shutdown_cancels_a_blocked_response_and_awaits_its_connection ... ok
+test application::services::test_support::scenario::tests::a_listener_remains_active_to_detect_extra_requests ... ok
+test application::services::test_support::scenario::tests::unused_and_mismatched_exchanges_fail_explicit_completion ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::callers::agent_history_level_lower_private_session_reuse_filters_hidden_pairs_without_raising_ceiling ... ok
+AH-P07 genuine_process_crash point=Enqueued cancelled_middle=true same_identity=true provider_calls=3
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::owner_races::agent_history_retention_actual_expiry_owner_precedes_blocked_fresh_selection_without_mixed_seed ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::e2e::queue_crashes::agent_history_e2e_process_crash_after_durable_enqueue_and_cancelled_middle_turn_recovers_in_order ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::owner_races::agent_history_retention_actual_preparation_owner_skips_competing_cleanup_and_replays_exact_copy ... ok
+2026-11-08T03:05:39.544719Z ERROR open_bots::adapters::http::app_error_impl: Request failed error_kind="bad_request"
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::views::agent_history_views_maximum_page_reaches_last_source_outside_page_and_keeps_exact_frozen_copy_after_expiry ... ok
+AH-P07 genuine_process_crash point=Acquisition durable_identity=true exact_context=true provider_calls=2
+AH-P07 genuine_process_crash point=BeforeWake polled=true successor_owned=true provider_calls=3
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::e2e::queue_crashes::agent_history_e2e_process_crash_before_successor_wakeup_recovers_by_poll_without_releasing_successor ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::channel_reply_e2e::history::continuation::agent_history_continuation_real_thread_reply_reaches_child_before_parent_owned_turn_queue ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::channel_reply_e2e::history::agent_history_channel_no_reply_and_explicit_send_retain_agent_output_independently ... ok
+AH-P07 genuine_process_crash point=Frozen durable_identity=true exact_context=true provider_calls=2
+AH-P07 genuine_process_crash point=ModelSettled durable_identity=true exact_context=true provider_calls=2
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::knowledge_e2e::agent_history::agent_history_e2e_real_knowledge_cc_removal_restores_private_seed_and_restricts_inspection ... ok
+AH-P07 genuine_process_crash point=FinalCheckpoint durable_identity=true exact_context=true provider_calls=2
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::e2e::crashes::agent_history_e2e_process_crashes_reconstruct_durable_frontiers_without_duplicate_calls ... ok
+
+test result: ok. 31 passed; 0 failed; 0 ignored; 0 measured; 3367 filtered out; finished in 30.86s
+

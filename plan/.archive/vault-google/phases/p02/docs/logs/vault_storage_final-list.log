@@ -1,0 +1,18 @@
+$ cargo test --locked --offline --lib vault_storage_ -- --list
+   Compiling open_bots v0.1.0 (/Users/mac02/.codex/worktrees/1133/openbot)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 57.69s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-048b7abd3ed0c794)
+adapters::persistence::integrations::tests::lifecycle_tests::vault_storage_durable_owner_teardown_restart_competitors_and_no_resurrection: test
+adapters::persistence::integrations::tests::lifecycle_tests::vault_storage_host_company_membership_and_user_deletion_preserve_other_accounts: test
+adapters::persistence::integrations::tests::lifecycle_tests::vault_storage_supervised_teardown_shutdown_cancels_actual_database_work: test
+adapters::persistence::integrations::tests::lifecycle_tests::vault_storage_supervised_teardown_shutdown_cancels_pool_acquisition: test
+adapters::persistence::integrations::tests::lifecycle_tests::vault_storage_teardown_poison_full_batch_backoff_restart_and_terminal_failure: test
+adapters::persistence::integrations::tests::storage_tests::vault_storage_cap_serializes_real_same_owner_creators: test
+adapters::persistence::integrations::tests::storage_tests::vault_storage_constraints_substitution_and_malformed_encrypted_json_fail_closed: test
+adapters::persistence::integrations::tests::storage_tests::vault_storage_envelope_identity_and_context_specific_bounds: test
+adapters::persistence::integrations::tests::storage_tests::vault_storage_host_consumers_do_not_read_module_tables: test
+adapters::persistence::integrations::tests::storage_tests::vault_storage_managed_identity_ignores_config_aliases_and_static_edits_deny: test
+adapters::persistence::integrations::tests::storage_tests::vault_storage_owner_namespaces_keys_and_competing_replacements: test
+adapters::persistence::integrations::tests::storage_tests::vault_storage_roundtrip_replace_disconnect_delete_and_redaction: test
+
+12 tests, 0 benchmarks

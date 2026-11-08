@@ -1,0 +1,84 @@
+{
+  "status": "PASS",
+  "selected": 866,
+  "distinct_latest_passes": 866,
+  "ignored": 0,
+  "required_families": {
+    "agent_history_views_": 3,
+    "agent_history_retention_": 14,
+    "agent_history_controls_": 2,
+    "agent_history_level_": 17
+  },
+  "accepted_p05_names_preserved": 769,
+  "prior_r1_names_preserved": 862,
+  "new_cases": 4,
+  "observations": [
+    {
+      "run": "p06-final-history-01",
+      "exit_code": 101,
+      "counts": {
+        "ok": 192,
+        "FAILED": 1
+      },
+      "receipt_sha256": "3fc39c0b7f36b559abaf1b9f24591c01dc263e9a7bcddca0e6faa723d0bb69c0",
+      "log_sha256": "fdfd95b497559a19beace232af9eca9f6e44ab0ac21951eac5da10ff6756589c"
+    },
+    {
+      "run": "p06-final-inspector-01",
+      "exit_code": 0,
+      "counts": {
+        "ok": 26
+      },
+      "receipt_sha256": "410fca24aacb2e662b50fbccb8d1ae8f0bbbc89fff0f2f4d1f5c2fe3d7276bf2",
+      "log_sha256": "61982b3a348d65b5f663dec2e8da5d0d15cdc7483e54010b65d1846cb05becfd"
+    },
+    {
+      "run": "p06-final-focused-runtime-01",
+      "exit_code": 101,
+      "counts": {
+        "ok": 811,
+        "FAILED": 1
+      },
+      "receipt_sha256": "e469945fc53ea0f8ada0cf6f5155407f088deb080ec1297c851475ca44377450",
+      "log_sha256": "b3e21e02c7aeb27febdd3cca1b3b39d51e9a6fa2a4a9309d502eec786b0e4945"
+    },
+    {
+      "run": "p06-decision-fixtures-01",
+      "exit_code": 0,
+      "counts": {
+        "ok": 4
+      },
+      "receipt_sha256": "d8f84323926a2e3c2ab19e68333fa3dd69496a932990525d95f976ce24f83a01",
+      "log_sha256": "9761dad33cd24e3fb9b4456168eda043d64b6bf8fa8f7a3d879b41fdbccfc6d2"
+    },
+    {
+      "run": "p06-corrections-02",
+      "exit_code": 0,
+      "counts": {
+        "ok": 5
+      },
+      "receipt_sha256": "a4d5e15bf17c675c6e4795f06078a096a01f74de175e9b22d267230a3a55bd8f",
+      "log_sha256": "8817692a46ac1a5d5cb39a81a6e216da49c97479f576c037c245675b36eaaabc"
+    },
+    {
+      "run": "p06-correction-affected-runtime-01",
+      "exit_code": 101,
+      "counts": {
+        "ok": 186,
+        "FAILED": 2
+      },
+      "receipt_sha256": "9b0f1d98e03a730185542a21df8482b2a152fe086d6889117dd73d62a2b69cd7",
+      "log_sha256": "e06d7d4091bb52269fd5aa0eba8e55d27aa30971875286ba00ca61422615df06"
+    },
+    {
+      "run": "p06-pressure-recheck-01",
+      "exit_code": 0,
+      "counts": {
+        "ok": 2
+      },
+      "receipt_sha256": "aa3b1dd27f7a4fed9f6ce9d609d8fe0d09cc6341c2a476add45d8dc7ea306c08",
+      "log_sha256": "1b74b18e4843967121e1e9daca6bf0057cf2c582afb9b7bc1ab0c9dfa3829859"
+    }
+  ],
+  "reuse_disposition": "R2 native predicate correction changes only failed-own-job replay pin. Current affected188 cohort supplies186 successes and two truthful pressure-fixture corrections supply the remaining2 (ordinary complete_io127 source jobs; cancelled count-prefix original retry window elapsed while remaining younger than90days). All assertions/qualified names/bounds64/128/2048/1536 preserved. Added4 owner-race cases and original two-real-human-round case PASS in corrections02, also in affected188. Other R1 cases reuse exact successful retained observations: production authorization/read/API/UI/harness/tool rendering/CP fields/admission/source-retirement SQL are unchanged, and the new conjunct is exercised only by history expiry; all native history consumers are rerun in188. The unchanged100001-member source retirement fixture contains no history rows or expiry call, so its retained native PASS is reused rather than rerun. Existing R1 view/browser/run/sample/decision byte-rendering code and fixture builders remain behaviorally unchanged; current native reader cases PASS in188. Full discovery preserves862 R1 names plus4 new. Failed whole commands stay FAIL, including R2 affected186/188 and initial compile-only correction01; no single-command all-current cohort claim."
+}

@@ -1,0 +1,23 @@
+{
+  "acceptance": "AH-FINAL-code-acceptance",
+  "at": "2026-11-08T03:15:37.532938+00:00",
+  "result": "PASS final combined localprimary accepted",
+  "review": "AH-FINAL-B1-R1",
+  "source_digest": "0703abfbae6408df334bf4deccdf736f73c6acf667b9784a54da24577e91be2f",
+  "archive_sha256": "098010f9d3c9d32d82754985290f714e2d0ac79a1cdc311216e84bd6c6a7d0c1",
+  "owned": 216,
+  "preserved_preexisting": 77,
+  "integration_delta": 0,
+  "all_seven_phases_integrated": true,
+  "primary": "/Users/mac02/dev/openbot",
+  "branch": "main",
+  "head": "4ab45555f8316ec7a8b1b64e8c05b77ff7d9a29d",
+  "coordination_checked": 34,
+  "verification": "883 current phase tests PASS;31 exact-name native integration rerun PASS/0ignored; freshbothmigrations/actualSQLx/offlinealltargets/Clippy/fmt/diff/source_modules/CSSgeneration/browser/sample/query-stat gates PASS; source/dependency identity justifies explicit883/17protocol reuse.",
+  "independent_review": "All seven accepted sources/archives plus complete notes/findings/assembly/path/case/entry+exit proofs read and independently reverified; no findings.",
+  "history_committed": false,
+  "history_pushed": false,
+  "full_suite": false,
+  "limits": "User targeted-only; no full/stack/lease/hostedCI/liveprovider/deployed-cookie/external-mailbox/deployment claim. Local uncommitted source/evidence retained; original external77/staging preserved.",
+  "remaining_required_work": []
+}

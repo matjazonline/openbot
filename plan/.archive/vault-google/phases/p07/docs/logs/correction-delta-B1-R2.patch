@@ -1,0 +1,502 @@
+--- B1-R1/scripts/integration-boundary.py
++++ B1-R2/scripts/integration-boundary.py
+@@ -52,6 +52,17 @@
+     raise ValueError('unbalanced Rust item')
+ 
+ 
++def field_end(ts, start):
++    depth = 0
++    for i in range(start, len(ts)):
++        if ts[i] in ('(', '[', '<', '{'): depth += 1
++        elif ts[i] in (')', ']', '>', '}'):
++            if depth == 0: return i
++            depth -= 1
++        elif ts[i] == ',' and depth == 0: return i+1
++    raise ValueError('unterminated Rust field')
++
++
+ def production(ts):
+     result, i = [], 0
+     while i < len(ts):
+@@ -61,6 +72,13 @@
+             if attribute == '#[cfg(test)]':
+                 i = end
+                 while ts[i:i+2] == ['#', '[']: i = balanced_end(ts, i+1, '[', ']')
++                field = i
++                if ts[field:field+1] == ['pub']:
++                    field += 1
++                    if ts[field:field+1] == ['(']: field = balanced_end(ts, field, '(', ')')
++                if ts[field+1:field+2] == [':']:
++                    i = field_end(ts, field+2)
++                    continue
+                 while i < len(ts) and ts[i] not in (';', '{'): i += 1
+                 i = balanced_end(ts, i, '{', '}') if i < len(ts) and ts[i] == '{' else i+1
+                 continue
+@@ -106,7 +124,7 @@
+ 
+ 
+ def imports(ts):
+-    paths = []
++    bindings = []
+     for i, token in enumerate(ts):
+         if token != 'use': continue
+         end = i+1
+@@ -115,27 +133,51 @@
+         def group(index, prefix):
+             while index < len(body) and body[index] != '}':
+                 path = list(prefix)
++                alias = None
+                 while index < len(body) and body[index] not in ('{', ',', '}'):
+                     if body[index] == 'as':
++                        alias = body[index+1]
+                         index += 2
+                         continue
+                     if body[index] != '::': path.append(body[index])
+                     index += 1
+                 if index < len(body) and body[index] == '{': index = group(index+1, path)
+-                else: paths.append('::'.join(path))
++                elif path: bindings.append(('::'.join(path), alias or path[-1]))
+                 if index < len(body) and body[index] == ',': index += 1
+             return index+1
+         group(0, [])
+-    return paths
++    return bindings
++
++
++def serializable_types(sources, bindings):
++    traits = {'Serialize'}
++    while True:
++        added = {alias for path, alias in bindings if path.split('::')[-1] in traits} - traits
++        if not added: break
++        traits.update(added)
++    trait = '(?:' + '|'.join(re.escape(name) for name in sorted(traits)) + ')'
++    result = set()
++    for _, ts in sources:
++        text = ''.join(ts)
++        for derive, name in re.findall(r'#\[derive\(([^]]*)\)\](?:#\[[^]]*\])*(?:pub(?:\([^)]*\))?)?(?:struct|enum)(\w+)', text):
++            if set(re.findall(r'\w+', derive)) & traits: result.add(name)
++        result.update(re.findall(r'impl(?:<[^>]+>)?(?:\w+::)*' + trait + r'for(\w+)', text))
++    return result
+ 
+ 
+ def violations(root):
+-    failures, definitions, serializable = [], {}, set()
++    failures, definitions, bindings = [], {}, []
+     sources = list(modules(root))
++    dto_sources = []
+     for file, ts in sources:
+         rel = file.relative_to(root.resolve()).as_posix()
+         text = ''.join(ts)
+-        dependencies = text + '\n' + '\n'.join(imports(ts))
++        imported = imports(ts)
++        # Follow import/re-export aliases through helper modules as well as DTOs.
++        bindings.extend(imported)
++        for path, alias in imported:
++            definitions.setdefault(alias, set()).add(path.split('::')[-1])
++        dependencies = text + '\n' + '\n'.join(path for path, _ in imported)
+         module_owned = rel.startswith('src/adapters/persistence/integrations/') or rel == 'src/adapters/persistence/integrations.rs'
+         if not module_owned and TABLE.search(text): failures.append(f'{rel}: integration table outside custody module')
+         if not module_owned and re.search(r'integrations::(?:private|renewal::CredentialResolver)|integrations::resolve\b', dependencies):
+@@ -145,9 +187,10 @@
+         dto = rel.startswith(('src/application/integrations/', 'src/domain/integrations/'))
+         if dto:
+             if HOST.search(dependencies): failures.append(f'{rel}: public module imports host/database type')
+-            definitions.update(declarations(ts))
+-            serializable.update(re.findall(r'#\[derive\([^]]*\bSerialize\b[^]]*\)\](?:#\[[^]]*\])*(?:pub(?:\([^)]*\))?)?(?:struct|enum)(\w+)', text))
+-            serializable.update(re.findall(r'impl(?:<[^>]+>)?(?:serde::)?Serializefor(\w+)', text))
++            dto_sources.append((file, ts))
++            for name, dependencies in declarations(ts).items():
++                definitions.setdefault(name, set()).update(dependencies)
++    serializable = serializable_types(dto_sources, bindings)
+     tainted = set(PRIVATE)
+     while True:
+         added = {name for name, dependencies in definitions.items() if dependencies & tainted} - tainted
+--- B1-R1/scripts/tests/fixtures/integration-boundary-alias.rs
++++ B1-R2/scripts/tests/fixtures/integration-boundary-alias.rs
+@@ -0,0 +1,8 @@
++use secrecy::{SecretString as PrivateSecret, ExposeSecret};
++pub struct Leaked { value: PrivateSecret }
++impl serde::Serialize for Leaked {
++ fn serialize<S: serde::Serializer>(&self, serializer: S)->Result<S::Ok,S::Error> {
++  serializer.serialize_str(self.value.expose_secret())
++ }
++}
++pub enum Reply { Leak(Leaked) }
+--- B1-R1/scripts/tests/integration-boundary.py
++++ B1-R2/scripts/tests/integration-boundary.py
+@@ -11,12 +11,13 @@
+ 
+ 
+ class Boundary(unittest.TestCase):
+-    def check(self, source, extra=None):
++    def check(self, source, extra=None, files=None):
+         with tempfile.TemporaryDirectory() as temporary:
+             root = Path(temporary)
+             for path, value in {'src/lib.rs':'mod application;\n'+source,
+                                 'src/application.rs':'pub mod integrations;',
+-                                'src/application/integrations/mod.rs': extra or 'pub enum Reply { Done {} }'}.items():
++                                'src/application/integrations/mod.rs': extra or 'pub enum Reply { Done {} }',
++                                **(files or {})}.items():
+                 file = root/path; file.parent.mkdir(parents=True, exist_ok=True); file.write_text(value)
+             return gate.violations(root)
+ 
+@@ -42,6 +43,24 @@
+         self.assertTrue(self.check('', 'type Leaked = CredentialRecord; pub enum Reply { Leak { value: Leaked } }'))
+     def test_command_secret_cannot_be_a_reply(self):
+         self.assertTrue(self.check('', '#[derive(Serialize)] pub struct SecretSubmission(SecretString); pub enum Reply { Leak(SecretSubmission) }'))
++    def test_compiling_imported_alias_mutation(self):
++        source = (Path(__file__).parent/'fixtures/integration-boundary-alias.rs').read_text()
++        failures = self.check('', source)
++        self.assertIn('Leaked: serializable runtime proof or credential-bearing type', failures)
++        self.assertIn('Reply: credential/runtime proof reachable from gateway result', failures)
++    def test_reexported_alias_chain(self):
++        self.assertTrue(self.check('', 'pub use secrecy::SecretString as Hidden; pub use self::Hidden as Payload; pub struct Leaked(Payload); impl serde::Serialize for Leaked {} pub enum Reply { Leak(Leaked) }'))
++    def test_serialization_trait_alias(self):
++        self.assertTrue(self.check('', 'use serde::Serialize as Encode; use secrecy::SecretString as Hidden; pub struct Leaked(Hidden); impl Encode for Leaked {}'))
++    def test_derive_trait_alias(self):
++        self.assertTrue(self.check('', 'use serde::Serialize as Encode; #[derive(Encode)] pub struct Leaked(SecretString);'))
++    def test_valid_aliased_metadata(self):
++        self.assertEqual(self.check('', 'use std::string::String as Label; use serde::Serialize as Encode; #[derive(Encode)] pub struct Metadata { label: Label } pub enum Reply { Value(Metadata) }'), [])
++    def test_alias_reexport_through_external_helper(self):
++        self.assertTrue(self.check('mod aliases;', 'use crate::aliases::Hidden as Payload; pub struct Leaked(Payload); impl serde::Serialize for Leaked {} pub enum Reply { Leak(Leaked) }',
++                                   {'src/aliases.rs':'pub use secrecy::SecretString as Hidden;'}))
++    def test_test_only_struct_field_does_not_consume_following_item(self):
++        self.assertTrue(self.check('', 'pub struct Metadata { #[cfg(test)] hidden: bool, label: String } pub struct Leaked(SecretString); impl serde::Serialize for Leaked {} pub enum Reply { Leak(Leaked) }'))
+ 
+ 
+ if __name__ == '__main__': unittest.main()
+--- B1-R1/src/adapters/persistence/integrations/connect_tests/control_wire.rs
++++ B1-R2/src/adapters/persistence/integrations/connect_tests/control_wire.rs
+@@ -32,16 +32,22 @@
+         if fault == "cancelled" {
+             cancel.cancel();
+         }
++        let local = wire::control_transport::LocalContext::new(
++            &request,
++            &f.owner,
++            ConnectWork {
++                deadline,
++                cancellation: cancel,
++            },
++            None,
++        )
++        .unwrap();
++        let altered: wire::Request = serde_json::from_value(value).unwrap();
+         assert!(
+             wire::control_transport::exchange(
+                 f.gateway().as_ref(),
+-                &f.owner,
+-                &serde_json::to_vec(&value).unwrap(),
+-                ConnectWork {
+-                    deadline,
+-                    cancellation: cancel
+-                },
+-                None
++                local,
++                &serde_json::to_vec(&altered).unwrap(),
+             )
+             .await
+             .is_err(),
+@@ -61,18 +67,20 @@
+         cancellation: CancellationId::parse(Uuid::new_v4().to_string()).unwrap(),
+         command,
+     };
+-    let bytes = wire::control_transport::exchange(
+-        f.gateway().as_ref(),
++    let local = wire::control_transport::LocalContext::new(
++        &request,
+         owner,
+-        &request.encode().unwrap(),
+         ConnectWork {
+             deadline,
+             cancellation: CancellationToken::new(),
+         },
+         None,
+     )
+-    .await
+     .unwrap();
++    let bytes =
++        wire::control_transport::exchange(f.gateway().as_ref(), local, &request.encode().unwrap())
++            .await
++            .unwrap();
+     for secret in [
+         "wire-static-secret",
+         "wire-static-replacement",
+@@ -86,6 +94,111 @@
+     wire::Response::decode(&bytes, request.identity)
+         .unwrap()
+         .reply
++}
++
++#[tokio::test]
++async fn integration_service_contract_control_binds_each_identity_and_original_local_context() {
++    let f = Box::pin(Fixture::new()).await;
++    for connect in [false, true] {
++        for fault in ["identity", "cancellation", "crossed", "command"] {
++            assert_substitution_denied(&f, connect, fault).await;
++        }
++    }
++    let Reply::Accounts { page } = command(
++        &f,
++        &f.owner,
++        Command::ListAccounts {
++            page: wire::Page {
++                after: None,
++                size: 10,
++            },
++        },
++    )
++    .await
++    else {
++        panic!("account metadata reply")
++    };
++    assert!(page.accounts.is_empty(), "no management work entered");
++    assert_eq!(f.script.calls.load(Ordering::SeqCst), 0);
++    assert!(matches!(
++        command(
++            &f,
++            &f.owner,
++            Command::CreateStatic {
++                input: static_input("wire-static-secret"),
++            }
++        )
++        .await,
++        Reply::Account { .. }
++    ));
++}
++async fn assert_substitution_denied(f: &Fixture, connect: bool, fault: &str) {
++    let deadline = Utc::now() + chrono::Duration::seconds(20);
++    let command = if connect {
++        let cmd = super::command(None);
++        Command::BeginConnect {
++            app: cmd.app,
++            config: cmd.config,
++            capabilities: cmd.requested_capabilities,
++            return_target: cmd.return_target,
++            reconnect: None,
++        }
++    } else {
++        Command::CreateStatic {
++            input: static_input("wire-static-secret"),
++        }
++    };
++    let mut request = wire::Request {
++        version: wire::PROTOCOL_VERSION,
++        identity: DispatchId::new(Uuid::new_v4()),
++        owner: f.owner.owner().clone(),
++        deadline,
++        cancellation: CancellationId::parse(Uuid::new_v4().to_string()).unwrap(),
++        command,
++    };
++    let local = wire::control_transport::LocalContext::new(
++        &request,
++        &f.owner,
++        ConnectWork {
++            deadline,
++            cancellation: CancellationToken::new(),
++        },
++        None,
++    )
++    .unwrap();
++    let original = request.encode().unwrap();
++    if matches!(fault, "identity" | "crossed") {
++        request.identity = DispatchId::new(Uuid::new_v4());
++    }
++    if matches!(fault, "cancellation" | "crossed") {
++        request.cancellation = CancellationId::parse(Uuid::new_v4().to_string()).unwrap();
++    }
++    if fault == "command" {
++        request.command = Command::ConnectableApps {};
++    }
++    if fault == "crossed" {
++        let other = wire::control_transport::LocalContext::new(
++            &request,
++            &f.owner,
++            ConnectWork {
++                deadline,
++                cancellation: CancellationToken::new(),
++            },
++            None,
++        )
++        .unwrap();
++        assert!(matches!(
++            wire::control_transport::exchange(f.gateway().as_ref(), other, &original).await,
++            Err(IntegrationError::Denied)
++        ));
++    }
++    // Gateway denials are encoded Replies. A transport-level Denied here proves
++    // neither management nor connect dispatch was entered.
++    assert!(matches!(
++        wire::control_transport::exchange(f.gateway().as_ref(), local, &request.encode().unwrap())
++            .await,
++        Err(IntegrationError::Denied)
++    ));
+ }
+ fn static_input(secret: &str) -> wire::StaticInput {
+     wire::StaticInput {
+--- B1-R1/src/adapters/persistence/workflow/vault_tests/native_control.rs
++++ B1-R2/src/adapters/persistence/workflow/vault_tests/native_control.rs
+@@ -42,18 +42,19 @@
+         cancellation: CancellationId::parse(Uuid::new_v4().to_string()).unwrap(),
+         command,
+     };
+-    let bytes = wire::control_transport::exchange(
+-        gateway,
++    let local = wire::control_transport::LocalContext::new(
++        &request,
+         owner,
+-        &request.encode().unwrap(),
+         ConnectWork {
+             deadline,
+             cancellation: CancellationToken::new(),
+         },
+         c,
+     )
+-    .await
+     .unwrap();
++    let bytes = wire::control_transport::exchange(gateway, local, &request.encode().unwrap())
++        .await
++        .unwrap();
+     assert!(!String::from_utf8_lossy(&bytes).contains(Case::Bearer.access()));
+     wire::Response::decode(&bytes, request.identity)
+         .unwrap()
+@@ -70,6 +71,7 @@
+         .vault
+         .gateway(Arc::new(host), unavailable.clone(), unavailable);
+     let owner = VerifiedOwner::from_verified_client(f.account.owner.clone());
++    assert_grant_identities_bound(&f, gateway.as_ref(), &owner, &proposal).await;
+     let denied = round_trip(
+         gateway.as_ref(),
+         &owner,
+@@ -126,6 +128,59 @@
+     f.peer.close().await;
+ }
+ 
++async fn assert_grant_identities_bound(
++    f: &Journey,
++    gateway: &dyn IntegrationGateway,
++    owner: &VerifiedOwner,
++    proposal: &BindingProposal,
++) {
++    let before = gateway
++        .inspect_grants(owner, f.account.id, None)
++        .await
++        .unwrap();
++    for identity in [true, false] {
++        let c = confirmation(f, proposal);
++        let deadline = Utc::now() + ChronoDuration::seconds(20);
++        let mut request = wire::Request {
++            version: wire::PROTOCOL_VERSION,
++            identity: DispatchId::new(Uuid::new_v4()),
++            owner: owner.owner().clone(),
++            deadline,
++            cancellation: CancellationId::parse(Uuid::new_v4().to_string()).unwrap(),
++            command: grant_command(&c),
++        };
++        let local = wire::control_transport::LocalContext::new(
++            &request,
++            owner,
++            ConnectWork {
++                deadline,
++                cancellation: CancellationToken::new(),
++            },
++            Some(c),
++        )
++        .unwrap();
++        if identity {
++            request.identity = DispatchId::new(Uuid::new_v4());
++        } else {
++            request.cancellation = CancellationId::parse(Uuid::new_v4().to_string()).unwrap();
++        }
++        assert!(matches!(
++            wire::control_transport::exchange(gateway, local, &request.encode().unwrap()).await,
++            Err(IntegrationError::Denied)
++        ));
++    }
++    let after = gateway
++        .inspect_grants(owner, f.account.id, None)
++        .await
++        .unwrap();
++    assert_eq!(
++        serde_json::to_value(before).unwrap(),
++        serde_json::to_value(after).unwrap()
++    );
++    // The positive exchange immediately following this helper still consumes the
++    // original proposal, proving the rejected envelopes did not consume consent.
++}
++
+ async fn new_proposal(f: &Journey) -> (PostgresIntegrationBindings, BindingProposal) {
+     let host = PostgresIntegrationBindings {
+         persistence: f.vault.persistence.clone(),
+--- B1-R1/src/application/integrations/wire/control_transport.rs
++++ B1-R2/src/application/integrations/wire/control_transport.rs
+@@ -3,23 +3,61 @@
+ use super::*;
+ use crate::application::integrations::*;
+ use secrecy::ExposeSecret;
++use sha2::{Digest, Sha256};
++
++/// Constructed from the original local request before transport. Decoding a frame
++/// cannot create the owner, token, consent, or its association with that request.
++pub(crate) struct LocalContext<'a> {
++    owner: &'a VerifiedOwner,
++    work: ConnectWork,
++    confirmation: Option<OwnerConfirmation>,
++    identity: DispatchId,
++    cancellation: CancellationId,
++    digest: [u8; 32],
++}
++impl<'a> LocalContext<'a> {
++    pub(crate) fn new(
++        request: &Request,
++        owner: &'a VerifiedOwner,
++        work: ConnectWork,
++        confirmation: Option<OwnerConfirmation>,
++    ) -> IntegrationResult<Self> {
++        Ok(Self {
++            owner,
++            work,
++            confirmation,
++            identity: request.identity,
++            cancellation: request.cancellation.clone(),
++            digest: Sha256::digest(request.encode()?).into(),
++        })
++    }
++}
+ 
+ pub(crate) async fn exchange(
+     gateway: &dyn IntegrationGateway,
+-    owner: &VerifiedOwner,
++    local: LocalContext<'_>,
+     bytes: &[u8],
+-    work: ConnectWork,
+-    confirmation: Option<OwnerConfirmation>,
+ ) -> IntegrationResult<Vec<u8>> {
+     let request = Request::decode(bytes)?;
+-    if owner.owner() != &request.owner
+-        || request.deadline != work.deadline
+-        || Utc::now() >= work.deadline
+-        || work.cancellation.is_cancelled()
++    if local.identity != request.identity
++        || local.cancellation != request.cancellation
++        || local.digest != <[u8; 32]>::from(Sha256::digest(bytes))
++        || local.owner.owner() != &request.owner
++        || request.deadline != local.work.deadline
++        || Utc::now() >= local.work.deadline
++        || local.work.cancellation.is_cancelled()
+     {
+         return Err(IntegrationError::Denied);
+     }
+-    let reply = match control(gateway, owner, request.command, work, confirmation).await {
++    let reply = match control(
++        gateway,
++        local.owner,
++        request.command,
++        local.work,
++        local.confirmation,
++    )
++    .await
++    {
+         Ok(reply) => reply,
+         Err(error) => Reply::Failure {
+             failure: error.into(),

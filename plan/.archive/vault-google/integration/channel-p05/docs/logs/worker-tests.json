@@ -1,0 +1,17 @@
+{
+  "command": [
+    "bash",
+    "scripts/test-network-isolation.sh",
+    "cargo",
+    "test",
+    "--locked",
+    "--offline",
+    "--lib",
+    "production_workers_stop_on_the_shutdown_token"
+  ],
+  "cwd": "/Users/mac02/.codex/worktrees/1133/openbot",
+  "database": "vault_google_1133_41402e4b8104_test",
+  "exit": 0,
+  "seconds": 1.25,
+  "log": "/Users/mac02/.codex/worktrees/1133/openbot/plan/vault-google/integration/channel-p05/docs/logs/worker-tests.log"
+}

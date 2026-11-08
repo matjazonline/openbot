@@ -1,0 +1,29 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.21s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-048b7abd3ed0c794)
+
+running 21 tests
+test adapters::persistence::workflow::tests::mcp_tests::catalog_tests::workflow_mcp_binding_rejects_foreign_and_wrong_kind_resources ... ok
+test adapters::persistence::workflow::tests::mcp_tests::catalog_tests::workflow_mcp_operation_cas_cascades_and_tenant_constraints ... ok
+test adapters::persistence::workflow::tests::mcp_tests::reconciliation_tests::workflow_mcp_unknown_note_through_the_production_composition ... ok
+test adapters::persistence::workflow::tests::mcp_tests::catalog_tests::workflow_mcp_registration_competes_with_grant_removal_refresh_and_delete ... ok
+test adapters::persistence::workflow::tests::mcp_tests::recovery_tests::workflow_mcp_cancellation_and_dropped_worker_cancel_and_close_without_second_call ... ok
+test adapters::persistence::workflow::tests::mcp_tests::reconciliation_tests::workflow_mcp_verified_not_applied_retries_lazily_and_checks_live_drift ... ok
+test adapters::persistence::workflow::tests::mcp_tests::recovery_tests::workflow_mcp_stale_worker_during_eager_open_retries_then_calls_once ... ok
+test adapters::persistence::workflow::tests::mcp_tests::recovery_tests::workflow_mcp_post_entry_failures_and_session_expiry_park_without_reinitialize ... ok
+test adapters::persistence::workflow::tests::mcp_tests::recovery_tests::workflow_mcp_revocation_and_rotation_racing_dispatch_never_call ... ok
+test adapters::persistence::workflow::tests::mcp_tests::workflow_mcp_competitors_restart_and_direct_tool_share_one_call ... ok
+test adapters::persistence::workflow::tests::mcp_tests::workflow_mcp_drift_and_missing_tool_fail_before_any_marker ... ok
+test adapters::persistence::workflow::tests::mcp_tests::recovery_tests::workflow_mcp_permit_timeout_retires_safely_then_retries_once ... ok
+test adapters::persistence::workflow::tests::mcp_tests::workflow_mcp_json_and_sse_run_end_to_end_with_typed_refs ... ok
+test adapters::persistence::workflow::tests::mcp_tests::workflow_mcp_output_violation_and_oversize_stay_unknown_without_second_call ... ok
+test adapters::persistence::workflow::tests::mcp_tests::workflow_mcp_tool_error_commits_receipt_and_takes_final_error ... ok
+test application::workflow::mcp::tests::workflow_mcp_discovery_must_offer_exactly_the_frozen_schemas ... ok
+test application::workflow::mcp::tests::workflow_mcp_error_envelope_classification ... ok
+test application::workflow::mcp::tests::workflow_mcp_operation_requires_grant_review_and_reconcile_recovery ... ok
+test adapters::persistence::workflow::tests::mcp_tests::workflow_mcp_unavailable_before_marker_retries_and_dispatches_once ... ok
+test adapters::persistence::workflow::tests::mcp_tests::workflow_mcp_resource_links_stay_inert_and_echoed_secrets_are_redacted ... ok
+test adapters::persistence::workflow::tests::mcp_tests::workflow_mcp_refusals_and_protection_are_terminal_without_network ... ok
+
+test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 3238 filtered out; finished in 14.47s
+

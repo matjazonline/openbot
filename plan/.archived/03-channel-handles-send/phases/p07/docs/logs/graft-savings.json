@@ -1,0 +1,6 @@
+{
+  "phase": "p07",
+  "known_displayed_estimated_tokens_saved_lower_bound": 700000,
+  "basis": "sum of displayed token-savings estimates in source-discovery tool results, rounded down; excludes unreported/truncated estimates",
+  "pricing_given": false
+}

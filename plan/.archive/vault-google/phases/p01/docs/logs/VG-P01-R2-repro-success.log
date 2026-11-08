@@ -1,0 +1,30 @@
+Compiled exact source modules with matching cached dependencies.
+rustc
+--edition=2024
+--crate-name
+vg_p01_r2_repro
+/Users/mac02/.codex/worktrees/1133/openbot/plan/vault-google/phases/p01/docs/logs/VG-P01-R2-repro.rs
+-L
+dependency=/Users/mac02/.codex/worktrees/1133/openbot/target/debug/deps
+-o
+/Users/mac02/.codex/worktrees/1133/openbot/plan/vault-google/phases/p01/docs/logs/VG-P01-R2-repro
+--extern
+chrono=/Users/mac02/.codex/worktrees/1133/openbot/target/debug/deps/libchrono-d6ec887d872552a1.rlib
+--extern
+serde=/Users/mac02/.codex/worktrees/1133/openbot/target/debug/deps/libserde-340aa8bf57bba01b.rlib
+--extern
+serde_json=/Users/mac02/.codex/worktrees/1133/openbot/target/debug/deps/libserde_json-979f27db015a3c9b.rlib
+--extern
+secrecy=/Users/mac02/.codex/worktrees/1133/openbot/target/debug/deps/libsecrecy-2b55b78a2c9b0a62.rlib
+--extern
+uuid=/Users/mac02/.codex/worktrees/1133/openbot/target/debug/deps/libuuid-7212bdae0e499c3b.rlib
+--extern
+thiserror=/Users/mac02/.codex/worktrees/1133/openbot/target/debug/deps/libthiserror-bf9eb4063803fe46.rlib
+--extern
+url=/Users/mac02/.codex/worktrees/1133/openbot/target/debug/deps/liburl-41a0fa811df4589e.rlib
+--extern
+async_trait=/Users/mac02/.codex/worktrees/1133/openbot/target/debug/deps/libasync_trait-a9a286109840946c.dylib
+--extern
+tokio_util=/Users/mac02/.codex/worktrees/1133/openbot/target/debug/deps/libtokio_util-68f828900d2cd13f.rlib
+F1: unsupported whitespace-prefixed JSON accepted and injected verbatim
+F2: registered X-API-Key header accepted as operation arguments

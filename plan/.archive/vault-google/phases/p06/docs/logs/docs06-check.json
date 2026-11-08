@@ -1,0 +1,10 @@
+{
+  "document": "docs/gmail-workflows.md",
+  "local_links": [
+    "../samples/gmail-read-prepare.json",
+    "../samples/gmail-reviewed-send.json"
+  ],
+  "json_fences_valid": true,
+  "provider_sources": "logs/provider-docs-2026-11-08.md",
+  "result": "PASS"
+}

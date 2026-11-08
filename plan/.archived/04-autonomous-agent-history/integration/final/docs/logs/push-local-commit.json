@@ -1,0 +1,6 @@
+{
+  "commit": "48461f665c827addd176a6e4cad436406ea4a0cb",
+  "message": "Implement automatic agent history, isolation, recovery and inspection",
+  "source_files": 216,
+  "new_upstream_integration_required": true
+}

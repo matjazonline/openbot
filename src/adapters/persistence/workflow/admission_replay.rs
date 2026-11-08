@@ -82,6 +82,9 @@ async fn replay(
     {
         return Ok(AdmissionResult::Conflict);
     }
+    if !agent_history_sessions::replay_matches(tx, command, run).await? {
+        return Ok(AdmissionResult::Conflict);
+    }
     // Always restore the committed configuration: the caller may have prepared
     // before a competitor committed, against a newer or older head revision.
     let configuration = admission_binding::read_saved_binding(

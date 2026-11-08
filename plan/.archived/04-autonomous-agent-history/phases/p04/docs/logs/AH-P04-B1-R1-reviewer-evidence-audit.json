@@ -1,0 +1,92 @@
+{
+  "coverage_hash": true,
+  "checks": {
+    "migrations-main-final-01": {
+      "receipt_hash": true,
+      "log_hash": true,
+      "exit_code": 0,
+      "command_matches": true
+    },
+    "migrations-test-final-01": {
+      "receipt_hash": true,
+      "log_hash": true,
+      "exit_code": 0,
+      "command_matches": true
+    },
+    "trusted-scope-audience-runtime-01": {
+      "receipt_hash": true,
+      "log_hash": true,
+      "exit_code": 0,
+      "command_matches": true
+    },
+    "final-focused-list-02": {
+      "receipt_hash": true,
+      "log_hash": true,
+      "exit_code": 0,
+      "command_matches": true
+    },
+    "final-focused-runtime-02": {
+      "receipt_hash": true,
+      "log_hash": true,
+      "exit_code": 0,
+      "command_matches": true
+    },
+    "sqlx-prepare-01": {
+      "receipt_hash": true,
+      "log_hash": true,
+      "exit_code": 0,
+      "command_matches": true
+    },
+    "sqlx-check-01": {
+      "receipt_hash": true,
+      "log_hash": true,
+      "exit_code": 0,
+      "command_matches": true
+    },
+    "offline-alltargets-01": {
+      "receipt_hash": true,
+      "log_hash": true,
+      "exit_code": 0,
+      "command_matches": true
+    },
+    "clippy-01": {
+      "receipt_hash": true,
+      "log_hash": true,
+      "exit_code": 0,
+      "command_matches": true
+    },
+    "fmt-check-01": {
+      "receipt_hash": true,
+      "log_hash": true,
+      "exit_code": 0,
+      "command_matches": true
+    },
+    "diff-check-01": {
+      "receipt_hash": true,
+      "log_hash": true,
+      "exit_code": 0,
+      "command_matches": true
+    },
+    "graft-build-01": {
+      "receipt_hash": true,
+      "log_hash": true,
+      "exit_code": 0,
+      "command_matches": true
+    }
+  },
+  "selected": 597,
+  "passed": 597,
+  "distinct_passed": 597,
+  "missing": [],
+  "extra": [],
+  "history": 99,
+  "summaries": [
+    "test result: ok. 597 passed; 0 failed; 0 ignored; 0 measured; 2741 filtered out; finished in 193.49s"
+  ],
+  "families": {
+    "agent_history_selection_": 4,
+    "agent_history_level_": 14,
+    "agent_history_preparation_": 6,
+    "agent_history_protocol_": 4
+  }
+}

@@ -58,6 +58,7 @@ pub(super) async fn update_on(
         token_budget::require_progression(tx, write.fence.scope).await?;
     }
     persist_on(tx, write.fence, &next, CheckpointOwnership::Progression).await?;
+    agent_history::accepted_on(tx, write.fence, &saved.workflow_prepared, &next).await?;
     live(tx, write.fence, bound).await?;
     Ok(End::Commit(WriteOutcome::Applied(next)))
 }

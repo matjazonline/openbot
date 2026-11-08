@@ -1,0 +1,11 @@
+{
+  "root_worktree": "/Users/mac02/.codex/worktrees/1133/openbot",
+  "publication_worktree": "/private/tmp/vault-google-publish-a95937f128",
+  "source_commit": "83b493e203e43bbd956f47326e17ee407b4dcc96",
+  "source_review_digest": "ad2cae3d8ce497444a91a39bf14fb21f8ecdc27ed547a842a97dbee4cbf9cd48",
+  "main": "22c94cf6fcb9d7bcce14eda2a59df58223699e7f",
+  "branch": "codex/vault-google-publish-a95937f128",
+  "target": "/Users/mac02/.codex/worktrees/1133/openbot/target",
+  "verification": "focused only; root-owned cache serialized, no foreign DB/target",
+  "authorization": "user: ok push and move plan to .archive"
+}

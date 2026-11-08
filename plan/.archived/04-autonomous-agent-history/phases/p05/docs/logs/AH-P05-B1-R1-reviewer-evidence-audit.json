@@ -1,0 +1,195 @@
+{
+  "selected": 769,
+  "latest_passing": 769,
+  "accepted_p04_preserved": 597,
+  "raw_runs": [
+    {
+      "run": "final-focused-runtime-02",
+      "exit_code": 101,
+      "count": {
+        "ok": 802,
+        "ignored, browser fixture: exact production library markup and JavaScript": 1,
+        "FAILED": 1
+      },
+      "failed": [
+        "adapters::persistence::workflow::tests::message_tests::ingress_tests::knowledge_e2e::races::knowledge_e2e_cc_and_member_demotion_mid_reply_refuse_delivery_and_show_typed_attention"
+      ]
+    },
+    {
+      "run": "final-affected-recheck01",
+      "exit_code": 101,
+      "count": {
+        "ok": 238,
+        "FAILED": 1
+      },
+      "failed": [
+        "adapters::persistence::workflow::tests::message_tests::ingress_tests::knowledge_e2e::races::knowledge_e2e_cc_and_member_demotion_mid_reply_refuse_delivery_and_show_typed_attention"
+      ]
+    },
+    {
+      "run": "knowledge-cc-final02",
+      "exit_code": 0,
+      "count": {
+        "ok": 1
+      },
+      "failed": []
+    },
+    {
+      "run": "cc-owner-final01",
+      "exit_code": 0,
+      "count": {
+        "ok": 1
+      },
+      "failed": []
+    }
+  ],
+  "latest_by_run": {
+    "final-affected-recheck01": 236,
+    "final-focused-runtime-02": 531,
+    "cc-owner-final01": 1,
+    "knowledge-cc-final02": 1
+  },
+  "late_assertions_receipt": "cc-owner-final01",
+  "new_source_discovery": [
+    {
+      "name": "agent_history_level_lower_private_session_reuse_filters_hidden_pairs_without_raising_ceiling",
+      "selected": true
+    },
+    {
+      "name": "agent_history_callers_copied_context_cannot_join_private_session_but_authenticated_reuse_can",
+      "selected": true
+    },
+    {
+      "name": "agent_history_channel_customer_cc_after_output_refuses_release_and_retains_classified_exchange",
+      "selected": true
+    },
+    {
+      "name": "agent_history_channel_projection_is_not_the_saved_output_or_next_seed",
+      "selected": true
+    },
+    {
+      "name": "agent_history_channel_no_reply_and_explicit_send_retain_agent_output_independently",
+      "selected": true
+    },
+    {
+      "name": "agent_history_channel_delivery_retry_keeps_one_exchange_output_and_model_call",
+      "selected": true
+    },
+    {
+      "name": "agent_history_channel_terminal_delivery_failure_preserves_business_success_and_accepted_exchange",
+      "selected": true
+    },
+    {
+      "name": "agent_history_children_same_agent_private_branch_completes_without_parent_transcript",
+      "selected": true
+    },
+    {
+      "name": "agent_history_level_child_branch_inherits_content_and_result_taints_parent",
+      "selected": true
+    },
+    {
+      "name": "agent_history_callers_repeated_activation_replay_keeps_outputs_after_later_workflow_failure",
+      "selected": true
+    },
+    {
+      "name": "agent_history_continuation_two_real_approval_rounds_and_competing_reviewers_preserve_one_exchange",
+      "selected": true
+    },
+    {
+      "name": "agent_history_callers_dynamic_selection_uses_actual_agent_and_returns_to_its_own_thread_stream",
+      "selected": true
+    },
+    {
+      "name": "agent_history_callers_schedule_uses_current_configured_actor_and_manual_starter_keeps_own_level",
+      "selected": true
+    },
+    {
+      "name": "agent_history_selection_private_session_preserves_json_pairs_without_recursive_current_input",
+      "selected": true
+    },
+    {
+      "name": "agent_history_selection_pair_limit_keeps_recent_complete_suffix_and_exact_omissions",
+      "selected": true
+    },
+    {
+      "name": "agent_history_selection_oversized_newest_pair_stops_walk_without_loading_older_pair",
+      "selected": true
+    },
+    {
+      "name": "agent_history_preparation_mandatory_current_budget_refusal_has_no_provider_snapshot_or_order",
+      "selected": true
+    },
+    {
+      "name": "agent_history_protocol_new_revision_provider_and_schema_keep_prior_pairs_as_data",
+      "selected": true
+    },
+    {
+      "name": "agent_history_level_private_thread_anchor_checks_current_acting_member_on_resume",
+      "selected": true
+    },
+    {
+      "name": "agent_history_level_private_thread_anchor_keeps_authorized_member_above_public_anchor",
+      "selected": true
+    },
+    {
+      "name": "agent_history_samples_sealed_capture_cannot_load_production_history_or_advance_turns",
+      "selected": true
+    },
+    {
+      "name": "agent_history_continuation_real_thread_reply_reaches_child_before_parent_owned_turn_queue",
+      "selected": true
+    },
+    {
+      "name": "channel_reply_knowledge_pure_owner_and_allowed_control",
+      "selected": true
+    },
+    {
+      "name": "channel_reply_knowledge_fenced_owner_records_actual_levels_and_allowed_control",
+      "selected": true
+    },
+    {
+      "name": "channel_reply_knowledge_parked_owner_keeps_real_wait_and_no_new_attempt",
+      "selected": true
+    },
+    {
+      "name": "channel_reply_knowledge_approved_contenders_settle_once_without_reexecuting_handler",
+      "selected": true
+    },
+    {
+      "name": "channel_reply_knowledge_commit_abort_and_lost_receipt_preserve_exact_owner_effects",
+      "selected": true
+    },
+    {
+      "name": "channel_reply_knowledge_pending_owner_keeps_cause_after_real_token_denial",
+      "selected": true
+    },
+    {
+      "name": "channel_reply_knowledge_fenced_owner_preserves_actual_unknown_http_effect",
+      "selected": true
+    },
+    {
+      "name": "agent_history_samples_repeated_calls_keep_exact_local_pairs_and_current_input_separate",
+      "selected": true
+    },
+    {
+      "name": "agent_history_samples_exact_pair_limit_reports_only_recent_complete_suffix",
+      "selected": true
+    },
+    {
+      "name": "agent_history_samples_oversized_newest_pair_stops_before_older_pair",
+      "selected": true
+    },
+    {
+      "name": "agent_history_samples_actual_agent_identity_separates_streams",
+      "selected": true
+    },
+    {
+      "name": "agent_history_samples_model_only_step_has_no_logical_seed",
+      "selected": true
+    },
+    {
+      "name": "agent_history_samples_same_agent_child_has_its_own_ephemeral_branch",
+      "selected": true
+    }
+  ]
+}

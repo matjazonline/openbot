@@ -44,11 +44,11 @@ fn the_graph_layers_every_route_downward_and_ends_below_every_step() {
         review,
         [
             ("approve", "reply", GraphEdgeKind::Choice),
-            ("reject", END_NODE, GraphEdgeKind::Choice)
+            ("reject", "review_rejected", GraphEdgeKind::Choice)
         ]
     );
     assert_eq!(graph.layers, 5);
-    assert_eq!(graph.nodes.len(), 5);
+    assert_eq!(graph.nodes.len(), 6);
 }
 
 #[test]

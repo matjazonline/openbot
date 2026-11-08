@@ -11,6 +11,7 @@ use crate::application::transport::TransportRenderers;
 use crate::application::use_cases::agent::{AgentPersistence, AgentWrite};
 use crate::application::use_cases::company::{CompanyModelConnectionWrite, CompanyPersistence};
 use crate::application::use_cases::thread::{InboundIngestPorts, ThreadStores, ThreadUseCases};
+use crate::application::workflow::channel_reply::*;
 use crate::application::workflow::triggers::MessageTriggerInput;
 use crate::domain::workflow::MessageTrigger;
 use crate::infra::config::AppConfig;
@@ -23,6 +24,10 @@ use crate::transport::DeliveryComposer;
 use std::collections::BTreeMap;
 use std::time::Duration;
 use tokio_util::sync::CancellationToken;
+
+#[path = "message_ingress_binding_support.rs"]
+mod binding_support;
+use binding_support::SourceBinding;
 
 #[path = "schedule_runtime_tests.rs"]
 mod schedule_runtime_tests;
@@ -41,6 +46,9 @@ mod knowledge_e2e;
 
 #[path = "autonomous_agent_entrypoint_tests.rs"]
 mod autonomous_entrypoints;
+
+#[path = "channel_reply_e2e_tests.rs"]
+mod channel_reply_e2e;
 
 const CUSTOMER: &str = "customer@partner.test";
 
@@ -141,63 +149,59 @@ impl Deployment {
         &self.fixture.persistence
     }
 
+    async fn configure_response(
+        &self,
+        binding: BindingTarget,
+        contract: ChannelReplyContract,
+        approval_policy: Option<ReplyApprovalPolicy>,
+    ) -> ChannelReplySettings {
+        let company = self.fixture.target.company;
+        let actor = self.fixture.target.actor;
+        let channel = RelatedChannelId::new(self.channel);
+        let current = self
+            .p()
+            .channel_reply_settings(company, channel, actor)
+            .await
+            .unwrap();
+        let state = self
+            .p()
+            .binding(company, binding.binding)
+            .await
+            .unwrap()
+            .unwrap();
+        self.p()
+            .configure_channel_reply(ConfigureChannelReply {
+                company,
+                channel,
+                actor,
+                expected: current.map(|settings| settings.revision),
+                responder: Some(ConfigureResponder {
+                    binding: binding.binding,
+                    expected_binding_revision: state.revision,
+                    contract,
+                }),
+                approval_policy,
+            })
+            .await
+            .unwrap()
+    }
+
     fn address(&self, local: &str) -> String {
         format!("{local}@workflow-tests.{APP_DOMAIN}")
     }
 
     /// Publish `source` through the production composition and bind it to the channel.
-    async fn bind(&self, mut source: Value, trigger: Option<MessageTrigger>) -> BindingTarget {
-        let workflow = WorkflowId::new(Uuid::new_v4());
-        source["workflow_id"] = json!(workflow.to_string());
-        let definitions = self
-            .engine
-            .services()
-            .definitions(Vec::new(), self.mcp_selections.clone());
-        let definition = DefinitionTarget {
-            workflow,
-            ..self.fixture.target
-        };
-        let mut draft = self.fixture.save(None);
-        draft.target = definition;
-        draft.content.source = source.to_string();
-        definitions.save(draft).await.unwrap();
-        let mut publication = self.fixture.publish();
-        publication.target = definition;
-        publication.key =
-            IdempotencyKey::parse(format!("publication-{}", workflow.as_uuid().simple())).unwrap();
-        let version = publication.version;
-        definitions.publish(publication).await.unwrap();
-        let target = BindingTarget {
-            company: self.fixture.target.company,
-            actor: self.fixture.target.actor,
-            binding: WorkflowBindingId::new(Uuid::new_v4()),
-        };
-        let state = self
-            .engine
-            .services()
-            .bindings()
-            .configure(ConfigureBinding {
-                target,
-                expected: None,
-                association: RelatedAssociation::Channel(RelatedChannelId::new(self.channel)),
-                version,
-                params: json!({}),
-                resources: self.resources.clone(),
-                run_as: None,
-                message_trigger: trigger,
-            })
-            .await
-            .unwrap();
-        self.engine
-            .services()
-            .bindings()
-            .activate(SetBindingActivity {
-                target,
-                expected: state.revision,
-            })
-            .await
-            .unwrap();
-        target
+    fn bind(
+        &self,
+        source: Value,
+        trigger: Option<MessageTrigger>,
+    ) -> impl std::future::Future<Output = BindingTarget> {
+        // Return the shared future directly; this fixture wrapper adds no async frame.
+        self.bind_source(SourceBinding {
+            source,
+            params: json!({}),
+            trigger,
+        })
     }
 
     async fn email(

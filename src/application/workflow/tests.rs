@@ -117,6 +117,7 @@ fn request(
     input: Value,
 ) -> AdmitWorkflowRequest {
     AdmitWorkflowRequest {
+        history_session: None,
         company_id,
         actor: actor(),
         association: RelatedAssociation::Company,

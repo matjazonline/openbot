@@ -1,0 +1,24 @@
+$ cargo test --locked --offline --lib profile
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.19s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-048b7abd3ed0c794)
+
+running 16 tests
+test adapters::http::routes::ui_profile::session_tests::dump_session_revocation_browser_fixtures ... ignored, writes actual profile responses for the browser protocol check
+test adapters::http::pages::tests::a_rejected_profile_shows_what_was_typed_rather_than_what_is_stored ... ok
+test adapters::http::pages::tests::the_profile_pane_offers_the_account_its_own_details_and_never_its_password ... ok
+test adapters::http::pages::tests::each_profile_banner_belongs_to_the_form_that_earned_it ... ok
+test adapters::http::pages::tests::security_email_identity_profile_displays_current_address_proof ... ok
+test adapters::http::pages::tests::the_profile_offers_the_decision_and_delivery_failure_email_toggles ... ok
+test adapters::http::pages::tests::an_oauth_only_profile_can_add_password_and_connect_available_providers ... ok
+test application::use_cases::user::tests::a_profile_needs_a_name_and_an_address_shaped_like_one ... ok
+test application::use_cases::user::tests::security_email_identity_stale_profile_read_preserves_concurrent_confirmation ... ok
+test application::use_cases::user::tests::updating_a_profile_trims_and_stores_every_field ... ok
+test adapters::http::auth_admission::tests::security_auth_limits_encoded_profile_kind_uses_matched_route_budget ... ok
+test adapters::http::pages::tests::the_profile_page_renders_through_the_ui_shell_with_or_without_a_company ... ok
+test adapters::persistence::participant::tests::a_profile_email_claim_neither_merges_a_principal_nor_grants_access ... ok
+test adapters::http::routes::ui_profile::session_tests::security_session_profile_failed_change_keeps_session_and_document_redirects ... ok
+test adapters::http::routes::ui_profile::session_tests::security_session_profile_code_confirmed_password_setup_and_email_revoke ... ok
+test adapters::http::routes::ui_profile::session_tests::security_session_profile_immediate_security_changes_sign_in_again ... ok
+
+test result: ok. 15 passed; 0 failed; 1 ignored; 0 measured; 3045 filtered out; finished in 3.17s
+

@@ -1,0 +1,14 @@
+{
+  "database_dropped": "vault_pull_main_1133_43797f74ae21",
+  "removed_owned_baseline_exports_and_binaries": [
+    "/private/tmp/vault-main-pull-rtehstpa/main-markup-baseline",
+    "/private/tmp/vault-main-pull-rtehstpa/main-transport-baseline",
+    "/private/tmp/vault-main-pull-rtehstpa/baseline-markup-guard",
+    "/private/tmp/vault-main-pull-rtehstpa/baseline_markup_guard.rs"
+  ],
+  "prepared_worktree_retained": "/private/tmp/vault-main-pull-rtehstpa/worktree",
+  "reason_retained": "Uncommitted merge preparation backup is preserved alongside installed root source and immutable review archive. No running processes or build cache in that checkout.",
+  "root_source_review_evidence_and_backups": "preserved",
+  "shared_postgres_and_foreign_resources": "untouched",
+  "no_outstanding_owned_workers": "author and reviewer commands completed; browser test closed browser/server"
+}

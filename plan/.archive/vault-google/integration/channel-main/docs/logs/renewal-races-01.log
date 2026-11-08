@@ -1,0 +1,12 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.20s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-048b7abd3ed0c794)
+
+running 4 tests
+test adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::google::google_refresh_race_http_requests_with_distinct_dispatches_share_one_refresh ... ok
+test adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::isolation::google_refresh_race_an_independent_user_is_not_blocked_by_another_account ... ok
+test adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::isolation::google_refresh_race_same_owner_different_accounts_reach_provider_independently ... ok
+test adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::google::google_refresh_race_http_and_mcp_apps_share_the_same_account_lock ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 3389 filtered out; finished in 2.20s
+

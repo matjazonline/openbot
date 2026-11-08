@@ -1,0 +1,26 @@
+{
+  "command": [
+    "cargo",
+    "test",
+    "--locked",
+    "--offline",
+    "--lib",
+    "agent_history_",
+    "--",
+    "--list"
+  ],
+  "cwd": "/private/tmp/openbot-agent-history-h_82_5pw/worktree",
+  "environment": {
+    "DATABASE_URL": "postgres://mac02@127.0.0.1:65037/openbot_ah_p03",
+    "TEST_DATABASE_URL": "postgres://mac02@127.0.0.1:65037/openbot_ah_p03_test",
+    "SQLX_OFFLINE": "true",
+    "CARGO_INCREMENTAL": "1",
+    "CARGO_TARGET_DIR": "/private/tmp/openbot-chs-p06-3f43t2k7/worktree/target",
+    "CARGO_BUILD_JOBS": "4",
+    "RUST_MIN_STACK": "2097152"
+  },
+  "started": "2026-11-07T15:46:19.307828+00:00",
+  "seconds": 101.46,
+  "exit_code": 0,
+  "log": "/private/tmp/openbot-agent-history-h_82_5pw/worktree/plan/04-autonomous-agent-history/phases/p03/docs/logs/history-list-01.log"
+}

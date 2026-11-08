@@ -1,0 +1,378 @@
+--- producer/migrations/20260817000000_init_schema.sql
++++ current/migrations/20260817000000_init_schema.sql
+@@ -13663,6 +13663,8 @@
+     created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
+     last_exchange_order bigint NOT NULL DEFAULT 0 CHECK (last_exchange_order >= 0),
+     active_exchange_id uuid,
++    expired_count bigint NOT NULL DEFAULT 0 CHECK (expired_count BETWEEN 0 AND last_exchange_order),
++    expired_through_order bigint NOT NULL DEFAULT 0 CHECK (expired_through_order BETWEEN 0 AND last_exchange_order),
+     PRIMARY KEY (company_id,id),
+     UNIQUE (company_id,agent_id,id),
+     FOREIGN KEY (company_id,agent_id) REFERENCES public.agents(company_id,id),
+@@ -13798,6 +13800,10 @@
+     checkpoint_id uuid,
+     output jsonb,
+     frozen_preparation jsonb CHECK (frozen_preparation IS NULL OR (jsonb_typeof(frozen_preparation)='object' AND octet_length(frozen_preparation::text)<=2097152)),
++    payload_retained boolean NOT NULL DEFAULT true,
++    payload_expired_at timestamptz,
++    preparation_digest bytea CHECK (preparation_digest IS NULL OR octet_length(preparation_digest)=32),
++    output_digest bytea CHECK (output_digest IS NULL OR octet_length(output_digest)=32),
+     created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
+     activated_at timestamptz,
+     finished_at timestamptz,
+@@ -13805,15 +13811,20 @@
+     UNIQUE (company_id,execution_id),
+     UNIQUE (company_id,conversation_id,position),
+     FOREIGN KEY (company_id,agent_id,conversation_id)
+-        REFERENCES public.agent_history_conversations(company_id,agent_id,id),
++        REFERENCES public.agent_history_conversations(company_id,agent_id,id) ON DELETE CASCADE,
+     FOREIGN KEY (company_id,agent_id,revision_id) REFERENCES public.agent_revisions(company_id,agent_id,id),
+     FOREIGN KEY (company_id,manifest_id) REFERENCES public.agent_dependency_manifests(company_id,id),
+-    FOREIGN KEY (company_id,run_id,execution_id) REFERENCES public.workflow_executions(company_id,run_id,id),
++    FOREIGN KEY (company_id,run_id,execution_id) REFERENCES public.workflow_executions(company_id,run_id,id) ON DELETE CASCADE,
+     FOREIGN KEY (company_id,execution_id,job_id) REFERENCES public.background_tasks(company_id,workflow_execution_id,id),
+     FOREIGN KEY (company_id,job_id,checkpoint_id) REFERENCES public.task_harness_runs(company_id,task_id,id)
+         DEFERRABLE INITIALLY DEFERRED,
+     CHECK (id=execution_id),
+-    CHECK ((state='completed')=(output IS NOT NULL)),
++    CHECK ((state='completed' AND payload_retained)=(output IS NOT NULL)),
++    CHECK ((state='completed')=(output_digest IS NOT NULL)),
++    CHECK (payload_retained=(payload_expired_at IS NULL)),
++    CHECK (payload_retained OR (state IN ('completed','failed','cancelled') AND output IS NULL AND frozen_preparation IS NULL)),
++    CHECK (frozen_preparation IS NULL OR preparation_digest=sha256(convert_to(frozen_preparation::text,'UTF8'))),
++    CHECK (output IS NULL OR output_digest=sha256(convert_to(output::text,'UTF8'))),
+     CHECK (output IS NULL OR octet_length(output::text)<=1048576),
+     CHECK ((state IN ('completed','failed','cancelled'))=(finished_at IS NOT NULL)),
+     CHECK (state NOT IN ('active','completed') OR (checkpoint_id IS NOT NULL AND activated_at IS NOT NULL)),
+@@ -13823,7 +13834,9 @@
+ CREATE INDEX agent_history_exchanges_pending ON public.agent_history_exchanges
+     (company_id,conversation_id,position) WHERE state IN ('queued','active');
+ CREATE INDEX agent_history_exchanges_recent ON public.agent_history_exchanges
+-    (company_id,conversation_id,access_level,position DESC) WHERE state='completed';
++    (company_id,conversation_id,access_level,position DESC) WHERE state='completed' AND payload_retained;
++CREATE INDEX agent_history_exchanges_retained ON public.agent_history_exchanges(company_id,conversation_id,position) WHERE payload_retained;
++CREATE INDEX agent_history_exchanges_expiry ON public.agent_history_exchanges(company_id,finished_at,id) WHERE payload_retained AND state IN ('completed','failed','cancelled');
+ CREATE INDEX agent_history_exchanges_source ON public.agent_history_exchanges(company_id,run_id,execution_id);
+ CREATE INDEX agent_history_exchanges_checkpoint ON public.agent_history_exchanges(company_id,checkpoint_id)
+     WHERE checkpoint_id IS NOT NULL;
+@@ -13854,9 +13867,143 @@
+     RETURN NEW;
+ END $$;
+ 
++-- Initial, code-owned history limits; workflow/checkpoint storage has its own retention owner.
++CREATE FUNCTION public.agent_history_limits()
++RETURNS TABLE(conversation_payloads bigint, company_payloads bigint, recent_payloads bigint,
++    pressure_payloads bigint, conversation_metadata bigint, company_metadata bigint, company_conversations bigint)
++LANGUAGE sql IMMUTABLE AS $$ SELECT 128::bigint,2048::bigint,64::bigint,1536::bigint,4096::bigint,32768::bigint,2048::bigint $$;
++
++CREATE FUNCTION public.agent_history_conversation_available(tenant uuid)
++RETURNS boolean LANGUAGE plpgsql VOLATILE AS $$
++DECLARE maximum bigint;
++BEGIN
++    PERFORM 1 FROM public.companies WHERE id=tenant FOR NO KEY UPDATE NOWAIT;
++    IF NOT FOUND THEN RETURN false; END IF;
++    SELECT company_conversations INTO STRICT maximum FROM public.agent_history_limits();
++    RETURN (SELECT count(*)<maximum FROM (SELECT 1 FROM public.agent_history_conversations
++        WHERE company_id=tenant LIMIT maximum) AS rows);
++END $$;
++
++CREATE FUNCTION public.agent_history_conversation_unused(conversation public.agent_history_conversations)
++RETURNS boolean LANGUAGE sql VOLATILE AS $$
++    SELECT conversation.active_exchange_id IS NULL
++      AND NOT EXISTS(SELECT 1 FROM public.agent_history_exchanges AS exchange
++        WHERE exchange.company_id=conversation.company_id AND exchange.conversation_id=conversation.id)
++      AND NOT EXISTS(SELECT 1 FROM public.workflow_runs AS run
++        WHERE run.company_id=conversation.company_id AND run.state IN ('queued','running','waiting') AND (
++          (conversation.scope_kind='child_branch' AND run.id=conversation.child_run_id)
++          OR (conversation.scope_kind='thread' AND run.channel_id=conversation.channel_id AND run.thread_id=conversation.thread_id)
++          OR (conversation.scope_kind='private_session' AND EXISTS(SELECT 1 FROM public.workflow_agent_sessions AS mapping
++            WHERE mapping.company_id=run.company_id AND mapping.run_id=run.id AND mapping.session_id=conversation.session_id))))
++$$;
++
++CREATE FUNCTION public.guard_agent_history_conversation_delete() RETURNS trigger LANGUAGE plpgsql AS $$
++BEGIN
++    IF NOT EXISTS(SELECT 1 FROM public.companies WHERE id=OLD.company_id) THEN RETURN OLD; END IF;
++    PERFORM 1 FROM public.companies WHERE id=OLD.company_id FOR NO KEY UPDATE NOWAIT;
++    -- A child source cascade may also remove its safely expired terminal metadata.
++    IF OLD.scope_kind='child_branch' AND NOT EXISTS(SELECT 1 FROM public.workflow_runs
++        WHERE company_id=OLD.company_id AND id=OLD.child_run_id)
++        AND OLD.active_exchange_id IS NULL AND NOT EXISTS(SELECT 1 FROM public.agent_history_exchanges
++            WHERE company_id=OLD.company_id AND conversation_id=OLD.id AND payload_retained) THEN RETURN OLD; END IF;
++    IF NOT public.agent_history_conversation_unused(OLD) THEN
++        RAISE EXCEPTION 'agent conversation has retained metadata or live work' USING ERRCODE='23514';
++    END IF;
++    RETURN OLD;
++END $$;
++CREATE TRIGGER agent_history_conversation_delete BEFORE DELETE ON public.agent_history_conversations
++    FOR EACH ROW EXECUTE FUNCTION public.guard_agent_history_conversation_delete();
++
++CREATE FUNCTION public.agent_history_storage_available(tenant uuid, conversation uuid)
++RETURNS boolean LANGUAGE plpgsql VOLATILE AS $$
++DECLARE bounds record;
++BEGIN
++    -- Direct writers also serialize before taking local locks. Reverse-order callers fail busy.
++    PERFORM 1 FROM public.companies WHERE id=tenant FOR NO KEY UPDATE NOWAIT;
++    IF NOT FOUND THEN RETURN false; END IF;
++    SELECT * INTO STRICT bounds FROM public.agent_history_limits();
++    RETURN (SELECT count(*)<bounds.conversation_payloads FROM (SELECT 1 FROM public.agent_history_exchanges
++        WHERE company_id=tenant AND conversation_id=conversation AND payload_retained LIMIT bounds.conversation_payloads) AS rows)
++      AND (SELECT count(*)<bounds.company_payloads FROM (SELECT 1 FROM public.agent_history_exchanges
++        WHERE company_id=tenant AND payload_retained LIMIT bounds.company_payloads) AS rows)
++      AND (SELECT count(*)<bounds.conversation_metadata FROM (SELECT 1 FROM public.agent_history_exchanges
++        WHERE company_id=tenant AND conversation_id=conversation LIMIT bounds.conversation_metadata) AS rows)
++      AND (SELECT count(*)<bounds.company_metadata FROM (SELECT 1 FROM public.agent_history_exchanges
++        WHERE company_id=tenant LIMIT bounds.company_metadata) AS rows);
++END $$;
++
++CREATE FUNCTION public.agent_history_payload_expirable(exchange public.agent_history_exchanges)
++RETURNS boolean LANGUAGE sql VOLATILE AS $$
++    SELECT exchange.payload_retained AND exchange.state IN ('completed','failed','cancelled')
++      AND (exchange.state<>'failed' OR run.deadline<=clock_timestamp())
++      AND job.status IN ('completed','failed')
++      AND (execution.completed_at IS NOT NULL OR run.state IN ('succeeded','failed','cancelled'))
++      AND NOT EXISTS(SELECT 1 FROM public.agent_history_conversations AS conversation
++        WHERE conversation.company_id=exchange.company_id AND conversation.id=exchange.conversation_id
++          AND conversation.active_exchange_id=exchange.id)
++      AND NOT EXISTS(SELECT 1 FROM public.task_attempts AS attempt WHERE attempt.task_id=job.id AND attempt.status='processing')
++      AND NOT EXISTS(SELECT 1 FROM public.workflow_waits AS wait WHERE wait.company_id=exchange.company_id
++        AND wait.run_id=exchange.run_id AND wait.execution_id=exchange.execution_id AND wait.state='waiting')
++      AND NOT EXISTS(SELECT 1 FROM public.workflow_decisions AS decision
++        JOIN public.workflow_waits AS wait ON wait.company_id=decision.company_id AND wait.id=decision.wait_id
++        WHERE decision.company_id=exchange.company_id AND decision.run_id=exchange.run_id
++          AND wait.execution_id=exchange.execution_id AND decision.submitted_at IS NULL AND wait.state='waiting')
++      AND public.workflow_action_retry_safe(exchange.company_id,exchange.execution_id) IS DISTINCT FROM false
++      AND NOT EXISTS(SELECT 1 FROM public.workflow_action_evidence_conflicts AS conflict
++        WHERE conflict.company_id=exchange.company_id AND conflict.run_id=exchange.run_id)
++      AND NOT EXISTS(SELECT 1 FROM public.workflow_message_actions AS action
++        WHERE action.company_id=exchange.company_id AND action.run_id=exchange.run_id AND action.state IN ('pending','uncertain','stalled'))
++      AND NOT EXISTS(SELECT 1 FROM public.channel_reply_decisions AS final
++        LEFT JOIN public.message_deliveries AS delivery ON delivery.company_id=final.company_id AND delivery.id=final.delivery_id
++        WHERE final.company_id=exchange.company_id AND final.run_id=exchange.run_id
++          AND (final.state IN ('pending','claimed') OR (final.state='published' AND final.delivery_id IS NOT NULL
++            AND (delivery.id IS NULL OR delivery.status NOT IN ('delivered','dead_letter')))))
++      AND (exchange.finished_at<=clock_timestamp()-interval '90 days'
++        OR (SELECT count(*)>=bounds.recent_payloads FROM (SELECT 1 FROM public.agent_history_exchanges AS newer
++          WHERE newer.company_id=exchange.company_id AND newer.conversation_id=exchange.conversation_id
++            AND newer.payload_retained AND newer.state IN ('completed','failed','cancelled')
++            AND newer.position>exchange.position LIMIT bounds.recent_payloads) AS rows)
++        OR (SELECT count(*)>bounds.pressure_payloads FROM (SELECT 1 FROM public.agent_history_exchanges AS retained
++          WHERE retained.company_id=exchange.company_id AND retained.payload_retained LIMIT bounds.pressure_payloads+1) AS rows))
++    FROM public.workflow_runs AS run
++    JOIN public.workflow_executions AS execution ON execution.company_id=run.company_id AND execution.run_id=run.id
++    JOIN public.background_tasks AS job ON job.company_id=execution.company_id AND job.workflow_execution_id=execution.id
++    CROSS JOIN public.agent_history_limits() AS bounds
++    WHERE run.company_id=exchange.company_id AND run.id=exchange.run_id
++      AND execution.id=exchange.execution_id AND job.id=exchange.job_id
++$$;
++
++CREATE FUNCTION public.agent_history_expiry_allowed(exchange public.agent_history_exchanges)
++RETURNS boolean LANGUAGE plpgsql VOLATILE AS $$
++BEGIN
++    -- A direct UPDATE already owns the exchange tuple; never wait in reverse lock order.
++    PERFORM 1 FROM public.companies WHERE id=exchange.company_id FOR NO KEY UPDATE NOWAIT;
++    PERFORM 1 FROM public.workflow_runs WHERE company_id=exchange.company_id AND id=exchange.run_id FOR SHARE NOWAIT;
++    PERFORM 1 FROM public.workflow_executions WHERE company_id=exchange.company_id AND id=exchange.execution_id FOR SHARE NOWAIT;
++    PERFORM 1 FROM public.background_tasks WHERE company_id=exchange.company_id AND id=exchange.job_id FOR SHARE NOWAIT;
++    RETURN public.agent_history_payload_expirable(exchange) IS TRUE;
++END $$;
++
++CREATE FUNCTION public.refresh_agent_history_expiry() RETURNS trigger LANGUAGE plpgsql AS $$
++BEGIN
++    UPDATE public.agent_history_conversations AS conversation SET
++      expired_count=conversation.last_exchange_order-(SELECT count(*) FROM public.agent_history_exchanges AS exchange
++        WHERE exchange.company_id=conversation.company_id AND exchange.conversation_id=conversation.id AND exchange.payload_retained),
++      expired_through_order=COALESCE((SELECT min(position)-1 FROM public.agent_history_exchanges AS exchange
++        WHERE exchange.company_id=conversation.company_id AND exchange.conversation_id=conversation.id AND exchange.payload_retained),conversation.last_exchange_order)
++      WHERE conversation.company_id=NEW.company_id AND conversation.id=NEW.conversation_id;
++    RETURN NULL;
++END $$;
++CREATE TRIGGER agent_history_payload_expired AFTER UPDATE OF payload_retained ON public.agent_history_exchanges
++    FOR EACH ROW WHEN (OLD.payload_retained IS DISTINCT FROM NEW.payload_retained)
++    EXECUTE FUNCTION public.refresh_agent_history_expiry();
++
+ CREATE FUNCTION public.guard_agent_history_exchange_insert() RETURNS trigger LANGUAGE plpgsql AS $$
+ DECLARE last_position bigint;
+ BEGIN
++    IF NOT public.agent_history_storage_available(NEW.company_id,NEW.conversation_id) THEN
++        RAISE EXCEPTION 'agent history storage is full' USING ERRCODE='23514', CONSTRAINT='agent_history_capacity';
++    END IF;
+     SELECT conversation.last_exchange_order INTO STRICT last_position
+         FROM public.agent_history_conversations AS conversation
+         WHERE conversation.company_id=NEW.company_id AND conversation.id=NEW.conversation_id
+@@ -13867,6 +14014,8 @@
+     IF NEW.position::numeric<>last_position::numeric+1 OR NEW.state<>'queued'
+         OR NEW.checkpoint_id IS NOT NULL OR NEW.output IS NOT NULL OR NEW.frozen_preparation IS NOT NULL
+         OR NEW.activated_at IS NOT NULL OR NEW.finished_at IS NOT NULL
++        OR NOT NEW.payload_retained OR NEW.payload_expired_at IS NOT NULL
++        OR NEW.preparation_digest IS NOT NULL OR NEW.output_digest IS NOT NULL
+     THEN
+         RAISE EXCEPTION 'invalid initial agent exchange or position' USING ERRCODE='23514';
+     END IF;
+@@ -13940,8 +14089,9 @@
+             AND checkpoint.task_id=exchange.job_id AND checkpoint.workflow_run_id=exchange.run_id
+             AND checkpoint.workflow_execution_id=exchange.execution_id AND checkpoint.agent_id=exchange.agent_id
+             AND checkpoint.workflow_prepared->>'version'='5'
+-            AND checkpoint.workflow_prepared=exchange.frozen_preparation
+-            AND checkpoint.checkpoint->'seed'=exchange.frozen_preparation->'history'->'seed'
++            AND ((exchange.payload_retained AND checkpoint.workflow_prepared=exchange.frozen_preparation)
++                OR (NOT exchange.payload_retained AND exchange.preparation_digest=sha256(convert_to(checkpoint.workflow_prepared::text,'UTF8'))))
++            AND checkpoint.checkpoint->'seed'=checkpoint.workflow_prepared->'history'->'seed'
+             AND checkpoint.workflow_prepared->>'history_exchange'=exchange.id::text
+             AND checkpoint.workflow_prepared->'selection'->>'mode'='tools'
+             AND checkpoint.workflow_prepared->'selection'->>'manifest'=exchange.manifest_id::text
+@@ -13955,7 +14105,8 @@
+             AND (checkpoint.state<>'invalid_output' OR exchange.state IN ('failed','cancelled'))
+             AND (exchange.state<>'completed' OR (
+                 checkpoint.checkpoint->'final_output'->'structured'->'contract'=exchange.provenance->'output_contract'
+-                AND exchange.output=(checkpoint.checkpoint->'final_output'->'structured'->>'body')::jsonb))
++                AND ((exchange.payload_retained AND exchange.output=(checkpoint.checkpoint->'final_output'->'structured'->>'body')::jsonb)
++                    OR (NOT exchange.payload_retained AND exchange.output_digest=sha256(convert_to(((checkpoint.checkpoint->'final_output'->'structured'->>'body')::jsonb)::text,'UTF8'))))))
+     ) END
+ $$;
+ 
+@@ -13970,7 +14121,7 @@
+                 AND execution.run_id=prior.run_id AND execution.id=prior.execution_id
+             WHERE prior.company_id=owner.company_id AND prior.conversation_id=owner.conversation_id
+                 AND prior.id=(metadata->>'id')::uuid AND prior.position=(metadata->>'position')::bigint
+-                AND prior.position<owner.position AND prior.state='completed' AND prior.access_level<=ceiling
++                AND prior.position<owner.position AND prior.state='completed' AND prior.payload_retained AND prior.access_level<=ceiling
+                 AND prior.access_level=(metadata->>'access_level')::smallint
+                 AND pair->'input'=execution.frozen_inputs->'context' AND pair->'output'=prior.output)
+ $$;
+@@ -14030,7 +14181,7 @@
+         highest:=GREATEST(highest,(selected->>'access_level')::smallint);
+     END LOOP;
+     SELECT count(*) INTO eligible FROM public.agent_history_exchanges
+-        WHERE company_id=owner.company_id AND conversation_id=owner.conversation_id AND state='completed'
++        WHERE company_id=owner.company_id AND conversation_id=owner.conversation_id AND state='completed' AND payload_retained
+             AND position<owner.position AND access_level<=source.knowledge_ceiling;
+     RETURN (history->>'selected_level')::smallint=highest AND source.content_level>=highest
+         AND (history->>'omitted_eligible')::bigint=eligible-jsonb_array_length(history->'selected')
+@@ -14088,38 +14239,56 @@
+ 
+ CREATE FUNCTION public.guard_agent_history_exchange_change() RETURNS trigger LANGUAGE plpgsql AS $$
+ DECLARE current_level public.access_level;
+-        source record;
+ BEGIN
+     IF TG_OP='DELETE' THEN
+         IF NOT EXISTS (SELECT 1 FROM public.companies WHERE id=OLD.company_id) THEN
+             RETURN OLD; -- Intentional whole-tenant teardown owns its cascades.
+         END IF;
+-        IF OLD.state IN ('queued','active') THEN
+-            RAISE EXCEPTION 'live agent exchange cannot be removed' USING ERRCODE='23514';
+-        END IF;
+-        IF OLD.state='failed' THEN
+-            -- DELETE already owns the exchange tuple. Never wait for the opposite
+-            -- run->exchange control order: fail busy while another owner has the run.
+-            SELECT state,deadline,terminal_execution_id INTO STRICT source
+-                FROM public.workflow_runs WHERE company_id=OLD.company_id AND id=OLD.run_id
+-                FOR SHARE NOWAIT;
+-            IF source.deadline>clock_timestamp() AND (
+-                source.state NOT IN ('succeeded','failed','cancelled')
+-                OR (source.state='failed' AND source.terminal_execution_id=OLD.execution_id
+-                    AND public.workflow_control_retry_safe(OLD.company_id,OLD.run_id,OLD.job_id))
+-            ) THEN
+-                RAISE EXCEPTION 'resumable agent exchange cannot be removed' USING ERRCODE='23514';
+-            END IF;
++        IF OLD.payload_retained OR EXISTS(SELECT 1 FROM public.workflow_runs
++            WHERE company_id=OLD.company_id AND id=OLD.run_id) THEN
++            RAISE EXCEPTION 'agent metadata retires only with its expired source' USING ERRCODE='23514';
+         END IF;
+         RETURN OLD;
+     END IF;
+     IF to_jsonb(NEW)=to_jsonb(OLD) AND NEW.output::text IS NOT DISTINCT FROM OLD.output::text THEN
+         RETURN NEW;
+     END IF;
++    IF OLD.payload_retained AND NOT NEW.payload_retained THEN
++        IF (to_jsonb(NEW)-ARRAY['payload_retained','payload_expired_at','output','frozen_preparation']::text[])
++            IS DISTINCT FROM (to_jsonb(OLD)-ARRAY['payload_retained','payload_expired_at','output','frozen_preparation']::text[])
++            OR NEW.output IS NOT NULL OR NEW.frozen_preparation IS NOT NULL
++            OR NEW.payload_expired_at IS NULL OR NEW.payload_expired_at<OLD.created_at
++            OR NEW.payload_expired_at>clock_timestamp()
++            OR NOT public.agent_history_expiry_allowed(OLD)
++            OR NOT public.agent_history_checkpoint_matches(NEW) THEN
++            RAISE EXCEPTION 'agent payload is pinned or expiry changed metadata' USING ERRCODE='23514';
++        END IF;
++        RETURN NEW;
++    END IF;
++    IF NOT OLD.payload_retained OR NEW.payload_retained IS DISTINCT FROM OLD.payload_retained
++        OR NEW.payload_expired_at IS DISTINCT FROM OLD.payload_expired_at THEN
++        RAISE EXCEPTION 'expired agent payload cannot reopen' USING ERRCODE='23514';
++    END IF;
++    IF OLD.preparation_digest IS NULL AND NEW.frozen_preparation IS NOT NULL THEN
++        IF NEW.preparation_digest IS NOT NULL AND NEW.preparation_digest<>sha256(convert_to(NEW.frozen_preparation::text,'UTF8')) THEN
++            RAISE EXCEPTION 'forged agent preparation digest' USING ERRCODE='23514';
++        END IF;
++        NEW.preparation_digest:=sha256(convert_to(NEW.frozen_preparation::text,'UTF8'));
++    ELSIF NEW.preparation_digest IS DISTINCT FROM OLD.preparation_digest THEN
++        RAISE EXCEPTION 'agent preparation digest is immutable' USING ERRCODE='23514';
++    END IF;
++    IF OLD.output_digest IS NULL AND NEW.output IS NOT NULL THEN
++        IF NEW.output_digest IS NOT NULL AND NEW.output_digest<>sha256(convert_to(NEW.output::text,'UTF8')) THEN
++            RAISE EXCEPTION 'forged agent output digest' USING ERRCODE='23514';
++        END IF;
++        NEW.output_digest:=sha256(convert_to(NEW.output::text,'UTF8'));
++    ELSIF NEW.output_digest IS DISTINCT FROM OLD.output_digest THEN
++        RAISE EXCEPTION 'agent output digest is immutable' USING ERRCODE='23514';
++    END IF;
+     IF OLD.state IN ('completed','cancelled')
+-        OR (to_jsonb(NEW)-ARRAY['state','checkpoint_id','output','access_level','activated_at','finished_at','frozen_preparation']::text[])
++        OR (to_jsonb(NEW)-ARRAY['state','checkpoint_id','output','access_level','activated_at','finished_at','frozen_preparation','preparation_digest','output_digest']::text[])
+             IS DISTINCT FROM
+-           (to_jsonb(OLD)-ARRAY['state','checkpoint_id','output','access_level','activated_at','finished_at','frozen_preparation']::text[])
++           (to_jsonb(OLD)-ARRAY['state','checkpoint_id','output','access_level','activated_at','finished_at','frozen_preparation','preparation_digest','output_digest']::text[])
+         OR (OLD.checkpoint_id IS NOT NULL AND NEW.checkpoint_id IS DISTINCT FROM OLD.checkpoint_id)
+         OR (OLD.activated_at IS NOT NULL AND NEW.activated_at IS DISTINCT FROM OLD.activated_at)
+         OR NOT public.agent_history_transition_allowed(OLD,NEW)
+@@ -14170,7 +14339,8 @@
+         END IF;
+         SELECT * INTO related FROM public.agent_history_exchanges
+             WHERE company_id=NEW.company_id AND id=proof::uuid;
+-        IF NOT FOUND AND NOT EXISTS (SELECT 1 FROM public.companies WHERE id=NEW.company_id) THEN
++        IF NOT FOUND AND NOT EXISTS(SELECT 1 FROM public.task_harness_runs WHERE company_id=NEW.company_id AND id=NEW.id)
++            AND NOT EXISTS(SELECT 1 FROM public.workflow_runs WHERE company_id=NEW.company_id AND id=NEW.workflow_run_id) THEN
+             RETURN NULL;
+         END IF;
+         IF NOT FOUND OR related.checkpoint_id IS DISTINCT FROM NEW.id THEN
+@@ -14179,7 +14349,8 @@
+     ELSE
+         SELECT * INTO related FROM public.agent_history_exchanges WHERE company_id=NEW.company_id AND id=NEW.id;
+         IF NOT FOUND THEN
+-            IF EXISTS (SELECT 1 FROM public.companies WHERE id=NEW.company_id) THEN
++            IF EXISTS(SELECT 1 FROM public.companies WHERE id=NEW.company_id) AND
++                (NEW.payload_retained OR EXISTS(SELECT 1 FROM public.workflow_runs WHERE company_id=NEW.company_id AND id=NEW.run_id)) THEN
+                 RAISE EXCEPTION 'agent exchange disappeared during its write' USING ERRCODE='23514';
+             END IF;
+             RETURN NULL;
+@@ -14286,7 +14457,11 @@
+ DECLARE owner public.agent_history_exchanges;
+ BEGIN
+     IF TG_OP='INSERT' THEN
+-        IF NEW.last_exchange_order<>0 OR NEW.active_exchange_id IS NOT NULL THEN
++        IF NOT public.agent_history_conversation_available(NEW.company_id)
++            OR NOT public.agent_history_storage_available(NEW.company_id,NEW.id) THEN
++            RAISE EXCEPTION 'agent conversation storage is full' USING ERRCODE='23514', CONSTRAINT='agent_history_capacity';
++        END IF;
++        IF NEW.last_exchange_order<>0 OR NEW.active_exchange_id IS NOT NULL OR NEW.expired_count<>0 OR NEW.expired_through_order<>0 THEN
+             RAISE EXCEPTION 'new conversation has no order or owner' USING ERRCODE='23514';
+         END IF;
+         IF NEW.scope_kind='child_branch' AND NOT EXISTS(SELECT 1 FROM public.workflow_runs
+@@ -14296,9 +14471,16 @@
+         END IF;
+         RETURN NEW;
+     END IF;
+-    IF (to_jsonb(NEW)-ARRAY['last_exchange_order','active_exchange_id']) IS DISTINCT FROM
+-       (to_jsonb(OLD)-ARRAY['last_exchange_order','active_exchange_id']) THEN
++    IF (to_jsonb(NEW)-ARRAY['last_exchange_order','active_exchange_id','expired_count','expired_through_order']) IS DISTINCT FROM
++       (to_jsonb(OLD)-ARRAY['last_exchange_order','active_exchange_id','expired_count','expired_through_order']) THEN
+         RAISE EXCEPTION 'agent conversation identity is immutable' USING ERRCODE='23514';
++    END IF;
++    IF NEW.expired_count<OLD.expired_count OR NEW.expired_through_order<OLD.expired_through_order
++        OR NEW.expired_count<>NEW.last_exchange_order-(SELECT count(*) FROM public.agent_history_exchanges
++            WHERE company_id=NEW.company_id AND conversation_id=NEW.id AND payload_retained)
++        OR NEW.expired_through_order<>COALESCE((SELECT min(position)-1 FROM public.agent_history_exchanges
++            WHERE company_id=NEW.company_id AND conversation_id=NEW.id AND payload_retained),NEW.last_exchange_order) THEN
++        RAISE EXCEPTION 'agent expiry boundary must match retained records' USING ERRCODE='23514';
+     END IF;
+     IF NEW.last_exchange_order IS DISTINCT FROM OLD.last_exchange_order THEN
+         IF NEW.active_exchange_id IS DISTINCT FROM OLD.active_exchange_id

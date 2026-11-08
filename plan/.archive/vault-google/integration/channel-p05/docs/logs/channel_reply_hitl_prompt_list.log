@@ -1,0 +1,30 @@
+   Compiling open_bots v0.1.0 (/Users/mac02/.codex/worktrees/1133/openbot)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 18.97s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-048b7abd3ed0c794)
+adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::approval::channel_reply_hitl_prompt_approval_notice_stays_private_and_then_parks_the_original_question: test
+adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::channel_reply_hitl_prompt_cannot_be_an_agent_or_ad_hoc_tool: test
+adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::channel_reply_hitl_prompt_commits_wait_and_delivery_together: test
+adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::channel_reply_hitl_prompt_competing_publishers_create_one_occurrence: test
+adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::channel_reply_hitl_prompt_in_app_acceptance_keeps_the_human_wait_open: test
+adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::channel_reply_hitl_prompt_uuid_case_and_nanosecond_deadline_keep_the_same_witness: test
+adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::commit::channel_reply_hitl_prompt_deferred_commit_cannot_outlive_its_real_claim: test
+adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::commit::channel_reply_hitl_prompt_lost_commit_ack_replays_human_wait_before_transport_receipt: test
+adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::integrity::channel_reply_hitl_prompt_canonical_content_and_delivery_membership_are_frozen: test
+adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::integrity::channel_reply_hitl_prompt_failed_atomic_write_leaves_no_prompt_or_wait: test
+adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::integrity::channel_reply_hitl_prompt_ownership_cannot_be_edited_or_removed: test
+adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::integrity::channel_reply_hitl_prompt_true_company_teardown_removes_its_owned_question_and_unknown_delivery: test
+adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::lifecycle::channel_reply_hitl_prompt_provider_entry_rechecks_deadline_after_competing_parent_lock: test
+adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::lifecycle::channel_reply_hitl_prompt_safe_retry_keeps_message_wait_deadline_and_continuation_budget: test
+adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::lifecycle::channel_reply_hitl_prompt_unknown_send_stays_unknown_after_a_human_response: test
+adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::release::channel_reply_hitl_prompt_release_authorized_entry_retains_accepted_truth_after_demotion: test
+adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::release::channel_reply_hitl_prompt_release_clearance_revoked_before_entry: test
+adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::release::channel_reply_hitl_prompt_release_committed_demotion_wins_while_entry_is_blocked: test
+adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::release::channel_reply_hitl_prompt_release_retired_frozen_address_is_refused: test
+adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::release::channel_reply_hitl_prompt_release_safe_retry_rechecks_without_changing_the_human_wait: test
+adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::release::channel_reply_hitl_prompt_release_thread_audience_change_is_refused: test
+adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::release::channel_reply_hitl_prompt_release_verification_revoked_before_entry: test
+application::workflow::registry::channel_question_tests::channel_reply_hitl_prompt_declares_a_human_result_separate_from_its_receipt: test
+application::workflow::registry::channel_question_tests::channel_reply_hitl_prompt_private_reply_event_cannot_be_declared_generically: test
+application::workflow::registry::channel_question_tests::channel_reply_hitl_prompt_schema_is_literal_and_exact: test
+
+25 tests, 0 benchmarks

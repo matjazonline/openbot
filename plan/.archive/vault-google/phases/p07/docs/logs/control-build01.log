@@ -1,0 +1,111 @@
+    Checking open_bots v0.1.0 (/Users/mac02/.codex/worktrees/1133/openbot)
+error[E0061]: this function takes 1 argument but 0 arguments were supplied
+  --> src/adapters/persistence/integrations/connect_tests/control_wire.rs:8:19
+   |
+ 8 |         identity: DispatchId::new(),
+   |                   ^^^^^^^^^^^^^^^-- argument #1 of type `uuid::Uuid` is missing
+   |
+note: associated function defined here
+  --> src/domain/integrations/ids.rs:68:20
+   |
+68 |             pub fn new(value: Uuid) -> Self {
+   |                    ^^^ -----------
+...
+80 | uuid_id!(DispatchId);
+   | -------------------- in this macro invocation
+   = note: this error originates in the macro `uuid_id` (in Nightly builds, run with -Z macro-backtrace for more info)
+help: provide the argument
+   |
+ 8 |         identity: DispatchId::new(/* uuid::Uuid */),
+   |                                   ++++++++++++++++
+
+error[E0599]: the function or associated item `new` exists for struct `domain::integrations::ids::CancellationId`, but its trait bounds were not satisfied
+  --> src/adapters/persistence/integrations/connect_tests/control_wire.rs:11:39
+   |
+11 |         cancellation: CancellationId::new(),
+   |                                       ^^^ function or associated item cannot be called on `domain::integrations::ids::CancellationId` due to unsatisfied trait bounds
+   |
+  ::: src/domain/integrations/ids.rs:9:9
+   |
+ 9 |         pub struct $name(String);
+   |         ------------------------- function or associated item `new` not found for this struct because `domain::integrations::ids::CancellationId` doesn't implement `FixedOutput`, `HashMarker`, `sha2::digest::Update` or `std::default::Default`
+   |
+note: if you're trying to build a new `domain::integrations::ids::CancellationId`, consider using `domain::integrations::ids::CancellationId::parse` which returns `std::result::Result<domain::integrations::ids::CancellationId, domain::integrations::IntegrationError>`
+  --> src/domain/integrations/ids.rs:11:13
+   |
+11 |             pub fn parse(value: impl Into<String>) -> IntegrationResult<Self> {
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+57 | text_id!(CancellationId, 128);
+   | ----------------------------- in this macro invocation
+   = note: the following trait bounds were not satisfied:
+           `domain::integrations::ids::CancellationId: FixedOutput`
+           which is required by `domain::integrations::ids::CancellationId: sha2::Digest`
+           `domain::integrations::ids::CancellationId: std::default::Default`
+           which is required by `domain::integrations::ids::CancellationId: sha2::Digest`
+           `domain::integrations::ids::CancellationId: sha2::digest::Update`
+           which is required by `domain::integrations::ids::CancellationId: sha2::Digest`
+           `domain::integrations::ids::CancellationId: HashMarker`
+           which is required by `domain::integrations::ids::CancellationId: sha2::Digest`
+           `&domain::integrations::ids::CancellationId: FixedOutput`
+           which is required by `&domain::integrations::ids::CancellationId: sha2::Digest`
+           `&domain::integrations::ids::CancellationId: std::default::Default`
+           which is required by `&domain::integrations::ids::CancellationId: sha2::Digest`
+           `&domain::integrations::ids::CancellationId: sha2::digest::Update`
+           which is required by `&domain::integrations::ids::CancellationId: sha2::Digest`
+           `&domain::integrations::ids::CancellationId: HashMarker`
+           which is required by `&domain::integrations::ids::CancellationId: sha2::Digest`
+           `&mut domain::integrations::ids::CancellationId: FixedOutput`
+           which is required by `&mut domain::integrations::ids::CancellationId: sha2::Digest`
+           `&mut domain::integrations::ids::CancellationId: std::default::Default`
+           which is required by `&mut domain::integrations::ids::CancellationId: sha2::Digest`
+           `&mut domain::integrations::ids::CancellationId: sha2::digest::Update`
+           which is required by `&mut domain::integrations::ids::CancellationId: sha2::Digest`
+           `&mut domain::integrations::ids::CancellationId: HashMarker`
+           which is required by `&mut domain::integrations::ids::CancellationId: sha2::Digest`
+note: the traits `FixedOutput`, `HashMarker`,  and `sha2::digest::Update` must be implemented
+  --> /Users/mac02/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/digest-0.10.7/src/lib.rs:77:1
+   |
+77 | pub trait Update {
+   | ^^^^^^^^^^^^^^^^
+...
+93 | pub trait FixedOutput: Update + OutputSizeUser + Sized {
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+  ::: /Users/mac02/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/digest-0.10.7/src/digest.rs:8:1
+   |
+ 8 | pub trait HashMarker {}
+   | ^^^^^^^^^^^^^^^^^^^^
+   = note: this error originates in the macro `text_id` (in Nightly builds, run with -Z macro-backtrace for more info)
+help: consider annotating `domain::integrations::ids::CancellationId` with `#[derive(Default)]`
+  --> src/domain/integrations/ids.rs:9:1
+   |
+ 9 +         #[derive(Default)]
+10 |         pub struct $name(String);
+   |
+
+error[E0599]: no function or associated item named `parse` found for struct `application::integrations::wire::text::AuthorizationUrlData` in the current scope
+   --> src/application/integrations/wire/control_transport.rs:130:58
+    |
+130 |                 authorization_url: AuthorizationUrlData::parse(
+    |                                                          ^^^^^ function or associated item not found in `application::integrations::wire::text::AuthorizationUrlData`
+    |
+   ::: src/application/integrations/wire/text.rs:6:1
+    |
+  6 | pub struct AuthorizationUrlData(String);
+    | ------------------------------- function or associated item `parse` not found for this struct
+    |
+    = help: items from traits can only be used if the trait is implemented and in scope
+    = note: the following traits define an item `parse`, perhaps you need to implement one of them:
+            candidate #1: `TxtRecordParser`
+            candidate #2: `fluent_uri::internal::Parse`
+            candidate #3: `lettre::message::header::Header`
+            candidate #4: `nom::internal::Parser`
+            candidate #5: `nom::internal::Parser`
+            candidate #6: `nom::sequence::Tuple`
+            candidate #7: `parsing::parsable::sealed::Sealed`
+            candidate #8: `uuid_simd::ext::UuidExt`
+
+Some errors have detailed explanations: E0061, E0599.
+For more information about an error, try `rustc --explain E0061`.
+error: could not compile `open_bots` (lib test) due to 3 previous errors

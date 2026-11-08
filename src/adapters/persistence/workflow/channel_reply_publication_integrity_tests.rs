@@ -120,6 +120,7 @@ async fn channel_reply_publication_release_rechecked_after_success_and_before_pr
             .unwrap();
         assert_eq!(f.advance().await.disposition, BatchDisposition::Completed);
         let live = claim(&f).await;
+        assert_canonical_reason_constraint(&f).await;
         let receipt = if boundary == "delivery" {
             let ReplyPublicationOutcome::Published(receipt) =
                 publisher(&f).publish_claim(live).await.unwrap()
@@ -148,6 +149,24 @@ async fn channel_reply_publication_release_rechecked_after_success_and_before_pr
             assert_eq!(
                 publisher(&f).publish_claim(live).await.unwrap(),
                 ReplyPublicationOutcome::Refused(ReplyPublicationFailure::ReleaseDenied)
+            );
+            assert!(matches!(
+                f.p.load_reply_publication(live).await.unwrap(),
+                ReplyPublicationLoad::Failed(ReplyPublicationFailure::ReleaseDenied)
+            ));
+            let reason:String=sqlx::query_scalar("SELECT diagnostic_code FROM channel_reply_decisions WHERE company_id=$1 AND run_id=$2")
+                .bind(f.scope.company.as_uuid()).bind(f.scope.run.as_uuid()).fetch_one(f.p.pool()).await.unwrap();
+            assert_eq!(reason, "knowledge.audience_below_content");
+            assert_eq!(
+                serde_json::to_value(ReplyPublicationFailure::ReleaseDenied).unwrap(),
+                json!(reason)
+            );
+            assert_eq!(
+                serde_json::from_value::<ReplyPublicationFailure>(json!(reason)).unwrap(),
+                ReplyPublicationFailure::ReleaseDenied
+            );
+            assert!(
+                serde_json::from_value::<ReplyPublicationFailure>(json!("release_denied")).is_err()
             );
         }
         assert_eq!(f.state().await["run"], "succeeded");
@@ -312,4 +331,35 @@ async fn channel_reply_publication_approved_reviewer_must_retain_payload_clearan
     );
     assert_eq!(outbound_count(&f).await, before);
     assert_eq!(f.state().await["run"], "succeeded");
+}
+
+async fn assert_canonical_reason_constraint(f: &FinalFixture) {
+    for reason in [
+        "release_denied",
+        "knowledge.invalid",
+        "knowledge.audience_below_content",
+    ] {
+        let mut tx = f.p.pool().begin().await.unwrap();
+        let result = sqlx::query(
+            "UPDATE channel_reply_decisions SET state='failed',diagnostic_code=$3,
+            worker_id=NULL,generation=NULL,lease_expires_at=NULL WHERE company_id=$1 AND run_id=$2",
+        )
+        .bind(f.scope.company.as_uuid())
+        .bind(f.scope.run.as_uuid())
+        .bind(reason)
+        .execute(&mut *tx)
+        .await;
+        if reason == "knowledge.audience_below_content" {
+            assert_eq!(result.unwrap().rows_affected(), 1);
+        } else {
+            let error = result.unwrap_err();
+            let database = error.as_database_error().unwrap();
+            assert_eq!(database.code().as_deref(), Some("23514"));
+            assert_eq!(
+                database.constraint(),
+                Some("channel_reply_decisions_diagnostic_code_check")
+            );
+        }
+        tx.rollback().await.unwrap();
+    }
 }

@@ -1,0 +1,28 @@
+{
+  "checker_sha256": "20a19430ab71af3dd586baf6bcd0588d5ceb757f6cc7be2c0a116c38444fb85a",
+  "original_fixture_byte_identical": true,
+  "fixture_sha256": "696709164a82696bbdc872164d56610a150f00f6cdc6a6a130c6c8b6c5a72161",
+  "compilation_evidence_reused": "reviewer-boundary-alias-compile.json (same exact bytes; root correction-alias-compile-R2.json also inspected)",
+  "cases": {
+    "original_compiling_mutation": {
+      "violations": [
+        "Leaked: serializable runtime proof or credential-bearing type",
+        "Reply: credential/runtime proof reachable from gateway result"
+      ],
+      "sources": {
+        "src/application/integrations/mod.rs": "use secrecy::{SecretString as PrivateSecret, ExposeSecret};\npub struct Leaked { value: PrivateSecret }\nimpl serde::Serialize for Leaked {\n fn serialize<S: serde::Serializer>(&self, serializer: S)->Result<S::Ok,S::Error> {\n  serializer.serialize_str(self.value.expose_secret())\n }\n}\npub enum Reply { Leak(Leaked) }\n"
+      }
+    },
+    "external_helper_credential_and_trait_reexports": {
+      "violations": [
+        "Leaked: serializable runtime proof or credential-bearing type",
+        "Reply: credential/runtime proof reachable from gateway result"
+      ],
+      "sources": {
+        "src/lib.rs": "mod application; mod aliases;",
+        "src/aliases.rs": "pub use secrecy::SecretString as Hidden; pub use serde::Serialize as Encode;",
+        "src/application/integrations/mod.rs": "use crate::aliases::{Hidden as Payload, Encode as WireEncode};\nuse secrecy::ExposeSecret;\npub struct Leaked { value: Payload }\nimpl WireEncode for Leaked {\n fn serialize<S: serde::Serializer>(&self, serializer:S)->Result<S::Ok,S::Error> { serializer.serialize_str(self.value.expose_secret()) }\n}\npub enum Reply { Leak(Leaked) }\n"
+      }
+    }
+  }
+}

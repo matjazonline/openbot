@@ -1,0 +1,17 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+   Compiling open_bots v0.1.0 (/private/tmp/openbot-agent-history-h_82_5pw/worktree)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1m 20s
+     Running unittests src/lib.rs (/private/tmp/openbot-chs-p06-3f43t2k7/worktree/target/debug/deps/open_bots-8b80d02f0b6cf2e6)
+
+running 8 tests
+test application::workflow::agent_history::tests::agent_history_identity_activation_is_stable_across_attempts_and_distinct_for_repeats ... ok
+test adapters::persistence::workflow::tests::admission_tests::agent_history_sessions::agent_history_identity_competing_admissions_allocate_one_private_session ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::history_identity::agent_history_identity_current_agent_revocation_refuses_existing_conversation ... ok
+test adapters::persistence::workflow::tests::admission_tests::agent_history_sessions::agent_history_identity_private_fresh_reuse_and_replay_are_admission_owned ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::history_identity::agent_history_identity_competing_fenced_resolvers_converge_and_stale_fence_refuses ... ok
+test adapters::persistence::workflow::tests::admission_tests::agent_history_sessions::agent_history_identity_native_mapping_and_creator_are_immutable ... ok
+test adapters::persistence::workflow::tests::admission_tests::agent_history_sessions::agent_history_identity_manual_starter_owns_session_and_ceiling_not_binding_actor ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::history_identity::agent_history_identity_model_only_steps_allocate_no_conversation ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 3247 filtered out; finished in 3.67s
+

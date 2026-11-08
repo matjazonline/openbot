@@ -1,0 +1,12 @@
+✔ vault dark: native picker progress, escaped private metadata and recoverable consent (2281.240125ms)
+✔ vault light: native picker progress, escaped private metadata and recoverable consent (1944.281958ms)
+✔ sample progress, failed request recovery and late navigation response use the requesting form (2134.305709ms)
+✔ actual sample textarea template preserves leading newlines for every raw JSON field (1629.584125ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 4408.037708

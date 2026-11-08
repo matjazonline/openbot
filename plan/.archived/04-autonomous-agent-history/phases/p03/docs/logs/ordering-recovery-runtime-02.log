@@ -1,0 +1,31 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+   Compiling open_bots v0.1.0 (/private/tmp/openbot-agent-history-h_82_5pw/worktree)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 54.86s
+     Running unittests src/lib.rs (/private/tmp/openbot-chs-p06-3f43t2k7/worktree/target/debug/deps/open_bots-8b80d02f0b6cf2e6)
+
+running 3 tests
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::agent_history_ordering_competing_preparations_park_without_checkpoint_or_retry_and_resume_once ... FAILED
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::agent_history_ordering_cancelled_queued_turn_never_releases_owner_or_blocks_next_position ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::agent_history_recovery_final_commit_releases_before_workflow_finish_and_poll_recovers_lost_wake ... FAILED
+
+failures:
+
+---- adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::agent_history_ordering_competing_preparations_park_without_checkpoint_or_retry_and_resume_once stdout ----
+
+thread 'adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::agent_history_ordering_competing_preparations_park_without_checkpoint_or_retry_and_resume_once' (35687545) panicked at src/adapters/persistence/workflow/agent_history_ordering_tests.rs:121:6:
+called `Result::unwrap()` on an `Err` value: ColumnDecode { index: "1", source: "mismatched types; Rust type `i32` (as SQL type `INT4`) is not compatible with SQL type `INT2`" }
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::agent_history_recovery_final_commit_releases_before_workflow_finish_and_poll_recovers_lost_wake stdout ----
+
+thread 'adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::agent_history_recovery_final_commit_releases_before_workflow_finish_and_poll_recovers_lost_wake' (35687546) panicked at src/adapters/persistence/workflow/agent_history_ordering_tests.rs:228:130:
+called `Result::unwrap()` on an `Err` value: WorkflowFailure { failure: StepFailure { knowledge_refusal: None, class: Retryable, code: FailureCode("agent.unresolved"), diagnostic: None }, safety: SafeToRetry }
+
+
+failures:
+    adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::agent_history_ordering_competing_preparations_park_without_checkpoint_or_retry_and_resume_once
+    adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::agent_history_recovery_final_commit_releases_before_workflow_finish_and_poll_recovers_lost_wake
+
+test result: FAILED. 1 passed; 2 failed; 0 ignored; 0 measured; 3297 filtered out; finished in 1.80s
+
+error: test failed, to rerun pass `--lib`

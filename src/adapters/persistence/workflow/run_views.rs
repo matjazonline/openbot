@@ -478,6 +478,10 @@ impl RunViews for PostgresPersistence {
             draft_revision: revision_of(facts.draft_revision)?,
             channel_name: facts.channel_name,
             trigger_message: self.trigger_message(company, run).await?,
+            response: super::channel_reply_views::read(self, company, viewer, &[run.as_uuid()])
+                .await?
+                .into_iter()
+                .next(),
             input: facts.input,
             params: facts.params,
             lineage,
@@ -585,6 +589,22 @@ impl RunViews for PostgresPersistence {
         Ok(Some(view))
     }
 
+    async fn agent_history_page(
+        &self,
+        scope: RunReadScope,
+        execution: Uuid,
+        request: crate::application::workflow::agent_history_views::HistoryPageRequest,
+    ) -> AppResult<Option<crate::application::workflow::agent_history_views::HistoryPage>> {
+        super::agent_history_views::page(self, scope, execution, request).await
+    }
+    async fn agent_history_exchange(
+        &self,
+        scope: RunReadScope,
+        execution: Uuid,
+        exchange: crate::application::workflow::agent_history::AgentExchangeId,
+    ) -> AppResult<Option<crate::application::workflow::agent_history_views::HistoryDetail>> {
+        super::agent_history_views::detail(self, scope, execution, exchange).await
+    }
     async fn workflow_titles(
         &self,
         company: CompanyId,

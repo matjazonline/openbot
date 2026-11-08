@@ -1,0 +1,11 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.18s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-048b7abd3ed0c794)
+
+running 3 tests
+test adapters::workflow_http::tests::integration_gateway_shared_http_injects_fixed_api_key_and_redacts_its_echo ... ok
+test adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::gateway::integration_gateway_gmail_path_policy_rejects_before_refresh_or_business_entry ... ok
+test adapters::persistence::workflow::tests::http_tests::vault_tests::execution::integration_gateway_real_host_static_bearer_and_api_key_share_native_receipts ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 3573 filtered out; finished in 2.34s
+

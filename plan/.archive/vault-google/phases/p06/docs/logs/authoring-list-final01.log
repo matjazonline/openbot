@@ -1,0 +1,12 @@
+   Compiling open_bots v0.1.0 (/Users/mac02/.codex/worktrees/1133/openbot)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1m 01s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-048b7abd3ed0c794)
+adapters::http::routes::connection_levels::tests::authoring_tests::vault_authoring_http_setup_rejects_credentials_and_unrecognized_fields: test
+adapters::http::routes::connection_levels::tests::authoring_tests::vault_authoring_http_setup_scopes_connection_and_registration_and_checks_revision: test
+adapters::http::routes::ui_vault_bindings::tests::authoring::vault_authoring_foreign_company_cannot_inspect_a_connection_source: test
+adapters::http::routes::ui_vault_bindings::tests::authoring::vault_authoring_picker_is_owner_scoped_and_only_exposes_approved_metadata: test
+adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::gateway::vault_authoring_expired_google_publication_and_sealed_sample_never_refresh: test
+application::workflow::sample::tests::gmail_tests::vault_authoring_gmail_examples_compile_and_execute_only_scripted_effects: test
+application::workflow::sample::tests::gmail_tests::vault_authoring_reviewed_mime_is_valid_base64url_and_keeps_reply_headers: test
+
+7 tests, 0 benchmarks

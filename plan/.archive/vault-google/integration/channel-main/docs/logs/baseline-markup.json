@@ -1,0 +1,30 @@
+{
+  "baseline_head": "4ab45555f8316ec7a8b1b64e8c05b77ff7d9a29d",
+  "method": "Exact existing source-guard and helper bodies compiled as a standalone std-only Rust test against HTTP source exported directly from canonical main. No Cargo target sharing, database, test assertion or project-source change.",
+  "body_lines": {
+    "guard": "4613-4669",
+    "helper": "4672-4681"
+  },
+  "body_sha256": "d00d6eb07c751ceeb7b7acb075a083fd766fb35e91f14e0f4a32f063c4a19f82",
+  "scanner_file_sha256": "5097616eeec41a175d61092ff35d673f8daf9d7fb44c51c628000e8348b22f14",
+  "fixture_file_sha256": "854af4c6a2c45a38b1c0b2691ba1ca74b8543e10c97da8f2ac634ae9ea8aad7e",
+  "root_files_identical_to_main": true,
+  "compile_command": [
+    "rustc",
+    "--edition=2024",
+    "--test",
+    "/private/tmp/vault-main-pull-rtehstpa/baseline_markup_guard.rs",
+    "-o",
+    "/private/tmp/vault-main-pull-rtehstpa/baseline-markup-guard"
+  ],
+  "compile_exit": 0,
+  "command": [
+    "/private/tmp/vault-main-pull-rtehstpa/baseline-markup-guard",
+    "--exact",
+    "rendered_markup_carries_no_inline_javascript",
+    "--nocapture"
+  ],
+  "exit": 101,
+  "same_failure_reproduced": true,
+  "disposition": "Confirmed inherited main false positive on cfg(test) hostile sample fixture. Leave upstream source/guard unchanged; no green all-checks/full-suite claim."
+}

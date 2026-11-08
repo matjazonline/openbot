@@ -1,0 +1,11 @@
+{
+  "command": [
+    "bash",
+    "scripts/transport-boundary-check.sh"
+  ],
+  "cwd": "/Users/mac02/.codex/worktrees/1133/openbot",
+  "database": "vault_google_1133_41402e4b8104_test",
+  "exit": 0,
+  "seconds": 3.26,
+  "log": "/Users/mac02/.codex/worktrees/1133/openbot/plan/vault-google/integration/channel-p05/docs/logs/transport-boundary.log"
+}

@@ -181,6 +181,15 @@ impl WorkflowLeases for PostgresPersistence {
         if workflow_tool_calls::confirm_suspension(self, fence, wait.as_uuid()).await? {
             return Ok(true);
         }
+        if tokio::time::timeout(std::time::Duration::from_secs(1), async {
+            agent_history::turn_waits::parked_on(&mut *self.pool().acquire().await?, fence).await
+        })
+        .await
+        .map_err(|_| AppError::Timeout("Turn suspension confirmation timed out".into()))??
+            == Some(wait)
+        {
+            return Ok(true);
+        }
         tokio::time::timeout(
             std::time::Duration::from_secs(1),
             decisions::approvals::confirm(self, fence, wait),

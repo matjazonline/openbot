@@ -1,0 +1,18 @@
+{
+  "acceptance": "AH-P06-code-acceptance",
+  "at": "2026-11-08T01:34:06.322921+00:00",
+  "result": "accepted in phase; local primary integration pending final07; no history commit/push inferred",
+  "review": "AH-P06-B1-R2 corrected whole06A/B PASS",
+  "source_digest": "f36a749426ec84d0dc5755380bb05312c34677bb49d1101316b2c66094d3ad20",
+  "owned": 202,
+  "phase_delta": 65,
+  "correction_delta": 13,
+  "external": 36,
+  "archive_sha256": "254555371ef2b0c071b96dad670b2cc48c9f60c9d6390eba5cd970c0fbfd2a0b",
+  "decision_sha256": "a831e406269f6eaab045f0758be6065adc3c6008a0002454ab2e24ec84b7b2c6",
+  "coordination_revision": 29,
+  "notes": "root read full R2 note/review/finding dispositions/entry+exit/case/evidence audits; independently verified snapshot/allowned/external/archive/producer/decision/coord/evidence/current866; F1/F2 FIXED",
+  "verification": "866 current-discovered latestPASS/0ignored;188 directlyaffected current case successes186+2correction; genuine owner races/65call accepted-output retry/current fixed pressure thresholds; current source_modules8/migrations/SQLx/offline/Clippy/fmt/diff/Graft PASS; unchanged browser/protocol evidence reused explicitly",
+  "limits": "retained historical whole-run FAIL; no single-command866/fullsuite/liveprovider/deployed-cookie claim; phase07 process/fulljourney/CI/finalintegration remain",
+  "next": "publish accepted C007r4; start07 authorized; no permission needed"
+}

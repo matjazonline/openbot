@@ -1,0 +1,29 @@
+{
+  "command": [
+    "scripts/test-network-isolation.sh",
+    "cargo",
+    "test",
+    "--locked",
+    "--offline",
+    "--lib",
+    "--",
+    "agent_history_level_hidden_rows",
+    "agent_history_preparation_native_first",
+    "agent_history_preparation_mandatory_current_budget",
+    "--nocapture"
+  ],
+  "cwd": "/private/tmp/openbot-agent-history-h_82_5pw/worktree",
+  "environment": {
+    "DATABASE_URL": "postgres://mac02@127.0.0.1:65037/openbot_ah_p04",
+    "TEST_DATABASE_URL": "postgres://mac02@127.0.0.1:65037/openbot_ah_p04_test",
+    "SQLX_OFFLINE": "true",
+    "CARGO_INCREMENTAL": "1",
+    "CARGO_TARGET_DIR": "/private/tmp/openbot-chs-p06-3f43t2k7/worktree/target",
+    "CARGO_BUILD_JOBS": "4",
+    "RUST_MIN_STACK": "2097152"
+  },
+  "started": "2026-11-07T18:48:58.254572+00:00",
+  "seconds": 10.83,
+  "exit_code": 101,
+  "log": "/private/tmp/openbot-agent-history-h_82_5pw/worktree/plan/04-autonomous-agent-history/phases/p04/docs/logs/selection-plan-bounds-runtime-01.log"
+}

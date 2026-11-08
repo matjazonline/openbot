@@ -1,0 +1,20 @@
+{
+  "command": [
+    "env",
+    "RUST_MIN_STACK=2097152",
+    "RUST_TEST_THREADS=4",
+    "bash",
+    "scripts/test-network-isolation.sh",
+    "cargo",
+    "test",
+    "--locked",
+    "--offline",
+    "--lib",
+    "channel_reply_e2e_"
+  ],
+  "cwd": "/Users/mac02/.codex/worktrees/1133/openbot",
+  "database": "vault_pull_main_1133_43797f74ae21",
+  "exit": 0,
+  "seconds": 20.41,
+  "log": "/Users/mac02/.codex/worktrees/1133/openbot/plan/vault-google/integration/channel-main/docs/logs/channel-e2e-01.log"
+}

@@ -45,6 +45,8 @@ pub struct ThreadRuns {
     pub items: Vec<ThreadRunActivity>,
     pub has_more: bool,
     pub message_runs: Vec<MessageRuns>,
+    pub response_outcomes: Vec<crate::application::workflow::channel_reply::ChannelResponseOutcome>,
+    pub responses_truncated: bool,
 }
 
 pub const THREAD_RUN_LIMIT: usize = 50;

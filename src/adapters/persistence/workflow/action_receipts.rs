@@ -6,6 +6,12 @@ use serde_json::Value;
 use std::time::Duration;
 use tokio::time::Instant;
 
+pub(super) enum RemoteMarkerState {
+    New,
+    Replay(Uuid),
+    Refused,
+}
+
 impl<A: SqlActionAuthority, L: SqlLocalAction> PostgresActionDispatch<A, L> {
     pub(super) async fn receipt_on(
         &self,
@@ -58,14 +64,13 @@ impl<A: SqlActionAuthority, L: SqlLocalAction> PostgresActionDispatch<A, L> {
         prepare_provider(action, contract, Duration::from_micros(micros))
     }
 
-    pub(super) async fn marker_on(
+    pub(super) async fn marker_state_on(
         &self,
         tx: &mut Transaction<'_, Postgres>,
         request: &ActionDispatchRequest,
         action: &FrozenAction,
-        policy: Value,
         provider: &ProviderInvocation,
-    ) -> AppResult<Option<Uuid>> {
+    ) -> AppResult<RemoteMarkerState> {
         let previous: Option<(Uuid, i32, bool)> = sqlx::query_as(
             "SELECT id,attempt_number,(current_policy->'approval_required'='false'::jsonb AND ((current_policy->'provider_replay'=$3 AND \
              COALESCE(workflow_action_replay_supported(company_id,invocation_id),false)) OR \
@@ -83,10 +88,30 @@ impl<A: SqlActionAuthority, L: SqlLocalAction> PostgresActionDispatch<A, L> {
         .fetch_optional(&mut **tx)
         .await?;
         if let Some((marker, attempt, safe)) = previous {
-            return Ok((attempt < request.fence.attempt.0 && safe).then_some(marker));
+            return Ok(if attempt < request.fence.attempt.0 && safe {
+                RemoteMarkerState::Replay(marker)
+            } else {
+                RemoteMarkerState::Refused
+            });
         }
         if Self::existing(tx, request).await? {
-            return Ok(None);
+            return Ok(RemoteMarkerState::Refused);
+        }
+        Ok(RemoteMarkerState::New)
+    }
+
+    pub(super) async fn marker_on(
+        &self,
+        tx: &mut Transaction<'_, Postgres>,
+        request: &ActionDispatchRequest,
+        action: &FrozenAction,
+        policy: Value,
+        provider: &ProviderInvocation,
+    ) -> AppResult<Option<Uuid>> {
+        match self.marker_state_on(tx, request, action, provider).await? {
+            RemoteMarkerState::Replay(marker) => return Ok(Some(marker)),
+            RemoteMarkerState::Refused => return Ok(None),
+            RemoteMarkerState::New => {}
         }
         let marker = Uuid::new_v4();
         Self::insert_subject(

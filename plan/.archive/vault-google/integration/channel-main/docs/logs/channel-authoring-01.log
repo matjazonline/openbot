@@ -1,0 +1,26 @@
+✖ response form supports keyboard navigation and submit and shows request progress without dropping form fields (9.660042ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 244.056708
+
+✖ failing tests:
+
+test at scripts/tests/channel-response-authoring.mjs:16:1
+✖ response form supports keyboard navigation and submit and shows request progress without dropping form fields (9.660042ms)
+  browserType.launch: Executable doesn't exist at /Users/mac02/Library/Caches/ms-playwright/chromium_headless_shell-1193/chrome-mac/headless_shell
+  ╔═════════════════════════════════════════════════════════════════════════╗
+  ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+  ║ Please run the following command to download new browsers:              ║
+  ║                                                                         ║
+  ║     npx playwright install                                              ║
+  ║                                                                         ║
+  ║ <3 Playwright Team                                                      ║
+  ╚═════════════════════════════════════════════════════════════════════════╝
+      at TestContext.<anonymous> (/Users/mac02/.codex/worktrees/1133/openbot/scripts/tests/channel-response-authoring.mjs:33:34) {
+    name: 'Error'
+  }

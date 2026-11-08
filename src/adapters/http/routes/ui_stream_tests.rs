@@ -221,6 +221,8 @@ impl ThreadActivityReader for ScriptedActivity {
             items,
             has_more: false,
             message_runs: vec![],
+            response_outcomes: vec![],
+            responses_truncated: false,
         })
     }
 

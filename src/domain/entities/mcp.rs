@@ -68,12 +68,14 @@ impl From<McpToolName> for String {
 pub enum McpAuth {
     None,
     Bearer,
+    Integration(crate::domain::integrations::authority::IntegrationReference),
 }
 impl McpAuth {
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::None => "none",
             Self::Bearer => "bearer",
+            Self::Integration(_) => "integration",
         }
     }
 }

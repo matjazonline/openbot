@@ -1,0 +1,12 @@
+{
+  "owned_base_dropped": "vault_google_1133_41402e4b8104_test",
+  "owned_full_child_absent": "vault_google_1133_41402e4b8104_test_check_29590",
+  "owned_baseline_database_absent": "vault_vf2_1133_f3da63908e68",
+  "baseline_worktree_removed": true,
+  "shared_postgres": "left running; never owned by this phase",
+  "foreign_worktrees_databases_workers": "untouched",
+  "backup_stash_preserved": "c6cf2a088ef25fe678a8458e5db190eb6bffd73f",
+  "cargo_target": "preserved own cache; only open_bots package was cleaned before fresh correction checks",
+  "source_and_review_evidence": "preserved uncommitted",
+  "remaining_owned_workers": "none; full, baseline and correction processes completed"
+}

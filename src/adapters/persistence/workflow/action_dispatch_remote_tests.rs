@@ -282,6 +282,9 @@ async fn persisted_windows(pool: &PgPool, entry: &RemoteEntry) -> Windows {
 fn describe(result: &AppResult<RemoteDispatchObservation>) -> String {
     match result {
         Ok(RemoteDispatchObservation::Interrupted) => "Interrupted".into(),
+        Ok(RemoteDispatchObservation::PreparationFailed(reason)) => {
+            format!("PreparationFailed({reason:?})")
+        }
         Ok(RemoteDispatchObservation::Committed(_)) => "Committed".into(),
         Ok(RemoteDispatchObservation::ApprovalParked(_)) => "ApprovalParked".into(),
         Ok(RemoteDispatchObservation::ApprovalRequired) => "ApprovalRequired".into(),

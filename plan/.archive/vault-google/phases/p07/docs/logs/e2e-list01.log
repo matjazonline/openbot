@@ -1,0 +1,25 @@
+   Compiling open_bots v0.1.0 (/Users/mac02/.codex/worktrees/1133/openbot)
+error[E0599]: no method named `read_usable` found for struct `persistence::integrations::PostgresVault` in the current scope
+   --> src/adapters/persistence/workflow/vault_tests/native_portability.rs:305:19
+    |
+305 |     assert!(vault.read_usable(&foreign, account.id).await.is_err());
+    |                   ^^^^^^^^^^^ method not found in `persistence::integrations::PostgresVault`
+    |
+   ::: src/application/integrations/private.rs:21:14
+    |
+ 21 |     async fn read_usable(
+    |              ----------- the method is available for `persistence::integrations::PostgresVault` here
+    |
+   ::: src/adapters/persistence/integrations/mod.rs:23:1
+    |
+ 23 | pub(crate) struct PostgresVault {
+    | ------------------------------- method `read_usable` not found for this struct
+    |
+    = help: items from traits can only be used if the trait is in scope
+help: trait `CredentialStore` which provides `read_usable` is implemented but not in scope; perhaps you want to import it
+    |
+  1 + use crate::application::integrations::private::CredentialStore;
+    |
+
+For more information about this error, try `rustc --explain E0599`.
+error: could not compile `open_bots` (lib test) due to 1 previous error

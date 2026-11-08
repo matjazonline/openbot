@@ -6,6 +6,7 @@ use crate::application::workflow::activation::*;
 pub(super) enum PendingFailure {
     InvalidInput,
     InvalidOutput,
+    KnowledgeRefused,
     ActivationLimit,
     AttemptsExhausted,
     RootBudgetExhausted,
@@ -19,6 +20,7 @@ impl PendingFailure {
         match self {
             Self::InvalidInput => "workflow.invalid_input",
             Self::InvalidOutput => "workflow.invalid_output",
+            Self::KnowledgeRefused => crate::domain::workflow::KNOWLEDGE_AUDIENCE_BELOW_CONTENT,
             Self::ActivationLimit => "workflow.activation_limit",
             Self::AttemptsExhausted => "workflow.attempts_exhausted",
             Self::RootBudgetExhausted => "workflow.root_budget_exhausted",
@@ -70,10 +72,14 @@ pub(super) async fn settle(
     scope: ActivationRequest,
     failure: PendingFailure,
 ) -> AppResult<()> {
-    let failure = token_budget::refusal_on(db, scope)
-        .await?
-        .map(PendingFailure::TokenRefused)
-        .unwrap_or(failure);
+    let failure = if matches!(failure, PendingFailure::KnowledgeRefused) {
+        failure
+    } else {
+        token_budget::refusal_on(db, scope)
+            .await?
+            .map(PendingFailure::TokenRefused)
+            .unwrap_or(failure)
+    };
     // Pre-activation failures cannot fabricate frozen inputs. Already activated
     // failures can take their immutable error edge through the one progression writer.
     let action_safe: Option<bool> = sqlx::query_scalar("SELECT workflow_action_retry_safe($1,$2)")

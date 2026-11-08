@@ -1,0 +1,17 @@
+{
+  "branch": "main",
+  "HEAD": "97e5d60dc538e26c7cb976a8d63772eed80baff2",
+  "digest_matches": false,
+  "source_mismatches": [
+    "scripts/check-workflow-evidence.py",
+    "scripts/tests/workflow-evidence.py"
+  ],
+  "coordination_matches": true,
+  "pin_hash_matches": true,
+  "decision_hash_matches": true,
+  "changed_external_hashes": {
+    "scripts/check-workflow-evidence.py": "3309f8594f61e34955b86d968e0f27d017149ea6b51d8b7865bfd4311290375d",
+    "scripts/tests/workflow-evidence.py": "9009f2fa720ac53e88130e3211bed517c58bb13d48483501f21d01355eef66f9"
+  },
+  "exit_snapshot": "CHS-P06-AG1-R1-reviewer-exit-snapshot.txt"
+}

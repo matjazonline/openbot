@@ -156,10 +156,13 @@ impl Fixture {
             self.company,
             self.actor(),
             binding,
-            None,
-            input,
-            Uuid::new_v4().to_string(),
-            None,
+            super::super::super::bindings::StartDetails {
+                association: None,
+                input,
+                key: Uuid::new_v4().to_string(),
+                rerun_of: None,
+                history_session: None,
+            },
         )
         .await
         .unwrap()

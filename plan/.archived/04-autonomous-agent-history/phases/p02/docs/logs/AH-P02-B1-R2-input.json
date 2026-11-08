@@ -1,0 +1,186 @@
+{
+  "review": "AH-P02-B1-R2",
+  "stage": "correction recheck of complete F1/F2 batch",
+  "at": "2026-11-07T14:30:23.714305+00:00",
+  "worktree": "/private/tmp/openbot-agent-history-h_82_5pw/worktree",
+  "branch": "codex/autonomous-agent-history-h_82_5pw",
+  "phase_start": "4ab45555f8316ec7a8b1b64e8c05b77ff7d9a29d",
+  "review_base": "4ab45555f8316ec7a8b1b64e8c05b77ff7d9a29d",
+  "head": "4ab45555f8316ec7a8b1b64e8c05b77ff7d9a29d",
+  "source_digest": "c24664b28aed5506158d3a2e709ae3c5ec1228567e03fdff06bd15c146a08147",
+  "snapshot": "/private/tmp/openbot-agent-history-h_82_5pw/worktree/plan/04-autonomous-agent-history/phases/p02/docs/logs/AH-P02-B1-R2-snapshot.txt",
+  "exclusions": [
+    "plan/04-autonomous-agent-history/COORDINATION.md",
+    "plan/04-autonomous-agent-history/phases/p01/docs",
+    "plan/04-autonomous-agent-history/phases/p02/docs",
+    "plan/04-autonomous-agent-history/phases/p03/docs",
+    "plan/04-autonomous-agent-history/phases/p04/docs",
+    "plan/04-autonomous-agent-history/phases/p05/docs",
+    "plan/04-autonomous-agent-history/phases/p06/docs",
+    "plan/04-autonomous-agent-history/phases/p07/docs",
+    "plan/04-autonomous-agent-history/integration/final/docs"
+  ],
+  "skill": "/private/tmp/openbot-chs-p06-3f43t2k7/workflow-skill-implement-astra-reviewed-2-2",
+  "snapshot_path_adapter": "/private/tmp/openbot-agent-history-h_82_5pw/worktree/plan/04-autonomous-agent-history/phases/p02/docs/logs/tools",
+  "coordination_authority": "/Users/mac02/dev/openbot/plan/04-autonomous-agent-history/COORDINATION.md",
+  "coordination_revision": 5,
+  "coordination_sha256": "9db6424e92cafe480527235c55bb244ad6dd3c4278318fce52dd06cfde0209b4",
+  "coordination_pin": "/private/tmp/openbot-agent-history-h_82_5pw/worktree/plan/04-autonomous-agent-history/phases/p02/docs/logs/coordination-r5.md",
+  "notices": [
+    "AH-I001/r1",
+    "AH-I002/r1",
+    "AH-I003/r1",
+    "AH-I004/r1",
+    "AH-I005/r1",
+    "AH-I006/r1",
+    "AH-C001/r1",
+    "AH-C002/r4",
+    "AH-C003/r1"
+  ],
+  "producer_source": "e62ebc6c7dac3ec2e34ca3ddce727df87b3d70f780154eb5b581b710a394aa91",
+  "producer_archive": "/private/tmp/openbot-agent-history-h_82_5pw/worktree/plan/04-autonomous-agent-history/phases/p01/docs/logs/AH-P01-B1-R1-owned-source.tar.gz",
+  "producer_archive_sha256": "4ba0fd3c1cf929754c4ac463bd9699bb8bd5fea7d33bb15e8fe21640b2b75822",
+  "producer_scope": "/private/tmp/openbot-agent-history-h_82_5pw/worktree/plan/04-autonomous-agent-history/phases/p01/docs/logs/author-scope-lifecycle-02.json",
+  "author_scope": "/private/tmp/openbot-agent-history-h_82_5pw/worktree/plan/04-autonomous-agent-history/phases/p02/docs/logs/author-scope-findings-02.json",
+  "author_scope_sha256": "91ebefc39aa35523f81830cdd35d7efa6a7f6a9718be0ca4811203de20d4133b",
+  "owned_count": 82,
+  "phase02_delta_count": 35,
+  "phase02_delta": "/private/tmp/openbot-agent-history-h_82_5pw/worktree/plan/04-autonomous-agent-history/phases/p02/docs/logs/AH-P02-B1-R2.diff",
+  "phase02_delta_sha256": "d23154b8bfc67e5e76542db4133cf12d1d6145d8da81ca8f31f1fa53774b5884",
+  "source_archive": "/private/tmp/openbot-agent-history-h_82_5pw/worktree/plan/04-autonomous-agent-history/phases/p02/docs/logs/AH-P02-B1-R2-owned-source.tar.gz",
+  "source_archive_sha256": "bfea3a87c7f347549e52ace9857fd1b4084a8780765430c0adab8de42e931c53",
+  "external_paths": {
+    ".agents/skills/implement-2.2-system-improvement/SKILL.md": "84884fda33b4f0584ff0da0b84b2b7f8ad8fe12c5aa73cfa39caca4856103bfc",
+    ".agents/skills/implement-astra-reviewed-2-2/SKILL.md": null,
+    ".agents/skills/implement-astra-reviewed-2-2/agents/openai.yaml": null,
+    ".agents/skills/implement-astra-reviewed-2-2/references/benchmarking.md": null,
+    ".agents/skills/implement-astra-reviewed-2-2/references/concurrent-phases.md": null,
+    ".agents/skills/implement-astra-reviewed-2-2/references/context.md": null,
+    ".agents/skills/implement-astra-reviewed-2-2/references/findings.md": null,
+    ".agents/skills/implement-astra-reviewed-2-2/references/review-notes.md": null,
+    ".agents/skills/implement-astra-reviewed-2-2/references/reviewer-assignment.md": null,
+    ".agents/skills/implement-astra-reviewed-2-2/scripts/snapshot.sh": null,
+    ".agents/skills/implement-astra-reviewed-2.2/SKILL.md": null,
+    ".agents/skills/implement-astra-reviewed-2.2/agents/openai.yaml": null,
+    ".agents/skills/implement-astra-reviewed-2.2/references/benchmarking.md": null,
+    ".agents/skills/implement-astra-reviewed-2.2/references/concurrent-phases.md": null,
+    ".agents/skills/implement-astra-reviewed-2.2/references/context.md": null,
+    ".agents/skills/implement-astra-reviewed-2.2/references/findings.md": null,
+    ".agents/skills/implement-astra-reviewed-2.2/references/review-notes.md": null,
+    ".agents/skills/implement-astra-reviewed-2.2/references/reviewer-assignment.md": null,
+    ".agents/skills/implement-astra-reviewed-2.2/scripts/snapshot.sh": null,
+    ".agents/skills/implement-plan-phases/SKILL.md": "d512058379648eb3f333d1afe7ac8e29bff77dc1e17219713f68f04caf00bb84",
+    ".claude/skills/implement-opus-2_2-system-improvement/SKILL.md": "a682b5a8cffaee738c9859fdbb4f18b8f0aba9571d4c7fe58862ec10e110fb53",
+    ".claude/skills/implement-opus-reviewed-2_2/SKILL.md": null,
+    ".claude/skills/implement-opus-reviewed-2_2/references/benchmarking.md": null,
+    ".claude/skills/implement-opus-reviewed-2_2/references/concurrent-phases.md": null,
+    ".claude/skills/implement-opus-reviewed-2_2/references/context.md": null,
+    ".claude/skills/implement-opus-reviewed-2_2/references/findings.md": null,
+    ".claude/skills/implement-opus-reviewed-2_2/references/review-notes.md": null,
+    ".claude/skills/implement-opus-reviewed-2_2/references/reviewer-assignment.md": null,
+    ".claude/skills/implement-opus-reviewed-2_2/scripts/snapshot.sh": null,
+    ".github/workflows/ci.yml": "5f8195927fa4ca1de6f5a38593009e2aa4a5ad78d45287e4158a44cac4395de5",
+    "Cargo.lock": "25dabaf49c1397a65e9f1cf2620d32a39b30bc731becccef9feee09f2dcb8ba5",
+    "Cargo.toml": "5481a604271f5e87240611fafbff9c5007b765d20d8def40789e27ce53797a30",
+    "scripts/check-workflow-evidence.py": "3309f8594f61e34955b86d968e0f27d017149ea6b51d8b7865bfd4311290375d",
+    "scripts/check.sh": "dfbf651b59bb2565247a69e2d75108f655ddb18699f542965ab21e2cb1409e02",
+    "scripts/tests/workflow-evidence.py": "9009f2fa720ac53e88130e3211bed517c58bb13d48483501f21d01355eef66f9",
+    "tests/source_modules.rs": "ace9b7a36c5a93992941fd09dac217be773ac8021b21fb3d7dedc5b185679379"
+  },
+  "architecture_decision": "AH-P02-D1/r2",
+  "architecture_decision_sha256": "4070ba26945e3e675d84f103a9fe3d3b3cc77c6a90514afe5b5254e2bdef819b",
+  "architecture_acceptance": "/private/tmp/openbot-agent-history-h_82_5pw/worktree/plan/04-autonomous-agent-history/phases/p02/docs/logs/AH-P02-architecture-acceptance.json",
+  "targeted_evidence": "/private/tmp/openbot-agent-history-h_82_5pw/worktree/plan/04-autonomous-agent-history/phases/p02/docs/logs/AH-P02-targeted-runtime-evidence-r2.json",
+  "checks": {
+    "migrations-main-findings-02": {
+      "receipt": "/private/tmp/openbot-agent-history-h_82_5pw/worktree/plan/04-autonomous-agent-history/phases/p02/docs/logs/migrations-main-findings-02.json",
+      "sha256": "454a6c27b7bc830232a4a4f598b8a3f610b4f1978f9a422e279533be653a139d",
+      "log": "/private/tmp/openbot-agent-history-h_82_5pw/worktree/plan/04-autonomous-agent-history/phases/p02/docs/logs/migrations-main-findings-02.log",
+      "log_sha256": "2996c65658c967eaa3abfa06e846d571770e5491834d1abe6ed62602389897e1"
+    },
+    "migrations-test-findings-02": {
+      "receipt": "/private/tmp/openbot-agent-history-h_82_5pw/worktree/plan/04-autonomous-agent-history/phases/p02/docs/logs/migrations-test-findings-02.json",
+      "sha256": "eb76444895450831cccf037a1d9505aaadf889936634e3a7b50f5f9feba43432",
+      "log": "/private/tmp/openbot-agent-history-h_82_5pw/worktree/plan/04-autonomous-agent-history/phases/p02/docs/logs/migrations-test-findings-02.log",
+      "log_sha256": "21d0bcc99488c536a3c948377a4014e0e5bb8cc1177d6aa32e576af30749d306"
+    },
+    "findings-affected-runtime-04": {
+      "receipt": "/private/tmp/openbot-agent-history-h_82_5pw/worktree/plan/04-autonomous-agent-history/phases/p02/docs/logs/findings-affected-runtime-04.json",
+      "sha256": "e0971c7e3feeb952a7829c84725140e6ab33188413ba2b5d7e19db62ac9e164c",
+      "log": "/private/tmp/openbot-agent-history-h_82_5pw/worktree/plan/04-autonomous-agent-history/phases/p02/docs/logs/findings-affected-runtime-04.log",
+      "log_sha256": "4810aed19dca6c5f49e1b07d279164deeec3b03f6d5bb1fba004cdba793031c9"
+    },
+    "findings-history-runtime-03": {
+      "receipt": "/private/tmp/openbot-agent-history-h_82_5pw/worktree/plan/04-autonomous-agent-history/phases/p02/docs/logs/findings-history-runtime-03.json",
+      "sha256": "ca5a7f9aaafcfd8ffa573ac351f94238cb911e7e5bff5bbc076527abe43a9802",
+      "log": "/private/tmp/openbot-agent-history-h_82_5pw/worktree/plan/04-autonomous-agent-history/phases/p02/docs/logs/findings-history-runtime-03.log",
+      "log_sha256": "a5f448cefcd3dc5c4f7b2b5b40f7f6f0b0f69f0eac71707f2ff507ea7713f73a"
+    },
+    "sqlx-prepare-findings-02": {
+      "receipt": "/private/tmp/openbot-agent-history-h_82_5pw/worktree/plan/04-autonomous-agent-history/phases/p02/docs/logs/sqlx-prepare-findings-02.json",
+      "sha256": "43d1e9d92641ccd0b7a0fd899a50b591964d97d77f5c4a7de75c50e343ce628b",
+      "log": "/private/tmp/openbot-agent-history-h_82_5pw/worktree/plan/04-autonomous-agent-history/phases/p02/docs/logs/sqlx-prepare-findings-02.log",
+      "log_sha256": "9c09af32e86ddcf7a6c5b1383a35fd81e141302139f458e6d1e2aef1abcc8162"
+    },
+    "sqlx-check-findings-02": {
+      "receipt": "/private/tmp/openbot-agent-history-h_82_5pw/worktree/plan/04-autonomous-agent-history/phases/p02/docs/logs/sqlx-check-findings-02.json",
+      "sha256": "3920220a2f9eede44e8d8d7a8be872624cf212e5e5306a1a2cb1430c455cc74c",
+      "log": "/private/tmp/openbot-agent-history-h_82_5pw/worktree/plan/04-autonomous-agent-history/phases/p02/docs/logs/sqlx-check-findings-02.log",
+      "log_sha256": "42ea067167e658da81c50c72d1caa0c469f327e9d07b1f0371a8e38a23e3f7b3"
+    },
+    "offline-all-targets-findings-02": {
+      "receipt": "/private/tmp/openbot-agent-history-h_82_5pw/worktree/plan/04-autonomous-agent-history/phases/p02/docs/logs/offline-all-targets-findings-02.json",
+      "sha256": "040038c19589cc265161177df2a449a737fec505ec619cb49a42389d329afff8",
+      "log": "/private/tmp/openbot-agent-history-h_82_5pw/worktree/plan/04-autonomous-agent-history/phases/p02/docs/logs/offline-all-targets-findings-02.log",
+      "log_sha256": "2bc683fb4e4f4f21ee9ee39e2b8ecce2efe20d3b1be57bda5316aa519ab3d30a"
+    },
+    "clippy-findings-02": {
+      "receipt": "/private/tmp/openbot-agent-history-h_82_5pw/worktree/plan/04-autonomous-agent-history/phases/p02/docs/logs/clippy-findings-02.json",
+      "sha256": "42725fe26327f8ffede2ef386e7c08ce17326a9cc113fc9427cb47ba73c29b5f",
+      "log": "/private/tmp/openbot-agent-history-h_82_5pw/worktree/plan/04-autonomous-agent-history/phases/p02/docs/logs/clippy-findings-02.log",
+      "log_sha256": "4c94f48c3019d91c78b710cc92c2e7778dcc0497d66c7e3047c6a5e50f5f64cd"
+    },
+    "fmt-findings-02": {
+      "receipt": "/private/tmp/openbot-agent-history-h_82_5pw/worktree/plan/04-autonomous-agent-history/phases/p02/docs/logs/fmt-findings-02.json",
+      "sha256": "54968e85b4376fdc0f04b301dd9ecf8a28f3ae09e390dddd5e75acbeda71b056",
+      "log": "/private/tmp/openbot-agent-history-h_82_5pw/worktree/plan/04-autonomous-agent-history/phases/p02/docs/logs/fmt-findings-02.log",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "diff-findings-02": {
+      "receipt": "/private/tmp/openbot-agent-history-h_82_5pw/worktree/plan/04-autonomous-agent-history/phases/p02/docs/logs/diff-findings-02.json",
+      "sha256": "3e101c255da4670fcf5f4edec06c58154af4d53c0bd5959592ac47489c483a15",
+      "log": "/private/tmp/openbot-agent-history-h_82_5pw/worktree/plan/04-autonomous-agent-history/phases/p02/docs/logs/diff-findings-02.log",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "graft-findings-02": {
+      "receipt": "/private/tmp/openbot-agent-history-h_82_5pw/worktree/plan/04-autonomous-agent-history/phases/p02/docs/logs/graft-findings-02.json",
+      "sha256": "09a3b92e6cad435ed6c537b17637dfa04dcc3dd0489f9573d9200e2e0c60c2df",
+      "log": "/private/tmp/openbot-agent-history-h_82_5pw/worktree/plan/04-autonomous-agent-history/phases/p02/docs/logs/graft-findings-02.log",
+      "log_sha256": "dcb67adc51ff7cb513cb20819a5e6929b05ee589ad1866c918d255b58314c392"
+    }
+  },
+  "verification_scope": "Targeted only. Actual current 58 history cases include genuine deletion/retry contention and real applied/aborted COMMIT ambiguity; affected cohort and prior unchanged retention evidence pinned separately. No full suite or live provider claim. Final acknowledgement test uses a counted scripted loopback provider.",
+  "recheck_of": "/private/tmp/openbot-agent-history-h_82_5pw/worktree/plan/04-autonomous-agent-history/phases/p02/docs/logs/AH-P02-B1-R1-input.json",
+  "prior_source_digest": "0c6df19310118c599e38cebf51b47cd4cfcb4e3a37b65c1be901da2a14308a8c",
+  "prior_source_archive": "/private/tmp/openbot-agent-history-h_82_5pw/worktree/plan/04-autonomous-agent-history/phases/p02/docs/logs/AH-P02-B1-R1-owned-source.tar.gz",
+  "prior_source_archive_sha256": "77a024f060139459a07e59087eba539bb96c773dee76031c90e12add776c167b",
+  "finding_ids": [
+    "AH-P02-B1-F1",
+    "AH-P02-B1-F2"
+  ],
+  "correction_paths": [
+    "migrations/20260817000000_init_schema.sql",
+    "src/adapters/persistence/workflow/agent_history/checkpoint.rs",
+    "src/adapters/persistence/workflow/agent_history/mod.rs",
+    "src/adapters/persistence/workflow/agent_history_commit_ack_tests.rs",
+    "src/adapters/persistence/workflow/agent_history_completion_tests.rs",
+    "src/adapters/persistence/workflow/agent_history_lifecycle_tests.rs",
+    "src/adapters/persistence/workflow/agent_history_reopen_ambiguity_tests.rs",
+    "src/adapters/persistence/workflow/agent_history_retry_deletion_tests.rs",
+    "src/adapters/persistence/workflow/agent_history_storage_tests.rs",
+    "src/adapters/persistence/workflow/checkpoints.rs"
+  ],
+  "correction_diff": "/private/tmp/openbot-agent-history-h_82_5pw/worktree/plan/04-autonomous-agent-history/phases/p02/docs/logs/AH-P02-B1-R1-to-R2.diff",
+  "correction_diff_sha256": "c2fd38fb770b45f2157960faff0f3dfdf2b8023dd50681fdb66d17be3782dab6",
+  "correction_record": "/private/tmp/openbot-agent-history-h_82_5pw/worktree/plan/04-autonomous-agent-history/phases/p02/docs/logs/AH-P02-B1-corrections.md"
+}

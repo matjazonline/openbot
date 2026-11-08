@@ -1,0 +1,12 @@
+{
+  "artifact": "a8326ab3d24c3f3283ceb91015b8590c4a978c898b8a42ce8c9ea440102882ba",
+  "source_copy_delta": [
+    "src/adapters/persistence/workflow/vault_tests/authority.rs"
+  ],
+  "delta": "only appended reviewer-lease-regression.rs; all other src files byte-identical",
+  "command": "env DATABASE_URL=postgresql://localhost/vault_google_1133_41402e4b8104_test TEST_DATABASE_URL=postgresql://localhost/vault_google_1133_41402e4b8104_test SQLX_OFFLINE=true CARGO_BUILD_JOBS=4 CARGO_TARGET_DIR=/Users/mac02/.codex/worktrees/1133/openbot/target RUST_MIN_STACK=2097152 bash scripts/test-network-isolation.sh cargo test --locked --offline --lib reviewer_final_gate_denies_lease_expired_during_module_lock_wait",
+  "cwd": "/Users/mac02/.codex/worktrees/1133/openbot/plan/vault-google/phases/p03/docs/logs/reviewer-lease-repro",
+  "exit": 101,
+  "observed": "one executed test failed: final_dispatch_guard returned Ok(()) after actual lease expiration during module owner lock wait",
+  "project_source_edited": false
+}

@@ -1,0 +1,6 @@
+{
+  "initial_case_audit": "FAIL due redundant zero-match vault_lifecycle_ selector, not runtime failure",
+  "corrected_selector": "vault_storage_host_company_membership_and_user_deletion_preserve_other_accounts",
+  "native_lifecycle_coverage": "All5 lifecycle module cases already selected/executed by vault_storage_",
+  "selected_names_changed": false
+}

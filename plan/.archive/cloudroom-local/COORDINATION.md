@@ -1,13 +1,13 @@
 # Plan coordination: cloudroom-local
 
-- Authority: `/Users/mac03/dev/openbot/plan/cloudroom-local/COORDINATION.md`
-- Writer: `/root`, main worktree `/Users/mac03/dev/openbot`
-- Revision: 37
+- Authority: `/tmp/openbot-cloudroom-publication/plan/.archive/cloudroom-local/COORDINATION.md`
+- Writer: `/root`, publication worktree `/tmp/openbot-cloudroom-publication`
+- Revision: 38
 - Workflow record, not an additional implementation plan.
 
 ## Plan-wide instructions
 
-- CL-I001/r1: Execute groups p01–p07 in dependency order from the original numbered plan files. Accept each group before dependent implementation. No commits, deployment, production resets, or provider inference outside disposable authorized projects.
+- CL-I001/r2: Execute groups p01–p07 in dependency order from the original numbered plan files. Accept each group before dependent implementation. The user authorized commit/push and archival after completion on 2026-11-08. Deployment, production resets and provider inference outside disposable authorized projects remain outside scope.
 - CL-I002/r1: Preserve pre-existing deletions in `.agents/skills/implement-astra-reviewed-2-2/`. All work is serialized in this checkout; no concurrent source writers.
 - CL-I003/r1: Follow repository reset policy; no backward compatibility. Source inspection and fixtures never establish real-provider/platform acceptance.
 - CL-I004/r1: Focused checks per group; repository full verification once at final integration. Record unavailable proof without claiming completion.
@@ -236,3 +236,12 @@ Root acknowledges unchanged active notices including C008/r1. B1/R1 source02c3�
 - Current immutable final-v2 evidence validates65PASS/0FAIL/2NOTEXERCISED. Full regular3319, full stock2MiB3314, finalMacnative3providers, Node90+4guards, migrations/offline/Clippy/SQLx, lease/browser/static/package gates passed. LinuxARM64 production image and memory/integrity/offline/non-root checks passed, including B independent recheck. Native Linux provider acceptance remains explicitly user-waived/unverified perI005/r1.
 - Historical evidence loss remains explicit: original R1 installation stdout overwritten/unrecoverable, no reconstruction or aggregate historical-validationPASS. Fresh uniquely named current installation proof passes. Earlier incompletely diagnosed native failures remain retained and are not declared unrelated; current final matrix passes. Detailed dispositions in p07 REVIEW/notes/findings/TASK.
 - All phases are integrated in the current working tree; no commit, merge, deployment or production reset performed. Preserve pre-existing skill deletions and unmerged work. Root performs only owned disposable verification-resource cleanup after acceptance.
+
+
+## Publication integration at revision38
+
+- All original phases remain accepted at their retained identities. User now authorizes push and moving the plan to `.archive`; current path is `plan/.archive/cloudroom-local`. Historical command/snapshot bytes remain unchanged.
+- Root integrates origin/main `b8c46300` (11 commits after the implementation base) in isolated `/tmp/openbot-cloudroom-publication`, branch `cloudroom-publication`. Root remains the only source writer; B remains independent. Publication records live in `publication/` and do not rewrite phase histories.
+- Root acknowledges active I001/r2,I002–005/r1,C001/r2,C002/r2,C003/r1,C004/r1,C005/r1,C006/r2,C007/r3,C008/r1. No shared wire/ownership/authority contract change. Native Linux provider acceptance remains NOT EXERCISED; current merged image/core and all affected tests require fresh verification.
+- Four invalid historical manifests retain exact bytes under explicit invalid-evidence names, indexed with original path, SHA and error in `publication/historical-invalid-evidence.json`. Current final-v2 remains unchanged; valid tracked manifests pass the newer origin CI retention contract.
+- Final merged-tree verification and affected independent review remain pending; do not push until accepted.

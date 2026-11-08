@@ -4,8 +4,14 @@ use crate::application::workflow::{fixtures::Fixture, publication::*, registry};
 use crate::domain::workflow::{CompanyId, TypeName, VersionId};
 use serde_json::json;
 
+#[path = "channel_reply_preview_tests.rs"]
+mod channel_reply_preview_tests;
 #[path = "channel_reply_terminal_tests.rs"]
 mod channel_reply_terminal_tests;
+#[path = "gmail_tests.rs"]
+mod gmail_tests;
+#[path = "history_tests.rs"]
+mod history_tests;
 #[path = "tools_tests.rs"]
 mod tools_tests;
 fn company() -> CompanyId {
@@ -149,6 +155,8 @@ fn script(workflow: u128, step: &str, outputs: Vec<Value>) -> StepScript {
 }
 fn request(scripts: Vec<StepScript>) -> SampleRequest {
     SampleRequest {
+        response_contract: None,
+        response_approval_policy: None,
         agents: vec![],
         input: json!({}),
         params: json!({}),
@@ -369,6 +377,8 @@ fn descendants_cannot_replenish_root_budgets_and_report_size_is_bounded() {
     let report = execute(
         build(&raw, DependencySnapshots::default(), vec![]),
         SampleRequest {
+            response_contract: None,
+            response_approval_policy: None,
             input: json!({"value":"x".repeat(8192)}),
             ..request(vec![])
         },

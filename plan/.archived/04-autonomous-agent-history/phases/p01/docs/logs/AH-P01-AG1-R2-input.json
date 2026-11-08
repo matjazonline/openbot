@@ -1,0 +1,38 @@
+{
+  "id": "AH-P01-AG1-R2",
+  "phase": "p01",
+  "stage": "architecture gate only, no source implementation yet",
+  "head": "4ab45555f8316ec7a8b1b64e8c05b77ff7d9a29d",
+  "phase_start_commit": "4ab45555f8316ec7a8b1b64e8c05b77ff7d9a29d",
+  "review_base": "4ab45555f8316ec7a8b1b64e8c05b77ff7d9a29d",
+  "worktree": "/private/tmp/openbot-agent-history-h_82_5pw/worktree",
+  "branch": "codex/autonomous-agent-history-h_82_5pw",
+  "digest": "1110c5fc00a39784aab21d8f94b47d1ec5e7cdc458f72ecfabb371c1b0f9d268",
+  "exclusions": [
+    "plan/04-autonomous-agent-history/COORDINATION.md",
+    "plan/04-autonomous-agent-history/phases/p01/docs",
+    "plan/04-autonomous-agent-history/phases/p02/docs",
+    "plan/04-autonomous-agent-history/phases/p03/docs",
+    "plan/04-autonomous-agent-history/phases/p04/docs",
+    "plan/04-autonomous-agent-history/phases/p05/docs",
+    "plan/04-autonomous-agent-history/phases/p06/docs",
+    "plan/04-autonomous-agent-history/phases/p07/docs",
+    "plan/04-autonomous-agent-history/integration/final/docs"
+  ],
+  "decision": "AH-P01-D1/r2",
+  "decision_path": "/private/tmp/openbot-agent-history-h_82_5pw/worktree/plan/04-autonomous-agent-history/phases/p01/docs/logs/AH-P01-D1-r2.md",
+  "decision_sha256": "2a2001b0889b9d586a077ebd69ea5aa4728ccfdc62005ceef3c69add824fdc3a",
+  "coordination_authority": "/Users/mac02/dev/openbot/plan/04-autonomous-agent-history/COORDINATION.md",
+  "coordination_revision": 1,
+  "coordination_pin": "/private/tmp/openbot-agent-history-h_82_5pw/worktree/plan/04-autonomous-agent-history/phases/p01/docs/logs/coordination-r1.md",
+  "coordination_sha256": "90e974fdeb62a4ad9bb3c67a9e273fbfac084e1ade332603586a0b1d2b6fa58b",
+  "preserved_external_setup": "/private/tmp/openbot-agent-history-h_82_5pw/worktree/plan/04-autonomous-agent-history/phases/p01/docs/logs/setup.json",
+  "full_suite": false,
+  "source_frozen": true,
+  "checks_pending": [],
+  "recheck_findings": [
+    "AH-P01-AG1-F1"
+  ],
+  "prior_decision_sha256": "5f45027f1c475f0cf43620915e89efd1ad3aa1c992ecd09cf51e63833b532732",
+  "changed_decision_scope": "manual actual execution actor / per-producer preservation and differing actor regression only; source unchanged"
+}

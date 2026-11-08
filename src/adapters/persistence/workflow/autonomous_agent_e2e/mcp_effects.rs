@@ -53,6 +53,7 @@ async fn next_admission(f: &Fixture, previous: &AgentRun) -> AgentRun {
             .unwrap();
     let result = WorkflowService::new(p.clone(), p.clone(), p.clone(), p.clone(), Preflight)
         .admit(AdmitWorkflowRequest {
+            history_session: None,
             company_id: company,
             actor: f.target.actor,
             association: RelatedAssociation::Company,

@@ -1,0 +1,27 @@
+{
+  "command": [
+    "env",
+    "WORKFLOW_DECISION_BROWSER_FIXTURES=/private/tmp/openbot-chs-p06-3f43t2k7/worktree/plan/03-channel-handles-send/phases/p06/docs/logs/decision-browser",
+    "scripts/test-network-isolation.sh",
+    "cargo",
+    "test",
+    "--lib",
+    "--locked",
+    "--offline",
+    "decision_browser_markup_and_closed_draft_recovery"
+  ],
+  "cwd": "/private/tmp/openbot-chs-p06-3f43t2k7/worktree",
+  "environment": {
+    "DATABASE_URL": "postgres://mac02@127.0.0.1:65037/openbot_chs_p06",
+    "TEST_DATABASE_URL": "postgres://mac02@127.0.0.1:65037/openbot_chs_p06_test",
+    "SQLX_OFFLINE": "true",
+    "CARGO_INCREMENTAL": "1",
+    "CARGO_TARGET_DIR": "/private/tmp/openbot-chs-p06-3f43t2k7/worktree/target",
+    "CARGO_BUILD_JOBS": "4",
+    "RUST_MIN_STACK": "2097152"
+  },
+  "started": "2026-11-07T08:42:29.528962+00:00",
+  "seconds": 31.119,
+  "exit_code": 0,
+  "log": "/private/tmp/openbot-chs-p06-3f43t2k7/worktree/plan/03-channel-handles-send/phases/p06/docs/logs/decision-browser-fixtures-01.log"
+}

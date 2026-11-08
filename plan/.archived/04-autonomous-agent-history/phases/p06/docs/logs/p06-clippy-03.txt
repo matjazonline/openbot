@@ -1,0 +1,20 @@
+    Checking open_bots v0.1.0 (/private/tmp/openbot-agent-history-h_82_5pw/worktree)
+error: this expression creates a reference which is immediately dereferenced by the compiler
+  --> src/adapters/persistence/workflow/agent_history_views_authority_tests.rs:28:47
+   |
+28 |     let html = agent_history_detail(anchor(f, &claim), &restricted);
+   |                                               ^^^^^^ help: change this to: `claim`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#needless_borrow
+   = note: `-D clippy::needless-borrow` implied by `-D warnings`
+   = help: to override `-D warnings` add `#[allow(clippy::needless_borrow)]`
+
+error: this expression creates a reference which is immediately dereferenced by the compiler
+  --> src/adapters/persistence/workflow/agent_history_views_authority_tests.rs:88:24
+   |
+88 |                     id(&claim)
+   |                        ^^^^^^ help: change this to: `claim`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#needless_borrow
+
+error: could not compile `open_bots` (lib test) due to 2 previous errors

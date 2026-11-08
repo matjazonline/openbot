@@ -974,6 +974,7 @@ async fn schedule_occurrence_schema_keeps_scope_identity_and_run() {
     let manual = manual::start(
         &admission(s.p()),
         StartRun {
+            history_session: None,
             company_id: s.fixture.target.company,
             actor: s.fixture.target.actor,
             binding_id: WorkflowBindingId::new(s.binding),
@@ -1078,6 +1079,7 @@ async fn manual_start_returns_its_run_replays_its_key_and_links_a_rerun() {
     let s = Schedules::new().await;
     let service = admission(s.p());
     let start = |key: &str, input: Value, actor: Uuid, rerun_of: Option<RunId>| StartRun {
+        history_session: None,
         company_id: s.fixture.target.company,
         actor: WorkflowActor::authenticated(actor).unwrap(),
         binding_id: WorkflowBindingId::new(s.binding),

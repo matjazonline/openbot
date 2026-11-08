@@ -105,6 +105,7 @@ pub(super) async fn request_on(
         contract,
         arguments,
         context: ActionPolicyContext {
+            integration: None,
             origin: ToolCallOrigin::Agent(origin),
             actor: facts.actor.user_id(),
             capability_ceiling: selection

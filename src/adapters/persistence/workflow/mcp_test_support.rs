@@ -280,8 +280,8 @@ pub(super) fn connection_write(endpoint: &str) -> McpConnectionWrite {
     }
 }
 
-pub(super) struct McpSetup {
-    pub(super) fixture: Fixture,
+pub(in crate::adapters::persistence::workflow::tests) struct McpSetup {
+    pub(in crate::adapters::persistence::workflow::tests) fixture: Fixture,
     pub(super) server: McpServer,
     pub(super) connection: CompanyMcpConnection,
     pub(super) operation: Uuid,
@@ -303,7 +303,9 @@ impl McpSetup {
     pub(super) fn actor(&self) -> WorkflowActor {
         self.fixture.target.actor
     }
-    pub(super) async fn current(&self) -> CompanyMcpConnection {
+    pub(in crate::adapters::persistence::workflow::tests) async fn current(
+        &self,
+    ) -> CompanyMcpConnection {
         connection_on(
             &self.fixture.persistence,
             self.company().as_uuid(),
@@ -487,6 +489,7 @@ pub(super) async fn admitted(setup: &McpSetup, key: &str) -> ActivationRequest {
     let company = setup.company();
     let admission = WorkflowService::new(p.clone(), p.clone(), p.clone(), p.clone(), Preflight)
         .admit(AdmitWorkflowRequest {
+            history_session: None,
             company_id: company,
             actor: setup.actor(),
             association: RelatedAssociation::Company,
@@ -537,6 +540,22 @@ pub(super) async fn claimed(setup: &McpSetup) -> ClaimedWorkflow {
     let scope = admitted(setup, "mcp-run").await;
     claim(&setup.fixture.persistence, scope).await
 }
+pub(in crate::adapters::persistence::workflow::tests) async fn integration_claim(
+    setup: &McpSetup,
+) -> ClaimedWorkflow {
+    let scope = Box::pin(admitted(setup, "mcp-run")).await;
+    let p = &setup.fixture.persistence;
+    let claim = p
+        .claim_io(scope, WorkflowWorkerId(Uuid::new_v4()), lease())
+        .await
+        .unwrap();
+    if let Some(claim) = claim {
+        return claim;
+    }
+    let state:Value=sqlx::query_scalar("SELECT jsonb_build_object('run',run.state,'job',job.status,'failures',job.retry_count,'ordinal',job.attempt_ordinal,'error',COALESCE(to_jsonb(job)->'last_error',to_jsonb(job)->'error',to_jsonb(job)->'last_error_message'),'activated',execution.activated_at,'events',(SELECT jsonb_agg(event_kind) FROM workflow_run_events WHERE run_id=run.id)) FROM workflow_runs AS run JOIN workflow_executions AS execution ON execution.run_id=run.id JOIN background_tasks AS job ON job.workflow_execution_id=execution.id WHERE run.id=$1")
+        .bind(scope.run.as_uuid()).fetch_one(p.pool()).await.unwrap();
+    panic!("integration claim missing: {state}");
+}
 /// Makes a retried job due now (the test does not wait out the backoff) and claims it.
 pub(super) async fn reclaim(p: &PostgresPersistence, scope: ActivationRequest) -> ClaimedWorkflow {
     sqlx::query("UPDATE background_tasks SET run_at=clock_timestamp() WHERE id=$1")
@@ -583,3 +602,6 @@ pub(super) fn counts(dispatches: i64, entries: i64, receipts: i64) -> ActionCoun
         receipts,
     }
 }
+
+#[path = "mcp_renewal_support.rs"]
+pub(in crate::adapters::persistence::workflow) mod renewal;

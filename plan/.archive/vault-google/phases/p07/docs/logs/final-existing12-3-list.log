@@ -1,0 +1,9 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.21s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-048b7abd3ed0c794)
+adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::cache::google_connection_lifecycle_owner_controls_keep_consent_revision_after_cache_update: test
+adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::management::google_connection_lifecycle_delete_competes_with_refresh_without_restoring_old_authority: test
+adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::management::google_connection_lifecycle_disconnect_competes_with_refresh_and_provider_failure: test
+adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::reconnect::google_connection_lifecycle_reconnect_ignores_routine_cache_revision_but_stales_old_grants: test
+adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::reconnect::google_connection_lifecycle_stale_invalid_grant_after_crash_cannot_invalidate_new_consent: test
+
+5 tests, 0 benchmarks

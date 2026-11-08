@@ -128,6 +128,7 @@ fn sample_view(
     let now = chrono::Utc::now();
     RunView {
         payload_restricted: false,
+        response: None,
         dependencies: None,
         calls: Default::default(),
         detail: RunDetail {

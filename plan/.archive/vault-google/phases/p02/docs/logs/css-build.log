@@ -1,0 +1,5 @@
+
+> openbots@1.0.0 build:css
+> tailwindcss -i assets/app.css.in -o assets/app.css --minify
+
+sh: tailwindcss: command not found

@@ -24,6 +24,7 @@ pub mod database_query_health;
 pub mod delivery;
 pub mod inbound_event;
 pub mod integration;
+pub(crate) mod integrations;
 pub mod knowledge;
 pub mod local_agents;
 pub(crate) mod model_usage;
@@ -490,3 +491,10 @@ mod auth_key_rotation_tests;
 
 #[cfg(test)]
 mod jsonb_test_support;
+mod user_lifecycle;
+
+pub(crate) mod integration_bindings;
+
+pub(crate) mod integration_connect_authority;
+
+pub(crate) use mcp::discovery::PostgresMcpDiscovery;

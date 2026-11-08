@@ -71,9 +71,20 @@ pub fn detail(company: Uuid, connection: &CompanyMcpConnection, draft: &Definiti
     } else {
         String::new()
     };
+    let refresh = format!(
+        r#"<form data-submit="busy-once" data-pending-label="Refreshing tools…" method="post" action="/ui/companies/{company}/mcp-connections/{id}/refresh"><input type="hidden" name="expected_revision" value="{revision}">{button}</form>"#,
+        button = button("Test connection / Refresh tools"),
+    );
+    let source = if connection.endpoint.as_str().starts_with("https://") {
+        format!(
+            "<a class=\"link\" href=\"/ui/companies/{company}/connection-credentials/mcp/{id}\">Choose credential source</a>"
+        )
+    } else {
+        "<p>Vault credentials require an HTTPS endpoint.</p>".into()
+    };
     format!(
-        r#"<a class="link" href="/ui/companies/{company}/mcp-connections">All MCP servers</a><p>Endpoint changes clear the token and discovery.</p>{fields}{credentials}<form data-submit="busy-once" data-pending-label="Working…" method="post" action="/ui/companies/{company}/mcp-connections/{id}/refresh"><input type="hidden" name="expected_revision" value="{revision}">{refresh}</form><p>Refresh removes grants for missing or changed schemas. Review tools before granting them again.</p><form data-submit="busy-once" data-pending-label="Working…" method="post" action="/ui/companies/{company}/mcp-connections/{id}/delete"><input type="hidden" name="expected_revision" value="{revision}">{delete}</form>"#,
-        refresh = button("Test connection / Refresh tools"),
+        r#"<a class="link" href="/ui/companies/{company}/mcp-connections">All MCP servers</a><p>Endpoint identity is immutable; authentication changes require a fresh review.</p>{fields}{credentials}{source}{refresh}<p>Refresh removes grants for missing or changed schemas. Review tools before granting them again.</p><form data-submit="busy-once" data-pending-label="Working…" method="post" action="/ui/companies/{company}/mcp-connections/{id}/delete"><input type="hidden" name="expected_revision" value="{revision}">{delete}</form>"#,
+        refresh = refresh,
         delete = button("Delete server")
     )
 }
@@ -90,7 +101,19 @@ fn definition_form(
         format!("<label class=\"flex gap-2\"><input class=\"checkbox\" type=\"checkbox\" name=\"grants\" value=\"{}\"{checked}>{}</label><p>{}</p><details><summary>Input schema</summary><pre class=\"overflow-auto\">{}</pre></details>",esc(tool.name.as_str()),escape_html_text(tool.name.as_str()),escape_html_text(&tool.description),escape_html_text(&tool.input_schema.to_string()))
     }).collect::<String>()).unwrap_or_default();
     format!(
-        r#"<form data-submit="busy-once" data-pending-label="Working…" method="post" action="{action}" class="space-y-3"><input type="hidden" name="expected_revision" value="{revision}"><label class="block">Name<input class="input w-full" name="slug" required maxlength="100" value="{slug}"></label><label class="block">Endpoint URL<input class="input w-full" type="url" name="endpoint_url" required maxlength="2048" value="{endpoint}"></label><label class="block">Authentication<select class="select" name="auth_type"><option value="none">None</option><option value="bearer"{bearer}>Bearer token</option></select></label><label class="flex gap-2"><input class="checkbox" type="checkbox" name="enabled"{enabled}>Enabled</label><fieldset class="space-y-2"><legend>Granted tools</legend>{grants}</fieldset>{button}</form>"#,
+        r#"<form data-submit="busy-once" data-pending-label="Working…" method="post" action="{action}" class="space-y-3"><input type="hidden" name="expected_revision" value="{revision}"><label class="block">Name<input class="input w-full" name="slug" required maxlength="100" value="{slug}"></label><label class="block">Endpoint URL<input class="input w-full" type="url" name="endpoint_url" required maxlength="2048" value="{endpoint}"></label><label class="block">Authentication<select class="select" name="auth_type"><option value="none">None</option><option value="bearer"{bearer}>Bearer token</option>{integration}</select></label><label class="flex gap-2"><input class="checkbox" type="checkbox" name="enabled"{enabled}>Enabled</label><fieldset class="space-y-2"><legend>Granted tools</legend>{grants}</fieldset>{button}</form>"#,
+        integration = if connection.is_some_and(|c| matches!(c.auth, McpAuth::Integration(_))) {
+            format!(
+                "<option value=\"integration\"{}>Vault (owner approved)</option>",
+                if draft.auth_type == "integration" {
+                    " selected"
+                } else {
+                    ""
+                }
+            )
+        } else {
+            String::new()
+        },
         revision = draft.expected_revision,
         slug = esc(&draft.slug),
         endpoint = esc(&draft.endpoint_url),

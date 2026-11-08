@@ -1,0 +1,74 @@
+[
+  {
+    "name": "format",
+    "command": [
+      "cargo",
+      "fmt",
+      "--all",
+      "--",
+      "--check"
+    ],
+    "status": "PASS",
+    "exit": 0,
+    "seconds": 2.29,
+    "log": "logs/format.log"
+  },
+  {
+    "name": "whitespace",
+    "command": [
+      "git",
+      "diff",
+      "--check"
+    ],
+    "status": "PASS",
+    "exit": 0,
+    "seconds": 0.03,
+    "log": "logs/whitespace.log"
+  },
+  {
+    "name": "offline",
+    "command": [
+      "cargo",
+      "check",
+      "--locked",
+      "--offline",
+      "--all-targets"
+    ],
+    "status": "PASS",
+    "exit": 0,
+    "seconds": 0.7,
+    "log": "logs/offline.log"
+  },
+  {
+    "name": "clippy",
+    "command": [
+      "cargo",
+      "clippy",
+      "--locked",
+      "--offline",
+      "--all-targets",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "status": "PASS",
+    "exit": 0,
+    "seconds": 109.01,
+    "log": "logs/clippy.log"
+  },
+  {
+    "name": "sqlx",
+    "command": [
+      "cargo",
+      "sqlx",
+      "prepare",
+      "--check",
+      "--",
+      "--all-targets"
+    ],
+    "status": "PASS",
+    "exit": 0,
+    "seconds": 19.38,
+    "log": "logs/sqlx.log"
+  }
+]

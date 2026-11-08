@@ -1,0 +1,150 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+    Blocking waiting for file lock on artifact directory
+   Compiling open_bots v0.1.0 (/private/tmp/openbot-agent-history-h_82_5pw/worktree)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1m 05s
+     Running unittests src/lib.rs (/private/tmp/openbot-chs-p06-3f43t2k7/worktree/target/debug/deps/open_bots-8b80d02f0b6cf2e6)
+
+running 18 tests
+test application::services::test_support::scenario::inheritance::tests::inherited_listener_refuses_external_origin_before_connection_or_registration ... ok
+test application::services::test_support::scenario::inheritance::tests::inherited_listener_forged_proof_registers_no_agent_and_fails_the_actual_owner ... ok
+test application::services::test_support::scenario::inheritance::tests::inherited_listener_capability_is_one_use_and_rejects_a_second_registration ... ok
+test application::services::test_support::scenario::inheritance::tests::inherited_listener_rejects_a_reflecting_listener_without_disclosing_its_secret ... ok
+test application::services::test_support::scenario::lifecycle_tests::malformed_framing_fails_completion_without_capturing_authentication ... ok
+test application::services::test_support::scenario::lifecycle_tests::registration_is_scoped_and_missing_external_endpoints_fail_locally ... ok
+test application::services::test_support::scenario::lifecycle_tests::dropping_a_fixture_cancels_its_listener_and_removes_registration ... ok
+test application::services::test_support::scenario::tests::unused_and_mismatched_exchanges_fail_explicit_completion ... ok
+test application::services::test_support::scenario::tests::a_listener_remains_active_to_detect_extra_requests ... ok
+test application::services::test_support::scenario::lifecycle_tests::shutdown_cancels_a_blocked_response_and_awaits_its_connection ... ok
+test application::services::test_support::scenario::lifecycle_tests::declared_disconnect_and_retry_are_counted_without_a_fallback_response ... ok
+test application::services::test_support::scenario::inheritance::tests::inherited_listener_proof_does_not_consume_or_capture_a_model_exchange ... ok
+AH-P07 genuine_process_crash point=Enqueued cancelled_middle=true same_identity=true provider_calls=3
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::e2e::queue_crashes::agent_history_e2e_process_crash_after_durable_enqueue_and_cancelled_middle_turn_recovers_in_order ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::knowledge_e2e::agent_history_human_cc::agent_history_e2e_real_search_human_wait_and_customer_cc_refuse_resume_without_provider ... ok
+AH-P07 genuine_process_crash point=Acquisition durable_identity=true exact_context=true provider_calls=2
+AH-P07 genuine_process_crash point=BeforeWake polled=true successor_owned=true provider_calls=3
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::e2e::queue_crashes::agent_history_e2e_process_crash_before_successor_wakeup_recovers_by_poll_without_releasing_successor ... ok
+Capacity retained-history plan (256 terminal, 1 live):
+Limit  (cost=0.52..26.37 rows=1 width=16) (actual time=0.016..0.017 rows=1.00 loops=1)
+  Buffers: shared hit=10
+  ->  Nested Loop  (cost=0.52..26.37 rows=1 width=16) (actual time=0.016..0.016 rows=1.00 loops=1)
+        Join Filter: (execution.run_id = run.id)
+        Buffers: shared hit=10
+        ->  Nested Loop  (cost=0.25..18.07 rows=1 width=64) (actual time=0.013..0.014 rows=1.00 loops=1)
+              Join Filter: (job.company_id = run.company_id)
+              Buffers: shared hit=7
+              ->  Index Scan using workflow_runs_open_by_channel on workflow_runs run  (cost=0.12..9.91 rows=1 width=32) (actual time=0.006..0.006 rows=1.00 loops=1)
+                    Index Cond: (state = ANY ('{queued,running}'::text[]))
+                    Filter: (deadline > clock_timestamp())
+                    Index Searches: 1
+                    Buffers: shared hit=5
+              ->  Index Scan using background_tasks_processing_lease_idx on background_tasks job  (cost=0.12..8.14 rows=1 width=32) (actual time=0.006..0.006 rows=1.00 loops=1)
+                    Filter: (lock_expires_at > clock_timestamp())
+                    Index Searches: 1
+                    Buffers: shared hit=2
+        ->  Index Scan using workflow_executions_pkey on workflow_executions execution  (cost=0.27..8.29 rows=1 width=48) (actual time=0.002..0.002 rows=1.00 loops=1)
+              Index Cond: ((company_id = job.company_id) AND (id = job.workflow_execution_id))
+              Filter: (completed_at IS NULL)
+              Index Searches: 1
+              Buffers: shared hit=3
+Planning:
+  Buffers: shared hit=372
+Planning Time: 0.915 ms
+Execution Time: 0.026 ms
+Fair company discovery retained-history plan (256 terminal, 1 live, 1 pending):
+Limit  (cost=5765.49..5765.81 rows=1 width=17) (actual time=0.223..0.225 rows=1.00 loops=1)
+  Buffers: shared hit=557
+  ->  Group  (cost=5765.49..5765.81 rows=1 width=17) (actual time=0.223..0.225 rows=1.00 loops=1)
+        Group Key: eligible.company_id
+        Buffers: shared hit=557
+        ->  Sort  (cost=5765.49..5765.65 rows=65 width=16) (actual time=0.223..0.224 rows=1.00 loops=1)
+              Sort Key: eligible.company_id
+              Sort Method: quicksort  Memory: 25kB
+              Buffers: shared hit=557
+              ->  Subquery Scan on eligible  (cost=41.98..5763.53 rows=65 width=16) (actual time=0.220..0.221 rows=1.00 loops=1)
+                    Buffers: shared hit=557
+                    ->  Hash Join  (cost=41.98..5762.88 rows=65 width=96) (actual time=0.220..0.221 rows=1.00 loops=1)
+                          Hash Cond: ((execution.company_id = job.company_id) AND (execution.id = job.workflow_execution_id))
+                          Join Filter: (((execution.completed_at IS NULL) AND (((run.state = ANY ('{queued,running,waiting}'::text[])) AND (run.deadline <= clock_timestamp())) OR ((wait.id IS NULL) AND (run.state = ANY ('{queued,running}'::text[])) AND (run.deadline > clock_timestamp()) AND (((job.status = 'pending'::text) AND (job.run_at <= clock_timestamp())) OR ((job.status = 'processing'::text) AND (job.lock_expires_at <= clock_timestamp())))) OR ((wait.id IS NOT NULL) AND ((wait.deadline <= clock_timestamp()) OR (run.deadline <= clock_timestamp()) OR (run.state = ANY ('{cancelled,failed,succeeded}'::text[])) OR ((wait.reason = 'event'::text) AND (ANY ((wait.company_id = (hashed SubPlan 3).col1) AND (wait.run_id = (hashed SubPlan 3).col2) AND (wait.event_name = (hashed SubPlan 3).col3) AND (wait.correlation = (hashed SubPlan 3).col4)))) OR ((wait.reason = 'agent_turn'::text) AND agent_history_turn_ready(wait.company_id, wait.agent_exchange_id)) OR ((wait.reason = 'child_run'::text) AND (ANY ((wait.company_id = (hashed SubPlan 5).col1) AND (wait.child_run_id = (hashed SubPlan 5).col2)))) OR ((wait.reason = 'effect'::text) AND ((ANY ((wait.company_id = (hashed SubPlan 7).col1) AND (wait.execution_id = (hashed SubPlan 7).col2) AND (wait.id = (hashed SubPlan 7).col3))) OR workflow_action_has_evidence_conflict(wait.company_id, wait.execution_id))))))) OR EXISTS(SubPlan 8))
+                          Rows Removed by Join Filter: 1
+                          Buffers: shared hit=557
+                          ->  Nested Loop Left Join  (cost=29.55..4599.38 rows=129 width=273) (actual time=0.158..0.160 rows=2.00 loops=1)
+                                Join Filter: ((wait.company_id = execution.company_id) AND (wait.execution_id = execution.id) AND (wait.run_id = run.id))
+                                Buffers: shared hit=547
+                                ->  Hash Join  (cost=29.43..4588.66 rows=129 width=89) (actual time=0.155..0.156 rows=2.00 loops=1)
+                                      Hash Cond: ((execution.company_id = run.company_id) AND (execution.run_id = run.id))
+                                      Buffers: shared hit=546
+                                      ->  Seq Scan on workflow_executions execution  (cost=0.00..4558.54 rows=129 width=56) (actual time=0.096..0.097 rows=2.00 loops=1)
+                                            Filter: ((completed_at IS NULL) OR EXISTS(SubPlan 8))
+                                            Rows Removed by Filter: 256
+                                            Buffers: shared hit=523
+                                            SubPlan 8
+                                              ->  Nested Loop Semi Join  (cost=4.29..17.68 rows=1 width=0) (actual time=0.000..0.000 rows=0.00 loops=257)
+                                                    Join Filter: ((event_2.seq > action_2.consumed_through) AND (action_2.invocation_id = event_2.invocation_id))
+                                                    Buffers: shared hit=514
+                                                    ->  Index Scan using workflow_message_actions_open on workflow_message_actions action_2  (cost=0.12..8.15 rows=1 width=40) (actual time=0.000..0.000 rows=0.00 loops=257)
+                                                          Index Cond: ((company_id = execution.company_id) AND (execution_id = execution.id))
+                                                          Filter: (consume_after <= clock_timestamp())
+                                                          Index Searches: 257
+                                                          Buffers: shared hit=514
+                                                    ->  Bitmap Heap Scan on workflow_message_delivery_events event_2  (cost=4.16..9.50 rows=2 width=40) (never executed)
+                                                          Recheck Cond: (company_id = execution.company_id)
+                                                          ->  Bitmap Index Scan on workflow_message_delivery_events_cursor  (cost=0.00..4.16 rows=2 width=0) (never executed)
+                                                                Index Cond: (company_id = execution.company_id)
+                                                                Index Searches: 0
+                                      ->  Hash  (cost=25.57..25.57 rows=257 width=49) (actual time=0.050..0.050 rows=258.00 loops=1)
+                                            Buckets: 1024  Batches: 1  Memory Usage: 31kB
+                                            Buffers: shared hit=23
+                                            ->  Seq Scan on workflow_runs run  (cost=0.00..25.57 rows=257 width=49) (actual time=0.002..0.030 rows=258.00 loops=1)
+                                                  Buffers: shared hit=23
+                                ->  Materialize  (cost=0.12..8.14 rows=1 width=200) (actual time=0.002..0.002 rows=0.00 loops=2)
+                                      Storage: Memory  Maximum Storage: 17kB
+                                      Buffers: shared hit=1
+                                      ->  Index Scan using workflow_wait_one_active on workflow_waits wait  (cost=0.12..8.14 rows=1 width=200) (actual time=0.002..0.002 rows=0.00 loops=1)
+                                            Index Searches: 1
+                                            Buffers: shared hit=1
+                          ->  Hash  (cost=8.57..8.57 rows=257 width=66) (actual time=0.049..0.049 rows=258.00 loops=1)
+                                Buckets: 1024  Batches: 1  Memory Usage: 33kB
+                                Buffers: shared hit=6
+                                ->  Seq Scan on background_tasks job  (cost=0.00..8.57 rows=257 width=66) (actual time=0.002..0.023 rows=258.00 loops=1)
+                                      Buffers: shared hit=6
+                          SubPlan 1
+                            ->  Nested Loop Semi Join  (cost=4.29..17.68 rows=1 width=0) (actual time=0.002..0.002 rows=0.00 loops=1)
+                                  Join Filter: ((event.seq > action.consumed_through) AND (action.invocation_id = event.invocation_id))
+                                  Buffers: shared hit=2
+                                  ->  Index Scan using workflow_message_actions_open on workflow_message_actions action  (cost=0.12..8.15 rows=1 width=40) (actual time=0.002..0.002 rows=0.00 loops=1)
+                                        Index Cond: ((company_id = execution.company_id) AND (execution_id = execution.id))
+                                        Filter: (consume_after <= clock_timestamp())
+                                        Index Searches: 1
+                                        Buffers: shared hit=2
+                                  ->  Bitmap Heap Scan on workflow_message_delivery_events event  (cost=4.16..9.50 rows=2 width=40) (never executed)
+                                        Recheck Cond: (company_id = execution.company_id)
+                                        ->  Bitmap Index Scan on workflow_message_delivery_events_cursor  (cost=0.00..4.16 rows=2 width=0) (never executed)
+                                              Index Cond: (company_id = execution.company_id)
+                                              Index Searches: 0
+                          SubPlan 3
+                            ->  Bitmap Heap Scan on workflow_wait_events event_1  (cost=4.13..9.47 rows=2 width=96) (never executed)
+                                  Recheck Cond: (consumed_execution_id IS NULL)
+                                  ->  Bitmap Index Scan on workflow_wait_event_unconsumed  (cost=0.00..4.13 rows=2 width=0) (never executed)
+                                        Index Searches: 0
+                          SubPlan 5
+                            ->  Seq Scan on workflow_runs child  (cost=0.00..25.57 rows=1 width=32) (never executed)
+                                  Filter: (terminal_wakeup_sequence IS NOT NULL)
+                          SubPlan 7
+                            ->  Hash Join  (cost=16.75..31.78 rows=2 width=48) (never executed)
+                                  Hash Cond: ((receipt.company_id = action_1.company_id) AND (receipt.invocation_id = action_1.invocation_id))
+                                  ->  Seq Scan on workflow_action_receipts receipt  (cost=0.00..13.30 rows=330 width=32) (never executed)
+                                  ->  Hash  (cost=12.70..12.70 rows=270 width=64) (never executed)
+                                        ->  Seq Scan on workflow_message_actions action_1  (cost=0.00..12.70 rows=270 width=64) (never executed)
+Planning:
+  Buffers: shared hit=846
+Planning Time: 1.622 ms
+Execution Time: 0.273 ms
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::capacity_tests::workflow_capacity_count_prunes_retained_terminal_history ... ok
+AH-P07 genuine_process_crash point=Frozen durable_identity=true exact_context=true provider_calls=2
+AH-P07 genuine_process_crash point=ModelSettled durable_identity=true exact_context=true provider_calls=2
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::knowledge_e2e::agent_history::agent_history_e2e_real_knowledge_cc_removal_restores_private_seed_and_restricts_inspection ... ok
+AH-P07 genuine_process_crash point=FinalCheckpoint durable_identity=true exact_context=true provider_calls=2
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::e2e::crashes::agent_history_e2e_process_crashes_reconstruct_durable_frontiers_without_duplicate_calls ... ok
+
+test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 3380 filtered out; finished in 25.57s
+

@@ -112,11 +112,15 @@ create_check_database() {
 
 gate "Generated CSS is current" generated_css_is_current
 gate "SSE navigation lifecycle" \
-  node --test scripts/tests/sse-navigation.mjs scripts/tests/agent-runtime.mjs
+  node --test scripts/tests/sse-navigation.mjs scripts/tests/agent-runtime.mjs scripts/tests/channel-response-authoring.mjs
 gate "Deployment script tests" deployment_script_tests
 gate "Formatting" cargo fmt --all -- --check
 gate "Patch whitespace" git diff HEAD --check
 gate "Transport abstraction boundary" transport_boundary
+gate "Workflow evidence validator fixtures" \
+  env PYTHONDONTWRITEBYTECODE=1 python3 scripts/tests/workflow-evidence.py
+gate "Retained workflow evidence" \
+  env PYTHONDONTWRITEBYTECODE=1 python3 scripts/check-workflow-evidence.py --available-manifests
 gate "Fetch locked Rust dependencies" cargo fetch --locked
 gate "Offline compilation" cargo check --locked --offline --all-targets
 gate "Clippy" cargo clippy --locked --all-targets -- -D warnings
@@ -124,6 +128,7 @@ gate "Migrations" env SQLX_OFFLINE=false cargo sqlx migrate run
 gate "SQLx metadata matches migrated schema" \
   env SQLX_OFFLINE=false cargo sqlx prepare --check -- --all-targets
 gate "Compile tests" cargo test --locked --offline --all-targets --no-run
+gate "Rust source module reachability" cargo test --locked --offline --test source_modules
 gate "Test database for this run" create_check_database
 gate "Database-backed test suite (isolated network)" \
   scripts/test-network-isolation.sh cargo test --locked --offline --all-targets

@@ -128,8 +128,44 @@ impl CredentialContext {
         }
     }
 
+    pub(crate) fn integration_account(
+        account: &crate::domain::integrations::ConnectedAccount,
+    ) -> Self {
+        Self {
+            scope: "integration_account",
+            fields: vec![
+                account.owner.namespace.as_str().as_bytes().to_vec(),
+                account.owner.subject.as_str().as_bytes().to_vec(),
+                account.id.as_uuid().as_bytes().to_vec(),
+                account.provider_id.as_str().as_bytes().to_vec(),
+                account.auth_config_id.as_str().as_bytes().to_vec(),
+                account.auth_method.as_str().as_bytes().to_vec(),
+                account.credential_schema.as_str().as_bytes().to_vec(),
+            ],
+        }
+    }
+
+    pub(crate) fn integration_connect(
+        f: &crate::application::integrations::connect::AttemptFacts,
+    ) -> Self {
+        Self {
+            scope: "integration_connect_attempt",
+            fields: vec![
+                f.owner.namespace.as_str().as_bytes().to_vec(),
+                f.owner.subject.as_str().as_bytes().to_vec(),
+                f.id.as_uuid().as_bytes().to_vec(),
+                f.provider.as_str().as_bytes().to_vec(),
+                f.config.as_str().as_bytes().to_vec(),
+                f.app.as_str().as_bytes().to_vec(),
+                f.purpose().as_bytes().to_vec(),
+            ],
+        }
+    }
+
     fn max_secret_bytes(&self) -> usize {
-        if self.scope == "company_mcp_credential" {
+        if self.scope == "integration_account" {
+            crate::domain::integrations::MAX_CREDENTIAL_BYTES
+        } else if self.scope == "company_mcp_credential" {
             crate::entities::mcp::MAX_MCP_SECRET_BYTES
         } else {
             MAX_CREDENTIAL_BYTES

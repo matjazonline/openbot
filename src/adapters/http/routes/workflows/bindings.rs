@@ -353,6 +353,8 @@ pub struct StartBody {
     pub association: Option<AssociationBody>,
     /// The top-level run this start reruns.
     pub rerun_of: Option<Uuid>,
+    pub history_session:
+        Option<crate::application::workflow::agent_history::AgentHistorySessionRef>,
 }
 
 /// 201 with the new run, or 200 with the run a retry of the key already started.
@@ -367,10 +369,13 @@ pub async fn start_run(
         company_id,
         actor(&user)?,
         binding,
-        body.association.map(Into::into),
-        body.input,
-        body.command_key,
-        body.rerun_of,
+        StartDetails {
+            association: body.association.map(Into::into),
+            input: body.input,
+            key: body.command_key,
+            rerun_of: body.rerun_of,
+            history_session: body.history_session,
+        },
     )
     .await?;
     let status = if replayed {
@@ -384,21 +389,26 @@ pub async fn start_run(
     ))
 }
 
+pub(super) struct StartDetails {
+    pub association: Option<RelatedAssociation>,
+    pub input: Value,
+    pub key: String,
+    pub rerun_of: Option<Uuid>,
+    pub history_session:
+        Option<crate::application::workflow::agent_history::AgentHistorySessionRef>,
+}
+
 /// Start a run of `binding` (in its own association unless one is named) under `key`; a
 /// `rerun_of` names the top-level run this one reruns. The run and whether the key replayed.
-#[allow(clippy::too_many_arguments)]
 pub(super) async fn start_command(
     engine: &WorkflowServices,
     company_id: Uuid,
     actor: WorkflowActor,
     binding: Uuid,
-    association: Option<RelatedAssociation>,
-    input: Value,
-    key: String,
-    rerun_of: Option<Uuid>,
+    details: StartDetails,
 ) -> WorkflowResult<(RunId, bool)> {
     let company = company(company_id);
-    let association = match association {
+    let association = match details.association {
         Some(association) => association,
         None => {
             visible_binding(engine, company, actor, binding)
@@ -409,13 +419,14 @@ pub(super) async fn start_command(
     let started = start(
         &engine.service(),
         StartRun {
+            history_session: details.history_session,
             company_id: company,
             actor,
             binding_id: WorkflowBindingId::new(binding),
             association,
-            input,
-            idempotency_key: key,
-            rerun_of: rerun_of.map(RunId::new),
+            input: details.input,
+            idempotency_key: details.key,
+            rerun_of: details.rerun_of.map(RunId::new),
         },
     )
     .await?;

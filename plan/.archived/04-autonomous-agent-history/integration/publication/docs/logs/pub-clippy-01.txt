@@ -1,0 +1,2 @@
+    Checking open_bots v0.1.0 (/private/var/folders/qc/f8s9x42x5sz6vbh79sb0cfth0000gn/T/openbot-history-publication-pc5qkluy/worktree)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1m 40s

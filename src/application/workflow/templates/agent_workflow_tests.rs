@@ -60,7 +60,7 @@ fn gate() -> CustomStep {
             "data_schema": {"literal": {"type": "string", "enum": ["billing", "other"]}}},
         "rule": {"cases": [{"when": {"eq": [{"ref": "/steps/topic/output"}, {"literal": "billing"}]},
             "choice": "send"}], "default": "hold"},
-        "routes": {"choices": {"send": "$next", "hold": "$end"}}}),
+        "routes": {"choices": {"send": "$next", "hold": "$next"}}}),
     )
 }
 
@@ -117,20 +117,28 @@ fn custom_steps_join_the_base_in_their_slots() {
     assert_eq!(steps["draft"]["routes"], json!({"success": "gate"}));
     assert_eq!(
         steps["gate"]["routes"],
-        json!({"choices": {"send": "review", "hold": "$end"}})
+        json!({"choices": {"send": "review", "hold": "review"}})
     );
     assert_eq!(
         steps["review"]["routes"],
-        json!({"choices": {"approve": "reply", "reject": "$end"}})
+        json!({"choices": {"approve": "reply", "reject": "review_rejected"}})
     );
     assert_eq!(steps["reply"]["routes"], json!({"success": "note"}));
-    assert_eq!(steps["note"]["routes"], json!({"success": "$end"}));
+    assert_eq!(
+        steps["note"]["routes"],
+        json!({"success": "finish_response"})
+    );
+    assert_eq!(
+        steps["finish_response"]["with"]["value"],
+        json!({"ref": "/steps/reply/output"})
+    );
+    assert_eq!(steps["review_rejected"]["type"], "channel.no_reply");
     assert_eq!(
         steps["draft"]["with"]["context"]["object"]["untrusted_topic"],
         json!({"ref": "/steps/topic/output"})
     );
     assert_eq!(
-        steps["reply"]["with"]["content"],
+        steps["reply"]["with"]["value"],
         json!({"ref": "/steps/review/output/data"})
     );
     // Without review the reply sends the draft, and a gate continues straight to it.
@@ -139,10 +147,10 @@ fn custom_steps_join_the_base_in_their_slots() {
     ));
     assert_eq!(
         source["steps"]["gate"]["routes"],
-        json!({"choices": {"send": "reply", "hold": "$end"}})
+        json!({"choices": {"send": "reply", "hold": "reply"}})
     );
     assert_eq!(
-        source["steps"]["reply"]["with"]["content"],
+        source["steps"]["reply"]["with"]["value"],
         json!({"ref": "/steps/draft/output"})
     );
 }
@@ -196,9 +204,42 @@ fn the_largest_composition_fits_the_base_step_limit() {
         step.id = format!("note_{n}");
         step
     }));
-    let source = plain(&composed(
-        &AgentWorkflow::base().reviewed().with_steps(steps),
-    ));
+    // An autonomous composition has room for all six custom nodes and the saved-response tail.
+    let source = plain(&composed(&AgentWorkflow::base().with_steps(steps.clone())));
     let limit = source["limits"]["max_steps"].as_u64().unwrap();
     assert_eq!(source["steps"].as_object().unwrap().len() as u64, limit);
+    // Review adds one activation on the approved path: refuse it before resource creation.
+    assert!(
+        AgentWorkflow::base()
+            .reviewed()
+            .with_steps(steps)
+            .compose(&WorkflowSourceDecoder, AGENT_BASE_SOURCE)
+            .is_err()
+    );
+}
+
+#[test]
+fn channel_reply_authoring_custom_end_requires_terminal_no_reply() {
+    for routes in [
+        json!({"success":"$end"}),
+        json!({"error":"$end"}),
+        json!({"choices":{"approve":"$next","reject":"$end"}}),
+    ] {
+        let mut custom = classify();
+        custom.definition.insert("routes".into(), routes);
+        let error = AgentWorkflow::base()
+            .with_steps(vec![custom])
+            .compose(&WorkflowSourceDecoder, AGENT_BASE_SOURCE)
+            .unwrap_err();
+        assert!(error.message.contains("Finish without reply"));
+    }
+    let silence = step(
+        json!({"id":"silence","slot":"after_reply","type":"channel.no_reply",
+        "with":{"value":{"ref":"/steps/reply/output"},
+        "output_schema":{"literal":{"type":"object","properties":{"body":{"type":"string","maxLength":16384}},"required":["body"],"additionalProperties":false}}},
+        "routes":{"success":"$end"}}),
+    );
+    let source = plain(&composed(&AgentWorkflow::base().with_steps(vec![silence])));
+    assert_eq!(source["steps"]["silence"]["routes"]["success"], "$end");
+    assert!(source["steps"].get("finish_response").is_none());
 }

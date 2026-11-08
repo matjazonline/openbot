@@ -17,7 +17,11 @@ parameter_schema:
     reviewer: {type: string, maxLength: 128}
   required: [reviewer]
   additionalProperties: false
-output_schema: true
+output_schema:
+  type: object
+  properties: {body: {type: string, maxLength: 16384}, review: {type: object}}
+  required: [body]
+  additionalProperties: false
 resources: []
 entry: context
 steps:
@@ -55,11 +59,30 @@ steps:
           required: [body]
           additionalProperties: false
       feedback_required: {literal: [reject]}
-    routes: {choices: {approve: reply, reject: $end}}
+    routes: {choices: {approve: reply, reject: review_rejected}}
   reply:
-    type: message.reply
+    type: data.map
     with:
-      source_message: {ref: /input/source_message}
-      content: {ref: /steps/review/output/data}
+      value: {ref: /steps/review/output/data}
+      output_schema:
+        literal:
+          type: object
+          properties: {body: {type: string, maxLength: 16384}}
+          required: [body]
+          additionalProperties: false
+    routes: {success: $end}
+  review_rejected:
+    type: channel.no_reply
+    with:
+      value:
+        object:
+          body: {literal: ""}
+          review: {ref: /steps/review/output}
+      output_schema:
+        literal:
+          type: object
+          properties: {body: {type: string, maxLength: 16384}, review: {type: object}}
+          required: [body]
+          additionalProperties: false
     routes: {success: $end}
 limits: {max_steps: 10, max_context_bytes: 65536}

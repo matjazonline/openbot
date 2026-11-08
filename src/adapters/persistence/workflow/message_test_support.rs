@@ -251,6 +251,7 @@ pub(super) async fn admitted_with(
     let company = fixture.target.company;
     let admission = WorkflowService::new(p.clone(), p.clone(), p.clone(), p.clone(), Preflight)
         .admit(AdmitWorkflowRequest {
+            history_session: None,
             company_id: company,
             actor: fixture.target.actor,
             association,

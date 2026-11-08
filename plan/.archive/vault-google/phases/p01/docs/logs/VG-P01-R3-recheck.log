@@ -1,0 +1,1 @@
+F1/F2 correction checks pass: bearer/API-key whitespace object/string/array shapes; mixed-case registered/custom credential headers denied; ordinary headers remain valid and cannot become injection destinations.

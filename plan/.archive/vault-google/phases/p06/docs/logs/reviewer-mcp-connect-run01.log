@@ -1,0 +1,2 @@
+connect future dropped before server released initialize response
+requests AFTER cancellation: ["POST /mcp HTTP/1.1 notifications/initialized", "DELETE /mcp HTTP/1.1 "]

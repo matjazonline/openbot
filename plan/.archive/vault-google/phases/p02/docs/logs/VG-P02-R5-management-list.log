@@ -1,0 +1,5 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.19s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-048b7abd3ed0c794)
+adapters::http::routes::ui_vault::tests::vault_management_real_session_origin_body_limit_and_owner_override_rejection: test
+
+1 test, 0 benchmarks

@@ -1,0 +1,11 @@
+{
+  "command": [
+    "python3",
+    "plan/.archive/vault-google/integration/publication-06-07/docs/logs/verify-publication.py"
+  ],
+  "cwd": "/private/tmp/vault-google-publish-a95937f128",
+  "exit": 0,
+  "seconds": 0.13,
+  "fixture": "no database required; owned cache serialized",
+  "log": "/private/tmp/vault-google-publish-a95937f128/plan/.archive/vault-google/integration/publication-06-07/docs/logs/reviewer-preservation.log"
+}

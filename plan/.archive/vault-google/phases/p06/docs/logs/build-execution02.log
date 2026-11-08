@@ -1,0 +1,28 @@
+    Checking open_bots v0.1.0 (/Users/mac02/.codex/worktrees/1133/openbot)
+warning: field `0` is never read
+  --> src/application/workflow/actions/dispatch.rs:42:14
+   |
+42 |     Prepared(Box<FrozenAction>),
+   |     -------- ^^^^^^^^^^^^^^^^^
+   |     |
+   |     field in this variant
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+help: consider changing the field to be of unit type to suppress this warning while preserving the field numbering, or remove the field
+   |
+42 -     Prepared(Box<FrozenAction>),
+42 +     Prepared(()),
+   |
+
+warning: this lint expectation is unfulfilled
+   --> src/adapters/persistence/workflow/mod.rs:172:12
+    |
+172 |     expect(dead_code, reason = "Final business dispatch is wired in phase06")
+    |            ^^^^^^^^^
+    |
+    = note: Final business dispatch is wired in phase06
+    = note: `#[warn(unfulfilled_lint_expectations)]` on by default
+
+warning: `open_bots` (lib) generated 2 warnings
+warning: `open_bots` (lib test) generated 1 warning (1 duplicate)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1m 19s

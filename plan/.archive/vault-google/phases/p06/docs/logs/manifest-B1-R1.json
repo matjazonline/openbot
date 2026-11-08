@@ -1,0 +1,16 @@
+{
+  "phase": "p06",
+  "start": "ace526fd8259ec53c5199ffa7555a1a99dcba58e",
+  "review_base": "ace526fd8259ec53c5199ffa7555a1a99dcba58e",
+  "head": "ace526fd8259ec53c5199ffa7555a1a99dcba58e",
+  "digest": "a781a861b6d39b7abccfdc0706619a7cfcc5573a440f5026ae0dbb492218c658",
+  "exclusions": [
+    "plan/vault-google/COORDINATION.md",
+    "plan/vault-google/phases/p06/docs"
+  ],
+  "coordination_revision": 18,
+  "coordination_sha256": "29796082388916e2f20f8ae381c195461a73aeea6f678c2cfd7145c9371ee2fb",
+  "decision": "VG-P06-D1/r1",
+  "review_note": "VG-P06-B1-R1",
+  "checks": "final-gates.py pending, existing253 Rust and4 browser PASS; sqlx-prepare-final01 PASS; inherited transport scanner unchanged"
+}

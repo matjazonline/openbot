@@ -1,0 +1,12 @@
+{
+  "our_head": "97e5d60dc538e26c7cb976a8d63772eed80baff2",
+  "external_channel_commit": "4ab45555f8316ec7a8b1b64e8c05b77ff7d9a29d",
+  "method": "File-path intersection of this complete vault overlay with pushed channel06/07 changes since shared channel05 HEAD. This is a merge risk map, not a conflict proof. No external dirty source imported.",
+  "shared_paths": [
+    "migrations/20260817000000_init_schema.sql",
+    "src/adapters/persistence/workflow/channel_reply_completion.rs",
+    "src/adapters/persistence/workflow/mod.rs",
+    "src/adapters/persistence/workflow/provisioning_dispatch_tests.rs"
+  ],
+  "next": "Recheck external channel/history authority and current branch heads before merging; preserve vault credential-source authorization on every changed action/publication/transport path. Then authorize vault06 separately."
+}

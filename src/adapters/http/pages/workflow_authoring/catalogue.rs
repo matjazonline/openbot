@@ -43,7 +43,7 @@ pub fn workflow_catalogue(entries: &[CatalogueEntry], agents: &[AgentReference<'
                 format!(" · runs a {}", entry.control)
             };
             format!(
-                r#"<li class="py-1"><details><summary class="cursor-pointer"><span class="font-mono font-semibold">{name}</span> <span class="text-xs opacity-70">routes: {routes}{control}</span></summary>
+                r#"<li class="py-1"><details><summary class="cursor-pointer"><span class="font-mono font-semibold">{name}</span> {label}<span class="text-xs opacity-70">routes: {routes}{control}</span></summary>
                     <div class="mt-2 space-y-2 pl-3">
                         <p>{notes}</p>
                         <p class="text-xs font-semibold">Inputs (<span class="font-mono">with</span>)</p>{input}
@@ -51,6 +51,7 @@ pub fn workflow_catalogue(entries: &[CatalogueEntry], agents: &[AgentReference<'
                         <p class="text-xs font-semibold">Example</p><pre class="max-h-80 overflow-auto rounded-box bg-base-200 p-3 font-mono text-xs">{example}</pre>
                     </div></details></li>"#,
                 name = escape_html_text(entry.type_name),
+                label = if entry.type_name == "channel.no_reply" { "<span>Finish without reply · terminal business value</span> " } else { "" },
                 routes = escape_html_text(&routes),
                 control = escape_html_text(&control),
                 notes = escape_html_text(entry.notes),
@@ -81,11 +82,18 @@ pub fn workflow_catalogue(entries: &[CatalogueEntry], agents: &[AgentReference<'
             r#"<p class="text-xs opacity-70">Name an agent by its handle in a step's <span class="font-mono">agent</span> input: <span class="font-mono">agent: {{literal: &lt;handle&gt;}}</span>.</p><div class="overflow-x-auto"><table class="table table-xs"><thead class="text-base-content"><tr><th>Agent</th><th>Handle</th><th>Model</th></tr></thead><tbody>{rows}</tbody></table></div>"#
         )
     };
+    let examples: String = crate::application::workflow::channel_reply::examples::response_examples()
+        .into_iter().map(|example| format!(
+            "<details><summary class=\"cursor-pointer\">{}</summary><p>Configure the response mapping separately on the channel. Replace the example reviewer with a current company admin.</p>{}{}</details>",
+            escape_html_text(example.title), json_block(&example.source),
+            json_block(&serde_json::json!({"contract":example.contract,"approval_policy":example.approval_policy}))
+        )).collect();
     // Replaces the loading body whole, so its busy state goes with it.
     format!(
         r#"<div id="workflow-reference-body" class="mt-3 space-y-4 text-sm">
             <section><h4 class="font-semibold">Step types</h4><ul class="divide-y divide-base-300">{types}</ul></section>
             <section class="space-y-1"><h4 class="font-semibold">Agents</h4>{agents}</section>
+            <section class="space-y-2"><h4 class="font-semibold">Channel response examples</h4>{examples}</section>
         </div>"#
     )
 }

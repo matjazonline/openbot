@@ -1,0 +1,16 @@
+{
+  "baseline_head": "4ab45555f8316ec7a8b1b64e8c05b77ff7d9a29d",
+  "method": "Execute unchanged committed boundary script against complete src/migrations exported directly from canonical main. No Cargo/DB/project source changes.",
+  "command": [
+    "bash",
+    "/private/tmp/vault-main-pull-rtehstpa/main-transport-baseline/scripts/transport-boundary-check.sh"
+  ],
+  "exit": 1,
+  "same_failure_reproduced": true,
+  "root_files_identical_to_main": {
+    "scripts/transport-boundary-check.sh": "f5123c80b02fee3f864b528846297134b42b05fdc5f9de8e2518821ff16aa2e8",
+    "src/adapters/persistence/workflow/channel_reply_continuation_views_support.rs": "c7681f4cad6a6e4a9a2378ab76ad4163868613274ca1e4002340fee6bd5e1250"
+  },
+  "output_identical_to_current": true,
+  "disposition": "Inherited upstream fixture/scanner mismatch: test-only continuation support creates provider input. Leave source/checker unchanged; report boundary as failed, not passed."
+}

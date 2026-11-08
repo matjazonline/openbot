@@ -27,11 +27,18 @@ struct Receipt {
 #[async_trait]
 impl WorkflowRunTransitions for PostgresPersistence {
     async fn cancel(&self, command: CancelCommand) -> AppResult<CancelResult> {
+        let company = command.company_id;
+        let run = command.run_id;
         let Some((result, revision)) = control(self, command, Operation::Cancel).await? else {
             return Ok(CancelResult::NotFound);
         };
         Ok(match result.as_str() {
-            "applied" => CancelResult::Applied { revision },
+            "applied" => {
+                tracing::info!(company_id=%company.as_uuid(),run_id=%run.as_uuid(),
+                    scope="run_tree",state="cancelled",durability="verified",event="agent_history.released",
+                    "Owned agent turns settled with committed run cancellation");
+                CancelResult::Applied { revision }
+            }
             "terminal" => CancelResult::AlreadyTerminalOrApplied { revision },
             "conflict" => CancelResult::RevisionConflict {
                 current_revision: revision,

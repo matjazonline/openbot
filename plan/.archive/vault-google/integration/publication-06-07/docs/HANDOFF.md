@@ -1,0 +1,11 @@
+# Vault implementation published and archived
+
+User-authorized push/archive is COMPLETE. Implementation and archive published to main in b8e6b32ebcaa01c3bda659b3a6464c518e92ac06, remote read-back verified; current source acceptance VG-PUB67-B1-R1 PASS of b0ae9af5c07980a42dac601855f7998facb8c431e8b978f8df8980dd7823f02a. No actionable publication findings. The commit carrying this handoff only records publication status/receipts; runtime source is identical.
+
+Completed plan is plan/.archive/vault-google. Current user/operator docs are docs/vault-integrations.md and docs/gmail-workflows.md. Original06/07 acceptance, all1620 prior files, immutable snapshots/reviews/failures and legacy logs retained. Standalone preservation validation proves152 accepted source files identical; four documentation/CI/notice adaptations independently reviewed. Historical phase handoffs predate this publication and keep their original unpushed status as evidence. This handoff and coordination27 are the current status.
+
+Focused publication checks passed:fmt/offlinealltargets/Clippy,8 source reachability cases,22 boundary mutations/currentgate,57 links/121reset inventory, evidence fixtures/retention. Original runtime/SQL/browser proof reused because runtime/migration/SQLx1683 files were independently compared unchanged; no full suite/live Google approval claimed. Upstream raw-archive whitespace and prior unrelated baseline transport fixture unchanged.
+
+Root /root user-confirmed Sol6.1/xhigh; original independent B /root/reviewer requested Astra/high, completed review. Global skill /Users/mac02/.codex/skills/implement-astra-reviewed-2-2. All current phases accepted/integrated, source and review roots preserved in provenance. Own publication worktree /private/tmp/vault-google-publish-a95937f128 is disposable after root synchronization; final checkout /Users/mac02/.codex/worktrees/1133/openbot. Root-owned target cache retained, no database allocated or shared PostgreSQL changes. No further implementation or publication action required.
+
+Evidence logs/release-publication.json,VG-PUB67-RELEASE.evidence.json,push-publication.log,remote-publication.log and root-acceptance.json record actual remote publication and exact source ancestry. Future remote extraction/live smoke remains separately scoped in the operations guide.

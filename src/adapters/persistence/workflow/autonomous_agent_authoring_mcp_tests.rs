@@ -80,6 +80,7 @@ async fn admit_again(f: &Fixture, first: &ClaimedWorkflow) -> ActivationRequest 
     let AdmissionResult::Created(run) =
         WorkflowService::new(p.clone(), p.clone(), p.clone(), p.clone(), Preflight)
             .admit(AdmitWorkflowRequest {
+                history_session: None,
                 company_id: scope.company,
                 actor: f.target.actor,
                 association: RelatedAssociation::Company,
