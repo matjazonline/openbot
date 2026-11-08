@@ -243,6 +243,11 @@ impl McpUseCases {
         current: &CompanyMcpConnection,
     ) -> AppResult<CompanyMcpConnection> {
         super::company::managed_company(self.companies.as_ref(), user, current.company_id).await?;
+        if matches!(current.auth, McpAuth::Integration(_)) {
+            return Err(crate::app_error::AppError::ServiceUnavailable(
+                "Integration discovery is not available yet".into(),
+            ));
+        }
         let token = self
             .credentials
             .mcp_token(current.company_id, current.id, current.revision)

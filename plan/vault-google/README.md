@@ -6,8 +6,12 @@
 
 ## Outcome and status
 
-Status: proposed implementation, revised on 2026-11-06. None of the stages below is implemented by
-this plan. The existing directory name is retained; the shared architecture covers multiple apps
+Status: stages 01–05 implemented; independent review and acceptance status are recorded in each phase's docs.
+The vault supports static bearer and registered `X-API-Key` credentials, separate Google mailbox
+consent, and explicit owner grants for company HTTP/MCP bindings. Private resolution serializes
+provider renewal and management on the shared account; business integration execution follows in
+phase 06. Workflow handlers do not receive vault credentials. The existing directory name is
+retained; the shared architecture covers multiple apps
 and authentication methods, with Google/Gmail as the first production OAuth integration.
 
 A user can save reusable private credentials, connect external accounts, and authorize selected
@@ -38,6 +42,25 @@ this implementation.
 
 Implement these stages in order. Each stage has cohesive batches, focused checks, and acceptance
 criteria. Finish the shared contract before changing transport implementations.
+
+## Next steps after stage 05
+
+The current implementation stops after 05. Continue with 06 only in a separately authorized task:
+connect the private resolver to authenticated HTTP/MCP execution, rebuild sessions when the
+provider requires it, and apply the genuine host/module authority gate immediately before each
+business dispatch. Preserve caller deadlines, provenance, approvals and the separation between
+consent revision and credential generation. Stage 07 then exercises the non-Google adapter
+through the transports and completes portability, operator guidance and live-project readiness
+checks. Scripted OAuth tests do not establish Google project approval.
+
+The completed channel-handles plan is integrated here from main commit
+`4ab45555f8316ec7a8b1b64e8c05b77ff7d9a29d`, with the accepted vault work preserved.
+History remains a separate, unpushed workstream. Before combining it, recheck branch and
+coordination freshness and review its final changes. Shared areas include the initial schema,
+workflow infrastructure and action contracts, HTTP/MCP runtime and publication authority,
+provisioning, source-kind boundaries, and their test fixtures. Keep history changes in their own
+worktree until those interfaces are reconciled. The phase records retain acceptance and
+verification evidence; this checkpoint authorizes no further implementation or merge.
 
 ## Module and future service boundary
 
@@ -153,5 +176,5 @@ metadata. Use focused tests during implementation; run the complete CI inventory
 stages are integrated, following [07](07-integration-verification-and-operations.md). The final
 gate includes formatting, offline compilation, migrations, and the database-backed suite.
 
-Every Markdown file in this directory carries the reset policy above and must appear in
+The README and numbered plan files carry the reset policy above and appear in
 NO_BACKWARD_COMPATIBILITY_NOTES in src/main.rs.

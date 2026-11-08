@@ -1,0 +1,8 @@
+{
+  "id": "VG-P03-root-architecture",
+  "decision": "D1/r2",
+  "sha256": "a33eb50f9ae21e674f8bd20edb989032400ade440a79df70635c42b8db21e15b",
+  "review": "VG-P03-AG1-R1 PASS",
+  "source_baseline": "34d6a2e7933a26523842f46e10a29afe5b97bfac9ab334c7eb06accf63cb3558",
+  "coordination_revision": 3
+}

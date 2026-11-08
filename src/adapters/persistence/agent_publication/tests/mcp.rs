@@ -47,10 +47,15 @@ fn connection_write(operation: &McpOperation) -> McpConnectionWrite {
     }
 }
 
-async fn source(f: &Fixture) -> McpSource {
+fn source(f: &Fixture) -> impl std::future::Future<Output = McpSource> + '_ {
+    source_at(f, "http://127.0.0.1:9")
+}
+async fn source_at(f: &Fixture, endpoint: &str) -> McpSource {
     let operation = operation(f.scope.company);
+    let mut definition = connection_write(&operation);
+    definition.endpoint = endpoint.to_string().try_into().unwrap();
     let connection =
-        f.p.create_mcp_connection(f.scope.company.as_uuid(), connection_write(&operation))
+        f.p.create_mcp_connection(f.scope.company.as_uuid(), definition)
             .await
             .unwrap();
     let version =
@@ -345,5 +350,26 @@ async fn autonomous_agent_resolution_malformed_stored_catalog_is_an_error_not_an
             revisions: 0,
             requests: 0
         }
+    );
+}
+
+#[tokio::test]
+async fn vault_binding_agent_publication_refuses_an_integration_mcp_source() {
+    let f = Fixture::new().await;
+    let source = source_at(&f, "https://mcp.example.test/rpc").await;
+    f.p.publish_agent(f.request("before-vault").await)
+        .await
+        .unwrap();
+    attach_vault(
+        &f,
+        source.connection.id,
+        source.connection.revision,
+        crate::application::use_cases::integration_binding::BindingKind::Mcp,
+    )
+    .await;
+    assert!(
+        f.p.publish_agent(f.request("after-vault").await)
+            .await
+            .is_err()
     );
 }

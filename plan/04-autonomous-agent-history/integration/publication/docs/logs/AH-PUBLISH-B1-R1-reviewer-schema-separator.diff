@@ -1,0 +1,10 @@
+--- literal-concatenation
++++ actual
+@@ -14645,6 +14645,7 @@
+ CREATE CONSTRAINT TRIGGER agent_turn_wait_agreement AFTER INSERT OR UPDATE ON public.workflow_waits
+     DEFERRABLE INITIALLY DEFERRED FOR EACH ROW WHEN (NEW.reason='agent_turn')
+     EXECUTE FUNCTION public.check_agent_turn_wait();
++
+ -- Private connected accounts. Owners are stable client references, never host-table FKs.
+ CREATE TABLE public.integration_owner_states (
+     owner_namespace text NOT NULL CHECK (octet_length(owner_namespace) BETWEEN 1 AND 256),

@@ -1,0 +1,25 @@
+{
+  "resource": "vault_google_1133_41402e4b8104_test",
+  "owned": true,
+  "commands": [
+    [
+      "psql",
+      "postgresql://localhost/postgres",
+      "-X",
+      "-v",
+      "ON_ERROR_STOP=1",
+      "-c",
+      "DROP DATABASE IF EXISTS \"vault_google_1133_41402e4b8104_test\" WITH (FORCE)"
+    ],
+    [
+      "psql",
+      "postgresql://localhost/postgres",
+      "-X",
+      "-v",
+      "ON_ERROR_STOP=1",
+      "-c",
+      "CREATE DATABASE \"vault_google_1133_41402e4b8104_test\""
+    ]
+  ],
+  "exit": 0
+}

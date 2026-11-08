@@ -584,3 +584,6 @@ pub(super) fn counts(dispatches: i64, entries: i64, receipts: i64) -> ActionCoun
         receipts,
     }
 }
+
+#[path = "mcp_renewal_support.rs"]
+pub(in crate::adapters::persistence::workflow) mod renewal;

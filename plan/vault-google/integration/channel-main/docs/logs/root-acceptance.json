@@ -1,0 +1,29 @@
+{
+  "integration": "channel-main",
+  "status": "accepted combined affected scope; inherited static failures remain",
+  "head": "4ab45555f8316ec7a8b1b64e8c05b77ff7d9a29d",
+  "digest": "f2bd7d430aa1f4eff0289a6006fa64deeb9fa189def2e9ae74fa427f232b7926",
+  "excludes": [
+    "plan/vault-google/COORDINATION.md",
+    "plan/vault-google/phases/p01/docs",
+    "plan/vault-google/phases/p02/docs",
+    "plan/vault-google/phases/p03/docs",
+    "plan/vault-google/phases/p04/docs",
+    "plan/vault-google/phases/p05/docs",
+    "plan/vault-google/integration/channel-p05/docs",
+    "plan/vault-google/integration/channel-main/docs"
+  ],
+  "review": "VG-INT-MAIN-R1 PASS",
+  "verification": "131distinct author targetedRustPASS +1realChromebrowserPASS; independent34channelcompletionPASS; freshmigration/SQLxprepare/check/offlinealltargets/Clippy/fmt/diff/sampleboundary/CSS/GraftPASS",
+  "introduced_defects": 0,
+  "unresolved_inherited_findings": [
+    "VG-INT-MAIN-F1 source-markup scanner flags main cfg(test) fixture",
+    "VG-INT-MAIN-F2 transport scanner flags main test-only continuation support"
+  ],
+  "baseline_proof": "Both reproduced against exported canonical main4ab source with unchanged original guards; source hashes independently verified. Neither failure counts as pass.",
+  "full_suite_run": false,
+  "overflow_test_run_or_changed": false,
+  "coordination_review_revision": 12,
+  "channel_authority_revision": 28,
+  "accepted_by": "/root"
+}

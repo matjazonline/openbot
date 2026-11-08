@@ -21,6 +21,8 @@ async fn isolated_connection() -> Option<PgConnection> {
     // tables by design, so a real-table fixture would rotate rows belonging to a test running
     // beside it.
     for statement in [
+        crate::adapters::persistence::integrations::inventory::ISOLATED_TABLE_SQL,
+        crate::adapters::persistence::integrations::connect::inventory::ISOLATED_TABLE_SQL,
         r#"CREATE TEMPORARY TABLE company_typesafe_connections (
                company_id UUID NOT NULL, id UUID NOT NULL, envelope TEXT NOT NULL,
                PRIMARY KEY (company_id, id)

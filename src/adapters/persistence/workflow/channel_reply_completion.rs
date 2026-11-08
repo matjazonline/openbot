@@ -357,6 +357,7 @@ fn final_action(
         contract: builtin_message_snapshot(scope.company, MessageKind::Reply)?,
         arguments: json!({"source_message":root.message_id,"content":content}),
         context: ActionPolicyContext {
+            integration: None,
             actor: root.actor_id,
             capability_ceiling: vec![TypeName::parse("message.reply").map_err(|_| invalid())?],
             approval_required: root.approval_policy.is_some(),

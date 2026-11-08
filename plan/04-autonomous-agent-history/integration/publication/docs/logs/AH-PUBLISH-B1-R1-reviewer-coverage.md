@@ -1,0 +1,17 @@
+# AH-PUBLISH-B1-R1 combined-parent coverage
+
+| Surface | Independent inspection and evidence |
+| --- | --- |
+| Accepted history parent | All216 source hashes in commit48461f66 equal accepted final scope;211 remain unchanged in merge. Prior all-phase/final reviews reused for exact unchanged code. |
+| Accepted Vault parent | All146 accepted `manifest-R1.json` source hashes match remote0d32. Separate independent VG-INT-MAIN-R1 review/root acceptance inspected.647 remote-only paths unchanged. Earlier prepared manifest has an older README draft; accepted manifest, not that draft, is the parent proof. |
+| Init schema | Reconstructed git three-way merge: one conflict, exact1019 history lines plus exact236 Vault lines with one blank separator. Earlier Vault HTTP identity revision guard preserved. History tables/triggers/caps/final checkpoint/frozen/retention and Vault owner/account/grant/teardown/connect/binding constraints coexist. Fresh main/test migrations plus actual native tests and SQLx prepare/check. |
+| workflow/http_tests.rs | Exact automatic merge preserves history/knowledge cases and adds Vault test module. All relevant names actually discovered/executed. |
+| workflow/mcp_test_support.rs | Exact automatic merge retains current fixture fields/history admission and adds renewal support. Current renewal/authority/binding coverage. |
+| workflow/mod.rs | Exact automatic merge retains agent-history/race/retention modules and Vault integration_authority. No new business dispatch implementation. |
+| infra/workflow.rs | Exact automatic merge retains StorageMaintenance and adds supervised integration teardown; test fixture history_session None retained. Seven named workers joined after shutdown in current native test. Teardown timeout/cancellation/bounded16/backoff and actual cancellation tests inspected. |
+| Semantic authority seam | Vault context is workflow-only; exact frozen integration authorization excludes secret/cache payload. Agent/ChannelFinal/sample origins denied; native host actor/fence/current grant authority before module and post-wait live-window check preserved. History data never authorizes a credential/tool call. Phase06 Vault business transport remains out of scope. |
+| Retention/lifecycle | History failed-own-job preparation pin and source ownership unchanged; Vault stable client owner references avoid host FK coupling. Teardown is separately bounded and does not mutate history. Current actor identity/deletion and five actual Vault lifecycle cases selected; current history cleanup owner cases pass. |
+| Clean published dependencies/assets | Cargo manifest/lock and original CI/check.sh equal common base, excluding unrelated primary tool edits. Actual published-Cargo offlinealltarget/lint/SQLx gates pass. CSS regenerated identical to accepted history asset; actual history browser2/channel browser1/sample checks pass. |
+| Preservation/coordination |863 current paths accounted as216 history union647 remote-only; all77 primary inputs preserved. Historycoord36/live Vaultcoord14 exact pins. No index conflicts;10 exclusions hide only assigned history workflow records, no Vault source/records. |
+
+Full scopes/hashes in input and reviewer parent audit. This is an integration review using accepted source coverage, not a claim of independently reauthoring/reviewing all146 unchanged Vault implementation files. Known inherited Vault scanner failures remain unchanged and unrun; no full-suite, overflow, live-provider or hostedCI claim.

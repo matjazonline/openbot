@@ -1,0 +1,10 @@
+{
+  "before_test": "membership-cutoff-before-02.log",
+  "before_result": "actual runtime failure: a later committed revocation must retire this consent",
+  "source_files": {
+    "src/adapters/persistence/integrations/lifecycle.rs": "da3be49618cc5b0f6612921f086644113075a07e474f8e3cb8fc65b070e582b1",
+    "migrations/20260817000000_init_schema.sql": "43135f0e1986d8eb1e6eaf479d69a10c42222c8680ce5dbf5c0edf79603f4c5c",
+    "src/adapters/persistence/company_invite.rs": "dfe7c8b27b61e8b484c9d8c2c17e61894a6f34cf56ff4a62270c0fee923b3768",
+    "src/adapters/persistence/workflow/vault_tests/membership_race.rs": "31530dd78b6483084d070ebd297b7395c57a6366598b229d05c2a7df3e2e0ccd"
+  }
+}

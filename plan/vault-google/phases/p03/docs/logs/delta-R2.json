@@ -1,0 +1,11 @@
+{
+  "baseline_digest": "a8326ab3d24c3f3283ceb91015b8590c4a978c898b8a42ce8c9ea440102882ba",
+  "current_digest": "ef36f90e6587c12bf9d38541d612a31945101a7d7fde5c782ef3c8df0a7175b9",
+  "changed_files": [
+    "src/adapters/persistence/integrations/grants.rs",
+    "src/adapters/persistence/workflow/integration_authority.rs",
+    "src/adapters/persistence/workflow/vault_tests/authority.rs",
+    "src/adapters/persistence/workflow/vault_tests/mod.rs",
+    "src/adapters/persistence/workflow/vault_tests/temporal.rs"
+  ]
+}

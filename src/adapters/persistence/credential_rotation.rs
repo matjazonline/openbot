@@ -68,6 +68,8 @@ pub struct CredentialRotationReport {
 /// whose rows never rotate, and nothing else in the system would notice.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum CredentialTable {
+    IntegrationAccounts,
+    ConnectAttempts,
     TypeSafeCredentials,
     WorkflowHttpCredentials,
     CompanyMcpCredentials,
@@ -82,6 +84,8 @@ enum CredentialTable {
 
 impl CredentialTable {
     const ALL: &'static [Self] = &[
+        Self::IntegrationAccounts,
+        Self::ConnectAttempts,
         Self::TypeSafeCredentials,
         Self::WorkflowHttpCredentials,
         Self::CompanyMcpCredentials,
@@ -97,6 +101,12 @@ impl CredentialTable {
 /// key of a batch is exactly where the next batch starts.
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum CredentialKey {
+    ConnectAttempt {
+        id: Uuid,
+    },
+    IntegrationAccount {
+        id: Uuid,
+    },
     TypeSafeCredential {
         company_id: Uuid,
         connection_id: Uuid,
@@ -438,6 +448,11 @@ async fn store_rotated_credential(
     rotated: &str,
 ) -> AppResult<bool> {
     let changed = match &row.key {
+        CredentialKey::ConnectAttempt {id} => super::integrations::connect::inventory::rewrap(transaction,*id,&row.stored,rotated).await,
+        CredentialKey::IntegrationAccount { id } => {
+            super::integrations::inventory::rewrap(transaction,*id,&row.stored,rotated).await
+        }
+
         CredentialKey::TypeSafeCredential { company_id, connection_id } => {
             sqlx::query("UPDATE company_typesafe_connections SET envelope=$3 WHERE company_id=$1 AND id=$2 AND envelope=$4")
                 .bind(company_id).bind(connection_id).bind(rotated).bind(&row.stored).execute(&mut **transaction).await
@@ -581,6 +596,44 @@ async fn fetch_credential_batch(
     cursor: Option<&CredentialKey>,
 ) -> AppResult<Vec<InventoryRow>> {
     match table {
+        CredentialTable::ConnectAttempts => {
+            let after = match cursor {
+                Some(CredentialKey::ConnectAttempt { id }) => Some(*id),
+                None => None,
+                _ => return Err(AppError::Internal("Invalid connect rotation cursor".into())),
+            };
+            Ok(super::integrations::connect::inventory::page(
+                connection,
+                after,
+                CREDENTIAL_BATCH_SIZE,
+            )
+            .await?
+            .into_iter()
+            .map(|r| InventoryRow {
+                key: CredentialKey::ConnectAttempt { id: r.id },
+                format: CredentialFormat::Envelope(r.context),
+                stored: r.envelope,
+            })
+            .collect())
+        }
+        CredentialTable::IntegrationAccounts => {
+            let after = match cursor {
+                Some(CredentialKey::IntegrationAccount { id }) => Some(*id),
+                None => None,
+                _ => return Err(AppError::Internal("Invalid vault rotation cursor".into())),
+            };
+            Ok(
+                super::integrations::inventory::page(connection, after, CREDENTIAL_BATCH_SIZE)
+                    .await?
+                    .into_iter()
+                    .map(|row| InventoryRow {
+                        key: CredentialKey::IntegrationAccount { id: row.id },
+                        format: CredentialFormat::Envelope(row.context),
+                        stored: row.envelope,
+                    })
+                    .collect(),
+            )
+        }
         CredentialTable::TypeSafeCredentials => {
             fetch_typesafe_credential_batch(connection, cursor).await
         }

@@ -1,0 +1,263 @@
+diff --git a/migrations/20260817000000_init_schema.sql b/migrations/20260817000000_init_schema.sql
+index 62bb4357..3597f8b5 100644
+--- a/migrations/20260817000000_init_schema.sql
++++ b/migrations/20260817000000_init_schema.sql
+@@ -3041,10 +3041,15 @@ CREATE FUNCTION public.workflow_http_identity_immutable() RETURNS trigger
+     LANGUAGE plpgsql
+     AS $$
+ BEGIN
+-    IF (NEW.company_id, NEW.id, NEW.origin, NEW.bearer, NEW.created_at)
+-        IS DISTINCT FROM (OLD.company_id, OLD.id, OLD.origin, OLD.bearer, OLD.created_at) THEN
++    IF (NEW.company_id, NEW.id, NEW.origin, NEW.created_at)
++        IS DISTINCT FROM (OLD.company_id, OLD.id, OLD.origin, OLD.created_at) THEN
+         RAISE EXCEPTION 'HTTP connection identity is immutable' USING CONSTRAINT='workflow_guard:workflow_http_identity_immutable';
+     END IF;
++    IF (NEW.bearer,NEW.integration_account_id,NEW.integration_grant_id,NEW.integration_authorization,NEW.integration_grant_revision)
++        IS DISTINCT FROM (OLD.bearer,OLD.integration_account_id,OLD.integration_grant_id,OLD.integration_authorization,OLD.integration_grant_revision)
++        AND NEW.revision<>OLD.revision+1 THEN
++        RAISE EXCEPTION 'HTTP authentication change requires a new revision' USING CONSTRAINT='workflow_guard:workflow_http_identity_immutable';
++    END IF;
+     RETURN NEW;
+ END;
+ $$;
+@@ -14640,3 +14645,240 @@ END $$;
+ CREATE CONSTRAINT TRIGGER agent_turn_wait_agreement AFTER INSERT OR UPDATE ON public.workflow_waits
+     DEFERRABLE INITIALLY DEFERRED FOR EACH ROW WHEN (NEW.reason='agent_turn')
+     EXECUTE FUNCTION public.check_agent_turn_wait();
++
++-- Private connected accounts. Owners are stable client references, never host-table FKs.
++CREATE TABLE public.integration_owner_states (
++    owner_namespace text NOT NULL CHECK (octet_length(owner_namespace) BETWEEN 1 AND 256),
++    owner_subject text NOT NULL CHECK (octet_length(owner_subject) BETWEEN 1 AND 256),
++    retired boolean NOT NULL DEFAULT false,
++    PRIMARY KEY (owner_namespace, owner_subject)
++);
++CREATE TABLE public.integration_accounts (
++    id uuid PRIMARY KEY,
++    owner_namespace text NOT NULL,
++    owner_subject text NOT NULL,
++    key text NOT NULL CHECK (octet_length(key) BETWEEN 1 AND 128 AND key = btrim(key)),
++    provider_id text NOT NULL CHECK (octet_length(provider_id) BETWEEN 1 AND 128),
++    auth_config_id text NOT NULL CHECK (octet_length(auth_config_id) BETWEEN 1 AND 128),
++    auth_method text NOT NULL,
++    credential_schema text NOT NULL,
++    external_identity text CHECK (octet_length(external_identity) <= 2048 AND jsonb_typeof(external_identity::jsonb) = 'object'),
++    authorization_key text CHECK (octet_length(authorization_key) BETWEEN 1 AND 256),
++    envelope text CHECK (octet_length(envelope) <= 23000 AND envelope LIKE 'enc:v2:%'),
++    revision bigint NOT NULL DEFAULT 1 CHECK (revision > 0),
++    authorization_revision bigint NOT NULL DEFAULT 1 CHECK (authorization_revision > 0),
++    credential_generation bigint NOT NULL DEFAULT 1 CHECK (credential_generation > 0),
++    renewal_attempt_id uuid,
++    renewal_generation bigint,
++    renewal_started_at timestamptz,
++    renewal_deadline timestamptz,
++    status text NOT NULL CHECK (status IN ('ready', 'reconnect_required', 'disconnected')),
++    metadata text NOT NULL CHECK (octet_length(metadata) <= 4096 AND jsonb_typeof(metadata::jsonb) = 'object'
++        AND (metadata::jsonb ? 'label') AND jsonb_typeof(metadata::jsonb->'label') = 'string'
++        AND octet_length(metadata::jsonb->>'label') BETWEEN 1 AND 256
++        AND btrim(metadata::jsonb->>'label') <> ''
++        AND metadata::jsonb - ARRAY['label','description'] = '{}'::jsonb
++        AND (NOT (metadata::jsonb ? 'description') OR jsonb_typeof(metadata::jsonb->'description') IN ('string','null'))),
++    created_at timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
++    updated_at timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
++    UNIQUE (owner_namespace, owner_subject, key),
++    UNIQUE (owner_namespace, owner_subject, provider_id, authorization_key),
++    FOREIGN KEY (owner_namespace, owner_subject) REFERENCES public.integration_owner_states(owner_namespace, owner_subject),
++    CHECK ((auth_method = 'static_secret' AND credential_schema = 'static-v1' AND external_identity IS NULL AND authorization_key IS NULL)
++        OR (auth_method = 'oauth_authorization_code' AND credential_schema IN ('google-v1', 'workspace-fixture-v1', 'workspace-rotating-fixture-v1')
++            AND external_identity IS NOT NULL AND authorization_key IS NOT NULL)),
++    CHECK (external_identity IS NULL OR (external_identity::jsonb ?& ARRAY['kind','subject','authorization_key']
++        AND external_identity::jsonb - ARRAY['kind','subject','authorization_key'] = '{}'::jsonb
++        AND jsonb_typeof(external_identity::jsonb->'kind') = 'string'
++        AND jsonb_typeof(external_identity::jsonb->'subject') = 'string'
++        AND jsonb_typeof(external_identity::jsonb->'authorization_key') = 'string'
++        AND octet_length(external_identity::jsonb->>'kind') BETWEEN 1 AND 128
++        AND octet_length(external_identity::jsonb->>'subject') BETWEEN 1 AND 256
++        AND external_identity::jsonb->>'authorization_key' = authorization_key)),
++    CHECK ((renewal_attempt_id IS NULL AND renewal_generation IS NULL AND renewal_started_at IS NULL AND renewal_deadline IS NULL)
++        OR (renewal_attempt_id IS NOT NULL AND renewal_generation IS NOT NULL AND renewal_started_at IS NOT NULL AND renewal_deadline IS NOT NULL
++            AND auth_method = 'oauth_authorization_code' AND status = 'ready' AND envelope IS NOT NULL
++            AND renewal_generation = credential_generation AND renewal_deadline > renewal_started_at
++            AND renewal_deadline <= renewal_started_at + interval '10 seconds')),
++    CHECK ((status <> 'ready' OR envelope IS NOT NULL) AND (status <> 'disconnected' OR envelope IS NULL))
++);
++-- workspace-fixture-v1 is a contract-test schema, never enabled in the production registry.
++CREATE FUNCTION public.guard_integration_account() RETURNS trigger LANGUAGE plpgsql AS $$
++DECLARE owner_retired boolean;
++BEGIN
++    IF TG_OP = 'UPDATE' THEN
++        IF ROW(NEW.id, NEW.owner_namespace, NEW.owner_subject, NEW.key, NEW.provider_id,
++            NEW.auth_config_id, NEW.auth_method, NEW.credential_schema, NEW.external_identity, NEW.authorization_key)
++            IS DISTINCT FROM ROW(OLD.id, OLD.owner_namespace, OLD.owner_subject, OLD.key, OLD.provider_id,
++            OLD.auth_config_id, OLD.auth_method, OLD.credential_schema, OLD.external_identity, OLD.authorization_key) THEN
++            RAISE EXCEPTION USING ERRCODE = '23514', CONSTRAINT = 'integration_account_immutable_identity', MESSAGE = 'Immutable integration identity';
++        END IF;
++        RETURN NEW;
++    END IF;
++    INSERT INTO public.integration_owner_states(owner_namespace, owner_subject)
++        VALUES(NEW.owner_namespace, NEW.owner_subject) ON CONFLICT DO NOTHING;
++    SELECT retired INTO owner_retired FROM public.integration_owner_states
++        WHERE owner_namespace = NEW.owner_namespace AND owner_subject = NEW.owner_subject FOR UPDATE;
++    IF owner_retired THEN
++        RAISE EXCEPTION USING ERRCODE = '23514', CONSTRAINT = 'integration_owner_retired', MESSAGE = 'Integration owner retired';
++    END IF;
++    IF (SELECT count(*) FROM public.integration_accounts
++        WHERE owner_namespace = NEW.owner_namespace AND owner_subject = NEW.owner_subject) >= 128 THEN
++        RAISE EXCEPTION USING ERRCODE = '23514', CONSTRAINT = 'integration_account_owner_cap', MESSAGE = 'Integration account limit';
++    END IF;
++    RETURN NEW;
++END $$;
++CREATE TRIGGER integration_account_guard BEFORE INSERT OR UPDATE ON public.integration_accounts
++    FOR EACH ROW EXECUTE FUNCTION public.guard_integration_account();
++
++CREATE TABLE public.integration_teardown_intents (
++    id uuid PRIMARY KEY,
++    kind text NOT NULL CHECK (kind IN ('owner', 'company', 'membership')),
++    owner_namespace text NOT NULL CHECK (octet_length(owner_namespace) BETWEEN 1 AND 256),
++    owner_subject text NOT NULL CHECK (octet_length(owner_subject) <= 256),
++    host_binding text NOT NULL CHECK (octet_length(host_binding) <= 256),
++    state text NOT NULL DEFAULT 'pending' CHECK (state IN ('pending', 'completed', 'failed')),
++    attempts integer NOT NULL DEFAULT 0 CHECK (attempts BETWEEN 0 AND 8),
++    available_at timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
++    created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
++    completed_at timestamptz,
++    UNIQUE (kind, owner_namespace, owner_subject, host_binding),
++    CHECK ((kind = 'owner' AND owner_subject <> '' AND host_binding = '')
++        OR (kind = 'company' AND owner_subject = '' AND host_binding <> '')
++        OR (kind = 'membership' AND owner_subject <> '' AND host_binding <> ''))
++);
++CREATE INDEX integration_teardown_due ON public.integration_teardown_intents(available_at, id) WHERE state = 'pending';
++
++-- Owner consent is module-owned. Host identities remain opaque, with no host FK.
++ALTER TABLE public.integration_accounts ADD UNIQUE (owner_namespace,owner_subject,id);
++CREATE TABLE public.integration_use_grants (
++    id uuid PRIMARY KEY,
++    account_id uuid NOT NULL,
++    owner_namespace text NOT NULL,
++    owner_subject text NOT NULL,
++    host_scope text NOT NULL CHECK (octet_length(host_scope) BETWEEN 1 AND 256),
++    host_binding text NOT NULL CHECK (octet_length(host_binding) BETWEEN 1 AND 256),
++    app_id text NOT NULL CHECK (octet_length(app_id) BETWEEN 1 AND 128),
++    app_policy text NOT NULL CHECK (app_policy ~ '^[0-9a-f]{64}$'),
++    destination text NOT NULL CHECK (octet_length(destination) BETWEEN 8 AND 2048),
++    purpose text NOT NULL CHECK (purpose IN ('http','mcp')),
++    account_authorization bigint NOT NULL CHECK (account_authorization>0),
++    revision bigint NOT NULL CHECK (revision>0),
++    enabled boolean NOT NULL,
++    confirmed_at timestamptz NOT NULL DEFAULT clock_timestamp(),
++    FOREIGN KEY (owner_namespace,owner_subject,account_id)
++        REFERENCES public.integration_accounts(owner_namespace,owner_subject,id) ON DELETE CASCADE,
++    UNIQUE (account_id,host_binding)
++);
++CREATE FUNCTION public.guard_integration_grant() RETURNS trigger LANGUAGE plpgsql AS $$
++BEGIN
++    PERFORM id FROM public.integration_accounts WHERE id=NEW.account_id FOR UPDATE;
++    IF TG_OP='INSERT' THEN
++        IF NOT EXISTS(SELECT 1 FROM public.integration_use_grants WHERE account_id=NEW.account_id AND host_binding=NEW.host_binding)
++            AND (SELECT count(*) FROM public.integration_use_grants WHERE account_id=NEW.account_id)>=128 THEN
++            RAISE EXCEPTION USING ERRCODE='23514',CONSTRAINT='integration_grant_cap',MESSAGE='Integration grant limit';
++        END IF;
++    ELSIF ROW(NEW.id,NEW.account_id,NEW.owner_namespace,NEW.owner_subject,NEW.host_scope,NEW.host_binding)
++            IS DISTINCT FROM ROW(OLD.id,OLD.account_id,OLD.owner_namespace,OLD.owner_subject,OLD.host_scope,OLD.host_binding)
++        OR NEW.revision<>OLD.revision+1 THEN
++        RAISE EXCEPTION USING ERRCODE='23514',CONSTRAINT='integration_grant_revision',MESSAGE='Invalid grant transition';
++    END IF;
++    RETURN NEW;
++END $$;
++CREATE TRIGGER integration_grant_guard BEFORE INSERT OR UPDATE ON public.integration_use_grants
++    FOR EACH ROW EXECUTE FUNCTION public.guard_integration_grant();
++
++ALTER TABLE public.workflow_http_connections
++    ADD COLUMN integration_account_id uuid,
++    ADD COLUMN integration_grant_id uuid,
++    ADD COLUMN integration_authorization bigint,
++    ADD COLUMN integration_grant_revision bigint,
++    ADD CONSTRAINT workflow_http_credential_source CHECK (
++        (num_nonnulls(integration_account_id,integration_grant_id,integration_authorization,integration_grant_revision)=0)
++        OR (NOT bearer AND num_nonnulls(integration_account_id,integration_grant_id,integration_authorization,integration_grant_revision)=4
++            AND integration_authorization>0 AND integration_grant_revision>0));
++ALTER TABLE public.company_mcp_connections DROP CONSTRAINT company_mcp_connections_auth_type_check;
++ALTER TABLE public.company_mcp_connections
++    ADD COLUMN integration_account_id uuid,
++    ADD COLUMN integration_grant_id uuid,
++    ADD COLUMN integration_authorization bigint,
++    ADD COLUMN integration_grant_revision bigint,
++    ADD CONSTRAINT company_mcp_credential_source CHECK (
++        (auth_type IN ('none','bearer') AND num_nonnulls(integration_account_id,integration_grant_id,integration_authorization,integration_grant_revision)=0)
++        OR (auth_type='integration' AND num_nonnulls(integration_account_id,integration_grant_id,integration_authorization,integration_grant_revision)=4
++            AND integration_authorization>0 AND integration_grant_revision>0));
++CREATE TABLE public.integration_binding_proposals (
++    id uuid PRIMARY KEY,
++    company_id uuid NOT NULL REFERENCES public.companies(id) ON DELETE CASCADE,
++    connection_id uuid NOT NULL,
++    kind text NOT NULL CHECK (kind IN ('http','mcp')),
++    administrator_id uuid NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
++    connection_revision bigint NOT NULL CHECK (connection_revision>0),
++    app_id text NOT NULL CHECK (octet_length(app_id) BETWEEN 1 AND 128),
++    app_policy text NOT NULL CHECK (app_policy ~ '^[0-9a-f]{64}$'),
++    destination text NOT NULL CHECK (octet_length(destination) BETWEEN 8 AND 2048),
++    expires_at timestamptz NOT NULL,
++    consumed boolean NOT NULL DEFAULT false
++);
++
++-- Bounded private external-app consent; never Openbot sign-in state.
++CREATE TABLE integration_connect_attempts (
++    id UUID PRIMARY KEY,
++    owner_namespace TEXT NOT NULL,
++    owner_subject TEXT NOT NULL,
++    facts TEXT NOT NULL CHECK(octet_length(facts)<=4096 AND jsonb_typeof(facts::jsonb)='object'),
++    status TEXT NOT NULL CHECK(status IN ('pending','processing','connected','denied','expired','cancelled','missing_permissions','missing_refresh','identity_mismatch','conflict','provider_error','configuration','admin_blocked')),
++    envelope TEXT CHECK(octet_length(envelope)<=23000),
++    account_id UUID,
++    created_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
++    expires_at TIMESTAMPTZ NOT NULL,
++    FOREIGN KEY(owner_namespace,owner_subject) REFERENCES integration_owner_states(owner_namespace,owner_subject),
++    FOREIGN KEY(owner_namespace,owner_subject,account_id) REFERENCES integration_accounts(owner_namespace,owner_subject,id) ON DELETE SET NULL(account_id),
++    CHECK(expires_at>created_at AND expires_at<=created_at+interval '10 minutes'),
++    CHECK((status='pending')=(envelope IS NOT NULL)),
++    CHECK(account_id IS NULL OR status='connected')
++);
++CREATE INDEX integration_connect_owner ON integration_connect_attempts(owner_namespace,owner_subject,created_at,id);
++CREATE FUNCTION integration_connect_guard() RETURNS TRIGGER LANGUAGE plpgsql AS $$
++DECLARE retired_owner BOOLEAN; active_count BIGINT; terminal_count BIGINT; total_count BIGINT;
++BEGIN
++    IF TG_OP='UPDATE' THEN
++        IF (NEW.id,NEW.owner_namespace,NEW.owner_subject,NEW.facts,NEW.created_at,NEW.expires_at)
++           IS DISTINCT FROM (OLD.id,OLD.owner_namespace,OLD.owner_subject,OLD.facts,OLD.created_at,OLD.expires_at) THEN
++            RAISE EXCEPTION 'immutable connect facts' USING ERRCODE='23514';
++        END IF;
++        IF NEW.status IS DISTINCT FROM OLD.status AND
++           NOT ((OLD.status='pending' AND NEW.status IN ('processing','expired','cancelled')) OR
++                (OLD.status='processing' AND NEW.status NOT IN ('pending','processing'))) THEN
++            RAISE EXCEPTION 'invalid connect transition' USING ERRCODE='23514';
++        END IF;
++        IF NEW.account_id IS DISTINCT FROM OLD.account_id AND
++           NOT ((OLD.status='processing' AND NEW.status='connected') OR NEW.account_id IS NULL) THEN
++            RAISE EXCEPTION 'invalid connect account' USING ERRCODE='23514';
++        END IF;
++        -- Rewrapping takes only this row. Never invert owner -> attempt locking.
++        IF NEW.status=OLD.status THEN RETURN NEW; END IF;
++    ELSE
++        INSERT INTO integration_owner_states(owner_namespace,owner_subject,retired)
++            VALUES(NEW.owner_namespace,NEW.owner_subject,FALSE) ON CONFLICT DO NOTHING;
++        IF NEW.status<>'pending' OR NEW.account_id IS NOT NULL THEN
++            RAISE EXCEPTION 'invalid initial connect state' USING ERRCODE='23514';
++        END IF;
++    END IF;
++    SELECT retired INTO retired_owner FROM integration_owner_states
++        WHERE owner_namespace=NEW.owner_namespace AND owner_subject=NEW.owner_subject FOR UPDATE;
++    IF retired_owner IS DISTINCT FROM FALSE THEN
++        RAISE EXCEPTION 'owner retired' USING ERRCODE='23514',CONSTRAINT='integration_owner_retired';
++    END IF;
++    SELECT count(*),count(*) FILTER(WHERE status IN ('pending','processing') AND expires_at>clock_timestamp()),
++           count(*) FILTER(WHERE status NOT IN ('pending','processing'))
++      INTO total_count,active_count,terminal_count FROM integration_connect_attempts
++      WHERE owner_namespace=NEW.owner_namespace AND owner_subject=NEW.owner_subject AND id<>NEW.id;
++    IF total_count>=40 OR (NEW.status IN ('pending','processing') AND active_count>=8) OR
++       (NEW.status NOT IN ('pending','processing') AND terminal_count>=32) THEN
++        RAISE EXCEPTION 'connect cap reached' USING ERRCODE='23514',CONSTRAINT='integration_connect_cap';
++    END IF;
++    RETURN NEW;
++END $$;
++CREATE TRIGGER integration_connect_guard BEFORE INSERT OR UPDATE ON integration_connect_attempts
++    FOR EACH ROW EXECUTE FUNCTION integration_connect_guard();

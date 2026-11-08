@@ -133,6 +133,7 @@ pub fn profile_pane(pane: &ProfilePane<'_>) -> String {
             {identity}
             {login_methods}
             {notifications}
+            <section class="mb-6 rounded-box border border-base-300 p-5"><h2 class="text-lg font-semibold">Vault / Connected apps</h2><a class="link" href="/ui/profile/vault">Manage private credentials</a></section>
             {password}
         </div>
         "##,

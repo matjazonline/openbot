@@ -129,6 +129,7 @@ async fn call(
         },
         arguments,
         context: ActionPolicyContext {
+            integration: None,
             origin: crate::application::agent::ToolCallOrigin::Workflow,
             actor: owner(f).user_id(),
             capability_ceiling: vec![contract.policy.capability.clone()],

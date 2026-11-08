@@ -399,6 +399,55 @@ legitimately request the plaintext in order to call the provider. Moving the KEK
 change to two functions in `src/adapters/persistence/credentials/envelope.rs` and does not change the
 stored format; revisit it when the deployment holds credentials for workspaces it does not own.
 
+### Private vault and deletion recovery
+
+The profile's **Vault / Connected apps** page stores reusable static bearer tokens and API keys
+for the code-registered `X-API-Key` header. Values are encrypted on the server with the existing
+credential key ring; this is not end-to-end encryption. Forms offer replacement, never readback.
+Company attachment uses an administrator's proposal followed by the credential owner's explicit
+confirmation of the company, connection, app and exact destination. Only deterministic workflow
+operations may use these grants; generic model tools cannot. Separate Google mailbox consent and
+private credential renewal are implemented. Business integration execution follows in phase 06.
+Google sign-in remains a separate login flow.
+
+`integration_accounts.envelope` participates in the same `credentials status` and
+`credentials rotate` commands below, including keyset batches, unavailable-key reporting and
+convergence checks. Ready and reconnect-required rows with envelopes are inventoried; disconnected
+rows have none. The vault uses its own owner/account/provider/config/type-bound encryption context
+and a 16 KiB decrypted limit. Existing credential contexts keep their existing limits. Rewrapping
+uses ciphertext compare-and-swap and preserves account/authorization revisions and credential
+generation, so it cannot overwrite a concurrent logical credential write.
+
+Host user/company/membership deletion records idempotent teardown intent before removing host
+state. Owner retirement clears usable credentials immediately; cleanup retries do not restore them.
+Company and membership cleanup invalidate only their grants and preserve private accounts.
+Pending or failed teardown blocks those grants immediately, and bounded cleanup uses the actual
+revocation timestamp so removal/readdition cannot restore old consent. The local user-deletion
+adapter implements this lifecycle port; no new browser user-deletion route is exposed.
+
+The existing supervised worker group drains at most 16 intents per iteration. Company/member
+cleanup processes at most 64 accounts per intent transaction and immediately continues only after
+making durable progress. Cleanup errors roll
+back to a per-intent savepoint, persist retry eligibility and back off 64, 128, then 256 seconds; after
+8 failures the intent remains observable as `failed`. Cancellation rolls back in-progress cleanup;
+a restart resumes retained pending intents. Database outages use an additional 5-second worker
+backoff. Diagnose counts without selecting credentials:
+
+```sql
+SELECT kind, state, count(*), min(available_at), max(attempts)
+FROM integration_teardown_intents
+GROUP BY kind, state;
+```
+
+After resolving a failed cleanup's database/locking cause, an operator may retry that intent
+idempotently (bind `intent_id` through psql's `-v` option):
+
+```sql
+UPDATE integration_teardown_intents
+SET state = 'pending', attempts = 0, available_at = clock_timestamp()
+WHERE id = :'intent_id'::uuid AND state = 'failed';
+```
+
 ### Multi-Machine credential-key rotation
 
 Never replace bytes under an existing version number: authenticated decryption of data written with
@@ -669,3 +718,75 @@ Use isolated scripted samples before a controlled live evaluation and inspect
 run history and company model usage. Provider usage is billed by TypeSafe; local
 estimates and configured prices are not invoices. Operational failure/recovery and
 revocation semantics are in the [Jev runbook](workflow-operations.md#typesafe-jev-evaluation).
+
+### Google connected apps
+
+Google mailbox consent uses the existing `GOOGLE_OAUTH_CLIENT_ID` and
+`GOOGLE_OAUTH_CLIENT_SECRET` pair. It has a separate callback and credential store
+from Openbot sign-in. Register both the existing sign-in redirect and
+`<public-base>/auth/integrations/google/callback` on that web OAuth client; the public
+base comes from the application's `APP_DOMAIN_NAME` configuration. Use HTTPS for
+public deployments. The integration authorization flow requests offline access,
+PKCE, `openid`, `email`, `gmail.readonly`, and `gmail.send`. Connecting is an explicit
+owner action; ordinary workflow runs do not prompt for consent. See Google's
+[web-server authorization guide](https://developers.google.com/identity/protocols/oauth2/web-server).
+
+Enable `gmail.googleapis.com` in the client project's API library, following
+[Google's API enablement instructions](https://developers.google.com/workspace/guides/enable-apis).
+Choose an audience that includes the accounts you intend to connect: personal
+Gmail accounts need an External audience. In Testing, add the intended accounts
+as test users. Google's [audience guide](https://support.google.com/cloud/answer/15549945?hl=en)
+explains the available audiences and testing restrictions. External Testing
+refresh grants with Gmail scopes ordinarily expire after seven days; see
+[Google's token expiration rules](https://developers.google.com/identity/protocols/oauth2).
+
+`gmail.send` is sensitive and `gmail.readonly` is restricted. Public use can require
+OAuth verification, and storing or transmitting restricted-scope data can require
+a security assessment. Draft management is not included. Check Google's
+[current Gmail scope requirements](https://developers.google.com/workspace/gmail/api/auth/scopes)
+for your deployment. Workspace administrators may additionally restrict or block
+the app through [API controls](https://knowledge.workspace.google.com/admin/apps/control-which-third-party-and-internal-apps-access-google-workspace-data).
+Credential configuration alone does not establish Google verification or Workspace
+approval; startup does not contact Google to validate those approvals.
+
+A connected mailbox may differ from the owner's Openbot login address. Consent
+saves a private account; each company connection still needs the owner's explicit
+binding confirmation. Reconnecting changes authorization identity and requires
+fresh confirmation for existing company grants. Disconnecting locally erases usable
+local credentials and denies those grants; it does not revoke Google's combined
+project grant. Removing one company binding also does not revoke that provider grant.
+
+Connect attempts expire after ten minutes, with at most eight active attempts and
+32 retained outcomes per owner. PKCE verifiers are encrypted in the credential key
+inventory, erased when consumed or when bounded owner maintenance observes expiry,
+and removed on owner retirement. Keep encryption keys available until the existing
+rotation/status commands report convergence. Scripted provider tests do not establish
+live-project readiness. Business Gmail HTTP/MCP transport is delivered by vault
+phase 06, after authorization and private renewal are integrated.
+
+### Private credential renewal
+
+Vault phase 05 supplies the private resolver for the authenticated transports planned in phase 06.
+Workflow handlers and the public gateway do not receive credential bytes. Google renewal uses
+one account lock across its bounded token request and credential write, shared by every permitted
+app and HTTP/MCP connection using that account. A cached access token needs at least 60 seconds
+remaining. Entry-lock waits are limited to 5 seconds and provider work to 10 seconds, capped by the
+caller deadline; total resolution is capped at 30 seconds. These are code limits, not additional
+environment settings. Resolver transactions use a local 12-second idle allowance; general pool
+and workflow transaction limits are unchanged.
+
+Temporary Google failures persist a shared bounded retry time, normally 30 seconds, while keeping
+the owner's consent identity. An invalid grant clears usable local credentials and requires
+reconnect. Invalid client configuration reports an operator error without marking every user's
+grant revoked. Disconnect and removal check the consent revision, so an ordinary cache refresh
+cannot defeat the owner's pending local action. Reconnect advances that revision; existing
+company grants need fresh owner confirmation and old business approvals remain stale.
+
+Reusable Google refresh is distinct from the strict rotating-token fixture protocol. A strict
+provider records a durable pending attempt before contacting the endpoint; an unresolved expired
+attempt requires reconnect. Cancellation and ambiguous responses preserve that marker. Database
+commit errors trigger a durable reread before another decision. This does not promise exactly-once
+provider requests across crashes. Tests use real PostgreSQL transactions, separate pools and
+scripted loopback endpoints, including lost commit acknowledgements; they do not establish live
+Google project readiness. Local disconnect never automatically revokes the project's combined
+Google authorization.

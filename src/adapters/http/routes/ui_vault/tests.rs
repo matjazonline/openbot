@@ -1,0 +1,351 @@
+use super::*;
+use crate::app_error::AppError;
+use crate::{
+    adapters::{
+        http::{auth, security, session::SessionAuthority},
+        integrations::owner::owner_for_user,
+        persistence::{
+            PostgresPersistence,
+            credentials::CredentialCipher,
+            integrations::PostgresVault,
+            test_support::{OwnDatabase, own_database},
+        },
+    },
+    application::integrations::private::CredentialStore,
+    use_cases::user::UserPersistence,
+};
+use axum::{
+    body::{Body, to_bytes},
+    http::{Request, StatusCode},
+    middleware,
+    response::IntoResponse,
+};
+use secrecy::ExposeSecret;
+use tower::ServiceExt;
+struct Fixture {
+    persistence: PostgresPersistence,
+    _database: OwnDatabase,
+    vault: PostgresVault,
+    gateway: Arc<dyn IntegrationGateway>,
+    user: Uuid,
+}
+impl Fixture {
+    async fn new() -> Self {
+        let database = own_database().await.expect("disposable database required");
+        let persistence = PostgresPersistence::with_credential_cipher(
+            database.pool.clone(),
+            CredentialCipher::for_test_with_keys(&[(1, [7; 32])], 1),
+        );
+        let vault = PostgresVault::new(persistence.clone());
+        let gateway = vault.gateway(Arc::new(
+            crate::adapters::persistence::integration_bindings::PostgresIntegrationBindings::new(
+                persistence.clone(),
+            ),
+        ),Arc::new(crate::application::integrations::unavailable::UnavailableIntegrations));
+        Self {
+            persistence,
+            _database: database,
+            vault,
+            gateway,
+            user: Uuid::new_v4(),
+        }
+    }
+    fn auth(&self) -> AuthenticatedUser {
+        AuthenticatedUser { id: self.user }
+    }
+    fn form(&self, value: &str, revision: Option<i64>) -> StaticForm {
+        StaticForm {
+            key: "private/key".into(),
+            app: "static-bearer".into(),
+            label: "Private label".into(),
+            value: SecretString::from(value.to_owned()),
+            expected_revision: revision,
+        }
+    }
+    async fn account(&self) -> ConnectedAccount {
+        self.gateway
+            .list_accounts(
+                &verified_owner(&self.auth()),
+                PageRequest::new(None, 50).unwrap(),
+            )
+            .await
+            .unwrap()
+            .accounts
+            .remove(0)
+    }
+}
+#[tokio::test]
+async fn vault_management_owner_crud_stale_revision_foreign_ids_and_no_readback() {
+    let f = Fixture::new().await;
+    let html = create(
+        State(f.gateway.clone()),
+        f.auth(),
+        Form(f.form("sentinel-vault-secret", None)),
+    )
+    .await
+    .unwrap()
+    .0;
+    assert!(!html.contains("sentinel-vault-secret") && !html.contains("enc:v2"));
+    assert!(html.contains("separate owner confirmation"));
+    assert!(!html.contains("data-submit=\"busy-once\""));
+    assert_eq!(
+        html.matches("<form ").count(),
+        html.matches("hx-sync=\"this:drop\"").count()
+    );
+
+    let account = f.account().await;
+    let owner = owner_for_user(f.user);
+    assert!(
+        f.vault
+            .read_usable(&owner, account.id)
+            .await
+            .unwrap()
+            .payload
+            .expose_secret()
+            == "sentinel-vault-secret"
+    );
+    deny_foreign(&f, account.id).await;
+    let html = replace(
+        State(f.gateway.clone()),
+        f.auth(),
+        Path(account.id.as_uuid()),
+        Form(f.form("replacement-vault-secret", Some(1))),
+    )
+    .await
+    .unwrap()
+    .0;
+    assert!(!html.contains("replacement-vault-secret"));
+    assert!(html.contains("Replacement secret"));
+    assert!(matches!(
+        replace(
+            State(f.gateway.clone()),
+            f.auth(),
+            Path(account.id.as_uuid()),
+            Form(f.form("stale-secret", Some(1)))
+        )
+        .await,
+        Err(AppError::Conflict(_))
+    ));
+    let inspection = f
+        .gateway
+        .inspect_grants(&verified_owner(&f.auth()), account.id, None)
+        .await
+        .unwrap();
+    assert!(inspection.attachment_available && inspection.grants.is_empty());
+    let removed = remove(
+        State(f.gateway.clone()),
+        f.auth(),
+        Path(account.id.as_uuid()),
+        Query(RevisionInput {
+            expected_revision: 2,
+        }),
+    )
+    .await
+    .unwrap();
+    assert!(!removed.0.contains("replacement-vault-secret"));
+    assert!(
+        f.gateway
+            .get_account(&verified_owner(&f.auth()), account.id)
+            .await
+            .is_err()
+    );
+}
+#[tokio::test]
+async fn vault_management_errors_and_html_escape_labels_and_keep_secret_inputs_blank() {
+    let f = Fixture::new().await;
+    let mut form = f.form("saved-secret", None);
+    form.label = "\"/><script>alert(1)</script>".into();
+    let html = create(State(f.gateway.clone()), f.auth(), Form(form))
+        .await
+        .unwrap()
+        .0;
+    assert!(!html.contains("<script>alert(1)"));
+    assert!(!html.contains("saved-secret"));
+    assert!(html.contains("name=\"value\"") && !html.contains("name=\"value\" value="));
+    let invalid = f.form(r#" {"token":42,"private":"sentinel"}"#, None);
+    let error = create(State(f.gateway.clone()), f.auth(), Form(invalid))
+        .await
+        .unwrap_err();
+    let error = to_bytes(error.into_response().into_body(), 4096)
+        .await
+        .unwrap();
+    let error = String::from_utf8(error.to_vec()).unwrap();
+    assert!(!error.contains("sentinel") && !error.contains("private"));
+}
+#[tokio::test]
+async fn vault_management_real_session_origin_body_limit_and_owner_override_rejection() {
+    let f = Fixture::new().await;
+    let browser = authenticated_browser(&f).await;
+    let app = browser.app;
+    let body = "key=real%2Fkey&app=static-bearer&label=Real&value=submitted-secret";
+    let unauth = app
+        .clone()
+        .oneshot(request(body, Some("http://localhost:3000"), None))
+        .await
+        .unwrap();
+    assert_eq!(unauth.status(), StatusCode::SEE_OTHER);
+    for origin in [None, Some("https://foreign.invalid")] {
+        assert_eq!(
+            app.clone()
+                .oneshot(request(body, origin, Some(&browser.cookie)))
+                .await
+                .unwrap()
+                .status(),
+            StatusCode::FORBIDDEN
+        );
+    }
+    let override_body = format!("{body}&user_id={}", Uuid::new_v4());
+    assert!(
+        app.clone()
+            .oneshot(request(
+                &override_body,
+                Some("http://localhost:3000"),
+                Some(&browser.cookie)
+            ))
+            .await
+            .unwrap()
+            .status()
+            .is_client_error()
+    );
+    let too_big = format!(
+        "key=too-big&app=static-bearer&label=Large&value={}",
+        "x".repeat(65536)
+    );
+    assert_eq!(
+        app.clone()
+            .oneshot(request(
+                &too_big,
+                Some("http://localhost:3000"),
+                Some(&browser.cookie)
+            ))
+            .await
+            .unwrap()
+            .status(),
+        StatusCode::PAYLOAD_TOO_LARGE
+    );
+    let saved = app
+        .clone()
+        .oneshot(request(
+            body,
+            Some("http://localhost:3000"),
+            Some(&browser.cookie),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(saved.status(), StatusCode::OK);
+    let saved = String::from_utf8(
+        to_bytes(saved.into_body(), 128 * 1024)
+            .await
+            .unwrap()
+            .to_vec(),
+    )
+    .unwrap();
+    assert!(!saved.contains("submitted-secret"));
+    let owner = VerifiedOwner::from_verified_client(owner_for_user(browser.user));
+    remove_over_http(&f, app, &browser.cookie, &owner).await;
+}
+
+async fn deny_foreign(f: &Fixture, id: AccountId) {
+    let foreign = AuthenticatedUser { id: Uuid::new_v4() };
+    assert!(matches!(
+        detail(
+            State(f.gateway.clone()),
+            foreign.clone(),
+            Path(id.as_uuid()),
+            Query(GrantQuery { after: None })
+        )
+        .await,
+        Err(AppError::NotFound(_))
+    ));
+    let denied = replace(
+        State(f.gateway.clone()),
+        foreign,
+        Path(id.as_uuid()),
+        Form(f.form("foreign-secret", Some(1))),
+    )
+    .await
+    .unwrap_err();
+    assert!(
+        !format!("{denied}").contains("Private label")
+            && !format!("{denied}").contains("foreign-secret")
+    );
+}
+
+struct Browser {
+    app: Router,
+    cookie: String,
+    user: Uuid,
+}
+async fn authenticated_browser(f: &Fixture) -> Browser {
+    let marker = Uuid::new_v4().simple().to_string();
+    let user = f
+        .persistence
+        .create_user(
+            &format!("vault-{marker}"),
+            &format!("vault-{marker}@example.test"),
+            "fixture-hash",
+        )
+        .await
+        .unwrap();
+    let config = Arc::new(AppConfig::for_test());
+    let sessions = Arc::new(SessionAuthority::new(
+        &config,
+        Arc::new(f.persistence.clone()),
+    ));
+    let cookie = sessions.cookie(&user).await.unwrap();
+    let cookie = format!("{}={}", cookie.name(), cookie.value());
+    let app = mutation_router()
+        .with_state(f.gateway.clone())
+        .layer(middleware::from_fn_with_state(sessions, auth::require_auth))
+        .layer(middleware::from_fn_with_state(
+            config,
+            security::browser_security,
+        ));
+    Browser {
+        app,
+        cookie,
+        user: user.id,
+    }
+}
+fn request(body: &str, origin: Option<&str>, session_cookie: Option<&str>) -> Request<Body> {
+    let mut builder = Request::builder()
+        .method("POST")
+        .uri("/ui/profile/vault")
+        .header("host", "localhost:3000")
+        .header("content-type", "application/x-www-form-urlencoded");
+    if let Some(cookie) = session_cookie {
+        builder = builder.header("cookie", cookie);
+    }
+    if let Some(origin) = origin {
+        builder = builder.header("origin", origin);
+    }
+    builder.body(Body::from(body.to_owned())).unwrap()
+}
+
+async fn remove_over_http(f: &Fixture, app: Router, cookie: &str, owner: &VerifiedOwner) {
+    let account = f
+        .gateway
+        .list_accounts(owner, PageRequest::new(None, 50).unwrap())
+        .await
+        .unwrap()
+        .accounts
+        .remove(0);
+    let removal = Request::builder()
+        .method("DELETE")
+        .uri(format!(
+            "/ui/profile/vault/{}?expected_revision={}",
+            account.id.as_uuid(),
+            account.revision.get()
+        ))
+        .header("host", "localhost:3000")
+        .header("origin", "http://localhost:3000")
+        .header("cookie", cookie)
+        .body(Body::empty())
+        .unwrap();
+    let removed = app.oneshot(removal).await.unwrap();
+    assert_eq!(removed.status(), StatusCode::OK);
+    assert!(matches!(
+        f.gateway.get_account(owner, account.id).await,
+        Err(IntegrationError::NotFound)
+    ));
+}

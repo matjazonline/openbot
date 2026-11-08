@@ -523,3 +523,6 @@ mod continuation_tests;
 
 #[path = "action_approval_review_tests.rs"]
 mod review_tests;
+
+#[path = "vault_tests/approval.rs"]
+mod vault_approval_tests;

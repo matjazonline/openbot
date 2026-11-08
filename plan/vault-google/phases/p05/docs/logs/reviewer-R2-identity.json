@@ -1,0 +1,35 @@
+{
+  "round": "VG-P05-B1-R2",
+  "digest": "9d561a9cd7b6e4662d859bca78e70b0739b985b1dad6d8e75e5f30b68311088b",
+  "head": "97e5d60dc538e26c7cb976a8d63772eed80baff2",
+  "excludes": [
+    "plan/vault-google/COORDINATION.md",
+    "plan/vault-google/phases/p01/docs",
+    "plan/vault-google/phases/p02/docs",
+    "plan/vault-google/phases/p03/docs",
+    "plan/vault-google/phases/p04/docs",
+    "plan/vault-google/phases/p05/docs",
+    "plan/vault-google/integration/channel-p05/docs"
+  ],
+  "coordination_revision": 9,
+  "coordination_pin_match": true,
+  "coordination_sha256": "adc773bbdbd7800e47471881af01d3d7160297e6e09b9cdf47c79434d51b4dd1",
+  "decision_sha256": "a0df7f11553ef95ea538942ee44a3277eb7e97a8934c9cd44b1fd09ae2dc1259",
+  "current_log_hashes_verified": [
+    "style-correction-02.log",
+    "vault-routes-correction-01.log",
+    "main-binary-01.log",
+    "offline-correction-01.log",
+    "clippy-correction-01.log",
+    "format-correction-01.log",
+    "diff-correction-01.log",
+    "transport-correction-01.log",
+    "graft-correction-01.log"
+  ],
+  "reviewer_pure_style_test_pass": true,
+  "production_unchanged": true,
+  "fixture_bytes_identical": true,
+  "full_suite_green": false,
+  "known_remaining_failure": "VG-P05-VF2 baseline overflow fixture SQLSTATE55006",
+  "verdict": "PASS affected correction and final integration; not full-suite-green"
+}

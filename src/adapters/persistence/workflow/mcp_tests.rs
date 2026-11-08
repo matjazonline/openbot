@@ -499,3 +499,6 @@ mod approval_tests;
 
 #[path = "knowledge_mcp_tests.rs"]
 mod knowledge_mcp_tests;
+
+#[path = "vault_tests/mcp.rs"]
+mod vault_authority_tests;

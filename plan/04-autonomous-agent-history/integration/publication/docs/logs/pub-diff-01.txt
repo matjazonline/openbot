@@ -1,0 +1,332 @@
+plan/vault-google/integration/channel-main/docs/logs/combined-vault-vs-main.patch:8: trailing whitespace.
++ 
+plan/vault-google/integration/channel-main/docs/logs/combined-vault-vs-main.patch:59: trailing whitespace.
++ 
+plan/vault-google/integration/channel-main/docs/logs/combined-vault-vs-main.patch:405: trailing whitespace.
++ 
+plan/vault-google/integration/channel-main/docs/logs/combined-vault-vs-main.patch:407: trailing whitespace.
++ 
+plan/vault-google/integration/channel-main/docs/logs/combined-vault-vs-main.patch:417: trailing whitespace.
++ 
+plan/vault-google/integration/channel-main/docs/logs/combined-vault-vs-main.patch:422: trailing whitespace.
++ 
+plan/vault-google/integration/channel-main/docs/logs/combined-vault-vs-main.patch:443: trailing whitespace.
++ 
+plan/vault-google/integration/channel-main/docs/logs/combined-vault-vs-main.patch:448: trailing whitespace.
++ 
+plan/vault-google/integration/channel-main/docs/logs/combined-vault-vs-main.patch:457: trailing whitespace.
++ 
+plan/vault-google/integration/channel-main/docs/logs/combined-vault-vs-main.patch:573: trailing whitespace.
++ 
+plan/vault-google/integration/channel-main/docs/logs/combined-vault-vs-main.patch:677: trailing whitespace.
++ 
+plan/vault-google/integration/channel-main/docs/logs/combined-vault-vs-main.patch:687: trailing whitespace.
++ 
+plan/vault-google/integration/channel-main/docs/logs/combined-vault-vs-main.patch:735: trailing whitespace.
++ 
+plan/vault-google/integration/channel-main/docs/logs/combined-vault-vs-main.patch:949: trailing whitespace.
++ 
+plan/vault-google/integration/channel-main/docs/logs/combined-vault-vs-main.patch:1047: trailing whitespace.
++ 
+plan/vault-google/integration/channel-main/docs/logs/combined-vault-vs-main.patch:1192: trailing whitespace.
++ 
+plan/vault-google/integration/channel-main/docs/logs/combined-vault-vs-main.patch:1205: trailing whitespace.
++ 
+plan/vault-google/integration/channel-main/docs/logs/combined-vault-vs-main.patch:1364: trailing whitespace.
++ 
+plan/vault-google/integration/channel-main/docs/logs/combined-vault-vs-main.patch:1448: trailing whitespace.
++ 
+plan/vault-google/integration/channel-main/docs/logs/combined-vault-vs-main.patch:1568: trailing whitespace.
++ 
+plan/vault-google/integration/channel-main/docs/logs/combined-vault-vs-main.patch:1579: trailing whitespace.
++ 
+plan/vault-google/integration/channel-main/docs/logs/combined-vault-vs-main.patch:1677: trailing whitespace.
++ 
+plan/vault-google/integration/channel-main/docs/logs/combined-vault-vs-main.patch:1758: trailing whitespace.
++ 
+plan/vault-google/integration/channel-main/docs/logs/combined-vault-vs-main.patch:1882: trailing whitespace.
++ 
+plan/vault-google/integration/channel-main/docs/logs/combined-vault-vs-main.patch:1889: trailing whitespace.
++ 
+plan/vault-google/integration/channel-main/docs/logs/vault-05-to-current.diff:90: trailing whitespace.
++ 
+plan/vault-google/integration/channel-main/docs/logs/vault-05-to-current.diff:137: trailing whitespace.
++ 
+plan/vault-google/integration/channel-main/docs/logs/vault-tracked.patch:8: trailing whitespace.
++ 
+plan/vault-google/integration/channel-main/docs/logs/vault-tracked.patch:59: trailing whitespace.
++ 
+plan/vault-google/integration/channel-main/docs/logs/vault-tracked.patch:404: trailing whitespace.
++ 
+plan/vault-google/integration/channel-main/docs/logs/vault-tracked.patch:406: trailing whitespace.
++ 
+plan/vault-google/integration/channel-main/docs/logs/vault-tracked.patch:416: trailing whitespace.
++ 
+plan/vault-google/integration/channel-main/docs/logs/vault-tracked.patch:421: trailing whitespace.
++ 
+plan/vault-google/integration/channel-main/docs/logs/vault-tracked.patch:442: trailing whitespace.
++ 
+plan/vault-google/integration/channel-main/docs/logs/vault-tracked.patch:447: trailing whitespace.
++ 
+plan/vault-google/integration/channel-main/docs/logs/vault-tracked.patch:456: trailing whitespace.
++ 
+plan/vault-google/integration/channel-main/docs/logs/vault-tracked.patch:572: trailing whitespace.
++ 
+plan/vault-google/integration/channel-main/docs/logs/vault-tracked.patch:676: trailing whitespace.
++ 
+plan/vault-google/integration/channel-main/docs/logs/vault-tracked.patch:686: trailing whitespace.
++ 
+plan/vault-google/integration/channel-main/docs/logs/vault-tracked.patch:734: trailing whitespace.
++ 
+plan/vault-google/integration/channel-main/docs/logs/vault-tracked.patch:948: trailing whitespace.
++ 
+plan/vault-google/integration/channel-main/docs/logs/vault-tracked.patch:1046: trailing whitespace.
++ 
+plan/vault-google/integration/channel-main/docs/logs/vault-tracked.patch:1191: trailing whitespace.
++ 
+plan/vault-google/integration/channel-main/docs/logs/vault-tracked.patch:1204: trailing whitespace.
++ 
+plan/vault-google/integration/channel-main/docs/logs/vault-tracked.patch:1363: trailing whitespace.
++ 
+plan/vault-google/integration/channel-main/docs/logs/vault-tracked.patch:1447: trailing whitespace.
++ 
+plan/vault-google/integration/channel-main/docs/logs/vault-tracked.patch:1567: trailing whitespace.
++ 
+plan/vault-google/integration/channel-main/docs/logs/vault-tracked.patch:1578: trailing whitespace.
++ 
+plan/vault-google/integration/channel-main/docs/logs/vault-tracked.patch:1676: trailing whitespace.
++ 
+plan/vault-google/integration/channel-main/docs/logs/vault-tracked.patch:1757: trailing whitespace.
++ 
+plan/vault-google/integration/channel-main/docs/logs/vault-tracked.patch:1881: trailing whitespace.
++ 
+plan/vault-google/integration/channel-main/docs/logs/vault-tracked.patch:1888: trailing whitespace.
++ 
+plan/vault-google/integration/channel-p05/docs/logs/coordination-r3.md:49: new blank line at EOF.
+plan/vault-google/integration/channel-p05/docs/logs/reviewer-doc-comparison.patch:4: trailing whitespace.
++ 
+plan/vault-google/integration/channel-p05/docs/logs/reviewer-input-comparison.patch:9: trailing whitespace.
++ 
+plan/vault-google/integration/channel-p05/docs/logs/reviewer-input-comparison.patch:18: trailing whitespace.
++ 
+plan/vault-google/integration/channel-p05/docs/logs/reviewer-input-comparison.patch:26: trailing whitespace.
++ 
+plan/vault-google/integration/channel-p05/docs/logs/reviewer-input-comparison.patch:46: trailing whitespace.
++ 
+plan/vault-google/integration/channel-p05/docs/logs/reviewer-input-comparison.patch:66: trailing whitespace.
++ 
+plan/vault-google/integration/channel-p05/docs/logs/reviewer-input-comparison.patch:77: trailing whitespace.
++ 
+plan/vault-google/integration/channel-p05/docs/logs/reviewer-input-comparison.patch:150: trailing whitespace.
++ 
+plan/vault-google/phases/p01/docs/logs/accepted-tracked.patch:8: trailing whitespace.
++ 
+plan/vault-google/phases/p01/docs/logs/accepted-tracked.patch:38: trailing whitespace.
++ 
+plan/vault-google/phases/p02/docs/logs/coordination-acceptance-r2.md:43: new blank line at EOF.
+plan/vault-google/phases/p02/docs/logs/correction-r5.patch:25: trailing whitespace.
++ 
+plan/vault-google/phases/p02/docs/logs/correction-r5.patch:92: trailing whitespace.
++ 
+plan/vault-google/phases/p02/docs/logs/phase02-delta.patch:6: trailing whitespace.
++ 
+plan/vault-google/phases/p02/docs/logs/phase02-delta.patch:51: trailing whitespace.
++ 
+plan/vault-google/phases/p02/docs/logs/phase02-delta.patch:155: trailing whitespace.
++ 
+plan/vault-google/phases/p02/docs/logs/phase02-delta.patch:157: trailing whitespace.
++ 
+plan/vault-google/phases/p02/docs/logs/phase02-delta.patch:164: trailing whitespace.
++ 
+plan/vault-google/phases/p02/docs/logs/phase02-delta.patch:169: trailing whitespace.
++ 
+plan/vault-google/phases/p02/docs/logs/phase02-delta.patch:190: trailing whitespace.
++ 
+plan/vault-google/phases/p02/docs/logs/phase02-delta.patch:887: trailing whitespace.
++ 
+plan/vault-google/phases/p02/docs/logs/phase02-delta.patch:955: trailing whitespace.
++ 
+plan/vault-google/phases/p02/docs/logs/phase02-delta.patch:2809: trailing whitespace.
++ 
+plan/vault-google/phases/p02/docs/logs/phase02-delta.patch:3277: trailing whitespace.
++ 
+plan/vault-google/phases/p02/docs/logs/phase02-delta.patch:3277: new blank line at EOF.
+plan/vault-google/phases/p03/docs/logs/VG-P03-D1-r1.md:16: new blank line at EOF.
+plan/vault-google/phases/p03/docs/logs/VG-P03-D1-r2.md:16: new blank line at EOF.
+plan/vault-google/phases/p03/docs/logs/coordination-r3.md:49: new blank line at EOF.
+plan/vault-google/phases/p03/docs/logs/correction-R2.diff:80: trailing whitespace.
++ 
+plan/vault-google/phases/p03/docs/logs/p03-R1.diff:13: trailing whitespace.
++ 
+plan/vault-google/phases/p03/docs/logs/p03-R1.diff:17: trailing whitespace.
++ 
+plan/vault-google/phases/p03/docs/logs/p03-R1.diff:26: trailing whitespace.
++ 
+plan/vault-google/phases/p03/docs/logs/p03-R1.diff:141: trailing whitespace.
++ 
+plan/vault-google/phases/p03/docs/logs/p03-R1.diff:143: trailing whitespace.
++ 
+plan/vault-google/phases/p03/docs/logs/p03-R1.diff:152: trailing whitespace.
++ 
+plan/vault-google/phases/p03/docs/logs/p03-R1.diff:157: trailing whitespace.
++ 
+plan/vault-google/phases/p03/docs/logs/p03-R1.diff:928: trailing whitespace.
++ 
+plan/vault-google/phases/p03/docs/logs/p03-R1.diff:974: trailing whitespace.
++ 
+plan/vault-google/phases/p03/docs/logs/p03-R1.diff:2138: trailing whitespace.
++ 
+plan/vault-google/phases/p03/docs/logs/p03-R1.diff:2289: trailing whitespace.
++ 
+plan/vault-google/phases/p03/docs/logs/p03-R1.diff:2367: trailing whitespace.
++ 
+plan/vault-google/phases/p03/docs/logs/p03-R1.diff:2837: trailing whitespace.
++ 
+plan/vault-google/phases/p03/docs/logs/p03-R1.diff:2846: trailing whitespace.
++ 
+plan/vault-google/phases/p03/docs/logs/p03-R1.diff:4386: trailing whitespace.
++ 
+plan/vault-google/phases/p03/docs/logs/p03-R1.diff:4509: trailing whitespace.
++ 
+plan/vault-google/phases/p03/docs/logs/p03-R1.diff:4673: trailing whitespace.
++ 
+plan/vault-google/phases/p03/docs/logs/p03-R1.diff:4746: trailing whitespace.
++ 
+plan/vault-google/phases/p04/docs/logs/browser-R2/connect.html:41: trailing whitespace.
++    
+plan/vault-google/phases/p04/docs/logs/browser-R2/connect.html:50: trailing whitespace.
++        
+plan/vault-google/phases/p04/docs/logs/browser-R2/connect.html:54: trailing whitespace.
++                
+plan/vault-google/phases/p04/docs/logs/browser-R2/connect.html:62: trailing whitespace.
++                
+plan/vault-google/phases/p04/docs/logs/browser-R2/connect.html:75: trailing whitespace.
++        
+plan/vault-google/phases/p04/docs/logs/browser-R2/connect.html:76: trailing whitespace.
++                
+plan/vault-google/phases/p04/docs/logs/browser-R2/page.html:41: trailing whitespace.
++    
+plan/vault-google/phases/p04/docs/logs/browser-R2/page.html:50: trailing whitespace.
++        
+plan/vault-google/phases/p04/docs/logs/browser-R2/page.html:54: trailing whitespace.
++                
+plan/vault-google/phases/p04/docs/logs/browser-R2/page.html:62: trailing whitespace.
++                
+plan/vault-google/phases/p04/docs/logs/browser-R2/page.html:75: trailing whitespace.
++        
+plan/vault-google/phases/p04/docs/logs/browser-R2/page.html:76: trailing whitespace.
++                
+plan/vault-google/phases/p04/docs/logs/browser-R2/reconnect.html:41: trailing whitespace.
++    
+plan/vault-google/phases/p04/docs/logs/browser-R2/reconnect.html:50: trailing whitespace.
++        
+plan/vault-google/phases/p04/docs/logs/browser-R2/reconnect.html:54: trailing whitespace.
++                
+plan/vault-google/phases/p04/docs/logs/browser-R2/reconnect.html:62: trailing whitespace.
++                
+plan/vault-google/phases/p04/docs/logs/browser-R2/reconnect.html:75: trailing whitespace.
++        
+plan/vault-google/phases/p04/docs/logs/browser-R2/reconnect.html:76: trailing whitespace.
++                
+plan/vault-google/phases/p04/docs/logs/correction-R2.diff:49: trailing whitespace.
++ 
+plan/vault-google/phases/p04/docs/logs/p04-R1.diff:123: trailing whitespace.
++ 
+plan/vault-google/phases/p04/docs/logs/p04-R1.diff:125: trailing whitespace.
++ 
+plan/vault-google/phases/p04/docs/logs/p04-R1.diff:135: trailing whitespace.
++ 
+plan/vault-google/phases/p04/docs/logs/p04-R1.diff:142: trailing whitespace.
++ 
+plan/vault-google/phases/p04/docs/logs/p04-R1.diff:228: trailing whitespace.
++ 
+plan/vault-google/phases/p04/docs/logs/p04-R1.diff:1117: trailing whitespace.
++ 
+plan/vault-google/phases/p04/docs/logs/p04-R1.diff:1140: trailing whitespace.
++ 
+plan/vault-google/phases/p04/docs/logs/p04-R1.diff:1161: trailing whitespace.
++ 
+plan/vault-google/phases/p04/docs/logs/p04-R1.diff:3916: trailing whitespace.
++ 
+plan/vault-google/phases/p04/docs/logs/p04-R1.diff:3952: trailing whitespace.
++ 
+plan/vault-google/phases/p04/docs/logs/p04-R1.diff:4505: trailing whitespace.
++ 
+plan/vault-google/phases/p04/docs/logs/p04-R1.diff:4682: trailing whitespace.
++ 
+plan/vault-google/phases/p04/docs/logs/reviewer-browser-B2/connect.html:41: trailing whitespace.
++    
+plan/vault-google/phases/p04/docs/logs/reviewer-browser-B2/connect.html:50: trailing whitespace.
++        
+plan/vault-google/phases/p04/docs/logs/reviewer-browser-B2/connect.html:54: trailing whitespace.
++                
+plan/vault-google/phases/p04/docs/logs/reviewer-browser-B2/connect.html:62: trailing whitespace.
++                
+plan/vault-google/phases/p04/docs/logs/reviewer-browser-B2/connect.html:75: trailing whitespace.
++        
+plan/vault-google/phases/p04/docs/logs/reviewer-browser-B2/connect.html:76: trailing whitespace.
++                
+plan/vault-google/phases/p04/docs/logs/reviewer-browser-B2/page.html:41: trailing whitespace.
++    
+plan/vault-google/phases/p04/docs/logs/reviewer-browser-B2/page.html:50: trailing whitespace.
++        
+plan/vault-google/phases/p04/docs/logs/reviewer-browser-B2/page.html:54: trailing whitespace.
++                
+plan/vault-google/phases/p04/docs/logs/reviewer-browser-B2/page.html:62: trailing whitespace.
++                
+plan/vault-google/phases/p04/docs/logs/reviewer-browser-B2/page.html:75: trailing whitespace.
++        
+plan/vault-google/phases/p04/docs/logs/reviewer-browser-B2/page.html:76: trailing whitespace.
++                
+plan/vault-google/phases/p04/docs/logs/reviewer-browser-B2/reconnect.html:41: trailing whitespace.
++    
+plan/vault-google/phases/p04/docs/logs/reviewer-browser-B2/reconnect.html:50: trailing whitespace.
++        
+plan/vault-google/phases/p04/docs/logs/reviewer-browser-B2/reconnect.html:54: trailing whitespace.
++                
+plan/vault-google/phases/p04/docs/logs/reviewer-browser-B2/reconnect.html:62: trailing whitespace.
++                
+plan/vault-google/phases/p04/docs/logs/reviewer-browser-B2/reconnect.html:75: trailing whitespace.
++        
+plan/vault-google/phases/p04/docs/logs/reviewer-browser-B2/reconnect.html:76: trailing whitespace.
++                
+plan/vault-google/phases/p05/docs/logs/p05-R1.diff:12: trailing whitespace.
++ 
+plan/vault-google/phases/p05/docs/logs/p05-R1.diff:85: trailing whitespace.
++ 
+plan/vault-google/phases/p05/docs/logs/p05-R1.diff:87: trailing whitespace.
++ 
+plan/vault-google/phases/p05/docs/logs/p05-R1.diff:98: trailing whitespace.
++ 
+plan/vault-google/phases/p05/docs/logs/p05-R1.diff:101: trailing whitespace.
++ 
+plan/vault-google/phases/p05/docs/logs/p05-R1.diff:123: trailing whitespace.
++ 
+plan/vault-google/phases/p05/docs/logs/p05-R1.diff:125: trailing whitespace.
++ 
+plan/vault-google/phases/p05/docs/logs/p05-R1.diff:808: trailing whitespace.
++ 
+plan/vault-google/phases/p05/docs/logs/p05-R1.diff:2308: trailing whitespace.
++ 
+plan/vault-google/phases/p05/docs/logs/p05-R1.diff:4246: trailing whitespace.
++ 
+plan/vault-google/phases/p05/docs/logs/p05-R2.diff:12: trailing whitespace.
++ 
+plan/vault-google/phases/p05/docs/logs/p05-R2.diff:85: trailing whitespace.
++ 
+plan/vault-google/phases/p05/docs/logs/p05-R2.diff:87: trailing whitespace.
++ 
+plan/vault-google/phases/p05/docs/logs/p05-R2.diff:98: trailing whitespace.
++ 
+plan/vault-google/phases/p05/docs/logs/p05-R2.diff:101: trailing whitespace.
++ 
+plan/vault-google/phases/p05/docs/logs/p05-R2.diff:123: trailing whitespace.
++ 
+plan/vault-google/phases/p05/docs/logs/p05-R2.diff:125: trailing whitespace.
++ 
+plan/vault-google/phases/p05/docs/logs/p05-R2.diff:1520: trailing whitespace.
++ 
+plan/vault-google/phases/p05/docs/logs/p05-R2.diff:3020: trailing whitespace.
++ 
+plan/vault-google/phases/p05/docs/logs/p05-R2.diff:4958: trailing whitespace.
++ 

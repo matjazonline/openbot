@@ -1,0 +1,12 @@
+{
+  "command": [
+    "npm",
+    "run",
+    "check:css"
+  ],
+  "cwd": "/Users/mac02/.codex/worktrees/1133/openbot",
+  "database": "vault_pull_main_1133_43797f74ae21",
+  "exit": 0,
+  "seconds": 0.49,
+  "log": "/Users/mac02/.codex/worktrees/1133/openbot/plan/vault-google/integration/channel-main/docs/logs/css-01.log"
+}

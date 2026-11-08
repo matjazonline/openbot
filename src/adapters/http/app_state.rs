@@ -34,6 +34,9 @@ use crate::{
 
 #[derive(Clone)]
 pub struct AppState {
+    pub integration_bindings:
+        Arc<dyn crate::application::use_cases::integration_binding::IntegrationBindings>,
+    pub integrations: Arc<dyn crate::application::integrations::IntegrationGateway>,
     pub knowledge: Arc<crate::application::knowledge::KnowledgeLibrary>,
     pub auth_admission: Arc<AuthAdmission>,
     /// Workflow commands and read models, without worker handlers or spawn capability.
@@ -241,5 +244,19 @@ impl FromRef<AppState> for Arc<dyn crate::services::model_usage::ModelUsageStore
 impl FromRef<AppState> for Arc<crate::use_cases::onboarding::OnboardingUseCases> {
     fn from_ref(state: &AppState) -> Self {
         state.onboarding_use_cases.clone()
+    }
+}
+
+impl FromRef<AppState> for Arc<dyn crate::application::integrations::IntegrationGateway> {
+    fn from_ref(state: &AppState) -> Self {
+        state.integrations.clone()
+    }
+}
+
+impl FromRef<AppState>
+    for Arc<dyn crate::application::use_cases::integration_binding::IntegrationBindings>
+{
+    fn from_ref(state: &AppState) -> Self {
+        state.integration_bindings.clone()
     }
 }

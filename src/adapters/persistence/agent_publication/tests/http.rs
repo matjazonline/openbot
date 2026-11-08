@@ -25,13 +25,16 @@ fn operation(company: CompanyId) -> HttpOperation {
     }
 }
 
-async fn source(f: &Fixture, bearer: bool) -> HttpConnection {
+fn source(f: &Fixture, bearer: bool) -> impl std::future::Future<Output = HttpConnection> + '_ {
+    source_at(f, bearer, "http://127.0.0.1:9")
+}
+async fn source_at(f: &Fixture, bearer: bool, origin: &str) -> HttpConnection {
     let connection =
         f.p.create_http(
             f.scope.company,
             f.scope.actor,
             HttpConnectionWrite {
-                origin: HttpOrigin::parse("http://127.0.0.1:9").unwrap(),
+                origin: HttpOrigin::parse(origin).unwrap(),
                 bearer,
             },
         )
@@ -167,5 +170,26 @@ async fn autonomous_agent_resolution_http_requires_current_secret_and_enabled_co
             revisions: 1,
             requests: 1
         }
+    );
+}
+
+#[tokio::test]
+async fn vault_binding_agent_publication_refuses_an_integration_http_source() {
+    let f = Fixture::new().await;
+    let connection = source_at(&f, false, "https://api.example.test").await;
+    f.p.publish_agent(f.request("before-vault").await)
+        .await
+        .unwrap();
+    attach_vault(
+        &f,
+        connection.id,
+        connection.revision,
+        crate::application::use_cases::integration_binding::BindingKind::Http,
+    )
+    .await;
+    assert!(
+        f.p.publish_agent(f.request("after-vault").await)
+            .await
+            .is_err()
     );
 }

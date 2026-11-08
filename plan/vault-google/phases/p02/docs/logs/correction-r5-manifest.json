@@ -1,0 +1,52 @@
+[
+  {
+    "path": "migrations/20260817000000_init_schema.sql",
+    "before": "cbb8804452542910ccc7067734943e7c5149d9baaa99a29cac01421a140e7c44",
+    "after": "2bbe0e8a2d8e446ad242d55e2284a419b0cb782df8c9a231ee6dc505fdc49f6b"
+  },
+  {
+    "path": "plan/vault-google/README.md",
+    "before": "a560f9b427a160f98384293c512e6036a51b60f80bbfc369bb561715f454bd7b",
+    "after": "28b1e946d2f30235815f8c11ccdef5ea1f93db96fd8b1a5eff5c429de287307c"
+  },
+  {
+    "path": "src/adapters/http/routes/ui_vault.rs",
+    "before": "be3b723cf33fdc9d4c5bb6593ad09e67173108a0639caa4c5dafe693bcade9e2",
+    "after": "7156ec3ba092092ea8e767f45ac92b7ff95e06462bc6fe2fdc6516071eb9e85a"
+  },
+  {
+    "path": "src/adapters/http/routes/vault_management_tests.rs",
+    "before": "b563885b63ea4ccb41c1efcad9b46d719a3dbc9a20c2ef1328e4229167735058",
+    "after": "d53ab19c650c7465ec789358ee98f1836174373eebc120971acdf5356e166f61"
+  },
+  {
+    "path": "src/adapters/integrations/google_credentials.rs",
+    "before": "83c2711654789f189ce81c08e36a51aa7fd51744b58181171cb42eb571e3ea01",
+    "after": "9b35a861f06368693f449ebaa723cd55a1e01c3267a4c9dcb91a73118a4b45b6"
+  },
+  {
+    "path": "src/adapters/persistence/integrations/accounts.rs",
+    "before": "dca11c563f38bf75513c1d91cfb55a1a982c1175235a100ea700a2d9a617cc2e",
+    "after": "437b44a19dffe98b94ca1655649222a6f366f883a5ccb20100a1bc668fb1126b"
+  },
+  {
+    "path": "src/adapters/persistence/integrations/cache_update_tests.rs",
+    "before": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "after": "757bdfbf71f2868c626b407eb102a91829baccc17127347e0d323c564bf90f7a"
+  },
+  {
+    "path": "src/adapters/persistence/integrations/tests.rs",
+    "before": "4eed4a09dc9a46b791568bda8786caae05e5b9d0cdc086df23f82a4a40e762a7",
+    "after": "b777f2bcbc6a053c9c808af5ba5ccd9386f0964d58ef365cde7020c4b5d59109"
+  },
+  {
+    "path": "src/application/integrations/private.rs",
+    "before": "9c01aee5e8021047ef1b4870b6e61f80c7cc96467b7b7e5e85c79aefd479ccc4",
+    "after": "0b39d8440dfe8acf988486b91ba1fee52e5df3c52c95fef927954c00c4ec7fc3"
+  },
+  {
+    "path": "src/application/integrations/registry.rs",
+    "before": "d4896974cd22c032001c47a445d5ee81fa40e591c0dcb9ff9777c2b46bd7f475",
+    "after": "e86829574c55d98c24b3a53ad484e4896cc7c7151a3490c4827810afc6ed017c"
+  }
+]

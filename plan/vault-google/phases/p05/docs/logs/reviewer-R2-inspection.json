@@ -1,0 +1,29 @@
+{
+  "round": "VG-P05-B1-R2",
+  "stage": "static and pure-test evidence complete; waiting author remaining current checks",
+  "head": "97e5d60dc538e26c7cb976a8d63772eed80baff2",
+  "digest": "9d561a9cd7b6e4662d859bca78e70b0739b985b1dad6d8e75e5f30b68311088b",
+  "comparison": "Independently compared R1/R2 manifests and R1 archive to working source; exactly3paths, identical moved fixture SHA2c1e74b32da10c85b5d86c184c0077e8c1c57d25742a53ba6aa1cbd8b089792e; module only loses old path attribute; scanner unchanged.",
+  "VF1": "Source scanner convention tests.rs now applies to deliberate hostile test inputs; escaping assertions preserved. Independent exact scanner binary test PASS1/3347filtered; current author management tests PASS3/3345filtered.",
+  "VF2": "Author cleanHEAD97e5d60d separate fresh owned DB reproduces SQLSTATE55006 at control_revision_tests.rs:85, before operations under test. Current test bytes independently verified identical to baselineHEAD and recorded SHA. Inherited unrelated fixture failure remains unresolved; not full-suitegreen.",
+  "full_gate": "Verified final-full-01.log SHA matches full-coverage-R1.json; normal and stock2MiB each3337PASS/2FAIL/9ignored;13othergatesPASS.",
+  "build_freshness": "style-correction-01 stale baseline binary is not acceptance evidence; style-correction-02 logs fresh rootcompile and3348totaltests, independent source scan passes after baseline worktree removed.",
+  "reused": "VG-P05-B1-R1 all52paths/45independentrenewalPASS unchanged excepttestrelocation",
+  "reviewer_check": {
+    "command": [
+      "env",
+      "RUST_MIN_STACK=2097152",
+      "RUST_TEST_THREADS=4",
+      "bash",
+      "scripts/test-network-isolation.sh",
+      "target/debug/deps/open_bots-048b7abd3ed0c794",
+      "--exact",
+      "adapters::http::pages::tests::rendered_markup_carries_no_inline_javascript"
+    ],
+    "cwd": "/Users/mac02/.codex/worktrees/1133/openbot",
+    "database": "vault_google_1133_41402e4b8104_test",
+    "exit": 0,
+    "seconds": 0.14,
+    "log": "/Users/mac02/.codex/worktrees/1133/openbot/plan/vault-google/phases/p05/docs/logs/reviewer-R2-style.log"
+  }
+}
