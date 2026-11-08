@@ -1,0 +1,13 @@
+{
+  "status": "source and reviewed archive published",
+  "verified_at_utc": "2026-11-08T17:59:09.970934+00:00",
+  "remote": "origin",
+  "branch": "refs/heads/main",
+  "published_commit": "d440005d50095f3aca6814656382c5b1a327f66f",
+  "verified_remote_commit": "d440005d50095f3aca6814656382c5b1a327f66f",
+  "reviewed_source_commit": "f63f08e00bc5c94dbcd83a33ff58fbcf142f97e4",
+  "source_identical_outside_workflow_records": true,
+  "archive": "plan/.archive/cloudroom-local",
+  "push": "normal fast-forward; no force",
+  "deployment_or_production_reset": false
+}

@@ -1,8 +1,8 @@
 # Cloudroom publication handoff
 
-User authorized archive and push after implementation completion. Original p01–p07 accepted. Feature/archive commit e67a6acf, merge commit f63f08e00bc5c94dbcd83a33ff58fbcf142f97e4 combines origin/main b8c46300. Source remains frozen at digest fbc00a75eb16d9c9cc00f4441976aaa9e176503a54d7dfad8a896d96d1143110; exact exclusions are the coordination file, each p01–p07 docs directory separately, and publication/. No push yet.
+User authorized archive and push after implementation completion. Original p01–p07 accepted. Feature/archive commit e67a6acf, merge commit f63f08e00bc5c94dbcd83a33ff58fbcf142f97e4 combines origin/main b8c46300. Source remains frozen at digest fbc00a75eb16d9c9cc00f4441976aaa9e176503a54d7dfad8a896d96d1143110; exact exclusions are the coordination file, each p01–p07 docs directory separately, and publication/. Source and reviewed archive published to origin/main at `d440005d50095f3aca6814656382c5b1a327f66f`; remote SHA verified.
 
-Root confirmed Sol6.1/xhigh author; reviewer /root/cloudroom_reviewer (Astra/high requested), source review completed without established defect, final PASS CL-PUB-R1 issued and root accepted. Reviewed COORDINATION r38 (r39 acceptance-only update) active I001/r2,I002–005/r1,C001/r2,C002/r2,C003/r1,C004/r1,C005/r1,C006/r2,C007/r3,C008/r1 acknowledged. Native Linux providers remain user-waived/unverified.
+Root confirmed Sol6.1/xhigh author; reviewer /root/cloudroom_reviewer (Astra/high requested), source review completed without established defect, final PASS CL-PUB-R1 issued and root accepted. Reviewed COORDINATION r38 (r39 acceptance-only / r40 publication-only updates) active I001/r2,I002–005/r1,C001/r2,C002/r2,C003/r1,C004/r1,C005/r1,C006/r2,C007/r3,C008/r1 acknowledged. Native Linux providers remain user-waived/unverified.
 
 ## Current proof
 
@@ -26,6 +26,6 @@ All54current generated browser inputs are now retained under logs/browser-fixtur
 
 Owned UTF8 PG56390 and stopped wrong-locale PG56389 are now stopped/removed; complete UTF8 PG log retained compressed, capacity/write/fsync/PANIC audit zero. Baseline source/cache, browser temp and runtime-install temp removed only after proof retention. Image VM/home already removed. See cleanup.json/image-cleanup.json. Original prepared Cloudroom/native package and current /tmp/openbot-cloudroom-publication-artifacts are preserved. No verification process remains. All54browser inputs retained in Git-eligible records.
 
-Primary checkout fast-forwarded to f63f08e0 with no incoming untracked collisions; original nine pre-existing skill deletions match independent upstream removal and primary checkout is clean. Primary graft graph refreshed. Publication worktree retains uncommitted records; source still frozen at same digest. No push yet.
+Primary checkout fast-forwarded to f63f08e0 with no incoming untracked collisions; original nine pre-existing skill deletions match independent upstream removal and primary checkout is clean. Primary graft graph refreshed. Publication worktree retains uncommitted records; source still frozen at same digest. Source and reviewed archive published to origin/main at `d440005d50095f3aca6814656382c5b1a327f66f`; remote SHA verified.
 
-Next: commit only excluded workflow records, normal push to origin/main, verify remote and fast-forward original main through the records commit. Source/review work is complete; no deployment or production reset. No force push or deployment.
+Source and reviewed archive were published normally to origin/main at `d440005d50095f3aca6814656382c5b1a327f66f`; remote ref matched. See publication-verification.json. No further source/review work is required; this follow-up records completed publication. No deployment or production reset. No force push or deployment.

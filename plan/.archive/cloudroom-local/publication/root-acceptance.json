@@ -14,5 +14,11 @@
     "native Linux provider/platform acceptance user waived/unverified"
   ],
   "resources": "owned disposable fixtures cleaned; native source/packages and evidence retained",
-  "publication": "user authorized normal commit/push; no deployment/reset"
+  "publication": {
+    "status": "published and remote verified",
+    "source_publication_commit": "d440005d50095f3aca6814656382c5b1a327f66f",
+    "proof": "publication-verification.json",
+    "followup": "workflow records only; reviewed implementation unchanged",
+    "deployment_or_production_reset": false
+  }
 }

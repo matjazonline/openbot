@@ -2,7 +2,7 @@
 
 - Authority: `/Users/mac03/dev/openbot/plan/.archive/cloudroom-local/COORDINATION.md`
 - Writer: `/root`, primary worktree `/Users/mac03/dev/openbot`
-- Revision: 39
+- Revision: 40
 - Workflow record, not an additional implementation plan.
 
 ## Plan-wide instructions
@@ -252,3 +252,10 @@ Root acknowledges unchanged active notices including C008/r1. B1/R1 source02c3â€
 - Root accepts verified affected publication scope after independent PASS CL-PUB-R1 for frozen artifact `fbc00a75eb16d9c9cc00f4441976aaa9e176503a54d7dfad8a896d96d1143110`, source HEAD `f63f08e00bc5c94dbcd83a33ff58fbcf142f97e4`. Final immutable publication manifest is55PASS/6FAIL/1NOTEXERCISED; the FAIL and waiver declarations remain explicit. No new contract or requirement. Reviewed r38 pin remains in publication/logs.
 - Complete2048KiB library proof:3746PASS/1confirmed-origin-CSPFAIL/14ignored, all129executable Cloudroom tests PASS, no overflow. Lease133tests/timing assertions PASS; plugin/browser/image/current source checks and main/module tests pass. The original regular ready timeout remains unknown cause/history; focused and complete stock reruns pass. Inherited MCP/CSP/transport failures are independently reproduced and unchanged. Native Linux provider/platform acceptance remains user-waived/unverified; Linux core/image proof passed.
 - All original active notice revisions remain unchanged and acknowledged/satisfied or explicitly dispositioned. Root records accepted status only here; metadata updates after review do not change implementation. Owned disposable resources cleaned, primary checkout matches exact accepted source, native prepared source/packages and all review/evidence retained. User-authorized normal records commit/push is next; no deployment or production reset.
+
+
+## Publication completed at revision40
+
+- Source and reviewed archive/evidence were pushed normally to `origin/main` at `d440005d50095f3aca6814656382c5b1a327f66f`; independent remote ref lookup matched. Publication proof is `publication/publication-verification.json`. Code is byte-identical to reviewed sourcef63f08e0 outside the nine excluded workflow-record paths. This follow-up records publication status only.
+- Plan location is `plan/.archive/cloudroom-local`; current affected review/verification accepted with every retained exception above. No further implementation or publication action is required. Native Linux provider acceptance remains unverified at user request. No deployment or production reset occurred.
+- Primary source was already fast-forwarded cleanly and graft refreshed; final record commit is a normal fast-forward with no implementation changes. Active contracts/notice revisions remain unchanged. All task-owned disposable fixtures are cleaned and evidence/packages retained.
