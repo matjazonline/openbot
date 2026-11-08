@@ -1,0 +1,17 @@
+{
+  "command": [
+    "cargo",
+    "test",
+    "--locked",
+    "--offline",
+    "--lib",
+    "sample_direct_workflow_tool_child_and_message_have_zero_production_effects",
+    "--",
+    "--list"
+  ],
+  "cwd": "/Users/mac02/.codex/worktrees/1133/openbot",
+  "database": "vault_google_p06_1133_baa6bd7114",
+  "exit": 0,
+  "seconds": 0.3,
+  "log": "/Users/mac02/.codex/worktrees/1133/openbot/plan/vault-google/phases/p06/docs/logs/final-sample_direct_workflow_tool_child_and_message_have_zero_production_effects-list.log"
+}

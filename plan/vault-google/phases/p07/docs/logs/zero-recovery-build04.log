@@ -1,0 +1,11 @@
+    Checking open_bots v0.1.0 (/Users/mac02/.codex/worktrees/1133/openbot)
+warning: unused import: `http::*`
+ --> src/adapters/persistence/workflow/vault_zero_effect_journey.rs:9:9
+  |
+9 |         http::*, sample::SampleStatus, sample_capture::SampleDefinitionCapture,
+  |         ^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: `open_bots` (lib test) generated 1 warning (run `cargo fix --lib -p open_bots --tests` to apply 1 suggestion)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 15.20s

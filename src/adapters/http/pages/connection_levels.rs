@@ -59,8 +59,15 @@ pub(crate) fn http_detail(
 ) -> String {
     let company = connection.company.as_uuid();
     let id = connection.id;
+    let source = if connection.origin.as_str().starts_with("https://") {
+        format!(
+            "<a class=\"link\" href=\"/ui/companies/{company}/connection-credentials/http/{id}\">Choose credential source</a>"
+        )
+    } else {
+        "<p>Vault credentials require an HTTPS destination.</p>".into()
+    };
     format!(
-        "<p>{}</p>{}",
+        "<p>{}</p>{}{source}",
         escape_html_text(connection.origin.as_str()),
         level_form(
             &format!("/ui/companies/{company}/http-connections/{id}/access-level"),

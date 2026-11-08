@@ -1,0 +1,15 @@
+{
+  "phase": "p06",
+  "status": "accepted in phase; uncommitted/unpublished",
+  "digest": "d9d84e7e35bc0a1d603f6f57bf2ac6ba5a9c95a133611bba00b432fe31533b71",
+  "head": "ace526fd8259ec53c5199ffa7555a1a99dcba58e",
+  "review": "VG-P06-B1-R2 PASS",
+  "architecture": "VG-P06-A3-R1 / D1r3",
+  "coordination_revision": 21,
+  "exclusions": [
+    "plan/vault-google/COORDINATION.md",
+    "plan/vault-google/phases/p06/docs"
+  ],
+  "verification": "67 affected author correction tests,25 independent reviewer checks, prior unaffected evidence retained; no full suite per I03r3",
+  "unrelated": "inherited scanner false positives remain separate"
+}

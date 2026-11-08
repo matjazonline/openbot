@@ -4,7 +4,10 @@ use super::*;
 use crate::adapters::workflow_http::{HttpProvider, NoLocal};
 use crate::application::workflow::decisions::*;
 
-fn protected(origin: &str, entrance: Entrance) -> impl std::future::Future<Output = Setup> {
+pub(super) fn protected(
+    origin: &str,
+    entrance: Entrance,
+) -> impl std::future::Future<Output = Setup> {
     protected_reviewers(origin, entrance, 1)
 }
 
@@ -16,7 +19,7 @@ fn protected_reviewers(
     protected_customized(origin, entrance, count, |_| {})
 }
 
-fn protected_customized<'a>(
+pub(super) fn protected_customized<'a>(
     origin: &'a str,
     entrance: Entrance,
     count: usize,
@@ -135,7 +138,7 @@ fn actions(
     )
 }
 
-async fn view(setup: &Setup) -> DecisionView {
+pub(super) async fn view(setup: &Setup) -> DecisionView {
     let p = &setup.fixture.persistence;
     let id = sqlx::query_scalar("SELECT id FROM workflow_decisions WHERE execution_id=$1")
         .bind(setup.claim.fence.scope.execution.as_uuid())
@@ -151,7 +154,7 @@ async fn view(setup: &Setup) -> DecisionView {
     .unwrap()
 }
 
-fn submission(setup: &Setup, view: &DecisionView, choice: &str) -> SubmitDecision {
+pub(super) fn submission(setup: &Setup, view: &DecisionView, choice: &str) -> SubmitDecision {
     SubmitDecision {
         company: setup.fixture.target.company,
         actor: setup.fixture.target.actor,

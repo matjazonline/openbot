@@ -167,8 +167,4 @@ mod storage_retention;
 mod sample_capture;
 pub use sample_capture::SampleCapture;
 
-#[cfg_attr(
-    not(test),
-    expect(dead_code, reason = "Final business dispatch is wired in phase06")
-)]
 pub(crate) mod integration_authority;

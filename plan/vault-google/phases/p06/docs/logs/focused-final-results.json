@@ -1,0 +1,77 @@
+[
+  {
+    "family": "integration_gateway_",
+    "listed": 3,
+    "exit": 0
+  },
+  {
+    "family": "vault_workflow_http_",
+    "listed": 5,
+    "exit": 0
+  },
+  {
+    "family": "vault_workflow_mcp_",
+    "listed": 10,
+    "exit": 0
+  },
+  {
+    "family": "vault_authoring_",
+    "listed": 6,
+    "exit": 0
+  },
+  {
+    "family": "workflow_action_approval_",
+    "listed": 32,
+    "exit": 0
+  },
+  {
+    "family": "integration_contract_",
+    "listed": 6,
+    "exit": 0
+  },
+  {
+    "family": "vault_dispatch_authority_",
+    "listed": 15,
+    "exit": 0
+  },
+  {
+    "family": "google_refresh_",
+    "listed": 22,
+    "exit": 0
+  },
+  {
+    "family": "integration_renewal_",
+    "listed": 18,
+    "exit": 0
+  },
+  {
+    "family": "google_connection_lifecycle_",
+    "listed": 5,
+    "exit": 0
+  },
+  {
+    "family": "integration_connect_",
+    "listed": 17,
+    "exit": 0
+  },
+  {
+    "family": "google_vault_callback_",
+    "listed": 13,
+    "exit": 0
+  },
+  {
+    "family": "workflow_http_",
+    "listed": 26,
+    "exit": 0
+  },
+  {
+    "family": "vault_binding_",
+    "listed": 14,
+    "exit": 0
+  },
+  {
+    "family": "sample_direct_workflow_tool_child_and_message_have_zero_production_effects",
+    "listed": 1,
+    "exit": 0
+  }
+]

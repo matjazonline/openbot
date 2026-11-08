@@ -117,6 +117,26 @@ pub(crate) trait CredentialResolver: Send + Sync {
     ) -> ResolutionResult<ResolvedCredential>;
 }
 
+/// Required final check of the private credential selected during preparation.
+#[async_trait]
+pub(crate) trait ExecutionCredentials: CredentialResolver {
+    async fn resolve_configuration(
+        &self,
+        context: &super::OwnerDiscoveryContext,
+    ) -> ResolutionResult<ResolvedCredential>;
+    async fn check_configuration(
+        &self,
+        context: &super::OwnerDiscoveryContext,
+        generation: CredentialGeneration,
+    ) -> IntegrationResult<()>;
+    async fn check_generation(
+        &self,
+        invocation: &AuthorizedInvocation,
+        context: &ExecutionContext,
+        generation: CredentialGeneration,
+    ) -> IntegrationResult<()>;
+}
+
 impl RenewalStrategy {
     pub fn protocol(&self) -> RenewalProtocol {
         match self {

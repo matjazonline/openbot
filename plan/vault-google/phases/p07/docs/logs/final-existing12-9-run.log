@@ -1,0 +1,11 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.18s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-048b7abd3ed0c794)
+
+running 3 tests
+test adapters::http::routes::ui_vault::tests::vault_management_errors_and_html_escape_labels_and_keep_secret_inputs_blank ... ok
+test adapters::http::routes::ui_vault::tests::vault_management_owner_crud_stale_revision_foreign_ids_and_no_readback ... ok
+test adapters::http::routes::ui_vault::tests::vault_management_real_session_origin_body_limit_and_owner_override_rejection ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 3624 filtered out; finished in 1.47s
+

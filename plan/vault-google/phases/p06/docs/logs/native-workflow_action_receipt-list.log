@@ -1,0 +1,16 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.21s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-048b7abd3ed0c794)
+adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_receipt_tests::acceptance_tests::workflow_action_receipt_actual_result_precedes_shared_completion_writer: test
+adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_receipt_tests::acceptance_tests::workflow_action_receipt_committed_ambiguous_ack_restart_zero_io: test
+adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_receipt_tests::acceptance_tests::workflow_action_receipt_reclaimed_attempt_rechecks_current_registration_and_access: test
+adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_receipt_tests::acceptance_tests::workflow_action_receipt_resolved_reconcile_retires_safe_and_reclaims_zero_io: test
+adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_receipt_tests::acceptance_tests::workflow_action_receipt_return_authority_errors_propagate_after_commit: test
+adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_receipt_tests::resolution_tests::workflow_action_receipt_resolution_commit_waits_out_exhausted_pool_after_effect: test
+adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_receipt_tests::resolution_tests::workflow_action_receipt_resolution_stalled_commit_against_completion: test
+adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_receipt_tests::workflow_action_receipt_deferred_rollback_returns_no_success: test
+adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_receipt_tests::workflow_action_receipt_late_cancel_and_stale_truth_without_advancement: test
+adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_receipt_tests::workflow_action_receipt_lost_actual_effect_supported_reclaim_and_competing_replay: test
+adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_receipt_tests::workflow_action_receipt_refused_return_releases_run_before_returning: test
+adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_receipt_tests::workflow_action_receipt_restart_model_link_no_registration_and_current_access: test
+
+12 tests, 0 benchmarks

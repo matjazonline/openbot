@@ -1,0 +1,19 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.22s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-048b7abd3ed0c794)
+adapters::persistence::workflow::tests::http_tests::approval_tests::vault_approval_tests::vault_dispatch_authority_approval_is_required_and_cannot_authorize_a_rebound_account: test
+adapters::persistence::workflow::tests::http_tests::vault_tests::authority::vault_dispatch_authority_host_cannot_skip_or_substitute_the_module_callback: test
+adapters::persistence::workflow::tests::http_tests::vault_tests::authority::vault_dispatch_authority_real_persisted_fence_and_exact_invocation_are_required: test
+adapters::persistence::workflow::tests::http_tests::vault_tests::authority::vault_dispatch_authority_replacement_and_rebind_cannot_reuse_frozen_action: test
+adapters::persistence::workflow::tests::http_tests::vault_tests::authority::vault_dispatch_authority_replacement_competes_before_the_final_check_and_sends_nothing: test
+adapters::persistence::workflow::tests::http_tests::vault_tests::authority::vault_dispatch_authority_revoke_competes_before_the_final_check_and_sends_nothing: test
+adapters::persistence::workflow::tests::http_tests::vault_tests::policies::vault_dispatch_authority_direct_http_tools_and_foreign_binding_cannot_mint_context: test
+adapters::persistence::workflow::tests::http_tests::vault_tests::policies::vault_dispatch_authority_policy_changes_require_fresh_owner_consent: test
+adapters::persistence::workflow::tests::http_tests::vault_tests::temporal::vault_dispatch_authority_cancellation_during_module_wait_denies: test
+adapters::persistence::workflow::tests::http_tests::vault_tests::temporal::vault_dispatch_authority_invocation_expiring_during_module_wait_denies: test
+adapters::persistence::workflow::tests::http_tests::vault_tests::temporal::vault_dispatch_authority_lease_expiring_during_module_wait_denies: test
+adapters::persistence::workflow::tests::http_tests::vault_tests::temporal::vault_dispatch_authority_run_expiring_during_module_wait_denies: test
+adapters::persistence::workflow::tests::http_tests::vault_tests::temporal::vault_dispatch_authority_unexpired_contested_gate_still_succeeds: test
+adapters::persistence::workflow::tests::mcp_tests::vault_authority_tests::vault_dispatch_authority_generic_mcp_tool_cannot_borrow_a_workflow_run: test
+adapters::persistence::workflow::tests::mcp_tests::vault_authority_tests::vault_dispatch_authority_mcp_uses_the_real_step_and_fence_without_exposing_a_token: test
+
+15 tests, 0 benchmarks

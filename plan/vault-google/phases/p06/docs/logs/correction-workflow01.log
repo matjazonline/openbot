@@ -1,0 +1,45 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.18s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-048b7abd3ed0c794)
+
+running 18 tests
+test adapters::persistence::workflow::tests::http_tests::vault_tests::execution::vault_workflow_http_preparation_failure_leaves_intent_without_remote_effect ... ok
+test adapters::persistence::workflow::tests::http_tests::vault_tests::execution::vault_workflow_http_competing_claimants_have_one_business_entry ... ok
+test adapters::persistence::workflow::tests::http_tests::vault_tests::execution::projection::vault_workflow_http_native_valid_oversized_projection_is_terminal_before_credentials ... FAILED
+test adapters::persistence::workflow::tests::http_tests::vault_tests::execution::vault_workflow_http_ownership_lost_during_preparation_sends_nothing ... ok
+test adapters::persistence::workflow::tests::http_tests::vault_tests::execution::vault_workflow_http_uncertain_send_is_not_dispatched_twice ... ok
+test adapters::persistence::workflow::tests::mcp_tests::support::renewal::gateway_tests::projection_tests::vault_workflow_mcp_native_valid_oversized_projection_is_terminal_before_credentials ... FAILED
+test adapters::persistence::workflow::tests::mcp_tests::support::renewal::gateway_tests::vault_workflow_mcp_another_administrator_cannot_discover_the_owners_account ... ok
+test adapters::persistence::workflow::tests::mcp_tests::support::renewal::gateway_tests::vault_workflow_mcp_browser_expiring_during_catalog_prevents_configuration_save ... ok
+test adapters::persistence::workflow::tests::mcp_tests::support::renewal::gateway_tests::vault_workflow_mcp_cancellation_drops_actual_call_then_awaits_session_close ... ok
+test adapters::persistence::workflow::tests::mcp_tests::support::renewal::gateway_tests::vault_workflow_mcp_competing_catalog_refreshes_commit_one_current_revision ... ok
+test adapters::persistence::workflow::tests::mcp_tests::support::renewal::gateway_tests::vault_workflow_mcp_credential_in_catalog_is_rejected_before_any_business_marker ... ok
+test adapters::persistence::workflow::tests::mcp_tests::support::renewal::gateway_tests::vault_workflow_mcp_owner_configuration_discovers_without_a_business_invocation ... ok
+test adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::gateway::vault_workflow_http_google_refresh_waits_for_approval_then_keeps_native_receipt ... ok
+test adapters::persistence::workflow::tests::mcp_tests::support::renewal::gateway_tests::vault_workflow_mcp_generation_change_during_catalog_closes_and_rebuilds_before_entry ... ok
+test adapters::persistence::workflow::tests::mcp_tests::support::renewal::gateway_tests::vault_workflow_mcp_owner_disconnect_during_catalog_prevents_configuration_save ... ok
+test adapters::persistence::workflow::tests::mcp_tests::support::renewal::gateway_tests::vault_workflow_mcp_private_session_uses_native_receipt_and_redacts_active_credential ... ok
+test adapters::persistence::workflow::tests::mcp_tests::support::renewal::gateway_tests::vault_workflow_mcp_uncertain_tool_call_never_reopens_or_replays ... ok
+test adapters::persistence::workflow::tests::mcp_tests::support::renewal::gateway_tests::preparation_authority_tests::vault_workflow_mcp_actual_authority_is_rechecked_after_each_preparation_wait ... ok
+
+failures:
+
+---- adapters::persistence::workflow::tests::http_tests::vault_tests::execution::projection::vault_workflow_http_native_valid_oversized_projection_is_terminal_before_credentials stdout ----
+
+thread 'adapters::persistence::workflow::tests::http_tests::vault_tests::execution::projection::vault_workflow_http_native_valid_oversized_projection_is_terminal_before_credentials' (36685222) panicked at src/adapters/persistence/workflow/http_test_support.rs:312:10:
+called `Result::unwrap()` on an `Err` value: Conflict("Workflow lifecycle revision or command conflict")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- adapters::persistence::workflow::tests::mcp_tests::support::renewal::gateway_tests::projection_tests::vault_workflow_mcp_native_valid_oversized_projection_is_terminal_before_credentials stdout ----
+
+thread 'adapters::persistence::workflow::tests::mcp_tests::support::renewal::gateway_tests::projection_tests::vault_workflow_mcp_native_valid_oversized_projection_is_terminal_before_credentials' (36685314) panicked at src/adapters/persistence/workflow/mcp_test_support.rs:510:10:
+called `Result::unwrap()` on an `Err` value: Conflict("Workflow lifecycle revision or command conflict")
+
+
+failures:
+    adapters::persistence::workflow::tests::http_tests::vault_tests::execution::projection::vault_workflow_http_native_valid_oversized_projection_is_terminal_before_credentials
+    adapters::persistence::workflow::tests::mcp_tests::support::renewal::gateway_tests::projection_tests::vault_workflow_mcp_native_valid_oversized_projection_is_terminal_before_credentials
+
+test result: FAILED. 16 passed; 2 failed; 0 ignored; 0 measured; 3566 filtered out; finished in 19.90s
+
+error: test failed, to rerun pass `--lib`

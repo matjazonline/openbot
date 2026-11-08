@@ -1,0 +1,20 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.19s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-048b7abd3ed0c794)
+
+running 12 tests
+test adapters::persistence::workflow::tests::mcp_tests::support::renewal::gateway_tests::vault_workflow_mcp_another_administrator_cannot_discover_the_owners_account ... ok
+test adapters::persistence::workflow::tests::mcp_tests::support::renewal::gateway_tests::vault_workflow_mcp_browser_expiring_during_catalog_prevents_configuration_save ... ok
+test adapters::persistence::workflow::tests::mcp_tests::support::renewal::gateway_tests::projection_tests::vault_workflow_mcp_native_valid_oversized_projection_is_terminal_before_credentials ... ok
+test adapters::persistence::workflow::tests::mcp_tests::support::renewal::gateway_tests::vault_workflow_mcp_cancellation_drops_actual_call_then_awaits_session_close ... ok
+test adapters::persistence::workflow::tests::mcp_tests::support::renewal::gateway_tests::vault_workflow_mcp_credential_in_catalog_is_rejected_before_any_business_marker ... ok
+test adapters::persistence::workflow::tests::mcp_tests::support::renewal::gateway_tests::vault_workflow_mcp_competing_catalog_refreshes_commit_one_current_revision ... ok
+test adapters::persistence::workflow::tests::mcp_tests::support::renewal::gateway_tests::vault_workflow_mcp_generation_change_during_catalog_closes_and_rebuilds_before_entry ... ok
+test adapters::persistence::workflow::tests::mcp_tests::support::renewal::gateway_tests::vault_workflow_mcp_owner_configuration_discovers_without_a_business_invocation ... ok
+test adapters::persistence::workflow::tests::mcp_tests::support::renewal::gateway_tests::vault_workflow_mcp_owner_disconnect_during_catalog_prevents_configuration_save ... ok
+test adapters::persistence::workflow::tests::mcp_tests::support::renewal::gateway_tests::vault_workflow_mcp_uncertain_tool_call_never_reopens_or_replays ... ok
+test adapters::persistence::workflow::tests::mcp_tests::support::renewal::gateway_tests::vault_workflow_mcp_private_session_uses_native_receipt_and_redacts_active_credential ... ok
+test adapters::persistence::workflow::tests::mcp_tests::support::renewal::gateway_tests::preparation_authority_tests::vault_workflow_mcp_actual_authority_is_rechecked_after_each_preparation_wait ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 3615 filtered out; finished in 17.29s
+

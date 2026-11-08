@@ -1,0 +1,11 @@
+{
+  "kind": "source/caller conformance audit, not a production exploit or executed private-function probe",
+  "files": {
+    "src/application/integrations/wire/control_transport.rs": "e732a10d5b6814ff034d2834f090b27b214834c2ed5610acd06802a2f7214fd4",
+    "src/application/integrations/wire/mod.rs": "0636a29c21aaa0bc7af153fc276c3b4ca2179871504bbfcb378c01ae304447a3",
+    "src/adapters/persistence/integrations/connect_tests/control_wire.rs": "ff852d9cd590e90d02d856eb998af494bcfcb2dd94fa0abacbc963f1399a23c0"
+  },
+  "observation": "control_transport::exchange accepts only owner, raw bytes, ConnectWork(deadline,token), optional confirmation. It compares owner/deadline/current token state, but has no expected identity or cancellation ID. Request::validate compares those only for business invocation variants; control wire IDs can change without affecting admission. Existing control fault test omits identity/cancellation-ID substitutions.",
+  "required": "D1/r1 required trusted local context factory resolving exact dispatch/cancellation identity and deadline across public command vocabulary",
+  "production_status": "control transport is cfg(test); this is a missing conformance invariant, not a deployed remote API vulnerability"
+}

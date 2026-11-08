@@ -6,6 +6,7 @@ pub(crate) mod inventory;
 pub(crate) mod lifecycle;
 pub(crate) mod resolve;
 mod rows;
+mod status;
 #[cfg(test)]
 mod tests;
 use super::PostgresPersistence;
@@ -43,12 +44,12 @@ impl PostgresVault {
         &self,
         authority: Arc<dyn crate::application::integrations::grants::BindingAuthority>,
         connect: Arc<dyn ConnectGateway>,
+        execution: Arc<dyn ExecutionGateway>,
     ) -> Arc<dyn IntegrationGateway> {
         let management = Arc::new(management::VaultManagement::new(
             Arc::new(self.clone()),
             self.registry.clone(),
         ));
-        let unavailable = Arc::new(unavailable::UnavailableIntegrations);
         Arc::new(LocalIntegrationGateway::new(
             management,
             connect,
@@ -56,7 +57,7 @@ impl PostgresVault {
                 writer: Arc::new(self.clone()),
                 authority,
             }),
-            unavailable,
+            execution,
         ))
     }
     fn registration(
@@ -91,5 +92,8 @@ fn storage_error(error: sqlx::Error) -> IntegrationError {
 #[cfg(test)]
 pub(crate) mod connect_tests;
 
+mod observations;
 #[cfg(test)]
 pub(crate) mod renewal_tests;
+#[cfg(test)]
+pub(crate) use observations::tests as observation_test_support;

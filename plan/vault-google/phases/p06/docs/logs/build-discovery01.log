@@ -1,0 +1,55 @@
+    Checking open_bots v0.1.0 (/Users/mac02/.codex/worktrees/1133/openbot)
+error[E0603]: module `authorization` is private
+  --> src/adapters/persistence/mcp/discovery.rs:13:46
+   |
+13 |     application::{integrations::*, workflow::authorization::WorkflowActor},
+   |                                              ^^^^^^^^^^^^^ private module
+   |
+note: the module `authorization` is defined here
+  --> src/application/workflow/mod.rs:13:1
+   |
+13 | mod authorization;
+   | ^^^^^^^^^^^^^^^^^^
+
+error[E0061]: this function takes 6 arguments but 4 arguments were supplied
+   --> src/adapters/http/routes/mcp_api_tests.rs:101:9
+    |
+101 |           refresh(
+    |           ^^^^^^^
+...
+104 | /             Path((f.other, id)),
+105 | |             Json(Revision {
+106 | |                 expected_revision: 1
+107 | |             })
+    | |______________- two arguments of type `axum::extract::State<std::sync::Arc<adapters::http::session::SessionAuthority>>` and `rig_core::http_client::HeaderMap` are missing
+    |
+note: function defined here
+   --> src/adapters/http/routes/mcp.rs:178:10
+    |
+178 | async fn refresh(
+    |          ^^^^^^^
+...
+181 |     State(sessions): State<std::sync::Arc<crate::adapters::http::session::SessionAuthority>>,
+    |     ----------------------------------------------------------------------------------------
+182 |     headers: axum::http::HeaderMap,
+    |     ------------------------------
+help: provide the arguments
+    |
+101 ~         refresh(
+102 +             State(f.service.clone()),
+103 +             actor(),
+104 +             /* axum::extract::State<std::sync::Arc<adapters::http::session::SessionAuthority>> */,
+105 +             /* rig_core::http_client::HeaderMap */,
+106 +             Path((f.other, id)),
+107 +             Json(Revision {
+108 +                 expected_revision: 1
+109 +             }),
+110 +         )
+    |
+
+For more information about this error, try `rustc --explain E0603`.
+error: could not compile `open_bots` (lib) due to 1 previous error
+warning: build failed, waiting for other jobs to finish...
+Some errors have detailed explanations: E0061, E0603.
+For more information about an error, try `rustc --explain E0061`.
+error: could not compile `open_bots` (lib test) due to 2 previous errors

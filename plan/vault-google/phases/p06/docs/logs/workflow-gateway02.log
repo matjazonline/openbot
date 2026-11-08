@@ -1,0 +1,42 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+   Compiling open_bots v0.1.0 (/Users/mac02/.codex/worktrees/1133/openbot)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 55.08s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-048b7abd3ed0c794)
+
+running 14 tests
+test adapters::persistence::workflow::tests::http_tests::vault_tests::execution::vault_workflow_http_uncertain_send_is_not_dispatched_twice ... ok
+test adapters::persistence::workflow::tests::http_tests::vault_tests::execution::vault_workflow_http_ownership_lost_during_preparation_sends_nothing ... ok
+test adapters::persistence::workflow::tests::http_tests::vault_tests::execution::vault_workflow_http_preparation_failure_leaves_intent_without_remote_effect ... ok
+test adapters::persistence::workflow::tests::http_tests::vault_tests::execution::vault_workflow_http_competing_claimants_have_one_business_entry ... ok
+test adapters::persistence::workflow::tests::mcp_tests::support::renewal::gateway_tests::vault_workflow_mcp_another_administrator_cannot_discover_the_owners_account ... FAILED
+test adapters::persistence::workflow::tests::mcp_tests::support::renewal::gateway_tests::vault_workflow_mcp_browser_expiring_during_catalog_prevents_configuration_save ... FAILED
+test adapters::persistence::workflow::tests::mcp_tests::support::renewal::gateway_tests::vault_workflow_mcp_competing_catalog_refreshes_commit_one_current_revision ... ok
+test adapters::persistence::workflow::tests::mcp_tests::support::renewal::gateway_tests::vault_workflow_mcp_cancellation_drops_actual_call_then_awaits_session_close ... ok
+test adapters::persistence::workflow::tests::mcp_tests::support::renewal::gateway_tests::vault_workflow_mcp_credential_in_catalog_is_rejected_before_any_business_marker ... ok
+test adapters::persistence::workflow::tests::mcp_tests::support::renewal::gateway_tests::vault_workflow_mcp_owner_disconnect_during_catalog_prevents_configuration_save ... ok
+test adapters::persistence::workflow::tests::mcp_tests::support::renewal::gateway_tests::vault_workflow_mcp_generation_change_during_catalog_closes_and_rebuilds_before_entry ... ok
+test adapters::persistence::workflow::tests::mcp_tests::support::renewal::gateway_tests::vault_workflow_mcp_owner_configuration_discovers_without_a_business_invocation ... ok
+test adapters::persistence::workflow::tests::mcp_tests::support::renewal::gateway_tests::vault_workflow_mcp_private_session_uses_native_receipt_and_redacts_active_credential ... ok
+test adapters::persistence::workflow::tests::mcp_tests::support::renewal::gateway_tests::vault_workflow_mcp_uncertain_tool_call_never_reopens_or_replays ... ok
+
+failures:
+
+---- adapters::persistence::workflow::tests::mcp_tests::support::renewal::gateway_tests::vault_workflow_mcp_another_administrator_cannot_discover_the_owners_account stdout ----
+
+thread 'adapters::persistence::workflow::tests::mcp_tests::support::renewal::gateway_tests::vault_workflow_mcp_another_administrator_cannot_discover_the_owners_account' (36588245) panicked at src/adapters/persistence/workflow/mcp_gateway_tests.rs:303:10:
+called `Result::unwrap()` on an `Err` value: Database(PgDatabaseError { severity: Error, code: "23502", message: "null value in column \"id\" of relation \"company_members\" violates not-null constraint", detail: Some("Failing row contains (null, 1e971de5-d0bf-4b4e-8ac7-b4a9f3a37115, 69554201-c5cd-4176-9b2f-044af44ba6bc, admin, 0, 2026-11-08 06:26:29.36245+00)."), hint: None, position: None, where: None, schema: Some("public"), table: Some("company_members"), column: Some("id"), data_type: None, constraint: None, file: Some("execMain.c"), line: Some(2219), routine: Some("ReportNotNullViolationError") })
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- adapters::persistence::workflow::tests::mcp_tests::support::renewal::gateway_tests::vault_workflow_mcp_browser_expiring_during_catalog_prevents_configuration_save stdout ----
+
+thread 'adapters::persistence::workflow::tests::mcp_tests::support::renewal::gateway_tests::vault_workflow_mcp_browser_expiring_during_catalog_prevents_configuration_save' (36588249) panicked at src/adapters/persistence/workflow/mcp_gateway_tests.rs:271:65:
+called `Result::unwrap()` on an `Err` value: Database(PgDatabaseError { severity: Error, code: "42703", message: "column \"created_at\" of relation \"user_sessions\" does not exist", detail: None, hint: None, position: Some(Original(26)), where: None, schema: None, table: None, column: None, data_type: None, constraint: None, file: Some("analyze.c"), line: Some(2597), routine: Some("transformUpdateTargetList") })
+
+
+failures:
+    adapters::persistence::workflow::tests::mcp_tests::support::renewal::gateway_tests::vault_workflow_mcp_another_administrator_cannot_discover_the_owners_account
+    adapters::persistence::workflow::tests::mcp_tests::support::renewal::gateway_tests::vault_workflow_mcp_browser_expiring_during_catalog_prevents_configuration_save
+
+test result: FAILED. 12 passed; 2 failed; 0 ignored; 0 measured; 3553 filtered out; finished in 6.02s
+
+error: test failed, to rerun pass `--lib`

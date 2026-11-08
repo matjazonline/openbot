@@ -178,12 +178,21 @@ async fn credential(
 async fn refresh(
     State(s): State<std::sync::Arc<crate::use_cases::mcp::McpUseCases>>,
     user: AuthenticatedUser,
+    State(sessions): State<std::sync::Arc<crate::adapters::http::session::SessionAuthority>>,
+    headers: axum::http::HeaderMap,
     Path((company, id)): Path<(Uuid, Uuid)>,
     Json(body): Json<Revision>,
 ) -> AppResult<Json<serde_json::Value>> {
     let current = s.get(user.id, company, id).await?;
     revision(&current, body.expected_revision)?;
-    Ok(Json(projection(&s.refresh(user.id, &current).await?)))
+    let owner = if matches!(current.auth, McpAuth::Integration(_)) {
+        super::ui_vault_connect::browser(&sessions, &headers).await?
+    } else {
+        crate::adapters::integrations::owner::verified_owner(&user)
+    };
+    Ok(Json(projection(
+        &s.refresh(user.id, &current, owner).await?,
+    )))
 }
 #[cfg(test)]
 mod tests {

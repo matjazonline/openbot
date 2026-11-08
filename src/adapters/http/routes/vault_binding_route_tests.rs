@@ -51,6 +51,7 @@ struct Fixture {
     cookie: String,
     user: Uuid,
     company: Uuid,
+    connection: Uuid,
     proposal: Uuid,
     account: ConnectedAccount,
     vault: PostgresVault,
@@ -118,6 +119,7 @@ impl Fixture {
             gateway: vault.gateway(
                 bindings.clone(),
                 Arc::new(crate::application::integrations::unavailable::UnavailableIntegrations),
+                Arc::new(crate::application::integrations::unavailable::UnavailableIntegrations),
             ),
             bindings,
         };
@@ -135,6 +137,7 @@ impl Fixture {
             cookie,
             user,
             company,
+            connection: connection.id,
             proposal: proposal.id,
             account,
             vault,
@@ -162,6 +165,8 @@ impl Fixture {
         request.body(Body::from(body)).unwrap()
     }
 }
+#[path = "vault_authoring_route_tests.rs"]
+mod authoring;
 #[tokio::test]
 async fn vault_binding_browser_consent_is_authenticated_csrf_protected_bounded_and_one_shot() {
     let f = Fixture::new().await;

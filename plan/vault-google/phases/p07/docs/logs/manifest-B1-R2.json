@@ -1,0 +1,487 @@
+{
+  "phase": "p07",
+  "round": "B1-R2",
+  "start": "ace526fd8259ec53c5199ffa7555a1a99dcba58e",
+  "review_base": "ace526fd8259ec53c5199ffa7555a1a99dcba58e",
+  "head": "ace526fd8259ec53c5199ffa7555a1a99dcba58e",
+  "digest": "ad2cae3d8ce497444a91a39bf14fb21f8ecdc27ed547a842a97dbee4cbf9cd48",
+  "exclusions": [
+    "plan/vault-google/COORDINATION.md",
+    "plan/vault-google/phases/p06/docs",
+    "plan/vault-google/phases/p07/docs"
+  ],
+  "coordination_revision": 23,
+  "coordination_sha256": "941f8b842642f81280259dee6cca8e2802af61e1f63155f823473c36c52890d3",
+  "coordination_pin": "plan/vault-google/phases/p07/docs/logs/coordination-B1-R2-rev23.md",
+  "requirements_sha256": "efc0ae12f146eecaf7e722f91d53e0e79fe3f6a76ab48261e385dc7f7c6e9571",
+  "decision": "VG-P07-D1/r1",
+  "decision_sha256": "241766fb8efd2af70cbdc5c8d8a5e7dcb23dcd4db63e7db3c1e52b4937049484",
+  "accepted06_digest": "d9d84e7e35bc0a1d603f6f57bf2ac6ba5a9c95a133611bba00b432fe31533b71",
+  "accepted06_archive": "plan/vault-google/phases/p06/docs/logs/source-B1-R2.tar.gz",
+  "whole_source_paths": 156,
+  "phase07_paths": 66,
+  "delta": [
+    {
+      "path": ".github/workflows/ci.yml",
+      "before_sha256": "8c649de1d9576bcced57904b1ba8cbaff1a82c3afd12d0a78ca35557be40d967",
+      "after_sha256": "41b2fe2cdec26088a4d314b77f00b4b7c96c92a622bdbc7f40c4eb584ed73287",
+      "old_lines": 163,
+      "new_lines": 180
+    },
+    {
+      "path": "docs/gmail-workflows.md",
+      "before_sha256": "ba960f4404ba9c64bfc3004e4e3f88015a4145b7723311d65d25a0c87cef90dc",
+      "after_sha256": "a18fdb11e7abd9efdda5e039baf6283cef38424ba1e11723b453b5d83a198c78",
+      "old_lines": 127,
+      "new_lines": 130
+    },
+    {
+      "path": "docs/vault-integrations.md",
+      "before_sha256": null,
+      "after_sha256": "88d82d986cd883c5e7e8d44c34c87d3e0dd37cc3f06ef179f12b02379f0d25c5",
+      "old_lines": 0,
+      "new_lines": 231
+    },
+    {
+      "path": "scripts/check-integration-docs.py",
+      "before_sha256": null,
+      "after_sha256": "e73130cd0d7d7ab75a1980463b6f1d251949c2ff20a95a8f7d239d684b6beb76",
+      "old_lines": 0,
+      "new_lines": 51
+    },
+    {
+      "path": "scripts/integration-boundary.py",
+      "before_sha256": null,
+      "after_sha256": "20a19430ab71af3dd586baf6bcd0588d5ceb757f6cc7be2c0a116c38444fb85a",
+      "old_lines": 0,
+      "new_lines": 214
+    },
+    {
+      "path": "scripts/tests/fixtures/integration-boundary-alias.rs",
+      "before_sha256": null,
+      "after_sha256": "696709164a82696bbdc872164d56610a150f00f6cdc6a6a130c6c8b6c5a72161",
+      "old_lines": 0,
+      "new_lines": 8
+    },
+    {
+      "path": "scripts/tests/integration-boundary.py",
+      "before_sha256": null,
+      "after_sha256": "356310eca62b67f2ce858845ef4a147825083fbd43a04f6089c8381827293d1a",
+      "old_lines": 0,
+      "new_lines": 66
+    },
+    {
+      "path": "scripts/tests/vault-authoring-browser.mjs",
+      "before_sha256": "f693a02e496bfdb06238b64207f83cc7e4865d525d6879e9051fd292ded0a44b",
+      "after_sha256": "041897a880250b05404ea26f6eccb8b1bd3df52e3efc2718d261a9b7d684d53c",
+      "old_lines": 87,
+      "new_lines": 152
+    },
+    {
+      "path": "src/adapters/integrations/execution/http.rs",
+      "before_sha256": "766c1f18a26b68e5d2142b248440264dd140b04f0cdf2f00c7c51dd68424f0f1",
+      "after_sha256": "6a274d911b9a624b875b6175679080784c9970d21a2ffc100c81c8f3291502a9",
+      "old_lines": 92,
+      "new_lines": 124
+    },
+    {
+      "path": "src/adapters/integrations/execution/mod.rs",
+      "before_sha256": "ede45bc88bf072d8ad747e2ad60f9dd0757ace3403ce1febdbf913e202dccd0b",
+      "after_sha256": "b63a7e3bf2a186d32b9c0e1ba9c2bdc95023c3bb61eda36874fd7e0fcf69fa27",
+      "old_lines": 77,
+      "new_lines": 94
+    },
+    {
+      "path": "src/adapters/mcp/mod.rs",
+      "before_sha256": "82fcbbdae2a9f5b3626354ad4a78db522b4ea3c77106ceaf5493c31edc09b668",
+      "after_sha256": "7d75dd611bcff75ef6910a0c8e9ca4fd4004c1965e7e53cb049e1da9f1c6e1c3",
+      "old_lines": 350,
+      "new_lines": 352
+    },
+    {
+      "path": "src/adapters/mcp/pinned_fixture.rs",
+      "before_sha256": null,
+      "after_sha256": "c63221d5dc662a8e874c7c574d7b43645f8d1dedec48c2df5ac8e39d46e87256",
+      "old_lines": 0,
+      "new_lines": 45
+    },
+    {
+      "path": "src/adapters/mcp/preparation_test_server.rs",
+      "before_sha256": "a424ada469d9d6a3d35363ab06fc37ee7544f6269f4df40ae1a6b6138d789df3",
+      "after_sha256": "aab1f8c7e3070c835678d19f1983b5444b7ca5abb7724b67abf369e9a3c4338a",
+      "old_lines": 168,
+      "new_lines": 250
+    },
+    {
+      "path": "src/adapters/persistence/integrations/connect_tests/control_wire.rs",
+      "before_sha256": null,
+      "after_sha256": "c2df2e34b86448c6a6cbb05886865cd75fe6965d201c6f26ff567c7fa3309d9e",
+      "old_lines": 0,
+      "new_lines": 385
+    },
+    {
+      "path": "src/adapters/persistence/integrations/connect_tests/mod.rs",
+      "before_sha256": "ec9efabc1c30e88c75ac2268eb6cf6bf6617707b2fc478cbe0e61ecabe458eb1",
+      "after_sha256": "d7845b13acff2da419e1ab6d48c36f92ae2f3955dbd4a91ae848329d898de344",
+      "old_lines": 360,
+      "new_lines": 362
+    },
+    {
+      "path": "src/adapters/persistence/integrations/connect_tests/portability.rs",
+      "before_sha256": null,
+      "after_sha256": "37f8838bf074bf975d93472282328f22c9c6e794556559bd8809c9f7ff98980a",
+      "old_lines": 0,
+      "new_lines": 361
+    },
+    {
+      "path": "src/adapters/persistence/integrations/grants.rs",
+      "before_sha256": "91ec028dc6ffc4500965c24c2fec1718d0d0c8aaff15dff626e0a357f0c307ac",
+      "after_sha256": "0a2bef92c1c645ac6485e49f7d55fedc9451c5e7d0abdc6c97411bbc88739904",
+      "old_lines": 400,
+      "new_lines": 402
+    },
+    {
+      "path": "src/adapters/persistence/integrations/mod.rs",
+      "before_sha256": "9566329666f212356a364de637ff18c4fe27a7defa30f2da3d91651937f7012b",
+      "after_sha256": "e931795a4dc40ae45efa879abac201af0e2403201e49af9946d9012ad4832b78",
+      "old_lines": 96,
+      "new_lines": 99
+    },
+    {
+      "path": "src/adapters/persistence/integrations/observations.rs",
+      "before_sha256": null,
+      "after_sha256": "96d4d09cec9b9e438f78f1e572178e53a12bd586ba81592a9a141d78dcab5966",
+      "old_lines": 0,
+      "new_lines": 122
+    },
+    {
+      "path": "src/adapters/persistence/integrations/renewal_tests/business_peer.rs",
+      "before_sha256": null,
+      "after_sha256": "4d63cf3225010f6cd7835bb0d38a90991ba140773d101b3bfdb1edf9c63a430a",
+      "old_lines": 0,
+      "new_lines": 295
+    },
+    {
+      "path": "src/adapters/persistence/integrations/renewal_tests/mod.rs",
+      "before_sha256": "b1c9e8b042ccf63a361ddd74d48bd445613c585213d47b530b4db3b0583118a0",
+      "after_sha256": "b01c3e2989af1b1f7faab2001caa1e1cc3443d1ea10a9c78020be77276e8bcd8",
+      "old_lines": 4,
+      "new_lines": 6
+    },
+    {
+      "path": "src/adapters/persistence/integrations/renewal_tests/server.rs",
+      "before_sha256": "dbc29af9b18eb72ad9d152e93900e658f3c30374a79e475c11f52998d3471bd6",
+      "after_sha256": "798f879496edac0890d05aa9e00ec8159d5cd10b77d83d897185669dc5768b48",
+      "old_lines": 147,
+      "new_lines": 159
+    },
+    {
+      "path": "src/adapters/persistence/integrations/renewal_tests/workspace.rs",
+      "before_sha256": "b15267bf63a4243d8a744f99213664ec96350c15170f3f228e9b2b18dc61a67e",
+      "after_sha256": "6896458a0a78b80cf2992ed16a762018823a729e6f629cb473f4e93aaa2452a1",
+      "old_lines": 247,
+      "new_lines": 283
+    },
+    {
+      "path": "src/adapters/persistence/integrations/renewal_tests/workspace_authorization.rs",
+      "before_sha256": null,
+      "after_sha256": "79999403dad98557aa52d8153836fa2645b93a91dbc9b633f467ad6fa14c0c11",
+      "old_lines": 0,
+      "new_lines": 180
+    },
+    {
+      "path": "src/adapters/persistence/integrations/resolve/mod.rs",
+      "before_sha256": "108966d1c54bf0d2f6d530f2d76658e7dd3920b685de4187de87d7c6fda06438",
+      "after_sha256": "9ff10a3e48a2ff8ff138f90f7dea53c26e9de6aa167f9d4238e6cf68dc2d2699",
+      "old_lines": 173,
+      "new_lines": 183
+    },
+    {
+      "path": "src/adapters/persistence/integrations/resolve/write.rs",
+      "before_sha256": "472ef34554dab14b52f41c43468642b1d58b9c9b1f47ad0af8320cbb296ddd01",
+      "after_sha256": "0acb7a94940d953de7d934d54c3d28ad1eb646a1848a8d90da64f0cc5d1ae20e",
+      "old_lines": 158,
+      "new_lines": 169
+    },
+    {
+      "path": "src/adapters/persistence/integrations/storage_tests.rs",
+      "before_sha256": "a3b802933881949fd853a8729cb602016093c5de83f4f3ae8f2e03e60136689d",
+      "after_sha256": "c3d2965e4c588ffde923011319fb9d1c45d5b257a14fb6820650655589534346",
+      "old_lines": 371,
+      "new_lines": 362
+    },
+    {
+      "path": "src/adapters/persistence/workflow/action_approval_http_tests.rs",
+      "before_sha256": "d2ab3a9c2e6206345b9cc1423c2baf5bfd78301211ea3c612b72dba12278bd8e",
+      "after_sha256": "67b396dab3e2ef58cc7fe93a971e9daca27d17ebe635ef2d21f9018870a83f82",
+      "old_lines": 531,
+      "new_lines": 531
+    },
+    {
+      "path": "src/adapters/persistence/workflow/agent_runtime_tests.rs",
+      "before_sha256": "a8003b4c8f4f1d24db3ad520de22e9e5f374ce5b2e6d549123164dda0f91b52a",
+      "after_sha256": "48dea2b79e68e10b7bd6fda652bd65c38049692cddc171457abdc594a2c9e173",
+      "old_lines": 899,
+      "new_lines": 901
+    },
+    {
+      "path": "src/adapters/persistence/workflow/mcp_gateway_tests.rs",
+      "before_sha256": "e0dc7f5fb4879423994190894907cb34bb70fdb55cf3d3c2921f672ed3f9e0e3",
+      "after_sha256": "73cce08535e6c2df03bcc403a1cc4084936d02f47123c18a8d19e3bf7c53ea54",
+      "old_lines": 341,
+      "new_lines": 343
+    },
+    {
+      "path": "src/adapters/persistence/workflow/mcp_renewal_support.rs",
+      "before_sha256": "cec210df0f7ee53a54a6702af128b3b7c5954646dcd9207db559f64760f63ac9",
+      "after_sha256": "dc5951b0065f3d8e7ab77777684e0bf1d5f7d2d37ac517ccceba0bf4d32dbaca",
+      "old_lines": 143,
+      "new_lines": 143
+    },
+    {
+      "path": "src/adapters/persistence/workflow/mcp_test_support.rs",
+      "before_sha256": "a4af30816220999b74237cc136a8d1186ace2af7913452322e28b6eca9d7419f",
+      "after_sha256": "2dff0783c8c6976b88ab0a89246575f690c501c4e3d1f3270d554df1c3161e15",
+      "old_lines": 589,
+      "new_lines": 607
+    },
+    {
+      "path": "src/adapters/persistence/workflow/mcp_wire_tests.rs",
+      "before_sha256": null,
+      "after_sha256": "352838c3c53a8fac6574c745f0c0faa875333ec4bad60bae5bfaeac9342bb3f2",
+      "old_lines": 0,
+      "new_lines": 275
+    },
+    {
+      "path": "src/adapters/persistence/workflow/vault_gmail_journey.rs",
+      "before_sha256": null,
+      "after_sha256": "a73be035f7cf1385acd4f9e639935b8fd6d78c5e9346d3e84a9c211831dfc1f1",
+      "old_lines": 0,
+      "new_lines": 355
+    },
+    {
+      "path": "src/adapters/persistence/workflow/vault_tests/execution.rs",
+      "before_sha256": "69f5c0869ae231bc55db6cdf91896df3b9f0777013f517ab099ee6d768cc18fe",
+      "after_sha256": "3d53d39f43fff777e79a6389c9acdab50a33d3cafbf92f46113e84cc1930134e",
+      "old_lines": 300,
+      "new_lines": 304
+    },
+    {
+      "path": "src/adapters/persistence/workflow/vault_tests/native_control.rs",
+      "before_sha256": null,
+      "after_sha256": "2ba1e540dfd0ee7f5fea10605803af8431fc0ac6eee5a6cb1ea6e2f2ec4b4ff0",
+      "old_lines": 0,
+      "new_lines": 210
+    },
+    {
+      "path": "src/adapters/persistence/workflow/vault_tests/native_journeys.rs",
+      "before_sha256": null,
+      "after_sha256": "f517cb33bfe5580e39aa95f4fe1f0a9a7330c17d14c00d58245b223c5f408f9f",
+      "old_lines": 0,
+      "new_lines": 359
+    },
+    {
+      "path": "src/adapters/persistence/workflow/vault_tests/native_lifecycle.rs",
+      "before_sha256": null,
+      "after_sha256": "3be15ff2ff7d3720c6ac4c52bab2d32b4206e761098d3588cba281dc8f42b93a",
+      "old_lines": 0,
+      "new_lines": 367
+    },
+    {
+      "path": "src/adapters/persistence/workflow/vault_tests/native_mcp_portability.rs",
+      "before_sha256": null,
+      "after_sha256": "d2860366134bb739e8ae89f1f84aa86ce47124c5b5f522edb98f34b594ecd2d9",
+      "old_lines": 0,
+      "new_lines": 150
+    },
+    {
+      "path": "src/adapters/persistence/workflow/vault_tests/native_portability.rs",
+      "before_sha256": null,
+      "after_sha256": "10431868e5d9d2b61cc10e99dbe10fe37f69a182b4322b2865ec42cac71efdbb",
+      "old_lines": 0,
+      "new_lines": 339
+    },
+    {
+      "path": "src/adapters/persistence/workflow/vault_tests/native_recovery.rs",
+      "before_sha256": null,
+      "after_sha256": "55c04453f1aac7cea5c04b5316e1bf8fa7144602b1a31bb35b5109d395294786",
+      "old_lines": 0,
+      "new_lines": 291
+    },
+    {
+      "path": "src/adapters/persistence/workflow/vault_tests/owner_browser.rs",
+      "before_sha256": null,
+      "after_sha256": "c9251c7cc9ab9071c5c1759d2c81309f7c61d246352f74e85720a9fa0c688770",
+      "old_lines": 0,
+      "new_lines": 82
+    },
+    {
+      "path": "src/adapters/persistence/workflow/vault_tests/renewal/mod.rs",
+      "before_sha256": "37cecfd1e629290e79c0fab11a8d04131df644c16b9ba863aefe434b00a5f62f",
+      "after_sha256": "5f90c0ba3c83157ae6e753d18fd9866032fc0d141bffd285093fb2f765c73444",
+      "old_lines": 186,
+      "new_lines": 186
+    },
+    {
+      "path": "src/adapters/persistence/workflow/vault_tests/shared_runtime.rs",
+      "before_sha256": null,
+      "after_sha256": "8be13ec488d9c6dd0e97e7ea17ffa30c888527705afab2f6573d52f3bc5de341",
+      "old_lines": 0,
+      "new_lines": 229
+    },
+    {
+      "path": "src/adapters/persistence/workflow/vault_tests/wire.rs",
+      "before_sha256": null,
+      "after_sha256": "042c80747ab5f580c04624a82561165d69db67661f187f4ec587d781b67ed3fb",
+      "old_lines": 0,
+      "new_lines": 76
+    },
+    {
+      "path": "src/adapters/persistence/workflow/vault_zero_effect_journey.rs",
+      "before_sha256": null,
+      "after_sha256": "f3bf1d59f71a86aee9f4e0baf59c3714b7b0f0832373b75121a1c6ebfab45bfe",
+      "old_lines": 0,
+      "new_lines": 285
+    },
+    {
+      "path": "src/application/integrations/choices.rs",
+      "before_sha256": "11052606c1d72fee10013304a36058fb53da7bfde365c01ecfa2b557740ad329",
+      "after_sha256": "fc72a90e76d92205fdc87bbe95f4bceea1eb34d5321144ddd81ed6c42c0caaef",
+      "old_lines": 39,
+      "new_lines": 40
+    },
+    {
+      "path": "src/application/integrations/discovery.rs",
+      "before_sha256": "c4b117d7752b98536e945eaaf53dfbd237539dcbae2947573e46c421b1bba18c",
+      "after_sha256": "f41cf9d940b87d13fd0a41670969c622b77ea250c222abaa2a4d217a896e2cec",
+      "old_lines": 82,
+      "new_lines": 89
+    },
+    {
+      "path": "src/application/integrations/execution.rs",
+      "before_sha256": "c694228fff5ea0521b1ee8d9e560f7665b8312f7115d6df6f9806a5755466e7e",
+      "after_sha256": "251ffc64ba962c2753254b04b476b04350f2e701c9a28c573a28ecf1d2bd3bc3",
+      "old_lines": 155,
+      "new_lines": 177
+    },
+    {
+      "path": "src/application/integrations/gateway.rs",
+      "before_sha256": "6946d9b7aa7d6a6cb845c707c2d64d004fbb48e471617cd453ef0d4620ad9611",
+      "after_sha256": "c8d4ca965a897f62fbd47961fef3582193d317cd098a5ac03b395914ee152dda",
+      "old_lines": 511,
+      "new_lines": 513
+    },
+    {
+      "path": "src/application/integrations/mod.rs",
+      "before_sha256": "f6410b61c593a6488d9f47c343d56aa77a0b9ace1d9dd434a35f564f4a197f93",
+      "after_sha256": "bb598b69488d717360cfd9cb42bc9cbcd5c73690c6bc91c1429bb631850acf5d",
+      "old_lines": 56,
+      "new_lines": 57
+    },
+    {
+      "path": "src/application/integrations/tests.rs",
+      "before_sha256": "e19142f0d7cf20086a0cce77934f37971c1acdd935d003c401de40a53361df2c",
+      "after_sha256": "52c691907722b0e5b8d857b4f7e1eb6002ebc1160ffabd0c98236ac522249571",
+      "old_lines": 399,
+      "new_lines": 433
+    },
+    {
+      "path": "src/application/integrations/wire/command.rs",
+      "before_sha256": null,
+      "after_sha256": "f564d555ab2d976fa43b26054a70c8340fcd9e40cfb6094c888011f68100ad20",
+      "old_lines": 0,
+      "new_lines": 152
+    },
+    {
+      "path": "src/application/integrations/wire/control_transport.rs",
+      "before_sha256": null,
+      "after_sha256": "84667657aaac8f15f565e00688e9d4466f53fced2a7d95f569a6c8786c78d08c",
+      "old_lines": 0,
+      "new_lines": 237
+    },
+    {
+      "path": "src/application/integrations/wire/mod.rs",
+      "before_sha256": null,
+      "after_sha256": "0636a29c21aaa0bc7af153fc276c3b4ca2179871504bbfcb378c01ae304447a3",
+      "old_lines": 0,
+      "new_lines": 133
+    },
+    {
+      "path": "src/application/integrations/wire/reply.rs",
+      "before_sha256": null,
+      "after_sha256": "980fcfcc7a6d2653912db2befbd68a060520eec165d609c0d44930f1291c03a7",
+      "old_lines": 0,
+      "new_lines": 88
+    },
+    {
+      "path": "src/application/integrations/wire/test_transport.rs",
+      "before_sha256": null,
+      "after_sha256": "20090a3399af3bd2074cf27b57184c2015ecd5143a0c54d915442a44ada23e58",
+      "old_lines": 0,
+      "new_lines": 200
+    },
+    {
+      "path": "src/application/integrations/wire/tests.rs",
+      "before_sha256": null,
+      "after_sha256": "ed826b9f190c0c2445b60a215f2441db377c4b007d3a2c97dafd518fab27dffe",
+      "old_lines": 0,
+      "new_lines": 404
+    },
+    {
+      "path": "src/application/integrations/wire/text.rs",
+      "before_sha256": null,
+      "after_sha256": "ff7df5694655b96f6d483808e7b3f41ee9daefb7a9c6aabecd6fcc2886f008b2",
+      "old_lines": 0,
+      "new_lines": 72
+    },
+    {
+      "path": "src/domain/integrations/account.rs",
+      "before_sha256": "335856d76de814565ef47c3ea725d510f9a068c7c27ca28d15f6bab7993df305",
+      "after_sha256": "09986944bf03e2bb5f4ac85ac20efffb745e82f98d935050663a5b9554485a9e",
+      "old_lines": 181,
+      "new_lines": 182
+    },
+    {
+      "path": "src/infra/integration_logging_tests.rs",
+      "before_sha256": null,
+      "after_sha256": "b5a1fa1673538b4de7809949caf42389acc0e6368012cef82ee10133977c6d39",
+      "old_lines": 0,
+      "new_lines": 57
+    },
+    {
+      "path": "src/infra/integrations.rs",
+      "before_sha256": "2bde7e10759ed44ff944bd82c3b69423f02ecfc1534b18d8369f07a252b659e4",
+      "after_sha256": "b812e9c95015114cb52d06636fdb9839f1c9ecf42e2cc0d9b6f1a83bb0f8af9d",
+      "old_lines": 115,
+      "new_lines": 167
+    },
+    {
+      "path": "src/infra/setup.rs",
+      "before_sha256": "ec9527603d0b196b60bf08b8595122ff186a31f42b1026d2d749eeb96cb38d28",
+      "after_sha256": "9d0fdf75aab31a707320c5f86b511803762ff18257e800fd80cdfe89ba35729c",
+      "old_lines": 173,
+      "new_lines": 181
+    },
+    {
+      "path": "src/infra/setup_tests.rs",
+      "before_sha256": "f16b10648c5cf4c914d43c96de690bb3383fc89d06ecbafc0cff5be01eed29bd",
+      "after_sha256": "45adf4e495564ef49fa8b665a65aa2f7a2ce2ddab17d5f6745f324c3f5f01c2b",
+      "old_lines": 75,
+      "new_lines": 78
+    },
+    {
+      "path": "src/infra/workflow.rs",
+      "before_sha256": "f9cd4896f0579b7bfd8e1aee3abb09dfabb04c4e66c7edd2af38c6c9957e62c3",
+      "after_sha256": "5a9285125681e9df460939aa676f102392225964b849539d1ad245f344e80a13",
+      "old_lines": 785,
+      "new_lines": 792
+    },
+    {
+      "path": "src/main.rs",
+      "before_sha256": "43895c9392ace7a07609ed89d2b85d6178d0f5ff534e25a82a72d07e6ffedc63",
+      "after_sha256": "e5ce25e880a44ad9a3128e2d0704512cfabc218d5184870b8ceec2a8f3c5aca6",
+      "old_lines": 594,
+      "new_lines": 596
+    }
+  ]
+}

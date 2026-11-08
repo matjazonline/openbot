@@ -89,6 +89,7 @@ fn redelivery(
 /// A debuggable name for a settlement outcome (the production type has no `Debug`).
 fn outcome(result: AppResult<RemoteDispatchObservation>) -> AppResult<&'static str> {
     result.map(|observation| match observation {
+        RemoteDispatchObservation::PreparationFailed(_) => "preparation_failed",
         RemoteDispatchObservation::Interrupted => "interrupted",
         RemoteDispatchObservation::Committed(_) => "committed",
         RemoteDispatchObservation::ApprovalParked(_) => "ApprovalParked",

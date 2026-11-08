@@ -1,0 +1,10 @@
+{
+  "final_source_digest": "ad2cae3d8ce497444a91a39bf14fb21f8ecdc27ed547a842a97dbee4cbf9cd48",
+  "matches_review_pass": true,
+  "coordination_revision": 24,
+  "coordination_change": "status only, requirements unchanged",
+  "worker": "original reviewer completed VG-P07-B1-R2",
+  "owned_database_cleanup": "resource-cleanup.json",
+  "git_diff_check_exit": 0,
+  "state": "accepted locally; uncommitted and unpushed; stopped"
+}

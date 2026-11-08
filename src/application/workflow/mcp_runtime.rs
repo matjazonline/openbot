@@ -163,7 +163,7 @@ where
             client: self.client.clone(),
             opened: Mutex::new(None),
         };
-        if state == ActionEffectState::Prepared {
+        if state == ActionEffectState::Prepared && request.context.integration.is_none() {
             tokio::select! {
                 biased;
                 _ = cancel.cancelled() => return Ok(RemoteDispatchObservation::Interrupted),
@@ -217,6 +217,9 @@ where
     ) -> WorkflowHandlerOutcome {
         use ActionStepOutcome as Outcome;
         let result = match self.step(kind, claim).await {
+            Ok(RemoteDispatchObservation::PreparationFailed(failure)) => {
+                Err(integration_pre_dispatch_failure(ActionFamily::Mcp, failure))
+            }
             Ok(RemoteDispatchObservation::Committed(receipt)) => {
                 if mcp_result_is_error(&receipt.result) {
                     // The receipt keeps the bounded error result; a tool error never proves

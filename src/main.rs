@@ -164,6 +164,8 @@ async fn run_credential_rotation() -> anyhow::Result<()> {
 
 /// Every file carrying the "No backward compatibility" note, logged at startup.
 const NO_BACKWARD_COMPATIBILITY_NOTES: &[&str] = &[
+    "plan/.archived/workflow-foundation/09-authoring-and-operations-ui.md",
+    "plan/.archived/workflow-foundation/README.md",
     "AGENTS.md",
     "src/adapters/persistence/AGENTS.md",
     "plan/.archived/fix-01-run-agent-query/01-agent-run-filter.md",

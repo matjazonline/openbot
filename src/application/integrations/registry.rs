@@ -23,6 +23,7 @@ pub struct AppDefinition {
     pub config: AuthConfigId,
     pub destinations: Vec<ApprovedDestination>,
     pub capabilities: Vec<Capability>,
+    pub transport: super::destinations::AppTransportPolicy,
 }
 pub(crate) struct Registration {
     pub provider: AuthProvider,
@@ -37,7 +38,33 @@ pub(crate) struct CodeOwnedRegistry {
     entries: BTreeMap<AppId, Registration>,
 }
 impl CodeOwnedRegistry {
+    pub(crate) fn binding_apps(&self) -> Vec<super::BindingApp> {
+        use crate::domain::integrations::authority::InvocationKind;
+        self.entries
+            .values()
+            .map(|entry| super::BindingApp {
+                id: entry.app.id.clone(),
+                provider: entry.provider.id.clone(),
+                config: entry.config.id.clone(),
+                method: entry.provider.method,
+                schema: entry.provider.schema.clone(),
+                capabilities: entry.app.capabilities.clone(),
+                destinations: entry.app.destinations.clone(),
+                purposes: [
+                    InvocationKind::DeterministicHttp,
+                    InvocationKind::DeterministicMcp,
+                ]
+                .into_iter()
+                .filter(|kind| entry.app.transport.kind(*kind).is_ok())
+                .collect(),
+            })
+            .collect()
+    }
     pub fn register(&mut self, entry: Registration) -> IntegrationResult<()> {
+        entry
+            .app
+            .transport
+            .validate_registration(entry.app.destinations.len())?;
         if (entry.provider.method == AuthMethod::StaticSecret
             && entry.config.client_secret_reference.is_some())
             || entry.provider.id != entry.config.provider
@@ -97,6 +124,7 @@ impl CodeOwnedRegistry {
             &entry.app.id,
             &entry.app.destinations,
             &entry.app.capabilities,
+            &entry.app.transport,
             injection,
         ))
         .map_err(|_| IntegrationError::Invalid)?;
@@ -276,6 +304,11 @@ pub(crate) fn static_registry() -> CodeOwnedRegistry {
                     config,
                     destinations: vec![],
                     capabilities: vec![],
+                    transport: if adapter.header.is_some() {
+                        super::destinations::AppTransportPolicy::OwnerApprovedHttp
+                    } else {
+                        super::destinations::AppTransportPolicy::OwnerApproved
+                    },
                 },
                 adapter: Arc::new(adapter),
             })

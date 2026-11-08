@@ -2,7 +2,7 @@
 
 - Authority: /Users/mac02/.codex/worktrees/1133/openbot/plan/vault-google/COORDINATION.md
 - Writer: /root, worktree /Users/mac02/.codex/worktrees/1133/openbot
-- Revision: 14
+- Revision: 24
 
 ## Plan-wide instructions
 
@@ -25,6 +25,8 @@
 | p03 | /root | same worktree | phases/p03/docs/TASK.md; HANDOFF.md |
 | p04 | /root, sequential after03 | same worktree | phases/p04/docs/TASK.md; HANDOFF.md |
 | p05 | /root, sequential after04 | same worktree | phases/p05/docs/TASK.md; HANDOFF.md |
+| p06 | /root, accepted uncommitted | same worktree | phases/p06/docs/TASK.md; HANDOFF.md |
+| p07 | /root, sequential after accepted06 | same worktree | phases/p07/docs/TASK.md; HANDOFF.md |
 
 ## Cross-phase notices
 
@@ -120,3 +122,72 @@
 
 - User explicitly requests “push to main.” Root may commit and push the accepted vault01–05/current-main integration. Accepted implementation and known inherited F1/F2 scanner failures are unchanged. I03/r3 targeted-only remains active; no redundant/full tests, unrelated fixes, history import,06/07 implementation or deployment is authorized.
 - Publish from this isolated worktree without changing the primary checkout's branch/index/dirty files. Preserve backups and all text review evidence; retain local compiled verification probes outside Git. Verify every accepted source hash, the staged/committed tree and remote main SHA. A local post-push receipt lives outside the repository to avoid a self-referential commit hash; Git remote/history determines publication status.
+
+### VG-I01 / r5 — continue after published history readiness (revision15)
+
+- User asks to pull/check plan04 and continue when ready. Root fetched and fast-forwarded cleanly to main ace526fd8259ec53c5199ffa7555a1a99dcba58e. History01–07 are independently accepted, integrated and published; publication merge AH-PUBLISH-B1-R1 PASS preserves both history48461f66 and vault0d32a33d,198 targeted cases and current native/build/browser checks. This fulfills the readiness condition.
+- Root may implement remaining vault06 then07 in order, accepting each cohesive phase independently under implement-astra-reviewed-2-2. Root/A user-confirmed Sol6.1/xhigh; reuse independentB /root/reviewer Astra/high. I03/r3 TARGETEDONLY remains active and overrides all plan full-suite defaults, including07. Leave known inherited failures untouched, record actual results; no full/stack/lease suites or offers.
+- Preserve existing C001/C003/C004 and accepted history ownership/taint/checkpoint/effect contracts. No company/run/action locks across provider I/O; no credentials/history-model token export.06 needs actual business-dispatch gate and session-generation safety. Consequential new module/session/effect decisions require one cohesive architecture gate before code.
+- Scope does not authorize deployment or a new automatic commit/push. Prior push request was fulfilled for01–05; future publication is a separate action. Do not alter other worktrees, source, resources or records. New06 records phases/p06/docs;07 remains dependent on accepted06.
+
+### VG-C005 / r1 — phase06 authenticated execution boundary (revision16)
+
+- State: proposed; dependent code is blocked on B architecture PASS for decision VG-P06-D1/r1.
+- Origin: p06 root/A; phases/p06/docs/logs/decision-r1.md and SHA256 receipt. Targets p06–p07.
+- Contract proposed: module resolves/prepares privately before native business dispatch; required host runtime dispatch port preserves native approval/fence/replay/effect/receipt ownership. Separate genuine owner configuration discovery; no synthetic business authority. Registry-controlled exact destinations, generation-bound MCP and typed failures. Existing C001/C003/C004 remain binding.
+- Verification: whole-phase focused acceptance matrix in the decision; I03/r3 applies. No implementation source edits yet.
+- Response: p06 acknowledged proposed review; p07 pending accepted06.
+
+### VG-C005 / r1 — activated after06 gate (revision17)
+
+- State: active. OriginalB VG-P06-A1-R1 PASS approved VG-P06-D1/r1 SHA2568fc6432c81d63527f34ab3dbe5f628683b7d705b636d093bd3f93d85af18ba45, source389ada67a176885437a913fb1d2fc7cbbcc7ffa16c7269feccdf7f43a5934054, no actionable findings.
+- p06 acknowledges and implements the whole decision; p07 depends on whole06 code acceptance. No source implementation acceptance is implied by this architecture PASS. All active C001/C003/C004 and I03/r3 remain binding.
+
+### Phase06 review preparation (revision18)
+
+- Whole06A–C authored under active C005/r1, code review pending. Original decision and all notice requirements are unchanged. Implementation source is being frozen for independent whole-batch review; no acceptance/integration/publication implied.
+- I03/r3 targeted-only scope remains authoritative. Phase07 depends on exact whole06 code acceptance, remains unstarted.
+
+### VG-C005 / r2 — proposed B1 correction (revision19)
+
+- State: proposed; r1 remains active until architecture review of VG-P06-D1/r2. No dependent correction source edits yet.
+- Origin: p06 B1/F1–F3 and root/A logs/decision-r2.md. Targets06–07. Required guarded MCP wait-to-request authority and per-attempt initialization cancellation/awaited cleanup, plus phase-preserving pre-dispatch projection failures. No business effect/renewal/schema changes.
+- p06 acknowledges pending gate; p07 remains dependent on accepted whole06. I03/r3 targeted-only remains active.
+
+### VG-C005 / r3 — revised preparation ownership proposal (revision20)
+
+- State: proposed; r2 NOT accepted (VG-P06-A2-R1/A2-F1), r1 remains active pending explicit B gate for VG-P06-D1/r3. No source edits.
+- Revision replaces retained SDK transport cleanup with cancellation/drop of initializer transport, awaited HTTP resource-completion witness and bounded cleanup of a known initialization session. Required genuine post-wait authority port and all other F1/F2/F3 corrections remain. Decision logs/decision-r3.md is immutable.
+- p06 acknowledges; p07 blocked on accepted whole06. I03/r3 unchanged.
+
+### VG-C005 / r3 — activated (revision21)
+
+- OriginalB VG-P06-A3-R1 PASS for D1/r3 SHA58e5a9056c77498d967a61ef2c931076aba1dc62ec70dbdfea358254af3af13e; source a781a861 unchanged. r3 active/supersedes r1 preparation details; A2-F1 resolved at design level, B1-F1–F3 still open until corrected code recheck.
+- Completion witness MUST cover clients AND every returned response/SSE stream, with actual body cancellation, as saved in A3 notes. p06 acknowledges; all other notices/I03r3 unchanged.07 still blocked on whole06 acceptance.
+
+### Accepted06 producer / revision22
+
+- C005/r3 implemented and accepted at source d9d84e7e35bc0a1d603f6f57bf2ac6ba5a9c95a133611bba00b432fe31533b71, originalB VG-P06-B1-R2 PASS, root p06/docs/logs/root-acceptance.json. All B1-F1/F2/F3 resolved; required native postwait business/config/generation checks and cooperative initialization/body/SSE cleanup verified.67 author correction and25 independent focused tests PASS; prior unaffected proof retained. Uncommitted/unpublished; do not infer push authorization.
+- p07 acknowledges C001r1/C003r1/C004r1/C005r3 and accepted06 export; no source changes to06 contracts without affected gate/review.
+
+### VG-C006 / r1 — proposed07 service-contract proof
+
+- State: proposed;07 dependent implementation waits for D1/r1 architecture PASS.
+- Origin p07 /root, phases/p07/docs/logs/decision-r1.md. Targets p07/future extraction; no remote deployment authorization.
+- Contract: bounded version1 public gateway command/result projections; local trusted authority/owner/cancellation/dispatch context stays required, never deserialized as proof. Credentials are sensitive command submissions only, never private resolver results or gateway response fields. Unknown versions fail closed; native effects/uncertainty and C001–005 protocols remain authoritative. Test-only portability registrations cannot enter production registry.
+- Verification: new portability/servicecontract/e2e families, actual persisted authority/native effect seams, sentinel tracing/receipt checks, CI boundary mutation fixtures and operational/extraction documentation. Targeted-only I03r3 applies.
+- Responses: p07 acknowledges proposedr1, waiting independent gate; future extraction pending/no server claims.
+
+### VG-C006 / r1 activated after07 architecture gate (revision23)
+
+- Original D1/r1 SHA241766fb8efd2af70cbdc5c8d8a5e7dcb23dcd4db63e7db3c1e52b4937049484 accepted by independent VG-P07-A1-R1. Activate C006/r1, p07 acknowledges. Explicitly handle128KiB frame overflow against larger locally valid catalogs/paged metadata; preserve native uncertainty/receipts for business response loss. No remote listener or distributed guarantee.
+- p07 implementation/verification pending. Accepted06 export remains unchanged at gate, no commit/push authorization.
+
+
+### Accepted p07 producer and authorized-scope completion (revision24)
+
+- Status-only addendum; applicable notice requirements remain unchanged. C001/r1,C003/r1,C004/r1,C005/r3,C006/r1 acknowledged and satisfied in accepted local06–07 scope; no remote-service or distributed protocol guarantee is added.
+- p07 accepted source ad2cae3d8ce497444a91a39bf14fb21f8ecdc27ed547a842a97dbee4cbf9cd48, HEAD ace526fd8259ec53c5199ffa7555a1a99dcba58e, originalB VG-P07-B1-R2 PASS/root phases/p07/docs/logs/root-acceptance-R2.json. B1-F1/F2 fixed; bounded wire identities tied to original local authority/cancellation, production alias-aware custody/DTO policy, actual provider portability/native journeys/recovery, fixed observations and operations/extraction docs accepted.
+- Current affected proof:43 new-family tests (9portability/23service/11e2e),122 affected existing tests,2 markup fixtures and4 Chrome tests; independent whole-phase42 initial and23 corrected service tests (overlap) plus22 boundary mutations/currentgate/alias reproduction PASS. Locked/offline/alltargets,Clippy,fmtdiff,migrations/SQLx/docs/source checks PASS; unaffected proof retained. Confirmed unrelated baseline transport-scanner fixture remains unchanged. I03/r3 targeted-only honored; no full-suite green or live Google approval claim.
+- Accepted06 d9d84e7e35bc0a1d603f6f57bf2ac6ba5a9c95a133611bba00b432fe31533b71/B VG-P06-B1-R2 prerequisite remains retained in its own records/source archive; current combined integration effects covered by07.06–07 are accepted locally, UNCOMMITTED and UNPUSHED. Published push covered01–05 only. No commit/push/deploy/live authorization is inferred.
+- Own06/07 disposable databases dropped after all checks/reviewer completed; shared PostgreSQL, foreign worktrees/targets/stashes untouched. Source, immutable exports, review and failed-check evidence retained. User-authorized06then07 scope complete: STOP. Next steps recorded in p07/docs/HANDOFF.md; no additional implementation.

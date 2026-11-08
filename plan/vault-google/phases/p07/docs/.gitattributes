@@ -1,0 +1,2 @@
+# Preserve raw review output and rendered fixtures byte for byte.
+logs/** -diff

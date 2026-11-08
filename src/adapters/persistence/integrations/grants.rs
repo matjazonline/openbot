@@ -1,5 +1,6 @@
 //! The module owns consent, credential compatibility and revocation. Host callbacks
 //! enter this adapter only after acquiring their short host authority locks.
+mod dispatch;
 use super::{
     PostgresVault,
     accounts::lock_owner,
@@ -82,7 +83,7 @@ async fn account_on(
         .bind(owner.namespace.as_str()).bind(owner.subject.as_str()).bind(id.as_uuid())
         .fetch_optional(&mut **tx).await.map_err(storage_error)?.ok_or(IntegrationError::NotFound)?.decode()
 }
-async fn read_account_on(
+pub(super) async fn read_account_on(
     tx: &mut Transaction<'_, Postgres>,
     owner: &AccountOwner,
     id: AccountId,
@@ -171,6 +172,7 @@ impl PostgresVault {
         kind: InvocationKind,
     ) -> IntegrationResult<()> {
         let registration = self.registry.get(app)?;
+        registration.app.transport.kind(kind)?;
         if account.provider_id != registration.provider.id
             || account.auth_config_id != registration.config.id
             || account.auth_method != registration.provider.method
@@ -229,9 +231,19 @@ impl PostgresVault {
         invocation: &AuthorizedInvocation,
         context: &ExecutionContext,
     ) -> IntegrationResult<()> {
+        self.dispatch_guard(invocation, context, GenerationCheck::Current)
+            .await
+    }
+    async fn dispatch_guard(
+        &self,
+        invocation: &AuthorizedInvocation,
+        context: &ExecutionContext,
+        generation: GenerationCheck,
+    ) -> IntegrationResult<()> {
         let gate = CurrentGate {
             vault: self,
             expected: invocation,
+            generation,
             passed: AtomicBool::new(false),
         };
         let remaining = (invocation.deadline - chrono::Utc::now())
@@ -303,13 +315,51 @@ impl GrantWriter for PostgresVault {
         if updated.rows_affected() != 1 {
             return Err(IntegrationError::Conflict);
         }
-        tx.commit().await.map_err(storage_error)
+        tx.commit().await.map_err(storage_error)?;
+        super::observations::Event::GrantRevoked.emit();
+        Ok(())
     }
 }
 struct CurrentGate<'a> {
     vault: &'a PostgresVault,
     expected: &'a AuthorizedInvocation,
     passed: AtomicBool,
+    generation: GenerationCheck,
+}
+#[derive(Clone, Copy)]
+enum GenerationCheck {
+    Current,
+    Exact(CredentialGeneration),
+}
+
+#[async_trait]
+impl crate::application::integrations::renewal::ExecutionCredentials for PostgresVault {
+    async fn resolve_configuration(
+        &self,
+        context: &OwnerDiscoveryContext,
+    ) -> crate::application::integrations::renewal::ResolutionResult<
+        crate::application::integrations::renewal::ResolvedCredential,
+    > {
+        self.resolve_configuration_credential(context).await
+    }
+    async fn check_configuration(
+        &self,
+        context: &OwnerDiscoveryContext,
+        generation: CredentialGeneration,
+    ) -> IntegrationResult<()> {
+        self.configuration_generation_guard(context, generation)
+            .await
+    }
+
+    async fn check_generation(
+        &self,
+        invocation: &AuthorizedInvocation,
+        context: &ExecutionContext,
+        generation: CredentialGeneration,
+    ) -> IntegrationResult<()> {
+        self.dispatch_guard(invocation, context, GenerationCheck::Exact(generation))
+            .await
+    }
 }
 #[async_trait]
 impl CredentialDispatchGate for CurrentGate<'_> {
@@ -337,21 +387,12 @@ impl CredentialDispatchGate for CurrentGate<'_> {
             .execute(&mut *tx)
             .await
             .map_err(storage_error)?;
-        let grant = grant_on(&mut tx, invocation.authorization.grant).await?;
-        let account = read_account_on(&mut tx, &grant.owner, grant.account).await?;
-        let grant = grant_on(&mut tx, grant.id).await?;
-        pending(&mut tx, &account.owner, &grant.host_scope).await?;
-        authorize_dispatch(&account, &grant, &invocation.authorization, host)?;
-        if self.vault.registry.policy(&grant.app)? != grant.app_policy {
-            return Err(IntegrationError::Denied);
-        }
         self.vault
-            .validate_binding_payload(
+            .module_gate(
                 &mut tx,
-                &account,
-                &grant.app,
-                &grant.destination,
-                grant.purpose,
+                &invocation.authorization,
+                self.generation,
+                dispatch::ModuleAuthority::Business(host),
             )
             .await?;
         tx.commit().await.map_err(storage_error)?;

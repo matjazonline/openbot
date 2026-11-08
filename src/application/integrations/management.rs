@@ -92,6 +92,27 @@ impl VaultManagement {
 }
 #[async_trait]
 impl ManagementGateway for VaultManagement {
+    async fn binding_apps(&self) -> IntegrationResult<Vec<super::BindingApp>> {
+        Ok(self.registry.binding_apps())
+    }
+    async fn account_choices(
+        &self,
+        owner: &VerifiedOwner,
+        app: &AppId,
+        page: PageRequest,
+    ) -> IntegrationResult<AccountPage> {
+        let definition = self
+            .registry
+            .binding_apps()
+            .into_iter()
+            .find(|entry| &entry.id == app)
+            .ok_or(IntegrationError::NotFound)?;
+        let mut result = self.repository.list(owner.owner(), page).await?;
+        result
+            .accounts
+            .retain(|account| definition.accepts(account));
+        Ok(result)
+    }
     async fn list_accounts(
         &self,
         owner: &VerifiedOwner,

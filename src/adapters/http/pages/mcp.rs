@@ -71,17 +71,19 @@ pub fn detail(company: Uuid, connection: &CompanyMcpConnection, draft: &Definiti
     } else {
         String::new()
     };
-    let refresh = if matches!(connection.auth, McpAuth::Integration(_)) {
-        "<p>Vault catalogue discovery requires its credential owner's authorization.</p>"
-            .to_string()
-    } else {
+    let refresh = format!(
+        r#"<form data-submit="busy-once" data-pending-label="Refreshing tools…" method="post" action="/ui/companies/{company}/mcp-connections/{id}/refresh"><input type="hidden" name="expected_revision" value="{revision}">{button}</form>"#,
+        button = button("Test connection / Refresh tools"),
+    );
+    let source = if connection.endpoint.as_str().starts_with("https://") {
         format!(
-            r#"<form data-submit="busy-once" data-pending-label="Working…" method="post" action="/ui/companies/{company}/mcp-connections/{id}/refresh"><input type="hidden" name="expected_revision" value="{revision}">{button}</form>"#,
-            button = button("Test connection / Refresh tools")
+            "<a class=\"link\" href=\"/ui/companies/{company}/connection-credentials/mcp/{id}\">Choose credential source</a>"
         )
+    } else {
+        "<p>Vault credentials require an HTTPS endpoint.</p>".into()
     };
     format!(
-        r#"<a class="link" href="/ui/companies/{company}/mcp-connections">All MCP servers</a><p>Endpoint identity is immutable; authentication changes require a fresh review.</p>{fields}{credentials}{refresh}<p>Refresh removes grants for missing or changed schemas. Review tools before granting them again.</p><form data-submit="busy-once" data-pending-label="Working…" method="post" action="/ui/companies/{company}/mcp-connections/{id}/delete"><input type="hidden" name="expected_revision" value="{revision}">{delete}</form>"#,
+        r#"<a class="link" href="/ui/companies/{company}/mcp-connections">All MCP servers</a><p>Endpoint identity is immutable; authentication changes require a fresh review.</p>{fields}{credentials}{source}{refresh}<p>Refresh removes grants for missing or changed schemas. Review tools before granting them again.</p><form data-submit="busy-once" data-pending-label="Working…" method="post" action="/ui/companies/{company}/mcp-connections/{id}/delete"><input type="hidden" name="expected_revision" value="{revision}">{delete}</form>"#,
         refresh = refresh,
         delete = button("Delete server")
     )

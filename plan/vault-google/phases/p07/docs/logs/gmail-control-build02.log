@@ -1,0 +1,92 @@
+    Checking open_bots v0.1.0 (/Users/mac02/.codex/worktrees/1133/openbot)
+error[E0659]: `CorrelationId` is ambiguous
+   --> src/adapters/persistence/workflow/vault_gmail_journey.rs:221:29
+    |
+221 |             correlation_id: CorrelationId::new(),
+    |                             ^^^^^^^^^^^^^ ambiguous name
+    |
+    = note: ambiguous because of multiple glob imports of a name in the same module
+note: `CorrelationId` could refer to the struct imported here
+   --> src/adapters/persistence/workflow/vault_gmail_journey.rs:25:5
+    |
+ 25 |     domain::integrations::*,
+    |     ^^^^^^^^^^^^^^^^^^^^^^^
+    = help: consider adding an explicit import of `CorrelationId` to disambiguate
+note: `CorrelationId` could also refer to the struct imported here
+   --> src/adapters/persistence/workflow/vault_gmail_journey.rs:1:5
+    |
+  1 | use super::*;
+    |     ^^^^^^^^
+    = help: consider adding an explicit import of `CorrelationId` to disambiguate
+
+warning: unused import: `lease::*`
+  --> src/adapters/persistence/workflow/vault_gmail_journey.rs:23:20
+   |
+23 |         workflow::{lease::*, polling::*, worker::*},
+   |                    ^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+error[E0599]: no function or associated item named `new` found for struct `domain::integrations::ids::CorrelationId` in the current scope
+   --> src/adapters/persistence/workflow/vault_gmail_journey.rs:221:44
+    |
+221 |             correlation_id: CorrelationId::new(),
+    |                                            ^^^ function or associated item not found in `domain::integrations::ids::CorrelationId`
+    |
+   ::: src/domain/integrations/ids.rs:9:9
+    |
+  9 |         pub struct $name(String);
+    |         ------------------------- function or associated item `new` not found for this struct
+    |
+note: if you're trying to build a new `domain::integrations::ids::CorrelationId`, consider using `domain::integrations::ids::CorrelationId::parse` which returns `std::result::Result<domain::integrations::ids::CorrelationId, domain::integrations::IntegrationError>`
+   --> src/domain/integrations/ids.rs:11:13
+    |
+ 11 |             pub fn parse(value: impl Into<String>) -> IntegrationResult<Self> {
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+ 56 | text_id!(CorrelationId, 128);
+    | ---------------------------- in this macro invocation
+    = help: items from traits can only be used if the trait is implemented and in scope
+    = note: the following traits define an item `new`, perhaps you need to implement one of them:
+            candidate #1: `Bit`
+            candidate #2: `BoundKey`
+            candidate #3: `KeyInit`
+            candidate #4: `KeyIvInit`
+            candidate #5: `ModelLister`
+            candidate #6: `VariableOutput`
+            candidate #7: `VariableOutputCore`
+            candidate #8: `ahash::HashMapExt`
+            candidate #9: `ahash::HashSetExt`
+            candidate #10: `aws_lc_rs::aead::BoundKey`
+            candidate #11: `fluent_uri::internal::RiRef`
+            candidate #12: `hmac::Mac`
+            candidate #13: `itertools::adaptors::coalesce::CountItem`
+            candidate #14: `mail_auth::hickory_resolver::hickory_proto::Executor`
+            candidate #15: `mail_auth::zip::read::magic_finder::FinderDirection`
+            candidate #16: `ndarray::data_traits::DataOwned`
+            candidate #17: `parking_lot_core::thread_parker::ThreadParkerT`
+            candidate #18: `rand::distr::uniform::UniformSampler`
+            candidate #19: `rand::distributions::uniform::UniformSampler`
+            candidate #20: `sha2::Digest`
+            candidate #21: `tendril::tendril::Atomicity`
+            candidate #22: `tendril::tendril::Atomicity`
+            candidate #23: `vsimd::isa::InstructionSet`
+help: there is a method `ne` with a similar name, but with different arguments
+   --> /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/cmp.rs:264:4
+    = note: this error originates in the macro `text_id` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0596]: cannot borrow `llm` as mutable, as it is not declared as mutable
+   --> src/adapters/persistence/workflow/vault_gmail_journey.rs:319:20
+    |
+319 |     let requests = llm.observed();
+    |                    ^^^ cannot borrow as mutable
+    |
+help: consider changing this to be mutable
+    |
+306 |     let mut llm = scripted_llm(vec![LlmTurn::text("\"Draft for review\"")]).await;
+    |         +++
+
+Some errors have detailed explanations: E0596, E0599, E0659.
+For more information about an error, try `rustc --explain E0596`.
+warning: `open_bots` (lib test) generated 1 warning
+error: could not compile `open_bots` (lib test) due to 3 previous errors; 1 warning emitted

@@ -1,0 +1,36 @@
+✖ vault dark: native picker progress, escaped private metadata and recoverable consent (46568.445375ms)
+✖ vault light: native picker progress, escaped private metadata and recoverable consent (46486.147208ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 0
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 93286.368542
+
+✖ failing tests:
+
+test at scripts/tests/vault-authoring-browser.mjs:12:40
+✖ vault dark: native picker progress, escaped private metadata and recoverable consent (46568.445375ms)
+  locator.press: Timeout 30000ms exceeded.
+  Call log:
+  [2m  - waiting for locator('form[data-submit="busy-once"]').getByRole('button', { name: 'Choose private account' })[22m
+  [2m    - locator resolved to <button type="submit" class="btn btn-primary">…</button>[22m
+  [2m  - elementHandle.press("Enter")[22m
+  
+      at TestContext.<anonymous> (/Users/mac02/.codex/worktrees/1133/openbot/scripts/tests/vault-authoring-browser.mjs:40:40) {
+    name: 'TimeoutError'
+  }
+
+test at scripts/tests/vault-authoring-browser.mjs:12:40
+✖ vault light: native picker progress, escaped private metadata and recoverable consent (46486.147208ms)
+  locator.press: Timeout 30000ms exceeded.
+  Call log:
+  [2m  - waiting for locator('form[data-submit="busy-once"]').getByRole('button', { name: 'Choose private account' })[22m
+  [2m    - locator resolved to <button type="submit" class="btn btn-primary">…</button>[22m
+  [2m  - elementHandle.press("Enter")[22m
+  
+      at TestContext.<anonymous> (/Users/mac02/.codex/worktrees/1133/openbot/scripts/tests/vault-authoring-browser.mjs:40:40) {
+    name: 'TimeoutError'
+  }

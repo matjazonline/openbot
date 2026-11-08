@@ -1,0 +1,15 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.18s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-048b7abd3ed0c794)
+
+running 7 tests
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::replay_tests::workflow_action_replay_delayed_lock_cannot_shorten_retention_horizon ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::replay_tests::workflow_action_replay_first_proof_crash_and_tampered_entry_stay_conservative ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::replay_tests::workflow_action_replay_approved_first_dispatch_stable_key_competing_tool_and_restart ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::replay_tests::workflow_action_replay_metadata_headers_and_changed_arguments_cannot_grant_retry ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::replay_tests::workflow_action_replay_unsupported_or_mismatched_contract_never_marks_or_polls ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::replay_tests::workflow_action_replay_frozen_policy_alone_does_not_register_provider_safety ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::replay_tests::workflow_action_replay_ambiguous_observations_never_issue_second_permit ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 3570 filtered out; finished in 8.57s
+

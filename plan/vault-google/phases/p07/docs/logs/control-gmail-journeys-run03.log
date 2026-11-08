@@ -1,0 +1,26 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.19s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-048b7abd3ed0c794)
+
+running 5 tests
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::vault_gmail::vault_google_e2e_different_login_mailbox_callback_reads_thread_and_passes_selected_data_to_model ... ok
+test adapters::persistence::workflow::tests::http_tests::vault_tests::execution::native_portability::native_journeys::vault_google_e2e_reviewed_supplied_mime_resumes_after_expiry_with_same_approval ... ok
+test adapters::persistence::workflow::tests::http_tests::vault_tests::execution::native_portability::native_journeys::vault_google_e2e_stalled_refresh_rechecks_disconnect_membership_rebind_and_operation ... FAILED
+test adapters::persistence::workflow::tests::http_tests::vault_tests::execution::native_portability::shared_runtime::vault_google_e2e_two_pools_http_mcp_share_one_refresh_and_cache_without_sharing_a_session ... ok
+test adapters::persistence::workflow::tests::http_tests::vault_tests::execution::native_portability::vault_google_e2e_owner_consent_reuses_one_private_secret_in_two_native_workflows ... ok
+
+failures:
+
+---- adapters::persistence::workflow::tests::http_tests::vault_tests::execution::native_portability::native_journeys::vault_google_e2e_stalled_refresh_rechecks_disconnect_membership_rebind_and_operation stdout ----
+
+thread 'adapters::persistence::workflow::tests::http_tests::vault_tests::execution::native_portability::native_journeys::vault_google_e2e_stalled_refresh_rechecks_disconnect_membership_rebind_and_operation' (36836764) panicked at src/adapters/persistence/workflow/vault_tests/native_journeys.rs:173:5:
+Membership
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    adapters::persistence::workflow::tests::http_tests::vault_tests::execution::native_portability::native_journeys::vault_google_e2e_stalled_refresh_rechecks_disconnect_membership_rebind_and_operation
+
+test result: FAILED. 4 passed; 1 failed; 0 ignored; 0 measured; 3611 filtered out; finished in 11.42s
+
+error: test failed, to rerun pass `--lib`

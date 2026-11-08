@@ -41,7 +41,7 @@ impl Fixture {
             crate::adapters::persistence::integration_bindings::PostgresIntegrationBindings::new(
                 persistence.clone(),
             ),
-        ),Arc::new(crate::application::integrations::unavailable::UnavailableIntegrations));
+        ),Arc::new(crate::application::integrations::unavailable::UnavailableIntegrations),Arc::new(crate::application::integrations::unavailable::UnavailableIntegrations));
         Self {
             persistence,
             _database: database,

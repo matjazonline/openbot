@@ -6,6 +6,9 @@ use serde_json::json;
 use std::sync::Arc;
 use uuid::Uuid;
 
+#[path = "wire/tests.rs"]
+mod service_contract;
+
 fn owner(namespace: &str, subject: &str) -> AccountOwner {
     AccountOwner {
         namespace: OwnerNamespace::parse(namespace).unwrap(),
@@ -211,6 +214,7 @@ fn integration_contract_managed_google_is_typed_and_shared_between_apps() {
                     ),
                 },
                 app: AppDefinition {
+                    transport: crate::application::integrations::destinations::AppTransportPolicy::OwnerApproved,
                     id: AppId::parse(app).unwrap(),
                     provider: ProviderId::parse("google").unwrap(),
                     config: AuthConfigId::parse("google-client").unwrap(),
@@ -395,4 +399,35 @@ fn integration_contract_operation_headers_cannot_override_adapter_credentials() 
     );
     assert!(OperationArguments::new(json!({"headers":{"Accept":"safe\r\ninjected"}})).is_err());
     assert!(StaticCredentialAdapter::api_key_header("Accept").is_err());
+}
+#[test]
+fn integration_service_contract_private_runtime_capabilities_cannot_implement_wire_traits() {
+    // A second applicable implementation makes inference ambiguous at compile time.
+    // Unlike a compile-fail doctest, privacy cannot accidentally be the failing reason.
+    macro_rules! nonserializable {
+        ($type:ty) => {{
+            trait AmbiguousIfSerialize<A> {
+                fn marker() {}
+            }
+            impl<T: ?Sized> AmbiguousIfSerialize<()> for T {}
+            struct Serialized;
+            impl<T: ?Sized + serde::Serialize> AmbiguousIfSerialize<Serialized> for T {}
+            let _ = <$type as AmbiguousIfSerialize<_>>::marker;
+            trait AmbiguousIfDeserialize<A> {
+                fn marker() {}
+            }
+            impl<T: ?Sized> AmbiguousIfDeserialize<()> for T {}
+            struct Deserialized;
+            impl<T: serde::de::DeserializeOwned> AmbiguousIfDeserialize<Deserialized> for T {}
+            let _ = <$type as AmbiguousIfDeserialize<_>>::marker;
+        }};
+    }
+    nonserializable!(private::CredentialRecord);
+    nonserializable!(private::TypedInjection);
+    nonserializable!(renewal::ResolvedCredential);
+    nonserializable!(VerifiedOwner);
+    nonserializable!(OwnerConfirmation);
+    nonserializable!(ExecutionContext);
+    nonserializable!(OwnerDiscoveryContext);
+    nonserializable!(ConnectWork);
 }

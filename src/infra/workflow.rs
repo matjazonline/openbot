@@ -192,6 +192,7 @@ pub struct WorkflowEngine {
 
 /// Named composition inputs keep the shared model explicit and avoid positional domain/URL arguments.
 pub struct WorkflowEngineSetup<'a> {
+    pub integrations: Arc<dyn crate::application::integrations::ExecutionGateway>,
     pub config: &'a crate::infra::config::AppConfig,
     pub composer: DeliveryComposer,
     pub mcp_client: Arc<dyn McpClient>,
@@ -214,17 +215,19 @@ fn compose_tools(
     templates: &ProvisioningDeployment,
     lease: LeasePolicy,
 ) -> ToolRuntimes {
-    let http = Arc::new(HttpRuntime::with_approvals(
+    let http = Arc::new(HttpRuntime::with_integrations(
         persistence.clone(),
         HttpDestinationPolicy::default(),
         lease,
         Some(notices.clone()),
+        setup.integrations.clone(),
     ));
-    let mcp = Arc::new(McpRuntime::with_approvals(
+    let mcp = Arc::new(McpRuntime::with_integrations(
         persistence.clone(),
         setup.mcp_client.clone(),
         lease,
         Some(notices.clone()),
+        setup.integrations.clone(),
     ));
     let message = Arc::new(MessageRuntime::with_approvals(
         persistence.clone(),
@@ -493,6 +496,15 @@ impl WorkflowEngine {
         self
     }
     pub(crate) fn for_tests(persistence: PostgresPersistence) -> Self {
+        Self::for_tests_with_integrations(
+            persistence,
+            Arc::new(crate::application::integrations::unavailable::UnavailableIntegrations),
+        )
+    }
+    pub(crate) fn for_tests_with_integrations(
+        persistence: PostgresPersistence,
+        integrations: Arc<dyn crate::application::integrations::ExecutionGateway>,
+    ) -> Self {
         use crate::adapters::protocols::email::EmailRenderer;
         use crate::application::transport::ports::TransportRenderers;
         let renderers = Arc::new(
@@ -517,6 +529,7 @@ impl WorkflowEngine {
         Self::new(
             persistence,
             WorkflowEngineSetup {
+                integrations,
                 config: &config,
                 composer,
                 mcp_client: client,

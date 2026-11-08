@@ -1,0 +1,144 @@
+    Checking open_bots v0.1.0 (/Users/mac02/.codex/worktrees/1133/openbot)
+warning: field `dispatch` is never read
+   --> src/application/integrations/execution.rs:107:16
+    |
+105 | pub struct ExecutionContext {
+    |            ---------------- field in this struct
+106 |     pub(crate) authority: std::sync::Arc<dyn DispatchAuthority>,
+107 |     pub(crate) dispatch: std::sync::Arc<dyn super::BusinessDispatch>,
+    |                ^^^^^^^^
+    |
+    = note: `ExecutionContext` has a derived impl for the trait `Clone`, but this is intentionally ignored during dead code analysis
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: methods `http` and `mcp` are never used
+  --> src/application/integrations/destinations.rs:38:19
+   |
+37 | impl AppTransportPolicy {
+   | ----------------------- methods in this implementation
+38 |     pub(crate) fn http(&self, url: &url::Url) -> IntegrationResult<()> {
+   |                   ^^^^
+...
+47 |     pub(crate) fn mcp(&self) -> IntegrationResult<()> {
+   |                   ^^^
+
+warning: `open_bots` (lib) generated 2 warnings
+error[E0004]: non-exhaustive patterns: `&Ok(application::workflow::actions::dispatch::RemoteDispatchObservation::PreparationFailed(_))` not covered
+   --> src/adapters/persistence/workflow/action_dispatch_remote_tests.rs:283:11
+    |
+283 |     match result {
+    |           ^^^^^^ pattern `&Ok(application::workflow::actions::dispatch::RemoteDispatchObservation::PreparationFailed(_))` not covered
+    |
+note: `std::result::Result<application::workflow::actions::dispatch::RemoteDispatchObservation, application::app_error::AppError>` defined here
+   --> /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/result.rs:557:0
+   ::: /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/result.rs:561:4
+    |
+    = note: not covered
+    = note: the matched value is of type `&std::result::Result<application::workflow::actions::dispatch::RemoteDispatchObservation, application::app_error::AppError>`
+help: ensure that all possible cases are being handled by adding a match arm with a wildcard pattern or an explicit pattern as shown
+    |
+289 ~         Err(error) => format!("Err({error:?})"),
+290 ~         &Ok(application::workflow::actions::dispatch::RemoteDispatchObservation::PreparationFailed(_)) => todo!(),
+    |
+
+error[E0004]: non-exhaustive patterns: `application::workflow::actions::dispatch::RemoteDispatchObservation::PreparationFailed(_)` not covered
+   --> src/adapters/persistence/workflow/action_cancellation_receipt_tests.rs:91:36
+    |
+ 91 |     result.map(|observation| match observation {
+    |                                    ^^^^^^^^^^^ pattern `application::workflow::actions::dispatch::RemoteDispatchObservation::PreparationFailed(_)` not covered
+    |
+note: `application::workflow::actions::dispatch::RemoteDispatchObservation` defined here
+   --> src/application/workflow/actions/dispatch.rs:109:10
+    |
+109 | pub enum RemoteDispatchObservation {
+    |          ^^^^^^^^^^^^^^^^^^^^^^^^^
+110 |     /// Integration preparation rejected before a native remote marker could be written.
+111 |     PreparationFailed(crate::application::integrations::PreDispatchFailure),
+    |     ----------------- not covered
+    = note: the matched value is of type `application::workflow::actions::dispatch::RemoteDispatchObservation`
+help: ensure that all possible cases are being handled by adding a match arm with a wildcard pattern or an explicit pattern as shown
+    |
+ 96 ~         RemoteDispatchObservation::PossibleDispatchExists => "possible_dispatch_exists",
+ 97 ~         application::workflow::actions::dispatch::RemoteDispatchObservation::PreparationFailed(_) => todo!(),
+    |
+
+error[E0004]: non-exhaustive patterns: `&Ok(application::workflow::actions::dispatch::RemoteDispatchObservation::PreparationFailed(_))` not covered
+   --> src/adapters/persistence/workflow/action_dispatch_resolution_tests.rs:238:11
+    |
+238 |     match result {
+    |           ^^^^^^ pattern `&Ok(application::workflow::actions::dispatch::RemoteDispatchObservation::PreparationFailed(_))` not covered
+    |
+note: `std::result::Result<application::workflow::actions::dispatch::RemoteDispatchObservation, application::app_error::AppError>` defined here
+   --> /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/result.rs:557:0
+   ::: /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/result.rs:561:4
+    |
+    = note: not covered
+    = note: the matched value is of type `&std::result::Result<application::workflow::actions::dispatch::RemoteDispatchObservation, application::app_error::AppError>`
+help: ensure that all possible cases are being handled by adding a match arm with a wildcard pattern or an explicit pattern as shown
+    |
+244 ~         Err(error) => format!("{error:?}"),
+245 ~         &Ok(application::workflow::actions::dispatch::RemoteDispatchObservation::PreparationFailed(_)) => todo!(),
+    |
+
+error[E0004]: non-exhaustive patterns: `&application::workflow::actions::dispatch::RemoteDispatchObservation::PreparationFailed(_)` not covered
+   --> src/adapters/persistence/workflow/action_reconciliation_sibling_boundary_tests.rs:184:29
+    |
+184 |         let variant = match outcome {
+    |                             ^^^^^^^ pattern `&application::workflow::actions::dispatch::RemoteDispatchObservation::PreparationFailed(_)` not covered
+    |
+note: `application::workflow::actions::dispatch::RemoteDispatchObservation` defined here
+   --> src/application/workflow/actions/dispatch.rs:109:10
+    |
+109 | pub enum RemoteDispatchObservation {
+    |          ^^^^^^^^^^^^^^^^^^^^^^^^^
+110 |     /// Integration preparation rejected before a native remote marker could be written.
+111 |     PreparationFailed(crate::application::integrations::PreDispatchFailure),
+    |     ----------------- not covered
+    = note: the matched value is of type `&application::workflow::actions::dispatch::RemoteDispatchObservation`
+help: ensure that all possible cases are being handled by adding a match arm with a wildcard pattern or an explicit pattern as shown
+    |
+189 ~             RemoteDispatchObservation::Interrupted => "Interrupted",
+190 ~             &application::workflow::actions::dispatch::RemoteDispatchObservation::PreparationFailed(_) => todo!(),
+    |
+
+error[E0004]: non-exhaustive patterns: `&Ok(application::workflow::actions::dispatch::RemoteDispatchObservation::PreparationFailed(_))` not covered
+  --> src/adapters/persistence/workflow/action_reconciliation_high_bounds_source.rs:56:11
+   |
+56 |     match observed {
+   |           ^^^^^^^^ pattern `&Ok(application::workflow::actions::dispatch::RemoteDispatchObservation::PreparationFailed(_))` not covered
+   |
+note: `std::result::Result<application::workflow::actions::dispatch::RemoteDispatchObservation, application::app_error::AppError>` defined here
+  --> /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/result.rs:557:0
+  ::: /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/result.rs:561:4
+   |
+   = note: not covered
+   = note: the matched value is of type `&std::result::Result<application::workflow::actions::dispatch::RemoteDispatchObservation, application::app_error::AppError>`
+help: ensure that all possible cases are being handled by adding a match arm with a wildcard pattern or an explicit pattern as shown
+   |
+66 ~         Ok(RemoteDispatchObservation::Interrupted) => "Ok(Interrupted)".into(),
+67 ~         &Ok(application::workflow::actions::dispatch::RemoteDispatchObservation::PreparationFailed(_)) => todo!(),
+   |
+
+error[E0004]: non-exhaustive patterns: `application::workflow::actions::dispatch::RemoteDispatchObservation::PreparationFailed(_)` not covered
+   --> src/adapters/persistence/workflow/action_reconciliation_validation_tests.rs:183:33
+    |
+183 |             let variant = match result {
+    |                                 ^^^^^^ pattern `application::workflow::actions::dispatch::RemoteDispatchObservation::PreparationFailed(_)` not covered
+    |
+note: `application::workflow::actions::dispatch::RemoteDispatchObservation` defined here
+   --> src/application/workflow/actions/dispatch.rs:109:10
+    |
+109 | pub enum RemoteDispatchObservation {
+    |          ^^^^^^^^^^^^^^^^^^^^^^^^^
+110 |     /// Integration preparation rejected before a native remote marker could be written.
+111 |     PreparationFailed(crate::application::integrations::PreDispatchFailure),
+    |     ----------------- not covered
+    = note: the matched value is of type `application::workflow::actions::dispatch::RemoteDispatchObservation`
+help: ensure that all possible cases are being handled by adding a match arm with a wildcard pattern or an explicit pattern as shown
+    |
+188 ~                 RemoteDispatchObservation::Interrupted => "Interrupted",
+189 ~                 application::workflow::actions::dispatch::RemoteDispatchObservation::PreparationFailed(_) => todo!(),
+    |
+
+For more information about this error, try `rustc --explain E0004`.
+error: could not compile `open_bots` (lib test) due to 6 previous errors

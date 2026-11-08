@@ -1,0 +1,19 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.18s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-048b7abd3ed0c794)
+
+running 11 tests
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::vault_gmail::vault_google_e2e_different_login_mailbox_callback_reads_thread_and_passes_selected_data_to_model ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::vault_gmail::zero_effect::vault_google_e2e_direct_nested_model_and_sealed_sample_never_resolve_private_credentials ... ok
+test adapters::persistence::workflow::tests::http_tests::vault_tests::execution::native_portability::native_journeys::lifecycle::vault_google_e2e_all_vault_kinds_survive_key_rotation_retirement_and_native_renewal ... ok
+test adapters::persistence::workflow::tests::http_tests::vault_tests::execution::native_portability::native_journeys::lifecycle::vault_google_e2e_company_teardown_restart_preserves_other_company_then_account_delete_denies_new_run ... ok
+test adapters::persistence::workflow::tests::http_tests::vault_tests::execution::native_portability::native_journeys::lifecycle::vault_google_e2e_stale_key_rotation_cas_cannot_overwrite_native_google_refresh ... ok
+test adapters::persistence::workflow::tests::http_tests::vault_tests::execution::native_portability::native_journeys::recovery::vault_google_e2e_native_cancel_releases_lock_and_never_retries_an_uncertain_business_send ... ok
+test adapters::persistence::workflow::tests::http_tests::vault_tests::execution::native_portability::native_journeys::recovery::vault_google_e2e_strict_native_backend_crash_after_response_preserves_pending_on_restart ... ok
+test adapters::persistence::workflow::tests::http_tests::vault_tests::execution::native_portability::native_journeys::vault_google_e2e_reviewed_supplied_mime_resumes_after_expiry_with_same_approval ... ok
+test adapters::persistence::workflow::tests::http_tests::vault_tests::execution::native_portability::native_journeys::vault_google_e2e_stalled_refresh_rechecks_disconnect_membership_rebind_and_operation ... ok
+test adapters::persistence::workflow::tests::http_tests::vault_tests::execution::native_portability::shared_runtime::vault_google_e2e_two_pools_http_mcp_share_one_refresh_and_cache_without_sharing_a_session ... ok
+test adapters::persistence::workflow::tests::http_tests::vault_tests::execution::native_portability::vault_google_e2e_owner_consent_reuses_one_private_secret_in_two_native_workflows ... ok
+
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 3616 filtered out; finished in 27.00s
+

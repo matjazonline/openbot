@@ -20,6 +20,9 @@ pub(super) fn engine(
     let engine = WorkflowEngine::new(
         persistence.clone(),
         WorkflowEngineSetup {
+            integrations: Arc::new(
+                crate::application::integrations::unavailable::UnavailableIntegrations,
+            ),
             config,
             composer: DeliveryComposer::new(renderers, store),
             mcp_client: Arc::new(crate::adapters::mcp::HttpMcpClient::new(

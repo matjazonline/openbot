@@ -43,7 +43,8 @@ pub struct StaticAccountInput {
     pub metadata: AccountMetadata,
     pub value: SecretString,
 }
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct GrantInspection {
     pub next: Option<UseGrantId>,
     pub grants: Vec<UseGrant>,
@@ -52,6 +53,13 @@ pub struct GrantInspection {
 
 #[async_trait]
 pub trait ManagementGateway: Send + Sync {
+    async fn binding_apps(&self) -> IntegrationResult<Vec<super::BindingApp>>;
+    async fn account_choices(
+        &self,
+        owner: &VerifiedOwner,
+        app: &AppId,
+        page: PageRequest,
+    ) -> IntegrationResult<AccountPage>;
     async fn list_accounts(
         &self,
         owner: &VerifiedOwner,
@@ -193,7 +201,8 @@ pub struct ReconnectTarget {
     pub account: AccountId,
     pub authorization: AuthorizationRevision,
 }
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct ConnectApp {
     pub provider: ProviderId,
     pub id: AppId,
@@ -315,6 +324,10 @@ pub trait GrantGateway: Send + Sync {
 }
 #[async_trait]
 pub trait ExecutionGateway: Send + Sync {
+    async fn discover_mcp(
+        &self,
+        context: super::OwnerDiscoveryContext,
+    ) -> IntegrationResult<super::DiscoveredCatalog>;
     async fn execute_http(
         &self,
         invocation: AuthorizedInvocation,
@@ -359,6 +372,17 @@ impl LocalIntegrationGateway {
 }
 #[async_trait]
 impl ManagementGateway for LocalIntegrationGateway {
+    async fn binding_apps(&self) -> IntegrationResult<Vec<super::BindingApp>> {
+        self.management.binding_apps().await
+    }
+    async fn account_choices(
+        &self,
+        owner: &VerifiedOwner,
+        app: &AppId,
+        page: PageRequest,
+    ) -> IntegrationResult<AccountPage> {
+        self.management.account_choices(owner, app, page).await
+    }
     async fn list_accounts(
         &self,
         o: &VerifiedOwner,
@@ -466,6 +490,12 @@ impl GrantGateway for LocalIntegrationGateway {
 }
 #[async_trait]
 impl ExecutionGateway for LocalIntegrationGateway {
+    async fn discover_mcp(
+        &self,
+        context: super::OwnerDiscoveryContext,
+    ) -> IntegrationResult<super::DiscoveredCatalog> {
+        self.execution.discover_mcp(context).await
+    }
     async fn execute_http(
         &self,
         i: AuthorizedInvocation,

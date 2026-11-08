@@ -1,0 +1,18 @@
+{
+  "command": [
+    "rustc",
+    "--edition=2024",
+    "--crate-type=lib",
+    "/Users/mac02/.codex/worktrees/1133/openbot/plan/vault-google/phases/p07/docs/logs/reviewer-boundary-alias-source.rs",
+    "--emit=metadata",
+    "-L",
+    "dependency=/Users/mac02/.codex/worktrees/1133/openbot/target/debug/deps",
+    "-o",
+    "/Users/mac02/.codex/worktrees/1133/openbot/plan/vault-google/phases/p07/docs/logs/reviewer-boundary-alias.rmeta",
+    "--extern",
+    "secrecy=/Users/mac02/.codex/worktrees/1133/openbot/target/debug/deps/libsecrecy-2b55b78a2c9b0a62.rlib",
+    "--extern",
+    "serde=/Users/mac02/.codex/worktrees/1133/openbot/target/debug/deps/libserde-340aa8bf57bba01b.rlib"
+  ],
+  "exit": 0
+}

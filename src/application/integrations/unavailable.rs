@@ -54,6 +54,9 @@ impl GrantGateway for UnavailableIntegrations {
 }
 #[async_trait]
 impl ExecutionGateway for UnavailableIntegrations {
+    async fn discover_mcp(&self, _: OwnerDiscoveryContext) -> IntegrationResult<DiscoveredCatalog> {
+        Err(IntegrationError::Unavailable)
+    }
     async fn execute_http(
         &self,
         _: AuthorizedInvocation,

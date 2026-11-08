@@ -1,0 +1,16 @@
+{
+  "command": [
+    "env",
+    "VAULT_AUTHORING_BROWSER_FIXTURES=plan/vault-google/phases/p06/docs/logs/browser-fixtures",
+    "CHROME_PATH=/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+    "node",
+    "--test",
+    "--test-name-pattern=vault dark",
+    "scripts/tests/vault-authoring-browser.mjs"
+  ],
+  "cwd": "/Users/mac02/.codex/worktrees/1133/openbot",
+  "database": "vault_google_p06_1133_baa6bd7114",
+  "exit": 1,
+  "seconds": 7.18,
+  "log": "/Users/mac02/.codex/worktrees/1133/openbot/plan/vault-google/phases/p06/docs/logs/browser-final04.log"
+}

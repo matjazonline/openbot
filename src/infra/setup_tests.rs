@@ -1,6 +1,9 @@
 use super::*;
 use std::{io::Write, sync::Mutex};
 
+#[path = "integration_logging_tests.rs"]
+mod integration_logging;
+
 struct Capture(Arc<Mutex<Vec<u8>>>);
 impl Write for Capture {
     fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {

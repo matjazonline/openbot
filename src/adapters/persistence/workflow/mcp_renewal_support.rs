@@ -46,12 +46,12 @@ async fn attach_account(
     .await
     .unwrap();
 }
-pub(in crate::adapters::persistence::workflow) async fn prepare(
+pub(in crate::adapters::persistence::workflow::tests) async fn configured_setup(
     original: &Fixture,
     vault: &PostgresVault,
     account: &ConnectedAccount,
     app: AppId,
-) -> Proof {
+) -> McpSetup {
     let fixture = Fixture {
         _db: original._db.clone(),
         persistence: original.persistence.clone(),
@@ -78,6 +78,16 @@ pub(in crate::adapters::persistence::workflow) async fn prepare(
         client,
     };
     attach_account(&setup, vault, account, app).await;
+    setup
+}
+
+pub(in crate::adapters::persistence::workflow) async fn prepare(
+    original: &Fixture,
+    vault: &PostgresVault,
+    account: &ConnectedAccount,
+    app: AppId,
+) -> Proof {
+    let setup = Box::pin(configured_setup(original, vault, account, app)).await;
     let claim = claimed(&setup).await;
     let p = &setup.fixture.persistence;
     let request = p.mcp_step_request(&claim, &kind()).await.unwrap();
@@ -128,3 +138,6 @@ async fn publish_unique(fixture: &Fixture, connection: Uuid, definition: Value) 
     service.publish(command.clone()).await.unwrap();
     command.version
 }
+
+#[path = "mcp_gateway_tests.rs"]
+mod gateway_tests;

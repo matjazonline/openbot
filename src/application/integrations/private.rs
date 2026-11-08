@@ -27,16 +27,7 @@ pub(crate) trait CredentialStore: Send + Sync {
 #[derive(Debug)]
 pub(crate) enum InjectionMethod {
     Bearer,
-    ApiKeyHeader(
-        #[cfg_attr(
-            not(test),
-            expect(
-                dead_code,
-                reason = "The fixed header is consumed by authenticated transport in phase06"
-            )
-        )]
-        String,
-    ),
+    ApiKeyHeader(String),
 }
 #[derive(Debug)]
 pub(crate) struct TypedInjection {

@@ -17,8 +17,20 @@ use secrecy::SecretString;
 use serde_json::{Value, json};
 use std::sync::Arc;
 struct NoNetwork;
+#[path = "http_authoring_tests.rs"]
+mod authoring_tests;
 #[async_trait::async_trait]
 impl McpClient for NoNetwork {
+    async fn connect_prepared(
+        &self,
+        _: &McpEndpoint,
+        _: secrecy::SecretString,
+        _: crate::application::services::mcp_client::McpPreparation,
+    ) -> crate::application::services::mcp_client::McpPreparationResult<
+        Box<dyn crate::application::services::mcp_client::McpSession>,
+    > {
+        Err(crate::application::services::mcp_client::McpPreparationFailure::Unavailable)
+    }
     async fn shutdown(&self) -> AppResult<()> {
         Ok(())
     }
@@ -123,6 +135,7 @@ impl Fixture {
                 shared.clone(),
                 shared.clone(),
                 Arc::new(NoNetwork),
+                Arc::new(crate::application::use_cases::mcp::UnavailableMcpDiscovery),
             )),
         };
         Self {

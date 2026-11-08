@@ -155,7 +155,8 @@ impl CredentialVersions {
     }
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct AccountPage {
     pub accounts: Vec<ConnectedAccount>,
     pub next: Option<AccountId>,

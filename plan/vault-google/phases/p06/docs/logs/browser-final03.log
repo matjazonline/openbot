@@ -1,0 +1,30 @@
+✖ vault dark: native picker progress, escaped private metadata and recoverable consent (7028.542875ms)
+✖ vault light: native picker progress, escaped private metadata and recoverable consent (6775.873917ms)
+✔ sample progress, failed request recovery and late navigation response use the requesting form (2118.074125ms)
+✔ actual sample textarea template preserves leading newlines for every raw JSON field (1607.887834ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 2
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 13995.4895
+
+✖ failing tests:
+
+test at scripts/tests/vault-authoring-browser.mjs:12:40
+✖ vault dark: native picker progress, escaped private metadata and recoverable consent (7028.542875ms)
+  Error: Timeout 5000ms exceeded while waiting on the predicate
+      at pollMatcher (/Users/mac02/.codex/worktrees/1133/openbot/node_modules/playwright/lib/matchers/expect.js:312:11)
+      at async TestContext.<anonymous> (file:///Users/mac02/.codex/worktrees/1133/openbot/scripts/tests/vault-authoring-browser.mjs:44:5)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)
+
+test at scripts/tests/vault-authoring-browser.mjs:12:40
+✖ vault light: native picker progress, escaped private metadata and recoverable consent (6775.873917ms)
+  Error: Timeout 5000ms exceeded while waiting on the predicate
+      at pollMatcher (/Users/mac02/.codex/worktrees/1133/openbot/node_modules/playwright/lib/matchers/expect.js:312:11)
+      at async TestContext.<anonymous> (file:///Users/mac02/.codex/worktrees/1133/openbot/scripts/tests/vault-authoring-browser.mjs:44:5)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7)

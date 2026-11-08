@@ -1,0 +1,22 @@
+{
+  "root": "/Users/mac02/.codex/worktrees/1133/openbot",
+  "phase": "p06",
+  "start_head": "ace526fd8259ec53c5199ffa7555a1a99dcba58e",
+  "review_base": "ace526fd8259ec53c5199ffa7555a1a99dcba58e",
+  "database": "vault_google_p06_1133_baa6bd7114",
+  "database_url": "postgresql://localhost/vault_google_p06_1133_baa6bd7114",
+  "test_database_url": "postgresql://localhost/vault_google_p06_1133_baa6bd7114",
+  "database_owned": true,
+  "database_state": "created fresh owned base",
+  "cargo_target": "/Users/mac02/.codex/worktrees/1133/openbot/target",
+  "jobs": 4,
+  "excludes": [
+    "plan/vault-google/COORDINATION.md",
+    "plan/vault-google/phases/p06/docs"
+  ],
+  "browser_executable": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+  "previous_backup_stashes": [
+    "c6cf2a088ef25fe678a8458e5db190eb6bffd73f",
+    "9483cc87716984f371328d3367f3bff24cce13c5"
+  ]
+}

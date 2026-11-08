@@ -1,10 +1,22 @@
 //! Application-owned gateway. Credential-bearing ports are crate-private.
+pub mod choices;
+pub mod destinations;
+pub use choices::{AccountUseStatus, BindingApp};
+pub mod discovery;
+pub mod dispatch;
+pub(crate) mod execute;
+mod preparation;
+pub use discovery::*;
 pub mod execution;
 pub mod gateway;
+pub mod operation;
 pub(crate) mod private;
 pub(crate) mod registry;
+pub mod wire;
+pub use dispatch::{BusinessDispatch, PreparedBusinessCall};
 pub use execution::*;
 pub use gateway::*;
+pub use operation::{OperationTarget, PreDispatchFailure};
 
 #[cfg(test)]
 mod tests;

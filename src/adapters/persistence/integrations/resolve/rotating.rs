@@ -27,11 +27,10 @@ pub(super) async fn reserve(
 pub(super) async fn execute(
     vault: &PostgresVault,
     pending: &PendingRenewal,
-    i: &AuthorizedInvocation,
-    context: &ExecutionContext,
+    i: &CredentialUse<'_>,
     work: &RenewalWork,
 ) -> ResolutionResult<ResolvedCredential> {
-    vault.final_dispatch_guard(i, context).await?;
+    i.check(vault).await?;
     let mut s = locked::lock(vault, i, work).await?;
     if s.pending.as_ref() != Some(pending) || s.versions.generation != pending.generation {
         return Err(IntegrationError::Denied.into());

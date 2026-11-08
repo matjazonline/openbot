@@ -44,7 +44,7 @@ pub(super) async fn http_snapshot(
     .await
     .map(Some)
 }
-pub(super) async fn mcp_snapshot(
+pub(in crate::adapters::persistence) async fn mcp_snapshot(
     db: &mut PgConnection,
     connection: &CompanyMcpConnection,
 ) -> AppResult<Option<AuthorizationSnapshot>> {
@@ -232,6 +232,7 @@ impl DispatchAuthority for HostDispatchAuthority {
             || current.request().arguments != *invocation.arguments.value()
             || current.request().operation_key.as_str() != invocation.operation.as_str()
             || current.request().context.integration.as_ref() != Some(&invocation.authorization)
+            || operation_target(&current, self.kind).map_err(host_error)? != invocation.target
         {
             return Err(integration::IntegrationError::Denied);
         }
@@ -287,6 +288,22 @@ fn digest(value: &str) -> AppResult<[u8; 32]> {
 /// This produces authority metadata only. Phase06 must call it from the existing
 /// remote-entry protocol; it does not authorize replay or perform a business call.
 impl PostgresPersistence {
+    /// Routing hint only. Production authorization is re-read by preflight and dispatch.
+    pub(crate) async fn action_uses_integration(
+        &self,
+        request: &ActionDispatchRequest,
+    ) -> AppResult<bool> {
+        let operation: Value = sqlx::query_scalar(
+            "SELECT operation FROM workflow_action_intents WHERE company_id=$1 AND run_id=$2 AND execution_id=$3 AND id=$4 AND argument_digest=$5",
+        ).bind(request.scope().company.as_uuid()).bind(request.scope().run.as_uuid())
+            .bind(request.scope().execution.as_uuid()).bind(request.subject.invocation.as_uuid())
+            .bind(request.subject.argument_digest.as_str()).fetch_optional(self.pool()).await?.ok_or_else(missing)?;
+        Ok(FrozenAction::restore(operation)?
+            .request()
+            .context
+            .integration
+            .is_some())
+    }
     pub(crate) async fn prepare_integration_invocation(
         &self,
         request: ActionDispatchRequest,
@@ -321,6 +338,7 @@ impl PostgresPersistence {
         let invocation = AuthorizedInvocation {
             authorization,
             operation: integration::OperationId::parse(action.operation_key().as_str())?,
+            target: operation_target(&action, kind)?,
             arguments: OperationArguments::new(action.request().arguments.clone())?,
             request_digest: digest(action.operation_digest().as_str())?,
             correlation: integration::CorrelationId::parse(correlation)?,
@@ -343,9 +361,36 @@ impl PostgresPersistence {
             invocation,
             ExecutionContext {
                 authority: Arc::new(authority),
+                dispatch: Arc::new(
+                    crate::application::integrations::dispatch::DeniedBusinessDispatch,
+                ),
                 cancellation: cancel,
             },
         ))
+    }
+}
+
+fn operation_target(action: &FrozenAction, kind: BindingKind) -> AppResult<OperationTarget> {
+    match kind {
+        BindingKind::Http => {
+            crate::application::workflow::http::HttpRequest::parse(&action.request().arguments)?;
+            Ok(OperationTarget::Http)
+        }
+        BindingKind::Mcp => {
+            let contract = &action.request().contract.contract;
+            let target = OperationTarget::Mcp {
+                tool: contract
+                    .name
+                    .as_str()
+                    .to_owned()
+                    .try_into()
+                    .map_err(|_| missing())?,
+                input_schema: contract.input_schema.clone(),
+                output_schema: Some(contract.output_schema.clone()),
+            };
+            target.validate()?;
+            Ok(target)
+        }
     }
 }
 

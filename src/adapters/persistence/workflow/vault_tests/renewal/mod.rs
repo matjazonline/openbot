@@ -11,6 +11,8 @@ mod bounds;
 mod cache;
 mod commit;
 mod failures;
+#[path = "gateway.rs"]
+mod gateway;
 mod google;
 mod isolation;
 mod management;
@@ -28,6 +30,9 @@ fn google_registry(server: &TokenServer) -> Arc<CodeOwnedRegistry> {
     for id in ["gmail", "gmail-read"] {
         let mut entry = server.google_entry();
         entry.app.id = AppId::parse(id).unwrap();
+        // Scripted test applications deliberately share both HTTP and MCP destinations.
+        entry.app.transport =
+            crate::application::integrations::destinations::AppTransportPolicy::OwnerApproved;
         entry.app.destinations.clear();
         if id == "gmail-read" {
             entry.app.capabilities = vec![Capability::parse("gmail.read").unwrap()];
@@ -36,7 +41,7 @@ fn google_registry(server: &TokenServer) -> Arc<CodeOwnedRegistry> {
     }
     Arc::new(registry)
 }
-fn google_payload(subject: &str, expires: chrono::DateTime<Utc>) -> SecretString {
+pub(super) fn google_payload(subject: &str, expires: chrono::DateTime<Utc>) -> SecretString {
     SecretString::from(json!({"subject":subject,"client":"google-client-fixture","mailbox":"vault@gmail.com","scopes":["openid","email","https://www.googleapis.com/auth/gmail.readonly","https://www.googleapis.com/auth/gmail.send"],"refresh_token":"refresh-sentinel","access_token":"old-access-sentinel","expires_at":expires,"generation":1,"refresh_retry_at":null}).to_string())
 }
 async fn managed(
@@ -145,12 +150,12 @@ impl RenewalSetup {
     }
 }
 
-struct ServiceInstance {
-    vault: PostgresVault,
-    application: String,
+pub(super) struct ServiceInstance {
+    pub(super) vault: PostgresVault,
+    pub(super) application: String,
 }
 
-async fn independent_service(original: &PostgresVault) -> ServiceInstance {
+pub(super) async fn independent_service(original: &PostgresVault) -> ServiceInstance {
     let application = format!("vg05-{}", Uuid::new_v4().simple());
     let options = original
         .persistence
@@ -170,7 +175,7 @@ async fn independent_service(original: &PostgresVault) -> ServiceInstance {
     );
     ServiceInstance { vault, application }
 }
-async fn wait_blocked(vault: &PostgresVault, application: &str) {
+pub(super) async fn wait_blocked(vault: &PostgresVault, application: &str) {
     tokio::time::timeout(std::time::Duration::from_secs(5),async{
         loop {
             let blocked:bool=sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM pg_stat_activity WHERE datname=current_database() AND application_name=$1 AND cardinality(pg_blocking_pids(pid))>0)")

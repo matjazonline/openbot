@@ -1,0 +1,152 @@
+{
+  "source": {
+    "format_version": 1,
+    "workflow_id": "00000000-0000-0000-0000-000000000001",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "thread_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_-]+$"
+        },
+        "raw": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 8192,
+          "pattern": "^[A-Za-z0-9_-]+$"
+        }
+      },
+      "required": [
+        "thread_id",
+        "raw"
+      ],
+      "additionalProperties": false
+    },
+    "parameter_schema": {
+      "type": "object",
+      "properties": {
+        "reviewers": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 16,
+          "items": {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "const": "user"
+              },
+              "id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "kind",
+              "id"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "reviewers"
+      ],
+      "additionalProperties": false
+    },
+    "output_schema": true,
+    "resources": [
+      {
+        "slot": "service",
+        "kind": "http"
+      }
+    ],
+    "entry": "start",
+    "steps": {
+      "start": {
+        "type": "http.request",
+        "with": {
+          "connection": {
+            "literal": "service"
+          },
+          "method": {
+            "literal": "POST"
+          },
+          "path": {
+            "literal": "/gmail/v1/users/me/messages/send"
+          },
+          "headers": {
+            "literal": {
+              "Accept": "application/json",
+              "Content-Type": "application/json"
+            }
+          },
+          "body": {
+            "object": {
+              "threadId": {
+                "ref": "/input/thread_id"
+              },
+              "raw": {
+                "ref": "/input/raw"
+              }
+            }
+          },
+          "approval": {
+            "object": {
+              "reviewers": {
+                "ref": "/params/reviewers"
+              },
+              "deadline": {
+                "ref": "/run/deadline"
+              }
+            }
+          }
+        },
+        "routes": {
+          "success": "$end"
+        }
+      }
+    },
+    "limits": {
+      "max_steps": 10,
+      "max_context_bytes": 65536
+    }
+  },
+  "sample": {
+    "agents": [],
+    "input": {
+      "thread_id": "fixture-thread",
+      "raw": "RnJvbTogYXV0aG9yQGV4YW1wbGUudGVzdA0KVG86IHJlY2lwaWVudEBleGFtcGxlLnRlc3QNClN1YmplY3Q6IFJlOiBNZWV0aW5nDQpNZXNzYWdlLUlEOiA8cmVwbHktZml4dHVyZUBleGFtcGxlLnRlc3Q-DQpJbi1SZXBseS1UbzogPG9yaWdpbmFsLWZpeHR1cmVAZXhhbXBsZS50ZXN0Pg0KUmVmZXJlbmNlczogPG9yaWdpbmFsLWZpeHR1cmVAZXhhbXBsZS50ZXN0Pg0KTUlNRS1WZXJzaW9uOiAxLjANCkNvbnRlbnQtVHlwZTogdGV4dC9wbGFpbjsgY2hhcnNldD1VVEYtOA0KDQpUaGUgbWVldGluZyBpcyBjb25maXJtZWQuDQo"
+    },
+    "params": {
+      "reviewers": [
+        {
+          "kind": "user",
+          "id": "00000000-0000-0000-0000-000000000006"
+        }
+      ]
+    },
+    "scripts": [
+      {
+        "workflow_id": "00000000-0000-0000-0000-000000000001",
+        "step": "start",
+        "responses": [
+          {
+            "output": {
+              "status": 200,
+              "headers": {},
+              "body": {
+                "id": "sent-fixture",
+                "threadId": "fixture-thread",
+                "labelIds": [
+                  "SENT"
+                ]
+              }
+            },
+            "approval": true
+          }
+        ]
+      }
+    ]
+  }
+}

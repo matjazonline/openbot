@@ -19,6 +19,7 @@ use axum::{
 use serde::Deserialize;
 use std::sync::Arc;
 use uuid::Uuid;
+mod source;
 pub(super) fn router<S>() -> Router<S>
 where
     S: Clone + Send + Sync + 'static,
@@ -26,6 +27,10 @@ where
     Arc<dyn IntegrationBindings>: axum::extract::FromRef<S>,
 {
     Router::new()
+        .route(
+            "/ui/companies/{company}/connection-credentials/{kind}/{connection}",
+            get(source::page),
+        )
         .route("/ui/profile/vault/binding-proposals", post(propose))
         .route(
             "/ui/profile/vault/binding-proposals/{proposal}",
@@ -59,8 +64,9 @@ async fn view(
     let owner = verified_owner(&user);
     let proposal = bindings.proposal(&owner, id).await?;
     let page = gateway
-        .list_accounts(
+        .account_choices(
             &owner,
+            &proposal.app,
             PageRequest::new(query.after.map(AccountId::new), 50)?,
         )
         .await?;

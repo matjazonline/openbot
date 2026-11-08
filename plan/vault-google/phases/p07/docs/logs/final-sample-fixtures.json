@@ -1,0 +1,11 @@
+{
+  "command": [
+    "python3",
+    "scripts/tests/workflow-sample-boundary.py"
+  ],
+  "cwd": "/Users/mac02/.codex/worktrees/1133/openbot",
+  "database": "vault_google_p07_1133_a3bcb2497b",
+  "exit": 0,
+  "seconds": 0.07,
+  "log": "/Users/mac02/.codex/worktrees/1133/openbot/plan/vault-google/phases/p07/docs/logs/final-sample-fixtures.log"
+}

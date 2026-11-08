@@ -1,0 +1,23 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.20s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-048b7abd3ed0c794)
+
+running 2 tests
+test adapters::persistence::workflow::tests::http_tests::vault_tests::execution::native_portability::shared_runtime::vault_google_e2e_two_pools_http_mcp_share_one_refresh_and_cache_without_sharing_a_session ... FAILED
+test adapters::persistence::workflow::tests::http_tests::vault_tests::execution::native_portability::vault_google_e2e_owner_consent_reuses_one_private_secret_in_two_native_workflows ... ok
+
+failures:
+
+---- adapters::persistence::workflow::tests::http_tests::vault_tests::execution::native_portability::shared_runtime::vault_google_e2e_two_pools_http_mcp_share_one_refresh_and_cache_without_sharing_a_session stdout ----
+
+thread 'adapters::persistence::workflow::tests::http_tests::vault_tests::execution::native_portability::shared_runtime::vault_google_e2e_two_pools_http_mcp_share_one_refresh_and_cache_without_sharing_a_session' (36803404) panicked at src/adapters/persistence/workflow/mcp_test_support.rs:537:10:
+called `Option::unwrap()` on a `None` value
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    adapters::persistence::workflow::tests::http_tests::vault_tests::execution::native_portability::shared_runtime::vault_google_e2e_two_pools_http_mcp_share_one_refresh_and_cache_without_sharing_a_session
+
+test result: FAILED. 1 passed; 1 failed; 0 ignored; 0 measured; 3607 filtered out; finished in 1.84s
+
+error: test failed, to rerun pass `--lib`

@@ -40,7 +40,9 @@ use std::sync::{
 use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
 mod bounds;
+mod control_wire;
 mod lifecycle;
+mod portability;
 mod provider;
 mod temporal;
 mod workspace;
@@ -228,6 +230,7 @@ impl Fixture {
                 },
             ),
             self.service.clone(),
+            Arc::new(crate::application::integrations::unavailable::UnavailableIntegrations),
         )
     }
     pub async fn new_cookie(&self) -> String {

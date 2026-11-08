@@ -1,0 +1,13 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.18s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-048b7abd3ed0c794)
+
+running 5 tests
+test adapters::persistence::workflow::tests::http_tests::vault_tests::execution::vault_workflow_http_competing_claimants_have_one_business_entry ... ok
+test adapters::persistence::workflow::tests::http_tests::vault_tests::execution::vault_workflow_http_uncertain_send_is_not_dispatched_twice ... ok
+test adapters::persistence::workflow::tests::http_tests::vault_tests::execution::vault_workflow_http_preparation_failure_leaves_intent_without_remote_effect ... ok
+test adapters::persistence::workflow::tests::http_tests::vault_tests::execution::vault_workflow_http_ownership_lost_during_preparation_sends_nothing ... ok
+test adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::gateway::vault_workflow_http_google_refresh_waits_for_approval_then_keeps_native_receipt ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 3572 filtered out; finished in 7.87s
+

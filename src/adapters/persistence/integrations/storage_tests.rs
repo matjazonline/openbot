@@ -345,27 +345,18 @@ async fn vault_storage_envelope_identity_and_context_specific_bounds() {
 #[test]
 fn vault_storage_host_consumers_do_not_read_module_tables() {
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
-    for path in [
-        "src/adapters/http/routes",
-        "src/adapters/persistence/workflow",
-    ] {
-        fn scan(dir: &std::path::Path) {
-            for entry in std::fs::read_dir(dir).unwrap() {
-                let path = entry.unwrap().path();
-                if path.is_dir() {
-                    scan(&path);
-                } else if path.extension().is_some_and(|e| e == "rs") {
-                    let source = std::fs::read_to_string(&path).unwrap();
-                    assert!(
-                        !source.contains("FROM integration_accounts")
-                            && !source.contains("JOIN integration_accounts")
-                            && !source.contains("UPDATE integration_accounts"),
-                        "{} bypasses account port",
-                        path.display()
-                    );
-                }
-            }
-        }
-        scan(&root.join(path));
-    }
+    // Use the same production-module traversal and mutation-tested custody policy
+    // as CI. Fault-injection fixtures legitimately inspect module rows, while all
+    // five private tables and every production consumer remain covered.
+    let result = std::process::Command::new("python3")
+        .arg(root.join("scripts/integration-boundary.py"))
+        .arg(root)
+        .output()
+        .expect("run the integration custody checker");
+    assert!(
+        result.status.success(),
+        "integration custody boundary failed:\n{}\n{}",
+        String::from_utf8_lossy(&result.stdout),
+        String::from_utf8_lossy(&result.stderr)
+    );
 }

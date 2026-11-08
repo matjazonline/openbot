@@ -61,17 +61,22 @@ async fn private_row(tx: &mut Tx, id: AccountId) -> ResolutionResult<PrivateRow>
 }
 pub(super) async fn lock(
     vault: &PostgresVault,
-    i: &AuthorizedInvocation,
+    i: &CredentialUse<'_>,
     work: &RenewalWork,
 ) -> ResolutionResult<Locked> {
     let mut tx = begin(vault, work).await?;
     let grant = super::super::grants::grant_on(&mut tx, i.authorization.grant).await?;
+    if i.configuration_owner()
+        .is_some_and(|owner| owner != &grant.owner)
+    {
+        return Err(IntegrationError::Denied.into());
+    }
     lock_owner(&mut tx, &grant.owner).await?;
     let row = load_account(&mut tx, &grant.owner, i.authorization.account).await?;
     let generation = CredentialGeneration::new(row.credential_generation)?;
     let account = row.decode()?;
     let grant = super::super::grants::grant_on(&mut tx, grant.id).await?;
-    authorize_credential(&account, &grant, &i.authorization, grant.purpose)?;
+    authorize_credential(&account, &grant, i.authorization, grant.purpose)?;
     super::super::grants::pending(&mut tx, &account.owner, &grant.host_scope).await?;
     if vault.registry.policy(&grant.app)? != grant.app_policy {
         return Err(IntegrationError::Denied.into());
@@ -120,7 +125,7 @@ pub(super) async fn lock(
 }
 pub(super) async fn live(
     tx: &mut Tx,
-    i: &AuthorizedInvocation,
+    i: &CredentialUse<'_>,
     work: &RenewalWork,
 ) -> ResolutionResult<()> {
     let now: DateTime<Utc> = sqlx::query_scalar("SELECT clock_timestamp()")

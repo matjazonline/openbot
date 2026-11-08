@@ -64,6 +64,9 @@ jobs:
           scripts/transport-boundary-check.sh
           python3 scripts/tests/workflow-sample-boundary.py
           python3 scripts/workflow-sample-boundary.py
+          python3 scripts/tests/integration-boundary.py
+          python3 scripts/integration-boundary.py
+          python3 scripts/check-integration-docs.py
       - name: Fetch locked Rust dependencies
         run: cargo fetch --locked
       - name: Offline compilation
@@ -108,6 +111,20 @@ jobs:
         run: cargo sqlx prepare --check -- --all-targets
       - name: Compile tests before denying network access
         run: cargo test --locked --offline --all-targets --no-run
+      - name: Integration conformance families are registered
+        run: |
+          for family in integration_portability_ integration_service_contract_ vault_google_e2e_; do
+            cargo test --locked --offline --lib "$family" -- --list > /tmp/integration-conformance-list
+            grep -Eq ': test$' /tmp/integration-conformance-list
+          done
+      - name: Vault authoring browser protocol
+        env:
+          TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5432/open_bots_test
+          VAULT_AUTHORING_BROWSER_FIXTURES: /tmp/vault-authoring-browser
+        run: |
+          cargo test --locked --offline --lib vault_authoring_picker_is_owner_scoped_and_only_exposes_approved_metadata
+          cargo test --locked --offline --lib vault_authoring_owner_forms_and_reconnect_states_emit_real_browser_markup
+          node --test scripts/tests/vault-authoring-browser.mjs
       - name: HTML rendering and team autocomplete browser protocol
         env:
           HTML_INJECTION_BROWSER_FIXTURES: /tmp/html-injection-browser

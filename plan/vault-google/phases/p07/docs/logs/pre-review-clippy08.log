@@ -1,0 +1,40 @@
+    Checking open_bots v0.1.0 (/Users/mac02/.codex/worktrees/1133/openbot)
+error: returning the result of a `let` binding from a block
+   --> src/adapters/persistence/workflow/vault_tests/native_journeys.rs:332:5
+    |
+316 | /     let account = vault
+317 | |         .create(
+318 | |             &f.account.owner,
+319 | |             AccountWrite {
+...   |
+330 | |         .await
+331 | |         .unwrap();
+    | |__________________- unnecessary `let` binding
+332 |       account
+    |       ^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#let_and_return
+    = note: `-D clippy::let-and-return` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::let_and_return)]`
+help: return the expression directly
+    |
+316 ~     
+317 ~     vault
+318 +         .create(
+319 +             &f.account.owner,
+320 +             AccountWrite {
+321 +                 key: AccountKey::parse("different-mailbox").unwrap(),
+322 +                 provider: entry.provider.id.clone(),
+323 +                 config: entry.config.id.clone(),
+324 +                 method: entry.provider.method,
+325 +                 schema: entry.provider.schema.clone(),
+326 +                 identity: entry.adapter.validate(&payload).unwrap(),
+327 +                 metadata: AccountMetadata::new("Other mailbox".into(), None).unwrap(),
+328 +                 payload,
+329 +             },
+330 +         )
+331 +         .await
+332 +         .unwrap()
+    |
+
+error: could not compile `open_bots` (lib test) due to 1 previous error

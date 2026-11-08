@@ -19,10 +19,16 @@ use crate::{
 };
 use secrecy::SecretString;
 use std::sync::Arc;
+pub(super) struct IntegrationServices {
+    pub gateway: Arc<dyn IntegrationGateway>,
+    pub bindings: Arc<dyn IntegrationBindings>,
+    pub discovery: Arc<dyn crate::application::use_cases::mcp::McpIntegrationDiscovery>,
+}
 pub(super) fn gateway(
     p: &PostgresPersistence,
     c: &AppConfig,
-) -> anyhow::Result<(Arc<dyn IntegrationGateway>, Arc<dyn IntegrationBindings>)> {
+    mcp: Arc<dyn crate::application::services::mcp_client::McpClient>,
+) -> anyhow::Result<IntegrationServices> {
     let registry = Arc::new(configured_registry(c, GoogleOAuthConfig::from_env())?);
     let vault = PostgresVault::with_registry(p.clone(), registry.clone());
     let bindings = Arc::new(PostgresIntegrationBindings {
@@ -30,14 +36,35 @@ pub(super) fn gateway(
         vault: vault.clone(),
     });
     let connect = Arc::new(ConnectService {
-        registry,
+        registry: registry.clone(),
         store: Arc::new(vault.clone()),
         codec: Arc::new(SignedConnectState::new(&c.jwt_secret)),
         authority: Arc::new(PostgresConnectAuthority {
             persistence: p.clone(),
         }),
     });
-    Ok((vault.gateway(bindings.clone(), connect), bindings))
+    let execution = Arc::new(
+        crate::application::integrations::execute::AuthenticatedExecution {
+            registry,
+            credentials: Arc::new(vault.clone()),
+            transports: Arc::new(
+                crate::adapters::integrations::execution::IntegrationTransports {
+                    http: crate::adapters::guarded_http::HttpDestinationPolicy::default(),
+                    mcp,
+                },
+            ),
+        },
+    );
+    let gateway = vault.gateway(bindings.clone(), connect, execution);
+    let discovery = Arc::new(crate::adapters::persistence::PostgresMcpDiscovery {
+        vault,
+        gateway: gateway.clone(),
+    });
+    Ok(IntegrationServices {
+        gateway,
+        bindings,
+        discovery,
+    })
 }
 pub(crate) fn configured_registry(
     c: &AppConfig,
@@ -85,4 +112,56 @@ pub(crate) fn configured_registry(
         )?;
     }
     Ok(registry)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn integration_portability_production_composition_registers_no_test_provider_or_app() {
+        let config = AppConfig::for_test();
+        for google in [
+            None,
+            Some(GoogleOAuthConfig {
+                client_id: "production-composition-fixture-client".into(),
+                client_secret: "not-a-live-secret".into(),
+            }),
+        ] {
+            let enabled = google.is_some();
+            let registry = configured_registry(&config, google).unwrap();
+            assert!(
+                registry
+                    .get(&AppId::parse("static-bearer").unwrap())
+                    .is_ok()
+            );
+            assert!(
+                registry
+                    .get(&AppId::parse("static-api-key").unwrap())
+                    .is_ok()
+            );
+            assert_eq!(
+                registry.get(&AppId::parse("gmail").unwrap()).is_ok(),
+                enabled
+            );
+            for fixture in [
+                "portable-key-fixture",
+                "workspace-reader",
+                "workspace-writer",
+                "workspace-other-client",
+                "workspace-strict",
+                "gmail-mcp-fixture",
+            ] {
+                assert!(
+                    registry.get(&AppId::parse(fixture).unwrap()).is_err(),
+                    "{fixture}"
+                );
+            }
+            for app in registry.binding_apps() {
+                assert!(matches!(
+                    app.provider.as_str(),
+                    "static-bearer" | "static-api-key" | "google"
+                ));
+            }
+        }
+    }
 }

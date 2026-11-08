@@ -1,0 +1,12 @@
+{
+  "command": [
+    "git",
+    "diff",
+    "--check"
+  ],
+  "cwd": "/Users/mac02/.codex/worktrees/1133/openbot",
+  "database": "vault_google_p07_1133_a3bcb2497b",
+  "exit": 0,
+  "seconds": 0.04,
+  "log": "/Users/mac02/.codex/worktrees/1133/openbot/plan/vault-google/phases/p07/docs/logs/closure13-diff.log"
+}

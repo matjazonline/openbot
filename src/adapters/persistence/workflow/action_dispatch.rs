@@ -413,7 +413,30 @@ enum ReservationEvidence {
     Entry(Option<LeaseWindow>),
 }
 
+#[derive(Clone, Copy)]
+enum ReserveMode {
+    Prepare,
+    Dispatch,
+}
+
+#[derive(Clone, Copy)]
+struct ReservationAttempt<'a> {
+    request: &'a ActionDispatchRequest,
+    contract: Option<&'a ProviderReplayContract>,
+    bound: &'a WriteBound,
+    entry: Uuid,
+    pending: &'a PendingReservation,
+    mode: ReserveMode,
+}
+struct ReadyReservation {
+    action: FrozenAction,
+    policy: Value,
+    window: LeaseWindow,
+    provider: ProviderInvocation,
+}
+
 enum Reserving {
+    Prepared(Box<FrozenAction>, LeaseWindow),
     Approval(crate::domain::workflow::WaitId),
     /// A receipt already exists: rolled back, then checked against the window read before.
     Receipt(ActionReceipt, LeaseWindow),
@@ -424,15 +447,95 @@ enum Reserving {
 }
 
 impl<A: SqlActionAuthority, L: SqlLocalAction> PostgresActionDispatch<A, L> {
+    /// Current native authorization and replay eligibility without a remote effect marker.
+    pub(crate) async fn preflight_remote(
+        &self,
+        request: &ActionDispatchRequest,
+        contract: Option<&ProviderReplayContract>,
+    ) -> AppResult<RemoteReservationResult> {
+        Box::pin(self.reserve_for(request, contract, ReserveMode::Prepare)).await
+    }
+
+    async fn reserve_for(
+        &self,
+        request: &ActionDispatchRequest,
+        contract: Option<&ProviderReplayContract>,
+        mode: ReserveMode,
+    ) -> AppResult<RemoteReservationResult> {
+        // Minted before the timer: the only COMMIT this operation sends inserts the remote
+        // entry with exactly this id, which is what an ambiguous outcome is resolved by.
+        let entry = Uuid::new_v4();
+        let pending = PendingReservation::default();
+        let bound = WriteBound::start(
+            match mode {
+                ReserveMode::Dispatch => "action.reserve_remote",
+                ReserveMode::Prepare => "action.preflight_remote",
+            },
+            request.lease,
+        );
+        let attempt = bound
+            .attempt(Box::pin(async {
+                let mut conn = bound.acquire(self.persistence.pool()).await?;
+                let mut tx = bound.begin(&mut conn).await?;
+                // Box the SQL phase so approval composition does not enlarge the supervisor frame.
+                let reserving = Box::pin(self.reserve_action(
+                    &mut tx,
+                    &ReservationAttempt {
+                        request,
+                        contract,
+                        bound: &bound,
+                        entry,
+                        pending: &pending,
+                        mode,
+                    },
+                ))
+                .await;
+                match bound.end(tx, reserving).await? {
+                    Reserving::Prepared(action, window) => {
+                        if Instant::now() >= window.expires.min(window.run_deadline) {
+                            return Err(conflict());
+                        }
+                        Ok(RemoteReservationResult::Prepared(action))
+                    }
+                    Reserving::Receipt(receipt, window) => {
+                        if Instant::now() >= window.expires.min(window.run_deadline) {
+                            return Err(conflict());
+                        }
+                        Ok(RemoteReservationResult::Committed(receipt))
+                    }
+                    Reserving::Refused(result) => Ok(result),
+                    Reserving::Approval(wait) => Ok(RemoteReservationResult::ApprovalParked(wait)),
+                    // Unreachable when empty: only the resolution also takes it, and it runs
+                    // only when this COMMIT's outcome is ambiguous.
+                    Reserving::Reserved => {
+                        let reservation = take(&pending).ok_or_else(|| bound.unresolved())?;
+                        Ok(RemoteReservationResult::Reserved(Box::new(reservation)))
+                    }
+                }
+            }))
+            .await;
+        match attempt {
+            Attempt::Done(result) => Ok(result),
+            Attempt::Failed(error) => Err(error),
+            // Boxed: the resolution's state stays off this frame (the dispatch chain runs at
+            // stock 2 MiB in stack-budget.sh).
+            Attempt::Ambiguous => {
+                Box::pin(self.resolve_reservation(&bound, request, entry, take(&pending))).await
+            }
+        }
+    }
+
     async fn reserve_action(
         &self,
         tx: &mut Transaction<'_, Postgres>,
-        request: &ActionDispatchRequest,
-        contract: Option<&ProviderReplayContract>,
-        bound: &WriteBound,
-        entry: Uuid,
-        pending: &PendingReservation,
+        attempt: &ReservationAttempt<'_>,
     ) -> AppResult<End<Reserving>> {
+        let ReservationAttempt {
+            request,
+            contract,
+            bound,
+            ..
+        } = *attempt;
         let AuthorizedAction {
             action,
             current_policy: mut policy,
@@ -477,26 +580,81 @@ impl<A: SqlActionAuthority, L: SqlLocalAction> PostgresActionDispatch<A, L> {
         let window = lease::live_window(tx, request.fence, bound.started())
             .await?
             .ok_or_else(conflict)?;
-        if let Err(error) = super::knowledge_release::evaluate_on(
+        if !Self::release_permits(tx, request, &action).await? {
+            return Ok(End::Rollback(Reserving::Refused(
+                RemoteReservationResult::PossibleDispatchExists,
+            )));
+        }
+        let provider = self.provider_on(tx, request, &action, contract).await?;
+        policy["provider_replay"] = provider.proof()?;
+        self.write_reservation(
             tx,
-            &action,
+            attempt,
+            ReadyReservation {
+                action,
+                policy,
+                window,
+                provider,
+            },
+        )
+        .await
+    }
+
+    async fn release_permits(
+        tx: &mut Transaction<'_, Postgres>,
+        request: &ActionDispatchRequest,
+        action: &FrozenAction,
+    ) -> AppResult<bool> {
+        match super::knowledge_release::evaluate_on(
+            tx,
+            action,
             super::knowledge_release::MessageRecipients::Current,
         )
         .await
         {
-            // A prior marker may already have had an effect. Retain that uncertainty while
-            // preventing a new provider entry under this now-refused classification.
-            if matches!(error, AppError::KnowledgeRelease { .. })
-                && Self::existing(tx, request).await?
-            {
+            Ok(_) => Ok(true),
+            Err(error) => {
+                if matches!(error, AppError::KnowledgeRelease { .. })
+                    && Self::existing(tx, request).await?
+                {
+                    return Ok(false);
+                }
+                Err(error)
+            }
+        }
+    }
+
+    async fn write_reservation(
+        &self,
+        tx: &mut Transaction<'_, Postgres>,
+        attempt: &ReservationAttempt<'_>,
+        ready: ReadyReservation,
+    ) -> AppResult<End<Reserving>> {
+        let ReservationAttempt {
+            request,
+            entry,
+            pending,
+            mode,
+            ..
+        } = *attempt;
+        let ReadyReservation {
+            action,
+            policy,
+            window,
+            provider,
+        } = ready;
+        if matches!(mode, ReserveMode::Prepare) {
+            if matches!(
+                self.marker_state_on(tx, request, &action, &provider)
+                    .await?,
+                super::action_receipts::RemoteMarkerState::Refused
+            ) {
                 return Ok(End::Rollback(Reserving::Refused(
                     RemoteReservationResult::PossibleDispatchExists,
                 )));
             }
-            return Err(error);
+            return Ok(End::Rollback(Reserving::Prepared(Box::new(action), window)));
         }
-        let provider = self.provider_on(tx, request, &action, contract).await?;
-        policy["provider_replay"] = provider.proof()?;
         let Some(marker) = self
             .marker_on(tx, request, &action, policy, &provider)
             .await?
@@ -531,47 +689,8 @@ impl<A: SqlActionAuthority, L: SqlLocalAction> RemoteDispatch for PostgresAction
         request: &ActionDispatchRequest,
         contract: Option<&ProviderReplayContract>,
     ) -> AppResult<RemoteReservationResult> {
-        // Minted before the timer: the only COMMIT this operation sends inserts the remote
-        // entry with exactly this id, which is what an ambiguous outcome is resolved by.
-        let entry = Uuid::new_v4();
-        let pending = PendingReservation::default();
-        let bound = WriteBound::start("action.reserve_remote", request.lease);
-        let attempt = bound
-            .attempt(Box::pin(async {
-                let mut conn = bound.acquire(self.persistence.pool()).await?;
-                let mut tx = bound.begin(&mut conn).await?;
-                // Box the SQL phase so approval composition does not enlarge the supervisor frame.
-                let reserving = Box::pin(
-                    self.reserve_action(&mut tx, request, contract, &bound, entry, &pending),
-                )
-                .await;
-                match bound.end(tx, reserving).await? {
-                    Reserving::Receipt(receipt, window) => {
-                        if Instant::now() >= window.expires.min(window.run_deadline) {
-                            return Err(conflict());
-                        }
-                        Ok(RemoteReservationResult::Committed(receipt))
-                    }
-                    Reserving::Refused(result) => Ok(result),
-                    Reserving::Approval(wait) => Ok(RemoteReservationResult::ApprovalParked(wait)),
-                    // Unreachable when empty: only the resolution also takes it, and it runs
-                    // only when this COMMIT's outcome is ambiguous.
-                    Reserving::Reserved => {
-                        let reservation = take(&pending).ok_or_else(|| bound.unresolved())?;
-                        Ok(RemoteReservationResult::Reserved(Box::new(reservation)))
-                    }
-                }
-            }))
-            .await;
-        match attempt {
-            Attempt::Done(result) => Ok(result),
-            Attempt::Failed(error) => Err(error),
-            // Boxed: the resolution's state stays off this frame (the dispatch chain runs at
-            // stock 2 MiB in stack-budget.sh).
-            Attempt::Ambiguous => {
-                Box::pin(self.resolve_reservation(&bound, request, entry, take(&pending))).await
-            }
-        }
+        // Box the additional preparation seam to keep the native supervisor frame bounded.
+        Box::pin(self.reserve_for(request, contract, ReserveMode::Dispatch)).await
     }
 
     async fn enter_remote(&self, reservation: RemoteReservation) -> AppResult<RemoteEntry> {

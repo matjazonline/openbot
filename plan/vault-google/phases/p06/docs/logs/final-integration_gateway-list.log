@@ -1,0 +1,7 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.20s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-048b7abd3ed0c794)
+adapters::persistence::workflow::tests::http_tests::vault_tests::execution::integration_gateway_real_host_static_bearer_and_api_key_share_native_receipts: test
+adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::gateway::integration_gateway_gmail_path_policy_rejects_before_refresh_or_business_entry: test
+adapters::workflow_http::tests::integration_gateway_shared_http_injects_fixed_api_key_and_redacts_its_echo: test
+
+3 tests, 0 benchmarks

@@ -1,0 +1,12 @@
+   Compiling open_bots v0.1.0 (/Users/mac02/.codex/worktrees/1133/openbot)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 17.95s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-048b7abd3ed0c794)
+adapters::mcp::http::body_lifetime_tests::integration_gateway_native_mcp_sse_body_owns_completion_after_client_release: test
+adapters::mcp::preparation_tests::integration_gateway_native_mcp_abandonment_and_shutdown_join_initialization: test
+adapters::mcp::preparation_tests::integration_gateway_native_mcp_cancellation_and_deadline_join_held_initialization: test
+adapters::mcp::preparation_tests::integration_gateway_native_mcp_competing_admission_cancel_releases_only_its_claim: test
+adapters::persistence::workflow::tests::http_tests::vault_tests::execution::integration_gateway_real_host_static_bearer_and_api_key_share_native_receipts: test
+adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::gateway::integration_gateway_gmail_path_policy_rejects_before_refresh_or_business_entry: test
+adapters::workflow_http::tests::integration_gateway_shared_http_injects_fixed_api_key_and_redacts_its_echo: test
+
+7 tests, 0 benchmarks
