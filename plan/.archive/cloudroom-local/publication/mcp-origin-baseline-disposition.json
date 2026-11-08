@@ -1,0 +1,58 @@
+{
+  "origin": "b8c46300",
+  "compiled_actual_origin_test": true,
+  "test_count": 1,
+  "exit": 101,
+  "failure": "unused required exchanges: completed 3 of 4",
+  "same_as_current_intermittent_failure": true,
+  "source_files_byte_identical": [
+    {
+      "path": "src/adapters/mcp/policy.rs",
+      "sha256": "53306d945397fe83463f4672df63feff02e6881dba73bfacd96f45c19f31dcb8"
+    },
+    {
+      "path": "src/adapters/mcp/preparation_test_server.rs",
+      "sha256": "aab1f8c7e3070c835678d19f1983b5444b7ca5abb7724b67abf369e9a3c4338a"
+    },
+    {
+      "path": "src/adapters/mcp/body_lifetime_tests.rs",
+      "sha256": "2200b1fc7ffd43b2ac821342decd30e090489c9975229f566c439625a78f51a3"
+    },
+    {
+      "path": "src/adapters/mcp/worker.rs",
+      "sha256": "954146513c1dbf74dedee1295ac62141ee3f5d287957f8a9dff17b9ea00d47c7"
+    },
+    {
+      "path": "src/adapters/mcp/pinned_fixture.rs",
+      "sha256": "c63221d5dc662a8e874c7c574d7b43645f8d1dedec48c2df5ac8e39d46e87256"
+    },
+    {
+      "path": "src/adapters/mcp/mod.rs",
+      "sha256": "7d75dd611bcff75ef6910a0c8e9ca4fd4004c1965e7e53cb049e1da9f1c6e1c3"
+    },
+    {
+      "path": "src/adapters/mcp/preparation.rs",
+      "sha256": "51a1a8581cb27179dbf135ad6131a45bfc544500500064a4fa712192f4736cde"
+    },
+    {
+      "path": "src/adapters/mcp/tests.rs",
+      "sha256": "6f65652b85576c7c99890f2f9d3a101da53b5e90edd7a2a1a9d618f568b9f5f6"
+    },
+    {
+      "path": "src/adapters/mcp/http.rs",
+      "sha256": "1add782556d4bec15e1b4e470f44c11388d8a0a0d8d8097648b8f694b7c6672a"
+    },
+    {
+      "path": "src/adapters/mcp/preparation_tests.rs",
+      "sha256": "3b10f3bf67a6f08edbdeefbf2c46485f3dd1f7ae5bbfbae2c6bfbd04aa811f2d"
+    },
+    {
+      "path": "src/adapters/mcp/connection.rs",
+      "sha256": "ea306117beaf8eede17c6ac7f83254fc8de3632022e29e99c7bb1db7595e06a9"
+    }
+  ],
+  "binarySha256": "4004cae96b2940e2857f9a0e75f9bd54a7c357252d55f6f61e764d052acc6ccc",
+  "profile": "test, opt-level0, debug symbols disabled only to bound task-owned diagnostic disk usage",
+  "command": "CARGO_PROFILE_TEST_DEBUG=0 scripts/test-network-isolation.sh cargo test --manifest-path <origin>/Cargo.toml --target-dir <origin>/target --locked --offline --lib mcp_dropped_call_sends_protocol_cancellation_and_joins_cleanup -- --nocapture",
+  "disposition": "Confirmed pre-existing upstream MCP cancellation test failure, independently reproduced before Cloudroom merge. Preserve failures and leave unrelated adapter/test unchanged per workflow."
+}

@@ -1,0 +1,98 @@
+[
+  {
+    "binary": "open_bots-50aeda0c9f5dbc3a",
+    "baseline": "accepted-parent",
+    "trial": 1,
+    "exit": 0,
+    "seconds": 1.2,
+    "log": "logs/mcp-accepted-parent-repeat-01.log"
+  },
+  {
+    "binary": "open_bots-50aeda0c9f5dbc3a",
+    "baseline": "accepted-parent",
+    "trial": 2,
+    "exit": 0,
+    "seconds": 0.02,
+    "log": "logs/mcp-accepted-parent-repeat-02.log"
+  },
+  {
+    "binary": "open_bots-50aeda0c9f5dbc3a",
+    "baseline": "accepted-parent",
+    "trial": 3,
+    "exit": 0,
+    "seconds": 0.02,
+    "log": "logs/mcp-accepted-parent-repeat-03.log"
+  },
+  {
+    "binary": "open_bots-50aeda0c9f5dbc3a",
+    "baseline": "accepted-parent",
+    "trial": 4,
+    "exit": 0,
+    "seconds": 0.02,
+    "log": "logs/mcp-accepted-parent-repeat-04.log"
+  },
+  {
+    "binary": "open_bots-50aeda0c9f5dbc3a",
+    "baseline": "accepted-parent",
+    "trial": 5,
+    "exit": 0,
+    "seconds": 0.02,
+    "log": "logs/mcp-accepted-parent-repeat-05.log"
+  },
+  {
+    "binary": "open_bots-50aeda0c9f5dbc3a",
+    "baseline": "accepted-parent",
+    "trial": 6,
+    "exit": 0,
+    "seconds": 0.02,
+    "log": "logs/mcp-accepted-parent-repeat-06.log"
+  },
+  {
+    "binary": "open_bots-b3fb49a4c0332dfc",
+    "baseline": "combined",
+    "trial": 1,
+    "exit": 0,
+    "seconds": 0.02,
+    "log": "logs/mcp-combined-repeat-01.log"
+  },
+  {
+    "binary": "open_bots-b3fb49a4c0332dfc",
+    "baseline": "combined",
+    "trial": 2,
+    "exit": 101,
+    "seconds": 0.1,
+    "log": "logs/mcp-combined-repeat-02.log"
+  },
+  {
+    "binary": "open_bots-b3fb49a4c0332dfc",
+    "baseline": "combined",
+    "trial": 3,
+    "exit": 101,
+    "seconds": 0.06,
+    "log": "logs/mcp-combined-repeat-03.log"
+  },
+  {
+    "binary": "open_bots-b3fb49a4c0332dfc",
+    "baseline": "combined",
+    "trial": 4,
+    "exit": 101,
+    "seconds": 0.06,
+    "log": "logs/mcp-combined-repeat-04.log"
+  },
+  {
+    "binary": "open_bots-b3fb49a4c0332dfc",
+    "baseline": "combined",
+    "trial": 5,
+    "exit": 0,
+    "seconds": 0.02,
+    "log": "logs/mcp-combined-repeat-05.log"
+  },
+  {
+    "binary": "open_bots-b3fb49a4c0332dfc",
+    "baseline": "combined",
+    "trial": 6,
+    "exit": 0,
+    "seconds": 0.02,
+    "log": "logs/mcp-combined-repeat-06.log"
+  }
+]

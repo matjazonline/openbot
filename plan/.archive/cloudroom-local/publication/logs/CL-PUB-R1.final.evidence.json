@@ -1,0 +1,1225 @@
+{
+  "version": 1,
+  "round": "CL-PUB-R1.final",
+  "artifact": "fbc00a75eb16d9c9cc00f4441976aaa9e176503a54d7dfad8a896d96d1143110",
+  "checks": [
+    {
+      "criteria": [
+        "AC-shared-static",
+        "format"
+      ],
+      "command": "cargo fmt --all -- --check",
+      "fixture": "frozen publication tree f63f08e0; task-owned fixtures only",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/format.log",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC-shared-static",
+        "whitespace"
+      ],
+      "command": "git diff --check",
+      "fixture": "frozen publication tree f63f08e0; task-owned fixtures only",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/whitespace.log",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC-shared-static",
+        "offline"
+      ],
+      "command": "cargo check --locked --offline --all-targets",
+      "fixture": "frozen publication tree f63f08e0; task-owned fixtures only",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/offline.log",
+          "sha256": "3bb679965f0a12982e07be2b1c71ba457c15ceb768859fabb10911106022ba16"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC-shared-static",
+        "clippy"
+      ],
+      "command": "cargo clippy --locked --offline --all-targets -- -D warnings",
+      "fixture": "frozen publication tree f63f08e0; task-owned fixtures only",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/clippy.log",
+          "sha256": "f1ee6bacebe853984c7cdaf92cc95182b82429b29a7de1b1d449d0893e925362"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC-shared-static",
+        "sqlx"
+      ],
+      "command": "cargo sqlx prepare --check -- --all-targets",
+      "fixture": "frozen publication tree f63f08e0; task-owned fixtures only",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/sqlx.log",
+          "sha256": "e73547c231b6a432166b2e806125d99751c20236e6cc2c43869ba9a185c65f23"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC-shared-static",
+        "compile-tests"
+      ],
+      "command": "cargo test --locked --offline --all-targets --no-run",
+      "fixture": "frozen publication tree f63f08e0; task-owned fixtures only",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/compile-tests.log",
+          "sha256": "672443ff47f01bbad361407d56c2d25b44ddeff72c6d762d7347caef876f55b3"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC-shared-static",
+        "inventory"
+      ],
+      "command": "cargo test --locked --offline --all-targets -- --list",
+      "fixture": "frozen publication tree f63f08e0; task-owned fixtures only",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/inventory.log",
+          "sha256": "a6a40bc2ff368c8efa19be65e28518ad3384a81f1358efe7d403c58f12fbb113"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC-static-and-browser",
+        "deploy-tests"
+      ],
+      "command": "scripts/tests/deploy.sh",
+      "fixture": "frozen publication tree f63f08e0; task-owned fixtures only",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/deploy-tests.log",
+          "sha256": "e970eb58edddc8dae62051093aa49f389c70fb68e98591d8676518e92dd09da7"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC-static-and-browser",
+        "rotation-tests"
+      ],
+      "command": "scripts/tests/credential-key-rotation.sh",
+      "fixture": "frozen publication tree f63f08e0; task-owned fixtures only",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/rotation-tests.log",
+          "sha256": "3ddbc0e774ee727d438513c3ad4a5c7fc6203e847efa6ffab28dd0f0da6e55a4"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC-static-and-browser",
+        "model-prepare-tests"
+      ],
+      "command": "python3 scripts/tests/knowledge-model-prepare.py",
+      "fixture": "frozen publication tree f63f08e0; task-owned fixtures only",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/model-prepare-tests.log",
+          "sha256": "279538fe812d165bb22f5a84ab94b40efa9072957816601b6c80f1ba281fa35e"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC-static-and-browser",
+        "transport-tests"
+      ],
+      "command": "scripts/tests/transport-boundary.sh",
+      "fixture": "frozen publication tree f63f08e0; task-owned fixtures only",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/transport-tests.log",
+          "sha256": "480891f26caa8bd468e29fde86837c36980ab880981422add136e69cc813b7e0"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC-static-and-browser",
+        "transport-boundary"
+      ],
+      "command": "scripts/transport-boundary-check.sh",
+      "fixture": "frozen publication tree f63f08e0; task-owned fixtures only",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/transport-boundary.log",
+          "sha256": "5404719cd719b1af8125ac9b5e8a2654bab6e3f42922bee9c3252b5174b4935c"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC-static-and-browser",
+        "sample-boundary-tests"
+      ],
+      "command": "python3 scripts/tests/workflow-sample-boundary.py",
+      "fixture": "frozen publication tree f63f08e0; task-owned fixtures only",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/sample-boundary-tests.log",
+          "sha256": "1df0dc843fbde79fd29b1d33831815ffd9089eb1b69f6ce31856db5fb25a1765"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC-static-and-browser",
+        "sample-boundary"
+      ],
+      "command": "python3 scripts/workflow-sample-boundary.py",
+      "fixture": "frozen publication tree f63f08e0; task-owned fixtures only",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/sample-boundary.log",
+          "sha256": "228c0f0f23407594379b257a3e3684550f2f3eb1741d27acbc9be312e22e6d2d"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC-static-and-browser",
+        "integration-boundary-tests"
+      ],
+      "command": "python3 scripts/tests/integration-boundary.py",
+      "fixture": "frozen publication tree f63f08e0; task-owned fixtures only",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/integration-boundary-tests.log",
+          "sha256": "98a7e5642e7c9a96cd8ae69bab3bf45f3e0f6906f7b2ee508e643777a47a7f7a"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC-static-and-browser",
+        "integration-boundary"
+      ],
+      "command": "python3 scripts/integration-boundary.py",
+      "fixture": "frozen publication tree f63f08e0; task-owned fixtures only",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/integration-boundary.log",
+          "sha256": "9f55dabd846b9377bfba6441b555d4ae8090f5b38d967ea08d6c338e9346f00a"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC-static-and-browser",
+        "integration-docs"
+      ],
+      "command": "python3 scripts/check-integration-docs.py",
+      "fixture": "frozen publication tree f63f08e0; task-owned fixtures only",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/integration-docs.log",
+          "sha256": "b0b02f4660be8d4a391486646f7a9898d0cc7c8544cb640fcca196cb3414d43c"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC-static-and-browser",
+        "browser-protocols"
+      ],
+      "command": "node --test scripts/tests/sse-navigation.mjs scripts/tests/agent-runtime.mjs scripts/tests/channel-response-authoring.mjs scripts/tests/workflow-runs.mjs scripts/tests/workflow-conversations.mjs scripts/tests/workflow-samples.mjs",
+      "fixture": "frozen publication tree f63f08e0; task-owned fixtures only",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/browser-protocols.log",
+          "sha256": "e59ee27163e84ede62aa1f66843e306e9524c4061282c1f8dcf85a969a17e240"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC-static-and-browser",
+        "run-counts"
+      ],
+      "command": "npm run test:run-counts",
+      "fixture": "frozen publication tree f63f08e0; task-owned fixtures only",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/run-counts.log",
+          "sha256": "d67176993655b4a6e831a62d3a777e51dbf13ebd8d60eee6194587376a437b63"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC-generated-browser",
+        "vault-fixture-1"
+      ],
+      "command": "scripts/test-network-isolation.sh /Users/mac03/dev/openbot/target/debug/deps/open_bots-b3fb49a4c0332dfc vault_authoring_picker_is_owner_scoped_and_only_exposes_approved_metadata --test-threads=1",
+      "fixture": "frozen publication tree f63f08e0; task-owned fixtures only",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/browser-vault-fixture-1.log",
+          "sha256": "1609d31848a615d58ced3ddc28bea61a59ce221dd9f640efa5df401ef6c03a1c"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC-generated-browser",
+        "vault-fixture-2"
+      ],
+      "command": "scripts/test-network-isolation.sh /Users/mac03/dev/openbot/target/debug/deps/open_bots-b3fb49a4c0332dfc vault_authoring_owner_forms_and_reconnect_states_emit_real_browser_markup --test-threads=1",
+      "fixture": "frozen publication tree f63f08e0; task-owned fixtures only",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/browser-vault-fixture-2.log",
+          "sha256": "3d0b2e967e5ebdd9140b683c9d9d179eb1fac7ee7a5b67c32bd80bd9e954a4a5"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC-generated-browser",
+        "vault-driver"
+      ],
+      "command": "node --test scripts/tests/vault-authoring-browser.mjs",
+      "fixture": "frozen publication tree f63f08e0; task-owned fixtures only",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/browser-vault-driver.log",
+          "sha256": "7d3bd961b48db27675f1edf05d5151d867a4314e366eb3bffd0deb090fec9d1a"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC-generated-browser",
+        "html-fixture-1"
+      ],
+      "command": "scripts/test-network-isolation.sh /Users/mac03/dev/openbot/target/debug/deps/open_bots-b3fb49a4c0332dfc dump_html_injection_browser_fixtures --test-threads=1 --ignored",
+      "fixture": "frozen publication tree f63f08e0; task-owned fixtures only",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/browser-html-fixture-1.log",
+          "sha256": "7e1103f5a070e7c328bde3549f7763c5ff0572acb424d92c1e01233f62306cf5"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC-generated-browser",
+        "html-driver"
+      ],
+      "command": "node --test scripts/tests/team-autocomplete-browser.mjs scripts/tests/html-injection-browser.mjs",
+      "fixture": "frozen publication tree f63f08e0; task-owned fixtures only",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/browser-html-driver.log",
+          "sha256": "33d0e2cda62968b0df2021f49cc742b88b5f2794372ebfc4e270c34dcbfc9e79"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC-generated-browser",
+        "knowledge-fixture-1"
+      ],
+      "command": "scripts/test-network-isolation.sh /Users/mac03/dev/openbot/target/debug/deps/open_bots-b3fb49a4c0332dfc dump_knowledge_browser_fixtures --test-threads=1 --ignored",
+      "fixture": "frozen publication tree f63f08e0; task-owned fixtures only",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/browser-knowledge-fixture-1.log",
+          "sha256": "be74b96c19423c300e856fb6c4e9ee703e2119e162f83e9a2db5cd1076ab579a"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC-generated-browser",
+        "knowledge-driver"
+      ],
+      "command": "node --test scripts/tests/knowledge-browser.mjs",
+      "fixture": "frozen publication tree f63f08e0; task-owned fixtures only",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/browser-knowledge-driver.log",
+          "sha256": "2c6268a470342c977987747caceeb06551081a28497848f40a0ea40455bf8ad7"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC-generated-browser",
+        "agent-fixture-1"
+      ],
+      "command": "scripts/test-network-isolation.sh /Users/mac03/dev/openbot/target/debug/deps/open_bots-b3fb49a4c0332dfc dump_autonomous_agent_authoring_browser_fixtures --test-threads=1 --ignored",
+      "fixture": "frozen publication tree f63f08e0; task-owned fixtures only",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/browser-agent-fixture-1.log",
+          "sha256": "360b35ecd0d7987b8ddb1decc07e716aad7c1055d8242fcf4a06b724aa3d6d7d"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC-generated-browser",
+        "agent-driver"
+      ],
+      "command": "node --test scripts/tests/agent-authoring-browser.mjs",
+      "fixture": "frozen publication tree f63f08e0; task-owned fixtures only",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/browser-agent-driver.log",
+          "sha256": "31c04a48d0dd7c0aa84ff033fa96e01fab5aa0144b790b56fc86f605b5c12b40"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC-generated-browser",
+        "local-fixture-1"
+      ],
+      "command": "scripts/test-network-isolation.sh /Users/mac03/dev/openbot/target/debug/deps/open_bots-b3fb49a4c0332dfc dump_cloudroom_management_browser_fixtures --test-threads=1 --ignored",
+      "fixture": "frozen publication tree f63f08e0; task-owned fixtures only",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/browser-local-fixture-1.log",
+          "sha256": "0e7c6e10b90f4fbf385c3852c678c34001d5a294018ba986f163f537af83f21b"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC-generated-browser",
+        "local-driver"
+      ],
+      "command": "node --test scripts/tests/local-agents-browser.mjs",
+      "fixture": "frozen publication tree f63f08e0; task-owned fixtures only",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/browser-local-driver.log",
+          "sha256": "1cf285604730977ee2cc7ef7513d29f67260114387e7e1f8b60019300379931f"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC-generated-browser",
+        "picker-fixture-1"
+      ],
+      "command": "scripts/test-network-isolation.sh /Users/mac03/dev/openbot/target/debug/deps/open_bots-b3fb49a4c0332dfc dump_autonomous_workflow_agent_picker_browser_fixtures --test-threads=1 --ignored",
+      "fixture": "frozen publication tree f63f08e0; task-owned fixtures only",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/browser-picker-fixture-1.log",
+          "sha256": "8cf8d2e3913491ee4779917196fd00f619495d490c904c541600a82f34ca8119"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC-generated-browser",
+        "picker-driver"
+      ],
+      "command": "node --test scripts/tests/workflow-agent-picker-browser.mjs",
+      "fixture": "frozen publication tree f63f08e0; task-owned fixtures only",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/browser-picker-driver.log",
+          "sha256": "a4f4bf7757572242fdc5c3a9d7b60aa513d7deda949553e99dd9bf79845aeabe"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC-generated-browser",
+        "session-fixture-1"
+      ],
+      "command": "scripts/test-network-isolation.sh /Users/mac03/dev/openbot/target/debug/deps/open_bots-b3fb49a4c0332dfc dump_session_revocation_browser_fixtures --test-threads=1 --ignored",
+      "fixture": "frozen publication tree f63f08e0; task-owned fixtures only",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/browser-session-fixture-1.log",
+          "sha256": "b981d174aa00fd437c4648723361beedf15f1c6cfe3c56d60fd67e0057dc42e4"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC-generated-browser",
+        "session-driver"
+      ],
+      "command": "node --test scripts/tests/session-revocation-browser.mjs",
+      "fixture": "frozen publication tree f63f08e0; task-owned fixtures only",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/browser-session-driver.log",
+          "sha256": "300aaee5c6c15239015efc138660ba82e6c2bb392f5dbbdf54cdd8db54bc9f1d"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC-generated-browser",
+        "decision-fixture-1"
+      ],
+      "command": "scripts/test-network-isolation.sh /Users/mac03/dev/openbot/target/debug/deps/open_bots-b3fb49a4c0332dfc decision_browser_markup_and_closed_draft_recovery --test-threads=1",
+      "fixture": "frozen publication tree f63f08e0; task-owned fixtures only",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/browser-decision-fixture-1.log",
+          "sha256": "96da6e857e132235cb4cd1466b48a7d120a2e8fc6025881ec735b57e3a58da91"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC-generated-browser",
+        "decision-fixture-2"
+      ],
+      "command": "scripts/test-network-isolation.sh /Users/mac03/dev/openbot/target/debug/deps/open_bots-b3fb49a4c0332dfc source_message_outside_window_is_exact_and_authorized --test-threads=1",
+      "fixture": "frozen publication tree f63f08e0; task-owned fixtures only",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/browser-decision-fixture-2.log",
+          "sha256": "94ff37cfea0f9b093298d80459e2370ce20e733482160cfe45ff5f854fac0f90"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC-generated-browser",
+        "decision-driver"
+      ],
+      "command": "node --test scripts/tests/workflow-decisions.mjs",
+      "fixture": "frozen publication tree f63f08e0; task-owned fixtures only",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/browser-decision-driver.log",
+          "sha256": "f7f823ec95df06dfc4e863003b71360c3f394db2e87107894019ea78cb3e2d4b"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC-combined-Rust",
+        "full-suite"
+      ],
+      "command": "scripts/test-network-isolation.sh cargo test --locked --offline --all-targets",
+      "fixture": "frozen publication tree f63f08e0; task-owned fixtures only",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/full-suite.log",
+          "sha256": "0c1694900b386750fafc3ca99fa858e12fa8de5e60302f68d6a5a5b037b7972b"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC-combined-Rust",
+        "stack-budget"
+      ],
+      "command": "scripts/test-network-isolation.sh scripts/stack-budget.sh --offline",
+      "fixture": "frozen publication tree f63f08e0; task-owned fixtures only",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/stack-budget.log",
+          "sha256": "b798b08a785a9dcaad040b98220ead2050e1d310ba29b27fd2f2ef8ed91ceea2"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC-combined-Rust",
+        "lease-budget"
+      ],
+      "command": "scripts/test-network-isolation.sh scripts/lease-budget.sh --offline",
+      "fixture": "frozen publication tree f63f08e0; task-owned fixtures only",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/lease-budget.log",
+          "sha256": "b7a611beb5e2445f716143cb3e5f3b9d72540d6a2a1c5d24abb81e78b44fd44e"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC-current-image",
+        "image-start"
+      ],
+      "command": "limactl start --tty=false --name=img --vm-type=vz --arch=aarch64 --cpus=2 --memory=6 --disk=12 --mount-only=/private/tmp/obpub-m8sfhp0f/context --set '.mounts[0].writable=false | .ssh.forwardAgent=false | .ssh.loadDotSSHPubKeys=false' --set '.images = [{\"location\": \"https://cloud-images.ubuntu.com/releases/resolute/release-20260927/ubuntu-26.04-server-cloudimg-arm64.img\", \"arch\": \"aarch64\", \"digest\": \"sha256:63a93bd5a8d76e33b15ceb5daa3657bd79be804748051ab178e643b0f5da22e7\"}]' --timeout=10m template:docker",
+      "fixture": "frozen publication tree f63f08e0; task-owned fixtures only",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/image-start.log",
+          "sha256": "e93319af97d173746f9f1bfa7b6b9453c6a4ffe79f5d7eca7ab2ba6c1a8a8e73"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC-current-image",
+        "image-build"
+      ],
+      "command": "limactl shell img -- docker build --progress=plain --tag openbot-cloudroom-publication:verified /private/tmp/obpub-m8sfhp0f/context",
+      "fixture": "frozen publication tree f63f08e0; task-owned fixtures only",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/image-build.log",
+          "sha256": "b84fad0a50815b0520ebdea9e105c025f40e116e54476ecda8a28cd63b317ec0"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC-current-image",
+        "image-check-copy"
+      ],
+      "command": "limactl shell img -- cp -a /private/tmp/obpub-m8sfhp0f/context /tmp/cloudroom-publication-image-check",
+      "fixture": "frozen publication tree f63f08e0; task-owned fixtures only",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/image-check-copy.log",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC-current-image",
+        "image-check-r2"
+      ],
+      "command": "limactl shell img -- python3 /tmp/cloudroom-publication-image-check/scripts/check-knowledge-image.py --image openbot-cloudroom-publication:verified",
+      "fixture": "frozen publication tree f63f08e0; task-owned fixtures only",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/image-check-r2.log",
+          "sha256": "a0ca7b6c3c66905466229479a20a8a1cbcabf2aef8a657f0a53091b6b8c2e8c7"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC-current-local-effects",
+        "AC-current-recovery",
+        "AC-current-2MiB"
+      ],
+      "command": "scripts/test-network-isolation.sh scripts/stack-budget.sh --offline; inspect complete current registered local-effect families",
+      "fixture": "frozen publication tree f63f08e0; task-owned fixtures only",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/stack-budget.log",
+          "sha256": "b798b08a785a9dcaad040b98220ead2050e1d310ba29b27fd2f2ef8ed91ceea2"
+        },
+        {
+          "path": "test-inventory-comparison.json",
+          "sha256": "72da8b12f47a4055979c218410fed36448791fe41508cf52f9dab7d7fdc1e6b6"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC-recovery-recheck"
+      ],
+      "command": "exact current cloudroom_e2e_cut_points_reconstruct_server_plugin_and_workers_without_blind_native_retry",
+      "fixture": "same frozen binary and owned UTF8 PostgreSQL18.6 port56390; earlier full-run timeout retained with unknown cause",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/cut-points-focused-r1.log",
+          "sha256": "fd825fe25d1e1265ae4b58ce5d71bd4bd0aa4bb0720f0e196482988d095c63b3"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC-inherited-MCP-disposition"
+      ],
+      "command": "compile exact origin b8c46300 and run its unchanged MCP cancellation test",
+      "fixture": "exact unchanged origin baseline; identical3of4-exchanges failure predates Cloudroom merge",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/mcp-origin-baseline-build-and-test-r4.log",
+          "sha256": "cab25cdbd104e67a16fd9311cb916d0f0129cf290488cdd556779a1bc07df91e"
+        },
+        {
+          "path": "mcp-origin-baseline-disposition.json",
+          "sha256": "274f956e042fa68794be17ef453efdc4e17bb3fd4b07a33b33a3866ccef73dae"
+        },
+        {
+          "path": "logs/reviewer-pub-r1-mcp-baseline-audit.json",
+          "sha256": "18ef8936e75157c00689da9a3e372dd747a94e474cbd571124bdffd4d99f6208"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC-inherited-CSP-disposition"
+      ],
+      "command": "compile exact origin scanner test/helper against its own origin source snapshot and run1test",
+      "fixture": "frozen publication tree f63f08e0; task-owned fixtures only",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/origin-markup-test.rs",
+          "sha256": "d00d6eb07c751ceeb7b7acb075a083fd766fb35e91f14e0f4a32f063c4a19f82"
+        },
+        {
+          "path": "logs/origin-markup-test.log",
+          "sha256": "7f858d46da5758d11cfbd6dd9ff02cfdf79f75fbe46d94a5fe8fb0f1fa3612ee"
+        },
+        {
+          "path": "markup-baseline-disposition.json",
+          "sha256": "8cbee278d3a12fad7f6c6cee4dbdb5ffb5dff2e0a88d0fa7511a33250ed0a4af"
+        },
+        {
+          "path": "logs/reviewer-pub-r1-markup-baseline-audit.json",
+          "sha256": "b393577d908a4d0f41af78d0ef41b69387b70d9c931a4fe601dc509db9c9a8ad"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC-inherited-transport-disposition"
+      ],
+      "command": "run exact origin transport boundary checker against exact origin source snapshot",
+      "fixture": "frozen publication tree f63f08e0; task-owned fixtures only",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/transport-boundary-origin-baseline.log",
+          "sha256": "5404719cd719b1af8125ac9b5e8a2654bab6e3f42922bee9c3252b5174b4935c"
+        },
+        {
+          "path": "transport-boundary-disposition.json",
+          "sha256": "b0ee03b10bad22a5abb8d1d392f6697ffdd9739ccca700cbe31dcd672557a50b"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC-targets"
+      ],
+      "command": "cargo test --locked --offline --bin open_bots --test source_modules",
+      "fixture": "frozen publication tree f63f08e0; task-owned fixtures only",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/main-and-module-tests.log",
+          "sha256": "960ceceafb4e913c32beab3932344c3c225ab0d6ea8fe6fa7fc9284b01814b68"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC-plugin"
+      ],
+      "command": "npm ci; plugin typecheck/build/test/test:guards",
+      "fixture": "frozen publication tree f63f08e0; task-owned fixtures only",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/preflight-plugin-install.log",
+          "sha256": "6fef84af97b543c3b459d31d1c5182a556f2ed383f3857c896caae43c69fab51"
+        },
+        {
+          "path": "logs/preflight-plugin-check.log",
+          "sha256": "2a76b0b41aed0a0cb5fa95cac7cc06b64b1ae4106faf0279b855bd394e7dadab"
+        },
+        {
+          "path": "logs/preflight-plugin-test.log",
+          "sha256": "a70c02de47735ca9aff3617d601ebc123a6b3a3add4b93294324c7a16d7c3137"
+        },
+        {
+          "path": "logs/preflight-plugin-guards.log",
+          "sha256": "c52eb8296e82879b3ef23e3f4b87f5220c060cd47d6a50dd3fd9cf3e958088e0"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC-reproducible-package"
+      ],
+      "command": "npm run package (two exact builds); fresh packaged npm ci --omit=dev",
+      "fixture": "frozen publication tree f63f08e0; task-owned fixtures only",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/plugin-package.log",
+          "sha256": "bdf5cf9721fe8e07b18222f2c731889c14bd221a897a5d5306eb4876d0b251e2"
+        },
+        {
+          "path": "logs/plugin-runtime-install.log",
+          "sha256": "c4d7ba0389d31ed872696e684ff134291a2399f1f2935665103eccbd8f1f5c88"
+        },
+        {
+          "path": "plugin-package-identity.json",
+          "sha256": "f87f78cb3ec15082237f0be8564f1307d0fa3f8cc1499cda842cf10b189892b3"
+        },
+        {
+          "path": "plugin-package-content-comparison.json",
+          "sha256": "80e26839b7e47968b0595db709a5d4d1afaee4c5f33d909c8f261e3d1da2a309"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC-retained-native-Mac-runtime"
+      ],
+      "command": "SHA256 comparison of every packaged runtime file against actual three-provider accepted native artifact; retain prior acceptance identity without claiming a new inference run",
+      "fixture": "frozen publication tree f63f08e0; task-owned fixtures only",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "plugin-package-content-comparison.json",
+          "sha256": "80e26839b7e47968b0595db709a5d4d1afaee4c5f33d909c8f261e3d1da2a309"
+        },
+        {
+          "path": "retained-package-artifact.json",
+          "sha256": "f15fd8e47413835f38a52cfa46eb6c41056d3fc2df4da4fb00d787a94cf5eba9"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC-schema"
+      ],
+      "command": "cargo sqlx migrate run on fresh UTF8 PostgreSQL18.6; rerun both Unicode identity tests",
+      "fixture": "frozen publication tree f63f08e0; task-owned fixtures only",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/migrate-utf8.log",
+          "sha256": "f4e480a0f19fe297d6970dad98dcd7884ca63a232e7e670f539c04d4d5806213"
+        },
+        {
+          "path": "logs/auth-locale-correction.log",
+          "sha256": "8d6bc21af36e7f7ff314a099f0b1f17a3dc0015311cdf3ed9d80c3fd39db4bca"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC-archive"
+      ],
+      "command": "compare all1636 original file hashes and historical relocation index; validate live Markdown/startup paths",
+      "fixture": "frozen publication tree f63f08e0; task-owned fixtures only",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "archive-preservation.json",
+          "sha256": "ee8f5c4fe80f51c30b298165d1774468996413acd8a00cfa3c412be0c05fc107"
+        },
+        {
+          "path": "archive-links-final.json",
+          "sha256": "7476c7f8fff0a5f065c6281b5fbcace96dbf3682a6d45cca5a4ca8cb041cdc38"
+        },
+        {
+          "path": "historical-invalid-evidence.json",
+          "sha256": "fff24703d533f3656dabd05a8d4ee0530a474754a482d7f6a14563d6aaeb8fea"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC-retained-browser-inputs"
+      ],
+      "command": "retain exact generated production markup and shipped JavaScript used by browser drivers",
+      "fixture": "frozen publication tree f63f08e0; task-owned fixtures only",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "browser-fixture-retention.json",
+          "sha256": "514e26552c2e4eabfc0073060ffe4e1a99eaec079e4fe1e991b9a378cfd7406e"
+        },
+        {
+          "path": "logs/browser-fixtures/agent/app.js",
+          "sha256": "d16cde30526cc2c9711c020d625c231c375a253a9d8d92f3d3250ab9583f9dda"
+        },
+        {
+          "path": "logs/browser-fixtures/agent/builtin.html",
+          "sha256": "6a86e15dc1d19890569effea247c348b7fde697aabcbc1bfaa378c97aa0ba4a9"
+        },
+        {
+          "path": "logs/browser-fixtures/agent/fresh-pane.html",
+          "sha256": "e66bd52c17c4dbfff095115ef6485d0be505a44fef3c8f8fb2a39ea006df32c8"
+        },
+        {
+          "path": "logs/browser-fixtures/agent/http-selected.html",
+          "sha256": "a099122c32e71a9da87c8a247fbf7e12d21089b43e0abb84197e5569b0a96130"
+        },
+        {
+          "path": "logs/browser-fixtures/agent/http.html",
+          "sha256": "9823fdf2a81d19f57dbf2cf4cd2bc56c5d661a8762e7228e9cc7d576aaa4a082"
+        },
+        {
+          "path": "logs/browser-fixtures/agent/late-save.json",
+          "sha256": "75a60cbb4883a70e84add1bf0abae4cf607de46072b5da36188158ceb8fbd656"
+        },
+        {
+          "path": "logs/browser-fixtures/agent/metadata.json",
+          "sha256": "2ef7ab3959a3b8977b6fbd4621994e7435a4973617170ce9e2b5b74a3898020f"
+        },
+        {
+          "path": "logs/browser-fixtures/agent/other-pane.html",
+          "sha256": "17fb5667128673e35f4afff166bfaf5a4c44e5ae45ad411712963df66e922f41"
+        },
+        {
+          "path": "logs/browser-fixtures/agent/page.html",
+          "sha256": "86ae4fbce5e55ae90e94d3e303c1a65f58c52563fa8f441c22b4bb02b1bf099b"
+        },
+        {
+          "path": "logs/browser-fixtures/agent/publication.html",
+          "sha256": "d2d11e26b8b82cd69d3c6c8c0cc71b91e919115f518dac637830ac6c8091d79c"
+        },
+        {
+          "path": "logs/browser-fixtures/agent/stale-pane.html",
+          "sha256": "18039214da692176d846bba92764383c7e3ead40dd0cbc0d171e22565ba43355"
+        },
+        {
+          "path": "logs/browser-fixtures/agent/theme-init.js",
+          "sha256": "b23ad4c72d7f288bfa1df3666ae18c4087fb8f6118f6b4187b3173bd4705c0c6"
+        },
+        {
+          "path": "logs/browser-fixtures/agent/workflow.html",
+          "sha256": "af0983e56f961fa7e68e0af4f575f9de415a74e7abfb09dc0a3fcdb3b4954631"
+        },
+        {
+          "path": "logs/browser-fixtures/decision/closed.html",
+          "sha256": "f70f27b88c7aa57b96386dc5cb8fc491de130d0cf3c49e5c809183e02db6b4ea"
+        },
+        {
+          "path": "logs/browser-fixtures/decision/comment.html",
+          "sha256": "1633bb85de1f4848719a1d91e69d44dbba1e993f9a7407093ae371755bdb0f09"
+        },
+        {
+          "path": "logs/browser-fixtures/decision/source-note.html",
+          "sha256": "48937c5594f23e20ae6c30d45d6ba4376b67643c5b5d95c43f14480cfa622678"
+        },
+        {
+          "path": "logs/browser-fixtures/decision/source-old.html",
+          "sha256": "801a4f5c737314ef88f6da4efcd8dc0121c9644534ccfdad2bf61cb09ec1819c"
+        },
+        {
+          "path": "logs/browser-fixtures/decision/source-retained.html",
+          "sha256": "327603ec56f5ef7ddf87fd7fdee228b1e5862e4709de8adcf762dc161e8e68ac"
+        },
+        {
+          "path": "logs/browser-fixtures/decision/waiting.html",
+          "sha256": "a890b49b8d770f1fd4351622f2d144a012596564086dd39b2acd7bdc3fd4a1af"
+        },
+        {
+          "path": "logs/browser-fixtures/html/app.js",
+          "sha256": "d16cde30526cc2c9711c020d625c231c375a253a9d8d92f3d3250ab9583f9dda"
+        },
+        {
+          "path": "logs/browser-fixtures/html/form-error.html",
+          "sha256": "f821f7a107b6712e3faf7b6fc597b1cfd4f6c0d59786cb2a61cd7a68207c117f"
+        },
+        {
+          "path": "logs/browser-fixtures/html/login-success.html",
+          "sha256": "1c18d5f0d36ead822852587914ed75e310f1259bfd0ea6f085d24199d95d2a7d"
+        },
+        {
+          "path": "logs/browser-fixtures/html/login.html",
+          "sha256": "8ecb49401d342f8bc93394c042b055c2e06681f061feec281412a1ab7f093677"
+        },
+        {
+          "path": "logs/browser-fixtures/html/register-success.html",
+          "sha256": "5a0f1b66f7381bcf0c6416bded66fb27bde5febed79e39ec1c59a5461a0be153"
+        },
+        {
+          "path": "logs/browser-fixtures/html/register.html",
+          "sha256": "32a9007f78731ed63332c00deb1431804e88b817a9cc9bcd12210c2e8aa29ef4"
+        },
+        {
+          "path": "logs/browser-fixtures/html/restricted.html",
+          "sha256": "4919879c246b509aa4f87cf408b97406c020538d04cd45c9cb43b22f90b978de"
+        },
+        {
+          "path": "logs/browser-fixtures/html/team.html",
+          "sha256": "271f66bb9ddcea70558a2a726d93041c2bb44da91d5862832831d905614356b3"
+        },
+        {
+          "path": "logs/browser-fixtures/knowledge/app.js",
+          "sha256": "d16cde30526cc2c9711c020d625c231c375a253a9d8d92f3d3250ab9583f9dda"
+        },
+        {
+          "path": "logs/browser-fixtures/knowledge/knowledge.html",
+          "sha256": "443c10ba92f6ca73f714d1ef9a9f22ce22f7a037dd350b93063ab22c54105673"
+        },
+        {
+          "path": "logs/browser-fixtures/knowledge/theme-init.js",
+          "sha256": "b23ad4c72d7f288bfa1df3666ae18c4087fb8f6118f6b4187b3173bd4705c0c6"
+        },
+        {
+          "path": "logs/browser-fixtures/local/app.js",
+          "sha256": "d16cde30526cc2c9711c020d625c231c375a253a9d8d92f3d3250ab9583f9dda"
+        },
+        {
+          "path": "logs/browser-fixtures/local/metadata.json",
+          "sha256": "a35c51c7a4b0968cc4677f9cea5de88daca3dc7f33124f071267324efd90ecbe"
+        },
+        {
+          "path": "logs/browser-fixtures/local/page.html",
+          "sha256": "0ef835edcad805fdf40f5317b160da201a18e17de30e06738e8d9ce719ea5715"
+        },
+        {
+          "path": "logs/browser-fixtures/local/profiles-first.html",
+          "sha256": "1c8e0791907aaa1864ee7a960efb6d962d46dda82bdf408d61331aa17648a2fb"
+        },
+        {
+          "path": "logs/browser-fixtures/local/profiles-navigation.json",
+          "sha256": "f43df767858eab3610663bd99cb780030eee21d279d495b6849d9b4717a37957"
+        },
+        {
+          "path": "logs/browser-fixtures/local/profiles-next.html",
+          "sha256": "37271c83c2ed8fb62e315f44299e15afb1bbdcc61bc3874a760de0451719c6e7"
+        },
+        {
+          "path": "logs/browser-fixtures/local/profiles-selected.html",
+          "sha256": "a663c5a50734c3ee752cb22f5a8a28e653aadf40dcccaeac518a97f752f73671"
+        },
+        {
+          "path": "logs/browser-fixtures/local/theme-init.js",
+          "sha256": "b23ad4c72d7f288bfa1df3666ae18c4087fb8f6118f6b4187b3173bd4705c0c6"
+        },
+        {
+          "path": "logs/browser-fixtures/picker/app.js",
+          "sha256": "d16cde30526cc2c9711c020d625c231c375a253a9d8d92f3d3250ab9583f9dda"
+        },
+        {
+          "path": "logs/browser-fixtures/picker/applied.html",
+          "sha256": "d60e7176d59c0e5ef86d8a615e052f9d6c7e27de2e85c5571597acb37b96c56b"
+        },
+        {
+          "path": "logs/browser-fixtures/picker/initial-picker.html",
+          "sha256": "01f0715676d66851b3dc4f369939693ab2d3c4e1e0e69c31ddfb06859e0c6cd5"
+        },
+        {
+          "path": "logs/browser-fixtures/picker/metadata.json",
+          "sha256": "e023eb72a4d6a7a97b684e8a64c5643bcc802f031441a52d4971366af8efd31a"
+        },
+        {
+          "path": "logs/browser-fixtures/picker/other-pane.html",
+          "sha256": "16822b11227c377fca1711a628cc89a45865c3d0f3f80b9d93fa5e9447e00d27"
+        },
+        {
+          "path": "logs/browser-fixtures/picker/page.html",
+          "sha256": "8730a892da4a5f264b71134577388de959b732a8dc486d967ef6d246eba34415"
+        },
+        {
+          "path": "logs/browser-fixtures/picker/selected-picker.html",
+          "sha256": "f3da5b5e2e994d69768430a9321cf14824869606acd7ef34932acd051872122b"
+        },
+        {
+          "path": "logs/browser-fixtures/picker/theme-init.js",
+          "sha256": "b23ad4c72d7f288bfa1df3666ae18c4087fb8f6118f6b4187b3173bd4705c0c6"
+        },
+        {
+          "path": "logs/browser-fixtures/session/failed.json",
+          "sha256": "11ef9f9fb32f049aadb6735ad218c4f325cfddf08a4063c03221ceca6fcef007"
+        },
+        {
+          "path": "logs/browser-fixtures/session/profile.html",
+          "sha256": "98e81287f53b0256f1207038040ba449d602e4c078fb083901b06d2c053191b9"
+        },
+        {
+          "path": "logs/browser-fixtures/session/success.json",
+          "sha256": "fa0405e9209e7b79e2179989a44c992a50a5d3cde9ccc396e59044016ca526d8"
+        },
+        {
+          "path": "logs/browser-fixtures/vault/app.js",
+          "sha256": "d16cde30526cc2c9711c020d625c231c375a253a9d8d92f3d3250ab9583f9dda"
+        },
+        {
+          "path": "logs/browser-fixtures/vault/consent.html",
+          "sha256": "a39eaa9c26c16a5b6f365576993c3d57ad30ed99e2dc01bd5a0480cae1d46ac3"
+        },
+        {
+          "path": "logs/browser-fixtures/vault/owner.html",
+          "sha256": "9ec3f3769d98224b0169bc349fd579262e4a40c41be38e5b7434bfe118a35f09"
+        },
+        {
+          "path": "logs/browser-fixtures/vault/reconnect.html",
+          "sha256": "9b1d3aa46f4850f721de852522db06abb3a5a0981b5fb078d18fcb8902acfce4"
+        },
+        {
+          "path": "logs/browser-fixtures/vault/source.html",
+          "sha256": "3e22e030b6cd6192c1b34e50b26d357d6256168f7a631fd6a0389720359fcf0b"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC-source-freeze"
+      ],
+      "command": "installed snapshot.sh with exact9workflow exclusions; independent reviewed image input identity",
+      "fixture": "frozen publication tree f63f08e0; task-owned fixtures only",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/review-entry-snapshot.txt",
+          "sha256": "6f641d93567db74db8edc92ff2b0c78c3a6269d54f453891232cfea2999f6d6e"
+        },
+        {
+          "path": "image-inputs.json",
+          "sha256": "1c63135f3d4ef44423eb283504e5810ebbdfaf289e9cfa91c91d227ca2377eb5"
+        },
+        {
+          "path": "logs/reviewer-pub-r1-image-input-audit.json",
+          "sha256": "4aaa190ce0a5653ad7a6a42910e2fbd83b820a5317cc5bb37fa1d6627728339e"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC-native-Linux"
+      ],
+      "command": "real native Linux provider/platform acceptance",
+      "fixture": "frozen publication tree f63f08e0; task-owned fixtures only",
+      "status": "NOT EXERCISED",
+      "files": [],
+      "reason": "User explicitly chose Leave Linux acceptance unverified (I005/r1). Current Linux core/image checks are exercised separately."
+    },
+    {
+      "criteria": [
+        "AC-CSS"
+      ],
+      "command": "npm run check:css",
+      "fixture": "frozen publication tree f63f08e0; task-owned fixtures only",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/preflight-css.log",
+          "sha256": "8b629bd94b3ecb9ecd437dd75bbb605fe2a26ca0aa1227efb7ead8dd2929c22f"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC-repo-graph"
+      ],
+      "command": "graft build from primary checkout fast-forwarded to exact frozen source f63f08e0",
+      "fixture": "frozen publication tree f63f08e0; task-owned fixtures only",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/graft-primary-final.log",
+          "sha256": "33f0599967fafc8420f6f663bd1700d784cbce6133a3d0e931257e7a69fbec9a"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC-resource-cleanup"
+      ],
+      "command": "stop/remove only owned fixtures after proof retention; preserve prepared source/packages/ordinary accounts",
+      "fixture": "frozen publication tree f63f08e0; task-owned fixtures only",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "cleanup.json",
+          "sha256": "32f842d7fed2649c1bc045565a1a388b43002d63faa8afafe69442bd325f2237"
+        },
+        {
+          "path": "image-cleanup.json",
+          "sha256": "021cc65e9b816d67da52b41e9552d8ad5824c3ab518a74d82dee6a6759ab0a14"
+        },
+        {
+          "path": "postgres-capacity-audit.json",
+          "sha256": "49af0319f94c5c0bc0d26b70cafbbfd7c85d572a0c1e3b5033912b785c072347"
+        },
+        {
+          "path": "logs/cleanup-postgres.log",
+          "sha256": "ca19178a35ab4153b75b494963b66ce8243e1b94c173107c87b44d09db23652d"
+        },
+        {
+          "path": "logs/owned-utf8-postgres.log.gz",
+          "sha256": "2185e2afb6d355374247ea1da007fae99cb2e3930bdb18c741d54bc73ba3996d"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC-runtime-identity"
+      ],
+      "command": "rustc/cargo/node/npm/psql versions and host architecture",
+      "fixture": "frozen publication tree f63f08e0; task-owned fixtures only",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "runtime-versions.json",
+          "sha256": "bfbdfa0d3a93663f1dfc9d85ad07c55248f071b98e34f9d56f4b5939a7664e1c"
+        }
+      ]
+    }
+  ]
+}

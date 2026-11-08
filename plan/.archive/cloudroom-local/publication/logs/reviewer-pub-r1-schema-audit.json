@@ -1,0 +1,33 @@
+{
+  "localAppendedSchemaByteIdentical": true,
+  "remoteAppendedSchemaByteIdentical": true,
+  "sharedEditedHunks": {
+    "HEAD^1": [
+      "@@ -225,2 +225,11 @@ BEGIN",
+      "@@ -322,2 +331,17 @@ BEGIN",
+      "@@ -481,3 +505,3 @@ CREATE FUNCTION public.check_workflow_wait_commit() RETURNS trigger",
+      "@@ -487,3 +511,3 @@ BEGIN",
+      "@@ -3070,6 +3094,11 @@ CREATE FUNCTION public.workflow_http_identity_immutable() RETURNS trigger",
+      "@@ -4341,3 +4370,3 @@ CREATE TABLE public.task_attempts (",
+      "@@ -5806,3 +5835,3 @@ CREATE TABLE public.workflow_runs (",
+      "@@ -5903,3 +5932,4 @@ CREATE TABLE public.workflow_waits (",
+      "@@ -5911,3 +5941,6 @@ CREATE TABLE public.workflow_waits (",
+      "@@ -13001,3 +13034,3 @@ CREATE TABLE public.channel_reply_decisions (",
+      "@@ -13980 +14013,1332 @@ CREATE CONSTRAINT TRIGGER local_workflow_operation_owner AFTER INSERT ON public."
+    ],
+    "HEAD^2": [
+      "@@ -186,2 +186,12 @@ BEGIN",
+      "@@ -263,2 +273,17 @@ BEGIN",
+      "@@ -2303,2 +2328,28 @@ BEGIN",
+      "@@ -3288,3 +3339,3 @@ $$;",
+      "@@ -3328,3 +3379,3 @@ END $$;",
+      "@@ -3333,7 +3384,16 @@ BEGIN",
+      "@@ -4310,3 +4370,3 @@ CREATE TABLE public.task_attempts (",
+      "@@ -4558,3 +4618,3 @@ CREATE TABLE public.workflow_action_dispatches (",
+      "@@ -4659,3 +4719,3 @@ CREATE TABLE public.workflow_action_receipts (",
+      "@@ -8999,3 +9059,3 @@ CREATE TRIGGER workflow_message_destination_in_app BEFORE INSERT ON public.workf",
+      "@@ -9006,3 +9066,3 @@ CREATE CONSTRAINT TRIGGER workflow_model_tool_wait_continuation AFTER UPDATE ON",
+      "@@ -13554,2 +13614,402 @@ CREATE CONSTRAINT TRIGGER workflow_question_provider_entry_guard AFTER UPDATE ON"
+    ]
+  }
+}

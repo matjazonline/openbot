@@ -1,0 +1,6 @@
+{
+  "log": "logs/owned-utf8-postgres.log.gz",
+  "uncompressedSha256": "90abe089f25b6cab841aa2b74d32512b2a2a4094d932638fece81efeb232fe84",
+  "capacity_write_fsync_panic_errors": [],
+  "parameter_logging": "0 for normal/error parameter lengths"
+}

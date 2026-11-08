@@ -1,0 +1,210 @@
+
+        <section id="agent-pane" data-skeleton="pane" class="ui-pane-detail flex min-w-0 flex-1 flex-col bg-base-100">
+            <div class="border-b border-base-300 px-4 py-4 sm:px-6">
+                <div class="flex flex-wrap items-start justify-between gap-3">
+                    <div class="flex min-w-0 grow basis-48 items-center gap-3">
+                        <div class="avatar avatar-placeholder shrink-0">
+                    <div class="relative w-12 rounded-full bg-primary text-primary-content">
+                        <span class="text-lg font-bold">C</span>
+                        
+                    </div>
+                </div>
+                        <div class="min-w-0">
+                            <h2 class="truncate text-xl font-bold">Concurrent winner</h2>
+                            <p class="truncate font-mono text-xs opacity-60">@authoring · openai / gpt-test</p>
+                            <p class="truncate text-xs opacity-50">Created by System</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="flex-1 overflow-y-auto px-4 py-4 sm:px-6">
+                <div class="alert alert-error mb-4 text-sm">Failed to save agent: Conflict: This agent draft changed. Reload it before saving your changes.</div>
+                <form method="post" action="/ui/agents/671adc84-9dc7-41c6-95a6-7d681c42d6d5?company_id=c5fdb7cf-361c-4be1-8103-8d33a229df72" hx-disabled-elt="find button[type='submit']" hx-put="/ui/agents/671adc84-9dc7-41c6-95a6-7d681c42d6d5?company_id=c5fdb7cf-361c-4be1-8103-8d33a229df72" hx-target="#agent-pane" hx-swap="outerHTML"
+                    hx-params="not avatar_file" class="space-y-4">
+                    <input type="hidden" name="form_mode" value="advanced">
+                    <input type="hidden" name="expected_revision" value="2">
+                    
+                    <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                        <label class="form-control w-full">
+                            <div class="label"><span class="text-xs opacity-70">Agent Name</span></div>
+                            <input type="text" name="name" required value="Draft &lt;browser&gt;" placeholder="Support Triage"
+                                data-input="slugify"
+                                class="input w-full">
+                        </label>
+                        <label class="form-control w-full">
+                            <div class="label"><span class="text-xs opacity-70">Handle</span></div>
+                            <input type="text" name="slug" required value="authoring" placeholder="support-triage"
+                                data-input="agent-address-preview" data-address-preview="agent-address-preview"
+                                class="input w-full font-mono">
+                        </label>
+                    </div>
+                    
+                    <div id="agent-avatar-671adc84-9dc7-41c6-95a6-7d681c42d6d5" class="form-control w-full">
+                        <div class="label"><span class="text-xs opacity-70">Agent Picture</span></div>
+                        <div class="flex items-center gap-3">
+                            <div class="avatar avatar-placeholder shrink-0">
+                    <div class="relative w-12 rounded-full bg-primary text-primary-content">
+                        <span class="text-lg font-bold">D</span>
+                        
+                    </div>
+                </div>
+                            <input type="hidden" name="avatar_url" value="">
+                            <input type="file" name="avatar_file" accept="image/png,image/jpeg,image/gif,image/webp"
+                                class="file-input file-input-sm w-full max-w-xs"
+                                hx-post="/ui/uploads/avatar" hx-encoding="multipart/form-data"
+                                hx-target="#agent-avatar-671adc84-9dc7-41c6-95a6-7d681c42d6d5" hx-swap="outerHTML"
+                                hx-params="avatar_file,avatar_url,avatar_field_id,avatar_name" hx-vals="{&quot;avatar_field_id&quot;:&quot;agent-avatar-671adc84-9dc7-41c6-95a6-7d681c42d6d5&quot;,&quot;avatar_name&quot;:&quot;Draft &lt;browser&gt;&quot;}"
+                                hx-disabled-elt="this" hx-indicator="#agent-avatar-671adc84-9dc7-41c6-95a6-7d681c42d6d5-spinner">
+                            <span id="agent-avatar-671adc84-9dc7-41c6-95a6-7d681c42d6d5-spinner" class="htmx-indicator loading loading-spinner loading-sm"></span>
+                            
+                        </div>
+                        <div class="label"><span class="text-[11px] opacity-60">PNG, JPEG, GIF or WebP, up to 5 MB. Saved when you save this form.</span></div>
+                    </div>
+        
+                    <div class="form-control w-full">
+                        <div class="label justify-between">
+                            <span class="text-xs opacity-70">System Prompt</span>
+                            <button type="button" class="btn btn-ghost btn-xs"
+                                data-action="toggle-agent-prompt" data-prefix="671adc84-9dc7-41c6-95a6-7d681c42d6d5"><svg class="inline-block shrink-0 h-4 w-4" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M7.53 1.282a.5.5 0 0 1 .94 0l.478 1.306a7.492 7.492 0 0 0 4.464 4.464l1.305.478a.5.5 0 0 1 0 .94l-1.305.478a7.492 7.492 0 0 0-4.464 4.464l-.478 1.305a.5.5 0 0 1-.94 0l-.478-1.305a7.492 7.492 0 0 0-4.464-4.464L1.282 8.47a.5.5 0 0 1 0-.94l1.306-.478a7.492 7.492 0 0 0 4.464-4.464Z"/></svg> Generate with AI</button>
+                        </div>
+                        
+                        <div id="agent-generator-671adc84-9dc7-41c6-95a6-7d681c42d6d5" class="mb-2 hidden space-y-2 rounded-box border border-base-300 bg-base-200 p-3">
+                            <p class="text-xs opacity-70">Describe what this agent should do. The instructions are expanded into a full system prompt, replacing what is in the field below.</p>
+                            <textarea id="agent-instructions-671adc84-9dc7-41c6-95a6-7d681c42d6d5" name="instructions" rows="3"
+                                placeholder="Answer billing questions politely, and escalate anything about refunds."
+                                class="textarea w-full text-xs"></textarea>
+                            <div class="flex items-center gap-3">
+                                <button type="button" class="btn btn-primary btn-outline btn-sm"
+                                    method="post" action="/ui/agents/generate-prompt?company_id=c5fdb7cf-361c-4be1-8103-8d33a229df72" hx-post="/ui/agents/generate-prompt?company_id=c5fdb7cf-361c-4be1-8103-8d33a229df72"
+                                    hx-include="#agent-instructions-671adc84-9dc7-41c6-95a6-7d681c42d6d5, #agent-provider-671adc84-9dc7-41c6-95a6-7d681c42d6d5, #agent-model-671adc84-9dc7-41c6-95a6-7d681c42d6d5, #agent-api-key-671adc84-9dc7-41c6-95a6-7d681c42d6d5" hx-vals='{"id_prefix": "671adc84-9dc7-41c6-95a6-7d681c42d6d5"}'
+                                    hx-target="#agent-generator-status-671adc84-9dc7-41c6-95a6-7d681c42d6d5" hx-swap="innerHTML"
+                                    hx-disabled-elt="this">
+                                    <span class="loading loading-spinner loading-sm hidden [.htmx-request_&]:inline-block"></span>
+                                    <span class="[.htmx-request_&]:hidden">Generate</span>
+                                    <span class="hidden [.htmx-request_&]:inline">Writing prompt...</span>
+                                </button>
+                                <div id="agent-generator-status-671adc84-9dc7-41c6-95a6-7d681c42d6d5" class="min-w-0 flex-1 text-xs"></div>
+                            </div>
+                        </div>
+        
+                        <textarea id="agent-prompt-671adc84-9dc7-41c6-95a6-7d681c42d6d5" name="system_prompt" rows="10"
+                            placeholder="You are a support triage agent. Read the incoming mail, decide..."
+                            class="textarea w-full font-mono text-xs">browser unsaved prompt marker</textarea>
+                    </div>
+                    <details class="collapse-arrow collapse border border-base-300 bg-base-200" open>
+                        <summary class="collapse-title text-sm font-medium">Capabilities &amp; advanced options</summary>
+                        <div class="collapse-content space-y-4">
+                            <section class="space-y-5 rounded-box border border-base-300 bg-base-100 p-4" data-agent-capability-picker>
+            <div><h3 class="font-semibold">Agent capabilities</h3><p class="text-xs opacity-60">Explicitly choose what this agent may use.</p></div>
+            <section class="space-y-2" data-capability-multi-select>
+            <input type="hidden" name="skill_ids" value="8fd4d52b-f62e-4ffa-8a20-cea7f20c8b85,b821836d-27ef-4c28-9a5c-e51a75bc5959">
+            <div class="flex items-center justify-between"><h4 class="text-sm font-semibold">Skills</h4><a class="btn btn-ghost btn-xs" href="/ui/companies?company_id=c5fdb7cf-361c-4be1-8103-8d33a229df72&amp;tab=skills">Browse library</a></div>
+            <p class="text-xs opacity-60">Selected skills are applied in the order shown. Use the arrow buttons to reorder them; their current text is copied when you publish.</p><div class="grid grid-cols-1 gap-2"><div class="flex items-start gap-3 rounded-box border border-base-300 p-3" data-agent-skill-row>
+            <label class="flex cursor-pointer items-start gap-3 grow"><input type="checkbox" class="checkbox checkbox-primary mt-0.5" value="8fd4d52b-f62e-4ffa-8a20-cea7f20c8b85" data-action="capability-multi-select" checked>
+            <span><span class="font-medium">alpha</span><span class="block text-xs opacity-60">Use alpha</span></span></label>
+            <div class="flex flex-col gap-1"><button type="button" class="btn btn-ghost btn-xs" data-agent-skill-move="up" aria-label="Move skill alpha earlier">↑</button><button type="button" class="btn btn-ghost btn-xs" data-agent-skill-move="down" aria-label="Move skill alpha later">↓</button></div></div><div class="flex items-start gap-3 rounded-box border border-base-300 p-3" data-agent-skill-row>
+            <label class="flex cursor-pointer items-start gap-3 grow"><input type="checkbox" class="checkbox checkbox-primary mt-0.5" value="b821836d-27ef-4c28-9a5c-e51a75bc5959" data-action="capability-multi-select" checked>
+            <span><span class="font-medium">zeta</span><span class="block text-xs opacity-60">Use zeta</span></span></label>
+            <div class="flex flex-col gap-1"><button type="button" class="btn btn-ghost btn-xs" data-agent-skill-move="up" aria-label="Move skill zeta earlier">↑</button><button type="button" class="btn btn-ghost btn-xs" data-agent-skill-move="down" aria-label="Move skill zeta later">↓</button></div></div></div></section>
+        </section>
+                            <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <label class="form-control w-full"><div class="label"><span class="text-xs opacity-70">Provider</span></div>
+                <select id="agent-provider-671adc84-9dc7-41c6-95a6-7d681c42d6d5" name="provider" class="select w-full font-mono text-sm">
+                    <option value="">Inherit company default</option><option value="openai" selected>openai</option>
+                </select>
+            </label>
+            <label class="form-control w-full"><div class="label"><span class="text-xs opacity-70">Model</span></div>
+                <select id="agent-model-671adc84-9dc7-41c6-95a6-7d681c42d6d5" name="model" class="select w-full font-mono text-sm">
+                    <option value="">Inherit company default</option><option value="gpt-test" data-provider="openai" selected>openai / gpt-test</option>
+                </select>
+                <div class="label"><span class="text-[11px] opacity-60">Select a model belonging to the provider; invalid pairs are refused on save.</span></div>
+            </label>
+        </div>
+                            <label class="form-control w-full">
+                                <div class="label">
+                                    <span class="text-xs opacity-70">Description</span>
+                                    <span class="text-xs opacity-50">Shown to other agents in this company</span>
+                                </div>
+                                <input type="text" id="agent-description-671adc84-9dc7-41c6-95a6-7d681c42d6d5" name="description" value="" placeholder="Answers supplier capacity and delivery-date questions"
+                                    class="input w-full text-sm">
+                            </label>
+
+                        </div>
+                    </details>
+        
+                    <section class="space-y-3 rounded-box border border-base-300 p-4" data-agent-tools-editor>
+        <h3 class="font-semibold">Tools for this agent</h3>
+        <p class="text-xs opacity-70">Aliases are the names the agent sees. Each tool has an explicit target. Selecting a tool does not grant a connection or approve its operation. Builder provisioning tools can only be kept or removed.</p>
+        <input type="hidden" name="tool_assignments" value="[{&quot;binding&quot;:null,&quot;alias&quot;:&quot;respond&quot;,&quot;choice&quot;:{&quot;kind&quot;:&quot;builtin&quot;,&quot;tool&quot;:&quot;message_reply&quot;}}]">
+        <div data-agent-tool-rows><div class="my-2 rounded border border-base-300 p-3" data-agent-tool-row data-assignment="{&quot;binding&quot;:null,&quot;alias&quot;:&quot;respond&quot;,&quot;choice&quot;:{&quot;kind&quot;:&quot;builtin&quot;,&quot;tool&quot;:&quot;message_reply&quot;}}">
+        <label class="form-control">Agent-visible alias<input class="input input-sm" data-agent-tool-alias value="respond" maxlength="64" required aria-label="Tool 1 alias"></label>
+        <p class="break-all text-xs opacity-70" data-agent-tool-target>Built-in message.reply</p>
+        <p class="break-all font-mono text-xs">Binding: assigned on save</p>
+        <button type="button" class="btn btn-ghost btn-xs" data-agent-tool-remove>Remove from draft</button></div></div><p data-agent-tool-error role="alert"></p>
+        <div id="agent-tool-catalog-671adc84-9dc7-41c6-95a6-7d681c42d6d5" hx-get="/ui/agents/671adc84-9dc7-41c6-95a6-7d681c42d6d5/tool-catalog?company_id=c5fdb7cf-361c-4be1-8103-8d33a229df72" hx-trigger="load" hx-params="none" hx-target="this" hx-swap="outerHTML" hx-sync="this:replace"><span class="loading loading-spinner loading-sm"></span> Loading tool catalog</div>
+        </section>
+                    <div class="flex items-center gap-3 border-t border-base-300 pt-4">
+                        <button type="submit" class="btn btn-primary">
+                            <span class="loading loading-spinner loading-sm hidden [.htmx-request_&]:inline-block"></span>
+                            <span class="[.htmx-request_&]:hidden">Save Changes</span>
+                            <span class="hidden [.htmx-request_&]:inline">Saving...</span>
+                        </button>
+                        <button type="button" class="btn btn-ghost"
+                            hx-get="/ui/agents/671adc84-9dc7-41c6-95a6-7d681c42d6d5?company_id=c5fdb7cf-361c-4be1-8103-8d33a229df72"
+                            hx-target="#agent-pane" hx-swap="outerHTML" hx-sync="#agent-pane:replace">Cancel</button>
+                        <button type="button" class="btn btn-error btn-outline ml-auto"
+                            hx-delete="/ui/agents/671adc84-9dc7-41c6-95a6-7d681c42d6d5?company_id=c5fdb7cf-361c-4be1-8103-8d33a229df72"
+                            hx-target="#agent-pane" hx-swap="outerHTML"
+                            hx-confirm="Delete agent 'Concurrent winner'? This cannot be undone."
+                            hx-push-url="/ui/agents?company_id=c5fdb7cf-361c-4be1-8103-8d33a229df72">Delete Agent</button>
+                    </div>
+                </form>
+                <form id="agent-catalog-form-671adc84-9dc7-41c6-95a6-7d681c42d6d5" class="hidden"></form>
+                
+                <section id="assistant-channel-card" class="mt-6 space-y-3 rounded-box border border-base-300 p-4">
+                    <div>
+                        <h3 class="font-semibold">Assistant channel</h3>
+                        <p class="text-sm opacity-70">Create a team channel (never public) that this agent answers. Autonomous replies send the agent's answer directly; reviewed replies wait for your approval first.</p>
+                    </div>
+                    
+                    <form hx-post="/ui/agents/671adc84-9dc7-41c6-95a6-7d681c42d6d5/assistant-channel?company_id=c5fdb7cf-361c-4be1-8103-8d33a229df72"
+                        hx-target="#assistant-channel-card" hx-swap="outerHTML"
+                        hx-disabled-elt="find button[type='submit']" class="grid gap-3 sm:grid-cols-2">
+                        <input type="hidden" name="command_key" value="ef3d279d-f267-42ef-95df-139e1dd1dcb6">
+                        <label class="form-control w-full">
+                            <div class="label"><span class="text-xs opacity-70">Channel name</span></div>
+                            <input class="input w-full" name="channel_name" required maxlength="120" value="Concurrent winner">
+                        </label>
+                        <label class="form-control w-full">
+                            <div class="label"><span class="text-xs opacity-70">Channel address</span></div>
+                            <input class="input w-full font-mono" name="channel_slug" required maxlength="64" placeholder="authoring-assistant">
+                        </label>
+                        <label class="form-control w-full">
+                            <div class="label"><span class="text-xs opacity-70">Replies</span></div>
+                            <select class="select w-full" name="reply_mode">
+                                <option value="autonomous">Autonomous</option>
+                                <option value="reviewed">Reviewed by me</option>
+                            </select>
+                        </label>
+                        <div class="flex items-end">
+                            <button type="submit" class="btn btn-outline">Create assistant channel</button>
+                        </div>
+                    </form>
+                </section>
+        
+                <section id="agent-publication-671adc84-9dc7-41c6-95a6-7d681c42d6d5" class="mt-6 space-y-4 rounded-box border border-base-300 p-4" hx-sync="this:queue all" hx-disabled-elt="#agent-publication-671adc84-9dc7-41c6-95a6-7d681c42d6d5 button">
+        <h3 class="font-semibold">Saved draft and publication</h3>
+        <p>Saved draft: <span data-agent-saved-draft>3</span></p><p class="break-all">Active revision: <span data-agent-active-revision>Inactive — publish a valid draft before using this agent in a new run</span></p>
+        <p class="text-sm opacity-70">Future runs use the active revision. Running work and retries keep the revision they selected. Removing or revoking access may stop running work. Changes to shared skills enter this agent when you publish again.</p>
+        <p class="text-xs opacity-70">Publication uses the saved draft. Save your editor changes first.</p>
+        <div class="flex flex-wrap gap-2"><form hx-post="/ui/agents/671adc84-9dc7-41c6-95a6-7d681c42d6d5/preview?company_id=c5fdb7cf-361c-4be1-8103-8d33a229df72" hx-target="#agent-publication-671adc84-9dc7-41c6-95a6-7d681c42d6d5" hx-swap="outerHTML"><button class="btn btn-outline btn-sm">Validate saved draft</button></form>
+        <form hx-post="/ui/agents/671adc84-9dc7-41c6-95a6-7d681c42d6d5/publish?company_id=c5fdb7cf-361c-4be1-8103-8d33a229df72" hx-target="#agent-publication-671adc84-9dc7-41c6-95a6-7d681c42d6d5" hx-swap="outerHTML"><input type="hidden" name="expected_draft_revision" value="3"><input type="hidden" name="expected_active_revision" value=""><input type="hidden" name="key" value="59183a39-0158-48e0-b0b4-aff2f0b3d896"><button class="btn btn-primary btn-sm">Publish saved draft</button></form>
+        <button type="button" class="btn btn-ghost btn-sm" hx-get="/ui/agents/671adc84-9dc7-41c6-95a6-7d681c42d6d5/publication?company_id=c5fdb7cf-361c-4be1-8103-8d33a229df72" hx-params="none" hx-target="#agent-publication-671adc84-9dc7-41c6-95a6-7d681c42d6d5" hx-swap="outerHTML">Reload publication status</button></div>
+        <div class="space-y-2"></div><section id="agent-history-671adc84-9dc7-41c6-95a6-7d681c42d6d5" class="space-y-2"><h4 class="font-semibold">Revision history</h4><p class="text-xs opacity-60">Up to 20 revisions per page, newest first.</p><ol class="space-y-2"></ol></section></section>
+                <div class="mt-6 rounded-box border border-dashed border-base-300 p-4 text-xs opacity-70" aria-busy="true"
+            hx-get="/ui/workflows/agents/671adc84-9dc7-41c6-95a6-7d681c42d6d5/usage?company_id=c5fdb7cf-361c-4be1-8103-8d33a229df72" hx-trigger="load" hx-swap="outerHTML" data-lazy-card="Where this agent is used could not be loaded.">Loading where this agent is used…</div>
+            </div>
+        
+        </section>
+        

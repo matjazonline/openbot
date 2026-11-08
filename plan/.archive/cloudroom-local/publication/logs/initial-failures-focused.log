@@ -1,0 +1,36 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+
+running 4 tests
+test adapters::http::pages::tests::rendered_markup_carries_no_inline_javascript ... 
+thread 'adapters::http::pages::tests::rendered_markup_carries_no_inline_javascript' (19922091) panicked at src/adapters/http/pages/tests.rs:4664:5:
+inline JavaScript is blocked by the page CSP and will never run:
+/private/tmp/openbot-cloudroom-publication/src/adapters/http/pages/workflow_authoring/sample.rs:153: inline <script> block
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+FAILED
+test adapters::mcp::tests::mcp_dropped_call_sends_protocol_cancellation_and_joins_cleanup ... 
+thread 'adapters::mcp::tests::mcp_dropped_call_sends_protocol_cancellation_and_joins_cleanup' (19922093) panicked at src/adapters/mcp/tests.rs:417:5:
+assertion `left == right` failed
+  left: Err("unused required exchanges: completed 3 of 4")
+ right: Ok(4)
+FAILED
+test adapters::persistence::auth_attempts::tests::security_auth_limits_login_counter_is_shared_and_success_resets_it ... 
+thread 'adapters::persistence::auth_attempts::tests::security_auth_limits_login_counter_is_shared_and_success_resets_it' (19922094) panicked at src/adapters/persistence/auth_attempts.rs:697:9:
+assertion `left == right` failed
+  left: 1
+ right: 5
+FAILED
+test adapters::persistence::auth_attempts::tests::security_auth_limits_unicode_registration_aliases_share_budget_and_code_digest ... 
+thread 'adapters::persistence::auth_attempts::tests::security_auth_limits_unicode_registration_aliases_share_budget_and_code_digest' (19922317) panicked at src/adapters/persistence/auth_attempts.rs:543:9:
+case alias confirmation failed: Err(BadRequest("Invalid or expired confirmation code"))
+FAILED
+
+failures:
+
+failures:
+    adapters::http::pages::tests::rendered_markup_carries_no_inline_javascript
+    adapters::mcp::tests::mcp_dropped_call_sends_protocol_cancellation_and_joins_cleanup
+    adapters::persistence::auth_attempts::tests::security_auth_limits_login_counter_is_shared_and_success_resets_it
+    adapters::persistence::auth_attempts::tests::security_auth_limits_unicode_registration_aliases_share_budget_and_code_digest
+
+test result: FAILED. 0 passed; 4 failed; 0 ignored; 0 measured; 3757 filtered out; finished in 6.17s
+

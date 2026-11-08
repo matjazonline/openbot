@@ -1,0 +1,9 @@
+{
+  "manifest_sha256": "bfe8b566631dfa99f76d68289c69991129d5d25e1b6a8e184b90209894827d58",
+  "authority_pin_equal": true,
+  "lease_summaries": [
+    "test result: ok. 133 passed; 0 failed; 0 ignored; 0 measured; 3628 filtered out; finished in 203.96s"
+  ],
+  "pg_storage_or_panic_errors": [],
+  "head": "f63f08e00bc5c94dbcd83a33ff58fbcf142f97e4"
+}

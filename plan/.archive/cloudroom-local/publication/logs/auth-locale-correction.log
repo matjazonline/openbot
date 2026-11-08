@@ -1,0 +1,8 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+
+running 2 tests
+test adapters::persistence::auth_attempts::tests::security_auth_limits_login_counter_is_shared_and_success_resets_it ... ok
+test adapters::persistence::auth_attempts::tests::security_auth_limits_unicode_registration_aliases_share_budget_and_code_digest ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 3759 filtered out; finished in 3.03s
+

@@ -1,0 +1,9 @@
+✔ failed password change preserves the browser; a committed change clears its cookie and navigates to login (516.147583ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 811.801333

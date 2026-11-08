@@ -70,5 +70,51 @@
     "exit": 0,
     "seconds": 19.38,
     "log": "logs/sqlx.log"
+  },
+  {
+    "name": "compile-tests",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "--offline",
+      "--all-targets",
+      "--no-run"
+    ],
+    "status": "PASS",
+    "exit": 0,
+    "seconds": 384.18,
+    "log": "logs/compile-tests.log"
+  },
+  {
+    "name": "inventory",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "--offline",
+      "--all-targets",
+      "--",
+      "--list"
+    ],
+    "status": "PASS",
+    "exit": 0,
+    "seconds": 5.35,
+    "log": "logs/inventory.log"
+  },
+  {
+    "name": "full-suite",
+    "command": [
+      "scripts/test-network-isolation.sh",
+      "cargo",
+      "test",
+      "--locked",
+      "--offline",
+      "--all-targets"
+    ],
+    "status": "FAIL",
+    "exit": 101,
+    "seconds": 396.81,
+    "log": "logs/full-suite.log"
   }
 ]

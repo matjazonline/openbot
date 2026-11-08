@@ -23,5 +23,41 @@
     "exit": 0,
     "seconds": 54.08,
     "log": "logs/image-start.log"
+  },
+  {
+    "name": "image-build",
+    "command": [
+      "limactl",
+      "shell",
+      "img",
+      "--",
+      "docker",
+      "build",
+      "--progress=plain",
+      "--tag",
+      "openbot-cloudroom-publication:verified",
+      "/private/tmp/obpub-m8sfhp0f/context"
+    ],
+    "status": "PASS",
+    "exit": 0,
+    "seconds": 851.34,
+    "log": "logs/image-build.log"
+  },
+  {
+    "name": "image-check",
+    "command": [
+      "limactl",
+      "shell",
+      "img",
+      "--",
+      "python3",
+      "/private/tmp/obpub-m8sfhp0f/context/scripts/check-knowledge-image.py",
+      "--image",
+      "openbot-cloudroom-publication:verified"
+    ],
+    "status": "FAIL",
+    "exit": 1,
+    "seconds": 4.13,
+    "log": "logs/image-check.log"
   }
 ]

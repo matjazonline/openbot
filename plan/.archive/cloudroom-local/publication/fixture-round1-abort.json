@@ -1,0 +1,6 @@
+{
+  "reason": "Author initialized disposable PostgreSQL with C locale; Unicode citext identity tests require UTF-8 collation as in CI. Stop invalid-fixture run, preserve all output, recreate owned cluster with en_US.UTF-8 and rerun.",
+  "pid": 71135,
+  "signal": "SIGINT",
+  "code_changed": false
+}

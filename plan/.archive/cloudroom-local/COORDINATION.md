@@ -1,8 +1,8 @@
 # Plan coordination: cloudroom-local
 
-- Authority: `/tmp/openbot-cloudroom-publication/plan/.archive/cloudroom-local/COORDINATION.md`
-- Writer: `/root`, publication worktree `/tmp/openbot-cloudroom-publication`
-- Revision: 38
+- Authority: `/Users/mac03/dev/openbot/plan/.archive/cloudroom-local/COORDINATION.md`
+- Writer: `/root`, primary worktree `/Users/mac03/dev/openbot`
+- Revision: 39
 - Workflow record, not an additional implementation plan.
 
 ## Plan-wide instructions
@@ -245,3 +245,10 @@ Root acknowledges unchanged active notices including C008/r1. B1/R1 source02c3â€
 - Root acknowledges active I001/r2,I002â€“005/r1,C001/r2,C002/r2,C003/r1,C004/r1,C005/r1,C006/r2,C007/r3,C008/r1. No shared wire/ownership/authority contract change. Native Linux provider acceptance remains NOT EXERCISED; current merged image/core and all affected tests require fresh verification.
 - Four invalid historical manifests retain exact bytes under explicit invalid-evidence names, indexed with original path, SHA and error in `publication/historical-invalid-evidence.json`. Current final-v2 remains unchanged; valid tracked manifests pass the newer origin CI retention contract.
 - Final merged-tree verification and affected independent review remain pending; do not push until accepted.
+
+
+## Publication acceptance at revision39
+
+- Root accepts verified affected publication scope after independent PASS CL-PUB-R1 for frozen artifact `fbc00a75eb16d9c9cc00f4441976aaa9e176503a54d7dfad8a896d96d1143110`, source HEAD `f63f08e00bc5c94dbcd83a33ff58fbcf142f97e4`. Final immutable publication manifest is55PASS/6FAIL/1NOTEXERCISED; the FAIL and waiver declarations remain explicit. No new contract or requirement. Reviewed r38 pin remains in publication/logs.
+- Complete2048KiB library proof:3746PASS/1confirmed-origin-CSPFAIL/14ignored, all129executable Cloudroom tests PASS, no overflow. Lease133tests/timing assertions PASS; plugin/browser/image/current source checks and main/module tests pass. The original regular ready timeout remains unknown cause/history; focused and complete stock reruns pass. Inherited MCP/CSP/transport failures are independently reproduced and unchanged. Native Linux provider/platform acceptance remains user-waived/unverified; Linux core/image proof passed.
+- All original active notice revisions remain unchanged and acknowledged/satisfied or explicitly dispositioned. Root records accepted status only here; metadata updates after review do not change implementation. Owned disposable resources cleaned, primary checkout matches exact accepted source, native prepared source/packages and all review/evidence retained. User-authorized normal records commit/push is next; no deployment or production reset.

@@ -1,0 +1,11 @@
+{
+  "command": [
+    "limactl",
+    "stop",
+    "--tty=false",
+    "img"
+  ],
+  "exit": 0,
+  "seconds": 3.17,
+  "reason": "Current image assertions complete; release VM resources before stock-stack and lease measurements."
+}

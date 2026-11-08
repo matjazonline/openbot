@@ -1,0 +1,14 @@
+Traceback (most recent call last):
+  File "/private/tmp/obpub-m8sfhp0f/context/scripts/check-knowledge-image.py", line 101, in <module>
+    main()
+    ~~~~^^
+  File "/private/tmp/obpub-m8sfhp0f/context/scripts/check-knowledge-image.py", line 97, in main
+    print(json.dumps(check(args.image), indent=2))
+                     ~~~~~^^^^^^^^^^^^
+  File "/private/tmp/obpub-m8sfhp0f/context/scripts/check-knowledge-image.py", line 80, in check
+    fixture_root.mkdir(exist_ok=True)
+    ~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.14/pathlib/__init__.py", line 1012, in mkdir
+    os.mkdir(self, mode)
+    ~~~~~~~~^^^^^^^^^^^^
+OSError: [Errno 30] Read-only file system: '/private/tmp/obpub-m8sfhp0f/context/target'

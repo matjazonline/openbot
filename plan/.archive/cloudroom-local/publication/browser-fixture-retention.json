@@ -1,0 +1,221 @@
+{
+  "source": "/tmp/obpub-browser-gatlypbc",
+  "files": [
+    {
+      "path": "logs/browser-fixtures/agent/app.js",
+      "sha256": "d16cde30526cc2c9711c020d625c231c375a253a9d8d92f3d3250ab9583f9dda"
+    },
+    {
+      "path": "logs/browser-fixtures/agent/builtin.html",
+      "sha256": "6a86e15dc1d19890569effea247c348b7fde697aabcbc1bfaa378c97aa0ba4a9"
+    },
+    {
+      "path": "logs/browser-fixtures/agent/fresh-pane.html",
+      "sha256": "e66bd52c17c4dbfff095115ef6485d0be505a44fef3c8f8fb2a39ea006df32c8"
+    },
+    {
+      "path": "logs/browser-fixtures/agent/http-selected.html",
+      "sha256": "a099122c32e71a9da87c8a247fbf7e12d21089b43e0abb84197e5569b0a96130"
+    },
+    {
+      "path": "logs/browser-fixtures/agent/http.html",
+      "sha256": "9823fdf2a81d19f57dbf2cf4cd2bc56c5d661a8762e7228e9cc7d576aaa4a082"
+    },
+    {
+      "path": "logs/browser-fixtures/agent/late-save.json",
+      "sha256": "75a60cbb4883a70e84add1bf0abae4cf607de46072b5da36188158ceb8fbd656"
+    },
+    {
+      "path": "logs/browser-fixtures/agent/metadata.json",
+      "sha256": "2ef7ab3959a3b8977b6fbd4621994e7435a4973617170ce9e2b5b74a3898020f"
+    },
+    {
+      "path": "logs/browser-fixtures/agent/other-pane.html",
+      "sha256": "17fb5667128673e35f4afff166bfaf5a4c44e5ae45ad411712963df66e922f41"
+    },
+    {
+      "path": "logs/browser-fixtures/agent/page.html",
+      "sha256": "86ae4fbce5e55ae90e94d3e303c1a65f58c52563fa8f441c22b4bb02b1bf099b"
+    },
+    {
+      "path": "logs/browser-fixtures/agent/publication.html",
+      "sha256": "d2d11e26b8b82cd69d3c6c8c0cc71b91e919115f518dac637830ac6c8091d79c"
+    },
+    {
+      "path": "logs/browser-fixtures/agent/stale-pane.html",
+      "sha256": "18039214da692176d846bba92764383c7e3ead40dd0cbc0d171e22565ba43355"
+    },
+    {
+      "path": "logs/browser-fixtures/agent/theme-init.js",
+      "sha256": "b23ad4c72d7f288bfa1df3666ae18c4087fb8f6118f6b4187b3173bd4705c0c6"
+    },
+    {
+      "path": "logs/browser-fixtures/agent/workflow.html",
+      "sha256": "af0983e56f961fa7e68e0af4f575f9de415a74e7abfb09dc0a3fcdb3b4954631"
+    },
+    {
+      "path": "logs/browser-fixtures/decision/closed.html",
+      "sha256": "f70f27b88c7aa57b96386dc5cb8fc491de130d0cf3c49e5c809183e02db6b4ea"
+    },
+    {
+      "path": "logs/browser-fixtures/decision/comment.html",
+      "sha256": "1633bb85de1f4848719a1d91e69d44dbba1e993f9a7407093ae371755bdb0f09"
+    },
+    {
+      "path": "logs/browser-fixtures/decision/source-note.html",
+      "sha256": "48937c5594f23e20ae6c30d45d6ba4376b67643c5b5d95c43f14480cfa622678"
+    },
+    {
+      "path": "logs/browser-fixtures/decision/source-old.html",
+      "sha256": "801a4f5c737314ef88f6da4efcd8dc0121c9644534ccfdad2bf61cb09ec1819c"
+    },
+    {
+      "path": "logs/browser-fixtures/decision/source-retained.html",
+      "sha256": "327603ec56f5ef7ddf87fd7fdee228b1e5862e4709de8adcf762dc161e8e68ac"
+    },
+    {
+      "path": "logs/browser-fixtures/decision/waiting.html",
+      "sha256": "a890b49b8d770f1fd4351622f2d144a012596564086dd39b2acd7bdc3fd4a1af"
+    },
+    {
+      "path": "logs/browser-fixtures/html/app.js",
+      "sha256": "d16cde30526cc2c9711c020d625c231c375a253a9d8d92f3d3250ab9583f9dda"
+    },
+    {
+      "path": "logs/browser-fixtures/html/form-error.html",
+      "sha256": "f821f7a107b6712e3faf7b6fc597b1cfd4f6c0d59786cb2a61cd7a68207c117f"
+    },
+    {
+      "path": "logs/browser-fixtures/html/login-success.html",
+      "sha256": "1c18d5f0d36ead822852587914ed75e310f1259bfd0ea6f085d24199d95d2a7d"
+    },
+    {
+      "path": "logs/browser-fixtures/html/login.html",
+      "sha256": "8ecb49401d342f8bc93394c042b055c2e06681f061feec281412a1ab7f093677"
+    },
+    {
+      "path": "logs/browser-fixtures/html/register-success.html",
+      "sha256": "5a0f1b66f7381bcf0c6416bded66fb27bde5febed79e39ec1c59a5461a0be153"
+    },
+    {
+      "path": "logs/browser-fixtures/html/register.html",
+      "sha256": "32a9007f78731ed63332c00deb1431804e88b817a9cc9bcd12210c2e8aa29ef4"
+    },
+    {
+      "path": "logs/browser-fixtures/html/restricted.html",
+      "sha256": "4919879c246b509aa4f87cf408b97406c020538d04cd45c9cb43b22f90b978de"
+    },
+    {
+      "path": "logs/browser-fixtures/html/team.html",
+      "sha256": "271f66bb9ddcea70558a2a726d93041c2bb44da91d5862832831d905614356b3"
+    },
+    {
+      "path": "logs/browser-fixtures/knowledge/app.js",
+      "sha256": "d16cde30526cc2c9711c020d625c231c375a253a9d8d92f3d3250ab9583f9dda"
+    },
+    {
+      "path": "logs/browser-fixtures/knowledge/knowledge.html",
+      "sha256": "443c10ba92f6ca73f714d1ef9a9f22ce22f7a037dd350b93063ab22c54105673"
+    },
+    {
+      "path": "logs/browser-fixtures/knowledge/theme-init.js",
+      "sha256": "b23ad4c72d7f288bfa1df3666ae18c4087fb8f6118f6b4187b3173bd4705c0c6"
+    },
+    {
+      "path": "logs/browser-fixtures/local/app.js",
+      "sha256": "d16cde30526cc2c9711c020d625c231c375a253a9d8d92f3d3250ab9583f9dda"
+    },
+    {
+      "path": "logs/browser-fixtures/local/metadata.json",
+      "sha256": "a35c51c7a4b0968cc4677f9cea5de88daca3dc7f33124f071267324efd90ecbe"
+    },
+    {
+      "path": "logs/browser-fixtures/local/page.html",
+      "sha256": "0ef835edcad805fdf40f5317b160da201a18e17de30e06738e8d9ce719ea5715"
+    },
+    {
+      "path": "logs/browser-fixtures/local/profiles-first.html",
+      "sha256": "1c8e0791907aaa1864ee7a960efb6d962d46dda82bdf408d61331aa17648a2fb"
+    },
+    {
+      "path": "logs/browser-fixtures/local/profiles-navigation.json",
+      "sha256": "f43df767858eab3610663bd99cb780030eee21d279d495b6849d9b4717a37957"
+    },
+    {
+      "path": "logs/browser-fixtures/local/profiles-next.html",
+      "sha256": "37271c83c2ed8fb62e315f44299e15afb1bbdcc61bc3874a760de0451719c6e7"
+    },
+    {
+      "path": "logs/browser-fixtures/local/profiles-selected.html",
+      "sha256": "a663c5a50734c3ee752cb22f5a8a28e653aadf40dcccaeac518a97f752f73671"
+    },
+    {
+      "path": "logs/browser-fixtures/local/theme-init.js",
+      "sha256": "b23ad4c72d7f288bfa1df3666ae18c4087fb8f6118f6b4187b3173bd4705c0c6"
+    },
+    {
+      "path": "logs/browser-fixtures/picker/app.js",
+      "sha256": "d16cde30526cc2c9711c020d625c231c375a253a9d8d92f3d3250ab9583f9dda"
+    },
+    {
+      "path": "logs/browser-fixtures/picker/applied.html",
+      "sha256": "d60e7176d59c0e5ef86d8a615e052f9d6c7e27de2e85c5571597acb37b96c56b"
+    },
+    {
+      "path": "logs/browser-fixtures/picker/initial-picker.html",
+      "sha256": "01f0715676d66851b3dc4f369939693ab2d3c4e1e0e69c31ddfb06859e0c6cd5"
+    },
+    {
+      "path": "logs/browser-fixtures/picker/metadata.json",
+      "sha256": "e023eb72a4d6a7a97b684e8a64c5643bcc802f031441a52d4971366af8efd31a"
+    },
+    {
+      "path": "logs/browser-fixtures/picker/other-pane.html",
+      "sha256": "16822b11227c377fca1711a628cc89a45865c3d0f3f80b9d93fa5e9447e00d27"
+    },
+    {
+      "path": "logs/browser-fixtures/picker/page.html",
+      "sha256": "8730a892da4a5f264b71134577388de959b732a8dc486d967ef6d246eba34415"
+    },
+    {
+      "path": "logs/browser-fixtures/picker/selected-picker.html",
+      "sha256": "f3da5b5e2e994d69768430a9321cf14824869606acd7ef34932acd051872122b"
+    },
+    {
+      "path": "logs/browser-fixtures/picker/theme-init.js",
+      "sha256": "b23ad4c72d7f288bfa1df3666ae18c4087fb8f6118f6b4187b3173bd4705c0c6"
+    },
+    {
+      "path": "logs/browser-fixtures/session/failed.json",
+      "sha256": "11ef9f9fb32f049aadb6735ad218c4f325cfddf08a4063c03221ceca6fcef007"
+    },
+    {
+      "path": "logs/browser-fixtures/session/profile.html",
+      "sha256": "98e81287f53b0256f1207038040ba449d602e4c078fb083901b06d2c053191b9"
+    },
+    {
+      "path": "logs/browser-fixtures/session/success.json",
+      "sha256": "fa0405e9209e7b79e2179989a44c992a50a5d3cde9ccc396e59044016ca526d8"
+    },
+    {
+      "path": "logs/browser-fixtures/vault/app.js",
+      "sha256": "d16cde30526cc2c9711c020d625c231c375a253a9d8d92f3d3250ab9583f9dda"
+    },
+    {
+      "path": "logs/browser-fixtures/vault/consent.html",
+      "sha256": "a39eaa9c26c16a5b6f365576993c3d57ad30ed99e2dc01bd5a0480cae1d46ac3"
+    },
+    {
+      "path": "logs/browser-fixtures/vault/owner.html",
+      "sha256": "9ec3f3769d98224b0169bc349fd579262e4a40c41be38e5b7434bfe118a35f09"
+    },
+    {
+      "path": "logs/browser-fixtures/vault/reconnect.html",
+      "sha256": "9b1d3aa46f4850f721de852522db06abb3a5a0981b5fb078d18fcb8902acfce4"
+    },
+    {
+      "path": "logs/browser-fixtures/vault/source.html",
+      "sha256": "3e22e030b6cd6192c1b34e50b26d357d6256168f7a631fd6a0389720359fcf0b"
+    }
+  ]
+}

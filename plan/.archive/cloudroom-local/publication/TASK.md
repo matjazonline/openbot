@@ -4,7 +4,7 @@ Original request: implement `plan/cloudroom-local` with `implement-astra-reviewe
 
 Root/author: `/root`. Reviewer: existing `/root/cloudroom_reviewer`, Astra/high requested. Worktree `/tmp/openbot-cloudroom-publication`, branch `cloudroom-publication`. Original implementation base `97e5d60dc538e26c7cb976a8d63772eed80baff2`, accepted artifact `bd92212d24d49b9d937eac2c52723eae45085cdb81abc36d12c262dcdf33cbe9`; feature/archive commit `e67a6acf`. Remote integration base `b8c46300` (11 newer commits).
 
-Authoritative coordination is now `plan/.archive/cloudroom-local/COORDINATION.md`; revision37 acceptance and applicable I001–005/r1,C001/r2,C002/r2,C003/r1,C004/r1,C005/r1,C006/r2,C007/r3,C008/r1 rechecked and acknowledged. Original historical records retain original paths. All prior source behavior remains subject to accepted invariants. No new wire/schema ownership decision is proposed: this batch composes independently implemented capability sets.
+Authoritative coordination is now `plan/.archive/cloudroom-local/COORDINATION.md`; revision38 and applicable I001/r2,I002–005/r1,C001/r2,C002/r2,C003/r1,C004/r1,C005/r1,C006/r2,C007/r3,C008/r1 rechecked and acknowledged. Original historical records retain original paths. All prior source behavior remains subject to accepted invariants. No new wire/schema ownership decision is proposed: this batch composes independently implemented capability sets.
 
 ## Scope and invariants
 
@@ -20,6 +20,33 @@ Merge current origin/main without losing vault, history or Cloudroom behavior. R
 - Plugin/browser/CSS: pinned npm installs, typecheck/build,90tests/4guards, generated CSS and composed local-management browser proof; remote browser suites as final integration checks.
 - Formatting, whitespace, Clippy, boundaries and evidence-retention CI contracts.
 
-Use only owned PostgreSQL cluster `/tmp/openbot-cloudroom-publication-pg` port56389, database `cloudroom_publication_test`; normal provider accounts and other PostgreSQL clusters untouched. Root target cache is reused; dependencies are locked/offline for Rust. Retain prior macOS provider and Linux image acceptance where byte-identical plugin/image inputs support it; report any current unexercised image rerun rather than inventing proof. Full original platform matrix is not re-run for archive-only paths; affected server composition is exercised through real PostgreSQL/WSS counted peers.
+Initial C-locale PostgreSQL56389 was superseded by owned UTF8 PostgreSQL56390; both are now stopped/removed after proof retention. Normal provider accounts and other PostgreSQL clusters remain untouched; recreate owned resources for future verification. Root target cache is reused; dependencies are locked/offline for Rust. Retain prior macOS provider and Linux image acceptance where byte-identical plugin/image inputs support it; report any current unexercised image rerun rather than inventing proof. Full original platform matrix is not re-run for archive-only paths; affected server composition is exercised through real PostgreSQL/WSS counted peers.
 
-Implementation and verification in progress. Freeze source and request affected final integration review after compilation and focused proofs establish the combined contracts.
+Implementation and required verification are complete for the affected Cloudroom scope. Independent publication PASS CL-PUB-R1 accepted by root; preserve the explicit verification exceptions below and do not claim uniformly green gates.
+
+## Superseded interim verification checkpoint
+
+See HANDOFF.md for current resource/failure truth. Correct fixture is now UTF8 PG56390; initial C-locale run was aborted and retained. VM image proof passed and owned VM was removed. All generated browser gates and main/module tests executed PASS. Current full-suite cut-point failure and intermittent MCP cancellation remain under investigation; no source correction or new acceptance yet.
+
+## Current final acceptance input
+
+- Source HEAD `f63f08e00bc5c94dbcd83a33ff58fbcf142f97e4`, frozen artifact `fbc00a75eb16d9c9cc00f4441976aaa9e176503a54d7dfad8a896d96d1143110`. Current source remains unchanged from review entry. Publication starting source base97e5d60d, feature/archive checkpoint e67a6acf and independent newer origin b8c46300 are separately identified above.
+- Exact nine workflow exclusions: `plan/.archive/cloudroom-local/COORDINATION.md`; separately `plan/.archive/cloudroom-local/phases/p01/docs`, `p02/docs`, `p03/docs`, `p04/docs`, `p05/docs`, `p06/docs`, `p07/docs` (each with the same full plan prefix); `plan/.archive/cloudroom-local/publication`. No implementation or deliverable documentation excluded.
+- Authority revision38/I001r2 and all other active revisions above acknowledged. Root/A `/root` user-confirmed Sol6.1/xhigh; independent B `/root/cloudroom_reviewer`, Astra/high requested, actual worker metadata unavailable. Context threshold unavailable; durable checkpoints used.
+- Immutable `logs/CL-PUB-R1.final.evidence.json` validates55PASS/6FAIL/1NOTEXERCISED, including tracked-retention validation. The FAIL declarations retain whole-gate and exercised upstream-baseline failures; they are not converted to PASS.
+
+| Criterion and impact | Exercised path/assertion and evidence | Final disposition |
+| --- | --- | --- |
+| Merge composition and typed transaction ownership | Offline all-target compile, Clippy, fresh migrations and SQLx; shared wait selection/readiness/guard composition and source callers independently audited | PASS; no source finding established |
+| Current local operation, recovery, authority and competing retention | Complete2048KiB library run,3761results accounted, all129executable Cloudroom tests PASS; exact focused cut-point case PASS34.41s | Current affected scope PASS; prior regular ready()15s timeout remains unknown cause/history |
+| Full and stock gate truth | Regular library3745PASS/2FAIL/14ignored; stock3746PASS/1inheritedCSPFAIL/14ignored, no overflow; main5/source-module8 separately PASS | Whole regular/stock gates remain FAIL; fresh current affected proof established |
+| Lease/concurrency early bound signal |133tests and code-owned timing assertions PASS204.77s, `logs/lease-budget.log` | PASS; no bound raised |
+| Browser and plugin consumers |90plugin tests/4source guards, repeated reproducible package, fresh locked runtime install;10actual fixture invocations/8drivers/54retained inputs,25protocol tests/2count tests | PASS; all23previous package files unchanged, only Git metadata added |
+| Current Linux production core/image | ActualARM64 production build and unchanged offline/read-only/non-root/model-integrity/memory assertions;1784inputs match source | PASS; initial readonly fixture-directory failure retained, corrected unchanged checker PASS |
+| Native platforms | Prior accepted actual three-provider macOS runtime remains byte-identical; native Linux providers/platform acceptance explicitly waived by userI005 | macOS acceptance retained; nativeLinux NOTEXERCISED |
+| Test registration and archived evidence |3332→3774registered tests, zero removals; all1636original plan files accounted,1633immutable bytes plus three live-link/authority edits; four invalid historical manifests byte-exact under explicit names/index | PASS for retention/identity; never claim invalid historical manifests valid |
+| Unchanged-origin failures | Exact origin CSP scanner and transport checker reproduce test-only-string false positives; actual compiled origin MCP test reproduces identical3of4cancellation-exchange failure,1698baseline inputs independently matched | Confirmed inherited, outside Cloudroom correction scope; source/tests unchanged |
+
+Owned PG56389/56390, VM/home, baseline/cache/browser/install fixtures are stopped/removed after proof retention. Complete PG log is retained compressed; zero storage/write/fsync/PANIC errors. Prepared original Cloudroom/native package and current reproducible package remain. Primary main checkout fast-forwarded cleanly to exact sourcef63f08e0, graft graph refreshed; prior skill deletions match independent upstream removal. No push yet.
+
+Root accepted explicit B PASS CL-PUB-R1 for the same artifact/manifest and these exceptions. Authority r39 records acceptance only; reviewed r38 requirements remain unchanged. Next: commit only excluded workflow records, normal push to origin/main, verify remote SHA and fast-forward primary through records commit. No deployment or production reset authorized/performed.

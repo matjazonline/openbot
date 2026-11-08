@@ -1,0 +1,105 @@
+{
+  "version": 1,
+  "round": "CL-PUB-R1.preliminary",
+  "artifact": "fbc00a75eb16d9c9cc00f4441976aaa9e176503a54d7dfad8a896d96d1143110",
+  "checks": [
+    {
+      "criteria": [
+        "AC-compile"
+      ],
+      "command": "cargo check --locked --offline --all-targets",
+      "fixture": "isolated publication worktree; owned PostgreSQL18.6 port56389; pinned npm/Node runtime",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/preflight-check-3.log",
+          "sha256": "a46c06b05703ddd7a8394873c3778f761fa175a1cb2bd16d3e6499d45c4c0dcd"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC-schema"
+      ],
+      "command": "SQLX_OFFLINE=false cargo sqlx migrate run",
+      "fixture": "isolated publication worktree; owned PostgreSQL18.6 port56389; pinned npm/Node runtime",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/preflight-migrate.log",
+          "sha256": "87732e6bad0ccec6cd8be244f23215212a4f99553eae731ede4059dab4ddab5a"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC-plugin"
+      ],
+      "command": "npm ci; plugin typecheck/build/test/test:guards",
+      "fixture": "isolated publication worktree; owned PostgreSQL18.6 port56389; pinned npm/Node runtime",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/preflight-plugin-install.log",
+          "sha256": "6fef84af97b543c3b459d31d1c5182a556f2ed383f3857c896caae43c69fab51"
+        },
+        {
+          "path": "logs/preflight-plugin-check.log",
+          "sha256": "2a76b0b41aed0a0cb5fa95cac7cc06b64b1ae4106faf0279b855bd394e7dadab"
+        },
+        {
+          "path": "logs/preflight-plugin-build.log",
+          "sha256": "54ba34766bbe8fa61156b478619557814d7a37b0eb4cce1032e9f7d4a51012a7"
+        },
+        {
+          "path": "logs/preflight-plugin-test.log",
+          "sha256": "a70c02de47735ca9aff3617d601ebc123a6b3a3add4b93294324c7a16d7c3137"
+        },
+        {
+          "path": "logs/preflight-plugin-guards.log",
+          "sha256": "c52eb8296e82879b3ef23e3f4b87f5220c060cd47d6a50dd3fd9cf3e958088e0"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC-css"
+      ],
+      "command": "npm run check:css",
+      "fixture": "isolated publication worktree; owned PostgreSQL18.6 port56389; pinned npm/Node runtime",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/preflight-css.log",
+          "sha256": "8b629bd94b3ecb9ecd437dd75bbb605fe2a26ca0aa1227efb7ead8dd2929c22f"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC-evidence"
+      ],
+      "command": "python3 scripts/check-workflow-evidence.py --tracked-manifests --require-tracked",
+      "fixture": "isolated publication worktree; owned PostgreSQL18.6 port56389; pinned npm/Node runtime",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/preflight-evidence.log",
+          "sha256": "b2938aec092aa5e94a2acd10396783e5bff733a0a27bb9b1de3298bb768071c1"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC-final-suite",
+        "AC-stock-stack",
+        "AC-lease",
+        "AC-current-linux-image"
+      ],
+      "command": "publication/run-checks.py and publication/run-image.py",
+      "fixture": "owned PG56389 and owned pinned ARM64 Lima VM",
+      "status": "NOT EXERCISED",
+      "reason": "Currently running; required before publication acceptance. This is pending evidence, not a waiver."
+    }
+  ]
+}

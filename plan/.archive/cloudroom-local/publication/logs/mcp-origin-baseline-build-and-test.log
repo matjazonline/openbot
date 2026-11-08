@@ -1,0 +1,90 @@
+   Compiling tokio-rustls v0.26.4
+   Compiling sqlx-core v0.8.6
+   Compiling axum v0.8.4
+   Compiling jsonschema v0.33.0
+   Compiling hyper-rustls v0.27.9
+   Compiling lettre v0.11.23
+   Compiling reqwest v0.13.4
+   Compiling rig-core v0.42.0
+   Compiling rmcp v1.8.0
+   Compiling sqlx-postgres v0.8.6
+   Compiling axum-extra v0.10.1
+   Compiling sqlx v0.8.6
+   Compiling rig-agent v0.42.0
+   Compiling open_bots v0.1.0 (/tmp/obpub-origin-jw2vio46)
+error: couldn't read `src/adapters/persistence/workflow/../../../../samples/gmail-read-prepare.json`: No such file or directory (os error 2)
+   --> src/adapters/persistence/workflow/vault_gmail_journey.rs:181:30
+    |
+181 |         serde_json::from_str(include_str!("../../../../samples/gmail-read-prepare.json")).unwrap();
+    |                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: couldn't read `src/adapters/persistence/workflow/vault_tests/../../../../../samples/gmail-reviewed-send.json`: No such file or directory (os error 2)
+  --> src/adapters/persistence/workflow/vault_tests/native_journeys.rs:76:46
+   |
+76 |       let sample: Value = serde_json::from_str(include_str!(
+   |  ______________________________________________^
+77 | |         "../../../../../samples/gmail-reviewed-send.json"
+78 | |     ))
+   | |_____^
+
+error: couldn't read `src/adapters/persistence/workflow/../../../../samples/jev-triage.json`: No such file or directory (os error 2)
+   --> src/adapters/persistence/workflow/jev_end_to_end_tests.rs:107:34
+    |
+107 |             serde_json::from_str(include_str!("../../../../samples/jev-triage.json")).unwrap();
+    |                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: couldn't read `src/adapters/persistence/workflow/../../../../samples/jev-image.json`: No such file or directory (os error 2)
+   --> src/adapters/persistence/workflow/jev_end_to_end_tests.rs:199:34
+    |
+199 |             serde_json::from_str(include_str!("../../../../samples/jev-image.json")).unwrap();
+    |                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: couldn't read `src/adapters/response_schema/../../../docs/rig.md`: No such file or directory (os error 2)
+  --> src/adapters/response_schema/tests.rs:14:17
+   |
+14 |     let guide = include_str!("../../../docs/rig.md");
+   |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: couldn't read `src/application/workflow/sample/../../../../samples/gmail-read-prepare.json`: No such file or directory (os error 2)
+ --> src/application/workflow/sample/gmail_tests.rs:6:19
+  |
+6 |         "read" => include_str!("../../../../samples/gmail-read-prepare.json"),
+  |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: couldn't read `src/application/workflow/sample/../../../../samples/gmail-reviewed-send.json`: No such file or directory (os error 2)
+ --> src/application/workflow/sample/gmail_tests.rs:7:19
+  |
+7 |         "send" => include_str!("../../../../samples/gmail-reviewed-send.json"),
+  |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: couldn't read `src/application/workflow/sample/../../../../samples/jev-image.json`: No such file or directory (os error 2)
+ --> src/application/workflow/sample/jev_tests.rs:6:30
+  |
+6 |         serde_json::from_str(include_str!("../../../../samples/jev-image.json")).unwrap();
+  |                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: couldn't read `src/application/workflow/sample/../../../../samples/jev-triage.json`: No such file or directory (os error 2)
+  --> src/application/workflow/sample/jev_tests.rs:27:30
+   |
+27 |         serde_json::from_str(include_str!("../../../../samples/jev-triage.json")).unwrap();
+   |                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: couldn't read `src/application/workflow/sample/../../../../samples/jev-image.json`: No such file or directory (os error 2)
+  --> src/application/workflow/sample/jev_tests.rs:57:30
+   |
+57 |         serde_json::from_str(include_str!("../../../../samples/jev-image.json")).unwrap();
+   |                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: couldn't read `src/infra/../../fly.toml`: No such file or directory (os error 2)
+  --> src/infra/setup_tests.rs:32:27
+   |
+32 |         configured_filter(include_str!("../../fly.toml")),
+   |                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: couldn't read `src/infra/../../.env.example`: No such file or directory (os error 2)
+  --> src/infra/setup_tests.rs:33:27
+   |
+33 |         configured_filter(include_str!("../../.env.example")),
+   |                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: could not compile `open_bots` (lib test) due to 12 previous errors

@@ -1,0 +1,8 @@
+{
+  "owner": "root/cloudroom-publication",
+  "directory": "/tmp/openbot-cloudroom-publication-utf8-pg",
+  "port": 56390,
+  "database": "cloudroom_publication_test",
+  "locale": "en_US.UTF-8",
+  "round1": "stopped; retained for cleanup"
+}

@@ -1,0 +1,16 @@
+warning: function `rendered_markup_carries_no_inline_javascript` is never used
+ --> /private/tmp/openbot-cloudroom-publication/plan/.archive/cloudroom-local/publication/logs/origin-markup-test.rs:1:4
+  |
+1 | fn rendered_markup_carries_no_inline_javascript() {
+  |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: function `inline_event_attribute` is never used
+  --> /private/tmp/openbot-cloudroom-publication/plan/.archive/cloudroom-local/publication/logs/origin-markup-test.rs:59:4
+   |
+59 | fn inline_event_attribute(line: &str) -> bool {
+   |    ^^^^^^^^^^^^^^^^^^^^^^
+
+warning: 2 warnings emitted
+

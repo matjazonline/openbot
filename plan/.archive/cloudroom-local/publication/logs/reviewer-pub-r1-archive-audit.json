@@ -1,0 +1,12 @@
+{
+  "originalFiles": 1636,
+  "byteIdentical": 1633,
+  "intentionalChanged": [
+    "07-integration-and-verification.md",
+    "COORDINATION.md",
+    "README.md"
+  ],
+  "invalidManifestRenamesByteIdentical": 4,
+  "transportBaselineFilesEqual": true,
+  "transportBaselineOutputEqual": true
+}

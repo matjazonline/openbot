@@ -1,0 +1,16 @@
+
+running 1 test
+
+thread 'rendered_markup_carries_no_inline_javascript' (19939775) panicked at /private/tmp/openbot-cloudroom-publication/plan/.archive/cloudroom-local/publication/logs/origin-markup-test.rs:53:5:
+inline JavaScript is blocked by the page CSP and will never run:
+/tmp/obpub-origin-jw2vio46/src/adapters/http/pages/workflow_authoring/sample.rs:153: inline <script> block
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test rendered_markup_carries_no_inline_javascript ... FAILED
+
+failures:
+
+failures:
+    rendered_markup_carries_no_inline_javascript
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.18s
+

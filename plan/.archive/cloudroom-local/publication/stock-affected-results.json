@@ -1,0 +1,14 @@
+{
+  "library_summary": [
+    "test result: FAILED. 3746 passed; 1 failed; 14 ignored; 0 measured; 0 filtered out; finished in 1335.60s"
+  ],
+  "whole_script": "FAIL due confirmed inherited CSP scanner; never claim whole gate PASS",
+  "current_affected_scope": "PASS",
+  "cloudroom_pass": 129,
+  "cloudroom_failure": false,
+  "failed_tests": [
+    "adapters::http::pages::tests::rendered_markup_carries_no_inline_javascript"
+  ],
+  "overflow": false,
+  "original_regular_cut_timeout": "unknown cut/cause remains retained; exact focused and complete stock reruns pass"
+}
