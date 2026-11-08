@@ -1,4 +1,0 @@
-interface:
-  display_name: "Implement Astra Reviewed 2.2"
-  short_description: "Sol 6.1/xhigh development with independent Astra/high review"
-  default_prompt: "Use $implement-astra-reviewed-2-2 to implement this phase with a Sol 6.1/xhigh root/developer, independent Astra/high review, phase-local progress, and an isolated worktree when other phases run concurrently."

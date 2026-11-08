@@ -1,0 +1,55 @@
+    Checking open_bots v0.1.0 (/Users/mac02/.codex/worktrees/1133/openbot)
+error[E0603]: struct import `WorkflowActor` is private
+  --> src/adapters/persistence/integration_bindings.rs:7:111
+   |
+ 7 |     application::{integrations::{*,grants::*},use_cases::integration_binding::*,workflow::{CompanyId,binding::WorkflowActor}},
+   |                                                                                                               ^^^^^^^^^^^^^ private struct import
+   |
+note: the struct import `WorkflowActor` is defined here...
+  --> src/application/workflow/binding/mod.rs:11:33
+   |
+11 | use super::{RelatedAssociation, WorkflowActor, compiler};
+   |                                 ^^^^^^^^^^^^^
+note: ...and refers to the struct import `WorkflowActor` which is defined here...
+  --> src/application/workflow/mod.rs:57:9
+   |
+57 | pub use authorization::*;
+   |         ^^^^^^^^^^^^^^^^ you could import this re-export
+note: ...and refers to the struct `WorkflowActor` which is defined here
+  --> src/application/workflow/authorization.rs:14:1
+   |
+14 | pub struct WorkflowActor {
+   | ^^^^^^^^^^^^^^^^^^^^^^^^ you could import this directly
+
+error[E0609]: no field `bearer` on type `application::workflow::http::HttpConnection`
+   --> src/adapters/persistence/agent_publication/tools.rs:228:16
+    |
+228 |     if current.bearer {
+    |                ^^^^^^ unknown field
+    |
+    = note: available fields are: `company`, `id`, `origin`, `enabled`, `credential_source` ... and 3 others
+
+error[E0061]: this method takes 3 arguments but 2 arguments were supplied
+   --> src/application/integrations/gateway.rs:332:25
+    |
+332 |         self.management.inspect_grants(o, id).await
+    |                         ^^^^^^^^^^^^^^------- argument #3 of type `std::option::Option<domain::integrations::ids::UseGrantId>` is missing
+    |
+note: method defined here
+   --> src/application/integrations/gateway.rs:76:14
+    |
+ 76 |     async fn inspect_grants(
+    |              ^^^^^^^^^^^^^^
+...
+ 80 |         after: Option<UseGrantId>,
+    |         -----
+help: provide the argument
+    |
+332 |         self.management.inspect_grants(o, id, /* std::option::Option<domain::integrations::ids::UseGrantId> */).await
+    |                                             ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+Some errors have detailed explanations: E0061, E0603, E0609.
+For more information about an error, try `rustc --explain E0061`.
+error: could not compile `open_bots` (lib) due to 3 previous errors
+warning: build failed, waiting for other jobs to finish...
+error: could not compile `open_bots` (lib test) due to 3 previous errors

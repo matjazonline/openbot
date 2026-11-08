@@ -1,0 +1,4 @@
+/ui/profile/vault/apps/{app}/connect None
+/auth/integrations/{provider}/callback None
+/auth/integrations/{provider}/callback None
+/auth/google/callback Some(Oauth)

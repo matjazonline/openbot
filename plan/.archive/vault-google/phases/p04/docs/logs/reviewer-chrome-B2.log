@@ -1,0 +1,13 @@
+{
+  "browser": "156.0.8078.80",
+  "productionRenderedFixtures": "plan/vault-google/phases/p04/docs/logs/reviewer-browser-B2",
+  "posted": 6,
+  "reached": 5,
+  "cspErrors": 0,
+  "connectAndReconnect": true,
+  "heldProgressAndDuplicateDrop": true,
+  "unrelatedNavigationAvailable": true,
+  "inPlaceFailureRetry": true,
+  "nativeFallbackBoth": true,
+  "noExternalNetwork": true
+}

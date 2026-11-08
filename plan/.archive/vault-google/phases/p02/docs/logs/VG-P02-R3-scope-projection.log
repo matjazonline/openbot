@@ -1,0 +1,17 @@
+warning: unused imports: `execution::OperationArguments` and `registry::StaticCredentialAdapter`
+ --> /Users/mac02/.codex/worktrees/1133/openbot/plan/vault-google/phases/p02/docs/logs/VG-P02-R3-scope-projection.rs:8:61
+  |
+8 | use application::integrations::{private::CredentialAdapter, registry::StaticCredentialAdapter, execution::OperationArguments};
+  |                                                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `ExposeSecret`
+ --> /Users/mac02/.codex/worktrees/1133/openbot/plan/vault-google/phases/p02/docs/logs/VG-P02-R3-scope-projection.rs:9:29
+  |
+9 | use secrecy::{SecretString, ExposeSecret};
+  |                             ^^^^^^^^^^^^
+
+warning: 2 warnings emitted
+
+Google adapter accepts changed granted scopes with unchanged validated identity; Refresh transition preserves authorization revision. write_managed checks only this identity, not old scope facts.

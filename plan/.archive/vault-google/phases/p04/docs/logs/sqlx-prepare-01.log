@@ -1,0 +1,20 @@
+    Checking open_bots v0.1.0 (/Users/mac02/.codex/worktrees/1133/openbot)
+warning: field `0` is never read
+  --> src/application/integrations/private.rs:30:18
+   |
+30 |     ApiKeyHeader(String),
+   |     ------------ ^^^^^^
+   |     |
+   |     field in this variant
+   |
+   = note: `InjectionMethod` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+help: consider changing the field to be of unit type to suppress this warning while preserving the field numbering, or remove the field
+   |
+30 -     ApiKeyHeader(String),
+30 +     ApiKeyHeader(()),
+   |
+
+warning: `open_bots` (lib) generated 1 warning
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1m 06s
+query data written to .sqlx in the current directory; please check this into version control

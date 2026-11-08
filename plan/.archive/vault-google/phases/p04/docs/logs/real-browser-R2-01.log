@@ -1,0 +1,41 @@
+Je [Error]: expect(locator).toHaveAttribute(expected) failed
+
+Locator: getByRole('button', { name: 'Connect gmail', exact: true })
+Expected string: "true"
+Received string: ""
+Timeout: 5000ms
+
+Call log:
+[2m  - Expect "to.have.attribute.value" with timeout 5000ms[22m
+[2m  - waiting for getByRole('button', { name: 'Connect gmail', exact: true })[22m
+[2m    9 × locator resolved to <button disabled type="submit" class="btn btn-primary" data-disabled-by-htmx="">Connect gmail</button>[22m
+[2m      - unexpected value "null"[22m
+
+    at Proxy.<anonymous> (/Users/mac02/.codex/worktrees/1133/openbot/node_modules/playwright/lib/matchers/expect.js:221:24)
+    at /Users/mac02/.codex/worktrees/1133/openbot/plan/vault-google/phases/p04/docs/logs/browser-navigation-R2.cjs:48:60 {
+  matcherResult: {
+    name: 'toHaveAttribute',
+    expected: 'true',
+    message: 'expect(locator).toHaveAttribute(expected) failed\n' +
+      '\n' +
+      "Locator: getByRole('button', { name: 'Connect gmail', exact: true })\n" +
+      'Expected string: "true"\n' +
+      'Received string: ""\n' +
+      'Timeout: 5000ms\n' +
+      '\n' +
+      'Call log:\n' +
+      '\x1B[2m  - Expect "to.have.attribute.value" with timeout 5000ms\x1B[22m\n' +
+      "\x1B[2m  - waiting for getByRole('button', { name: 'Connect gmail', exact: true })\x1B[22m\n" +
+      '\x1B[2m    9 × locator resolved to <button disabled type="submit" class="btn btn-primary" data-disabled-by-htmx="">Connect gmail</button>\x1B[22m\n' +
+      '\x1B[2m      - unexpected value "null"\x1B[22m\n',
+    pass: false,
+    actual: null,
+    log: [
+      '  - Expect "to.have.attribute.value" with timeout 5000ms',
+      "  - waiting for getByRole('button', { name: 'Connect gmail', exact: true })",
+      '    9 × locator resolved to <button disabled type="submit" class="btn btn-primary" data-disabled-by-htmx="">Connect gmail</button>',
+      '      - unexpected value "null"'
+    ],
+    timeout: 5000
+  }
+}

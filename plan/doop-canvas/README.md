@@ -77,7 +77,7 @@ Recheck the actual deployed revision before implementation:
 - [Workflow MCP authority](../../src/adapters/persistence/workflow/mcp.rs):26–37, 152–186 and
   [operation contracts](../../src/application/workflow/mcp.rs):68–98 own live scoped dispatch.
 
-The proposed [vault/integrations plan](../vault-google/README.md) is not a prerequisite. Use the
+The proposed [vault/integrations plan](../.archive/vault-google/README.md) is not a prerequisite. Use the
 credential owner actually present when implementing; if that plan has landed, reuse its approved
 credential reference rather than introducing a second secret store.
 

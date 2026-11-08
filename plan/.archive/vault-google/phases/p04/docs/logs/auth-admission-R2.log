@@ -1,0 +1,32 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.32s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-048b7abd3ed0c794)
+
+running 24 tests
+test adapters::http::auth_admission::tests::security_auth_limits_every_costly_route_is_classified ... ok
+test adapters::http::auth_admission::tests::security_auth_limits_competing_claimants_share_last_active_slot ... ok
+test adapters::http::auth_admission::tests::security_auth_limits_body_is_rejected_before_handler ... ok
+test adapters::http::auth_admission::tests::security_auth_limits_metric_rollup_uses_fixed_kinds_and_saturating_counts ... ok
+test adapters::http::auth_admission::tests::security_auth_limits_trusted_proxy_requires_one_ip ... ok
+test adapters::http::auth_admission::tests::security_auth_limits_head_oauth_requests_consume_the_budget ... ok
+test adapters::http::auth_admission::tests::security_auth_limits_encoded_profile_kind_uses_matched_route_budget ... ok
+test adapters::http::auth_admission::tests::security_auth_limits_untrusted_forwarded_source_cannot_escape_budget ... ok
+test adapters::http::routes::user::tests::session_routes::security_auth_limits_hash_overload_reaches_html_and_json_routes ... ok
+test adapters::http::auth_admission::tests::security_auth_limits_stalled_body_times_out_without_reaching_handler ... ok
+test adapters::persistence::auth_attempts::tests::security_auth_limits_cancel_and_expired_code_reissue_keep_budget ... ok
+test adapters::persistence::auth_attempts::tests::security_auth_limits_cleanup_is_bounded_and_preserves_active_budget ... ok
+test adapters::persistence::auth_attempts::tests::security_auth_limits_competing_claimants_cannot_exceed_last_code_attempt ... ok
+test adapters::persistence::auth_attempts::tests::security_auth_limits_competing_correct_codes_spend_once ... ok
+test adapters::persistence::auth_attempts::tests::security_auth_limits_competing_login_reservations_share_the_last_slot ... ok
+test adapters::persistence::auth_attempts::tests::security_auth_limits_registration_code_spends_once_across_instances ... ok
+test application::use_cases::user::tests::security_auth_limits_cancelled_hash_keeps_source_capacity ... ok
+test application::use_cases::user::tests::security_auth_limits_dummy_hash_is_valid_argon2 ... ok
+test application::use_cases::user::tests::security_auth_limits_hash_capacity_fails_before_fifth_job ... ok
+test application::use_cases::user::tests::security_auth_limits_unknown_and_oauth_only_use_dummy_verification ... ok
+test infra::app::tests::security_auth_limits_callback_uri_is_not_traced ... ok
+test adapters::persistence::auth_attempts::tests::security_auth_limits_unicode_registration_aliases_share_budget_and_code_digest ... ok
+test adapters::persistence::auth_attempts::tests::security_auth_limits_login_counter_is_shared_and_success_resets_it ... ok
+test adapters::persistence::auth_attempts::tests::security_auth_limits_public_burst_and_cooldown_recovery ... ok
+
+test result: ok. 24 passed; 0 failed; 0 ignored; 0 measured; 3279 filtered out; finished in 6.39s
+

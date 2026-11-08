@@ -1,0 +1,40 @@
+    Checking open_bots v0.1.0 (/Users/mac02/.codex/worktrees/1133/openbot)
+warning: this lint expectation is unfulfilled
+ --> src/adapters/integrations/mod.rs:4:12
+  |
+4 |     expect(dead_code, reason = "External-app OAuth registration ships in phase04")
+  |            ^^^^^^^^^
+  |
+  = note: External-app OAuth registration ships in phase04
+  = note: `#[warn(unfulfilled_lint_expectations)]` on by default
+
+warning: `open_bots` (lib) generated 1 warning
+warning: unused import: `*`
+  --> src/adapters/persistence/integrations/tests.rs:13:9
+   |
+13 |         *,
+   |         ^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused `axum::response::Html` that must be used
+   --> src/adapters/http/routes/vault_management_tests.rs:146:5
+    |
+146 | /     remove(
+147 | |         State(f.gateway.clone()),
+148 | |         f.auth(),
+149 | |         Path(account.id.as_uuid()),
+...   |
+154 | |     .await
+155 | |     .unwrap();
+    | |_____________^
+    |
+    = note: `#[warn(unused_must_use)]` (part of `#[warn(unused)]`) on by default
+help: use `let _ = ...` to ignore the resulting value
+    |
+146 |     let _ = remove(
+    |     +++++++
+
+warning: `open_bots` (lib test) generated 2 warnings (run `cargo fix --lib -p open_bots --tests` to apply 1 suggestion)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 52.59s
+query data written to .sqlx in the current directory; please check this into version control

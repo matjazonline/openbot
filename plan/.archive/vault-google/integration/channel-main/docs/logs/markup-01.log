@@ -1,0 +1,23 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.20s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-048b7abd3ed0c794)
+
+running 1 test
+test adapters::http::pages::tests::rendered_markup_carries_no_inline_javascript ... FAILED
+
+failures:
+
+---- adapters::http::pages::tests::rendered_markup_carries_no_inline_javascript stdout ----
+
+thread 'adapters::http::pages::tests::rendered_markup_carries_no_inline_javascript' (35903398) panicked at src/adapters/http/pages/tests.rs:4664:5:
+inline JavaScript is blocked by the page CSP and will never run:
+/Users/mac02/.codex/worktrees/1133/openbot/src/adapters/http/pages/workflow_authoring/sample.rs:152: inline <script> block
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    adapters::http::pages::tests::rendered_markup_carries_no_inline_javascript
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 3392 filtered out; finished in 0.14s
+
+error: test failed, to rerun pass `--lib`

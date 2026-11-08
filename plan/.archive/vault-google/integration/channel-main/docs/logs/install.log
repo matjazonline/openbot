@@ -1,0 +1,701 @@
+Saved working directory and index state On (no branch): vault-main-pull-preserve-9a7fdc63a3d94fb29358f4ea579db2ba
+Updating 97e5d60d..4ab45555
+Fast-forward
+ .github/workflows/ci.yml                           |    2 +-
+ docs/workflow-operations.md                        |   69 ++
+ docs/workflow-verification.md                      |   45 +
+ migrations/20260817000000_init_schema.sql          |   74 ++
+ plan/03-channel-handles-send/COORDINATION.md       |   65 +-
+ .../phases/p05/docs/HANDOFF.md                     |    2 +
+ .../phases/p05/docs/logs/CHS-P05-main-push.json    |   11 +
+ .../phases/p06/docs/HANDOFF.md                     |   87 ++
+ .../phases/p06/docs/REVIEW.md                      |   51 +
+ .../phases/p06/docs/TASK.md                        |   68 ++
+ .../phases/p06/docs/agent-review-findings.md       |  104 ++
+ .../phases/p06/docs/agent-review-notes.md          |  109 ++
+ .../phases/p06/docs/logs/CHS-P06-AG1-R1-input.json |   66 ++
+ .../docs/logs/CHS-P06-AG1-R1-reviewer-entry.json   |    9 +
+ .../docs/logs/CHS-P06-AG1-R1-reviewer-exit.json    |   17 +
+ .../phases/p06/docs/logs/CHS-P06-AG1-R2-input.json |   63 ++
+ .../docs/logs/CHS-P06-AG1-R2-reviewer-entry.json   |   10 +
+ .../docs/logs/CHS-P06-AG1-R2-reviewer-exit.json    |   12 +
+ .../docs/logs/CHS-P06-B1-R1-author-evidence.json   |  642 +++++++++++
+ .../phases/p06/docs/logs/CHS-P06-B1-R1-input.json  |  114 ++
+ .../docs/logs/CHS-P06-B1-R1-reviewer-coverage.json |   88 ++
+ .../docs/logs/CHS-P06-B1-R1-reviewer-entry.json    |   10 +
+ .../CHS-P06-B1-R1-reviewer-evidence-audit.json     |   23 +
+ .../p06/docs/logs/CHS-P06-B1-R1-reviewer-exit.json |   12 +
+ .../p06/docs/logs/CHS-P06-B1-R1-source.tar.gz      |  Bin 0 -> 321089 bytes
+ .../docs/logs/CHS-P06-B1-R2-author-evidence.json   |  697 ++++++++++++
+ .../phases/p06/docs/logs/CHS-P06-B1-R2-input.json  |  126 +++
+ .../docs/logs/CHS-P06-B1-R2-reviewer-entry.json    |   10 +
+ .../CHS-P06-B1-R2-reviewer-evidence-audit.json     |   27 +
+ .../p06/docs/logs/CHS-P06-B1-R2-reviewer-exit.json |   13 +
+ .../p06/docs/logs/CHS-P06-B1-R2-source.tar.gz      |  Bin 0 -> 330946 bytes
+ .../docs/logs/CHS-P06-B1-R3-author-evidence.json   |  835 ++++++++++++++
+ .../phases/p06/docs/logs/CHS-P06-B1-R3-input.json  |  121 +++
+ .../docs/logs/CHS-P06-B1-R3-reviewer-entry.json    |   10 +
+ .../CHS-P06-B1-R3-reviewer-evidence-audit.json     |   34 +
+ .../p06/docs/logs/CHS-P06-B1-R3-reviewer-exit.json |   13 +
+ .../p06/docs/logs/CHS-P06-B1-R3-source.tar.gz      |  Bin 0 -> 331962 bytes
+ .../phases/p06/docs/logs/CHS-P06-D1-r1.md          |   23 +
+ .../phases/p06/docs/logs/CHS-P06-D1-r2.md          |   31 +
+ .../p06/docs/logs/CHS-P06-root-acceptance.json     |   40 +
+ .../docs/logs/CHS-P06-root-gate-acceptance.json    |   11 +
+ .../docs/logs/CHS-P06-verification-outputs.json    |  144 +++
+ .../docs/logs/CHS-P06-verification-outputs.tar.gz  |  Bin 0 -> 179047 bytes
+ .../phases/p06/docs/logs/VERIFICATION-OUTPUTS.md   |    5 +
+ .../phases/p06/docs/logs/authoring-tests-01.json   |   25 +
+ .../phases/p06/docs/logs/authoring-tests-02.json   |   25 +
+ .../phases/p06/docs/logs/authoring-tests-03.json   |   25 +
+ .../phases/p06/docs/logs/authoring-tests-04.json   |   25 +
+ .../phases/p06/docs/logs/browser-protocols-01.json |   27 +
+ .../phases/p06/docs/logs/browser-protocols-02.json |   28 +
+ .../docs/logs/child-review-regression-red-01.json  |   25 +
+ .../phases/p06/docs/logs/clippy-01.json            |   26 +
+ .../p06/docs/logs/clippy-corrections-03.json       |   26 +
+ .../p06/docs/logs/clippy-corrections-04.json       |   26 +
+ .../phases/p06/docs/logs/clippy-final-02.json      |   26 +
+ .../phases/p06/docs/logs/clippy-nested-05.json     |   26 +
+ .../phases/p06/docs/logs/compile-final-01.json     |   23 +
+ .../phases/p06/docs/logs/compile-outcomes-01.json  |   22 +
+ .../phases/p06/docs/logs/compile-samples-01.json   |   23 +
+ .../phases/p06/docs/logs/compile-settings-01.json  |   22 +
+ .../docs/logs/concurrent-verification-work-01.json |   15 +
+ .../logs/continuation-regressions-green-01.json    |   25 +
+ .../logs/continuation-regressions-green-02.json    |   25 +
+ .../logs/continuation-regressions-green-03.json    |   25 +
+ .../logs/continuation-regressions-green-04.json    |   25 +
+ .../phases/p06/docs/logs/controls-tests-01.json    |   25 +
+ .../docs/logs/conversation-stream-tests-01.json    |   25 +
+ .../p06/docs/logs/conversation-tests-01.json       |   25 +
+ .../phases/p06/docs/logs/coordination-r18.md       |  144 +++
+ .../phases/p06/docs/logs/coordination-r19.md       |  150 +++
+ .../phases/p06/docs/logs/coordination-r20.md       |  156 +++
+ .../phases/p06/docs/logs/coordination-r21.md       |  161 +++
+ .../phases/p06/docs/logs/coordination-r22.md       |  166 +++
+ .../p06/docs/logs/create-main-isolation-01.json    |   22 +
+ .../p06/docs/logs/create-test-isolation-01.json    |   24 +
+ .../phases/p06/docs/logs/css-check-01.json         |   21 +
+ .../phases/p06/docs/logs/css-check-02.json         |   21 +
+ .../phases/p06/docs/logs/decision-browser-02.json  |   24 +
+ .../phases/p06/docs/logs/decision-browser-03.json  |   24 +
+ .../docs/logs/decision-browser-fixtures-01.json    |   27 +
+ .../phases/p06/docs/logs/fixtures-tests-01.json    |   25 +
+ .../p06/docs/logs/fmt-check-corrections-02.json    |   23 +
+ .../p06/docs/logs/fmt-check-corrections-03.json    |   23 +
+ .../phases/p06/docs/logs/fmt-check-final-01.json   |   23 +
+ .../phases/p06/docs/logs/fmt-check-nested-04.json  |   23 +
+ .../p06/docs/logs/fmt-correction-child-01.json     |   21 +
+ .../p06/docs/logs/fmt-correction-tests-01.json     |   21 +
+ .../p06/docs/logs/fmt-correction-tests-02.json     |   21 +
+ .../phases/p06/docs/logs/fmt-corrections-01.json   |   21 +
+ .../phases/p06/docs/logs/fmt-corrections-02.json   |   21 +
+ .../phases/p06/docs/logs/fmt-corrections-03.json   |   21 +
+ .../phases/p06/docs/logs/fmt-corrections-04.json   |   21 +
+ .../phases/p06/docs/logs/fmt-corrections-05.json   |   21 +
+ .../phases/p06/docs/logs/fmt-nested-fix-01.json    |   21 +
+ .../phases/p06/docs/logs/fmt-nested-fix-02.json    |   21 +
+ .../p06/docs/logs/fmt-nested-regression-01.json    |   21 +
+ .../phases/p06/docs/logs/fmt-write-01.json         |   20 +
+ .../phases/p06/docs/logs/fmt-write-02.json         |   20 +
+ .../phases/p06/docs/logs/fmt-write-03.json         |   20 +
+ .../phases/p06/docs/logs/fmt-write-04.json         |   20 +
+ .../phases/p06/docs/logs/fmt-write-05.json         |   21 +
+ .../p06/docs/logs/fmt-write-authoring-01.json      |   21 +
+ .../p06/docs/logs/fmt-write-example-tests-01.json  |   21 +
+ .../p06/docs/logs/fmt-write-examples-01.json       |   21 +
+ .../p06/docs/logs/fmt-write-final-source-01.json   |   21 +
+ .../phases/p06/docs/logs/fmt-write-focused-01.json |   21 +
+ .../phases/p06/docs/logs/fmt-write-native-01.json  |   21 +
+ .../phases/p06/docs/logs/fmt-write-native-02.json  |   21 +
+ .../phases/p06/docs/logs/fmt-write-native-03.json  |   21 +
+ .../phases/p06/docs/logs/fmt-write-review-01.json  |   21 +
+ .../phases/p06/docs/logs/fmt-write-runtime-01.json |   21 +
+ .../phases/p06/docs/logs/fmt-write-sample-01.json  |   21 +
+ .../phases/p06/docs/logs/fmt-write-sample-02.json  |   21 +
+ .../phases/p06/docs/logs/focused-inventory-01.json |   26 +
+ .../p06/docs/logs/formal-decision-tests-03.json    |   25 +
+ .../phases/p06/docs/logs/graft-build-02.json       |   20 +
+ .../phases/p06/docs/logs/graft-corrections-03.json |   20 +
+ .../phases/p06/docs/logs/graft-isolation-01.json   |   20 +
+ .../phases/p06/docs/logs/graft-nested-04.json      |   20 +
+ .../phases/p06/docs/logs/graph-tests-01.json       |   25 +
+ .../p06/docs/logs/http-authoring-tests-01.json     |   25 +
+ .../phases/p06/docs/logs/http-csrf-tests-02.json   |   25 +
+ .../p06/docs/logs/integration-preflight-01.json    |   17 +
+ .../phases/p06/docs/logs/isolation-export.json     |   90 ++
+ .../logs/later-question-regression-red-01.json     |   25 +
+ .../logs/later-question-regression-red-02.json     |   25 +
+ .../phases/p06/docs/logs/migrations-main-01.json   |   22 +
+ .../phases/p06/docs/logs/migrations-main-03.json   |   23 +
+ .../phases/p06/docs/logs/migrations-main-04.json   |   23 +
+ .../docs/logs/migrations-main-isolation-01.json    |   22 +
+ .../phases/p06/docs/logs/migrations-test-01.json   |   24 +
+ .../phases/p06/docs/logs/migrations-test-03.json   |   25 +
+ .../phases/p06/docs/logs/migrations-test-04.json   |   25 +
+ .../docs/logs/migrations-test-isolation-01.json    |   24 +
+ .../p06/docs/logs/native-reviewed-tests-03.json    |   25 +
+ .../p06/docs/logs/native-runtime-tests-01.json     |   25 +
+ .../p06/docs/logs/native-runtime-tests-02.json     |   25 +
+ .../p06/docs/logs/native-runtime-tests-03.json     |   25 +
+ .../logs/nested-review-regression-green-01.json    |   25 +
+ .../logs/nested-review-regression-green-02.json    |   25 +
+ .../docs/logs/nested-review-regression-red-01.json |   25 +
+ .../phases/p06/docs/logs/onboarding-tests-01.json  |   25 +
+ .../phases/p06/docs/logs/onboarding-tests-02.json  |   25 +
+ .../p06/docs/logs/prerequisite-main-push.json      |   11 +
+ .../phases/p06/docs/logs/privacy-tests-03.json     |   27 +
+ .../phases/p06/docs/logs/resources.json            |   18 +
+ .../phases/p06/docs/logs/response-browser-03.json  |   23 +
+ .../phases/p06/docs/logs/response-browser-04.json  |   23 +
+ .../phases/p06/docs/logs/run-check.py              |   40 +
+ .../phases/p06/docs/logs/run-views-tests-01.json   |   25 +
+ .../phases/p06/docs/logs/sample-boundary-01.json   |   20 +
+ .../p06/docs/logs/sample-boundary-tests-01.json    |   20 +
+ .../phases/p06/docs/logs/samples-tests-01.json     |   25 +
+ .../phases/p06/docs/logs/samples-tests-02.json     |   25 +
+ .../p06/docs/logs/source-browser-fixtures-01.json  |   27 +
+ .../phases/p06/docs/logs/sqlx-check-01.json        |   24 +
+ .../p06/docs/logs/sqlx-check-corrections-02.json   |   24 +
+ .../phases/p06/docs/logs/sqlx-check-nested-03.json |   24 +
+ .../p06/docs/logs/sqlx-migrations-main-02.json     |   23 +
+ .../p06/docs/logs/sqlx-migrations-test-02.json     |   25 +
+ .../phases/p06/docs/logs/sqlx-prepare-01.json      |   23 +
+ .../p06/docs/logs/sqlx-prepare-corrections-02.json |   23 +
+ .../p06/docs/logs/sqlx-prepare-nested-03.json      |   23 +
+ .../phases/p06/docs/logs/templates-tests-01.json   |   25 +
+ .../phases/p06/docs/logs/templates-tests-02.json   |   25 +
+ .../phases/p06/docs/logs/views-list-01.json        |   26 +
+ .../phases/p06/docs/logs/views-tests-01.json       |   26 +
+ .../phases/p06/docs/logs/views-tests-02.json       |   27 +
+ .../phases/p06/docs/logs/views-tests-03.json       |   25 +
+ .../phases/p06/docs/logs/views-tests-04.json       |   25 +
+ .../phases/p07/docs/HANDOFF.md                     |   31 +
+ .../phases/p07/docs/REVIEW.md                      |   11 +
+ .../phases/p07/docs/TASK.md                        |   53 +
+ .../phases/p07/docs/agent-review-findings.md       |    9 +
+ .../phases/p07/docs/agent-review-notes.md          |   23 +
+ .../docs/logs/CHS-P07-B1-R1-author-evidence.json   | 1143 ++++++++++++++++++++
+ .../phases/p07/docs/logs/CHS-P07-B1-R1-input.json  |  298 +++++
+ .../docs/logs/CHS-P07-B1-R1-reviewer-coverage.json |   21 +
+ .../docs/logs/CHS-P07-B1-R1-reviewer-entry.json    |   11 +
+ .../CHS-P07-B1-R1-reviewer-evidence-audit.json     |  251 +++++
+ .../logs/CHS-P07-B1-R1-reviewer-exit-check.json    |    4 +
+ .../p07/docs/logs/CHS-P07-B1-R1-reviewer-exit.json |   12 +
+ .../p07/docs/logs/CHS-P07-primary-integration.json |   13 +
+ .../p07/docs/logs/CHS-P07-root-acceptance.json     |   31 +
+ .../p07/docs/logs/CHS-P07-scoped-source.json       |   96 ++
+ .../p07/docs/logs/CHS-P07-scoped-source.tar.gz     |  Bin 0 -> 349714 bytes
+ .../p07/docs/logs/CHS-P07-staging-audit.json       |  427 ++++++++
+ .../docs/logs/CHS-P07-verification-outputs.json    |   60 +
+ .../docs/logs/CHS-P07-verification-outputs.tar.gz  |  Bin 0 -> 50661 bytes
+ .../phases/p07/docs/logs/VERIFICATION-OUTPUTS.md   |    5 +
+ .../phases/p07/docs/logs/browser-protocols-01.json |   25 +
+ .../p07/docs/logs/channel-family-list-01.json      |   26 +
+ .../p07/docs/logs/channel-family-runtime-01.json   |   25 +
+ .../phases/p07/docs/logs/clippy-final-01.json      |   26 +
+ .../phases/p07/docs/logs/coordination-r23.md       |  175 +++
+ .../phases/p07/docs/logs/coordination-r24.md       |  184 ++++
+ .../phases/p07/docs/logs/coordination-r25.md       |  191 ++++
+ .../phases/p07/docs/logs/coordination-r26.md       |  195 ++++
+ .../phases/p07/docs/logs/coordination-r27.md       |  199 ++++
+ .../phases/p07/docs/logs/coverage-map.md           |   20 +
+ .../phases/p07/docs/logs/css-final-01.json         |   21 +
+ .../phases/p07/docs/logs/diff-final-01.json        |   21 +
+ .../phases/p07/docs/logs/diff-final-02.json        |   21 +
+ .../phases/p07/docs/logs/e2e-list-01.json          |   26 +
+ .../phases/p07/docs/logs/e2e-list-02.json          |   26 +
+ .../phases/p07/docs/logs/e2e-list-03.json          |   26 +
+ .../phases/p07/docs/logs/e2e-list-04.json          |   26 +
+ .../phases/p07/docs/logs/e2e-list-final-01.json    |   26 +
+ .../phases/p07/docs/logs/e2e-list-final-02.json    |   26 +
+ .../phases/p07/docs/logs/e2e-list-final-03.json    |   26 +
+ .../phases/p07/docs/logs/e2e-runtime-01.json       |   25 +
+ .../phases/p07/docs/logs/e2e-runtime-final-01.json |   25 +
+ .../phases/p07/docs/logs/e2e-runtime-final-02.json |   25 +
+ .../phases/p07/docs/logs/e2e-runtime-final-03.json |   25 +
+ .../p07/docs/logs/evidence-available-01.json       |   23 +
+ .../docs/logs/evidence-validator-fixtures-01.json  |   22 +
+ .../phases/p07/docs/logs/external-adoption-01.json |   47 +
+ .../phases/p07/docs/logs/final-checks-01.json      |   10 +
+ .../phases/p07/docs/logs/final-checks-02.json      |   46 +
+ .../phases/p07/docs/logs/final-checks.py           |   22 +
+ .../phases/p07/docs/logs/fmt-final-01.json         |   23 +
+ .../phases/p07/docs/logs/graft-savings.json        |    6 +
+ .../phases/p07/docs/logs/graph-final-01.json       |   20 +
+ .../phases/p07/docs/logs/graph-final-02.json       |   20 +
+ .../p07/docs/logs/integration-preflight-02.json    |   45 +
+ .../p07/docs/logs/message-delivery-list-01.json    |   26 +
+ .../p07/docs/logs/message-delivery-runtime-01.json |   25 +
+ .../phases/p07/docs/logs/migrations-main-01.json   |   22 +
+ .../phases/p07/docs/logs/migrations-main-02.json   |   22 +
+ .../phases/p07/docs/logs/migrations-test-01.json   |   24 +
+ .../phases/p07/docs/logs/migrations-test-02.json   |   24 +
+ .../p07/docs/logs/nested-question-green-01.json    |   25 +
+ .../p07/docs/logs/nested-question-red-01.json      |   25 +
+ .../p07/docs/logs/nested-question-red-02.json      |   25 +
+ .../logs/primary-integration-preflight-03.json     |  331 ++++++
+ .../phases/p07/docs/logs/query-statistics-01.json  |   20 +
+ .../phases/p07/docs/logs/query-statistics.py       |   12 +
+ .../phases/p07/docs/logs/recovery-list-01.json     |   26 +
+ .../phases/p07/docs/logs/recovery-list-02.json     |   26 +
+ .../phases/p07/docs/logs/recovery-runtime-01.json  |   25 +
+ .../phases/p07/docs/logs/resources.json            |   18 +
+ .../p07/docs/logs/reviewed-email-list-01.json      |   26 +
+ .../p07/docs/logs/reviewed-email-list-02.json      |   26 +
+ .../p07/docs/logs/reviewed-email-runtime-01.json   |   25 +
+ .../p07/docs/logs/reviewed-email-runtime-02.json   |   25 +
+ .../phases/p07/docs/logs/run-check.py              |   40 +
+ .../phases/p07/docs/logs/run-shipping-check.py     |   12 +
+ .../p07/docs/logs/sample-boundary-final-01.json    |   20 +
+ .../p07/docs/logs/sample-boundary-fixtures-01.json |   20 +
+ .../phases/p07/docs/logs/shipping-clippy-01.json   |   27 +
+ .../phases/p07/docs/logs/shipping-e2e-list-01.json |   27 +
+ .../p07/docs/logs/shipping-e2e-runtime-01.json     |   26 +
+ .../p07/docs/logs/shipping-source-manifest.json    |  174 +++
+ .../phases/p07/docs/logs/source-modules-01.json    |   24 +
+ .../phases/p07/docs/logs/sqlx-check-final-01.json  |   24 +
+ .../p07/docs/logs/sqlx-prepare-final-01.json       |   23 +
+ scripts/check.sh                                   |    2 +-
+ scripts/tests/channel-response-authoring.mjs       |   67 ++
+ scripts/workflow-sample-boundary.py                |    4 +-
+ src/adapters/http/pages/tests.rs                   |    2 +
+ src/adapters/http/pages/thread_activity.rs         |    5 +-
+ .../http/pages/workflow_authoring/bindings.rs      |   83 +-
+ .../http/pages/workflow_authoring/catalogue.rs     |   10 +-
+ .../pages/workflow_authoring/channel_response.rs   |  109 ++
+ .../http/pages/workflow_authoring/graph.rs         |   14 +-
+ src/adapters/http/pages/workflow_authoring/mod.rs  |    2 +
+ .../http/pages/workflow_authoring/sample.rs        |   85 +-
+ .../http/pages/workflow_conversation_tests.rs      |    2 +
+ src/adapters/http/pages/workflow_runs/detail.rs    |   13 +
+ src/adapters/http/pages/workflow_runs/mod.rs       |    2 +
+ src/adapters/http/pages/workflow_runs/responses.rs |  144 +++
+ .../http/routes/ui_conversation_stream_tests.rs    |    2 +
+ src/adapters/http/routes/ui_stream_tests.rs        |    2 +
+ .../http/routes/workflows/channel_replies.rs       |  105 ++
+ src/adapters/http/routes/workflows/mod.rs          |    5 +
+ .../routes/workflows/ui/authoring/access_tests.rs  |    1 +
+ .../http/routes/workflows/ui/authoring/bindings.rs |   15 +-
+ .../workflows/ui/authoring/bindings_tests.rs       |    7 +-
+ .../workflows/ui/authoring/channel_response.rs     |  114 ++
+ .../ui/authoring/channel_response_tests.rs         |  227 ++++
+ .../http/routes/workflows/ui/authoring/mod.rs      |    6 +-
+ .../http/routes/workflows/ui/authoring/sample.rs   |   16 +
+ .../routes/workflows/ui/authoring/sample_tests.rs  |    2 +
+ .../http/routes/workflows/ui/runs/pages_tests.rs   |    1 +
+ src/adapters/persistence/onboarding/tests.rs       |   24 +-
+ src/adapters/persistence/thread_activity.rs        |   19 +-
+ .../autonomous_agent_sample_closure_tests.rs       |    2 +
+ src/adapters/persistence/workflow/channel_reply.rs |   54 +-
+ .../workflow/channel_reply_completion.rs           |    7 +
+ .../channel_reply_continuation_views_support.rs    |  411 +++++++
+ .../channel_reply_continuation_views_tests.rs      |  288 +++++
+ .../workflow/channel_reply_e2e_hitl_tests.rs       |  376 +++++++
+ .../workflow/channel_reply_e2e_recovery_tests.rs   |  133 +++
+ .../workflow/channel_reply_e2e_support.rs          |  224 ++++
+ .../workflow/channel_reply_e2e_tests.rs            |  312 ++++++
+ .../workflow/channel_reply_native_runtime_tests.rs |  117 ++
+ .../workflow/channel_reply_native_tests.rs         |  120 ++
+ .../workflow/channel_reply_publication_tests.rs    |    2 +
+ .../persistence/workflow/channel_reply_views.rs    |  199 ++++
+ .../persistence/workflow/channel_reply_views.sql   |   50 +
+ .../workflow/channel_reply_views_tests.rs          |  384 +++++++
+ .../persistence/workflow/mcp_agent_tests.rs        |    2 +-
+ .../persistence/workflow/message_ingress_tests.rs  |   41 +
+ src/adapters/persistence/workflow/mod.rs           |    1 +
+ src/adapters/persistence/workflow/provisioning.rs  |  167 +--
+ .../workflow/provisioning_dispatch_tests.rs        |    3 +
+ .../persistence/workflow/provisioning_native.rs    |  215 ++++
+ .../workflow/provisioning_runtime_tests.rs         |   41 +-
+ .../workflow/reviewed_delivery_tests.rs            |   12 +-
+ src/adapters/persistence/workflow/run_views.rs     |    4 +
+ .../workflow/sample_capture_bounds_tests.rs        |    2 +-
+ src/application/thread_activity.rs                 |    2 +
+ src/application/workflow/authoring/tests.rs        |    4 +-
+ src/application/workflow/channel_reply/examples.rs |   73 ++
+ src/application/workflow/channel_reply/mod.rs      |    3 +
+ src/application/workflow/channel_reply/outcomes.rs |  130 +++
+ .../workflow/fixtures/autonomous-response.yaml     |   17 +-
+ .../workflow/fixtures/reviewed-support.yaml        |   33 +-
+ src/application/workflow/fixtures/tests.rs         |    4 +-
+ src/application/workflow/provisioning.rs           |    9 +-
+ src/application/workflow/run_views.rs              |    2 +
+ .../workflow/sample/channel_reply_preview_tests.rs |  248 +++++
+ src/application/workflow/sample/definitions.rs     |   24 +-
+ src/application/workflow/sample/dispatch.rs        |    8 +-
+ src/application/workflow/sample/mod.rs             |   13 +-
+ src/application/workflow/sample/responses.rs       |   63 ++
+ src/application/workflow/sample/tests.rs           |    6 +
+ src/application/workflow/sample/types.rs           |   43 +
+ .../workflow/templates/agent_workflow.rs           |  123 ++-
+ .../workflow/templates/agent_workflow_tests.rs     |   61 +-
+ src/application/workflow/templates/catalogue.rs    |    6 +-
+ src/infra/workflow/services.rs                     |    6 +
+ 332 files changed, 17787 insertions(+), 289 deletions(-)
+ create mode 100644 plan/03-channel-handles-send/phases/p05/docs/logs/CHS-P05-main-push.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/HANDOFF.md
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/REVIEW.md
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/TASK.md
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/agent-review-findings.md
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/agent-review-notes.md
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/CHS-P06-AG1-R1-input.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/CHS-P06-AG1-R1-reviewer-entry.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/CHS-P06-AG1-R1-reviewer-exit.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/CHS-P06-AG1-R2-input.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/CHS-P06-AG1-R2-reviewer-entry.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/CHS-P06-AG1-R2-reviewer-exit.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/CHS-P06-B1-R1-author-evidence.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/CHS-P06-B1-R1-input.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/CHS-P06-B1-R1-reviewer-coverage.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/CHS-P06-B1-R1-reviewer-entry.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/CHS-P06-B1-R1-reviewer-evidence-audit.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/CHS-P06-B1-R1-reviewer-exit.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/CHS-P06-B1-R1-source.tar.gz
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/CHS-P06-B1-R2-author-evidence.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/CHS-P06-B1-R2-input.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/CHS-P06-B1-R2-reviewer-entry.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/CHS-P06-B1-R2-reviewer-evidence-audit.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/CHS-P06-B1-R2-reviewer-exit.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/CHS-P06-B1-R2-source.tar.gz
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/CHS-P06-B1-R3-author-evidence.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/CHS-P06-B1-R3-input.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/CHS-P06-B1-R3-reviewer-entry.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/CHS-P06-B1-R3-reviewer-evidence-audit.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/CHS-P06-B1-R3-reviewer-exit.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/CHS-P06-B1-R3-source.tar.gz
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/CHS-P06-D1-r1.md
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/CHS-P06-D1-r2.md
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/CHS-P06-root-acceptance.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/CHS-P06-root-gate-acceptance.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/CHS-P06-verification-outputs.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/CHS-P06-verification-outputs.tar.gz
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/VERIFICATION-OUTPUTS.md
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/authoring-tests-01.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/authoring-tests-02.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/authoring-tests-03.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/authoring-tests-04.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/browser-protocols-01.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/browser-protocols-02.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/child-review-regression-red-01.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/clippy-01.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/clippy-corrections-03.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/clippy-corrections-04.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/clippy-final-02.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/clippy-nested-05.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/compile-final-01.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/compile-outcomes-01.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/compile-samples-01.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/compile-settings-01.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/concurrent-verification-work-01.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/continuation-regressions-green-01.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/continuation-regressions-green-02.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/continuation-regressions-green-03.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/continuation-regressions-green-04.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/controls-tests-01.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/conversation-stream-tests-01.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/conversation-tests-01.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/coordination-r18.md
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/coordination-r19.md
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/coordination-r20.md
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/coordination-r21.md
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/coordination-r22.md
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/create-main-isolation-01.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/create-test-isolation-01.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/css-check-01.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/css-check-02.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/decision-browser-02.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/decision-browser-03.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/decision-browser-fixtures-01.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/fixtures-tests-01.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/fmt-check-corrections-02.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/fmt-check-corrections-03.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/fmt-check-final-01.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/fmt-check-nested-04.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/fmt-correction-child-01.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/fmt-correction-tests-01.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/fmt-correction-tests-02.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/fmt-corrections-01.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/fmt-corrections-02.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/fmt-corrections-03.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/fmt-corrections-04.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/fmt-corrections-05.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/fmt-nested-fix-01.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/fmt-nested-fix-02.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/fmt-nested-regression-01.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/fmt-write-01.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/fmt-write-02.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/fmt-write-03.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/fmt-write-04.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/fmt-write-05.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/fmt-write-authoring-01.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/fmt-write-example-tests-01.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/fmt-write-examples-01.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/fmt-write-final-source-01.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/fmt-write-focused-01.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/fmt-write-native-01.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/fmt-write-native-02.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/fmt-write-native-03.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/fmt-write-review-01.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/fmt-write-runtime-01.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/fmt-write-sample-01.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/fmt-write-sample-02.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/focused-inventory-01.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/formal-decision-tests-03.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/graft-build-02.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/graft-corrections-03.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/graft-isolation-01.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/graft-nested-04.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/graph-tests-01.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/http-authoring-tests-01.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/http-csrf-tests-02.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/integration-preflight-01.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/isolation-export.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/later-question-regression-red-01.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/later-question-regression-red-02.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/migrations-main-01.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/migrations-main-03.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/migrations-main-04.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/migrations-main-isolation-01.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/migrations-test-01.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/migrations-test-03.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/migrations-test-04.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/migrations-test-isolation-01.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/native-reviewed-tests-03.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/native-runtime-tests-01.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/native-runtime-tests-02.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/native-runtime-tests-03.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/nested-review-regression-green-01.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/nested-review-regression-green-02.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/nested-review-regression-red-01.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/onboarding-tests-01.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/onboarding-tests-02.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/prerequisite-main-push.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/privacy-tests-03.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/resources.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/response-browser-03.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/response-browser-04.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/run-check.py
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/run-views-tests-01.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/sample-boundary-01.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/sample-boundary-tests-01.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/samples-tests-01.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/samples-tests-02.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/source-browser-fixtures-01.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/sqlx-check-01.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/sqlx-check-corrections-02.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/sqlx-check-nested-03.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/sqlx-migrations-main-02.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/sqlx-migrations-test-02.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/sqlx-prepare-01.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/sqlx-prepare-corrections-02.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/sqlx-prepare-nested-03.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/templates-tests-01.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/templates-tests-02.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/views-list-01.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/views-tests-01.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/views-tests-02.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/views-tests-03.json
+ create mode 100644 plan/03-channel-handles-send/phases/p06/docs/logs/views-tests-04.json
+ create mode 100644 plan/03-channel-handles-send/phases/p07/docs/HANDOFF.md
+ create mode 100644 plan/03-channel-handles-send/phases/p07/docs/REVIEW.md
+ create mode 100644 plan/03-channel-handles-send/phases/p07/docs/TASK.md
+ create mode 100644 plan/03-channel-handles-send/phases/p07/docs/agent-review-findings.md
+ create mode 100644 plan/03-channel-handles-send/phases/p07/docs/agent-review-notes.md
+ create mode 100644 plan/03-channel-handles-send/phases/p07/docs/logs/CHS-P07-B1-R1-author-evidence.json
+ create mode 100644 plan/03-channel-handles-send/phases/p07/docs/logs/CHS-P07-B1-R1-input.json
+ create mode 100644 plan/03-channel-handles-send/phases/p07/docs/logs/CHS-P07-B1-R1-reviewer-coverage.json
+ create mode 100644 plan/03-channel-handles-send/phases/p07/docs/logs/CHS-P07-B1-R1-reviewer-entry.json
+ create mode 100644 plan/03-channel-handles-send/phases/p07/docs/logs/CHS-P07-B1-R1-reviewer-evidence-audit.json
+ create mode 100644 plan/03-channel-handles-send/phases/p07/docs/logs/CHS-P07-B1-R1-reviewer-exit-check.json
+ create mode 100644 plan/03-channel-handles-send/phases/p07/docs/logs/CHS-P07-B1-R1-reviewer-exit.json
+ create mode 100644 plan/03-channel-handles-send/phases/p07/docs/logs/CHS-P07-primary-integration.json
+ create mode 100644 plan/03-channel-handles-send/phases/p07/docs/logs/CHS-P07-root-acceptance.json
+ create mode 100644 plan/03-channel-handles-send/phases/p07/docs/logs/CHS-P07-scoped-source.json
+ create mode 100644 plan/03-channel-handles-send/phases/p07/docs/logs/CHS-P07-scoped-source.tar.gz
+ create mode 100644 plan/03-channel-handles-send/phases/p07/docs/logs/CHS-P07-staging-audit.json
+ create mode 100644 plan/03-channel-handles-send/phases/p07/docs/logs/CHS-P07-verification-outputs.json
+ create mode 100644 plan/03-channel-handles-send/phases/p07/docs/logs/CHS-P07-verification-outputs.tar.gz
+ create mode 100644 plan/03-channel-handles-send/phases/p07/docs/logs/VERIFICATION-OUTPUTS.md
+ create mode 100644 plan/03-channel-handles-send/phases/p07/docs/logs/browser-protocols-01.json
+ create mode 100644 plan/03-channel-handles-send/phases/p07/docs/logs/channel-family-list-01.json
+ create mode 100644 plan/03-channel-handles-send/phases/p07/docs/logs/channel-family-runtime-01.json
+ create mode 100644 plan/03-channel-handles-send/phases/p07/docs/logs/clippy-final-01.json
+ create mode 100644 plan/03-channel-handles-send/phases/p07/docs/logs/coordination-r23.md
+ create mode 100644 plan/03-channel-handles-send/phases/p07/docs/logs/coordination-r24.md
+ create mode 100644 plan/03-channel-handles-send/phases/p07/docs/logs/coordination-r25.md
+ create mode 100644 plan/03-channel-handles-send/phases/p07/docs/logs/coordination-r26.md
+ create mode 100644 plan/03-channel-handles-send/phases/p07/docs/logs/coordination-r27.md
+ create mode 100644 plan/03-channel-handles-send/phases/p07/docs/logs/coverage-map.md
+ create mode 100644 plan/03-channel-handles-send/phases/p07/docs/logs/css-final-01.json
+ create mode 100644 plan/03-channel-handles-send/phases/p07/docs/logs/diff-final-01.json
+ create mode 100644 plan/03-channel-handles-send/phases/p07/docs/logs/diff-final-02.json
+ create mode 100644 plan/03-channel-handles-send/phases/p07/docs/logs/e2e-list-01.json
+ create mode 100644 plan/03-channel-handles-send/phases/p07/docs/logs/e2e-list-02.json
+ create mode 100644 plan/03-channel-handles-send/phases/p07/docs/logs/e2e-list-03.json
+ create mode 100644 plan/03-channel-handles-send/phases/p07/docs/logs/e2e-list-04.json
+ create mode 100644 plan/03-channel-handles-send/phases/p07/docs/logs/e2e-list-final-01.json
+ create mode 100644 plan/03-channel-handles-send/phases/p07/docs/logs/e2e-list-final-02.json
+ create mode 100644 plan/03-channel-handles-send/phases/p07/docs/logs/e2e-list-final-03.json
+ create mode 100644 plan/03-channel-handles-send/phases/p07/docs/logs/e2e-runtime-01.json
+ create mode 100644 plan/03-channel-handles-send/phases/p07/docs/logs/e2e-runtime-final-01.json
+ create mode 100644 plan/03-channel-handles-send/phases/p07/docs/logs/e2e-runtime-final-02.json
+ create mode 100644 plan/03-channel-handles-send/phases/p07/docs/logs/e2e-runtime-final-03.json
+ create mode 100644 plan/03-channel-handles-send/phases/p07/docs/logs/evidence-available-01.json
+ create mode 100644 plan/03-channel-handles-send/phases/p07/docs/logs/evidence-validator-fixtures-01.json
+ create mode 100644 plan/03-channel-handles-send/phases/p07/docs/logs/external-adoption-01.json
+ create mode 100644 plan/03-channel-handles-send/phases/p07/docs/logs/final-checks-01.json
+ create mode 100644 plan/03-channel-handles-send/phases/p07/docs/logs/final-checks-02.json
+ create mode 100644 plan/03-channel-handles-send/phases/p07/docs/logs/final-checks.py
+ create mode 100644 plan/03-channel-handles-send/phases/p07/docs/logs/fmt-final-01.json
+ create mode 100644 plan/03-channel-handles-send/phases/p07/docs/logs/graft-savings.json
+ create mode 100644 plan/03-channel-handles-send/phases/p07/docs/logs/graph-final-01.json
+ create mode 100644 plan/03-channel-handles-send/phases/p07/docs/logs/graph-final-02.json
+ create mode 100644 plan/03-channel-handles-send/phases/p07/docs/logs/integration-preflight-02.json
+ create mode 100644 plan/03-channel-handles-send/phases/p07/docs/logs/message-delivery-list-01.json
+ create mode 100644 plan/03-channel-handles-send/phases/p07/docs/logs/message-delivery-runtime-01.json
+ create mode 100644 plan/03-channel-handles-send/phases/p07/docs/logs/migrations-main-01.json
+ create mode 100644 plan/03-channel-handles-send/phases/p07/docs/logs/migrations-main-02.json
+ create mode 100644 plan/03-channel-handles-send/phases/p07/docs/logs/migrations-test-01.json
+ create mode 100644 plan/03-channel-handles-send/phases/p07/docs/logs/migrations-test-02.json
+ create mode 100644 plan/03-channel-handles-send/phases/p07/docs/logs/nested-question-green-01.json
+ create mode 100644 plan/03-channel-handles-send/phases/p07/docs/logs/nested-question-red-01.json
+ create mode 100644 plan/03-channel-handles-send/phases/p07/docs/logs/nested-question-red-02.json
+ create mode 100644 plan/03-channel-handles-send/phases/p07/docs/logs/primary-integration-preflight-03.json
+ create mode 100644 plan/03-channel-handles-send/phases/p07/docs/logs/query-statistics-01.json
+ create mode 100644 plan/03-channel-handles-send/phases/p07/docs/logs/query-statistics.py
+ create mode 100644 plan/03-channel-handles-send/phases/p07/docs/logs/recovery-list-01.json
+ create mode 100644 plan/03-channel-handles-send/phases/p07/docs/logs/recovery-list-02.json
+ create mode 100644 plan/03-channel-handles-send/phases/p07/docs/logs/recovery-runtime-01.json
+ create mode 100644 plan/03-channel-handles-send/phases/p07/docs/logs/resources.json
+ create mode 100644 plan/03-channel-handles-send/phases/p07/docs/logs/reviewed-email-list-01.json
+ create mode 100644 plan/03-channel-handles-send/phases/p07/docs/logs/reviewed-email-list-02.json
+ create mode 100644 plan/03-channel-handles-send/phases/p07/docs/logs/reviewed-email-runtime-01.json
+ create mode 100644 plan/03-channel-handles-send/phases/p07/docs/logs/reviewed-email-runtime-02.json
+ create mode 100644 plan/03-channel-handles-send/phases/p07/docs/logs/run-check.py
+ create mode 100644 plan/03-channel-handles-send/phases/p07/docs/logs/run-shipping-check.py
+ create mode 100644 plan/03-channel-handles-send/phases/p07/docs/logs/sample-boundary-final-01.json
+ create mode 100644 plan/03-channel-handles-send/phases/p07/docs/logs/sample-boundary-fixtures-01.json
+ create mode 100644 plan/03-channel-handles-send/phases/p07/docs/logs/shipping-clippy-01.json
+ create mode 100644 plan/03-channel-handles-send/phases/p07/docs/logs/shipping-e2e-list-01.json
+ create mode 100644 plan/03-channel-handles-send/phases/p07/docs/logs/shipping-e2e-runtime-01.json
+ create mode 100644 plan/03-channel-handles-send/phases/p07/docs/logs/shipping-source-manifest.json
+ create mode 100644 plan/03-channel-handles-send/phases/p07/docs/logs/source-modules-01.json
+ create mode 100644 plan/03-channel-handles-send/phases/p07/docs/logs/sqlx-check-final-01.json
+ create mode 100644 plan/03-channel-handles-send/phases/p07/docs/logs/sqlx-prepare-final-01.json
+ create mode 100644 scripts/tests/channel-response-authoring.mjs
+ create mode 100644 src/adapters/http/pages/workflow_authoring/channel_response.rs
+ create mode 100644 src/adapters/http/pages/workflow_runs/responses.rs
+ create mode 100644 src/adapters/http/routes/workflows/channel_replies.rs
+ create mode 100644 src/adapters/http/routes/workflows/ui/authoring/channel_response.rs
+ create mode 100644 src/adapters/http/routes/workflows/ui/authoring/channel_response_tests.rs
+ create mode 100644 src/adapters/persistence/workflow/channel_reply_continuation_views_support.rs
+ create mode 100644 src/adapters/persistence/workflow/channel_reply_continuation_views_tests.rs
+ create mode 100644 src/adapters/persistence/workflow/channel_reply_e2e_hitl_tests.rs
+ create mode 100644 src/adapters/persistence/workflow/channel_reply_e2e_recovery_tests.rs
+ create mode 100644 src/adapters/persistence/workflow/channel_reply_e2e_support.rs
+ create mode 100644 src/adapters/persistence/workflow/channel_reply_e2e_tests.rs
+ create mode 100644 src/adapters/persistence/workflow/channel_reply_native_runtime_tests.rs
+ create mode 100644 src/adapters/persistence/workflow/channel_reply_native_tests.rs
+ create mode 100644 src/adapters/persistence/workflow/channel_reply_views.rs
+ create mode 100644 src/adapters/persistence/workflow/channel_reply_views.sql
+ create mode 100644 src/adapters/persistence/workflow/channel_reply_views_tests.rs
+ create mode 100644 src/adapters/persistence/workflow/provisioning_native.rs
+ create mode 100644 src/application/workflow/channel_reply/examples.rs
+ create mode 100644 src/application/workflow/channel_reply/outcomes.rs
+ create mode 100644 src/application/workflow/sample/channel_reply_preview_tests.rs
+ create mode 100644 src/application/workflow/sample/responses.rs
+Auto-merging migrations/20260817000000_init_schema.sql
+CONFLICT (content): Merge conflict in migrations/20260817000000_init_schema.sql
+Auto-merging src/adapters/persistence/workflow/channel_reply_completion.rs
+Auto-merging src/adapters/persistence/workflow/mod.rs
+Auto-merging src/adapters/persistence/workflow/provisioning_dispatch_tests.rs
+Not currently on any branch.
+Changes to be committed:
+  (use "git restore --staged <file>..." to unstage)
+	modified:   docs/deploy.md
+	modified:   plan/vault-google/README.md
+	modified:   src/adapters/http/app_state.rs
+	modified:   src/adapters/http/auth_admission.rs
+	modified:   src/adapters/http/pages/mcp.rs
+	modified:   src/adapters/http/pages/mod.rs
+	modified:   src/adapters/http/pages/profile.rs
+	modified:   src/adapters/http/routes/mod.rs
+	modified:   src/adapters/http/routes/ui_mcp.rs
+	modified:   src/adapters/http/security.rs
+	modified:   src/adapters/mod.rs
+	modified:   src/adapters/persistence/agent_publication/tests/http.rs
+	modified:   src/adapters/persistence/agent_publication/tests/mcp.rs
+	modified:   src/adapters/persistence/agent_publication/tests/support.rs
+	modified:   src/adapters/persistence/agent_publication/tools.rs
+	modified:   src/adapters/persistence/company.rs
+	modified:   src/adapters/persistence/company_invite.rs
+	modified:   src/adapters/persistence/credential_rotation.rs
+	modified:   src/adapters/persistence/credential_rotation_tests.rs
+	modified:   src/adapters/persistence/credentials/envelope.rs
+	modified:   src/adapters/persistence/mcp.rs
+	modified:   src/adapters/persistence/mod.rs
+	modified:   src/adapters/persistence/workflow/action_approval_http_tests.rs
+	modified:   src/adapters/persistence/workflow/agent_origin.rs
+	modified:   src/adapters/persistence/workflow/channel_reply_completion.rs
+	modified:   src/adapters/persistence/workflow/decision_authority_tests.rs
+	modified:   src/adapters/persistence/workflow/http.rs
+	modified:   src/adapters/persistence/workflow/http_publication.rs
+	modified:   src/adapters/persistence/workflow/http_runtime.rs
+	modified:   src/adapters/persistence/workflow/http_tests.rs
+	modified:   src/adapters/persistence/workflow/knowledge_history_race_tests.rs
+	modified:   src/adapters/persistence/workflow/mcp.rs
+	modified:   src/adapters/persistence/workflow/mcp_runtime.rs
+	modified:   src/adapters/persistence/workflow/mcp_test_support.rs
+	modified:   src/adapters/persistence/workflow/mcp_tests.rs
+	modified:   src/adapters/persistence/workflow/mod.rs
+	modified:   src/adapters/persistence/workflow/provisioning_dispatch_tests.rs
+	modified:   src/adapters/workflow_http/mod.rs
+	modified:   src/adapters/workflow_http/tests.rs
+	modified:   src/application/mod.rs
+	modified:   src/application/ports/mod.rs
+	modified:   src/application/use_cases/mcp.rs
+	modified:   src/application/use_cases/mod.rs
+	modified:   src/application/workflow/actions/contracts.rs
+	modified:   src/application/workflow/actions/tests.rs
+	modified:   src/application/workflow/http.rs
+	modified:   src/application/workflow/mcp_runtime.rs
+	modified:   src/domain/entities/mcp.rs
+	modified:   src/domain/mod.rs
+	modified:   src/infra/mod.rs
+	modified:   src/infra/setup.rs
+	modified:   src/infra/workflow.rs
+	modified:   src/lib.rs
+
+Unmerged paths:
+  (use "git restore --staged <file>..." to unstage)
+  (use "git add <file>..." to mark resolution)
+	both modified:   migrations/20260817000000_init_schema.sql
+
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+	plan/vault-google/COORDINATION.md
+	plan/vault-google/integration/
+	plan/vault-google/phases/
+	src/adapters/http/pages/vault.rs
+	src/adapters/http/routes/ui_vault.rs
+	src/adapters/http/routes/ui_vault/
+	src/adapters/http/routes/ui_vault_bindings.rs
+	src/adapters/http/routes/ui_vault_connect.rs
+	src/adapters/http/routes/ui_vault_connect/
+	src/adapters/http/routes/vault_binding_route_tests.rs
+	src/adapters/integrations/
+	src/adapters/persistence/integration_bindings.rs
+	src/adapters/persistence/integration_connect_authority.rs
+	src/adapters/persistence/integrations/
+	src/adapters/persistence/user_lifecycle.rs
+	src/adapters/persistence/workflow/integration_authority.rs
+	src/adapters/persistence/workflow/mcp_renewal_support.rs
+	src/adapters/persistence/workflow/vault_tests/
+	src/application/integrations/
+	src/application/ports/account_deletion.rs
+	src/application/use_cases/integration_binding.rs
+	src/domain/integrations/
+	src/infra/integrations.rs
+

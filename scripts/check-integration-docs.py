@@ -7,7 +7,7 @@ import sys
 root = Path(__file__).resolve().parents[1]
 errors = []
 documents = [root/'docs/vault-integrations.md', root/'docs/gmail-workflows.md',
-             root/'plan/vault-google/07-integration-verification-and-operations.md']
+             root/'plan/.archive/vault-google/07-integration-verification-and-operations.md']
 for file in documents:
     text = file.read_text()
     for target in re.findall(r'\[[^\]]+\]\(([^)]+)\)', text):
@@ -26,7 +26,7 @@ for file in sorted((root/'plan').rglob('*.md')):
         carriers.append(file)
         if f'"{file.relative_to(root).as_posix()}"' not in inventory:
             errors.append(f'{file.relative_to(root)}: reset notice missing from startup inventory')
-for file in (root/'plan/vault-google').glob('[0-9][0-9]-*.md'):
+for file in (root/'plan/.archive/vault-google').glob('[0-9][0-9]-*.md'):
     if '> **No backward compatibility.**' not in file.read_text(): errors.append(f'{file}: missing reset notice')
 
 docs = documents[0].read_text()

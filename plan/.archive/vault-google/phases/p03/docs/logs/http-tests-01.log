@@ -1,0 +1,29 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.20s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-048b7abd3ed0c794)
+
+running 21 tests
+test adapters::mcp::policy::tests::workflow_http_resolved_dns_rejects_any_prohibited_answer_and_rebinding ... ok
+test adapters::mcp::policy::tests::workflow_http_connector_uses_pinned_addresses_without_resolving_hostname_again ... ok
+test adapters::persistence::credential_rotation::tests::http_tests::workflow_http_rotation_stale_ciphertext_cannot_overwrite_normal_writer ... ok
+test adapters::persistence::credential_rotation::tests::http_tests::workflow_http_rotation_inventory_preserves_context_and_is_idempotent ... ok
+test adapters::persistence::workflow::tests::http_tests::authority_tests::workflow_http_admission_rechecks_bound_operation_after_activation ... ok
+test adapters::persistence::workflow::tests::http_tests::authority_tests::workflow_http_binding_checks_exact_selected_connection_contract ... ok
+test adapters::persistence::workflow::tests::http_tests::workflow_http_foreign_credential_fk_and_nonadmin_authority_fail_closed ... ok
+test adapters::persistence::workflow::tests::http_tests::workflow_http_publication_rejects_forged_policy_and_registration_revocation ... ok
+test adapters::persistence::workflow::tests::http_tests::workflow_http_crash_before_marker_retries_and_after_marker_reconciles ... ok
+test adapters::persistence::workflow::tests::http_tests::workflow_http_real_publication_admission_receipt_restart_and_competitors ... ok
+test adapters::persistence::workflow::tests::http_tests::workflow_http_registered_tool_and_direct_model_call_share_receipt ... ok
+test adapters::workflow_http::tests::workflow_http_default_denies_special_addresses_and_operator_scope_is_exact ... ok
+test adapters::workflow_http::tests::workflow_http_origin_and_request_authority_cannot_be_replaced ... ok
+test adapters::workflow_http::tests::workflow_http_pending_actual_request_is_dropped_on_cancellation ... ok
+test adapters::workflow_http::tests::workflow_http_redirect_errors_and_oversize_never_produce_receipts ... ok
+test adapters::workflow_http::tests::workflow_http_response_redacts_secret_and_sensitive_headers_before_output ... ok
+test adapters::workflow_http::tests::workflow_http_scalar_secret_echoes_are_redacted ... ok
+test adapters::persistence::workflow::tests::http_tests::workflow_http_remote_failure_remains_unknown_without_second_entry ... ok
+test adapters::persistence::workflow::tests::http_tests::workflow_http_secret_is_encrypted_scoped_and_revision_competitors_have_one_winner ... ok
+test adapters::persistence::workflow::tests::http_tests::workflow_http_current_revocation_and_protection_prevent_network ... ok
+test adapters::workflow_http::tests::workflow_http_stalled_body_hits_read_deadline ... ok
+
+test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 3229 filtered out; finished in 14.01s
+

@@ -1,0 +1,40 @@
+{
+  "status": "PUSHED_AND_VERIFIED",
+  "commit": "ace526fd8259ec53c5199ffa7555a1a99dcba58e",
+  "review": "AH-PUBLISH-B1-R1",
+  "source_digest": "b1f1194ed9a2672c731a7ee4c9a20861c9a386aa77bb39193afb1e925ea99d9a",
+  "targeted_tests_passed": 198,
+  "full_suite_run": false,
+  "push": {
+    "at": "2026-11-08T04:09:50.189118+00:00",
+    "commit": "ace526fd8259ec53c5199ffa7555a1a99dcba58e",
+    "remote_before": "0d32a33d385796b493313aba8455c110402e8e2a",
+    "remote_after": "ace526fd8259ec53c5199ffa7555a1a99dcba58e",
+    "origin_main": "ace526fd8259ec53c5199ffa7555a1a99dcba58e",
+    "push_exit": 0,
+    "nonforce": true,
+    "remote": "origin",
+    "ref": "refs/heads/main"
+  },
+  "primary": {
+    "at": "2026-11-08T04:10:08.242712+00:00",
+    "primary": "/Users/mac02/dev/openbot",
+    "branch": "main",
+    "head": "ace526fd8259ec53c5199ffa7555a1a99dcba58e",
+    "remote_main": "ace526fd8259ec53c5199ffa7555a1a99dcba58e",
+    "fast_forward_exit": 0,
+    "primary_inputs_preserved": 77,
+    "published_source_hashes_verified": 863,
+    "index_clean": true
+  },
+  "cleanup": {
+    "at": "2026-11-08T04:10:29.891591+00:00",
+    "owned_pid": 71251,
+    "other_client_backends": 0,
+    "pg_stop_exit": 0,
+    "data_directory_retained": "/private/tmp/openbot-chs-xb34mvy9/pgdata",
+    "databases_retained": true,
+    "worktrees_and_evidence_retained": true
+  },
+  "receipt_directory": "/private/var/folders/qc/f8s9x42x5sz6vbh79sb0cfth0000gn/T/openbot-history-publication-pc5qkluy"
+}

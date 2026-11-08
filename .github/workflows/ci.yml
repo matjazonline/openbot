@@ -69,6 +69,12 @@ jobs:
           python3 scripts/check-integration-docs.py
       - name: Fetch locked Rust dependencies
         run: cargo fetch --locked
+      - name: Workflow evidence retention
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: |
+          python3 scripts/tests/workflow-evidence.py
+          python3 scripts/check-workflow-evidence.py --tracked-manifests --require-tracked
       - name: Offline compilation
         run: cargo check --locked --offline --all-targets
       - name: Clippy
@@ -125,6 +131,8 @@ jobs:
           cargo test --locked --offline --lib vault_authoring_picker_is_owner_scoped_and_only_exposes_approved_metadata
           cargo test --locked --offline --lib vault_authoring_owner_forms_and_reconnect_states_emit_real_browser_markup
           node --test scripts/tests/vault-authoring-browser.mjs
+      - name: Rust source module reachability
+        run: cargo test --locked --offline --test source_modules
       - name: HTML rendering and team autocomplete browser protocol
         env:
           HTML_INJECTION_BROWSER_FIXTURES: /tmp/html-injection-browser

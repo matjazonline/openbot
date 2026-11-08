@@ -6,7 +6,7 @@ description: Implement an ordered directory of numbered plan phases with one Ast
 # Implement Plan Phases
 
 The user supplies a plan directory. Coordinate its implementation through
-`$implement-astra-reviewed-2.2`; keep phase authorship and independent review in
+`$implement-astra-reviewed-2-2`; keep phase authorship and independent review in
 that workflow. This skill owns phase ordering and the final verification gate.
 
 1. Resolve the plan directory and read its overview and repository instructions.
@@ -19,14 +19,14 @@ that workflow. This skill owns phase ordering and the final verification gate.
    `fork_turns: "none"` (or the host's equivalent). Give it this core prompt,
    substituting the resolved phase path:
 
-   > use $implement-astra-reviewed-2.2 to implement <phase-file> (you are Astra/high)
+   > use $implement-astra-reviewed-2-2 to implement <phase-file> (you are Astra/high)
 
    Also supply the plan directory, applicable `AGENTS.md` paths, existing
    authorizations, and these boundaries: implement only this phase; use targeted
    tests for its changed behavior and affected interfaces; record commands,
    results, and executed-test counts; leave the full suite to the coordinator
    after all phases. The phase agent handles its own independent reviewer under
-   `$implement-astra-reviewed-2.2`. Do not replace that review with coordinator
+   `$implement-astra-reviewed-2-2`. Do not replace that review with coordinator
    self-review. The phase agent need not ask the user about the final suite;
    this invocation already authorizes it.
 3. Wait for the phase agent to finish. Check its durable phase records and review

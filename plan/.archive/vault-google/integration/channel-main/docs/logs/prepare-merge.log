@@ -1,0 +1,58 @@
+Preparing worktree (detached HEAD 4ab45555)
+Updating files:  88% (7237/8213)Updating files:  89% (7310/8213)Updating files:  90% (7392/8213)Updating files:  91% (7474/8213)Updating files:  92% (7556/8213)Updating files:  93% (7639/8213)Updating files:  94% (7721/8213)Updating files:  95% (7803/8213)Updating files:  96% (7885/8213)Updating files:  97% (7967/8213)Updating files:  98% (8049/8213)Updating files:  99% (8131/8213)Updating files: 100% (8213/8213)Updating files: 100% (8213/8213), done.
+HEAD is now at 4ab45555 Complete channel response authoring and end-to-end integration
+Applied patch to 'docs/deploy.md' cleanly.
+Applied patch to 'migrations/20260817000000_init_schema.sql' with conflicts.
+Applied patch to 'plan/vault-google/README.md' cleanly.
+Applied patch to 'src/adapters/http/app_state.rs' cleanly.
+Applied patch to 'src/adapters/http/auth_admission.rs' cleanly.
+Applied patch to 'src/adapters/http/pages/mcp.rs' cleanly.
+Applied patch to 'src/adapters/http/pages/mod.rs' cleanly.
+Applied patch to 'src/adapters/http/pages/profile.rs' cleanly.
+Applied patch to 'src/adapters/http/routes/mod.rs' cleanly.
+Applied patch to 'src/adapters/http/routes/ui_mcp.rs' cleanly.
+Applied patch to 'src/adapters/http/security.rs' cleanly.
+Applied patch to 'src/adapters/mod.rs' cleanly.
+Applied patch to 'src/adapters/persistence/agent_publication/tests/http.rs' cleanly.
+Applied patch to 'src/adapters/persistence/agent_publication/tests/mcp.rs' cleanly.
+Applied patch to 'src/adapters/persistence/agent_publication/tests/support.rs' cleanly.
+Applied patch to 'src/adapters/persistence/agent_publication/tools.rs' cleanly.
+Applied patch to 'src/adapters/persistence/company.rs' cleanly.
+Applied patch to 'src/adapters/persistence/company_invite.rs' cleanly.
+Applied patch to 'src/adapters/persistence/credential_rotation.rs' cleanly.
+Applied patch to 'src/adapters/persistence/credential_rotation_tests.rs' cleanly.
+Applied patch to 'src/adapters/persistence/credentials/envelope.rs' cleanly.
+Applied patch to 'src/adapters/persistence/mcp.rs' cleanly.
+Applied patch to 'src/adapters/persistence/mod.rs' cleanly.
+Applied patch to 'src/adapters/persistence/workflow/action_approval_http_tests.rs' cleanly.
+Applied patch to 'src/adapters/persistence/workflow/agent_origin.rs' cleanly.
+Applied patch to 'src/adapters/persistence/workflow/channel_reply_completion.rs' cleanly.
+Applied patch to 'src/adapters/persistence/workflow/decision_authority_tests.rs' cleanly.
+Applied patch to 'src/adapters/persistence/workflow/http.rs' cleanly.
+Applied patch to 'src/adapters/persistence/workflow/http_publication.rs' cleanly.
+Applied patch to 'src/adapters/persistence/workflow/http_runtime.rs' cleanly.
+Applied patch to 'src/adapters/persistence/workflow/http_tests.rs' cleanly.
+Applied patch to 'src/adapters/persistence/workflow/knowledge_history_race_tests.rs' cleanly.
+Applied patch to 'src/adapters/persistence/workflow/mcp.rs' cleanly.
+Applied patch to 'src/adapters/persistence/workflow/mcp_runtime.rs' cleanly.
+Applied patch to 'src/adapters/persistence/workflow/mcp_test_support.rs' cleanly.
+Applied patch to 'src/adapters/persistence/workflow/mcp_tests.rs' cleanly.
+Applied patch to 'src/adapters/persistence/workflow/mod.rs' cleanly.
+Applied patch to 'src/adapters/persistence/workflow/provisioning_dispatch_tests.rs' cleanly.
+Applied patch to 'src/adapters/workflow_http/mod.rs' cleanly.
+Applied patch to 'src/adapters/workflow_http/tests.rs' cleanly.
+Applied patch to 'src/application/mod.rs' cleanly.
+Applied patch to 'src/application/ports/mod.rs' cleanly.
+Applied patch to 'src/application/use_cases/mcp.rs' cleanly.
+Applied patch to 'src/application/use_cases/mod.rs' cleanly.
+Applied patch to 'src/application/workflow/actions/contracts.rs' cleanly.
+Applied patch to 'src/application/workflow/actions/tests.rs' cleanly.
+Applied patch to 'src/application/workflow/http.rs' cleanly.
+Applied patch to 'src/application/workflow/mcp_runtime.rs' cleanly.
+Applied patch to 'src/domain/entities/mcp.rs' cleanly.
+Applied patch to 'src/domain/mod.rs' cleanly.
+Applied patch to 'src/infra/mod.rs' cleanly.
+Applied patch to 'src/infra/setup.rs' cleanly.
+Applied patch to 'src/infra/workflow.rs' cleanly.
+Applied patch to 'src/lib.rs' cleanly.
+U migrations/20260817000000_init_schema.sql

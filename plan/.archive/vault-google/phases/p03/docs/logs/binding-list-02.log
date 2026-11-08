@@ -1,0 +1,11 @@
+   Compiling open_bots v0.1.0 (/Users/mac02/.codex/worktrees/1133/openbot)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2m 35s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-048b7abd3ed0c794)
+adapters::persistence::workflow::tests::http_tests::integration_authority_tests::vault_binding_cap_competing_creators_reconfirmation_and_pagination: test
+adapters::persistence::workflow::tests::http_tests::integration_authority_tests::vault_binding_database_rejects_partial_sources_and_cross_owner_references: test
+adapters::persistence::workflow::tests::http_tests::integration_authority_tests::vault_binding_member_removal_readdition_repeated_teardown_and_owner_unbind: test
+adapters::persistence::workflow::tests::http_tests::integration_authority_tests::vault_binding_missing_consent_destination_and_shape_denials_are_non_mutating: test
+adapters::persistence::workflow::tests::http_tests::integration_authority_tests::vault_binding_owner_confirmation_and_admin_cannot_use_another_owners_account: test
+adapters::persistence::workflow::tests::http_tests::integration_authority_tests::vault_binding_same_private_account_has_separate_http_and_mcp_grants: test
+
+6 tests, 0 benchmarks

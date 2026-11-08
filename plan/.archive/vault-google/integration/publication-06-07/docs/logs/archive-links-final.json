@@ -1,0 +1,291 @@
+{
+  "count": 57,
+  "links": [
+    {
+      "file": "plan/.archive/vault-google/05-token-resolution-and-refresh.md",
+      "target": "03-connection-bindings-and-authority.md",
+      "exists": true
+    },
+    {
+      "file": "plan/.archive/vault-google/05-token-resolution-and-refresh.md",
+      "target": "04-google-authorization.md",
+      "exists": true
+    },
+    {
+      "file": "plan/.archive/vault-google/02-vault-storage-and-management.md",
+      "target": "01-contracts-and-ownership.md",
+      "exists": true
+    },
+    {
+      "file": "plan/.archive/vault-google/04-google-authorization.md",
+      "target": "02-vault-storage-and-management.md",
+      "exists": true
+    },
+    {
+      "file": "plan/.archive/vault-google/07-integration-verification-and-operations.md",
+      "target": "../../../.github/workflows/ci.yml",
+      "exists": true
+    },
+    {
+      "file": "plan/.archive/vault-google/README.md",
+      "target": "../../../docs/vault-integrations.md",
+      "exists": true
+    },
+    {
+      "file": "plan/.archive/vault-google/README.md",
+      "target": "phases/p07/docs/REVIEW.md",
+      "exists": true
+    },
+    {
+      "file": "plan/.archive/vault-google/README.md",
+      "target": "integration/publication-06-07/docs/REVIEW.md",
+      "exists": true
+    },
+    {
+      "file": "plan/.archive/vault-google/README.md",
+      "target": "01-contracts-and-ownership.md",
+      "exists": true
+    },
+    {
+      "file": "plan/.archive/vault-google/README.md",
+      "target": "02-vault-storage-and-management.md",
+      "exists": true
+    },
+    {
+      "file": "plan/.archive/vault-google/README.md",
+      "target": "03-connection-bindings-and-authority.md",
+      "exists": true
+    },
+    {
+      "file": "plan/.archive/vault-google/README.md",
+      "target": "04-google-authorization.md",
+      "exists": true
+    },
+    {
+      "file": "plan/.archive/vault-google/README.md",
+      "target": "05-token-resolution-and-refresh.md",
+      "exists": true
+    },
+    {
+      "file": "plan/.archive/vault-google/README.md",
+      "target": "06-workflow-integration-and-authoring.md",
+      "exists": true
+    },
+    {
+      "file": "plan/.archive/vault-google/README.md",
+      "target": "07-integration-verification-and-operations.md",
+      "exists": true
+    },
+    {
+      "file": "plan/.archive/vault-google/README.md",
+      "target": "../../../docs/vault-integrations.md",
+      "exists": true
+    },
+    {
+      "file": "plan/.archive/vault-google/README.md",
+      "target": "../../../docs/gmail-workflows.md",
+      "exists": true
+    },
+    {
+      "file": "plan/.archive/vault-google/README.md",
+      "target": "../../../src/adapters/http/routes/user.rs",
+      "exists": true
+    },
+    {
+      "file": "plan/.archive/vault-google/README.md",
+      "target": "../../../src/infra/config.rs",
+      "exists": true
+    },
+    {
+      "file": "plan/.archive/vault-google/README.md",
+      "target": "../../../src/adapters/persistence/credentials/envelope.rs",
+      "exists": true
+    },
+    {
+      "file": "plan/.archive/vault-google/README.md",
+      "target": "../../../src/adapters/persistence/credential_rotation.rs",
+      "exists": true
+    },
+    {
+      "file": "plan/.archive/vault-google/README.md",
+      "target": "../../../src/adapters/persistence/workflow/http.rs",
+      "exists": true
+    },
+    {
+      "file": "plan/.archive/vault-google/README.md",
+      "target": "../../../src/adapters/workflow_http/mod.rs",
+      "exists": true
+    },
+    {
+      "file": "plan/.archive/vault-google/README.md",
+      "target": "../../../src/adapters/persistence/workflow/mcp.rs",
+      "exists": true
+    },
+    {
+      "file": "plan/.archive/vault-google/README.md",
+      "target": "../../../src/adapters/persistence/AGENTS.md",
+      "exists": true
+    },
+    {
+      "file": "plan/.archive/vault-google/README.md",
+      "target": "07-integration-verification-and-operations.md",
+      "exists": true
+    },
+    {
+      "file": "plan/.archive/vault-google/03-connection-bindings-and-authority.md",
+      "target": "02-vault-storage-and-management.md",
+      "exists": true
+    },
+    {
+      "file": "plan/.archive/vault-google/06-workflow-integration-and-authoring.md",
+      "target": "05-token-resolution-and-refresh.md",
+      "exists": true
+    },
+    {
+      "file": "docs/vault-integrations.md",
+      "target": "gmail-workflows.md",
+      "exists": true
+    },
+    {
+      "file": "docs/vault-integrations.md",
+      "target": "../scripts/credential-key-rotation.sh",
+      "exists": true
+    },
+    {
+      "file": "docs/vault-integrations.md",
+      "target": "../plan/.archive/vault-google/07-integration-verification-and-operations.md",
+      "exists": true
+    },
+    {
+      "file": "docs/vault-integrations.md",
+      "target": "../.github/workflows/ci.yml",
+      "exists": true
+    },
+    {
+      "file": "docs/gmail-workflows.md",
+      "target": "vault-integrations.md",
+      "exists": true
+    },
+    {
+      "file": "docs/gmail-workflows.md",
+      "target": "../samples/gmail-read-prepare.json",
+      "exists": true
+    },
+    {
+      "file": "docs/gmail-workflows.md",
+      "target": "../samples/gmail-reviewed-send.json",
+      "exists": true
+    },
+    {
+      "file": "plan/cloudroom-local/README.md",
+      "target": "01-contracts-and-cloudroom-compatibility.md",
+      "exists": true
+    },
+    {
+      "file": "plan/cloudroom-local/README.md",
+      "target": "02-company-machines-and-pairing.md",
+      "exists": true
+    },
+    {
+      "file": "plan/cloudroom-local/README.md",
+      "target": "03-outbound-connection-and-durable-protocol.md",
+      "exists": true
+    },
+    {
+      "file": "plan/cloudroom-local/README.md",
+      "target": "04-cloudroom-plugin-and-session-recovery.md",
+      "exists": true
+    },
+    {
+      "file": "plan/cloudroom-local/README.md",
+      "target": "05-openbot-management-and-workflows.md",
+      "exists": true
+    },
+    {
+      "file": "plan/cloudroom-local/README.md",
+      "target": "06-local-setup-and-operations.md",
+      "exists": true
+    },
+    {
+      "file": "plan/cloudroom-local/README.md",
+      "target": "07-integration-and-verification.md",
+      "exists": true
+    },
+    {
+      "file": "plan/cloudroom-local/README.md",
+      "target": "../tenant-owned-execution-backends.md",
+      "exists": true
+    },
+    {
+      "file": "plan/cloudroom-local/README.md",
+      "target": "../.archive/vault-google/README.md",
+      "exists": true
+    },
+    {
+      "file": "plan/doop-canvas/README.md",
+      "target": "../fix-file-access/README.md",
+      "exists": true
+    },
+    {
+      "file": "plan/doop-canvas/README.md",
+      "target": "01-contracts-and-company-setup.md",
+      "exists": true
+    },
+    {
+      "file": "plan/doop-canvas/README.md",
+      "target": "02-company-mcp-connections.md",
+      "exists": true
+    },
+    {
+      "file": "plan/doop-canvas/README.md",
+      "target": "03-workflow-and-agent-authoring.md",
+      "exists": true
+    },
+    {
+      "file": "plan/doop-canvas/README.md",
+      "target": "04-results-and-human-access.md",
+      "exists": true
+    },
+    {
+      "file": "plan/doop-canvas/README.md",
+      "target": "05-operations-and-lifecycle.md",
+      "exists": true
+    },
+    {
+      "file": "plan/doop-canvas/README.md",
+      "target": "06-integration-and-verification.md",
+      "exists": true
+    },
+    {
+      "file": "plan/doop-canvas/README.md",
+      "target": "../../src/domain/entities/mcp.rs",
+      "exists": true
+    },
+    {
+      "file": "plan/doop-canvas/README.md",
+      "target": "../../src/application/use_cases/mcp.rs",
+      "exists": true
+    },
+    {
+      "file": "plan/doop-canvas/README.md",
+      "target": "../../src/adapters/mcp/mod.rs",
+      "exists": true
+    },
+    {
+      "file": "plan/doop-canvas/README.md",
+      "target": "../../src/adapters/persistence/workflow/mcp.rs",
+      "exists": true
+    },
+    {
+      "file": "plan/doop-canvas/README.md",
+      "target": "../../src/application/workflow/mcp.rs",
+      "exists": true
+    },
+    {
+      "file": "plan/doop-canvas/README.md",
+      "target": "../.archive/vault-google/README.md",
+      "exists": true
+    }
+  ],
+  "broken": []
+}

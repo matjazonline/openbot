@@ -1,0 +1,108 @@
+    Checking open_bots v0.1.0 (/Users/mac02/.codex/worktrees/1133/openbot)
+error[E0061]: this function takes 4 arguments but 3 arguments were supplied
+   --> src/adapters/http/routes/vault_management_tests.rs:251:9
+    |
+251 |           detail(
+    |  _________^^^^^^-
+252 | |             State(f.gateway.clone()),
+253 | |             foreign.clone(),
+254 | |             Path(id.as_uuid())
+255 | |         )
+    | |_________- argument #4 of type `axum::extract::Query<GrantQuery>` is missing
+    |
+note: function defined here
+   --> src/adapters/http/routes/ui_vault.rs:109:10
+    |
+109 | async fn detail(
+    |          ^^^^^^
+...
+113 |     Query(query): Query<GrantQuery>,
+    |     -------------------------------
+help: provide the argument
+    |
+251 |         detail(
+252 |             State(f.gateway.clone()),
+253 |             foreign.clone(),
+254 ~             Path(id.as_uuid()),
+255 +             /* axum::extract::Query<GrantQuery> */,
+    |
+
+warning: methods `grant_metadata` and `final_dispatch_guard` are never used
+   --> src/adapters/persistence/integrations/grants.rs:121:25
+    |
+114 | impl PostgresVault {
+    | ------------------ methods in this implementation
+...
+121 |     pub(crate) async fn grant_metadata(&self, id: UseGrantId) -> IntegrationResult<UseGrant> {
+    |                         ^^^^^^^^^^^^^^
+...
+211 |     pub(crate) async fn final_dispatch_guard(
+    |                         ^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: struct `CurrentGate` is never constructed
+   --> src/adapters/persistence/integrations/grants.rs:289:8
+    |
+289 | struct CurrentGate<'a> {
+    |        ^^^^^^^^^^^
+
+warning: struct `IntegrationResource` is never constructed
+   --> src/adapters/persistence/workflow/integration_authority.rs:120:8
+    |
+120 | struct IntegrationResource(BindingKind);
+    |        ^^^^^^^^^^^^^^^^^^^
+
+warning: struct `NoLocal` is never constructed
+   --> src/adapters/persistence/workflow/integration_authority.rs:134:8
+    |
+134 | struct NoLocal;
+    |        ^^^^^^^
+
+warning: struct `HostDispatchAuthority` is never constructed
+   --> src/adapters/persistence/workflow/integration_authority.rs:148:8
+    |
+148 | struct HostDispatchAuthority {
+    |        ^^^^^^^^^^^^^^^^^^^^^
+
+warning: method `current` is never used
+   --> src/adapters/persistence/workflow/integration_authority.rs:156:14
+    |
+155 | impl HostDispatchAuthority {
+    | -------------------------- method in this implementation
+156 |     async fn current(&self, tx: &mut Transaction<'_, Postgres>) -> AppResult<FrozenAction> {
+    |              ^^^^^^^
+
+warning: function `host_error` is never used
+   --> src/adapters/persistence/workflow/integration_authority.rs:257:4
+    |
+257 | fn host_error(error: AppError) -> integration::IntegrationError {
+    |    ^^^^^^^^^^
+
+warning: function `digest` is never used
+   --> src/adapters/persistence/workflow/integration_authority.rs:266:4
+    |
+266 | fn digest(value: &str) -> AppResult<[u8; 32]> {
+    |    ^^^^^^
+
+warning: method `prepare_integration_invocation` is never used
+   --> src/adapters/persistence/workflow/integration_authority.rs:279:25
+    |
+278 | impl PostgresPersistence {
+    | ------------------------ method in this implementation
+279 |     pub(crate) async fn prepare_integration_invocation(
+    |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: field `authority` is never read
+   --> src/application/integrations/execution.rs:103:16
+    |
+102 | pub struct ExecutionContext {
+    |            ---------------- field in this struct
+103 |     pub(crate) authority: std::sync::Arc<dyn DispatchAuthority>,
+    |                ^^^^^^^^^
+    |
+    = note: `ExecutionContext` has a derived impl for the trait `Clone`, but this is intentionally ignored during dead code analysis
+
+warning: `open_bots` (lib) generated 10 warnings
+For more information about this error, try `rustc --explain E0061`.
+error: could not compile `open_bots` (lib test) due to 1 previous error

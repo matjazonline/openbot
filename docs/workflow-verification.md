@@ -99,7 +99,7 @@ belong in plan03 phase records. A test name in this map alone is not passing evi
 
 History verification uses fresh PostgreSQL fixtures and targeted test filters. Naming a test here
 is not a claim of release acceptance; current commands, failures, rechecks and immutable evidence
-are in `plan/04-autonomous-agent-history/phases/`. No full-suite run is implied by these focused checks.
+are in `plan/.archived/04-autonomous-agent-history/phases/`. No full-suite run is implied by these focused checks.
 
 - `agent_history_views_`: native pages reach the actual last exchange, one selected source is
   outside the first 16-item page, private other-admin access matches current Inspect, restricted

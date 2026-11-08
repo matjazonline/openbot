@@ -1,0 +1,16 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+adapters::persistence::integrations::connect_tests::provider::google_oauth_cancellation_reaches_active_request_and_never_writes_account: test
+adapters::persistence::integrations::connect_tests::provider::google_oauth_invalid_client_distinct: test
+adapters::persistence::integrations::connect_tests::provider::google_oauth_malformed_response_sanitized: test
+adapters::persistence::integrations::connect_tests::provider::google_oauth_missing_refresh_refused: test
+adapters::persistence::integrations::connect_tests::provider::google_oauth_oversized_response_refused: test
+adapters::persistence::integrations::connect_tests::provider::google_oauth_partial_permissions_refused: test
+adapters::persistence::integrations::connect_tests::provider::google_oauth_personal_and_workspace_identities_supported: test
+adapters::persistence::integrations::connect_tests::provider::google_oauth_registered_url_state_pkce_and_private_metadata: test
+adapters::persistence::integrations::connect_tests::provider::google_oauth_short_lifetime_refused: test
+adapters::persistence::integrations::connect_tests::provider::google_oauth_unverified_mailbox_refused: test
+adapters::persistence::integrations::connect_tests::provider::google_oauth_user_denial_distinct: test
+adapters::persistence::integrations::connect_tests::provider::google_oauth_workspace_admin_block_distinct: test
+adapters::persistence::integrations::connect_tests::provider::google_oauth_wrong_token_type_refused: test
+
+13 tests, 0 benchmarks

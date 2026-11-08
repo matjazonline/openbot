@@ -1,0 +1,15 @@
+{
+  "status": "accepted for publication",
+  "review_pass": "VG-PUB67-B1-R1",
+  "digest": "b0ae9af5c07980a42dac601855f7998facb8c431e8b978f8df8980dd7823f02a",
+  "coordination_checked": 25,
+  "head": "83b493e203e43bbd956f47326e17ee407b4dcc96",
+  "review_base": "22c94cf6fcb9d7bcce14eda2a59df58223699e7f",
+  "exclusions": [
+    "plan/.archive/vault-google/COORDINATION.md",
+    "plan/.archive/vault-google/integration/publication-06-07/docs"
+  ],
+  "runtime_sql_unchanged": true,
+  "release_action": "pending authorized commit/push/remote verification",
+  "time_utc": "2026-11-08T14:27:10.105257+00:00"
+}

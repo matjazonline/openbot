@@ -107,7 +107,7 @@ from Openbot's existing published `Agent` entity; this does not replace native `
 
 This plan supersedes the retired reverse OpenCode tunnel sketch for
 company-owned local execution. It is separate from [tenant-owned custom tool execution](../tenant-owned-execution-backends.md),
-which sends individual scripts to a cloud provider, and from [app credential integrations](../vault-google/README.md).
+which sends individual scripts to a cloud provider, and from [app credential integrations](../.archive/vault-google/README.md).
 Neither unrelated implementation is a prerequisite, and their credentials are not copied locally.
 
 ## Source baseline and verification status

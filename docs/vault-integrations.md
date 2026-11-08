@@ -207,7 +207,7 @@ Before enabling a production `RemoteIntegrationGateway`:
 
 Run with explicit disposable `DATABASE_URL` and `TEST_DATABASE_URL`,
 `SQLX_OFFLINE=true`, and `ALLOW_MISSING_DATABASE_URL` unset. Never aim tests at a
-development/production database. The plan's [database setup and command inventory](../plan/vault-google/07-integration-verification-and-operations.md)
+development/production database. The plan's [database setup and command inventory](../plan/.archive/vault-google/07-integration-verification-and-operations.md)
 and [CI](../.github/workflows/ci.yml) cover provisioning and broader checks.
 
 ```sh

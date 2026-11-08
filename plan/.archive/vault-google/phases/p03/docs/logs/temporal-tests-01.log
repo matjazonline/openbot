@@ -1,0 +1,33 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+   Compiling open_bots v0.1.0 (/Users/mac02/.codex/worktrees/1133/openbot)
+error[E0308]: mismatched types
+   --> src/adapters/persistence/workflow/integration_authority.rs:255:71
+    |
+255 |             || super::lease::live_window(&mut tx, self.request.fence, std::time::Instant::now())
+    |                -------------------------                              ^^^^^^^^^^^^^^^^^^^^^^^^^ expected `tokio::time::Instant`, found `std::time::Instant`
+    |                |
+    |                arguments to this function are incorrect
+    |
+    = note: `std::time::Instant` and `tokio::time::Instant` have similar names, but are actually distinct types
+note: `std::time::Instant` is defined in crate `std`
+   --> /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/time.rs:157:0
+note: `tokio::time::Instant` is defined in crate `tokio`
+   --> /Users/mac02/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.50.0/src/time/instant.rs:34:1
+    |
+ 34 | pub struct Instant {
+    | ^^^^^^^^^^^^^^^^^^
+note: function defined here
+   --> src/adapters/persistence/workflow/lease.rs:324:21
+    |
+324 | pub(super) async fn live_window(
+    |                     ^^^^^^^^^^^
+...
+327 |     started: Instant,
+    |     ----------------
+help: call `Into::into` on this expression to convert `std::time::Instant` into `tokio::time::Instant`
+    |
+255 |             || super::lease::live_window(&mut tx, self.request.fence, std::time::Instant::now().into())
+    |                                                                                                +++++++
+
+For more information about this error, try `rustc --explain E0308`.
+error: could not compile `open_bots` (lib test) due to 1 previous error

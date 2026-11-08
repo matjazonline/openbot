@@ -1,0 +1,13 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+adapters::persistence::integrations::connect_tests::lifecycle::google_vault_callback_competing_distinct_attempts_never_overwrite_authorization: test
+adapters::persistence::integrations::connect_tests::lifecycle::google_vault_callback_competing_same_attempt_exchanges_once: test
+adapters::persistence::integrations::connect_tests::lifecycle::google_vault_callback_deletion_wins_delayed_reconnect: test
+adapters::persistence::integrations::connect_tests::lifecycle::google_vault_callback_disconnect_wins_delayed_reconnect: test
+adapters::persistence::integrations::connect_tests::lifecycle::google_vault_callback_logout_wins_delayed_reconnect: test
+adapters::persistence::integrations::connect_tests::lifecycle::google_vault_callback_owner_retirement_erases_pending_verifiers: test
+adapters::persistence::integrations::connect_tests::lifecycle::google_vault_callback_reconnect_preserves_missing_refresh_only_for_intended_identity: test
+adapters::persistence::integrations::connect_tests::provider::google_vault_callback_verified_mailbox_differs_from_login_and_replay_denies: test
+adapters::persistence::integrations::connect_tests::temporal::google_vault_callback_session_expiry_during_module_lock_denies: test
+adapters::persistence::integrations::connect_tests::temporal::google_vault_callback_session_valid_during_module_lock_succeeds: test
+
+10 tests, 0 benchmarks

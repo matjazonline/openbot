@@ -1,0 +1,12 @@
+$ cargo test --locked --offline --lib vault_authority_
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.20s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-048b7abd3ed0c794)
+
+running 4 tests
+test application::integrations::tests::authority_tests::vault_authority_matrix_requires_owner_confirmation_and_current_company_authority ... ok
+test application::integrations::tests::authority_tests::vault_authority_deterministic_and_scheduled_steps_require_explicit_grant ... ok
+test application::integrations::tests::authority_tests::vault_authority_stale_status_binding_namespace_and_versions_deny ... ok
+test application::integrations::tests::authority_tests::vault_authority_host_port_denial_propagates ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 3059 filtered out; finished in 0.00s
+

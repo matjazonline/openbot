@@ -1,0 +1,45 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+   Compiling open_bots v0.1.0 (/Users/mac02/.codex/worktrees/1133/openbot)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 58.19s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-048b7abd3ed0c794)
+
+running 36 tests
+test adapters::persistence::integrations::connect_tests::bounds::integration_connect_cap_has_real_competing_creators ... ok
+test adapters::persistence::integrations::connect_tests::bounds::integration_connect_required_host_cannot_skip_atomic_finalizer ... ok
+test adapters::persistence::integrations::connect_tests::bounds::integration_connect_expiry_erases_verifier_and_cannot_complete ... ok
+test adapters::persistence::integrations::connect_tests::bounds::integration_connect_ciphertext_context_substitution_fails_and_consumes_material ... ok
+test adapters::persistence::integrations::connect_tests::bounds::integration_connect_retains_only_bounded_terminal_outcomes ... ok
+test adapters::persistence::integrations::connect_tests::bounds::integration_connect_static_api_key_uses_registered_account_lifecycle_without_redirect ... ok
+test adapters::persistence::integrations::connect_tests::bounds::integration_connect_wrong_browser_provider_purpose_signature_and_apps_deny ... ok
+test adapters::persistence::integrations::connect_tests::bounds::integration_connect_unavailable_key_cannot_exchange_or_restore_verifier ... ok
+test adapters::persistence::integrations::connect_tests::bounds::vault_rotation_connect_attempt_competes_with_consumption_without_resurrecting_pkce ... ok
+test adapters::persistence::integrations::connect_tests::lifecycle::google_vault_callback_broader_consent_requires_reconnect_and_invalidates_old_grants ... ok
+test adapters::persistence::integrations::connect_tests::lifecycle::google_vault_callback_competing_distinct_attempts_never_overwrite_authorization ... ok
+test adapters::persistence::integrations::connect_tests::lifecycle::google_vault_callback_competing_same_attempt_exchanges_once ... ok
+test adapters::persistence::integrations::connect_tests::lifecycle::google_vault_callback_deletion_wins_delayed_reconnect ... ok
+test adapters::persistence::integrations::connect_tests::lifecycle::google_vault_callback_disconnect_wins_delayed_reconnect ... ok
+test adapters::persistence::integrations::connect_tests::lifecycle::google_vault_callback_logout_wins_delayed_reconnect ... ok
+test adapters::persistence::integrations::connect_tests::lifecycle::google_vault_callback_owner_retirement_erases_pending_verifiers ... ok
+test adapters::persistence::integrations::connect_tests::lifecycle::google_vault_callback_reconnect_preserves_missing_refresh_only_for_intended_identity ... ok
+test adapters::persistence::integrations::connect_tests::lifecycle::google_vault_callback_user_deletion_wins_delayed_reconnect ... ok
+test adapters::persistence::integrations::connect_tests::provider::google_oauth_cancellation_reaches_active_request_and_never_writes_account ... ok
+test adapters::persistence::integrations::connect_tests::provider::google_oauth_invalid_client_distinct ... ok
+test adapters::persistence::integrations::connect_tests::provider::google_oauth_malformed_response_sanitized ... ok
+test adapters::persistence::integrations::connect_tests::provider::google_oauth_missing_refresh_refused ... ok
+test adapters::persistence::integrations::connect_tests::provider::google_oauth_oversized_response_refused ... ok
+test adapters::persistence::integrations::connect_tests::provider::google_oauth_partial_permissions_refused ... ok
+test adapters::persistence::integrations::connect_tests::provider::google_oauth_registered_url_state_pkce_and_private_metadata ... ok
+test adapters::persistence::integrations::connect_tests::provider::google_oauth_short_lifetime_refused ... ok
+test adapters::persistence::integrations::connect_tests::provider::google_oauth_unverified_mailbox_refused ... ok
+test adapters::persistence::integrations::connect_tests::provider::google_oauth_personal_and_workspace_identities_supported ... ok
+test adapters::persistence::integrations::connect_tests::provider::google_oauth_user_denial_distinct ... ok
+test adapters::persistence::integrations::connect_tests::provider::google_oauth_workspace_admin_block_distinct ... ok
+test adapters::persistence::integrations::connect_tests::provider::google_oauth_wrong_token_type_refused ... ok
+test adapters::persistence::integrations::connect_tests::provider::google_vault_callback_verified_mailbox_differs_from_login_and_replay_denies ... ok
+test adapters::persistence::integrations::connect_tests::temporal::google_vault_callback_session_valid_during_module_lock_succeeds ... ok
+test adapters::persistence::integrations::connect_tests::workspace::integration_connect_workspace_identity_needs_neither_email_nor_refresh_token ... ok
+test adapters::persistence::integrations::connect_tests::temporal::google_vault_callback_expiry_cancels_account_write_wait_without_partial_account ... ok
+test adapters::persistence::integrations::connect_tests::temporal::google_vault_callback_session_expiry_during_module_lock_denies ... ok
+
+test result: ok. 36 passed; 0 failed; 0 ignored; 0 measured; 3261 filtered out; finished in 13.94s
+

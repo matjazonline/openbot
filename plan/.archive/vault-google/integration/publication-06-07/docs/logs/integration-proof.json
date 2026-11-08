@@ -1,0 +1,11 @@
+{
+  "accepted_source": "83b493e203e43bbd956f47326e17ee407b4dcc96",
+  "main": "22c94cf6fcb9d7bcce14eda2a59df58223699e7f",
+  "changed_runtime_files_vs_accepted": [
+    "src/main.rs"
+  ],
+  "unchanged_runtime": "All other accepted source and SQL files byte identical",
+  "ci_steps_from_both_parents_retained": true,
+  "archive_links": "archive-link-check.json:53 current links resolve",
+  "schema_sqlx": "unchanged"
+}

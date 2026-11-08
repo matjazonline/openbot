@@ -1,0 +1,61 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.20s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-048b7abd3ed0c794)
+
+running 53 tests
+test adapters::http::routes::ui_vault::tests::vault_management_errors_and_html_escape_labels_and_keep_secret_inputs_blank ... ok
+test adapters::http::routes::ui_vault::tests::vault_management_real_session_origin_body_limit_and_owner_override_rejection ... ok
+test adapters::http::routes::ui_vault::tests::vault_management_owner_crud_stale_revision_foreign_ids_and_no_readback ... ok
+test adapters::persistence::integrations::tests::cache_update_tests::vault_storage_cache_updates_preserve_each_providers_authorization_facts ... ok
+test adapters::persistence::integrations::tests::cache_update_tests::vault_storage_sql_required_json_fields_cannot_evaluate_to_null ... ok
+test adapters::http::routes::ui_vault_bindings::tests::vault_binding_browser_consent_is_authenticated_csrf_protected_bounded_and_one_shot ... ok
+test adapters::persistence::agent_publication::tests::http::vault_binding_agent_publication_refuses_an_integration_http_source ... ok
+test adapters::persistence::agent_publication::tests::mcp::vault_binding_agent_publication_refuses_an_integration_mcp_source ... ok
+test adapters::persistence::integrations::tests::lifecycle_tests::vault_storage_durable_owner_teardown_restart_competitors_and_no_resurrection ... ok
+test adapters::persistence::integrations::tests::lifecycle_tests::vault_storage_host_company_membership_and_user_deletion_preserve_other_accounts ... ok
+test adapters::persistence::integrations::tests::lifecycle_tests::vault_storage_supervised_teardown_shutdown_cancels_pool_acquisition ... ok
+test adapters::persistence::integrations::tests::lifecycle_tests::vault_storage_supervised_teardown_shutdown_cancels_actual_database_work ... ok
+test adapters::persistence::integrations::tests::rotation_tests::vault_rotation_inventory_keysets_reconnect_rows_and_retirement ... ok
+test adapters::persistence::integrations::tests::rotation_tests::vault_rotation_real_managed_cache_write_defeats_waiting_stale_cas ... ok
+test adapters::persistence::integrations::tests::storage_tests::vault_storage_cap_serializes_real_same_owner_creators ... ok
+test adapters::persistence::integrations::tests::storage_tests::vault_storage_constraints_substitution_and_malformed_encrypted_json_fail_closed ... ok
+test adapters::persistence::integrations::tests::storage_tests::vault_storage_envelope_identity_and_context_specific_bounds ... ok
+test adapters::persistence::integrations::tests::storage_tests::vault_storage_host_consumers_do_not_read_module_tables ... ok
+test adapters::persistence::integrations::tests::storage_tests::vault_storage_managed_identity_ignores_config_aliases_and_static_edits_deny ... ok
+test adapters::persistence::integrations::tests::storage_tests::vault_storage_owner_namespaces_keys_and_competing_replacements ... ok
+test adapters::persistence::integrations::tests::storage_tests::vault_storage_roundtrip_replace_disconnect_delete_and_redaction ... ok
+test adapters::persistence::integrations::tests::rotation_tests::vault_rotation_real_owner_replacement_defeats_waiting_stale_cas ... ok
+test adapters::persistence::integrations::tests::rotation_tests::vault_rotation_unavailable_key_blocks_convergence_without_plaintext_fallback ... ok
+test adapters::persistence::workflow::tests::http_tests::vault_tests::authority::vault_dispatch_authority_host_cannot_skip_or_substitute_the_module_callback ... ok
+test adapters::persistence::workflow::tests::http_tests::approval_tests::vault_approval_tests::vault_dispatch_authority_approval_is_required_and_cannot_authorize_a_rebound_account ... ok
+test adapters::persistence::workflow::tests::http_tests::vault_tests::authority::vault_dispatch_authority_real_persisted_fence_and_exact_invocation_are_required ... ok
+test adapters::persistence::workflow::tests::http_tests::vault_tests::authority::vault_dispatch_authority_revoke_competes_before_the_final_check_and_sends_nothing ... ok
+test adapters::persistence::workflow::tests::http_tests::vault_tests::authority::vault_dispatch_authority_replacement_and_rebind_cannot_reuse_frozen_action ... ok
+test adapters::persistence::workflow::tests::http_tests::vault_tests::bindings::vault_binding_cap_competing_creators_reconfirmation_and_pagination ... ok
+test adapters::persistence::integrations::tests::lifecycle_tests::vault_storage_teardown_poison_full_batch_backoff_restart_and_terminal_failure ... ok
+test adapters::persistence::workflow::tests::http_tests::vault_tests::bindings::vault_binding_company_teardown_preserves_other_real_company_grants_and_private_account ... ok
+test adapters::persistence::workflow::tests::http_tests::vault_tests::bindings::vault_binding_database_rejects_partial_sources_and_cross_owner_references ... ok
+test adapters::persistence::workflow::tests::http_tests::vault_tests::bindings::vault_binding_member_removal_readdition_repeated_teardown_and_owner_unbind ... ok
+test adapters::persistence::workflow::tests::http_tests::vault_tests::bindings::vault_binding_missing_consent_destination_and_shape_denials_are_non_mutating ... ok
+test adapters::persistence::workflow::tests::http_tests::vault_tests::bindings::vault_binding_owner_confirmation_and_admin_cannot_use_another_owners_account ... ok
+test adapters::persistence::workflow::tests::http_tests::vault_tests::bindings::vault_binding_proposal_cap_competing_creators_and_expiry_pruning ... ok
+test adapters::persistence::workflow::tests::http_tests::vault_tests::bindings::vault_binding_same_private_account_has_separate_http_and_mcp_grants ... ok
+test adapters::persistence::workflow::tests::http_tests::vault_tests::membership_race::vault_binding_membership_revocation_covers_consent_created_while_delete_waits ... ok
+test adapters::persistence::workflow::tests::http_tests::vault_tests::policies::vault_binding_old_proposal_cannot_confirm_changed_app_policy_or_destination ... ok
+test adapters::persistence::workflow::tests::http_tests::vault_tests::policies::vault_dispatch_authority_direct_http_tools_and_foreign_binding_cannot_mint_context ... ok
+test adapters::persistence::workflow::tests::http_tests::vault_tests::policies::vault_dispatch_authority_policy_changes_require_fresh_owner_consent ... ok
+test application::integrations::tests::authority_tests::vault_authority_deterministic_and_scheduled_steps_require_explicit_grant ... ok
+test application::integrations::tests::authority_tests::vault_authority_host_port_denial_propagates ... ok
+test application::integrations::tests::authority_tests::vault_authority_matrix_requires_owner_confirmation_and_current_company_authority ... ok
+test application::integrations::tests::authority_tests::vault_authority_stale_status_binding_namespace_and_versions_deny ... ok
+test application::integrations::tests::vault_contract_identifier_and_page_bounds_survive_deserialization ... ok
+test application::integrations::tests::vault_contract_managed_scope_and_aggregate_bounds ... ok
+test application::integrations::tests::vault_contract_metadata_is_bounded_and_has_no_credential_fields ... ok
+test application::integrations::tests::vault_contract_revision_table_separates_refresh_rewrap_and_authorization ... ok
+test application::integrations::tests::vault_contract_static_credential_bound_is_aggregate_and_inclusive ... ok
+test adapters::persistence::workflow::tests::mcp_tests::vault_authority_tests::vault_dispatch_authority_generic_mcp_tool_cannot_borrow_a_workflow_run ... ok
+test adapters::persistence::workflow::tests::mcp_tests::vault_authority_tests::vault_binding_mcp_definition_edits_preserve_the_confirmed_source_and_refuse_substitution ... ok
+test adapters::persistence::workflow::tests::mcp_tests::vault_authority_tests::vault_dispatch_authority_mcp_uses_the_real_step_and_fence_without_exposing_a_token ... ok
+
+test result: ok. 53 passed; 0 failed; 0 ignored; 0 measured; 3200 filtered out; finished in 11.67s
+
