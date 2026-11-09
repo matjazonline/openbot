@@ -23,7 +23,10 @@ agent tool call, using the existing worker, child, and wait lifecycle.
 4. Commit invocation snapshot, thread/source context, target scope, child run/first job, child wait,
    response ownership, and parent park atomically. Roll back all of them on refusal or lease loss.
    Child provenance remains `ChildCause::ToolCall`; having a source message is not message ingress.
-5. Preserve parent deadline, tree depth/child count, continuation count, correlation, simulation
+5. Set the child's deadline to the earlier of the parent's and the call's own; the child-deadline
+   test (`workflow_child_timeout_fails_child_and_reaches_parent_error_route`,
+   `src/adapters/persistence/workflow/child_runtime_tests.rs:451`) gains the shorter case.
+   Preserve tree depth/child count, continuation count, correlation, simulation
    delivery restrictions, and knowledge bounds. Reject a destination channel already present in
    the active channel-call ancestry, including direct self-calls. Separate later calls after a
    completed invocation remain valid; no global blacklist or time-based deduplication.

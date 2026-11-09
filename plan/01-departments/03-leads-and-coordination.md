@@ -46,12 +46,18 @@ is a plain team desk they read. Continues in [04](04-ui-and-docs.md).
    `departments: Vec<DepartmentRef { id, name, slug, roles: Vec<DepartmentRole> }>` and the entry's
    default desk address, so an agent lead can address a member without a separate lookup. The
    directory's paging key is unchanged. The directory tool's description tells the model that a
-   department's members are the agents listing that department.
+   department's members are the agents listing that department. `DepartmentRef` also carries the
+   charter, and a run admitted on a department desk gets the owning department's name and charter
+   in its `agent.run` system context, after the agent's own prompt, so members and leads see the
+   same framing without a memory lookup.
 2. Dispatch is `message.send` (`src/application/workflow/registry/actions.rs:158`) to the member's
    desk address over the internal relay. The member's own desk binding runs the member and replies;
    reply correlation offers the answer to the waiting run
    (`application/workflow/message_admission.rs`). Nothing new is needed for a lead that dispatches
-   and waits for replies. Add the sample
+   and waits for replies. Once `channel.call` lands, the lead fixture switches to it: the call
+   returns a typed closure (`done`, `denied`, `handed_off`) and takes a per-call deadline, which
+   is what makes a dispatch an owned piece of work rather than a message
+   ([agent-workflow-call](../agent-workflow-call/README.md), contract decisions). Add the sample
    `src/application/workflow/fixtures/department-lead.yaml`: `context.history` → `agent.run`
    with a prompt that says to use the directory and send to members → `reply`. It is a fixture
    for tests and for the authoring sample list, not a hardcoded base; the base stays

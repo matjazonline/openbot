@@ -42,7 +42,14 @@ step may still name an agent. The role form adds a second way to fill the slot, 
 5. **Reviewers become principals.** `workflow_decision_reviewers` and the `decision.human`
    `reviewers` input move from user ids to principal ids, so a role that resolves to person
    principals plugs in without translation. Agent principals are still refused as reviewers.
-6. **Publication freezes the requirement, not the holder.** The compiled version records which
+6. **Escalation is a binding option, not a prompt.** A department desk's binding may say "on
+   failure or expiry, notify the `lead`"; a second expiry goes one hop up. It rides on the existing
+   wait sweeper and child terminal handling. Authored error routes still take precedence.
+7. **A parked human decision may follow its role.** Per `decision.human` step, opt in to
+   re-resolving role-derived reviewers while the step is parked. The artifact under review is
+   unchanged, so this is reassignment, not re-admission. It closes the reviewer-reassignment gap
+   in `plan/todo.md`.
+8. **Publication freezes the requirement, not the holder.** The compiled version records which
    steps name which roles and in which mode (`AgentUseMode`), the same way it records agent
    references. Capability checks that today run at publication against the pinned agent run at
    admission against the resolved agent, with the same rules.
@@ -62,4 +69,5 @@ step may still name an agent. The role form adds a second way to fill the slot, 
 1. [Role references and publication](01-role-references-and-publication.md).
 2. [Admission resolution and run snapshots](02-admission-resolution-and-snapshots.md).
 3. [Reviewers as principals and authoring UI](03-reviewers-and-ui.md).
-4. [Integration and final verification](04-integration-and-final-verification.md).
+4. [Escalation and reassignment](04-escalation-and-reassignment.md).
+5. [Integration and final verification](05-integration-and-final-verification.md).

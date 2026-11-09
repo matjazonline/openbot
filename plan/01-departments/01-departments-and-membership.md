@@ -18,7 +18,8 @@ Edit `migrations/20260817000000_init_schema.sql` in place, next to `channels` (`
 
 1. `departments`:
    - `id uuid`, `company_id uuid`, `name text`, `slug citext`, `description text`,
-     `parent_id uuid`, `created_by jsonb`, `created_at`.
+     `parent_id uuid`, `charter text` (at most 4 KiB, `octet_length` check), `created_by jsonb`,
+     `created_at`.
    - `departments_name_not_blank` and `departments_slug_format`, the same shape as
      `agents_name_not_blank` and `agents_slug_format` (`:3469`), so a department slug is a legal
      channel slug and can be the department desk's address.
@@ -49,7 +50,8 @@ Edit `migrations/20260817000000_init_schema.sql` in place, next to `channels` (`
 ## Batch 01B Domain and persistence
 
 1. `src/domain/entities/department.rs`: `Department { id, company_id, name, slug: DepartmentSlug,
-   description, parent_id, created_by, created_at }`, `DepartmentId` and `DepartmentSlug` newtypes
+   description, charter, parent_id, created_by, created_at }`, `DepartmentId` and `DepartmentSlug`
+   newtypes
    beside `ChannelSlug`, `DepartmentRole` with the single variant `Lead` and `as_str`/`FromStr`
    like `GrantProvenance`, `DepartmentRoleHolder { role, principal_id }`, and `DepartmentWrite`
    with `normalize()` (trimmed name, lowercased slug, same validation as `ChannelWrite`).

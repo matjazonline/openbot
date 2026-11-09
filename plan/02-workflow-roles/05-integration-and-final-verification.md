@@ -1,4 +1,4 @@
-# 04 Integration and final verification
+# 05 Integration and final verification
 
 > **No backward compatibility.** We don't need backward compatibility and will reset the database
 > when needed. Do not add data backfills, dual reads/writes, legacy decoders, compatibility shims,
@@ -7,7 +7,8 @@
 ## Order
 
 [01](01-role-references-and-publication.md), then [02](02-admission-resolution-and-snapshots.md),
-then [03](03-reviewers-and-ui.md). The standard operating procedures plan's role contract
+then [03](03-reviewers-and-ui.md), then [04](04-escalation-and-reassignment.md). The standard
+operating procedures plan's role contract
 (`plan/standard-operating-procedures/01-shared-contracts-and-workflow-integration.md`, batch A
 item 3) is satisfied by this plan's `DepartmentRole`; update that plan to reference it instead of
 defining a second role key.
@@ -37,6 +38,7 @@ Update `docs/workflow-language-v1.md`, `docs/workflow-operations.md` (admission 
 | 01 focused checks (source, publication, binding) | Pending |
 | 02 focused checks (resolver, admission, competing) | Pending |
 | 03 focused checks (reviewers, role reviewers, rendering) | Pending |
+| 04 focused checks (escalation ladder, parked reassignment) | Pending |
 | Formatting, offline compilation, clippy and reachability | Pending |
 | Fresh migrations and SQLx metadata | Pending |
 | Database-backed full suite and network isolation | Pending |

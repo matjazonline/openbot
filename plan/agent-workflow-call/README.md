@@ -4,7 +4,9 @@
 > when needed. Do not add data backfills, dual reads/writes, legacy decoders, compatibility shims,
 > or staged rollouts for existing data.
 
-Status: proposed implementation, 2026-11-08. These documents do not implement the feature.
+Status: proposed implementation, 2026-11-08; amended 2026-11-09 with a closure envelope and a
+per-call deadline so department leads can use the call as their dispatch primitive
+([01-departments](../01-departments/README.md)). These documents do not implement the feature.
 
 ## Intended behavior
 
@@ -60,6 +62,13 @@ knowledge, and agent authority are checked on each invocation.
   message for the call. Do not reuse the caller's thread or read unrelated target-channel history.
   Channel visibility still governs the stored request; perform content/audience checks before
   storing it. Private agent history remains a child branch.
+- **Closure says why.** A `replied` result carries a closure: `done`, `denied` with a bounded
+  reason, or `handed_off` with the run id the destination delegated to. The destination's response
+  contract produces it; a child that declines completes successfully at the run level and closes
+  as `denied` at the work level. The caller never has to infer refusal from prose.
+- **A call may carry its own deadline.** Optional, and it must be earlier than the parent run's
+  deadline; the child's deadline is the earlier of the two. Expiry is the existing typed deadline
+  error. A lead can therefore give a member less time than its own run has left.
 - **Return through the pending tool call.** Do not enqueue ordinary message ingress, observer
   runs, or automatic email delivery. Human review and human-input waits keep their normal gates;
   review notifications are distinct from automatically publishing the final channel response.

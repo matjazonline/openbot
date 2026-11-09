@@ -15,8 +15,9 @@ desk belongs to; documentation describes departments and uses the word desk. Con
 1. Add `CompanyTab::Departments` (`src/adapters/http/pages/company_settings.rs:19`) and its pane,
    following the list-and-pane shape of `company_settings_body` (`:308`) and the channel settings
    page (`pages/channel_settings.rs`). The pane shows the tree (indented by parent), and for the
-   selected department: name, slug, description, parent, role holders, members, owned desks.
-2. Forms: create (name, slug, description, parent, lead), edit, delete, add member, remove
+   selected department: name, slug, description, charter, parent, role holders, members, owned
+   desks.
+2. Forms: create (name, slug, description, charter, parent, lead), edit, delete, add member, remove
    member, assign or clear the lead role. Role and member pickers list the company's person and
    agent principals. Routes live in `src/adapters/http/routes/ui_departments.rs`, mounted like
    `ui_channels.rs:47`, and call `DepartmentUseCases` only. Refusals render on the form (`Conflict`
@@ -34,6 +35,10 @@ desk belongs to; documentation describes departments and uses the word desk. Con
    "No department" last. `channel_row_fragment` (`:362`) shows the department name as a badge.
 3. Agent settings (`pages/agent_settings.rs`) show the agent's departments and held roles as
    read-only text with links to the Departments tab; membership is edited there, not on the agent.
+4. The run board (`src/adapters/http/pages/workflow_runs/`) gains a department filter, derived
+   from the run's desk, beside the agent and binding filters (`RunLineage`, `reads_tests.rs:104`),
+   and a "Waiting on a person" view listing parked human decisions and escalations grouped by
+   department. Both are reads over existing rows; no new state.
 
 ## Batch 04C Documentation
 

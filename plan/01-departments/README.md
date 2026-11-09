@@ -21,6 +21,8 @@ company that:
 - owns desks (what the code calls channels: an address where work arrives, with workflow
   bindings deciding who handles it);
 - has members, which are principals: agents and people;
+- has a charter: one bounded text saying what the department is for, shown to its members and
+  leads so they share the same framing;
 - has roles held by principals. The only role this plan uses is `lead`, the one who coordinates
   the department's work; later plans add more and let workflows name them;
 - may sit under a parent department, so departments form a hierarchy. Desks do not nest.
@@ -57,7 +59,9 @@ The primitives keep their meaning:
    `department_roles (department_id, role, principal_id)`. This plan defines one role, `lead`,
    with exactly one holder per department. The holder is an agent or a person. An agent lead
    answers the department desk through the standard autonomous base workflow and dispatches with
-   the existing `message.send` step. Storing the lead as a role rather than a column is what lets
+   the existing `message.send` step, and `channel.call` with its closure envelope once
+   [agent-workflow-call](../agent-workflow-call/README.md) lands, so a member can decline work
+   explicitly. Storing the lead as a role rather than a column is what lets
    [02-workflow-roles](../02-workflow-roles/README.md) let workflows name roles without a schema
    change here. The synchronous `channel.call` planned in
    [agent-workflow-call](../agent-workflow-call/README.md) is a later improvement, not a dependency.
@@ -79,7 +83,11 @@ The primitives keep their meaning:
    address refuses the whole creation.
 9. **Delete is conservative.** A department that owns desks or has child departments cannot be
    deleted; detach or delete those first. Membership and role rows go with the department.
-10. **Departments carry no access level.** Knowledge and memory levels stay on the member.
+10. **Stalled work has a default destination.** Escalation on failure, expiry or refusal is a
+    binding option that notifies the `lead` role, specified in
+    [02-workflow-roles](../02-workflow-roles/04-escalation-and-reassignment.md), not a line in the
+    lead's prompt. This plan only makes sure every department desk has a department to resolve it.
+11. **Departments carry no access level.** Knowledge and memory levels stay on the member.
     Department-scoped memory namespaces are a follow-up for the memory service plan; this plan
     gives it a stable `department_id` to scope by and nothing more.
 

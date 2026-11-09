@@ -14,9 +14,14 @@ weakening tool grants, channel access, or existing response approval.
    child-call effect and durable continuation semantics. Reserve the name across tool registries.
 2. Define application-owned request, resolved-target, invocation identity, and result types.
    Use existing channel/binding/run/call identifiers and typed revisions. Avoid untyped strings
-   and a collection of behavior flags. The call accepts exactly `channel_id` and `content`.
-3. Define a bounded result envelope: `replied` with approved canonical response content and child
-   run ID; `no_reply` with child run ID; or an error with a stable code and bounded safe detail.
+   and a collection of behavior flags. The call accepts exactly `channel_id`, `content` and an
+   optional `deadline` (RFC 3339), refused unless earlier than the parent run's deadline.
+3. Define a bounded result envelope: `replied` with approved canonical response content, child
+   run ID and a `closure` of `done`, `denied { reason }` (reason bounded like a subject) or
+   `handed_off { run_id }`; `no_reply` with child run ID; or an error with a stable code and
+   bounded safe detail. The closure is produced by the destination's response contract (a
+   `channel.deny` built-in beside `channel.no_reply`, and `handed_off` when the final response
+   came from a nested channel call), never parsed from the body.
    No successful `accepted` result while the child or its review is still pending. Do not expose
    unreviewed workflow output, hidden policy, credentials, or inaccessible channel metadata.
 4. Define errors for unavailable/unauthorized target, invalid input, dependency/recursion limit,

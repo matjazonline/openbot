@@ -7,7 +7,7 @@
 ## Outcome
 
 `decision.human` reviewers are principals, may be named by role, and the authoring UI offers roles
-wherever it offers agents. Continues in [04](04-integration-and-final-verification.md).
+wherever it offers agents. Continues in [04](04-escalation-and-reassignment.md).
 
 ## Batch 03A Reviewers
 
