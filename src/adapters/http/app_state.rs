@@ -62,6 +62,7 @@ pub struct AppState {
     /// token, with no way back to a write.
     pub company_resend_api_accounts: Arc<dyn CompanyResendApiAccounts>,
     pub channel_use_cases: Arc<ChannelUseCases>,
+    pub department_use_cases: Arc<crate::use_cases::department::DepartmentUseCases>,
     pub schedule_use_cases: Arc<ScheduleUseCases>,
     pub agent_use_cases: Arc<AgentUseCases>,
     pub onboarding_use_cases: Arc<crate::use_cases::onboarding::OnboardingUseCases>,
@@ -188,6 +189,12 @@ impl FromRef<AppState> for Arc<CompanyInviteUseCases> {
 impl FromRef<AppState> for Arc<ChannelUseCases> {
     fn from_ref(app_state: &AppState) -> Self {
         app_state.channel_use_cases.clone()
+    }
+}
+
+impl FromRef<AppState> for Arc<crate::use_cases::department::DepartmentUseCases> {
+    fn from_ref(app_state: &AppState) -> Self {
+        app_state.department_use_cases.clone()
     }
 }
 

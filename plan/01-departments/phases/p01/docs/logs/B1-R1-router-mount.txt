@@ -1,0 +1,11 @@
+   Compiling open_bots v0.1.0 (/Users/mac02/.codex/worktrees/2050/openbot)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1m 24s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-c4f538027eed5c31)
+
+running 3 tests
+test adapters::http::routes::ui_agents::authoring::security_tests::autonomous_agent_authoring_every_publication_write_refuses_cross_origin_cookie_posts ... ok
+test adapters::http::routes::ui_agents::authoring::security_tests::autonomous_agent_authoring_routes_mount_in_the_authenticated_application_router ... ok
+test adapters::http::routes::workflows::tests::workflow_routes_mount_in_the_app_router ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 3791 filtered out; finished in 0.02s
+

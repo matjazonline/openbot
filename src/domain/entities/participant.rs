@@ -221,15 +221,28 @@ pub enum GrantProvenance {
     Manager,
     ConversationMembership,
     System,
+    /// Derived from department membership and roles on a members-only desk, and rewritten
+    /// whenever they change; never edited directly.
+    DepartmentMembership,
 }
 
 impl GrantProvenance {
+    /// Every provenance, in the order `channel_principal_grants_provenance_check` lists them.
+    pub const ALL: [Self; 5] = [
+        Self::ConfiguredAllowlist,
+        Self::Manager,
+        Self::ConversationMembership,
+        Self::System,
+        Self::DepartmentMembership,
+    ];
+
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::ConfiguredAllowlist => "configured_allowlist",
             Self::Manager => "manager",
             Self::ConversationMembership => "conversation_membership",
             Self::System => "system",
+            Self::DepartmentMembership => "department_membership",
         }
     }
 }
@@ -243,6 +256,7 @@ impl FromStr for GrantProvenance {
             "manager" => Ok(Self::Manager),
             "conversation_membership" => Ok(Self::ConversationMembership),
             "system" => Ok(Self::System),
+            "department_membership" => Ok(Self::DepartmentMembership),
             _ => Err(InvalidParticipantValue::new("grant provenance", value)),
         }
     }
@@ -337,6 +351,22 @@ impl fmt::Display for PrincipalCapability {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn every_grant_provenance_round_trips_through_its_stored_string() {
+        for provenance in GrantProvenance::ALL {
+            assert_eq!(provenance.as_str().parse(), Ok(provenance));
+            assert_eq!(
+                serde_json::to_value(provenance).unwrap(),
+                serde_json::Value::String(provenance.as_str().into())
+            );
+        }
+        assert_eq!(
+            GrantProvenance::DepartmentMembership.as_str(),
+            "department_membership"
+        );
+        assert!("department".parse::<GrantProvenance>().is_err());
+    }
 
     #[test]
     fn claim_payloads_require_the_current_version() {

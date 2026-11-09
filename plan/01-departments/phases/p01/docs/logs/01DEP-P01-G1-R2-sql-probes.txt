@@ -1,0 +1,82 @@
+# 01DEP-P01-G1-R2 reviewer SQL probes (scratch DB openbot_dept_p01_review, PostgreSQL 18.6 (Homebrew))
+# Reconstruction of r2 D1 demotion trigger and D2 FOR KEY SHARE kind guard as written (not the author's code), on the real init schema.
+# principals_company_id_id_kind_key: UNIQUE (company_id, id, kind)
+
+## Schema reconstruction
+```sql
+\set ON_ERROR_STOP 1
+BEGIN;
+CREATE TABLE public.departments (
+  id uuid PRIMARY KEY, company_id uuid NOT NULL REFERENCES public.companies(id) ON DELETE CASCADE,
+  name text NOT NULL, slug public.citext NOT NULL, parent_id uuid,
+  created_by jsonb NOT NULL, created_at timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT departments_not_own_parent CHECK (parent_id IS NULL OR parent_id <> id),
+  UNIQUE (company_id, slug), UNIQUE (company_id, id));
+ALTER TABLE public.departments ADD CONSTRAINT departments_parent_fk FOREIGN KEY (company_id, parent_id) REFERENCES public.departments(company_id, id);
+CREATE TABLE public.department_members (company_id uuid NOT NULL, department_id uuid NOT NULL, principal_id uuid NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY (department_id, principal_id),
+  FOREIGN KEY (company_id, department_id) REFERENCES public.departments(company_id, id) ON DELETE CASCADE,
+  FOREIGN KEY (company_id, principal_id) REFERENCES public.principals(company_id, id) ON DELETE CASCADE);
+CREATE TABLE public.department_roles (company_id uuid NOT NULL, department_id uuid NOT NULL, role text NOT NULL, principal_id uuid NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY (department_id, role, principal_id),
+  CONSTRAINT department_roles_role_check CHECK (role = 'lead'),
+  FOREIGN KEY (company_id, department_id) REFERENCES public.departments(company_id, id) ON DELETE CASCADE,
+  FOREIGN KEY (company_id, principal_id) REFERENCES public.principals(company_id, id) ON DELETE CASCADE);
+CREATE UNIQUE INDEX department_roles_one_lead ON public.department_roles (department_id, role) WHERE role = 'lead';
+-- r2 D2 kind guard (reconstruction): reads principal FOR KEY SHARE
+CREATE FUNCTION public.guard_department_principal_kind() RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE k text;
+BEGIN
+  SELECT kind INTO k FROM public.principals WHERE company_id=NEW.company_id AND id=NEW.principal_id FOR KEY SHARE;
+  IF k IS NULL OR k NOT IN ('person','agent') THEN
+    RAISE EXCEPTION 'department principal must be a person or agent' USING ERRCODE='23514', CONSTRAINT='department_principal_kind';
+  END IF;
+  RETURN NEW;
+END $$;
+CREATE TRIGGER guard_department_principal_kind BEFORE INSERT OR UPDATE ON public.department_members FOR EACH ROW EXECUTE FUNCTION public.guard_department_principal_kind();
+CREATE TRIGGER guard_department_principal_kind BEFORE INSERT OR UPDATE ON public.department_roles FOR EACH ROW EXECUTE FUNCTION public.guard_department_principal_kind();
+-- r2 D1 demotion trigger (reconstruction)
+CREATE FUNCTION public.department_principal_demoted() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  DELETE FROM public.department_members WHERE company_id=NEW.company_id AND principal_id=NEW.id;
+  DELETE FROM public.department_roles WHERE company_id=NEW.company_id AND principal_id=NEW.id;
+  RETURN NULL;
+END $$;
+CREATE TRIGGER department_principal_demoted AFTER UPDATE OF kind ON public.principals FOR EACH ROW
+  WHEN (NEW.kind NOT IN ('person','agent')) EXECUTE FUNCTION public.department_principal_demoted();
+COMMIT;
+```
+## Data
+```sql
+\set ON_ERROR_STOP 1
+BEGIN;
+INSERT INTO users(id, username, email) VALUES ('10000000-0000-0000-0000-000000000001','owner1','owner1@example.test'),('10000000-0000-0000-0000-000000000002','mem1','mem1@example.test'),('10000000-0000-0000-0000-000000000003','mem2','mem2@example.test');
+INSERT INTO companies(id, user_id, name, slug) VALUES ('20000000-0000-0000-0000-000000000001','10000000-0000-0000-0000-000000000001','Acme','acme');
+INSERT INTO company_members(id, company_id, user_id, role, access_level) VALUES
+ (gen_random_uuid(),'20000000-0000-0000-0000-000000000001','10000000-0000-0000-0000-000000000001','owner',9),
+ (gen_random_uuid(),'20000000-0000-0000-0000-000000000001','10000000-0000-0000-0000-000000000002','member',0),
+ (gen_random_uuid(),'20000000-0000-0000-0000-000000000001','10000000-0000-0000-0000-000000000003','member',0);
+INSERT INTO principals(id, company_id, kind, user_id, display_label) VALUES
+ ('30000000-0000-0000-0000-000000000001','20000000-0000-0000-0000-000000000001','person','10000000-0000-0000-0000-000000000001','Owner'),
+ ('30000000-0000-0000-0000-000000000002','20000000-0000-0000-0000-000000000001','person','10000000-0000-0000-0000-000000000002','Mem'),
+ ('30000000-0000-0000-0000-000000000003','20000000-0000-0000-0000-000000000001','person','10000000-0000-0000-0000-000000000003','Mem2');
+INSERT INTO departments(id, company_id, name, slug, parent_id, created_by) VALUES
+ ('40000000-0000-0000-0000-000000000001','20000000-0000-0000-0000-000000000001','Ops','ops',NULL,'{"actor_type":"system","actor_id":null,"actor_name":"t"}');
+COMMIT;
+```
+## Runs (Case A/B use two concurrent sessions; the held transaction sleeps 2s)
+```
+## Case 0: committed demotion removes existing member + lead rows
+UPDATE 1
+rows for P2 after demotion|0
+## Case A: demotion held open 2s; concurrent insert of member waits, then refused
+ERROR:  department principal must be a person or agent
+CONTEXT:  PL/pgSQL function guard_department_principal_kind() line 6 at RAISE
+waited ~2s
+P3 kind|external
+rows for P3|0
+## Case B: insert (member + lead) held open 2s; concurrent demotion waits, then its trigger deletes the committed rows
+UPDATE 1
+waited ~2s
+rows for P3 after B|0
+```

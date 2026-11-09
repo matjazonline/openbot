@@ -1,0 +1,77 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.21s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-c4f538027eed5c31)
+
+running 54 tests
+test adapters::http::routes::channel::tests::thread_cursor_round_trips ... ok
+test adapters::http::routes::channel::tests::test_slugify ... ok
+test adapters::http::routes::channel::tests::test_channel_form_deserialization ... ok
+test adapters::http::routes::channel::tests::channel_pages_and_fragments_render_correctly ... ok
+test adapters::persistence::channel::tests::an_enabled_channel_needs_no_agent ... ok
+test adapters::persistence::channel::tests::a_channel_form_round_trips_its_email_allowlist_through_principal_grants ... ok
+test adapters::persistence::channel::tests::postgres_channel_persistence_works ... ok
+test adapters::persistence::channel::tests::alias_slugs_are_unique_within_a_company_and_free_across_companies ... ok
+test adapters::persistence::participant::tests::a_profile_email_claim_neither_merges_a_principal_nor_grants_access ... ok
+test adapters::persistence::test_support::tests::a_development_url_is_redirected_to_its_test_sibling ... ok
+test adapters::persistence::participant::tests::concurrent_observation_of_one_identity_creates_one_principal ... ok
+test adapters::persistence::test_support::tests::a_test_database_is_not_suffixed_twice ... ok
+test adapters::persistence::test_support::tests::a_url_with_no_database_name_is_left_for_the_connection_to_reject ... ok
+test adapters::persistence::participant::tests::the_database_rejects_every_cross_tenant_participant_row ... ok
+test adapters::persistence::test_support::tests::query_parameters_survive_the_rename ... ok
+test adapters::persistence::test_support::tests::skipping_needs_a_real_value_not_just_a_present_variable ... ok
+test adapters::persistence::participant::tests::the_same_subject_in_two_namespaces_does_not_collide ... ok
+test adapters::persistence::tests::a_row_defaulted_from_a_non_utc_session_reads_back_as_the_same_instant ... ok
+test adapters::persistence::tests::clean_schema_contains_only_the_canonical_message_spine ... ok
+test adapters::persistence::tests::every_timestamp_column_carries_a_timezone ... ok
+test adapters::persistence::tests::no_two_indexes_share_a_definition ... ok
+test adapters::persistence::tests::a_statement_cancelled_at_its_timeout_is_a_database_timeout ... ok
+test adapters::persistence::tests::the_memory_provider_schema_is_gone ... ok
+test application::use_cases::channel::tests::a_platform_address_splits_into_its_company_and_untouched_local_part ... ok
+test application::use_cases::channel::tests::admins_manage_channels_while_members_cannot ... ok
+test application::use_cases::channel::tests::company_owner_channel_crud_flow_works ... ok
+test application::use_cases::channel::tests::normalize_canonicalizes_and_dedupes_alias_slugs ... ok
+test application::use_cases::channel::tests::normalize_rejects_an_alias_ending_in_a_reserved_suffix ... ok
+test application::use_cases::channel::tests::parse_recipient_address_works ... ok
+test application::use_cases::channel::tests::process_inbound_email_resolves_company_and_channel ... ok
+test application::use_cases::channel::tests::reads_and_writes_refuse_a_foreign_channel_exactly_like_a_missing_one ... ok
+test application::use_cases::channel::tests::rejected_slugs_are_bad_requests_that_name_the_field_and_the_reason ... ok
+test application::use_cases::channel::tests::security_email_identity_unverified_account_cannot_read_participant_channel ... ok
+test application::use_cases::channel::tests::test_channel_creation_spam_disabled_confirmation ... ok
+test application::use_cases::channel::tests::test_levenshtein_and_fuzzy_channel_suggestions ... ok
+test application::use_cases::channel::tests::test_slug_validation_reserved_suffixes ... ok
+test application::use_cases::channel::tests::the_platform_domain_test_is_wider_than_the_address_parser ... ok
+test domain::entities::channel::tests::a_channel_without_aliases_answers_on_one_address_only ... ok
+test domain::entities::channel::tests::a_team_channel_is_readable_by_the_team_and_nobody_else ... ok
+test adapters::persistence::tests::workflow_guard_error_is_typed_by_its_constraint_name ... ok
+test domain::entities::channel::tests::a_team_channel_takes_the_team_s_mail_and_no_one_else_s ... ok
+test domain::entities::channel::tests::addresses_list_the_canonical_slug_first ... ok
+test domain::entities::channel::tests::an_allowlist_channel_is_narrower_than_the_team ... ok
+test domain::entities::channel::tests::an_allowlist_channel_still_takes_its_owner_s_mail ... ok
+test domain::entities::channel::tests::an_unresolved_actor_holds_no_grant ... ok
+test domain::entities::channel::tests::matches_slug_accepts_canonical_and_alias_case_insensitively ... ok
+test domain::entities::channel::tests::public_lets_a_stranger_write_without_trusting_them ... ok
+test domain::entities::channel::tests::public_opens_a_channel_to_mail_not_to_readers ... ok
+test domain::entities::department::tests::the_lead_has_a_single_holder ... ok
+test domain::entities::channel::tests::the_preferred_approver_is_the_first_principal_granted_a_view ... ok
+test domain::entities::participant::tests::every_grant_provenance_round_trips_through_its_stored_string ... ok
+test domain::entities::participant::tests::claim_payloads_require_the_current_version ... ok
+test adapters::persistence::test_support::tests::a_fresh_database_applies_only_the_init_schema ... ok
+test adapters::persistence::test_support::tests::competing_fixtures_migrate_independent_databases ... ok
+
+test result: ok. 54 passed; 0 failed; 0 ignored; 0 measured; 3740 filtered out; finished in 13.68s
+
+   Compiling open_bots v0.1.0 (/Users/mac02/.codex/worktrees/2050/openbot)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1m 26s
+     Running tests/source_modules.rs (target/debug/deps/source_modules-a453341e81152e67)
+
+running 8 tests
+test comments_and_strings_do_not_declare_modules ... ok
+test unresolved_forms_and_recursive_includes_fail_explicitly ... ok
+test removed_module_and_removed_ancestor_leave_detectable_orphans ... ok
+test conditional_inline_paths_keep_the_ordinary_directory_reachable ... ok
+test cfg_attr_paths_and_literal_includes_are_connected ... ok
+test inline_path_and_conditional_modules_are_connected ... ok
+test included_files_resolve_nested_modules_and_includes_like_rustc ... ok
+test every_rust_source_is_connected_to_a_cargo_target ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.32s
+

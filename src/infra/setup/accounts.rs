@@ -19,6 +19,7 @@ pub(super) struct UseCases {
     pub(super) invites: Arc<CompanyInviteUseCases>,
     pub(super) resend: Arc<CompanyResendApiUseCases>,
     pub(super) channel: Arc<ChannelUseCases>,
+    pub(super) department: Arc<crate::use_cases::department::DepartmentUseCases>,
     pub(super) agent: Arc<AgentUseCases>,
     pub(super) skill: Arc<SkillUseCases>,
     pub(super) onboarding: Arc<crate::use_cases::onboarding::OnboardingUseCases>,
@@ -67,6 +68,10 @@ pub(super) fn build(
             p.clone(),
             p.clone(),
             f.config.spam_scanning(),
+        )),
+        department: Arc::new(crate::use_cases::department::DepartmentUseCases::new(
+            p.clone(),
+            p.clone(),
         )),
         onboarding: Arc::new(crate::use_cases::onboarding::OnboardingUseCases::new(
             p.clone(),

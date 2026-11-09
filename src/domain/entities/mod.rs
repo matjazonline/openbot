@@ -13,6 +13,7 @@ pub mod creation;
 pub mod cursor;
 pub mod dashboard;
 pub mod delivery;
+pub mod department;
 pub mod email_message;
 pub mod harness;
 pub mod internal_note;

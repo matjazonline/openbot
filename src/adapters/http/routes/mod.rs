@@ -11,6 +11,7 @@ pub mod channel;
 pub mod company;
 pub mod company_invite;
 mod connection_levels;
+pub mod department;
 pub mod health;
 mod knowledge;
 mod live_updates;
@@ -97,6 +98,7 @@ pub fn router(sessions: Arc<SessionAuthority>) -> Router<AppState> {
         .merge(ui_local_agents::router())
         .merge(company_invite::router())
         .merge(channel::router())
+        .merge(department::router())
         .merge(schedule::router())
         .merge(skill_library::router())
         .merge(agent::router())

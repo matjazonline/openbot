@@ -1,0 +1,111 @@
+{
+  "version": 1,
+  "round": "01DEP-P01-B1-R2",
+  "artifact": "ccc4ee26be865cf9806a1e192f05bdddb8753eb4993704e2b8f98fcc78f03880",
+  "checks": [
+    {
+      "criteria": [
+        "B1-F1",
+        "AC1",
+        "AC2",
+        "AC3",
+        "AC4",
+        "AC5",
+        "AC6",
+        "D1",
+        "D2",
+        "D5"
+      ],
+      "command": "cargo test --locked --offline --lib department -- --test-threads=4",
+      "fixture": "TEST_DATABASE_URL db openbot_dept_p01_test (phase-owned, recreated after init-schema comment edit) + own_database per competing test; SQLX_OFFLINE=true; test-threads=4",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R2-department-tests.txt",
+          "sha256": "9270cfd3cc1cab7fa302beecfdc3866f6731927dcb1ada0ef415f7f66628f7ab"
+        },
+        {
+          "path": "logs/B1-R2-test-inventory.txt",
+          "sha256": "3a87a9e010e8f7c6224acd3cbab74ac35035775e84a489620444d036c3777ab9"
+        },
+        {
+          "path": "logs/B1-R2-test-inventory-diff.txt",
+          "sha256": "79e4109c55afec2cc3a9d20ebe86ce61281585cd8eb16baba31e8dafb4c618d6"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "B1-F1"
+      ],
+      "command": "same filter, before recreating the phase test DB (init schema checksum changed by comment edits)",
+      "fixture": "TEST_DATABASE_URL db openbot_dept_p01_test (phase-owned, recreated after init-schema comment edit) + own_database per competing test; SQLX_OFFLINE=true; test-threads=4",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B1-R2-department-tests-stale-db.txt",
+          "sha256": "dee7f6948c39a3642b12dbd6bd06d0d1c65f93916039a0601d9f0b046d70fc8e"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "module-tree"
+      ],
+      "command": "cargo test --locked --offline --test source_modules",
+      "fixture": "none",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R2-source-modules.txt",
+          "sha256": "ff140d3e0a7ac96c0f616857a78c72e43fad0afad2bffe6cbe373d86de7ab15c"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "lint"
+      ],
+      "command": "cargo clippy --locked --offline --lib --tests -- -D warnings",
+      "fixture": "none",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R2-clippy.txt",
+          "sha256": "de7fd06326254125194134c189df1fcfdf5b03632e36b5ae0ea19b06ceebc92e"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "contract-impact"
+      ],
+      "command": "B1-R1 affected/caller runs reused: only SQL comments and test files changed since; RowLock refactor covered by the department filter",
+      "fixture": "TEST_DATABASE_URL db openbot_dept_p01_test (phase-owned, recreated after init-schema comment edit) + own_database per competing test; SQLX_OFFLINE=true; test-threads=4",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R1-affected-tests.txt",
+          "sha256": "c86ee7e90d0d930ae3ca3a85156aabdeaaf7ff2840acc68d39b3c84d8ee62395"
+        },
+        {
+          "path": "logs/B1-R1-demotion-callers.txt",
+          "sha256": "4cb203a77239c6e40d08d31493d06abfef3d766ea6341e5610fe58e21be21ed6"
+        },
+        {
+          "path": "logs/B1-R1-router-mount.txt",
+          "sha256": "ec84c189eb2a1772be7825c6b0874ebd73c10dc30765ec479b5d7395667ec75f"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "full-gate"
+      ],
+      "command": "scripts/check.sh",
+      "fixture": "none",
+      "status": "NOT EXERCISED",
+      "reason": "User decision 2026-11-09 (01DEP-I003): focused checks only for this run"
+    }
+  ]
+}

@@ -417,6 +417,7 @@ pub enum SlugKind {
     ChannelAddress,
     ChannelAlias,
     AgentSlug,
+    DepartmentAddress,
 }
 
 impl SlugKind {
@@ -425,6 +426,7 @@ impl SlugKind {
             SlugKind::ChannelAddress => "channel address",
             SlugKind::ChannelAlias => "channel alias",
             SlugKind::AgentSlug => "agent slug",
+            SlugKind::DepartmentAddress => "department address",
         }
     }
 }
