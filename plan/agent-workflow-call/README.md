@@ -69,6 +69,9 @@ knowledge, and agent authority are checked on each invocation.
 - **A call may carry its own deadline.** Optional, and it must be earlier than the parent run's
   deadline; the child's deadline is the earlier of the two. Expiry is the existing typed deadline
   error. A lead can therefore give a member less time than its own run has left.
+- **Leave the trail in the threads.** The approved response is written to the destination thread
+  as the child's reply, and the parent's thread gets an internal note naming the desk called and
+  the closure, so supervisors see delegated work where they see everything else (04, Batch C).
 - **Return through the pending tool call.** Do not enqueue ordinary message ingress, observer
   runs, or automatic email delivery. Human review and human-input waits keep their normal gates;
   review notifications are distinct from automatically publishing the final channel response.

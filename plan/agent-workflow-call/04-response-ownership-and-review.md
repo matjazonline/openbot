@@ -62,6 +62,33 @@ approval versus cancellation/revocation, and result consumption versus access re
 approved text is exactly what the resumed model sees and that raw output never leaks through a
 tool result, sample preview, notification, run view, or logging path.
 
+## Batch C — Thread trail on both desks
+
+A call must leave the same trail in the thread views as a message exchange would, or people
+supervising a desk lose sight of delegated work. Both writes happen in the transaction that settles
+the call; neither creates an outbound delivery or re-enters ingress.
+
+1. Write the approved response into the call's destination thread as the child's reply message,
+   `MessageRole::Agent` (`src/domain/entities/message.rs:43`), the same way the native `reply`
+   step publishes to a thread for mail, so the member desk reads question, then answer. A
+   `no_reply` writes nothing; a `denied` closure writes the bounded reason as the reply body and
+   marks the message with the closure so the thread row can render it.
+2. Write one internal note (`add_internal_note`, `src/application/use_cases/thread/mod.rs:383`,
+   `internal_notes`, `init_schema.sql:3898`) on the thread the parent run is answering, if it has
+   one, naming the destination desk, the child run and the closure. A parent without a thread (a
+   schedule, a company-wide binding) records nothing here; its run page already shows the lineage.
+   The note's author is the system principal, with the calling agent named in the body.
+3. Read access to each write is the owning desk's grants, unchanged. The parent's note never quotes
+   the child's response; the child's reply never quotes the parent's thread. Classification
+   propagation from Batch B happens before either write.
+4. The call records remain the source of truth for the result the model consumed. The thread
+   writes are projections and must not be read back to resume the parent.
+
+Focused checks: `channel_call_trail_`. A replied call leaves exactly one reply on the destination
+thread and one note on the parent thread; `no_reply` leaves the note only; `denied` renders its
+reason; a parent without a thread leaves no note; a reader without access to one desk sees nothing
+from the other; a replayed settlement writes nothing twice.
+
 ## Acceptance and record
 
 - Automatic and reviewed responders both return through the pending call, with no duplicate final
