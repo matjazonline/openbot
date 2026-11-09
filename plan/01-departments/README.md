@@ -7,12 +7,14 @@
 Status: proposed implementation, 2026-11-09, amended the same day to store the lead as a role.
 These documents do not implement the feature.
 
-This is the first of five plans that reshape the organization model. The later four build on it
+This is the first of seven plans that reshape the organization model. The later six build on it
 and are implemented in order, each as its own resettable step:
 [02-workflow-roles](../02-workflow-roles/README.md),
 [03-principal-addresses](../03-principal-addresses/README.md),
 [04-root-unit](../04-root-unit/README.md),
-[05-scopes](../05-scopes/README.md).
+[05-scopes](../05-scopes/README.md),
+[06-delegated-administration](../06-delegated-administration/README.md),
+[07-unit-resources](../07-unit-resources/README.md).
 
 ## Intended behavior
 
@@ -106,6 +108,7 @@ The primitives keep their meaning:
   [02-workflow-roles](../02-workflow-roles/README.md).
 - Managing departments requires the same authority as managing channels today: an owner or admin
   (`managed_company`, `src/application/use_cases/company.rs:223`).
+  [06-delegated-administration](../06-delegated-administration/README.md) revisits this.
 
 ## Documents
 

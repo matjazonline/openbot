@@ -37,7 +37,11 @@ pages and invites operate on it. Continues in [02](02-access-modes.md).
    membership with the invited level; promotion to admin assigns the `admin` role; the team pages
    (`ui_team_authorization_tests.rs`) read the root.
 4. Account deletion and user lifecycle (`src/adapters/persistence/user_lifecycle.rs`,
-   `account_deletion.rs`) remove root membership and roles where they removed `company_members`.
+   `account_deletion.rs`) remove root membership and every role the person holds anywhere in the
+   tree where they removed `company_members`, in one transaction, before the person principal is
+   retired. Company deletion (`delete_company`) removes departments after desks and before
+   principals, so the composite foreign keys hold at every step; a test deletes a company with a
+   three-level tree, roles, members-only desks and knowledge documents and leaves no row.
 
 ## Focused checks
 

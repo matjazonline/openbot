@@ -42,6 +42,15 @@ is a plain team desk they read. Continues in [04](04-ui-and-docs.md).
 
 ## Batch 03B What a lead can see and do
 
+0. Placement. Every path that creates a company agent (the UI form, the JSON API, a library copy,
+   onboarding, and the Agent Builder's `create_agent_channel` tool) takes an optional department
+   and an optional role to assign in it, written in the creation transaction through
+   `add_member_on` and `assign_role_on` from [01](01-departments-and-membership.md). The form and
+   the tool default to the creator's single department; onboarding creates the company's first
+   department when the person names one and places the first agent there. `list_company_agents`
+   accepts a department filter. The tool descriptions in `docs/agent-builder-context.md` and
+   `docs/custom_tools.md` say so.
+
 1. Agent directory. `AgentDirectoryEntry` (`src/application/agent/authoring_reads.rs:138`) gains
    `departments: Vec<DepartmentRef { id, name, slug, roles: Vec<DepartmentRole> }>` and the entry's
    default desk address and, when the desk's selected procedure declares one, its intake schema

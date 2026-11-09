@@ -4,6 +4,12 @@
 > when needed. Do not add data backfills, dual reads/writes, legacy decoders, compatibility shims,
 > or staged rollouts for existing data.
 
+> **Organization plans, 2026-11-09.** [03-principal-addresses](../03-principal-addresses/README.md)
+> supersedes this plan: agents get an address and a binding on their own principal, and the
+> per-agent desk this plan provisions is removed by its document 03. Decide before implementing
+> whether to build this as a bridge until that plan lands, or to mark it superseded and skip it.
+> [01-departments](../01-departments/README.md) does not depend on it.
+
 Status: proposed implementation, 2026-11-09. These documents do not implement the feature.
 
 ## Intended behavior

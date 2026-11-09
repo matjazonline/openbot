@@ -4,7 +4,7 @@
 > when needed. Do not add data backfills, dual reads/writes, legacy decoders, compatibility shims,
 > or staged rollouts for existing data.
 
-Status: proposed, 2026-11-09; knowledge folded in the same day. Fifth of the organization plans;
+Status: proposed, 2026-11-09; knowledge folded in the same day. Fifth of seven organization plans;
 depends on
 [01-departments](../01-departments/README.md) through [04-root-unit](../04-root-unit/README.md)
 and on the memory service integration (`plan/memory-service`, batch 05A), which is implemented on

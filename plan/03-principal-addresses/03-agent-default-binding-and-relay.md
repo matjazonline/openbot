@@ -22,7 +22,10 @@ Continues in [04](04-integration-and-final-verification.md).
    binding and workflow with the agent in the order the default-channel plan established, minus the
    channel.
 3. The Agent Builder tool `create_agent_channel` is renamed `create_agent`; the desk-staffing
-   variant is `create_desk_for_agent`. Both go through the same provisioning functions.
+   variant is `create_desk_for_agent`. Both go through the same provisioning functions and keep
+   the department and role placement from
+   [01-departments](../01-departments/03-leads-and-coordination.md),
+   Batch 03B item 0.
 
 ## Batch 03B Relay identity
 

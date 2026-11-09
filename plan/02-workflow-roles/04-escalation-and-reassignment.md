@@ -48,6 +48,11 @@ hands while it is parked moves to the new holder. Continues in
    04A.
 3. Live reviewer removal (membership loss, principal retirement) uses the same replacement path,
    which is the general fix `plan/todo.md` calls "live reviewer reassignment".
+4. Retiring a principal that holds roles (agent deletion, `src/adapters/persistence/agent.rs:398`;
+   account removal, `src/adapters/persistence/user_lifecycle.rs`) clears every role it holds in the
+   same transaction and appends an administration audit row. Parked decisions that followed the
+   role are re-resolved as in item 1; a department left without a lead is what the ladder in 04A
+   reports as "no holder" on its next trigger. Nothing is reassigned automatically to a person.
 
 ## Focused checks
 

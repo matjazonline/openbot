@@ -40,7 +40,21 @@ desk belongs to; documentation describes departments and uses the word desk. Con
    and a "Waiting on a person" view listing parked human decisions and escalations grouped by
    department. Both are reads over existing rows; no new state.
 
-## Batch 04C Documentation
+## Batch 04C Surfaces that gain a department dimension
+
+1. The company dashboard (`src/adapters/http/routes/ui_dashboard.rs`) and the attention queue
+   (`routes/attention.rs`) group by department, derived from the desk, with a department filter.
+2. The model usage page (`routes/model_usage.rs`) shows spend by department; the per-unit cap and
+   remaining amount arrive with [07-unit-resources](../07-unit-resources/README.md).
+3. The `_help` reply and the undeliverable-address bounce (`writable_channel_directory`,
+   `docs/system_addresses.md`) list desks under their department heading, root first.
+4. The JSON API: channel responses carry `department_id` and `members_only`; agent responses carry
+   `departments` with held roles; the department endpoints are in
+   [01](01-departments-and-membership.md). Shapes are additive and documented in the route tests.
+5. Documentation: `docs/agent-builder-context.md` and `docs/custom_tools.md` describe the
+   directory's department, role and intake fields and the placement arguments of the builder tools.
+
+## Batch 04D Documentation
 
 1. New `docs/departments.md`: what a department is, desks and ownership, members-only access and
    the one-step hierarchy rule, leads and the department desk, dispatch and escalation over the
@@ -61,5 +75,7 @@ desk belongs to; documentation describes departments and uses the word desk. Con
   badge and the members-only help text.
 - Route tests in `routes/ui_departments_tests.rs` mirroring `channel_authorization_tests.rs`: a
   member gets `404` on every department write and sees only their departments.
+- Rendering tests for the dashboard, attention and usage grouping and the `_help` body; route tests
+  for the added JSON fields.
 - Documentation-only checks: links resolve, quoted file:line anchors match the final code, and no
   prose "channel" remains outside code spans (a grep the reviewer runs and records).
