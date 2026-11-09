@@ -14,8 +14,9 @@ policy already consults. The product calls channels desks. Continues in
 ## Batch 02A Ownership
 
 1. Schema: `channels.department_id uuid` with
-   `FOREIGN KEY (company_id, department_id) REFERENCES departments (company_id, id) ON DELETE RESTRICT`.
-   `UNIQUE (company_id, id)` on `channels` if it does not already exist for composite keys.
+   `FOREIGN KEY (company_id, department_id) REFERENCES departments (company_id, id) ON DELETE
+   RESTRICT`. `UNIQUE (company_id, id)` on `channels` if it does not already exist for composite
+   keys.
 2. `Channel` (`src/domain/entities/channel.rs:44`) gains `department_id: Option<DepartmentId>`;
    `ChannelDb`, `CHANNEL_SELECT` (`src/adapters/persistence/channel.rs:38`, `:88`),
    `ChannelWrite`, `ChannelUpdate` and `write_channel_settings_on` (`:450`) carry it.
@@ -37,9 +38,10 @@ policy already consults. The product calls channels desks. Continues in
    principals, plus the owner".
 2. Derived grants. One persistence function `sync_department_grants_on(tx, department)` deletes
    every `department_membership` grant on the department's members-only channels and inserts the
-   current set: each member, the lead, and the parent department's lead (decision 7), each with
+   current set: each member, each role holder, and the holder of the parent department's `lead`
+   role (decision 7), each with
    `participate` and `view`. It runs inside:
-   - every membership and lead change in [01](01-departments-and-membership.md);
+   - every membership and role change in [01](01-departments-and-membership.md);
    - every re-parent, for both the old and the new parent's subtree one level down;
    - `write_channel_settings_on` when `members_only` or `department_id` changes.
 
@@ -56,12 +58,12 @@ policy already consults. The product calls channels desks. Continues in
    change; `notification_recheck_channel_access` fires on grant writes and re-evaluates. Add a
    test that removing a member revokes their pending notifications on a members-only desk.
 5. Agent principals. Derived grants are also written for agent members. Internal relay authorizes
-   by the sending channel's address (`authorize_relay`, `docs/inter_channel_agent_communication.md`),
-   and the receiving channel's `participant_access` then sees the run's actor. Confirm in a test
-   which principal a relayed message carries into `participant_access`, and document the result
-   in [03](03-leads-and-coordination.md)'s dispatch section; if it is the binding's run-as person
-   rather than the agent, an agent lead must also be a person-reachable grant and the plan's
-   decision 7 is applied to that person.
+   by the sending channel's address (`authorize_relay`,
+   `docs/inter_channel_agent_communication.md`), and the receiving channel's `participant_access`
+   then sees the run's actor. Confirm in a test which principal a relayed message carries into
+   `participant_access`, and document the result in [03](03-leads-and-coordination.md)'s dispatch
+   section; if it is the binding's run-as person rather than the agent, an agent lead must also be a
+   person-reachable grant and the plan's decision 7 is applied to that person.
 
 ## Batch 02C The word "desk"
 

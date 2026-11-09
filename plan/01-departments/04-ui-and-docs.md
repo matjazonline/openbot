@@ -15,12 +15,12 @@ desk belongs to; documentation describes departments and uses the word desk. Con
 1. Add `CompanyTab::Departments` (`src/adapters/http/pages/company_settings.rs:19`) and its pane,
    following the list-and-pane shape of `company_settings_body` (`:308`) and the channel settings
    page (`pages/channel_settings.rs`). The pane shows the tree (indented by parent), and for the
-   selected department: name, slug, description, parent, lead, members, owned desks.
-2. Forms: create (name, slug, description, parent, lead), edit, delete, add member, remove member.
-   Lead and member pickers list the company's person and agent principals. Routes live in
-   `src/adapters/http/routes/ui_departments.rs`, mounted like `ui_channels.rs:47`, and call
-   `DepartmentUseCases` only. Refusals render on the form (`Conflict` for a taken slug or a
-   department that still owns desks, `BadRequest` for a cycle).
+   selected department: name, slug, description, parent, role holders, members, owned desks.
+2. Forms: create (name, slug, description, parent, lead), edit, delete, add member, remove
+   member, assign or clear the lead role. Role and member pickers list the company's person and
+   agent principals. Routes live in `src/adapters/http/routes/ui_departments.rs`, mounted like
+   `ui_channels.rs:47`, and call `DepartmentUseCases` only. Refusals render on the form (`Conflict`
+   for a taken slug or a department that still owns desks, `BadRequest` for a cycle).
 3. `workspace_links` (`company_settings.rs:414`) adds a Departments count beside the Desks count.
 4. Nav: no new top-level item. Departments are reached through company settings; the desks list
    groups desks by department.
@@ -32,7 +32,7 @@ desk belongs to; documentation describes departments and uses the word desk. Con
    says who gets access: members, the lead, and the parent department's lead.
 2. The desks list (`pages/channels.rs:111`) groups desks under their department heading, with
    "No department" last. `channel_row_fragment` (`:362`) shows the department name as a badge.
-3. Agent settings (`pages/agent_settings.rs`) show the agent's departments and lead roles as
+3. Agent settings (`pages/agent_settings.rs`) show the agent's departments and held roles as
    read-only text with links to the Departments tab; membership is edited there, not on the agent.
 
 ## Batch 04C Documentation

@@ -29,23 +29,24 @@ is a plain team desk they read. Continues in [04](04-ui-and-docs.md).
    when provisioned through `assistant_channel_on`, and by `channels.department_id` plus slug
    equality otherwise. No ownership column or trigger is added (the agent default channel plan's
    decision 4 applies here too): after creation the desk is an ordinary desk.
-3. Changing the lead from one agent to another re-points the desk's `agent.run`. Reuse the
-   publication path the Agent Builder uses when it edits an existing agent channel's workflow
-   (`apply`, `provisioning.rs:192`) rather than editing the workflow source by hand. Changing the
-   lead from an agent to a person pauses the binding; from a person to an agent provisions the
-   workflow and binding on the existing desk through the same `assistant_channel_on` internals,
-   factored so they can target an existing channel. Record in the plan which of these factorings
-   turned out to be needed.
+3. Reassigning the `lead` role from one agent to another re-points the desk's `agent.run`. The
+   role write and the workflow change are one transaction, through `assign_role_on` from
+   [01](01-departments-and-membership.md). Reuse the publication path the Agent Builder uses when it
+   edits an existing agent channel's workflow (`apply`, `provisioning.rs:192`) rather than editing
+   the workflow source by hand. Changing the lead role from an agent to a person pauses the binding;
+   from a person to an agent provisions the workflow and binding on the existing desk through the
+   same `assistant_channel_on` internals, factored so they can target an existing channel. Record in
+   the plan which of these factorings turned out to be needed.
 4. Department delete runs after the department desk is detached or deleted by the user (decision
    9). The desk's own delete rules apply (`channel.rs:401`).
 
 ## Batch 03B What a lead can see and do
 
 1. Agent directory. `AgentDirectoryEntry` (`src/application/agent/authoring_reads.rs:138`) gains
-   `departments: Vec<DepartmentRef { id, name, slug, lead: bool }>` and the entry's default desk
-   address, so an agent lead can address a member without a separate lookup. The directory's
-   paging key is unchanged. The directory tool's description tells the model that a department's
-   members are the agents listing that department.
+   `departments: Vec<DepartmentRef { id, name, slug, roles: Vec<DepartmentRole> }>` and the entry's
+   default desk address, so an agent lead can address a member without a separate lookup. The
+   directory's paging key is unchanged. The directory tool's description tells the model that a
+   department's members are the agents listing that department.
 2. Dispatch is `message.send` (`src/application/workflow/registry/actions.rs:158`) to the member's
    desk address over the internal relay. The member's own desk binding runs the member and replies;
    reply correlation offers the answer to the waiting run
@@ -80,5 +81,5 @@ is a plain team desk they read. Continues in [04](04-ui-and-docs.md).
   to its run; a send to the parent desk is admitted and a send from a non-member department is
   refused.
 - `department_lead_loop_`: the chain test from 03B.4.
-- `department_directory_`: entries list departments and lead flags; an agent in no department has
+- `department_directory_`: entries list departments and held roles; an agent in no department has
   an empty list; the page key is unaffected.
