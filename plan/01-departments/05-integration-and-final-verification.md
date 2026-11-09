@@ -13,9 +13,10 @@
 3. [03](03-leads-and-coordination.md) after 02B, since dispatch tests depend on derived grants.
 4. [04](04-ui-and-docs.md) last, once the use cases are stable.
 
-Agent default channel ([plan](../agent-default-channel/README.md)) and this plan both call
-`assistant_channel_on` with a new command key. Whichever lands second updates the
-`workflow_provisioning_commands` table comment (`init_schema.sql:5594`) to list both keys.
+This plan calls `assistant_channel_on` with a new command key, `department:{id}`; update the
+`workflow_provisioning_commands` table comment (`init_schema.sql:5594`) to list it. Agents get no
+desk of their own: that is [03-principal-addresses](../03-principal-addresses/README.md), and the
+earlier agent-default-channel plan was removed in its favor.
 
 ## Batch 05A Final gate, once after integration
 

@@ -15,9 +15,9 @@ Continues in [04](04-integration-and-final-verification.md).
 1. Split `assistant_channel_on` (`src/adapters/persistence/workflow/provisioning.rs:812`) into
    `provision_agent_workflow_on` (copy the autonomous base, point `agent.run`, publish) and the
    channel-specific remainder. Agent creation calls the first and then
-   `bind_on_principal(agent_principal)`. The `agent:{agent_id}` provisioning key and the agent's
-   desk from [agent-default-channel](../agent-default-channel/README.md) are removed; the
-   `workflow_provisioning_commands` comment (`init_schema.sql:5594`) is updated.
+   `bind_on_principal(agent_principal)`. No per-agent desk or `agent:{agent_id}` provisioning key
+   exists (the plan that proposed them was removed); the `workflow_provisioning_commands` comment
+   (`init_schema.sql:5594`) lists only the `department:{id}` key.
 2. Agent delete refuses while the agent has direct threads or runs; otherwise it removes the
    binding and workflow with the agent in the order the default-channel plan established, minus the
    channel.

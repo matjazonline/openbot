@@ -7,9 +7,8 @@
 ## Order
 
 [01](01-unified-addresses.md), then [02](02-direct-threads-and-bindings.md), then
-[03](03-agent-default-binding-and-relay.md). If
-[agent-default-channel](../agent-default-channel/README.md) was implemented before this plan, batch
-03A removes what it added; if not, mark that plan superseded in its README and do not implement it.
+[03](03-agent-default-binding-and-relay.md). Until this plan lands, agents are reached through the
+desks they staff; no per-agent desk is provisioned in the meantime.
 
 ## Batch 04A Documentation
 

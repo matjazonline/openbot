@@ -17,8 +17,8 @@ direct message to that principal, not traffic on a desk. An agent answers its di
 through a workflow binding on itself, so an agent no longer needs a desk of its own; a person reads
 theirs in the product and in notifications. Desks are reserved for shared intake.
 
-This supersedes [agent-default-channel](../agent-default-channel/README.md): the per-agent desk and
-its `agent:{agent_id}` provisioning marker go away, replaced by a per-agent binding.
+The earlier agent-default-channel plan, which gave every agent a desk of its own, was removed in
+favor of this one: an agent gets a per-agent binding, not a desk.
 
 ## Decisions (user, 2026-11-09)
 
