@@ -69,6 +69,10 @@ knowledge, and agent authority are checked on each invocation.
 - **A call may carry its own deadline.** Optional, and it must be earlier than the parent run's
   deadline; the child's deadline is the earlier of the two. Expiry is the existing typed deadline
   error. A lead can therefore give a member less time than its own run has left.
+- **Structure is declared by the procedure, prepared by the caller.** A desk's version may declare
+  an intake sub-schema on its input and a result sub-schema on its output. The call carries
+  `fields` validated against the intake before a child exists, and `replied` returns the reply's
+  `fields` typed. Mail stays prose; `fields` never chooses the procedure (01, Batch C).
 - **Leave the trail in the threads.** The approved response is written to the destination thread
   as the child's reply, and the parent's thread gets an internal note naming the desk called and
   the closure, so supervisors see delegated work where they see everything else (04, Batch C).

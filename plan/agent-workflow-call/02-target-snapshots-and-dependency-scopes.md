@@ -20,8 +20,9 @@ channel call, with database constraints preventing forged relationships.
 3. Key invocation identity by company + parent execution + saved tool-call ID. Bind it to the
    canonical saved arguments/fingerprint so reuse with changed channel/content is rejected.
    Tenant and exact execution identifiers belong in composite foreign keys, not just app checks.
-4. Capture the chosen binding version, params, resources, response configuration, and target
-   dependency closure under coherent locks. Record the global lock order alongside existing action
+4. Capture the chosen binding version, params, resources, response configuration, intake and
+   result schemas ([01](01-contracts-and-authority.md), Batch C), and target dependency closure
+   under coherent locks. Record the global lock order alongside existing action
    and binding owners. Do not hold database locks across a model/provider call.
 5. Reconfiguration races must select either the complete old configuration or the complete new
    configuration, never a mixture. A committed invocation is immutable. Retrying after a lost

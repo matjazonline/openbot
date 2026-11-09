@@ -44,7 +44,9 @@ is a plain team desk they read. Continues in [04](04-ui-and-docs.md).
 
 1. Agent directory. `AgentDirectoryEntry` (`src/application/agent/authoring_reads.rs:138`) gains
    `departments: Vec<DepartmentRef { id, name, slug, roles: Vec<DepartmentRole> }>` and the entry's
-   default desk address, so an agent lead can address a member without a separate lookup. The
+   default desk address and, when the desk's selected procedure declares one, its intake schema
+   ([agent-workflow-call](../agent-workflow-call/01-contracts-and-authority.md), Batch C), so an
+   agent lead can address a member and shape the request without a separate lookup. The
    directory's paging key is unchanged. The directory tool's description tells the model that a
    department's members are the agents listing that department. `DepartmentRef` also carries the
    charter, and a run admitted on a department desk gets the owning department's name and charter
