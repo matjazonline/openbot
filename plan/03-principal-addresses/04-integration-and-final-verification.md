@@ -7,15 +7,23 @@
 ## Order
 
 [01](01-unified-addresses.md), then [02](02-direct-threads-and-bindings.md), then
-[03](03-agent-default-binding-and-relay.md). Until this plan lands, agents are reached through the
-desks they staff; no per-agent desk is provisioned in the meantime.
+[03](03-agent-default-binding-and-relay.md). Until this plan lands, company agents are reached
+through the automatic default desks provisioned by 01-departments, plus any other desks they
+staff. Reset the database for the new address and binding schema, then remove automatic
+agent-desk provisioning; shared department desks remain. Phase 01 disables the old automatic-desk
+call before registering principal addresses at the same slugs, and phase 03 supplies their workflow
+bindings. Deploy only the integrated plan. Do not backfill principal addresses from old desk rows
+or keep both default-address paths.
 
 ## Batch 04A Documentation
 
 `docs/system_addresses.md`, `docs/transport_architecture.md`,
 `docs/inter_channel_agent_communication.md`, `docs/agent-authoring.md`, `docs/custom_tools.md` and
 `docs/departments.md` describe principal addresses, direct threads and the agent binding. Name
-only behavior the code has.
+only behavior the code has. Explain the independent controls for public desks and public direct
+agent addresses. Record external-mail prerequisites (company-domain MX/inbound routing, selected
+SMTP or provider-webhook setup, and outbound sender-domain setup) and distinguish them from the
+per-entry-point access setting. Existing routed domains need no per-agent DNS or mailbox setup.
 
 ## Batch 04B Final gate, once after integration
 
@@ -34,8 +42,8 @@ only behavior the code has.
 
 | Evidence | Status |
 | --- | --- |
-| 01 focused checks (namespace, resolution) | Pending |
-| 02 focused checks (direct threads, bindings, competing) | Pending |
+| 01 focused checks (namespace, resolution, external SMTP/webhook ingress) | Pending |
+| 02 focused checks (direct threads, bindings, public settings, public desk/private agent, competing) | Pending |
 | 03 focused checks (create, delete, relay identity) | Pending |
 | Formatting, offline compilation, clippy and reachability | Pending |
 | Fresh migrations and SQLx metadata | Pending |

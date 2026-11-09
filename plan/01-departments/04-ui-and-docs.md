@@ -35,6 +35,9 @@ desk belongs to; documentation describes departments and uses the word desk. Con
    "No department" last. `channel_row_fragment` (`:362`) shows the department name as a badge.
 3. Agent settings (`pages/agent_settings.rs`) show the agent's departments and held roles as
    read-only text with links to the Departments tab; membership is edited there, not on the agent.
+   Show the automatically created default desk's current address and a link to it. The existing
+   assistant-desk action creates an additional desk; onboarding shows the default desk that agent
+   creation already committed instead of asking the user to create it again.
 4. The run board (`src/adapters/http/pages/workflow_runs/`) gains a department filter, derived
    from the run's desk, beside the agent and binding filters (`RunLineage`, `reads_tests.rs:104`),
    and a "Waiting on a person" view listing parked human decisions and escalations grouped by
@@ -72,7 +75,8 @@ desk belongs to; documentation describes departments and uses the word desk. Con
 ## Focused checks
 
 - Rendering tests in `pages/tests.rs` for the Departments pane, the tree indentation, the desk
-  badge and the members-only help text.
+  badge, the members-only help text and the automatic agent desk's address/link. Onboarding and
+  agent settings distinguish the existing default desk from creating an additional desk.
 - Route tests in `routes/ui_departments_tests.rs` mirroring `channel_authorization_tests.rs`: a
   member gets `404` on every department write and sees only their departments.
 - Rendering tests for the dashboard, attention and usage grouping and the `_help` body; route tests

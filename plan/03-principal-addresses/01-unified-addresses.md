@@ -25,6 +25,9 @@ a principal address as a deliverable target. Continues in
    principals have no address and the trigger refuses them.
 3. The agent slug and the principal slug are the same value by construction
    (`create_agent_principal_on`); renaming an agent's slug renames its address.
+   Disable automatic default-desk creation from 01-departments when switching to this namespace:
+   a desk at the same slug would collide with the new principal address. Phase 03 adds the direct
+   workflow binding; deploy this plan only after all its phases are integrated and verified.
 
 ## Batch 01B Resolution
 
@@ -39,6 +42,11 @@ a principal address as a deliverable target. Continues in
    company, domain)` used by desks and principals; the `_help` reply and bounce directory
    (`writable_channel_directory`) list principals the sender may write to under a "People and
    agents" heading after desks.
+4. Extend external SMTP/provider-webhook ingress as well as the internal relay. Desk and principal
+   local parts resolve inside the same already configured company mail domain; switching a desk
+   to public changes application access policy, not its DNS or provider mailbox configuration.
+   Keep existing inbound-domain/MX routing, provider webhook credentials and outbound sender-domain
+   setup as prerequisites for external mail; an internal-relay test alone does not prove them.
 
 ## Focused checks
 
@@ -46,3 +54,5 @@ a principal address as a deliverable target. Continues in
   across companies; an external or system principal cannot have an address; one primary per target.
 - `address_resolution_`: platform addresses classify to desk, principal, system or nobody; the
   reserved suffixes still strip for desks and are refused for principals; `_help` lists both.
+- `address_external_ingress_`: SMTP and signed provider-webhook paths resolve desk and principal
+  recipients through the same namespace. Direct-address access checks are covered in phase 02.

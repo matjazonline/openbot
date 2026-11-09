@@ -4,7 +4,7 @@
 > when needed. Do not add data backfills, dual reads/writes, legacy decoders, compatibility shims,
 > or staged rollouts for existing data.
 
-Status: proposed, 2026-11-09. Third of four organization plans; depends on
+Status: proposed, 2026-11-09. Third of seven organization plans; depends on
 [01-departments](../01-departments/README.md) and
 [02-workflow-roles](../02-workflow-roles/README.md). Followed by
 [04-root-unit](../04-root-unit/README.md).
@@ -17,8 +17,11 @@ direct message to that principal, not traffic on a desk. An agent answers its di
 through a workflow binding on itself, so an agent no longer needs a desk of its own; a person reads
 theirs in the product and in notifications. Desks are reserved for shared intake.
 
-The earlier agent-default-channel plan, which gave every agent a desk of its own, was removed in
-favor of this one: an agent gets a per-agent binding, not a desk.
+[01-departments](../01-departments/03-leads-and-coordination.md) first gives every company agent an
+automatic default desk, which remains the addressing model through 02-workflow-roles. This plan
+replaces automatic agent desks with direct principal addresses after a database reset. Agent
+creation then writes a per-principal binding; department and other explicitly created shared
+desks remain desks. Do not convert old desk rows or keep a parallel default-desk address path.
 
 ## Decisions (user, 2026-11-09)
 
@@ -50,6 +53,13 @@ favor of this one: an agent gets a per-agent binding, not a desk.
    provisioning code with the channel parts removed. "Create assistant channel" remains for desks
    an agent should staff. Deleting an agent with no direct-thread history removes the binding and
    workflow with it.
+7. **A public desk and a public agent address are independent entry points.** A public desk admits
+   external messages through its own policy and runs its bound agent even when that agent's direct
+   address has `open_to_public = false`. The thread and reply stay on the desk. Opening the desk
+   does not open the agent's direct address, and opening the agent does not open any desk it staffs.
+   Both use the existing company mail transport and domain configuration; no per-address mailbox,
+   DNS record or new credential is required under an already routed company domain. External
+   access retains the existing authentication, spam and audience/egress checks.
 
 ## What does not change
 

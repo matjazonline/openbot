@@ -4,7 +4,8 @@
 > when needed. Do not add data backfills, dual reads/writes, legacy decoders, compatibility shims,
 > or staged rollouts for existing data.
 
-Status: proposed implementation, 2026-11-09, amended the same day to store the lead as a role.
+Status: proposed implementation, 2026-11-09, amended the same day to store the lead as a role
+and provision an automatic desk for each company agent.
 These documents do not implement the feature.
 
 This is the first of seven plans that reshape the organization model. The later six build on it
@@ -93,13 +94,19 @@ The primitives keep their meaning:
 11. **Departments carry no access level.** Knowledge and memory levels stay on the member.
     Department-scoped memory namespaces are [05-scopes](../05-scopes/README.md);
     this plan gives it a stable `department_id` to scope by and nothing more.
+12. **Creating a company agent creates its default desk.** In phase
+    [03](03-leads-and-coordination.md), every company-agent creation path provisions a team desk at
+    the agent's initial slug, with a published autonomous workflow and an active binding on that
+    agent, in the same transaction. Library agents get no desk until copied into a company. A
+    department desk is separate, even when the same agent answers both.
+    [03-principal-addresses](../03-principal-addresses/README.md) later replaces automatic agent
+    desks with direct principal addresses after a database reset; no data conversion or parallel
+    addressing path is required.
 
 ## What does not change
 
 - The company remains the tenant and the access boundary. `company_members`, roles and access
   levels are untouched. [04-root-unit](../04-root-unit/README.md) revisits this.
-- Every agent still gets its own default desk at its slug. A department does not replace it.
-  [03-principal-addresses](../03-principal-addresses/README.md) revisits this.
 - Channel policy (`src/domain/entities/channel.rs:135` and `:174`) is unchanged; departments feed
   it grant rows, nothing else.
 - Workflow bindings stay on channels. A department's jobs are its desks' bindings; no
@@ -116,7 +123,7 @@ The primitives keep their meaning:
    persistence, use cases and JSON API.
 2. [Desks, ownership and access](02-desks-ownership-and-access.md): `channels.department_id`,
    members-only desks, and the desk vocabulary.
-3. [Leads and coordination](03-leads-and-coordination.md): the department desk, agent leads,
-   dispatch, escalation and the agent directory.
+3. [Leads and coordination](03-leads-and-coordination.md): automatic agent desks, the department
+   desk, agent leads, dispatch, escalation and the agent directory.
 4. [UI and documentation](04-ui-and-docs.md).
 5. [Integration and final verification](05-integration-and-final-verification.md).
