@@ -1,4 +1,4 @@
-# 03 Integration and final verification
+# 04 Integration and final verification
 
 > **No backward compatibility.** We don't need backward compatibility and will reset the database
 > when needed. Do not add data backfills, dual reads/writes, legacy decoders, compatibility shims,
@@ -8,12 +8,15 @@
 
 This plan runs after [04-root-unit](../04-root-unit/README.md) and after the memory service
 integration is on `main`. [01](01-unit-and-principal-namespaces.md) then
-[02](02-scope-resolution-and-tools.md). Update `plan/memory-service/05-openbot-integration.md`
+[02](02-scope-resolution-and-tools.md) then
+[03](03-knowledge-scopes.md); 03 depends on 02's snapshot only and may run before 01 if the memory
+integration is late. Update `plan/memory-service/05-openbot-integration.md`
 batch 05A item 2 to point here instead of describing company, agent and user scopes.
 
 ## Batch 03A Documentation
 
-`docs/departments.md` gains a memory section; the memory service's OpenBot integration notes and
+`docs/departments.md` gains a memory and knowledge section; the memory service's OpenBot integration
+notes and
 `docs/agent-authoring.md` describe the scope vocabulary. Name only behavior the code has.
 
 ## Batch 03B Final gate, once after integration
@@ -37,6 +40,7 @@ batch 05A item 2 to point here instead of describing company, agent and user sco
 | --- | --- |
 | 01 focused checks (shape, lifecycle) | Pending |
 | 02 focused checks (resolver, admission, tools) | Pending |
+| 03 focused checks (schema, search, upload) | Pending |
 | Formatting, offline compilation, clippy and reachability | Pending |
 | Fresh migrations and SQLx metadata | Pending |
 | Database-backed full suite and network isolation | Pending |

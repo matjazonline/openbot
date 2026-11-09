@@ -6,29 +6,34 @@
 
 ## Outcome
 
-A run's readable and writable namespaces are computed from the organization tree once, at
-admission, and frozen into the run; the memory tools and steps speak that vocabulary. Continues in
-[03](03-integration-and-final-verification.md).
+A run's readable units and namespaces are computed from the organization tree once, at admission,
+and frozen into the run; the memory tools and steps speak that vocabulary, and knowledge search
+([03](03-knowledge-scopes.md)) reads the same snapshot. Continues in [03](03-knowledge-scopes.md).
 
 ## Batch 02A Resolution
 
-1. One pure function `memory_scopes(chain, agent, roles_held, personal)` in
-   `src/application/workflow/memory_scopes.rs` takes the desk's department chain (desk unit first,
-   root last), the acting agent principal, the departments where that agent holds `lead`, and
-   returns `ResolvedScopes { read: Vec<NamespaceOwner>, write_default: NamespaceOwner,
-   write_personal: NamespaceOwner }` per the README's decisions 4 to 6:
-   - read = `Principal(agent)` ∪ `Unit(each in chain)` ∪ `Unit(each direct child of a department
-     where the agent holds lead)`;
-   - write_default = `Unit(chain[0])`, or `Principal(agent)` when there is no chain;
-   - no chain and several departments → read `Principal(agent)` and `Unit(root)` only.
+1. One pure function `run_scopes(chain, agent, roles_held)` in
+   `src/application/workflow/scopes.rs` takes the desk's department chain (desk unit first, root
+   last), the acting agent principal and the departments where that agent holds `lead`, and
+   returns `RunScopes { units: Vec<DepartmentId>, personal: PrincipalId, write_unit:
+   Option<DepartmentId> }` per the README's decisions 4 to 6 and 9:
+   - units = each in chain ∪ each direct child of a department where the agent holds lead; this
+     set is both the memory unit namespaces readable and the knowledge units searchable;
+   - write_unit = chain[0], or none when there is no chain;
+   - no chain and several departments → units = root only.
+
+   Memory namespaces readable are `Principal(personal)` ∪ `Unit(each of units)`; the default
+   memory write is `Unit(write_unit)` or `Principal(personal)` when there is none.
 
    It has no I/O and is unit tested across every combination, including the depth bound of 8.
 2. Admission (`create`, `src/adapters/persistence/workflow/admission_write.rs:7`) computes it with
    the department chain already loaded for role resolution
    ([02-workflow-roles](../02-workflow-roles/02-admission-resolution-and-snapshots.md)) and stores
-   it in `workflow_run_memory_scopes (company_id, run_id, namespace_id, access)`, `access` in
-   `read`, `write_default`, `write_personal`, immutable after insert. Later tree changes affect later
-   runs only, like every other admission snapshot.
+   it in `workflow_run_scopes (company_id, run_id, unit_id, access)` with `access` in `read`,
+   `write`, plus one `personal` row naming the principal, immutable after insert. Later tree
+   changes affect later runs only, like every other admission snapshot. Memory namespace ids are
+   looked up from the unit and principal at use, so a namespace provisioned after admission becomes
+   readable without re-admission.
 3. `ScopeAccess` in the memory tools runtime reads that table instead of deriving company, agent and
    user owners per call. Namespaces not yet `ready` are reported `not_ready` as today; a namespace
    missing from the table is `scope_unavailable`.
@@ -61,7 +66,7 @@ admission, and frozen into the run; the memory tools and steps speak that vocabu
 
 ## Focused checks
 
-- `memory_scope_resolve_`: unit tests of the pure resolver for every case in 02A item 1.
+- `run_scopes_resolve_`: unit tests of the pure resolver for every case in 02A item 1.
 - `memory_scope_admission_`: with the scripted-model `Deployment` harness, the same agent on two
   department desks reads two different unit chains; a lead reads one step down and a member does
   not; a sub-department run cannot write the root; a direct-message run with one department writes

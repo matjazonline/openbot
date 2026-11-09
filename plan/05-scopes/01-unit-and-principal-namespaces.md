@@ -42,7 +42,8 @@ created and retired with its owner; nothing else has one. Continues in
 3. Retirement: `delete_on` for a department calls `retire_namespaces_on` for its unit, as agent and
    user deletion already do (`agent.rs:472`, `user_lifecycle.rs:88`). Re-parenting a department
    touches no namespace. Removing a member from a department touches no namespace; its reads
-   change through [02](02-scope-resolution-and-tools.md).
+   change through [02](02-scope-resolution-and-tools.md). Knowledge documents are not namespaces
+   and are covered in [03](03-knowledge-scopes.md).
 4. A returning principal or a re-created department slug gets a new namespace id, as today (E9);
    the tombstone cool-down applies.
 

@@ -12,7 +12,7 @@ and are implemented in order, each as its own resettable step:
 [02-workflow-roles](../02-workflow-roles/README.md),
 [03-principal-addresses](../03-principal-addresses/README.md),
 [04-root-unit](../04-root-unit/README.md),
-[05-memory-scopes](../05-memory-scopes/README.md).
+[05-scopes](../05-scopes/README.md).
 
 ## Intended behavior
 
@@ -89,7 +89,7 @@ The primitives keep their meaning:
     [02-workflow-roles](../02-workflow-roles/04-escalation-and-reassignment.md), not a line in the
     lead's prompt. This plan only makes sure every department desk has a department to resolve it.
 11. **Departments carry no access level.** Knowledge and memory levels stay on the member.
-    Department-scoped memory namespaces are [05-memory-scopes](../05-memory-scopes/README.md);
+    Department-scoped memory namespaces are [05-scopes](../05-scopes/README.md);
     this plan gives it a stable `department_id` to scope by and nothing more.
 
 ## What does not change

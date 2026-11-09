@@ -5,7 +5,7 @@
 > or staged rollouts for existing data.
 
 Status: proposed, 2026-11-09. Fourth of five organization plans, followed by
-[05-memory-scopes](../05-memory-scopes/README.md); depends on
+[05-scopes](../05-scopes/README.md); depends on
 [01-departments](../01-departments/README.md), [02-workflow-roles](../02-workflow-roles/README.md)
 and [03-principal-addresses](../03-principal-addresses/README.md).
 
