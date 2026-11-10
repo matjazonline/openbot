@@ -10,8 +10,8 @@ use crate::{
     entities::{
         creation::CreationProvenance,
         department::{
-            Department, DepartmentId, DepartmentMember, DepartmentRole, DepartmentRoleHolder,
-            HeldDepartmentRole,
+            Department, DepartmentDesk, DepartmentId, DepartmentMember, DepartmentPrincipal,
+            DepartmentRole, DepartmentRoleHolder, HeldDepartmentRole,
         },
         transport::PrincipalId,
     },
@@ -122,4 +122,22 @@ pub trait DepartmentPersistence: Send + Sync {
         company: CompanyId,
         principal: PrincipalId,
     ) -> AppResult<Vec<HeldDepartmentRole>>;
+    /// The company's people and agents, agents first, each by name; at most `limit`.
+    async fn principals(
+        &self,
+        company: CompanyId,
+        limit: usize,
+    ) -> AppResult<Vec<DepartmentPrincipal>>;
+    /// These principals of the company, by name; an id not in the company is left out.
+    async fn principals_by_id(
+        &self,
+        company: CompanyId,
+        ids: &[PrincipalId],
+    ) -> AppResult<Vec<DepartmentPrincipal>>;
+    /// The desks this department owns, by address.
+    async fn desks(
+        &self,
+        company: CompanyId,
+        department: DepartmentId,
+    ) -> AppResult<Vec<DepartmentDesk>>;
 }

@@ -51,7 +51,10 @@ async fn placed(
                 roles: department.roles,
             })
             .collect();
-        entry.desk = desks.remove(&id).map(|desk| desk.address);
+        entry.desk = desks.remove(&id).map(|desk| AgentDesk {
+            id: desk.id,
+            address: desk.address,
+        });
     }
     Ok(())
 }

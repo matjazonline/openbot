@@ -114,6 +114,75 @@ pub struct DepartmentMember {
     pub created_at: DateTime<Utc>,
 }
 
+/// The most people and agents the department forms offer as members or leads; a longer list is
+/// cut and says so.
+pub const MAX_DEPARTMENT_PRINCIPAL_CHOICES: usize = 500;
+
+/// A person or agent of the company as the department pages name it: an agent by its name and
+/// handle, a person by their username and email.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DepartmentPrincipal {
+    pub principal_id: PrincipalId,
+    pub kind: crate::entities::participant::PrincipalKind,
+    pub name: String,
+    pub detail: String,
+}
+
+/// A desk a department owns, at its primary address slug.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DepartmentDesk {
+    pub id: Uuid,
+    pub name: String,
+    pub slug: String,
+    /// The department's own desk, the one its `department:{id}` record names. A slug edit does
+    /// not move it, so its address is this slug, not the department's.
+    pub own: bool,
+}
+
+/// The departments in tree order with their depth (a root is 0): each department, then its
+/// children, siblings by name and then id. A department whose parent is not in `departments`
+/// (a member sees only their own) is placed as a root, so nothing is dropped.
+pub fn department_tree(departments: &[Department]) -> Vec<(usize, &Department)> {
+    let present: std::collections::HashSet<DepartmentId> =
+        departments.iter().map(|department| department.id).collect();
+    let mut sorted: Vec<&Department> = departments.iter().collect();
+    sorted.sort_by(|a, b| {
+        a.name
+            .cmp(&b.name)
+            .then(a.id.as_uuid().cmp(&b.id.as_uuid()))
+    });
+    let children = |parent: Option<DepartmentId>| -> Vec<&Department> {
+        sorted
+            .iter()
+            .copied()
+            .filter(|department| match parent {
+                None => department.parent_id.is_none_or(|id| !present.contains(&id)),
+                Some(parent) => department.parent_id == Some(parent),
+            })
+            .collect()
+    };
+    let mut ordered = Vec::with_capacity(departments.len());
+    let mut stack: Vec<(usize, &Department)> = children(None)
+        .into_iter()
+        .rev()
+        .map(|root| (0, root))
+        .collect();
+    while let Some((depth, department)) = stack.pop() {
+        ordered.push((depth, department));
+        // The schema keeps the tree acyclic and at most `MAX_DEPARTMENT_DEPTH` deep; the bound
+        // only keeps a corrupt row from looping.
+        if depth + 1 < MAX_DEPARTMENT_DEPTH * 2 {
+            stack.extend(
+                children(Some(department.id))
+                    .into_iter()
+                    .rev()
+                    .map(|child| (depth + 1, child)),
+            );
+        }
+    }
+    ordered
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

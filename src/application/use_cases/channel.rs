@@ -35,12 +35,12 @@ impl ChannelWrite {
 
         if self.name.is_empty() {
             return Err(AppError::BadRequest(
-                "The channel name cannot be empty.".into(),
+                "The desk name cannot be empty.".into(),
             ));
         }
         if self.slug.is_empty() {
             return Err(AppError::BadRequest(
-                "The channel address cannot be empty.".into(),
+                "The desk address cannot be empty.".into(),
             ));
         }
         validate_slug(&self.slug, SlugKind::ChannelAddress)?;
@@ -106,7 +106,7 @@ fn check_spam_interlock(
 /// A channel belonging to another company is reported exactly like a missing one, so an id probe
 /// cannot tell a foreign channel from a nonexistent one. See [`managed_company`].
 pub fn channel_not_found() -> AppError {
-    AppError::NotFound("Channel not found in this company.".into())
+    AppError::NotFound("Desk not found in this company.".into())
 }
 
 /// The ports the channel read rule needs, borrowed from whichever use case asks.
@@ -423,8 +423,8 @@ pub enum SlugKind {
 impl SlugKind {
     fn noun(self) -> &'static str {
         match self {
-            SlugKind::ChannelAddress => "channel address",
-            SlugKind::ChannelAlias => "channel alias",
+            SlugKind::ChannelAddress => "desk address",
+            SlugKind::ChannelAlias => "desk alias",
             SlugKind::AgentSlug => "agent slug",
             SlugKind::DepartmentAddress => "department address",
         }
@@ -1163,7 +1163,7 @@ mod tests {
             "Internal drops the message on the way out: {alias_err:?}"
         );
         let message = alias_err.to_string();
-        assert!(message.contains("channel alias"), "{message}");
+        assert!(message.contains("desk alias"), "{message}");
         assert!(message.contains("ops-quiet"), "{message}");
         assert!(
             message.contains("noagent, quiet, message, msg, na"),
@@ -1175,7 +1175,7 @@ mod tests {
             .unwrap_err()
             .to_string();
         assert!(
-            address_message.contains("channel address"),
+            address_message.contains("desk address"),
             "{address_message}"
         );
 

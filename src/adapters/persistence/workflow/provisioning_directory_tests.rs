@@ -1,7 +1,9 @@
 //! The agent directories name departments and desks (01-departments p03 B3, 01DEP-P03-D10):
 //! `list_company_agents` and the authoring picker's entries, `department_directory_`.
 use super::*;
-use crate::application::agent::{AgentAuthoringReads, AgentCompanyScope, AgentKey, DepartmentRef};
+use crate::application::agent::{
+    AgentAuthoringReads, AgentCompanyScope, AgentDesk, AgentKey, DepartmentRef,
+};
 use crate::application::ports::channel::ChannelPersistence;
 use crate::application::use_cases::agent::AgentPlacement;
 use crate::entities::department::{DepartmentId, DepartmentRole};
@@ -204,6 +206,15 @@ async fn department_directory_lists_departments_roles_and_desks() {
     assert_eq!(desks().await, before, "a listing recreates no desk");
 }
 
+async fn agent_id(f: &AdmissionFixture, slug: &str) -> Uuid {
+    sqlx::query_scalar("SELECT id FROM agents WHERE company_id = $1 AND slug = $2")
+        .bind(company(f).as_uuid())
+        .bind(slug)
+        .fetch_one(f.persistence().pool())
+        .await
+        .unwrap()
+}
+
 fn listed_desk(listing: &Value, slug: &str) -> Value {
     listing["agents"]
         .as_array()
@@ -301,7 +312,14 @@ async fn department_directory_picker_entries_name_departments_and_the_desk() {
         roles: vec![DepartmentRole::Lead],
     }];
     assert_eq!(closer.departments, expected);
-    assert_eq!(closer.desk, Some(address(&f, "closer").await));
+    let closer_agent = agent_id(&f, "closer").await;
+    assert_eq!(
+        closer.desk,
+        Some(AgentDesk {
+            id: desk_of(&f, closer_agent).await,
+            address: address(&f, "closer").await,
+        })
+    );
     let entry = reads
         .agent_directory_entry(scope, AgentKey::parse("closer").unwrap())
         .await

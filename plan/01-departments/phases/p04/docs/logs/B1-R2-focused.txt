@@ -1,0 +1,38 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.34s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-c4f538027eed5c31)
+
+running 31 tests
+test adapters::http::pages::tests::department_ui::department_ui_company_pane_has_a_departments_tab_and_count ... ok
+test adapters::http::pages::tests::department_ui::department_ui_desk_form_offers_the_department_and_members_only ... ok
+test adapters::http::pages::tests::department_ui::department_ui_desk_lists_group_by_department_with_a_badge ... ok
+test adapters::http::pages::tests::department_ui::department_ui_agent_settings_show_its_desk_and_departments ... ok
+test adapters::http::pages::tests::department_ui::department_ui_member_sees_their_departments_without_forms ... ok
+test adapters::http::pages::tests::department_ui::department_ui_tree_orders_each_root_before_its_children ... ok
+test adapters::http::pages::tests::desk_wording::desk_wording_company_workspace_count ... ok
+test adapters::http::pages::tests::department_ui::department_ui_refusal_renders_on_the_form_that_made_it ... ok
+test adapters::http::pages::tests::department_ui::department_ui_pane_indents_the_tree_and_shows_the_selected_department ... ok
+test adapters::http::pages::tests::desk_wording::desk_wording_desks_page_heading ... ok
+test adapters::http::pages::tests::desk_wording::desk_wording_flash_messages_say_desk ... ok
+test adapters::http::pages::tests::desk_wording::desk_wording_nav_names_the_desks_link ... ok
+test adapters::http::pages::tests::desk_wording::desk_wording_settings_breadcrumb ... ok
+test adapters::http::routes::ui_channels::tests::department_ui_desk_form_asks_only_for_the_ownership_it_changes ... ok
+test adapters::http::pages::tests::desk_wording::desk_wording_scan_reads_text_nodes_in_every_literal_form ... ok
+test adapters::http::pages::tests::desk_wording::desk_wording_page_sources_keep_channel_out_of_text_nodes ... ok
+test adapters::http::routes::ui_departments::tests::department_ui_member_sees_only_their_departments ... ok
+test adapters::http::routes::onboarding::tests::agent_default_desk_onboarding_completion_reads_back_the_default_desk ... ok
+test adapters::persistence::department::tests::ui_reads::department_ui_reads_name_people_and_agents_and_list_owned_desks ... ok
+test adapters::http::routes::ui_departments::tests::department_ui_owner_writes_render_and_refusals_land_on_their_form ... ok
+test adapters::http::routes::ui_departments::tests::department_ui_foreign_ids_under_the_owners_path_change_nothing ... ok
+test adapters::http::routes::ui_departments::tests::department_ui_writes_answer_404_to_members_strangers_and_foreign_companies ... ok
+test adapters::persistence::onboarding::tests::agent_default_desk_onboarding_creates_and_replays_the_first_department ... ok
+test adapters::persistence::onboarding::tests::agent_default_desk_onboarding_taken_address_rejects_and_commits_nothing ... ok
+test adapters::persistence::onboarding::tests::agent_default_desk_onboarding_names_the_department_on_a_resubmission ... ok
+test adapters::persistence::onboarding::tests::agent_default_desk_onboarding_without_a_keyed_model_is_rejected ... ok
+test application::use_cases::builtin_agent_library::tests::desk_wording_agent_builder_prompt_says_desk ... ok
+test application::workflow::publication::tests::agent_tests::department::department_directory_tool_description_names_departments_and_desks ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::directory::department_directory_picker_entries_name_departments_and_the_desk ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::directory::department_directory_lists_departments_roles_and_desks ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::directory::department_directory_filters_by_one_department ... ok
+
+test result: ok. 31 passed; 0 failed; 0 ignored; 0 measured; 4122 filtered out; finished in 4.88s
+

@@ -96,6 +96,8 @@ pub struct AgentEditPane<'a> {
     pub error: Option<&'a str>,
     pub capability_options: AgentCapabilityOptions<'a>,
     pub authoring: Option<&'a crate::application::agent::AgentAuthoringState>,
+    /// The agent's departments, roles and default desk (01-departments 04B.3).
+    pub directory: Option<&'a crate::application::agent::AgentDirectoryEntry>,
 }
 
 #[derive(Debug, Clone, Copy, Default)]
@@ -317,6 +319,7 @@ fn agent_settings_body(pane: &AgentEditPane<'_>) -> String {
                     </div>
                 </form>
                 <form id="agent-catalog-form-{agent_id}" class="hidden"></form>
+                {placement_html}
                 {assistant_html}
                 {publication}
                 {workflow_usage}
@@ -326,6 +329,10 @@ fn agent_settings_body(pane: &AgentEditPane<'_>) -> String {
             .expected_revision
             .unwrap_or(pane.agent.draft_revision)
             .get(),
+        placement_html = pane
+            .directory
+            .map(|entry| agent_placement_card(company_id, entry))
+            .unwrap_or_default(),
         assistant_html = assistant_channel_card(company_id, pane.agent, None),
         workflow_usage = super::workflow_agent_usage_card(company_id, agent_id),
         tools = pane
@@ -345,6 +352,67 @@ fn agent_settings_body(pane: &AgentEditPane<'_>) -> String {
             model_connections: pane.model_connections,
             capability_options: pane.capability_options,
         }),
+    )
+}
+
+/// Where the agent works: its default desk, created with it, and the departments it belongs to or
+/// leads. Read-only: membership and roles are edited on the company's Departments tab.
+fn agent_placement_card(
+    company_id: Uuid,
+    entry: &crate::application::agent::AgentDirectoryEntry,
+) -> String {
+    let desk = match &entry.desk {
+        Some(desk) => format!(
+            r#"<p class="text-sm">Mail to <code id="agent-default-desk" class="font-mono">{address}</code> reaches this agent's own desk, created with the agent.</p>
+            <a class="btn btn-ghost btn-sm" href="/ui/channels?company_id={company_id}&amp;channel_id={id}">Open desk settings</a>"#,
+            address = escape_html_text(&desk.address),
+            id = desk.id,
+        ),
+        None => r#"<p id="agent-default-desk" class="text-sm opacity-70">This agent's own desk was deleted. Create an additional desk below to give it an address again.</p>"#.to_string(),
+    };
+    let departments = if entry.departments.is_empty() {
+        r#"<p class="text-sm opacity-70">Not in any department.</p>"#.to_string()
+    } else {
+        let rows: String = entry
+            .departments
+            .iter()
+            .map(|department| {
+                let roles = department
+                    .roles
+                    .iter()
+                    .map(|role| {
+                        format!(
+                            r#" <span class="badge badge-outline badge-sm">{}</span>"#,
+                            escape_html_text(role.as_str())
+                        )
+                    })
+                    .collect::<String>();
+                format!(
+                    r#"<li><a class="link-hover" href="{url}">{name}</a> <span class="font-mono text-xs opacity-60">{slug}</span>{roles}</li>"#,
+                    url = super::departments_url(
+                        company_id,
+                        Some(crate::entities::department::DepartmentId::new(department.id))
+                    ),
+                    name = escape_html_text(&department.name),
+                    slug = escape_html_text(&department.slug),
+                )
+            })
+            .collect();
+        format!(r#"<ul id="agent-departments" class="space-y-1 text-sm">{rows}</ul>"#)
+    };
+    format!(
+        r##"
+                <section id="agent-placement-card" class="mt-6 space-y-3 rounded-box border border-base-300 p-4">
+                    <div>
+                        <h3 class="font-semibold">Desk and departments</h3>
+                    </div>
+                    {desk}
+                    <h4 class="text-xs font-semibold uppercase tracking-wider opacity-60">Departments</h4>
+                    {departments}
+                    <p class="text-xs opacity-60">Membership and the lead role are edited on the company's <a class="link" href="{departments_url}">Departments</a> tab.</p>
+                </section>
+        "##,
+        departments_url = super::departments_url(company_id, None),
     )
 }
 
@@ -376,8 +444,8 @@ pub fn assistant_channel_card(
         r##"
                 <section id="assistant-channel-card" class="mt-6 space-y-3 rounded-box border border-base-300 p-4">
                     <div>
-                        <h3 class="font-semibold">Assistant desk</h3>
-                        <p class="text-sm opacity-70">Create a team desk (never public) that this agent answers. Autonomous replies send the agent's answer directly; reviewed replies wait for your approval first.</p>
+                        <h3 class="font-semibold">Additional assistant desk</h3>
+                        <p class="text-sm opacity-70">The agent already has its own desk. Create another team desk (never public) that this agent answers, at a different address. Autonomous replies send the agent's answer directly; reviewed replies wait for your approval first.</p>
                     </div>
                     {banner}
                     <form hx-post="/ui/agents/{agent_id}/assistant-channel?company_id={company_id}"
@@ -400,7 +468,7 @@ pub fn assistant_channel_card(
                             </select>
                         </label>
                         <div class="flex items-end">
-                            <button type="submit" class="btn btn-outline">Create assistant desk</button>
+                            <button type="submit" class="btn btn-outline">Create additional desk</button>
                         </div>
                     </form>
                 </section>

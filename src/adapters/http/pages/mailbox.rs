@@ -991,6 +991,7 @@ document.addEventListener('input', function (event) {
         case 'agent-simple-address-preview': updateSimpleAgentAddressPreview(control); break;
         case 'spam-warning': toggleSpamWarning(control); break;
         case 'channel-spam-confirm': toggleChannelSpamConfirm(control); break;
+        case 'desk-members-only': toggleDeskMembersOnly(control); break;
         case 'auto-grow-composer': autoGrowComposer(control); break;
     }
 });

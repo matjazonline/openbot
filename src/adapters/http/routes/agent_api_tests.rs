@@ -201,7 +201,7 @@ async fn library_builder_copy_keeps_its_grants_on_an_explicit_model() {
         .create_agent_from_library(f.user, f.company, definition.id, None)
         .await
         .unwrap();
-    // 01DEP-P03-D1: the copy comes with its default desk at its slug; "Create assistant desk"
+    // 01DEP-P03-D1: the copy comes with its default desk at its slug; "Create additional desk"
     // adds more.
     assert_eq!(company_channels().await, channels_before + 1);
     assert_eq!(

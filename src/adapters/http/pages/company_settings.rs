@@ -21,6 +21,7 @@ pub enum CompanyTab {
     Settings,
     Team,
     Skills,
+    Departments,
 }
 
 impl CompanyTab {
@@ -29,6 +30,7 @@ impl CompanyTab {
         match value.map(str::trim) {
             Some("team") => CompanyTab::Team,
             Some("skills") => CompanyTab::Skills,
+            Some("departments") => CompanyTab::Departments,
             _ => CompanyTab::Settings,
         }
     }
@@ -44,6 +46,7 @@ pub enum CompanyPaneBody<'a> {
     Settings,
     Team(&'a str),
     Skills(&'a str),
+    Departments(&'a str),
 }
 
 impl CompanyPaneBody<'_> {
@@ -52,6 +55,7 @@ impl CompanyPaneBody<'_> {
             CompanyPaneBody::Settings => CompanyTab::Settings,
             CompanyPaneBody::Team(_) => CompanyTab::Team,
             CompanyPaneBody::Skills(_) => CompanyTab::Skills,
+            CompanyPaneBody::Departments(_) => CompanyTab::Departments,
         }
     }
 }
@@ -147,6 +151,7 @@ pub struct CompanyCreatePane<'a> {
 #[derive(Debug, Clone, Copy, Default)]
 pub struct CompanyCounts {
     pub channels: usize,
+    pub departments: usize,
     pub agents: usize,
     pub skills: usize,
 }
@@ -267,6 +272,7 @@ pub fn company_edit_pane(pane: &CompanyEditPane<'_>) -> String {
             CompanyPaneBody::Settings => company_settings_body(pane),
             CompanyPaneBody::Team(html) => html.to_string(),
             CompanyPaneBody::Skills(html) => html.to_string(),
+            CompanyPaneBody::Departments(html) => html.to_string(),
         },
     )
 }
@@ -284,6 +290,7 @@ fn company_tabs(company_id: Uuid, tab: CompanyTab) -> String {
                     <a role="tab" class="tab {settings_active}" href="/ui/companies?company_id={company_id}">Settings</a>
                     <a role="tab" class="tab {team_active}" href="{team_url}">Team</a>
                     <a role="tab" class="tab {skills_active}" href="/ui/companies?company_id={company_id}&amp;tab=skills">Skills</a>
+                    <a role="tab" class="tab {departments_active}" href="/ui/companies?company_id={company_id}&amp;tab=departments">Departments</a>
                 </div>
         "##,
         settings_active = if tab == CompanyTab::Settings {
@@ -297,6 +304,11 @@ fn company_tabs(company_id: Uuid, tab: CompanyTab) -> String {
             ""
         },
         skills_active = if tab == CompanyTab::Skills {
+            "tab-active"
+        } else {
+            ""
+        },
+        departments_active = if tab == CompanyTab::Departments {
             "tab-active"
         } else {
             ""
@@ -415,10 +427,14 @@ pub fn company_create_pane(pane: &CompanyCreatePane<'_>) -> String {
 fn workspace_links(company_id: Uuid, counts: CompanyCounts) -> String {
     format!(
         r##"
-                <div class="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-6">
+                <div class="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-7">
                     <a href="/ui/channels?company_id={company_id}" class="btn btn-ghost h-auto flex-col gap-0 py-2">
                         <span class="text-lg font-bold">{channels}</span>
                         <span class="text-[11px] font-normal opacity-60">Desks</span>
+                    </a>
+                    <a href="/ui/companies?company_id={company_id}&amp;tab=departments" class="btn btn-ghost h-auto flex-col gap-0 py-2">
+                        <span class="text-lg font-bold">{departments}</span>
+                        <span class="text-[11px] font-normal opacity-60">Departments</span>
                     </a>
                     <a href="/ui/agents?company_id={company_id}" class="btn btn-ghost h-auto flex-col gap-0 py-2">
                         <span class="text-lg font-bold">{agents}</span>
@@ -440,6 +456,7 @@ fn workspace_links(company_id: Uuid, counts: CompanyCounts) -> String {
                 </div>
         "##,
         channels = counts.channels,
+        departments = counts.departments,
         agents = counts.agents,
         skills = counts.skills,
         work_glyph = icon(Icon::Gear, "h-5 w-5"),

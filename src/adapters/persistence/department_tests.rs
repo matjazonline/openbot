@@ -1038,3 +1038,6 @@ mod lead_desks;
 
 #[path = "department_roster_tests.rs"]
 mod roster;
+
+#[path = "department_ui_reads_tests.rs"]
+mod ui_reads;

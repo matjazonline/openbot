@@ -6,7 +6,9 @@
 //! sends the sidebar list along out of band, so a rename or a delete shows up immediately.
 
 use super::*;
-use crate::entities::{channel::PUBLIC_PARTICIPANT, schedule::ChannelSchedule};
+use crate::entities::{
+    channel::PUBLIC_PARTICIPANT, department::Department, schedule::ChannelSchedule,
+};
 use crate::use_cases::schedule::ScheduleBindingChoice;
 
 /// Client-side behaviour this workspace adds on top of [`MAILBOX_SCRIPT`].
@@ -28,6 +30,19 @@ pub(crate) const CHANNEL_SETTINGS_SCRIPT: &str = r##"        // The spam interlo
                 if (!isPublic) checkbox.checked = false;
             }
         }
+
+        // The members-only box means something only for a desk a department owns.
+        function toggleDeskMembersOnly(select) {
+            var form = select.closest('form');
+            if (!form) return;
+            var box = form.querySelector('.desk-members-only');
+            if (!box) return;
+            box.classList.toggle('hidden', !select.value);
+            if (!select.value) {
+                var checkbox = box.querySelector('input[type="checkbox"]');
+                if (checkbox) checkbox.checked = false;
+            }
+        }
 "##;
 
 /// The channel list in the sidebar — the only part of the workspace a write has to refresh.
@@ -36,6 +51,8 @@ pub struct ChannelSettingsList<'a> {
     /// Domain the channel addresses are built on, e.g. `mailagents.com`.
     pub app_domain_name: &'a str,
     pub channels: &'a [Channel],
+    /// The company's departments, to group the desks under.
+    pub departments: &'a [Department],
     pub selected_channel_id: Option<Uuid>,
 }
 
@@ -66,6 +83,11 @@ pub struct ChannelDraft<'a> {
     pub enabled: bool,
     /// Whether CC'd outsiders may join this channel's threads. Starts on, like `enabled`.
     pub add_3rd_party: bool,
+    /// The department that owns the desk, if any.
+    pub department_id: Option<Uuid>,
+    /// Only the department's people (and the neighbouring leads) may use the desk; meaningful
+    /// only with a department.
+    pub members_only: bool,
 }
 
 impl Default for ChannelDraft<'_> {
@@ -78,6 +100,8 @@ impl Default for ChannelDraft<'_> {
             participant_emails: "",
             enabled: true,
             add_3rd_party: true,
+            department_id: None,
+            members_only: false,
         }
     }
 }
@@ -107,6 +131,8 @@ pub struct ChannelEditPane<'a> {
     /// What the user last typed, when a save was rejected; `None` shows the stored channel.
     pub draft: Option<&'a ChannelDraft<'a>>,
     pub error: Option<&'a str>,
+    /// The company's departments, for the owner select.
+    pub departments: &'a [Department],
 }
 
 /// The pane for a channel that does not exist yet.
@@ -116,6 +142,7 @@ pub struct ChannelCreatePane<'a> {
     pub spam_scan_enabled: bool,
     pub draft: &'a ChannelDraft<'a>,
     pub error: Option<&'a str>,
+    pub departments: &'a [Department],
 }
 
 pub fn channel_settings_page(page: &ChannelSettingsPage<'_>) -> String {
@@ -161,30 +188,76 @@ pub fn channel_settings_page(page: &ChannelSettingsPage<'_>) -> String {
 /// Rendered out of band after a write, so a created, renamed or deleted channel shows up without
 /// the pane having to reload the whole workspace.
 pub fn channel_settings_list(list: &ChannelSettingsList<'_>, swap: FragmentSwap) -> String {
-    let entries: String = list
-        .channels
-        .iter()
-        .map(|channel| {
-            channel_settings_entry(
-                list.company.id,
-                channel,
-                &channel.inbound_address(&list.company.slug, list.app_domain_name),
-                list.selected_channel_id == Some(channel.id),
-            )
-        })
-        .collect();
-
     let menu_body = if list.channels.is_empty() {
         r##"<li class="px-2 py-6 text-center text-xs opacity-60">No desks yet. Create your first one below.</li>"##
             .to_string()
     } else {
-        entries
+        grouped_by_department(list.channels, list.departments)
+            .into_iter()
+            .map(|(heading, channels)| {
+                let entries: String = channels
+                    .into_iter()
+                    .map(|channel| {
+                        channel_settings_entry(
+                            list.company.id,
+                            channel,
+                            &channel.inbound_address(&list.company.slug, list.app_domain_name),
+                            list.selected_channel_id == Some(channel.id),
+                        )
+                    })
+                    .collect();
+                match heading {
+                    Some(heading) => format!(
+                        r#"<li class="menu-title desk-group pt-3 text-[11px] uppercase tracking-wider">{}</li>{entries}"#,
+                        escape_html_text(&heading)
+                    ),
+                    None => entries,
+                }
+            })
+            .collect()
     };
 
     format!(
         r##"<ul id="channel-menu" class="menu w-full flex-1 flex-nowrap gap-1 overflow-y-auto px-2"{oob}>{menu_body}</ul>"##,
         oob = swap.oob_attribute(),
     )
+}
+
+/// The desks under their department's heading, departments in tree order (a root before its
+/// children), then "No department" last. With no department owning any desk there are no
+/// headings at all: a company that does not use departments sees its list as before.
+pub fn grouped_by_department<'c>(
+    channels: &'c [Channel],
+    departments: &[Department],
+) -> Vec<(Option<String>, Vec<&'c Channel>)> {
+    let owned =
+        |department: Option<crate::entities::department::DepartmentId>| -> Vec<&'c Channel> {
+            channels
+                .iter()
+                .filter(|channel| channel.department_id == department)
+                .collect()
+        };
+    let known: std::collections::HashSet<_> =
+        departments.iter().map(|department| department.id).collect();
+    let mut groups: Vec<(Option<String>, Vec<&'c Channel>)> =
+        crate::entities::department::department_tree(departments)
+            .into_iter()
+            .map(|(_, department)| (Some(department.name.clone()), owned(Some(department.id))))
+            .filter(|(_, desks)| !desks.is_empty())
+            .collect();
+    // A desk whose department is not in `departments` (deleted since the list was read) is shown
+    // with the unowned ones rather than dropped.
+    let rest: Vec<&Channel> = channels
+        .iter()
+        .filter(|channel| channel.department_id.is_none_or(|id| !known.contains(&id)))
+        .collect();
+    if groups.is_empty() {
+        return vec![(None, rest)];
+    }
+    if !rest.is_empty() {
+        groups.push((Some("No department".to_owned()), rest));
+    }
+    groups
 }
 
 fn channel_settings_entry(
@@ -306,6 +379,7 @@ pub fn channel_edit_pane(pane: &ChannelEditPane<'_>) -> String {
             app_domain_name: pane.app_domain_name,
             draft,
             spam_scan_enabled: pane.spam_scan_enabled,
+            departments: pane.departments,
         }),
         delete_action = delete_action,
         workflows_html = super::lazy_card(
@@ -361,6 +435,7 @@ pub fn channel_create_pane(pane: &ChannelCreatePane<'_>) -> String {
             app_domain_name: pane.app_domain_name,
             draft: pane.draft,
             spam_scan_enabled: pane.spam_scan_enabled,
+            departments: pane.departments,
         }),
     )
 }
@@ -371,6 +446,62 @@ struct ChannelFields<'a> {
     app_domain_name: &'a str,
     draft: &'a ChannelDraft<'a>,
     spam_scan_enabled: bool,
+    departments: &'a [Department],
+}
+
+/// The owning department and, once one is picked, whether only its people may use the desk.
+///
+/// The members-only box stays hidden until a department is chosen (`toggleDeskMembersOnly`), and
+/// the route ignores it without one, so a desk is never members-only of nobody.
+fn department_fields(departments: &[Department], draft: &ChannelDraft<'_>) -> String {
+    if departments.is_empty() && draft.department_id.is_none() {
+        return String::new();
+    }
+    let options: String = crate::entities::department::department_tree(departments)
+        .into_iter()
+        .map(|(depth, department)| {
+            let id = department.id.as_uuid();
+            format!(
+                r#"<option value="{id}"{selected}>{indent}{name}</option>"#,
+                selected = if draft.department_id == Some(id) {
+                    " selected"
+                } else {
+                    ""
+                },
+                indent = "&nbsp;&nbsp;".repeat(depth),
+                name = escape_html_text(&department.name),
+            )
+        })
+        .collect();
+    format!(
+        r##"
+                    <label class="form-control w-full">
+                        <div class="label"><span class="text-xs opacity-70">Department</span></div>
+                        <select name="department_id" class="select w-full" data-input="desk-members-only">
+                            <option value="">No department</option>{options}
+                        </select>
+                        <div class="label"><span class="text-[11px] opacity-60">The department that owns this desk. Ownership alone changes nobody's access.</span></div>
+                    </label>
+                    <div class="desk-members-only form-control w-full{hidden}">
+                        <label class="flex cursor-pointer items-start gap-3 rounded-lg border border-base-300 bg-base-200 p-3">
+                            <input type="checkbox" name="members_only" value="true" class="checkbox checkbox-sm mt-0.5"{checked}>
+                            <span class="text-xs">
+                                <span class="font-semibold">Members only</span>
+                                <span class="block opacity-70">Only the department's members, its lead, the lead of its parent department, the leads of its direct child departments and the addresses in Participant Emails can use this desk. Everyone else in the company, and anyone outside it, is refused. Other desks in the company can still hand work to it.</span>
+                            </span>
+                        </label>
+                    </div>"##,
+        hidden = if draft.department_id.is_some() {
+            ""
+        } else {
+            " hidden"
+        },
+        checked = if draft.members_only && draft.department_id.is_some() {
+            " checked"
+        } else {
+            ""
+        },
+    )
 }
 
 fn channel_fields(fields: &ChannelFields<'_>) -> String {
@@ -435,8 +566,10 @@ fn channel_fields(fields: &ChannelFields<'_>) -> String {
                             </span>
                         </label>
                     </div>
+                    {department_html}
                     {spam_html}
         "##,
+        department_html = department_fields(fields.departments, draft),
         name = escape_html_text(draft.name),
         description = escape_html_text(draft.description),
         company_slug = escape_html_text(&fields.company.slug),
@@ -499,6 +632,8 @@ fn stored_channel_draft<'a>(
         participant_emails,
         enabled: channel.enabled,
         add_3rd_party: channel.add_3rd_party,
+        department_id: channel.department_id.map(|department| department.as_uuid()),
+        members_only: channel.members_only,
     }
 }
 

@@ -336,7 +336,7 @@ async fn channels_an_admin_cannot_see_stay_out_of_the_tab_the_form_and_the_card(
         r#"<option value="channel:{open}">Desk Open desk</option>"#
     )));
     let refused = bind(f.admin, board, "").await;
-    assert!(refused.contains("Not saved: A chosen channel"), "{refused}");
+    assert!(refused.contains("Not saved: A chosen desk"), "{refused}");
     let card = async |user: Uuid, channel: Uuid| {
         channel_bindings(f.ui(user), Path(channel), f.query())
             .await

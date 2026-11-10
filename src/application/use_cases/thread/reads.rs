@@ -65,7 +65,7 @@ impl ThreadUseCases {
         };
         readable_channel(&readers, viewer, scope.company_id, scope.channel_id)
             .await?
-            .ok_or_else(|| AppError::NotFound("Channel not found".into()))?;
+            .ok_or_else(|| AppError::NotFound("Desk not found".into()))?;
         Ok(())
     }
 

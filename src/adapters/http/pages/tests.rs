@@ -778,6 +778,7 @@ fn icon_rail_lights_the_workspace_the_response_belongs_to() {
     )));
 
     let list = ChannelSettingsList {
+        departments: &[],
         company: &company,
         app_domain_name: "example.com",
         channels: std::slice::from_ref(&channel),
@@ -1023,6 +1024,7 @@ fn agent_edit_pane_prefills_the_stored_agent_and_offers_delete() {
     }];
 
     let html = agent_edit_pane(&AgentEditPane {
+        directory: None,
         authoring: None,
         company: &company,
         app_domain_name: "mail.test",
@@ -1056,6 +1058,7 @@ fn agent_edit_pane_prefills_the_stored_agent_and_offers_delete() {
     // An agent with nothing overridden keeps the model section collapsed.
     let plain = settings_agent(company.id, "Plain", "plain");
     let plain_html = agent_edit_pane(&AgentEditPane {
+        directory: None,
         authoring: None,
         company: &company,
         app_domain_name: "mail.test",
@@ -1078,6 +1081,7 @@ fn an_agent_with_a_picture_shows_it_and_one_without_falls_back_to_its_letter() {
     let plain = settings_agent(company.id, "Plain", "plain");
 
     let html = agent_edit_pane(&AgentEditPane {
+        directory: None,
         authoring: None,
         company: &company,
         app_domain_name: "mail.test",
@@ -1094,6 +1098,7 @@ fn an_agent_with_a_picture_shows_it_and_one_without_falls_back_to_its_letter() {
     assert!(html.contains(">T</span>"));
 
     let plain_html = agent_edit_pane(&AgentEditPane {
+        directory: None,
         authoring: None,
         company: &company,
         app_domain_name: "mail.test",
@@ -1133,6 +1138,7 @@ fn agent_edit_pane_keeps_a_rejected_save_in_the_form() {
     };
 
     let html = agent_edit_pane(&AgentEditPane {
+        directory: None,
         authoring: None,
         company: &company,
         app_domain_name: "mail.test",
@@ -1159,6 +1165,7 @@ fn prompt_generator_names_the_pane_it_answers_into() {
     let agent = settings_agent(company.id, "Triage", "triage");
 
     let edit = agent_edit_pane(&AgentEditPane {
+        directory: None,
         authoring: None,
         company: &company,
         app_domain_name: "mail.test",
@@ -1355,6 +1362,7 @@ fn channel_settings_list_targets_the_pane_and_swaps_out_of_band() {
     let company = mailbox_company();
     let channel = mailbox_channel(company.id);
     let list = ChannelSettingsList {
+        departments: &[],
         company: &company,
         app_domain_name: "example.com",
         channels: std::slice::from_ref(&channel),
@@ -1411,6 +1419,7 @@ fn channel_edit_pane_prefills_the_stored_channel_and_offers_delete() {
     };
 
     let html = channel_edit_pane(&ChannelEditPane {
+        departments: &[],
         company: &company,
         app_domain_name: "example.com",
         channel: &channel,
@@ -1451,6 +1460,7 @@ fn channel_edit_pane_reflects_the_stored_third_party_setting() {
     let company = mailbox_company();
 
     let open = channel_edit_pane(&ChannelEditPane {
+        departments: &[],
         company: &company,
         app_domain_name: "example.com",
         channel: &mailbox_channel(company.id),
@@ -1469,6 +1479,7 @@ fn channel_edit_pane_reflects_the_stored_third_party_setting() {
         ..mailbox_channel(company.id)
     };
     let closed = channel_edit_pane(&ChannelEditPane {
+        departments: &[],
         company: &company,
         app_domain_name: "example.com",
         channel: &closed_channel,
@@ -1496,6 +1507,7 @@ fn channel_edit_pane_keeps_a_rejected_save_in_the_form() {
     };
 
     let html = channel_edit_pane(&ChannelEditPane {
+        departments: &[],
         company: &company,
         app_domain_name: "example.com",
         channel: &channel,
@@ -1533,6 +1545,7 @@ fn spam_confirmation_is_inert_until_the_channel_is_public() {
             ..ChannelDraft::default()
         };
         channel_edit_pane(&ChannelEditPane {
+            departments: &[],
             company: &company,
             app_domain_name: "example.com",
             channel: &channel,
@@ -1572,6 +1585,7 @@ fn cancelling_a_channel_form_dismisses_the_pane() {
     );
 
     let edit = channel_edit_pane(&ChannelEditPane {
+        departments: &[],
         company: &company,
         app_domain_name: "example.com",
         channel: &channel,
@@ -1585,6 +1599,7 @@ fn cancelling_a_channel_form_dismisses_the_pane() {
 
     // All three create tabs offer the same way out.
     let create = channel_create_pane(&ChannelCreatePane {
+        departments: &[],
         company: &company,
         app_domain_name: "example.com",
         spam_scan_enabled: true,
@@ -1601,6 +1616,7 @@ fn channel_create_pane_makes_a_plain_channel_and_keeps_a_rejected_draft() {
     let company = mailbox_company();
     let pane = |draft: &ChannelDraft<'_>, error| {
         channel_create_pane(&ChannelCreatePane {
+            departments: &[],
             company: &company,
             app_domain_name: "example.com",
             spam_scan_enabled: true,
@@ -1641,6 +1657,7 @@ fn channels_page_opens_the_form_the_mailbox_asked_for() {
     let channels = std::slice::from_ref(&channel);
     let page = |focus| {
         channels_page(&ChannelsPage {
+            departments: &[],
             company: &company,
             app_domain_name: "example.com",
             channels,
@@ -3004,6 +3021,7 @@ fn company_edit_pane_prefills_the_stored_company_and_offers_delete() {
         model_connections: &model_connections,
         app_domain_name: "example.com",
         counts: CompanyCounts {
+            departments: 0,
             channels: 3,
             agents: 2,
             skills: 0,
@@ -3099,6 +3117,7 @@ fn company_member_can_open_company_without_edit_controls_or_api_key() {
         model_connections: &[],
         app_domain_name: "example.com",
         counts: CompanyCounts {
+            departments: 0,
             channels: 3,
             agents: 2,
             skills: 0,
@@ -3541,6 +3560,7 @@ fn each_agent_form_owns_its_own_picker() {
         ..settings_agent(company.id, "Triage", "triage")
     };
     let edit = agent_edit_pane(&AgentEditPane {
+        directory: None,
         authoring: None,
         company: &company,
         app_domain_name: "mail.test",
@@ -4054,6 +4074,7 @@ fn every_ui_workspace_first_column_renders_a_sidebar_header() {
         user: &user,
         companies: &companies,
         list: &ChannelSettingsList {
+            departments: &[],
             company: &company,
             app_domain_name: "example.com",
             channels: &[],
@@ -4595,6 +4616,7 @@ fn the_channel_form_offers_a_description_and_escapes_what_was_typed_into_it() {
     };
 
     let html = channel_create_pane(&ChannelCreatePane {
+        departments: &[],
         company: &company,
         app_domain_name: "mailagents.com",
         spam_scan_enabled: true,
@@ -4854,3 +4876,6 @@ mod knowledge_views;
 
 #[path = "desk_wording_tests.rs"]
 mod desk_wording;
+
+#[path = "department_ui_tests.rs"]
+mod department_ui;

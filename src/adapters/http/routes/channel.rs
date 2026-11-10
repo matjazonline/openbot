@@ -115,6 +115,12 @@ pub struct ChannelForm {
     pub confirm_spam_disabled: Option<String>,
     pub enabled: Option<String>,
     pub add_3rd_party: Option<String>,
+    /// The `/ui` desk form's owner select: blank for no department. Absent on a form without it,
+    /// which then leaves the ownership as it is.
+    #[serde(default)]
+    pub department_id: Option<String>,
+    #[serde(default)]
+    pub members_only: Option<String>,
 }
 
 impl ChannelForm {
@@ -325,6 +331,7 @@ pub struct ChannelsPageQuery {
 async fn list_channels_page(
     State(company_use_cases): State<Arc<CompanyUseCases>>,
     State(channel_use_cases): State<Arc<ChannelUseCases>>,
+    State(department_use_cases): State<Arc<crate::use_cases::department::DepartmentUseCases>>,
     State(config): State<Arc<AppConfig>>,
     user: AuthenticatedUser,
     Path(company_id): Path<Uuid>,
@@ -337,11 +344,15 @@ async fn list_channels_page(
     let channels = channel_use_cases
         .list_company_channels(user.id, company_id)
         .await?;
+    let departments = department_use_cases
+        .list_departments(user.id, company_id)
+        .await?;
 
     Ok(Html(pages::channels_page(&pages::ChannelsPage {
         company: &company,
         app_domain_name: &config.app_domain_name,
         channels: &channels,
+        departments: &departments,
         spam_scan_enabled: config.is_spam_scan_enabled(),
         focus: pages::ChannelsPageFocus {
             create_form_open: matches!(query.new.as_deref(), Some("1") | Some("true")),
@@ -355,6 +366,7 @@ async fn list_channels_page(
 async fn create_channel_handler(
     State(company_use_cases): State<Arc<CompanyUseCases>>,
     State(channel_use_cases): State<Arc<ChannelUseCases>>,
+    State(department_use_cases): State<Arc<crate::use_cases::department::DepartmentUseCases>>,
     State(config): State<Arc<AppConfig>>,
     user: AuthenticatedUser,
     Path(company_id): Path<Uuid>,
@@ -366,6 +378,7 @@ async fn create_channel_handler(
         .company;
     let view = ChannelListView {
         channel_use_cases: &channel_use_cases,
+        department_use_cases: &department_use_cases,
         app_domain_name: &config.app_domain_name,
         user_id: user.id,
         company: &company,
@@ -414,6 +427,7 @@ async fn create_channel_handler(
 /// error alert, so the reload lives here instead of at each `return`.
 struct ChannelListView<'a> {
     channel_use_cases: &'a ChannelUseCases,
+    department_use_cases: &'a crate::use_cases::department::DepartmentUseCases,
     app_domain_name: &'a str,
     user_id: Uuid,
     company: &'a crate::entities::company::Company,
@@ -426,7 +440,16 @@ impl ChannelListView<'_> {
             .channel_use_cases
             .list_company_channels(self.user_id, company_id)
             .await?;
-        let list = pages::channel_list_fragment(self.company, self.app_domain_name, &channels);
+        let departments = self
+            .department_use_cases
+            .list_departments(self.user_id, company_id)
+            .await?;
+        let list = pages::channel_list_fragment(
+            self.company,
+            self.app_domain_name,
+            &channels,
+            &departments,
+        );
         Ok(Html(match error {
             Some(message) => format!("{}{}", pages::error_alert(&message), list),
             None => list,
@@ -455,7 +478,7 @@ async fn managed_channel(
 }
 
 fn channel_not_found() -> AppError {
-    AppError::NotFound("Channel not found".into())
+    AppError::NotFound("Desk not found".into())
 }
 
 /// GET /companies/{company_id}/channels/{id}/edit - HTMX edit channel form fragment (Protected).
@@ -488,6 +511,7 @@ async fn edit_channel_form(
 async fn cancel_channel_edit(
     State(company_use_cases): State<Arc<CompanyUseCases>>,
     State(channel_use_cases): State<Arc<ChannelUseCases>>,
+    State(department_use_cases): State<Arc<crate::use_cases::department::DepartmentUseCases>>,
     State(config): State<Arc<AppConfig>>,
     user: AuthenticatedUser,
     Path((company_id, channel_id)): Path<(Uuid, Uuid)>,
@@ -500,10 +524,14 @@ async fn cancel_channel_edit(
         channel_id,
     )
     .await?;
+    let departments = department_use_cases
+        .list_departments(user.id, company_id)
+        .await?;
     Ok(Html(pages::channel_row_fragment(
         &company,
         &config.app_domain_name,
         &channel,
+        pages::department_name(&departments, &channel),
     )))
 }
 
@@ -512,6 +540,7 @@ async fn cancel_channel_edit(
 async fn update_channel_handler(
     State(company_use_cases): State<Arc<CompanyUseCases>>,
     State(channel_use_cases): State<Arc<ChannelUseCases>>,
+    State(department_use_cases): State<Arc<crate::use_cases::department::DepartmentUseCases>>,
     State(config): State<Arc<AppConfig>>,
     user: AuthenticatedUser,
     Path((company_id, channel_id)): Path<(Uuid, Uuid)>,
@@ -567,10 +596,14 @@ async fn update_channel_handler(
         }
         Err(error) => return Err(error),
     };
+    let departments = department_use_cases
+        .list_departments(user.id, company_id)
+        .await?;
     Ok(Html(pages::channel_row_fragment(
         &company,
         &config.app_domain_name,
         &updated,
+        pages::department_name(&departments, &updated),
     )))
 }
 
@@ -683,7 +716,7 @@ async fn list_channel_threads_fragment(
     let channel = channel_use_cases
         .get_company_channel(viewer.user_id, company_id, channel_id)
         .await?
-        .ok_or_else(|| AppError::NotFound("Channel not found".into()))?;
+        .ok_or_else(|| AppError::NotFound("Desk not found".into()))?;
     let page = load_thread_page(&thread_use_cases, &viewer, &channel, &query).await?;
 
     Ok(Html(pages::channel_thread_list_fragment(
@@ -719,7 +752,7 @@ async fn list_channel_threads_json(
     let channel = channel_use_cases
         .get_company_channel(viewer.user_id, company_id, channel_id)
         .await?
-        .ok_or_else(|| AppError::NotFound("Channel not found".into()))?;
+        .ok_or_else(|| AppError::NotFound("Desk not found".into()))?;
 
     let page = load_thread_page(&thread_use_cases, &viewer, &channel, &query).await?;
 
@@ -904,6 +937,7 @@ mod tests {
 
         let channels = [channel.clone()];
         let page = pages::ChannelsPage {
+            departments: &[],
             company: &company,
             app_domain_name: "example.com",
             channels: &channels,
@@ -925,7 +959,7 @@ mod tests {
         assert!(!page_html.contains("id=\"simple_prompt_gen_box\""));
         assert!(page_html.contains("hx-disabled-elt=\"find button[type='submit']\""));
 
-        let row_html = pages::channel_row_fragment(&company, "example.com", &channel);
+        let row_html = pages::channel_row_fragment(&company, "example.com", &channel, None);
         assert!(row_html.contains("Auto Dispatcher"));
         assert!(row_html.contains("auto-dispatcher@acme.example.com"));
         assert!(row_html.contains("agent@test.com"));

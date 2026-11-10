@@ -3,18 +3,19 @@
 - Authority: /Users/mac02/.codex/worktrees/2050/openbot/plan/01-departments/COORDINATION.md
 - Writer: root session 68933786-cbe7-4b6b-9387-b5dcb29689a4, worktree
   /Users/mac02/.codex/worktrees/2050/openbot (branch codex/departments-addressing-plans)
-- Revision: 6
+- Revision: 7
 
 ## Plan-wide instructions
 
 - 01DEP-I001 / r1: No backward compatibility (plan README, root AGENTS.md). Edit the init schema
   in place; reset databases instead of backfills, dual reads, shims or staged rollouts.
-- 01DEP-I002 / r1: Phases run in order 01 -> 02 -> 03 in this one worktree, each committed
-  locally once accepted (user authorization, 2026-11-09). 02C (the word "desk") is its own
-  commit. Phase 04 (UI and docs) and phase 05 are out of scope for this run.
-- 01DEP-I003 / r1: Verification for this run is per-phase focused checks only (user decision,
-  2026-11-09). The repository's full gate (`scripts/check.sh` plus CI-only gates) is not run and
-  must be reported as not run; the task is not claimed fully verified.
+- 01DEP-I002 / r2: Phases run in order in this one worktree, each committed locally once
+  accepted. p01–p03 accepted and committed (57adfa7a … 30654e3c). User 2026-11-10 "pull main and
+  continue": origin/main merged into the branch (b1026003), then phase 04, then 05. No push.
+  (r1: phases 01 -> 02 -> 03 only; 04 and 05 out of scope.)
+- 01DEP-I003 / r2: Verification is per-batch focused checks; the repository's full gate
+  (`scripts/check.sh` plus CI-only gates) runs once in phase 05 (05A), as plan 05 specifies. Until
+  then it is reported as not run. (r1: full gate not run in this run, user decision 2026-11-09.)
 
 ## Phase directory
 
@@ -22,7 +23,8 @@
 | --- | --- | --- | --- |
 | p01 | root 68933786 (A), B per TASK | /Users/mac02/.codex/worktrees/2050/openbot | plan/01-departments/phases/p01/docs/{TASK,HANDOFF}.md — accepted in phase, commit 57adfa7a |
 | p02 | root 68933786 (A), B per TASK | /Users/mac02/.codex/worktrees/2050/openbot | plan/01-departments/phases/p02/docs/{TASK,HANDOFF}.md — accepted in phase (B2 0c5df403, B1 next commit) |
-| p03 | root 68933786 (A), B per TASK | /Users/mac02/.codex/worktrees/2050/openbot | plan/01-departments/phases/p03/docs/{TASK,HANDOFF}.md — accepted in phase (B1 523732b7, B2 01608b1f, B3 next commit) |
+| p03 | root 68933786 (A), B per TASK | /Users/mac02/.codex/worktrees/2050/openbot | plan/01-departments/phases/p03/docs/{TASK,HANDOFF}.md — accepted in phase (B1 523732b7, B2 01608b1f, B3 30654e3c) |
+| p04 | root 68933786 (A), B per TASK | /Users/mac02/.codex/worktrees/2050/openbot | plan/01-departments/phases/p04/docs/{TASK,HANDOFF}.md — in progress (start b1026003) |
 
 ## Cross-phase notices
 

@@ -63,7 +63,10 @@ ordered assignments and first history page. Catalog endpoints under that agent a
 `tool-connections?kind=http|mcp`, `tool-options?kind=builtin|http|mcp|workflow` (with `connection` for
 HTTP/MCP operations), and `history`. Catalog responses contain `items` and `next`; pass `next` as
 `after` for subsequent options/connections. History uses both `before_created_at` and `before_id`.
-`GET /api/companies/{company}/agents/directory` lists scoped agent identities.
+`GET /api/companies/{company}/agents/directory` lists scoped agent identities. Each entry carries
+`departments` (the departments the agent belongs to or holds a role in: `id`, `name`, `slug`,
+`charter`, `roles`) and `desk`, the agent's own desk as `{"id", "address"}`, or `null` once that
+desk is deleted.
 
 Update an existing draft with `PUT /api/companies/{company}/agents/{agent}`:
 

@@ -44,4 +44,4 @@ granted two workflow tools:
 Both answer only an owner or admin writing in the app; the requester becomes the binding's run-as
 member.
 
-An owner or admin can provision the same way from the UI ("Create assistant desk").
+An owner or admin can provision the same way from the UI: an agent's settings offer "Create additional desk" beside the desk the agent already has.

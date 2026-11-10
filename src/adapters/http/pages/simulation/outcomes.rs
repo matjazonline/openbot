@@ -312,7 +312,7 @@ pub fn channel_simulation_result_fragment(
         status_banner(
             Icon::X,
             "bg-error/10 border-error/40 text-base-content",
-            "Unauthorized Sender: Email 'from' address is not listed in channel participant_emails.",
+            "Unauthorized Sender: the 'from' address is not one of this desk's Participant Emails.",
         )
     } else {
         status_banner(

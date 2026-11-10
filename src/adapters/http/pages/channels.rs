@@ -1,6 +1,7 @@
 //! Channel list and editor.
 
 use super::*;
+use crate::entities::department::Department;
 
 pub(crate) fn render_spam_disabled_warning(
     spam_scan_enabled: bool,
@@ -104,6 +105,8 @@ pub struct ChannelsPage<'a> {
     pub company: &'a Company,
     pub app_domain_name: &'a str,
     pub channels: &'a [Channel],
+    /// The company's departments: the list groups desks under them and badges each desk.
+    pub departments: &'a [Department],
     pub spam_scan_enabled: bool,
     pub focus: ChannelsPageFocus,
 }
@@ -184,7 +187,12 @@ fn focused_channel_list(page: &ChannelsPage<'_>) -> String {
         .editing_channel_id
         .filter(|id| page.channels.iter().any(|channel| channel.id == *id));
     let Some(editing_id) = editing else {
-        return channel_list_fragment(page.company, page.app_domain_name, page.channels);
+        return channel_list_fragment(
+            page.company,
+            page.app_domain_name,
+            page.channels,
+            page.departments,
+        );
     };
 
     page.channels
@@ -198,16 +206,31 @@ fn focused_channel_list(page: &ChannelsPage<'_>) -> String {
                     page.spam_scan_enabled,
                 )
             } else {
-                channel_row_fragment(page.company, page.app_domain_name, channel)
+                channel_row_fragment(
+                    page.company,
+                    page.app_domain_name,
+                    channel,
+                    department_name(page.departments, channel),
+                )
             }
         })
         .collect()
+}
+
+/// The name of the department that owns `channel`, when it is one of `departments`.
+pub fn department_name<'d>(departments: &'d [Department], channel: &Channel) -> Option<&'d str> {
+    let owner = channel.department_id?;
+    departments
+        .iter()
+        .find(|department| department.id == owner)
+        .map(|department| department.name.as_str())
 }
 
 pub fn channel_list_fragment(
     company: &Company,
     app_domain_name: &str,
     channels: &[Channel],
+    departments: &[Department],
 ) -> String {
     if channels.is_empty() {
         return r##"
@@ -218,9 +241,28 @@ pub fn channel_list_fragment(
         .to_string();
     }
 
-    channels
-        .iter()
-        .map(|wf| channel_row_fragment(company, app_domain_name, wf))
+    super::grouped_by_department(channels, departments)
+        .into_iter()
+        .map(|(heading, desks)| {
+            let rows: String = desks
+                .into_iter()
+                .map(|channel| {
+                    channel_row_fragment(
+                        company,
+                        app_domain_name,
+                        channel,
+                        department_name(departments, channel),
+                    )
+                })
+                .collect();
+            match heading {
+                Some(heading) => format!(
+                    r#"<h4 class="desk-group pt-2 text-xs font-semibold uppercase tracking-wider text-base-content/70">{}</h4>{rows}"#,
+                    escape_html_text(&heading)
+                ),
+                None => rows,
+            }
+        })
         .collect()
 }
 
@@ -359,7 +401,12 @@ pub fn channel_thread_list_fragment(
     format!("{cards}{pagination}")
 }
 
-pub fn channel_row_fragment(company: &Company, app_domain_name: &str, channel: &Channel) -> String {
+pub fn channel_row_fragment(
+    company: &Company,
+    app_domain_name: &str,
+    channel: &Channel,
+    department: Option<&str>,
+) -> String {
     let created_at_str = super::format_date(channel.created_at);
     let emails_str = match &channel.participant_emails {
         Some(emails) if !emails.is_empty() => emails.join(", "),
@@ -380,6 +427,7 @@ pub fn channel_row_fragment(company: &Company, app_domain_name: &str, channel: &
                     <div class="flex items-center gap-3">
                         <h4 class="text-md font-semibold text-base-content">{name}</h4>
                         <span class="px-2.5 py-0.5 rounded-full text-xs font-mono bg-success/10 text-base-content border border-success/40">{display_slug}</span>
+                        {department_badge}
                         {disabled_badge}
                     </div>
                     <p class="text-xs text-base-content/70 mt-1">Created on {created_at_str}</p>
@@ -413,6 +461,12 @@ pub fn channel_row_fragment(company: &Company, app_domain_name: &str, channel: &
         channel_id = channel.id,
         name = escape_html_attr(&channel.name),
         display_slug = escape_html_text(&display_slug),
+        department_badge = department
+            .map(|name| format!(
+                r#"<span class="desk-department badge badge-outline badge-sm">{}</span>"#,
+                escape_html_text(name)
+            ))
+            .unwrap_or_default(),
         created_at_str = created_at_str,
         emails_str = escape_html_text(&emails_str),
     )

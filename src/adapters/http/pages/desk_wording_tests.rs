@@ -50,6 +50,7 @@ fn desk_wording_desks_page_heading() {
     let company = mailbox_company();
     let channel = mailbox_channel(company.id);
     let html = channels_page(&ChannelsPage {
+        departments: &[],
         company: &company,
         app_domain_name: "example.com",
         channels: std::slice::from_ref(&channel),
@@ -71,7 +72,7 @@ fn desk_wording_desks_page_heading() {
     assert!(html.contains(r#"id="channel-list""#));
     assert!(html.contains(r#"hx-post="/companies/"#));
 
-    let empty = channel_list_fragment(&company, "example.com", &[]);
+    let empty = channel_list_fragment(&company, "example.com", &[], &[]);
     assert!(empty.contains("No desks configured yet. Use Add Desk to create your first one."));
 }
 
@@ -84,6 +85,7 @@ fn desk_wording_settings_breadcrumb() {
         user: &user,
         companies: std::slice::from_ref(&company),
         list: &ChannelSettingsList {
+            departments: &[],
             company: &company,
             app_domain_name: "example.com",
             channels: &[],
@@ -109,6 +111,7 @@ fn desk_wording_company_workspace_count() {
         model_connections: &[],
         app_domain_name: "example.com",
         counts: CompanyCounts {
+            departments: 0,
             channels: 7,
             agents: 2,
             skills: 0,
@@ -150,8 +153,9 @@ fn desk_wording_flash_messages_say_desk() {
     assert!(created.contains(
         r#"<div role="status" class="alert alert-success text-sm">Created the team desk support-assistant (support-assistant@acme.example.com); it now answers through its workflow.</div>"#
     ));
-    assert!(created.contains(r#"<h3 class="font-semibold">Assistant desk</h3>"#));
-    assert!(created.contains("Create assistant desk</button>"));
+    // The agent already has its own desk (01-departments 04B.3): this one is additional.
+    assert!(created.contains(r#"<h3 class="font-semibold">Additional assistant desk</h3>"#));
+    assert!(created.contains("Create additional desk</button>"));
     // The form still posts to the channel route with channel field names.
     assert!(created.contains(r#"name="channel_name""#));
     assert!(created.contains(r#"name="channel_slug""#));

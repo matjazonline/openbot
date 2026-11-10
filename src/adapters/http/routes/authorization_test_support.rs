@@ -63,6 +63,19 @@ pub(super) struct Fixture {
 }
 
 impl Fixture {
+    /// Department use cases over this fixture's database.
+    pub fn departments(&self) -> Arc<crate::use_cases::department::DepartmentUseCases> {
+        Arc::new(crate::use_cases::department::DepartmentUseCases::new(
+            self.persistence.clone(),
+            Arc::new(
+                crate::adapters::persistence::department::PostgresDepartments::new(
+                    self.persistence.as_ref().clone(),
+                    crate::adapters::persistence::test_support::provisioning_templates(),
+                ),
+            ),
+        ))
+    }
+
     pub async fn new() -> Option<Self> {
         let p = Arc::new(PostgresPersistence::new(test_pool().await?));
         let owner = account(&p, "owner").await;

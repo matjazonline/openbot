@@ -32,6 +32,7 @@ pub mod ui_channels;
 pub mod ui_companies;
 pub mod ui_dashboard;
 pub mod ui_deliveries;
+pub mod ui_departments;
 mod ui_internal_notes;
 pub mod ui_invites;
 pub mod ui_local_agents;
@@ -118,6 +119,7 @@ pub fn router(sessions: Arc<SessionAuthority>) -> Router<AppState> {
         .merge(ui_schedules::router())
         .merge(ui_companies::router())
         .merge(ui_dashboard::router())
+        .merge(ui_departments::router())
         .merge(ui_invites::router())
         .merge(ui_deliveries::router())
         .merge(ui_profile::router())

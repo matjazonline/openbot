@@ -213,7 +213,7 @@ pub(super) async fn load_viewable_channel(
     let channel = channel_use_cases
         .get_readable_channel(viewer, company_id, channel_id)
         .await?
-        .ok_or_else(|| AppError::NotFound("Channel not found".into()))?;
+        .ok_or_else(|| AppError::NotFound("Desk not found".into()))?;
     let company = company_use_cases
         .readable_company(viewer.user_id, company_id)
         .await?
@@ -409,7 +409,7 @@ async fn thread_column_fragment(
     let channel = channel_use_cases
         .get_readable_channel(&viewer, query.company_id, query.channel_id)
         .await?
-        .ok_or_else(|| AppError::NotFound("Channel not found".into()))?;
+        .ok_or_else(|| AppError::NotFound("Desk not found".into()))?;
 
     let page = load_thread_page(
         &thread_use_cases,
@@ -455,7 +455,7 @@ async fn thread_page_fragment(
     let channel = channel_use_cases
         .get_readable_channel(&viewer, query.company_id, query.channel_id)
         .await?
-        .ok_or_else(|| AppError::NotFound("Channel not found".into()))?;
+        .ok_or_else(|| AppError::NotFound("Desk not found".into()))?;
 
     let page = load_thread_page(
         &thread_use_cases,
@@ -495,7 +495,7 @@ async fn message_pane_fragment(
     let channel = channel_use_cases
         .get_readable_channel(&viewer, query.company_id, query.channel_id)
         .await?
-        .ok_or_else(|| AppError::NotFound("Channel not found".into()))?;
+        .ok_or_else(|| AppError::NotFound("Desk not found".into()))?;
     let thread = thread_use_cases
         .readable_thread(&viewer, channel.company_id, channel.id, query.thread_id)
         .await?
@@ -554,7 +554,7 @@ async fn thread_message_stream(
     let channel = channel_use_cases
         .get_readable_channel(&viewer, query.company_id, query.channel_id)
         .await?
-        .ok_or_else(|| AppError::NotFound("Channel not found".into()))?;
+        .ok_or_else(|| AppError::NotFound("Desk not found".into()))?;
     let thread = thread_use_cases
         .readable_thread(&viewer, channel.company_id, channel.id, query.thread_id)
         .await?
@@ -686,7 +686,7 @@ async fn thread_column_stream(
     let channel = channel_use_cases
         .get_readable_channel(&viewer, query.company_id, query.channel_id)
         .await?
-        .ok_or_else(|| AppError::NotFound("Channel not found".into()))?;
+        .ok_or_else(|| AppError::NotFound("Desk not found".into()))?;
 
     let company_id = query.company_id;
     // Owned, because the stream outlives this handler's borrow of the config.

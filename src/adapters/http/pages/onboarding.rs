@@ -73,7 +73,7 @@ pub fn onboarding_company_page(
             <div class="card-actions items-center justify-between"><a href="/ui" class="btn btn-ghost">Skip</a>{submit_button}</div>
         </form>"##,
         busy_handler = busy_submit_handler("Creating your workspace…"),
-        submit_button = busy_submit_button("Continue to desk"),
+        submit_button = busy_submit_button("Continue to your first desk"),
     );
     onboarding_shell("Set up your company", user, None, 1, &pane)
 }

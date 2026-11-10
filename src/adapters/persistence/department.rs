@@ -38,14 +38,41 @@ use crate::application::workflow::WorkflowActor;
 use crate::domain::workflow::CompanyId;
 use crate::entities::creation::CreationProvenance;
 use crate::entities::department::{
-    Department, DepartmentId, DepartmentMember, DepartmentRole, DepartmentRoleHolder,
-    HeldDepartmentRole, MAX_DEPARTMENT_DEPTH,
+    Department, DepartmentDesk, DepartmentId, DepartmentMember, DepartmentPrincipal,
+    DepartmentRole, DepartmentRoleHolder, HeldDepartmentRole, MAX_DEPARTMENT_DEPTH,
 };
 use crate::entities::participant::PrincipalKind;
 use crate::entities::transport::PrincipalId;
 use crate::entities::value_objects::DepartmentSlug;
 use crate::use_cases::company::company_not_found;
 use crate::use_cases::department::department_not_found;
+
+/// A principal named as the department pages show it: an agent by its current name and handle, a
+/// person by their account's username and email (not `display_label`, which a rename leaves).
+const PRINCIPAL_CHOICE: &str = "SELECT principal.id, principal.kind, \
+     COALESCE(agent.name, account.username::text, principal.display_label) AS name, \
+     COALESCE(agent.slug::text, account.email::text, '') AS detail \
+     FROM principals AS principal \
+     LEFT JOIN agents AS agent ON agent.company_id = principal.company_id \
+      AND agent.id = principal.agent_id \
+     LEFT JOIN users AS account ON account.id = principal.user_id \
+     WHERE principal.company_id = $1";
+
+fn principal_choices(
+    rows: Vec<(Uuid, String, String, String)>,
+) -> AppResult<Vec<DepartmentPrincipal>> {
+    rows.into_iter()
+        .map(|(id, kind, name, detail)| {
+            Ok(DepartmentPrincipal {
+                principal_id: PrincipalId::new(id),
+                kind: PrincipalKind::from_str(&kind)
+                    .map_err(|error| AppError::Internal(error.to_string()))?,
+                name,
+                detail,
+            })
+        })
+        .collect()
+}
 
 const DEPARTMENT_COLUMNS: &str = "department.id, department.company_id, department.name, \
      department.slug::text AS slug, department.description, department.charter, \
@@ -1009,6 +1036,74 @@ impl DepartmentPersistence for PostgresDepartments {
                 })
             })
             .collect()
+    }
+
+    async fn principals(
+        &self,
+        company: CompanyId,
+        limit: usize,
+    ) -> AppResult<Vec<DepartmentPrincipal>> {
+        let rows = sqlx::query_as(&format!(
+            "{PRINCIPAL_CHOICE} AND principal.kind IN ('agent', 'person') \
+             ORDER BY principal.kind, name, principal.id LIMIT $2"
+        ))
+        .bind(company.as_uuid())
+        .bind(i64::try_from(limit).unwrap_or(i64::MAX))
+        .fetch_all(&self.persistence.pool)
+        .await?;
+        principal_choices(rows)
+    }
+
+    async fn principals_by_id(
+        &self,
+        company: CompanyId,
+        ids: &[PrincipalId],
+    ) -> AppResult<Vec<DepartmentPrincipal>> {
+        if ids.is_empty() {
+            return Ok(Vec::new());
+        }
+        let ids: Vec<Uuid> = ids.iter().map(|id| id.as_uuid()).collect();
+        let rows = sqlx::query_as(&format!(
+            "{PRINCIPAL_CHOICE} AND principal.id = ANY($2) ORDER BY name, principal.id"
+        ))
+        .bind(company.as_uuid())
+        .bind(&ids)
+        .fetch_all(&self.persistence.pool)
+        .await?;
+        principal_choices(rows)
+    }
+
+    async fn desks(
+        &self,
+        company: CompanyId,
+        department: DepartmentId,
+    ) -> AppResult<Vec<DepartmentDesk>> {
+        let rows: Vec<(Uuid, String, String, bool)> = sqlx::query_as(
+            "SELECT desk.id, desk.name, desk_slug.slug::text, \
+                    desk_record.command_key IS NOT NULL AS own \
+             FROM channels AS desk \
+             JOIN channel_slugs AS desk_slug ON desk_slug.company_id = desk.company_id \
+              AND desk_slug.channel_id = desk.id AND desk_slug.is_primary \
+             LEFT JOIN workflow_provisioning_commands AS desk_record \
+               ON desk_record.company_id = desk.company_id AND desk_record.command_key = $3 \
+              AND (desk_record.result->'channel'->>'id')::uuid = desk.id \
+             WHERE desk.company_id = $1 AND desk.department_id = $2 \
+             ORDER BY own DESC, desk_slug.slug, desk.id",
+        )
+        .bind(company.as_uuid())
+        .bind(department.as_uuid())
+        .bind(department_desk_key(department))
+        .fetch_all(&self.persistence.pool)
+        .await?;
+        Ok(rows
+            .into_iter()
+            .map(|(id, name, slug, own)| DepartmentDesk {
+                id,
+                name,
+                slug,
+                own,
+            })
+            .collect())
     }
 }
 

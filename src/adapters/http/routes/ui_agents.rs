@@ -682,6 +682,23 @@ impl AgentSettingsView<'_> {
             tool_assignments: None,
         };
         let shown = draft.cloned().unwrap_or(stored);
+        let directory = match crate::application::agent::AgentKey::parse(agent.slug.as_str()) {
+            Some(key) => {
+                self.workflow
+                    .agent_authoring_reads()
+                    .agent_directory_entry(
+                        crate::application::agent::AgentCompanyScope {
+                            company: crate::domain::workflow::CompanyId::new(self.company.id),
+                            actor: crate::application::workflow::WorkflowActor::authenticated(
+                                self.user_id,
+                            )?,
+                        },
+                        key,
+                    )
+                    .await?
+            }
+            None => None,
+        };
 
         let html = pages::agent_edit_pane(&pages::AgentEditPane {
             company: self.company,
@@ -692,6 +709,7 @@ impl AgentSettingsView<'_> {
             error,
             capability_options: pages::AgentCapabilityOptions { skills: &skills },
             authoring: Some(&authoring),
+            directory: directory.as_ref(),
         });
         self.workflow
             .agent_authoring_reads()

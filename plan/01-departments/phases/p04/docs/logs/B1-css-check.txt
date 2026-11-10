@@ -1,0 +1,19 @@
+B1 CSS check (2026-11-10)
+
+Toolchain: /Users/mac02/dev/openbot/node_modules (tailwindcss 4.1.12, @tailwindcss/cli 4.1.12,
+daisyui 5.0.50 — the versions package-lock.json pins). This worktree has no node_modules.
+
+Reproducibility of the committed assets/app.css from its own sources (git archive <rev> src assets,
+node_modules symlinked, `tailwindcss -i assets/app.css.in -o built.css --minify`, cmp):
+  origin/main (6091c3cd)   REPRODUCES
+  merge base (3752ea35)    REPRODUCES
+  p03 head (30654e3c)      DIFFERS   <- drift introduced by p01–p03 classes (full gate was not run, I003)
+  HEAD b1026003            DIFFERS
+
+B1: assets/app.css regenerated from the working tree's src+assets with the same command, then
+rebuilt again from the result and compared: REPRODUCES ("CSS matches sources" after the last test
+edit). New classes present, e.g. sm:grid-cols-7, grid-cols-[auto_1fr],
+grid-cols-[minmax(0,1fr)_minmax(24rem,1.5fr)], divide-base-300, badge-ghost, whitespace-pre-wrap.
+This is the comparison scripts/check-css.sh and scripts/check.sh make.
+CSS matches sources
+R2: CSS matches sources

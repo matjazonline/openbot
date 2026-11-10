@@ -187,7 +187,7 @@ fn slug_conflict_error(err: sqlx::Error, slug: &str) -> AppError {
         && db_err.code().as_deref() == Some("23505")
     {
         return AppError::BadRequest(format!(
-            "Address '{slug}' is already in use by another channel in this company."
+            "Address '{slug}' is already in use by another desk in this company."
         ));
     }
     AppError::from(err)

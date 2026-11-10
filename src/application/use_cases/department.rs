@@ -20,8 +20,9 @@ use crate::{
     entities::{
         creation::CreationProvenance,
         department::{
-            Department, DepartmentId, DepartmentMember, DepartmentRole, DepartmentRoleHolder,
-            MAX_DEPARTMENT_CHARTER_BYTES,
+            Department, DepartmentDesk, DepartmentId, DepartmentMember, DepartmentPrincipal,
+            DepartmentRole, DepartmentRoleHolder, MAX_DEPARTMENT_CHARTER_BYTES,
+            MAX_DEPARTMENT_PRINCIPAL_CHOICES,
         },
         transport::PrincipalId,
     },
@@ -120,6 +121,24 @@ pub struct DepartmentDetail {
     pub department: Department,
     pub members: Vec<DepartmentMember>,
     pub roles: Vec<DepartmentRoleHolder>,
+}
+
+/// One department as the Departments tab shows it: its detail, the people and agents that detail
+/// names, and the desks it owns.
+#[derive(Debug, Clone)]
+pub struct DepartmentView {
+    pub detail: DepartmentDetail,
+    pub principals: Vec<DepartmentPrincipal>,
+    pub desks: Vec<DepartmentDesk>,
+}
+
+impl DepartmentView {
+    /// The named principal, when it is still one of the company's.
+    pub fn principal(&self, id: PrincipalId) -> Option<&DepartmentPrincipal> {
+        self.principals
+            .iter()
+            .find(|principal| principal.principal_id == id)
+    }
 }
 
 #[derive(Clone)]
@@ -308,6 +327,53 @@ impl DepartmentUseCases {
             roles: self.departments.roles(company, department.id).await?,
             department,
         })
+    }
+
+    /// [`Self::visible_department`] with the names of its members and role holders and the desks
+    /// it owns.
+    #[instrument(skip_all)]
+    pub async fn department_view(
+        &self,
+        user_id: Uuid,
+        company_id: Uuid,
+        department: DepartmentId,
+    ) -> AppResult<DepartmentView> {
+        let detail = self
+            .visible_department(user_id, company_id, department)
+            .await?;
+        let company = CompanyId::new(company_id);
+        let named: Vec<PrincipalId> = detail
+            .members
+            .iter()
+            .map(|member| member.principal_id)
+            .chain(detail.roles.iter().map(|holder| holder.principal_id))
+            .collect();
+        Ok(DepartmentView {
+            principals: self.departments.principals_by_id(company, &named).await?,
+            desks: self
+                .departments
+                .desks(company, detail.department.id)
+                .await?,
+            detail,
+        })
+    }
+
+    /// The people and agents a manager may add as members or make lead, agents first; at most
+    /// [`MAX_DEPARTMENT_PRINCIPAL_CHOICES`], and whether the company has more.
+    #[instrument(skip_all)]
+    pub async fn principal_choices(
+        &self,
+        user_id: Uuid,
+        company_id: Uuid,
+    ) -> AppResult<(Vec<DepartmentPrincipal>, bool)> {
+        let scope = self.managed(user_id, company_id).await?;
+        let mut choices = self
+            .departments
+            .principals(scope.company, MAX_DEPARTMENT_PRINCIPAL_CHOICES + 1)
+            .await?;
+        let cut = choices.len() > MAX_DEPARTMENT_PRINCIPAL_CHOICES;
+        choices.truncate(MAX_DEPARTMENT_PRINCIPAL_CHOICES);
+        Ok((choices, cut))
     }
 }
 
