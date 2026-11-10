@@ -153,11 +153,7 @@ pub enum OnboardingChannel {
         channel_id: uuid::Uuid,
         address: String,
     },
-    /// The command refused; the agent page's assistant-channel card is the way on.
-    Refused(String),
-    /// The agent has no model, because the company has no default model connection.
-    NoModel,
-    /// No channel is stored for it: a reloaded completion page keeps no refusal.
+    /// No desk is recorded for it.
     Missing,
 }
 
@@ -182,14 +178,6 @@ pub fn onboarding_complete_page(
         .enumerate()
         .map(|(index, onboarded)| onboarded_agent_row(company, index, onboarded))
         .collect::<String>();
-    let no_model = agents
-        .iter()
-        .any(|onboarded| onboarded.channel == OnboardingChannel::NoModel);
-    let no_model_html = if no_model {
-        r##"<div class="alert alert-info">Connect a model in company settings, then create an assistant desk from each agent's page.</div>"##
-    } else {
-        ""
-    };
     let (title, lede, guide_html) = if first_channel.is_some() {
         (
             "Your email agents are ready",
@@ -213,7 +201,6 @@ pub fn onboarding_complete_page(
     };
     let pane = format!(
         r##"<div><div class="mb-3 inline-flex size-12 items-center justify-center rounded-full bg-success/15 text-success">{check}</div><h1 class="card-title text-2xl">{title}</h1><p class="mt-2 opacity-70">{lede}</p></div>
-        {no_model_html}
         <ul class="list rounded-box border border-base-300">{rows}</ul>
         {guide_html}
         <div class="card-actions justify-end"><a href="{finish_href}" class="btn btn-primary">Finish</a></div>"##,
@@ -222,8 +209,7 @@ pub fn onboarding_complete_page(
     onboarding_shell(title, user, Some(company), 3, &pane)
 }
 
-/// One agent on the completion page: its channel's address, or why it has none and the agent
-/// page to create one from.
+/// One agent on the completion page: its desk's address, or the agent page to create one from.
 fn onboarded_agent_row(company: &Company, index: usize, onboarded: &OnboardedAgent<'_>) -> String {
     let agent = onboarded.agent;
     let agent_href = format!("/ui/agents?company_id={}&agent_id={}", company.id, agent.id);
@@ -238,13 +224,6 @@ fn onboarded_agent_row(company: &Company, index: usize, onboarded: &OnboardedAge
             r##"<code id="onboarding-address-{index}" class="block break-all">{address}</code></div><button type="button" class="btn btn-sm" data-action="copy-text" data-copy-from="onboarding-address-{index}" data-copied-label="Copied">Copy address</button><a href="/ui/channels?company_id={company_id}&channel_id={channel_id}" class="btn btn-sm btn-ghost">Manage desk</a>"##,
             address = escape_html_text(address),
             company_id = company.id,
-        ),
-        OnboardingChannel::Refused(message) => format!(
-            r##"<p class="text-sm text-error">The desk could not be created: {message}</p></div>{create_link}"##,
-            message = escape_html_text(message),
-        ),
-        OnboardingChannel::NoModel => format!(
-            r##"<p class="text-sm opacity-70">No desk: there is no model connection to run it on.</p></div>{create_link}"##
         ),
         OnboardingChannel::Missing => {
             format!(r##"<p class="text-sm opacity-70">No desk yet.</p></div>{create_link}"##)

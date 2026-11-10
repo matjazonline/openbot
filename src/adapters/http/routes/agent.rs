@@ -341,6 +341,7 @@ async fn create_agent_handler(
                     avatar_url,
                     created_by: None,
                 },
+                None,
             )
             .await
         {
@@ -524,16 +525,57 @@ async fn list_agents_json(
     Ok((StatusCode::OK, Json(response)))
 }
 
-/// JSON API: Create company agent (Protected).
+/// Where a JSON-created agent goes: `department_id` and `role`, beside the agent's own fields
+/// (plan 01-departments 03C item 0). Taken out of the body so the agent fields keep their strict
+/// shape.
+fn json_placement(
+    body: &mut serde_json::Value,
+) -> AppResult<Option<crate::use_cases::agent::AgentPlacement>> {
+    let fields = body
+        .as_object_mut()
+        .ok_or_else(|| AppError::BadRequest("The agent must be a JSON object.".into()))?;
+    let department = match fields.remove("department_id") {
+        None | Some(serde_json::Value::Null) => None,
+        Some(serde_json::Value::String(id)) => Some(
+            Uuid::parse_str(&id)
+                .map(crate::entities::department::DepartmentId::new)
+                .map_err(|_| AppError::BadRequest("Invalid department id.".into()))?,
+        ),
+        Some(_) => return Err(AppError::BadRequest("Invalid department id.".into())),
+    };
+    let role = match fields.remove("role") {
+        None | Some(serde_json::Value::Null) => None,
+        Some(serde_json::Value::String(role)) => Some(
+            role.parse::<crate::entities::department::DepartmentRole>()
+                .map_err(|_| AppError::BadRequest(format!("'{role}' is not a department role.")))?,
+        ),
+        Some(_) => return Err(AppError::BadRequest("Invalid department role.".into())),
+    };
+    match (department, role) {
+        (None, Some(_)) => Err(AppError::BadRequest(
+            "Name the department the agent holds its role in.".into(),
+        )),
+        (None, None) => Ok(None),
+        (Some(department), role) => Ok(Some(crate::use_cases::agent::AgentPlacement {
+            department,
+            role,
+        })),
+    }
+}
+
+/// JSON API: Create company agent (Protected), with its default desk and its placement.
 async fn create_agent_json(
     State(agent_use_cases): State<Arc<AgentUseCases>>,
     user: AuthenticatedUser,
     Path(company_id): Path<Uuid>,
-    Json(payload): Json<AgentJsonPayload>,
+    Json(mut body): Json<serde_json::Value>,
 ) -> AppResult<impl IntoResponse> {
+    let placement = json_placement(&mut body)?;
+    let payload: AgentJsonPayload = serde_json::from_value(body)
+        .map_err(|error| AppError::BadRequest(format!("Invalid agent: {error}")))?;
     let avatar_url = payload.avatar_url().map_err(AppError::BadRequest)?;
 
-    let agent = agent_use_cases
+    let created = agent_use_cases
         .create_agent(
             user.id,
             company_id,
@@ -550,6 +592,7 @@ async fn create_agent_json(
                 avatar_url,
                 created_by: None,
             },
+            placement,
         )
         .await?;
 
@@ -557,7 +600,7 @@ async fn create_agent_json(
         StatusCode::CREATED,
         Json(AgentResponse {
             success: true,
-            agent,
+            agent: created.agent,
             skill_ids: payload.skill_ids.unwrap_or_default(),
         }),
     ))

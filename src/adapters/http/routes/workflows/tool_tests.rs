@@ -92,7 +92,6 @@ async fn autonomous_agent_authoring_competing_json_draft_writes_apply_once() {
         shared.clone(),
         shared.clone(),
         shared.clone(),
-        shared.clone(),
     ));
     let skills = Arc::new(SkillUseCases::new(
         shared.clone(),

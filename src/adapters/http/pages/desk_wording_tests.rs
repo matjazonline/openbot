@@ -159,16 +159,16 @@ fn desk_wording_flash_messages_say_desk() {
     let email = mailbox_account_email();
     let user = mailbox_user(&email);
     let triage = settings_agent(company.id, "Triage", "triage");
-    let refused = onboarding_complete_page(
+    let missing = onboarding_complete_page(
         &user,
         &company,
         &[OnboardedAgent {
             agent: &triage,
-            channel: OnboardingChannel::Refused("The address is already used".into()),
+            channel: OnboardingChannel::Missing,
         }],
     );
-    assert!(refused.contains("The desk could not be created: The address is already used"));
-    assert!(refused.contains("Create an assistant desk</a>"));
+    assert!(missing.contains("No desk yet."));
+    assert!(missing.contains("Create an assistant desk</a>"));
 }
 
 /// Collect the value of every string literal in `source`, except doc comments: the copy a page

@@ -186,6 +186,17 @@ impl WorkflowServices {
         )
     }
 
+    /// Company-agent creation with each agent's default desk (01DEP-P03-D2), over the same
+    /// provisioning templates.
+    pub fn company_agents(&self) -> Arc<dyn crate::use_cases::agent::CompanyAgents> {
+        Arc::new(
+            crate::adapters::persistence::company_agent::CompanyAgentService::new(
+                self.persistence.clone(),
+                self.templates.clone(),
+            ),
+        )
+    }
+
     pub fn assistant_channels(&self) -> Arc<dyn AssistantChannels> {
         Arc::new(AssistantChannelService::new(
             self.persistence.clone(),

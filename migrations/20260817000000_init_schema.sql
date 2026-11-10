@@ -5641,7 +5641,7 @@ CREATE TABLE public.workflow_provisioning_commands (
 -- Name: TABLE workflow_provisioning_commands; Type: COMMENT; Schema: public; Owner: -
 --
 
-COMMENT ON TABLE public.workflow_provisioning_commands IS 'One "Create assistant channel" command per client key (p08 D2.4): the request digest decides replay or conflict, and the stored result is what a replay returns. The tool path needs none; its action receipt is the record.';
+COMMENT ON TABLE public.workflow_provisioning_commands IS 'One assistant-desk command per key (p08 D2.4): the request digest decides replay or conflict, and the stored result is what a replay returns. Keys: a client key for "Create assistant desk"; agent:{agent_id} for the default desk a company agent is created with (01-departments p03), which also records which desk that was. The tool path needs none; its action receipt is the record.';
 
 
 --

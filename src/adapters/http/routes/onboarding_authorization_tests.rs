@@ -62,6 +62,7 @@ async fn onboarding_submission_key_is_required_and_denials_propagate() {
             instructions: String::new(),
             library_agent_ids: None,
             submission_key: key,
+            department_name: None,
         };
         assert!(matches!(form.submission(), Err(AppError::BadRequest(_))));
     }
@@ -87,6 +88,7 @@ async fn onboarding_submission_key_is_required_and_denials_propagate() {
                     instructions: "Help customers".into(),
                     library_agent_ids: None,
                     submission_key: Some(Uuid::new_v4().to_string()),
+                    department_name: None,
                 }),
             )
             .await,

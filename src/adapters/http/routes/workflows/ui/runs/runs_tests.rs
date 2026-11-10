@@ -342,7 +342,6 @@ fn ui_over(persistence: &PostgresPersistence, engine: &Engine, user: Uuid) -> Ui
             shared.clone(),
             shared.clone(),
             shared.clone(),
-            shared.clone(),
         )),
         config: crate::adapters::http::routes::ui::stream_tests::test_config(),
         user,

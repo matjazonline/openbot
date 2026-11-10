@@ -1,0 +1,28 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.22s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-c4f538027eed5c31)
+
+running 21 tests
+test adapters::persistence::company_agent::tests::agent_default_desk_company_agents_have_one_creation_path ... ok
+test adapters::http::routes::onboarding::tests::agent_default_desk_onboarding_completion_reads_back_the_default_desk ... ok
+test adapters::persistence::department::tests::agent_desks::agent_default_desk_competing_creators_of_one_slug_make_one_agent ... ok
+test adapters::http::routes::agent::api_tests::agent_default_desk_json_create_places_the_agent ... ok
+test adapters::persistence::department::tests::agent_desks::agent_default_desk_creation_commits_the_agent_with_its_desk ... ok
+test adapters::persistence::department::tests::agent_desks::agent_default_desk_library_definitions_have_none_and_copies_do ... ok
+test adapters::persistence::department::tests::agent_desks::agent_default_desk_deletion_guards_are_unchanged ... ok
+test adapters::persistence::department::tests::agent_desks::agent_default_desk_refuses_a_library_copy_it_cannot_publish ... ok
+test adapters::persistence::department::tests::agent_desks::agent_default_desk_refuses_without_a_keyed_model ... ok
+test adapters::persistence::department::tests::agent_desks::agent_default_desk_places_the_agent_and_its_lead_role_with_grants ... ok
+test adapters::persistence::department::tests::agent_desks::agent_default_desk_refuses_a_taken_address_or_slug ... ok
+test adapters::persistence::onboarding::tests::agent_default_desk_onboarding_creates_and_replays_the_first_department ... ok
+test adapters::persistence::onboarding::tests::agent_default_desk_onboarding_without_a_keyed_model_is_rejected ... ok
+test adapters::persistence::onboarding::tests::agent_default_desk_onboarding_taken_address_rejects_and_commits_nothing ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::agent_default_desk_builder_creation_refusals_are_tool_errors ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::agent_default_desk_builder_provisions_another_desk_beside_the_default ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::agent_default_desk_builder_places_the_agent_in_a_department ... ok
+test application::use_cases::agent::tests::agent_default_desk_creation_goes_through_company_agents ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::agent_default_desk_builder_refuses_other_settings_at_the_agents_slug ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::agent_default_desk_builder_reuses_the_default_desk_at_the_agents_slug ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::agent_default_desk_competing_builder_claimants_make_one_default_desk ... ok
+
+test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 3821 filtered out; finished in 5.46s
+

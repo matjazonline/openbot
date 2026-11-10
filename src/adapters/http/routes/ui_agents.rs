@@ -8,7 +8,7 @@
 
 use std::sync::Arc;
 
-use crate::use_cases::agent::{AgentWrite, LibraryCopyModel};
+use crate::use_cases::agent::AgentWrite;
 
 use axum::{
     Form, Router,
@@ -353,9 +353,9 @@ async fn create_agent(
     }
     let created = workspace
         .agent_use_cases
-        .create_agent(workspace.user_id, company.id, write)
+        .create_agent(workspace.user_id, company.id, write, None)
         .await
-        .map(|agent| (agent, Vec::new()))
+        .map(|created| (created.agent, Vec::new()))
         .map_err(|err| format!("Failed to create agent: {err}"));
 
     match created {
@@ -412,12 +412,7 @@ async fn create_from_library(
     for agent_id in &picked {
         match workspace
             .agent_use_cases
-            .create_agent_from_library(
-                workspace.user_id,
-                company.id,
-                *agent_id,
-                LibraryCopyModel::FollowDefault,
-            )
+            .create_agent_from_library(workspace.user_id, company.id, *agent_id, None)
             .await
         {
             Ok(provisioned) => {

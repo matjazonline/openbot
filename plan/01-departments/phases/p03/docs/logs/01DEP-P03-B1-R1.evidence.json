@@ -1,0 +1,44 @@
+{
+  "version": 1,
+  "round": "01DEP-P03-B1-R1",
+  "artifact": "2f77ca9fc17c9b5e30a5481686580f8cb71597058ff9cdaa99d6072007d04279",
+  "checks": [
+    {
+      "criteria": ["03A.1", "03A.2", "03A.3", "03A.4", "03C.0", "D1", "D2", "D3", "D4", "D5", "D6", "F2", "F3", "F4", "F5"],
+      "command": "cargo test --locked --offline --lib -- agent_default_desk routes::agent --test-threads=4",
+      "fixture": "TEST_DATABASE_URL db openbot_dept_p03_test (phase-owned, recreated) + own_database; SQLX_OFFLINE=true; test-threads=4",
+      "status": "PASS",
+      "files": [
+        {"path": "logs/B1-agent-default-desk-5.txt", "sha256": "0508252854a19d7d2dd05fa8e767b875b4432ca2d10206fa930fe3bcf8ff9527"},
+        {"path": "logs/B1-test-inventory.txt", "sha256": "ae8e3966b682198287774d30b71a52f820d5f87bc10f065505dc6b3ddd83c0cd"}
+      ]
+    },
+    {
+      "criteria": ["contract-impact"],
+      "command": "cargo test --locked --offline --lib -- onboarding provisioning use_cases::agent routes::agent routes::ui_agents skill_tests department assistant_channel desk_wording authorization routes::workflows agent_retire agent_constraint persistence::agent:: agent_default_desk --test-threads=4",
+      "fixture": "TEST_DATABASE_URL db openbot_dept_p03_test (phase-owned) + own_database; SQLX_OFFLINE=true; test-threads=4",
+      "status": "FAIL",
+      "files": [
+        {"path": "logs/B1-affected-1.txt", "sha256": "d64622def6bb4090bcb7a281f3d236eb1197994e270da20abe1086f301cfa91b"}
+      ]
+    },
+    {
+      "criteria": ["contract-impact"],
+      "command": "cargo test --locked --offline --lib -- onboarding provisioning use_cases::agent routes::agent routes::ui_agents skill_tests department assistant_channel desk_wording authorization routes::workflows agent_retire agent_constraint persistence::agent:: agent_default_desk --test-threads=4 (after updating the nine expected-consequence tests)",
+      "fixture": "TEST_DATABASE_URL db openbot_dept_p03_test (phase-owned) + own_database; SQLX_OFFLINE=true; test-threads=4",
+      "status": "PASS",
+      "files": [
+        {"path": "logs/B1-affected-3.txt", "sha256": "83262e0833974571c7f9b723221e726a128831c44d3da00869cc8a60ada5eedb"}
+      ]
+    },
+    {
+      "criteria": ["test-discovery"],
+      "command": "python3 scratchpad/testnames.py (test fn names HEAD vs worktree)",
+      "fixture": "git HEAD 9291fcd5 vs working tree",
+      "status": "PASS",
+      "files": [
+        {"path": "logs/B1-test-names.txt", "sha256": "b9ad889686fc9ba9ac38f9561d12207e37fa5fa0fb56e7f6a10b5ee0c54e4aa7"}
+      ]
+    }
+  ]
+}

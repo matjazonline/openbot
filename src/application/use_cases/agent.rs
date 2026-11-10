@@ -6,10 +6,13 @@ use uuid::Uuid;
 
 use crate::{
     app_error::{AppError, AppResult},
+    application::workflow::WorkflowActor,
+    domain::workflow::CompanyId,
     entities::{
         agent::{Agent, MAX_AGENT_SKILLS},
         company::Company,
         creation::CreationProvenance,
+        department::{DepartmentId, DepartmentRole},
         user::{Caller, Viewer},
         value_objects::{AvatarUrl, ModelName, ModelProvider},
     },
@@ -104,6 +107,10 @@ fn deduplicate<T: PartialEq>(values: &mut Vec<T>) {
 
 #[async_trait]
 pub trait AgentPersistence: Send + Sync {
+    /// The bare agent row and principal, without a desk, publication or placement: fixtures
+    /// only. Production company agents are created through [`CompanyAgents`], and this being
+    /// test-only is what keeps it that way (01DEP-P03-D1).
+    #[cfg(test)]
     async fn create(&self, company_id: Uuid, write: AgentWrite) -> AppResult<Agent>;
 
     async fn create_library(&self, write: AgentWrite) -> AppResult<Agent>;
@@ -119,17 +126,43 @@ pub trait AgentPersistence: Send + Sync {
     async fn delete(&self, id: Uuid) -> AppResult<()>;
 }
 
+/// Where a new agent goes: a member of `department`, holding `role` there when one is named
+/// (plan 01-departments 03C item 0).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct AgentPlacement {
+    pub department: DepartmentId,
+    pub role: Option<DepartmentRole>,
+}
+
+/// A company agent as created: the agent and its default desk.
+#[derive(Debug, Clone)]
+pub struct CreatedAgent {
+    pub agent: Agent,
+    pub desk_id: Uuid,
+}
+
+/// The one way a company agent comes to exist (01DEP-P03-D1): the agent, its principal, its
+/// first published version, its default desk at its slug and its placement, in one transaction
+/// or not at all.
 #[async_trait]
-pub trait LibraryAgentCopyPersistence: Send + Sync {
-    /// A company agent copied from a library definition: its skills and workflow tool grants
-    /// come with it, in one transaction. Agent only: no channel (P08-D4 §D4.7).
-    async fn create_agent_from_library(
+pub trait CompanyAgents: Send + Sync {
+    async fn create(
         &self,
-        company_id: Uuid,
-        actor: crate::application::workflow::WorkflowActor,
+        actor: WorkflowActor,
+        company: CompanyId,
+        write: AgentWrite,
+        placement: Option<AgentPlacement>,
+    ) -> AppResult<CreatedAgent>;
+
+    /// A copy of a library definition: its skills and workflow tool grants come with it.
+    async fn copy_from_library(
+        &self,
+        actor: WorkflowActor,
+        company: CompanyId,
         library_agent_id: Uuid,
-        agent: AgentWrite,
-    ) -> AppResult<Agent>;
+        write: AgentWrite,
+        placement: Option<AgentPlacement>,
+    ) -> AppResult<CreatedAgent>;
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
@@ -179,16 +212,6 @@ pub fn pinned_default_model(
     ))
 }
 
-/// What a library copy that names no usable model runs on.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum LibraryCopyModel {
-    /// The company default, followed as it changes, unless the definition grants workflow tools:
-    /// those copies are pinned to it.
-    FollowDefault,
-    /// Pinned to the company default: onboarding gives each copy an assistant channel (p08 D4.7).
-    PinDefault,
-}
-
 /// One library definition as a company agent write: every stored field, with the provenance left
 /// for [`AgentUseCases::create_agent_from_library`] to stamp with whoever picked it. Its workflow
 /// tool grants are copied with its skills, in the creating transaction.
@@ -212,7 +235,9 @@ pub struct AgentUseCases {
     company_persistence: Arc<dyn CompanyPersistence>,
     agent_persistence: Arc<dyn AgentPersistence>,
     draft_persistence: Arc<dyn crate::application::agent::AgentDraftPersistence>,
-    library_copy_persistence: Arc<dyn LibraryAgentCopyPersistence>,
+    /// What creates company agents. Optional so the many use cases that only read or edit agents
+    /// can be built without the provisioning templates; creation refuses without it.
+    company_agents: Option<Arc<dyn CompanyAgents>>,
     /// What writes a system prompt when an operator asks for one to be generated.
     ///
     /// Optional because every other use case here works without a model: a deployment that has
@@ -226,15 +251,25 @@ impl AgentUseCases {
         company_persistence: Arc<dyn CompanyPersistence>,
         agent_persistence: Arc<dyn AgentPersistence>,
         draft_persistence: Arc<dyn crate::application::agent::AgentDraftPersistence>,
-        library_copy_persistence: Arc<dyn LibraryAgentCopyPersistence>,
     ) -> Self {
         Self {
             company_persistence,
             agent_persistence,
             draft_persistence,
-            library_copy_persistence,
+            company_agents: None,
             prompt_classifier: None,
         }
+    }
+
+    pub fn with_company_agents(mut self, company_agents: Arc<dyn CompanyAgents>) -> Self {
+        self.company_agents = Some(company_agents);
+        self
+    }
+
+    fn company_agents(&self) -> AppResult<&Arc<dyn CompanyAgents>> {
+        self.company_agents
+            .as_ref()
+            .ok_or_else(|| AppError::Internal("agent creation is not configured".to_string()))
     }
 
     pub fn with_prompt_classifier(mut self, classifier: Arc<dyn TextClassifier>) -> Self {
@@ -282,20 +317,28 @@ impl AgentUseCases {
             .await
     }
 
-    /// Create a company agent, and only the agent: its address is an assistant channel the agent
-    /// page's "Create assistant channel" action makes (P08-D4 §D4.7).
+    /// Create a company agent with its default desk at its slug, placed in `placement` when one
+    /// is named (01DEP-P03-D1).
     #[instrument(skip_all)]
     pub async fn create_agent(
         &self,
         user_id: Uuid,
         company_id: Uuid,
         write: AgentWrite,
-    ) -> AppResult<Agent> {
+        placement: Option<AgentPlacement>,
+    ) -> AppResult<CreatedAgent> {
         let (_, write) = self
             .prepared_agent_write(user_id, company_id, write)
             .await?;
         info!(%company_id, "Creating agent");
-        self.agent_persistence.create(company_id, write).await
+        self.company_agents()?
+            .create(
+                WorkflowActor::authenticated(user_id)?,
+                CompanyId::new(company_id),
+                write,
+                placement,
+            )
+            .await
     }
 
     /// Everything a create checks before it writes anything, answering with the normalized write.
@@ -332,18 +375,18 @@ impl AgentUseCases {
         Ok((company, write))
     }
 
-    /// Create one company agent from a global library definition.
+    /// Create one company agent from a global library definition, with its default desk like
+    /// every company agent.
     ///
     /// The definition is copied rather than referenced: the company owns what it creates and can
-    /// edit it afterwards without the global entry changing under it. Agent only, like every
-    /// create (P08-D4 §D4.7).
+    /// edit it afterwards without the global entry changing under it.
     #[instrument(skip_all)]
     pub async fn create_agent_from_library(
         &self,
         user_id: Uuid,
         company_id: Uuid,
         library_agent_id: Uuid,
-        copy_model: LibraryCopyModel,
+        placement: Option<AgentPlacement>,
     ) -> AppResult<ProvisionedAgent> {
         managed_company(self.company_persistence.as_ref(), user_id, company_id).await?;
         let definition = self
@@ -354,27 +397,25 @@ impl AgentUseCases {
             .company_persistence
             .list_model_connections(company_id)
             .await?;
-        let (write, mut warnings) = model_preparation::prepare_library_write(
-            &definition,
-            user_id,
-            copy_model,
-            &connections,
-        )?;
-        let inherited = write.provider.is_none();
-        let agent = self
-            .library_copy_persistence
-            .create_agent_from_library(
-                company_id,
-                crate::application::workflow::WorkflowActor::authenticated(user_id)?,
+        let (write, mut warnings) =
+            model_preparation::prepare_library_write(&definition, user_id, &connections)?;
+        let inherited = definition.provider.is_none() && definition.model.is_none();
+        let created = self
+            .company_agents()?
+            .copy_from_library(
+                WorkflowActor::authenticated(user_id)?,
+                CompanyId::new(company_id),
                 library_agent_id,
                 write,
+                placement,
             )
             .await?;
+        let agent = created.agent;
         if inherited && let (Some(provider), Some(model)) = (&agent.provider, &agent.model) {
             warnings.push(ProvisioningWarning {
                 code: "library_model_pinned".into(),
                 message: format!(
-                    "'{}' runs workflows, which need an explicit model, so it was created on the company's default: {provider} {model}.",
+                    "'{}' answers its desk, which needs an explicit model, so it was created on the company's default: {provider} {model}.",
                     definition.name
                 ),
             });

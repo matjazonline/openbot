@@ -94,7 +94,14 @@ preserves them; `[]` clears the draft list. Omitting `skill_ids` preserves order
 `[]` clears them. For an unchanged tool, submit its existing `binding` and exact `choice` returned
 by authoring. Catalog `choice` values carry exact HTTP/MCP/workflow identifiers; use those values
 rather than fabricating operation names, review versions or workflow parameter digests.
-Create uses `POST /api/companies/{company}/agents` with flat agent metadata and creates a draft.
+Create uses `POST /api/companies/{company}/agents` with flat agent metadata. It creates the agent,
+publishes its first revision and gives it its default desk at its slug: a team desk with the
+autonomous reply workflow and an active binding, all in one transaction. The company needs a model
+connection first: an omitted provider and model are pinned to the default connection's first model.
+A taken address, a model the company's connections lack or an unmet publication prerequisite (such
+as a skill whose tool the draft does not bind) refuses the whole create. Optional `department_id`
+and `role` (`"lead"`, which needs `department_id`) place the agent in a department. Library
+copies follow the same rules. Later edits are saved to the draft and published as new revisions.
 The update contract requires the nested payload and expected revision.
 
 `POST .../{agent}/preview` previews the saved draft and returns revision/count metadata.

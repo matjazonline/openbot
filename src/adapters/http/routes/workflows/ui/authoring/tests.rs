@@ -62,7 +62,6 @@ impl Fixture {
                 shared.clone(),
                 shared.clone(),
                 shared.clone(),
-                shared.clone(),
             )),
             config: crate::adapters::http::routes::ui::stream_tests::test_config(),
             user,

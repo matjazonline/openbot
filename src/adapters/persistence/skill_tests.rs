@@ -5,7 +5,7 @@ use crate::{
     adapters::persistence::test_support::test_pool,
     entities::creation::CreationProvenance,
     use_cases::{
-        agent::{AgentPersistence, AgentWrite, LibraryAgentCopyPersistence},
+        agent::{AgentPersistence, AgentWrite},
         company::{CompanyPersistence, CompanyWrite},
         skill::AgentCapabilityReader,
         user::UserPersistence,
@@ -387,9 +387,8 @@ async fn picking_a_library_agent_copies_its_skills_with_the_agent_and_channel() 
         created_by: Some(CreationProvenance::system()),
         ..Default::default()
     };
-    let created = persistence
-        .create_agent_from_library(
-            company_id,
+    let created = crate::adapters::persistence::test_support::company_agents(&persistence)
+        .copy_from_library(
             crate::application::workflow::WorkflowActor::authenticated(
                 sqlx::query_scalar("SELECT user_id FROM companies WHERE id=$1")
                     .bind(company_id)
@@ -398,11 +397,14 @@ async fn picking_a_library_agent_copies_its_skills_with_the_agent_and_channel() 
                     .unwrap(),
             )
             .unwrap(),
+            crate::domain::workflow::CompanyId::new(company_id),
             source_agent.id,
             company_write,
+            None,
         )
         .await
-        .unwrap();
+        .unwrap()
+        .agent;
     let snapshot = persistence
         .load_capabilities(company_id, created.id)
         .await

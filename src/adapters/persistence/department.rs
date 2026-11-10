@@ -272,7 +272,18 @@ pub(crate) async fn create_department_on(
     write: &DepartmentWrite,
     lead: Option<PrincipalId>,
 ) -> AppResult<Department> {
-    let id = DepartmentId::random();
+    create_department_with_id_on(tx, company, DepartmentId::random(), write, lead).await
+}
+
+/// [`create_department_on`] under a caller-chosen id, for a creator that replays by id
+/// (onboarding's first department, 01DEP-P03-D4).
+pub(crate) async fn create_department_with_id_on(
+    tx: &mut Transaction<'_, Postgres>,
+    company: CompanyId,
+    id: DepartmentId,
+    write: &DepartmentWrite,
+    lead: Option<PrincipalId>,
+) -> AppResult<Department> {
     if let Some(parent) = write.parent_id {
         let parent = lock_parent_on(tx, company, parent).await?;
         check_shape_on(tx, company, id, &write.name, &parent).await?;
@@ -448,26 +459,70 @@ pub(crate) async fn assign_department_role_on(
     role: DepartmentRole,
     principal: PrincipalId,
 ) -> AppResult<()> {
+    write_placement_on(tx, company, department, principal, false, Some(role)).await
+}
+
+/// Make `principal` a member of the department and, with `role`, its holder of that role, as
+/// company-agent creation places a new agent (plan 01-departments 03C item 0). One write: the
+/// rows, then a single grant sync over everything they reach, so the department's desk gates
+/// are taken once, in order, with its neighbours' (01DEP-P03-B1-F1). The caller holds the company
+/// write lock.
+pub(crate) async fn place_in_department_on(
+    tx: &mut Transaction<'_, Postgres>,
+    company: CompanyId,
+    department: DepartmentId,
+    principal: PrincipalId,
+    role: Option<DepartmentRole>,
+) -> AppResult<()> {
+    write_placement_on(tx, company, department, principal, true, role).await
+}
+
+/// Membership and role rows for one principal, under the department row and the principals the
+/// write touches (sorted), then one sync of the derived grants: the department's for membership,
+/// the role's reach for a role.
+async fn write_placement_on(
+    tx: &mut Transaction<'_, Postgres>,
+    company: CompanyId,
+    department: DepartmentId,
+    principal: PrincipalId,
+    member: bool,
+    role: Option<DepartmentRole>,
+) -> AppResult<()> {
     lock_department_on(tx, company, department).await?;
-    // The holder this assignment replaces loses a row: lock them with the new holder, first.
-    let mut involved: Vec<Uuid> = if role.is_single_holder() {
-        sqlx::query_scalar(
-            "SELECT holder.principal_id FROM department_roles AS holder \
+    // The holder a single-holder role replaces loses a row: lock them with the new one, first.
+    let mut involved: Vec<Uuid> = match role.filter(|role| role.is_single_holder()) {
+        Some(role) => {
+            sqlx::query_scalar(
+                "SELECT holder.principal_id FROM department_roles AS holder \
               WHERE holder.company_id = $1 AND holder.department_id = $2 AND holder.role = $3",
-        )
-        .bind(company.as_uuid())
-        .bind(department.as_uuid())
-        .bind(role.as_str())
-        .fetch_all(&mut **tx)
-        .await?
-    } else {
-        Vec::new()
+            )
+            .bind(company.as_uuid())
+            .bind(department.as_uuid())
+            .bind(role.as_str())
+            .fetch_all(&mut **tx)
+            .await?
+        }
+        None => Vec::new(),
     };
     involved.push(principal.as_uuid());
     involved.sort_unstable();
     involved.dedup();
     lock_principals_on(tx, company, &involved).await?;
     check_principal_on(tx, company, principal).await?;
+    if member {
+        sqlx::query(
+            "INSERT INTO department_members (company_id, department_id, principal_id) \
+             VALUES ($1, $2, $3) ON CONFLICT (department_id, principal_id) DO NOTHING",
+        )
+        .bind(company.as_uuid())
+        .bind(department.as_uuid())
+        .bind(principal.as_uuid())
+        .execute(&mut **tx)
+        .await?;
+    }
+    let Some(role) = role else {
+        return sync_department_grants_on(tx, company, &[department]).await;
+    };
     if role.is_single_holder() {
         sqlx::query(
             "DELETE FROM department_roles \
@@ -491,6 +546,7 @@ pub(crate) async fn assign_department_role_on(
     .bind(principal.as_uuid())
     .execute(&mut **tx)
     .await?;
+    // The reach contains the department itself, so one sync covers the membership too.
     let reach = role_reach_on(tx, company, department).await?;
     sync_department_grants_on(tx, company, &reach).await
 }
@@ -533,18 +589,7 @@ pub(crate) async fn add_department_member_on(
     department: DepartmentId,
     principal: PrincipalId,
 ) -> AppResult<()> {
-    lock_department_on(tx, company, department).await?;
-    check_principal_on(tx, company, principal).await?;
-    sqlx::query(
-        "INSERT INTO department_members (company_id, department_id, principal_id) \
-         VALUES ($1, $2, $3) ON CONFLICT (department_id, principal_id) DO NOTHING",
-    )
-    .bind(company.as_uuid())
-    .bind(department.as_uuid())
-    .bind(principal.as_uuid())
-    .execute(&mut **tx)
-    .await?;
-    sync_department_grants_on(tx, company, &[department]).await
+    write_placement_on(tx, company, department, principal, true, None).await
 }
 
 /// Remove `principal` from the department. The caller holds the company write lock.

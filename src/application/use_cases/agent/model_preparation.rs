@@ -26,7 +26,6 @@ pub(crate) fn validate_model_selection(
 pub(crate) fn prepare_library_write(
     definition: &Agent,
     user_id: Uuid,
-    copy_model: LibraryCopyModel,
     connections: &[CompanyModelConnection],
 ) -> AppResult<(AgentWrite, Vec<ProvisioningWarning>)> {
     let mut write = library_agent_write(definition);
@@ -43,8 +42,9 @@ pub(crate) fn prepare_library_write(
         Err(error) => return Err(error),
         Ok(()) => {}
     }
-    if copy_model == LibraryCopyModel::PinDefault
-        && write.provider.is_none()
+    // Its desk answers only on an explicit model, so a copy that would inherit is pinned to the
+    // company default (01DEP-P03-D3); with no usable default, creation refuses it.
+    if write.provider.is_none()
         && let Some((provider, model)) = pinned_default_model(connections)
     {
         write.provider = Some(provider);

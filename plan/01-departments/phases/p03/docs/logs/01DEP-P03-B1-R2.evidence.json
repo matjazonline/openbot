@@ -1,0 +1,53 @@
+{
+  "version": 1,
+  "round": "01DEP-P03-B1-R2",
+  "artifact": "a75c40e7b888d42b415fe7408a319812242e96157e642c594a91ab87c7d55798",
+  "checks": [
+    {
+      "criteria": ["03A.1", "03A.2", "03A.3", "03A.4", "03C.0", "D1", "D2", "D3", "D4", "D5", "D6", "B1-F1", "B1-F2", "B1-F3", "B1-F5", "B1-F6"],
+      "command": "cargo test --locked --offline --lib agent_default_desk -- --test-threads=4",
+      "fixture": "TEST_DATABASE_URL db openbot_dept_p03_test (phase-owned) + own_database; SQLX_OFFLINE=true; test-threads=4",
+      "status": "PASS",
+      "files": [
+        {"path": "logs/B1-R2-agent-default-desk.txt", "sha256": "5c95ffd63cb9e759add801c6294e1a7deac6ad5183148f3cb4eb22be434cd8f8"},
+        {"path": "logs/B1-R2-test-inventory.txt", "sha256": "03543321602f1eb0c4532f56eb0a7940e725407c558349fad7562dbefa540f51"}
+      ]
+    },
+    {
+      "criteria": ["contract-impact", "B1-F2", "B1-F4"],
+      "command": "cargo test --locked --offline --lib -- onboarding provisioning use_cases::agent routes::agent routes::ui_agents skill_tests department assistant_channel desk_wording authorization routes::workflows agent_retire agent_constraint persistence::agent:: agent_default_desk builtin_agent_library response_schema --test-threads=4",
+      "fixture": "TEST_DATABASE_URL db openbot_dept_p03_test (phase-owned) + own_database; SQLX_OFFLINE=true; test-threads=4",
+      "status": "PASS",
+      "files": [
+        {"path": "logs/B1-R2-affected.txt", "sha256": "b2193fbeeb29baaf51bfdd4a49e21af5e97f3d19b5c86e4aed761872bc64b0a2"}
+      ]
+    },
+    {
+      "criteria": ["B1-F1"],
+      "command": "cargo test --locked --offline --lib agent_default_desk_competing_lead (with the pre-fix two-call placement temporarily restored)",
+      "fixture": "openbot_dept_p03_test; mutation reverted afterwards",
+      "status": "FAIL",
+      "files": [
+        {"path": "logs/B1-R2-gate-mutation.txt", "sha256": "c1f5b410f235de709f4aae8f9e21b64f7cccd17a95f767144dfece2ada3e40e0"}
+      ]
+    },
+    {
+      "criteria": ["B1-F3"],
+      "command": "cargo test --locked --offline --lib agent_default_desk_company_agents_have_one_creation_path (with a production insert_agent_on call temporarily appended to agent_publication/mod.rs)",
+      "fixture": "mutation reverted afterwards",
+      "status": "FAIL",
+      "files": [
+        {"path": "logs/B1-R2-scan-mutation.txt", "sha256": "3f39cfee1d8152ffc1b471cc87bb84c07adf544fbf929bc6406f74842179e7ef"}
+      ]
+    },
+    {
+      "criteria": ["test-discovery"],
+      "command": "python3 scratchpad/testnames.py (test fn names HEAD vs worktree)",
+      "fixture": "git HEAD 9291fcd5 vs working tree",
+      "status": "PASS",
+      "files": [
+        {"path": "logs/B1-R2-test-names.txt", "sha256": "ff10e90826ba4dbbf0c27bb7c0b51c51a08fb30ae5dc0f6e91bf8b63e5c8a6b6"}
+      ]
+    }
+  ]
+}

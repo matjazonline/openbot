@@ -1,0 +1,47 @@
+   Compiling open_bots v0.1.0 (/Users/mac02/.codex/worktrees/2050/openbot)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1m 07s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-c4f538027eed5c31)
+
+running 20 tests
+test adapters::persistence::company_agent::tests::agent_default_desk_company_agents_have_one_creation_path ... ok
+test adapters::http::routes::onboarding::tests::agent_default_desk_onboarding_completion_reads_back_the_default_desk ... ok
+test adapters::persistence::department::tests::agent_desks::agent_default_desk_competing_creators_of_one_slug_make_one_agent ... ok
+test adapters::persistence::department::tests::agent_desks::agent_default_desk_deletion_guards_are_unchanged ... ok
+test adapters::persistence::department::tests::agent_desks::agent_default_desk_refuses_a_library_copy_it_cannot_publish ... ok
+test adapters::persistence::department::tests::agent_desks::agent_default_desk_creation_commits_the_agent_with_its_desk ... ok
+test adapters::persistence::department::tests::agent_desks::agent_default_desk_library_definitions_have_none_and_copies_do ... ok
+test adapters::persistence::department::tests::agent_desks::agent_default_desk_refuses_without_a_keyed_model ... FAILED
+test adapters::persistence::department::tests::agent_desks::agent_default_desk_refuses_a_taken_address_or_slug ... ok
+test adapters::persistence::department::tests::agent_desks::agent_default_desk_places_the_agent_and_its_lead_role_with_grants ... ok
+test adapters::persistence::onboarding::tests::agent_default_desk_onboarding_taken_address_rejects_and_commits_nothing ... ok
+test adapters::persistence::onboarding::tests::agent_default_desk_onboarding_creates_and_replays_the_first_department ... ok
+test adapters::persistence::onboarding::tests::agent_default_desk_onboarding_without_a_keyed_model_is_rejected ... FAILED
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::agent_default_desk_builder_creation_refusals_are_tool_errors ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::agent_default_desk_builder_provisions_another_desk_beside_the_default ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::agent_default_desk_builder_places_the_agent_in_a_department ... ok
+test application::use_cases::agent::tests::agent_default_desk_creation_goes_through_company_agents ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::agent_default_desk_builder_refuses_other_settings_at_the_agents_slug ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::agent_default_desk_builder_reuses_the_default_desk_at_the_agents_slug ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::agent_default_desk_competing_builder_claimants_make_one_default_desk ... ok
+
+failures:
+
+---- adapters::persistence::department::tests::agent_desks::agent_default_desk_refuses_without_a_keyed_model stdout ----
+
+thread 'adapters::persistence::department::tests::agent_desks::agent_default_desk_refuses_without_a_keyed_model' (39974478) panicked at src/adapters/persistence/department_agent_desks_tests.rs:43:14:
+called `Result::unwrap()` on an `Err` value: Database(PgDatabaseError { severity: Error, code: "23502", message: "null value in column \"api_key\" of relation \"company_model_connections\" violates not-null constraint", detail: Some("Failing row contains (0400a0c3-d140-4b6b-a2fe-489bee0f9d6b, openai, null, {gpt-4o-mini,gpt-4o}, t, 2026-11-10 06:16:36.524105+00, 2026-11-10 06:16:36.524105+00)."), hint: None, position: None, where: None, schema: Some("public"), table: Some("company_model_connections"), column: Some("api_key"), data_type: None, constraint: None, file: Some("execMain.c"), line: Some(2219), routine: Some("ReportNotNullViolationError") })
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- adapters::persistence::onboarding::tests::agent_default_desk_onboarding_without_a_keyed_model_is_rejected stdout ----
+
+thread 'adapters::persistence::onboarding::tests::agent_default_desk_onboarding_without_a_keyed_model_is_rejected' (39974492) panicked at src/adapters/persistence/onboarding/tests.rs:894:10:
+called `Result::unwrap()` on an `Err` value: Database(PgDatabaseError { severity: Error, code: "23502", message: "null value in column \"api_key\" of relation \"company_model_connections\" violates not-null constraint", detail: Some("Failing row contains (5076d639-943b-491e-8788-df95d4e19d5f, openai, null, {gpt-4o-mini}, t, 2026-11-10 06:16:37.785952+00, 2026-11-10 06:16:37.785952+00)."), hint: None, position: None, where: None, schema: Some("public"), table: Some("company_model_connections"), column: Some("api_key"), data_type: None, constraint: None, file: Some("execMain.c"), line: Some(2219), routine: Some("ReportNotNullViolationError") })
+
+
+failures:
+    adapters::persistence::department::tests::agent_desks::agent_default_desk_refuses_without_a_keyed_model
+    adapters::persistence::onboarding::tests::agent_default_desk_onboarding_without_a_keyed_model_is_rejected
+
+test result: FAILED. 18 passed; 2 failed; 0 ignored; 0 measured; 3821 filtered out; finished in 5.95s
+
+error: test failed, to rerun pass `--lib`

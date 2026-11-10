@@ -1,0 +1,46 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.20s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-c4f538027eed5c31)
+
+running 20 tests
+test adapters::persistence::company_agent::tests::agent_default_desk_company_agents_have_one_creation_path ... ok
+test adapters::http::routes::onboarding::tests::agent_default_desk_onboarding_completion_reads_back_the_default_desk ... ok
+test adapters::persistence::department::tests::agent_desks::agent_default_desk_competing_creators_of_one_slug_make_one_agent ... ok
+test adapters::persistence::department::tests::agent_desks::agent_default_desk_deletion_guards_are_unchanged ... ok
+test adapters::persistence::department::tests::agent_desks::agent_default_desk_refuses_a_library_copy_it_cannot_publish ... ok
+test adapters::persistence::department::tests::agent_desks::agent_default_desk_creation_commits_the_agent_with_its_desk ... ok
+test adapters::persistence::department::tests::agent_desks::agent_default_desk_library_definitions_have_none_and_copies_do ... ok
+test adapters::persistence::department::tests::agent_desks::agent_default_desk_refuses_without_a_keyed_model ... FAILED
+test adapters::persistence::department::tests::agent_desks::agent_default_desk_refuses_a_taken_address_or_slug ... ok
+test adapters::persistence::department::tests::agent_desks::agent_default_desk_places_the_agent_and_its_lead_role_with_grants ... ok
+test adapters::persistence::onboarding::tests::agent_default_desk_onboarding_taken_address_rejects_and_commits_nothing ... ok
+test adapters::persistence::onboarding::tests::agent_default_desk_onboarding_creates_and_replays_the_first_department ... ok
+test adapters::persistence::onboarding::tests::agent_default_desk_onboarding_without_a_keyed_model_is_rejected ... FAILED
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::agent_default_desk_builder_creation_refusals_are_tool_errors ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::agent_default_desk_builder_provisions_another_desk_beside_the_default ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::agent_default_desk_builder_places_the_agent_in_a_department ... ok
+test application::use_cases::agent::tests::agent_default_desk_creation_goes_through_company_agents ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::agent_default_desk_builder_refuses_other_settings_at_the_agents_slug ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::agent_default_desk_builder_reuses_the_default_desk_at_the_agents_slug ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::agent_default_desk_competing_builder_claimants_make_one_default_desk ... ok
+
+failures:
+
+---- adapters::persistence::department::tests::agent_desks::agent_default_desk_refuses_without_a_keyed_model stdout ----
+
+thread 'adapters::persistence::department::tests::agent_desks::agent_default_desk_refuses_without_a_keyed_model' (39972100) panicked at src/adapters/persistence/department_agent_desks_tests.rs:36:6:
+called `Result::unwrap()` on an `Err` value: BadRequest("An API key is required when adding provider 'openai'.")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- adapters::persistence::onboarding::tests::agent_default_desk_onboarding_without_a_keyed_model_is_rejected stdout ----
+
+thread 'adapters::persistence::onboarding::tests::agent_default_desk_onboarding_without_a_keyed_model_is_rejected' (39972113) panicked at src/adapters/persistence/onboarding/tests.rs:915:5:
+Completed([OnboardedAgent { agent: Agent { id: 4cfa4784-588a-8259-b303-033bfa3ea499, draft_revision: AgentDraftRevision(1), company_id: Some(a0c47c64-2349-4210-80a7-1f8a307a707a), name: "Desk", slug: "desk", provider: Some("openai"), model: Some("gpt-4o-mini"), system_prompt: None, description: None, avatar_url: None, created_by: CreationProvenance { actor_type: User, actor_id: Some(8f83e00f-8cdf-4d6b-80ec-eecf4a263e29), actor_name: "Company owner" }, created_at: 2026-11-10T06:15:05.741051Z }, channel: Object {"agent": Object {"id": String("4cfa4784-588a-8259-b303-033bfa3ea499"), "slug": String("desk")}, "binding_id": String("3efde7c3-4c3c-87e7-ac20-c4f6091b5be0"), "channel": Object {"address": String("desk@onboarding.agents.test"), "id": String("b6dfdedb-610c-8234-90c0-9fb80c810f5b"), "slug": String("desk")}, "reply_mode": String("autonomous"), "version_id": String("193808d2-3032-87b9-bf67-a7b29aeed788"), "workflow_id": String("3f33da7a-086d-855d-a32c-00745a5c181f")} }])
+
+
+failures:
+    adapters::persistence::department::tests::agent_desks::agent_default_desk_refuses_without_a_keyed_model
+    adapters::persistence::onboarding::tests::agent_default_desk_onboarding_without_a_keyed_model_is_rejected
+
+test result: FAILED. 18 passed; 2 failed; 0 ignored; 0 measured; 3821 filtered out; finished in 6.13s
+
+error: test failed, to rerun pass `--lib`

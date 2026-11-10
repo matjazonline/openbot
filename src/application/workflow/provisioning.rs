@@ -159,8 +159,13 @@ pub fn provisioning_tool_schemas(kind: ProvisioningKind) -> (Value, Value) {
                 "provider": {"type": "string", "minLength": 1, "maxLength": 64},
                 "model": {"type": "string", "minLength": 1, "maxLength": 128},
                 "reply_mode": {"enum": ["autonomous", "reviewed"]},
-                "channel_slug": {"type": "string", "minLength": 1, "maxLength": 64},
+                "channel_slug": {"type": "string", "minLength": 1, "maxLength": 64,
+                    "description": "The desk to answer. The agent always gets its own autonomous desk at its slug; name another address for a reviewed desk or one with steps."},
                 "channel_name": {"type": "string", "minLength": 1, "maxLength": 120},
+                "department": {"type": "string", "minLength": 1, "maxLength": 64,
+                    "description": "Slug of the department the agent joins as a member. Omitted, the agent joins your department when you belong to exactly one."},
+                "role": {"enum": ["lead"],
+                    "description": "A role the agent holds in that department; needs department."},
                 "tools": {"type": "array", "maxItems": 32,
                     "items": {"type": "string", "minLength": 1, "maxLength": 128}},
                 "skills": {"type": "array", "maxItems": 16,
@@ -284,6 +289,12 @@ pub struct CreateAgentChannel {
     pub channel_slug: Option<String>,
     #[serde(default)]
     pub channel_name: Option<String>,
+    /// The slug of the department the agent joins (plan 01-departments 03C item 0).
+    #[serde(default)]
+    pub department: Option<String>,
+    /// A role it holds there; the schema allows only `lead`.
+    #[serde(default)]
+    pub role: Option<String>,
     #[serde(default)]
     pub tools: Vec<String>,
     #[serde(default)]

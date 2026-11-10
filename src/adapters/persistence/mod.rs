@@ -15,6 +15,7 @@ pub mod channel;
 pub(crate) mod channel_edit;
 pub(crate) mod channel_gate;
 pub mod company;
+pub(crate) mod company_agent;
 pub mod company_invite;
 pub mod company_resend_api;
 pub mod credential_rotation;

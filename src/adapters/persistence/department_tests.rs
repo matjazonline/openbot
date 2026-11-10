@@ -951,3 +951,6 @@ mod competing;
 
 #[path = "department_desks_tests.rs"]
 mod desks;
+
+#[path = "department_agent_desks_tests.rs"]
+mod agent_desks;

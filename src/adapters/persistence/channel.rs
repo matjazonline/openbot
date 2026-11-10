@@ -11,10 +11,8 @@ use crate::adapters::persistence::department_desks::{
 use crate::adapters::persistence::integration::email_binding::{
     CanonicalEmailBinding, write_canonical_email_binding,
 };
-use crate::adapters::persistence::participant::{
-    create_agent_principal_on, resolve_or_create_external_identity_on,
-};
-use crate::adapters::persistence::{agent::insert_agent_on, skill::copy_library_skill_on};
+use crate::adapters::persistence::participant::resolve_or_create_external_identity_on;
+use crate::adapters::persistence::skill::copy_library_skill_on;
 use crate::adapters::protocols::email::EmailIdentity;
 use crate::app_error::AppError;
 use crate::app_error::AppResult;
@@ -23,7 +21,6 @@ use crate::application::ports::channel::ChannelUpdate;
 use crate::application::ports::channel::ChannelWrite;
 use crate::application::ports::participant::IdentityObservation;
 use crate::domain::workflow::CompanyId;
-use crate::entities::agent::Agent;
 use crate::entities::channel::Channel;
 use crate::entities::channel::ChannelAccessMode;
 use crate::entities::creation::CreationProvenance;
@@ -34,9 +31,7 @@ use crate::entities::participant::PrincipalCapability;
 use crate::entities::value_objects::ChannelSlug;
 use crate::entities::value_objects::CompanySlug;
 use crate::entities::value_objects::EmailAddress;
-use crate::use_cases::agent::AgentPersistence;
 use crate::use_cases::agent::AgentWrite;
-use crate::use_cases::agent::LibraryAgentCopyPersistence;
 use crate::use_cases::participant::IdentityResolution;
 
 #[derive(sqlx::FromRow, Debug, Serialize)]
@@ -534,44 +529,9 @@ pub(super) async fn write_channel_settings_on(
     Ok(())
 }
 
-#[async_trait]
-impl LibraryAgentCopyPersistence for PostgresPersistence {
-    async fn create_agent_from_library(
-        &self,
-        company_id: Uuid,
-        actor: crate::application::workflow::WorkflowActor,
-        library_agent_id: Uuid,
-        mut agent: AgentWrite,
-    ) -> AppResult<Agent> {
-        let agent_id = Uuid::new_v4();
-        let mut tx = self.pool.begin().await.map_err(AppError::from)?;
-        sqlx::query_scalar::<_, Uuid>("SELECT id FROM users WHERE id=$1 FOR SHARE")
-            .bind(actor.user_id())
-            .fetch_optional(&mut *tx)
-            .await?
-            .ok_or_else(|| AppError::NotFound("Library installation actor".into()))?;
-        super::workflow::authority::authorize_company(
-            &mut tx,
-            crate::domain::workflow::CompanyId::new(company_id),
-            actor,
-        )
-        .await?;
-        prepare_library_agent_on(&mut tx, company_id, library_agent_id, &mut agent).await?;
-        insert_agent_on(&mut tx, agent_id, Some(company_id), &agent).await?;
-        create_agent_principal_on(&mut tx, company_id, agent_id, &agent.name).await?;
-        // Library selection creates a draft so company-local tools can be configured
-        // before publication. Runnable assistant creation publishes on its own transaction.
-        tx.commit().await.map_err(AppError::from)?;
-        AgentPersistence::get_by_id(self, agent_id)
-            .await?
-            .ok_or_else(|| AppError::Internal("Created agent was not found".into()))
-    }
-}
-
 /// Copy a library definition into the company inside `tx`: its global skills become tenant-owned
-/// copies the agent is attached to, and its portable builtin grants come with it. A copy that grants
-/// tools and would inherit its model gets the company default connection's first model, because a
-/// workflow runs an agent only on an explicit model (p08 D2.6).
+/// copies the agent is attached to, and its portable builtin grants come with it. Its model is
+/// resolved by company-agent creation, like every company agent's (01DEP-P03-D3).
 pub(crate) async fn prepare_library_agent_on(
     tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
     company_id: Uuid,
@@ -611,26 +571,8 @@ pub(crate) async fn prepare_library_agent_on(
     agent.skill_ids = copied_skill_ids;
 
     // Library bindings are builtin-only; native scope constraints forbid tenant targets.
-    // A workflow runs an agent
-    // only on an explicit model, so a copy that grants tools and would inherit gets the
-    // company's default connection's first model, when it has a key.
     let mut bindings = super::agent_capability::bindings_on(tx, None, library_agent_id).await?;
     if !bindings.is_empty() {
-        if agent.provider.is_none() && agent.model.is_none() {
-            let default: Option<(String, String)> = sqlx::query_as(
-                "SELECT provider, models[1] FROM company_model_connections \
-                 WHERE company_id = $1 AND is_default AND api_key IS NOT NULL \
-                   AND cardinality(models) > 0",
-            )
-            .bind(company_id)
-            .fetch_optional(&mut **tx)
-            .await
-            .map_err(AppError::from)?;
-            if let Some((provider, model)) = default {
-                agent.provider = Some(provider);
-                agent.model = Some(model);
-            }
-        }
         for binding in &mut bindings {
             binding.id = crate::entities::agent_capability::AgentBindingId::new(Uuid::new_v4());
         }

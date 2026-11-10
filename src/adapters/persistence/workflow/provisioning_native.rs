@@ -43,11 +43,11 @@ pub(super) async fn provision_on(
     let created_by = CreationProvenance::user(requester.user_id());
 
     // 1. Pre-checks under the company lock.
-    if let Some(refusal) = taken_slug(tx, provisioning).await? {
+    if let Some(refusal) = taken_slug(tx, company, &provisioning.channel_slug).await? {
         return Ok(Err(refusal));
     }
 
-    let agent = match provision_agent_on(tx, provisioning, &created_by).await? {
+    let agent = match provision_agent_on(tx, provisioning).await? {
         Ok(agent) => agent,
         Err(refusal) => return Ok(Err(refusal)),
     };

@@ -695,6 +695,30 @@ pub async fn invite_update_command(
     }
 }
 
+/// The shipped provisioning templates on the test domain, as production builds them.
+pub fn provisioning_templates() -> super::workflow::provisioning::ProvisioningDeployment {
+    super::workflow::provisioning::ProvisioningDeployment::new(
+        std::sync::Arc::new(
+            crate::application::workflow::templates::TemplateCatalogue::shipped(
+                &crate::adapters::workflow_source::WorkflowSourceDecoder,
+            )
+            .unwrap(),
+        ),
+        &[],
+        "agents.test",
+    )
+}
+
+/// Company-agent creation over `persistence` with [`provisioning_templates`] (01DEP-P03-D2).
+pub fn company_agents(
+    persistence: &super::PostgresPersistence,
+) -> std::sync::Arc<dyn crate::use_cases::agent::CompanyAgents> {
+    std::sync::Arc::new(super::company_agent::CompanyAgentService::new(
+        persistence.clone(),
+        provisioning_templates(),
+    ))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

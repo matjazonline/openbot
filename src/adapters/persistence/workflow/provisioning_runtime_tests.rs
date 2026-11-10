@@ -142,11 +142,18 @@ async fn receipts(d: &Deployment, binding: Uuid) -> Vec<Value> {
     .unwrap()
 }
 
+/// An agent answering the desk at `slug`. The agent's own address is its autonomous default desk
+/// (01DEP-P03-D5), so a reviewed desk at `slug` belongs to the agent `{slug}-agent`.
 fn spec(slug: &str, mode: ReplyMode) -> Value {
-    json!({
+    let mut spec = json!({
         "name": "Helper", "slug": slug, "system_prompt": "Answer the team briefly.",
         "provider": SCRIPTED_PROVIDER, "model": SCRIPTED_MODEL, "reply_mode": mode.as_str()
-    })
+    });
+    if mode == ReplyMode::Reviewed {
+        spec["slug"] = json!(format!("{slug}-agent"));
+        spec["channel_slug"] = json!(slug);
+    }
+    spec
 }
 
 /// D2 verification: a signed-in admin's request runs the Builder, which lists, then creates the
@@ -310,10 +317,12 @@ async fn builder_sees_the_conversation_so_far() {
 
 /// The Builder's spec adds its own steps to the reply mode's: a classifier before the draft,
 /// whose label the agent reads, and a rule before the reply that lets only billing questions
-/// through. The new channel runs them in that order.
+/// through. The new desk -- beside the agent's default one, which takes no steps -- runs them in
+/// that order.
 #[tokio::test]
 async fn builder_adds_custom_steps_to_the_new_agents_workflow() {
     let mut spec = spec("helper", ReplyMode::Autonomous);
+    spec["channel_slug"] = json!("billing");
     let labels = json!({"literal": {"type": "string", "enum": ["billing", "other"]}});
     spec["steps"] = json!([
         {"id": "topic", "slot": "before_draft", "type": "ai.classify", "with": {
@@ -358,7 +367,7 @@ async fn builder_adds_custom_steps_to_the_new_agents_workflow() {
     write(
         &d,
         &email,
-        "helper",
+        "billing",
         "Where is my invoice?",
         IngressOrigin::TrustedApplication,
     )

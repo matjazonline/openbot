@@ -418,7 +418,7 @@ async fn provisioning_refusals_commit_a_receipt_and_no_effect() {
 async fn provisioning_transient_fault_leaves_no_marker_receipt_or_effect() {
     let (f, claim) = claimed(false).await;
     let mut faulty = spec("faulty");
-    faulty["channel_name"] = json!("Faulty provisioning target");
+    faulty["name"] = json!("Faulty provisioning target");
     let request = call(&f, &claim, ProvisioningKind::CreateAgentChannel, faulty).await;
     let pool = f.persistence().pool();
     sqlx::raw_sql(
@@ -907,3 +907,287 @@ mod autonomous_provisioning;
 
 #[path = "channel_reply_native_tests.rs"]
 mod channel_reply_native_tests;
+
+/// The company's `agent:{id}` command rows, oldest first: its agents' default desks.
+async fn default_desks(f: &AdmissionFixture) -> Vec<Value> {
+    sqlx::query_scalar(
+        "SELECT result FROM workflow_provisioning_commands \
+         WHERE company_id = $1 AND command_key LIKE 'agent:%' ORDER BY created_at",
+    )
+    .bind(company(f).as_uuid())
+    .fetch_all(f.persistence().pool())
+    .await
+    .unwrap()
+}
+
+/// 01DEP-P03-D5: the agent's own address is its default desk. A request for exactly that desk --
+/// autonomous, no steps, the agent's name -- answers with it, and nothing else is provisioned.
+#[tokio::test]
+async fn agent_default_desk_builder_reuses_the_default_desk_at_the_agents_slug() {
+    let (f, claim) = claimed(false).await;
+    let before = written(&f).await;
+    let mut named = spec("helper");
+    named["channel_slug"] = json!("helper");
+    named["channel_name"] = json!("Helper");
+    let request = call(&f, &claim, ProvisioningKind::CreateAgentChannel, named).await;
+    let created = committed(&dispatch(&f), &request).await;
+    assert_eq!(created["channel"]["slug"], "helper");
+    assert_eq!(
+        grew(&before, &written(&f).await),
+        serde_json::from_str::<Value>(ONE_ASSISTANT).unwrap()
+    );
+    assert_eq!(default_desks(&f).await, [created]);
+}
+
+/// D5: any other setting at the agent's own address -- reviewed replies, added steps, another
+/// name -- refuses the whole command; the receipt commits and nothing is provisioned.
+#[tokio::test]
+async fn agent_default_desk_builder_refuses_other_settings_at_the_agents_slug() {
+    let (f, claim) = claimed(false).await;
+    let mut reviewed = spec("helper");
+    reviewed["reply_mode"] = json!("reviewed");
+    let mut stepped = spec("helper");
+    stepped["steps"] = json!([{"id": "quiet", "slot": "after_reply", "type": "channel.no_reply",
+        "with": {}}]);
+    let mut renamed = spec("helper");
+    renamed["channel_slug"] = json!("helper");
+    renamed["channel_name"] = json!("Another name");
+    for arguments in [reviewed, stepped, renamed] {
+        let before = written(&f).await;
+        let request = call(&f, &claim, ProvisioningKind::CreateAgentChannel, arguments).await;
+        let refused = committed(&dispatch(&f), &request).await;
+        assert_eq!(refused["error"]["code"], PROVISIONING_INVALID, "{refused}");
+        assert!(
+            refused["error"]["message"]
+                .as_str()
+                .unwrap()
+                .contains("autonomous default desk"),
+            "{refused}"
+        );
+        assert_eq!(
+            grew(&before, &written(&f).await),
+            json!({"markers": 1, "receipts": 1, "agents": 0, "channels": 0, "workflows": 0,
+                "bindings": 0})
+        );
+    }
+    assert!(default_desks(&f).await.is_empty());
+}
+
+/// D5: a desk at another address is provisioned beside the default one, in the same command;
+/// the answer is the requested desk.
+#[tokio::test]
+async fn agent_default_desk_builder_provisions_another_desk_beside_the_default() {
+    let (f, claim) = claimed(false).await;
+    let before = written(&f).await;
+    let mut reviewed = spec("helper");
+    reviewed["channel_slug"] = json!("helper-review");
+    reviewed["reply_mode"] = json!("reviewed");
+    let request = call(&f, &claim, ProvisioningKind::CreateAgentChannel, reviewed).await;
+    let created = committed(&dispatch(&f), &request).await;
+    assert_eq!(created["channel"]["slug"], "helper-review");
+    assert_eq!(created["reply_mode"], "reviewed");
+    assert_eq!(
+        grew(&before, &written(&f).await),
+        json!({"markers": 1, "receipts": 1, "agents": 1, "channels": 2, "workflows": 2,
+            "bindings": 2})
+    );
+    let defaults = default_desks(&f).await;
+    assert_eq!(defaults.len(), 1);
+    assert_eq!(defaults[0]["channel"]["slug"], "helper");
+    assert_eq!(defaults[0]["reply_mode"], "autonomous");
+    assert_eq!(committed(&dispatch(&f), &request).await, created);
+}
+
+/// D5, F2: refusals of the shared creation -- no keyed model, an address a desk already holds --
+/// are worded tool errors with a committed receipt and no agent or desk.
+#[tokio::test]
+async fn agent_default_desk_builder_creation_refusals_are_tool_errors() {
+    let (f, claim) = claimed(false).await;
+    let mut tx = f.persistence().pool().begin().await.unwrap();
+    let desk = Uuid::new_v4();
+    let write = ChannelWrite {
+        name: "Front desk".into(),
+        slug: "front".into(),
+        enabled: true,
+        ..ChannelWrite::default()
+    };
+    insert_channel_row_on(&mut tx, company(&f).as_uuid(), desk, &write)
+        .await
+        .unwrap();
+    insert_channel_slugs(&mut tx, company(&f).as_uuid(), desk, "front", &[])
+        .await
+        .unwrap();
+    tx.commit().await.unwrap();
+    let before = written(&f).await;
+    let request = call(
+        &f,
+        &claim,
+        ProvisioningKind::CreateAgentChannel,
+        spec("front"),
+    )
+    .await;
+    let refused = committed(&dispatch(&f), &request).await;
+    assert_eq!(refused["error"]["code"], PROVISIONING_CONFLICT, "{refused}");
+    assert_eq!(
+        grew(&before, &written(&f).await),
+        json!({"markers": 1, "receipts": 1, "agents": 0, "channels": 0, "workflows": 0,
+            "bindings": 0})
+    );
+
+    CompanyPersistence::replace_model_connections_for_user(
+        f.persistence(),
+        owner(&f).user_id(),
+        company(&f).as_uuid(),
+        vec![],
+    )
+    .await
+    .unwrap();
+    let before = written(&f).await;
+    let request = call(
+        &f,
+        &claim,
+        ProvisioningKind::CreateAgentChannel,
+        spec("helper"),
+    )
+    .await;
+    let refused = committed(&dispatch(&f), &request).await;
+    assert_eq!(refused["error"]["code"], PROVISIONING_INVALID, "{refused}");
+    assert_eq!(
+        grew(&before, &written(&f).await),
+        json!({"markers": 1, "receipts": 1, "agents": 0, "channels": 0, "workflows": 0,
+            "bindings": 0})
+    );
+    assert!(default_desks(&f).await.is_empty());
+}
+
+/// 03C.0: the Builder places the agent in a named department (with a role), or by default in the
+/// requester's one department; an unknown department or a role without one is refused.
+#[tokio::test]
+async fn agent_default_desk_builder_places_the_agent_in_a_department() {
+    let (f, claim) = claimed(false).await;
+    let pool = f.persistence().pool();
+    let company_id = company(&f).as_uuid();
+    let department = |slug: &'static str| async move {
+        let id = Uuid::new_v4();
+        sqlx::query(
+            "INSERT INTO departments (id, company_id, name, slug, created_by) \
+             VALUES ($1, $2, $3, $3, '{\"actor_type\":\"system\",\"actor_id\":null,\"actor_name\":\"Test\"}')",
+        )
+        .bind(id)
+        .bind(company_id)
+        .bind(slug)
+        .execute(pool)
+        .await
+        .unwrap();
+        id
+    };
+    let support = department("support").await;
+    let sales = department("sales").await;
+    let requester: Uuid = sqlx::query_scalar(
+        "SELECT id FROM principals WHERE company_id = $1 AND user_id = $2 AND kind = 'person'",
+    )
+    .bind(company_id)
+    .bind(owner(&f).user_id())
+    .fetch_one(pool)
+    .await
+    .unwrap();
+    sqlx::query(
+        "INSERT INTO department_members (company_id, department_id, principal_id) VALUES ($1, $2, $3)",
+    )
+    .bind(company_id)
+    .bind(support)
+    .bind(requester)
+    .execute(pool)
+    .await
+    .unwrap();
+    let placed = |slug: &'static str| async move {
+        sqlx::query_as::<_, (Uuid, Option<String>)>(
+            "SELECT member.department_id, role.role FROM agents AS agent \
+             JOIN principals AS principal ON principal.agent_id = agent.id \
+             JOIN department_members AS member ON member.principal_id = principal.id \
+             LEFT JOIN department_roles AS role ON role.principal_id = principal.id \
+              AND role.department_id = member.department_id \
+             WHERE agent.company_id = $1 AND agent.slug = $2",
+        )
+        .bind(company_id)
+        .bind(slug)
+        .fetch_all(pool)
+        .await
+        .unwrap()
+    };
+
+    let request = call(
+        &f,
+        &claim,
+        ProvisioningKind::CreateAgentChannel,
+        spec("member"),
+    )
+    .await;
+    committed(&dispatch(&f), &request).await;
+    assert_eq!(placed("member").await, [(support, None)]);
+
+    let mut lead = spec("lead");
+    lead["department"] = json!("sales");
+    lead["role"] = json!("lead");
+    let request = call(&f, &claim, ProvisioningKind::CreateAgentChannel, lead).await;
+    committed(&dispatch(&f), &request).await;
+    assert_eq!(placed("lead").await, [(sales, Some("lead".into()))]);
+
+    let mut unknown = spec("stray");
+    unknown["department"] = json!("nowhere");
+    let mut roleless = spec("stray");
+    roleless["role"] = json!("lead");
+    for arguments in [unknown, roleless] {
+        let request = call(&f, &claim, ProvisioningKind::CreateAgentChannel, arguments).await;
+        let refused = committed(&dispatch(&f), &request).await;
+        assert_eq!(refused["error"]["code"], PROVISIONING_INVALID, "{refused}");
+    }
+
+    // In a second department, the requester has no single one, so the agent is placed nowhere.
+    sqlx::query(
+        "INSERT INTO department_members (company_id, department_id, principal_id) VALUES ($1, $2, $3)",
+    )
+    .bind(company_id)
+    .bind(sales)
+    .bind(requester)
+    .execute(pool)
+    .await
+    .unwrap();
+    let request = call(
+        &f,
+        &claim,
+        ProvisioningKind::CreateAgentChannel,
+        spec("unplaced"),
+    )
+    .await;
+    committed(&dispatch(&f), &request).await;
+    assert!(placed("unplaced").await.is_empty());
+}
+
+/// Two holders of one fence dispatch the same command at once: one agent, one default desk and
+/// one `agent:{id}` record, which is the command's answer.
+#[tokio::test]
+async fn agent_default_desk_competing_builder_claimants_make_one_default_desk() {
+    let (f, claim) = claimed(false).await;
+    let request = call(
+        &f,
+        &claim,
+        ProvisioningKind::CreateAgentChannel,
+        spec("helper"),
+    )
+    .await;
+    let (left, right) = (dispatch(&f), dispatch(&f));
+    let barrier = Barrier::new(2);
+    let (a, b) = tokio::join!(
+        async {
+            barrier.wait().await;
+            committed(&left, &request).await
+        },
+        async {
+            barrier.wait().await;
+            committed(&right, &request).await
+        }
+    );
+    assert_eq!(a, b);
+    assert_eq!(default_desks(&f).await, [a]);
+}

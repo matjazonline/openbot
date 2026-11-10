@@ -8,6 +8,9 @@
 #[path = "provisioning_agent.rs"]
 mod agent;
 use agent::provision_agent_on;
+#[path = "provisioning_builder.rs"]
+mod builder;
+use builder::create_agent_channel_on;
 #[path = "provisioning_native.rs"]
 mod native;
 pub(crate) use native::ProvisionedAssistant;
@@ -17,11 +20,9 @@ use super::action_dispatch::{LockedActionAuthority, SqlActionAuthority, SqlLocal
 use super::http::begin_http;
 use super::http::runtime::{context, facts};
 use super::*;
-use crate::adapters::persistence::agent::insert_agent_on;
 use crate::adapters::persistence::channel::{
     insert_channel_row_on, insert_channel_slugs, write_channel_email_binding,
 };
-use crate::adapters::persistence::participant::create_agent_principal_on;
 use crate::application::ports::channel::ChannelWrite;
 use crate::application::use_cases::agent::{AgentWrite, model_allowed};
 use crate::application::workflow::actions::*;
@@ -210,25 +211,19 @@ impl SqlLocalAction for ProvisioningEffects {
             ProvisioningKind::ListAgents => list_on(tx, company).await,
             ProvisioningKind::CreateAgentChannel => {
                 let spec = CreateAgentChannel::parse(&request.arguments)?;
-                let provisioning = Provisioning {
-                    company,
-                    requester,
-                    agent: AssistantAgent::New(Box::new(spec.clone())),
-                    channel_slug: spec
-                        .channel_slug
-                        .clone()
-                        .unwrap_or_else(|| spec.slug.clone()),
-                    channel_name: spec
-                        .channel_name
-                        .clone()
-                        .unwrap_or_else(|| spec.name.clone()),
-                    reply_mode: spec.reply_mode,
-                    steps: spec.steps.clone(),
-                    key: ProvisioningKey::invocation(subject.invocation.as_uuid()),
-                };
+                // Boxed: creation descends into publication and template compilation.
                 Ok(
-                    match provision_guarded(tx, &self.templates, &provisioning).await? {
-                        Ok(provisioned) => provisioned.to_json(),
+                    match Box::pin(create_agent_channel_on(
+                        tx,
+                        &self.templates,
+                        company,
+                        requester,
+                        &spec,
+                        subject.invocation.as_uuid(),
+                    ))
+                    .await?
+                    {
+                        Ok(created) => created,
                         Err(refusal) => refusal.tool_error(),
                     },
                 )
@@ -411,7 +406,7 @@ async fn list_on(tx: &mut Transaction<'_, Postgres>, company: CompanyId) -> AppR
 
 /// Every enabled model of a connection that has a key, default connection first, each in the
 /// order the connection stores them.
-async fn ready_models_on(
+pub(crate) async fn ready_models_on(
     tx: &mut Transaction<'_, Postgres>,
     company: CompanyId,
 ) -> AppResult<Vec<(String, String)>> {
@@ -430,14 +425,6 @@ async fn ready_models_on(
                 .map(move |model| (provider.clone(), model))
         })
         .collect())
-}
-
-/// Which agent the assistant channel answers with.
-pub(crate) enum AssistantAgent {
-    /// `create_agent_channel`: a new agent from the Builder's spec.
-    New(Box<CreateAgentChannel>),
-    /// "Create assistant channel": an existing company agent.
-    Existing(String),
 }
 
 /// The seed every provisioned id derives from: the action invocation for the tool, or the
@@ -473,7 +460,9 @@ impl ProvisioningKey {
 pub(crate) struct Provisioning {
     pub company: CompanyId,
     pub requester: WorkflowActor,
-    pub agent: AssistantAgent,
+    /// The existing company agent the desk's workflow answers with: a new agent is created
+    /// first, through company-agent creation (01DEP-P03-D1).
+    pub agent_slug: String,
     pub channel_slug: String,
     pub channel_name: String,
     pub reply_mode: ReplyMode,
@@ -503,7 +492,7 @@ pub(crate) async fn provision_guarded(
         }
         Err(error) => {
             savepoint.rollback().await?;
-            match taken_slug(tx, provisioning).await? {
+            match taken_slug(tx, provisioning.company, &provisioning.channel_slug).await? {
                 Some(refusal) => Ok(Err(refusal)),
                 None => Err(error),
             }
@@ -511,39 +500,23 @@ pub(crate) async fn provision_guarded(
     }
 }
 
-/// The conflict refusal when the new agent's slug or the channel's address is already taken in
-/// the company (channel aliases included).
+/// The conflict refusal when a desk address is already taken in the company (aliases included).
 async fn taken_slug(
     tx: &mut Transaction<'_, Postgres>,
-    provisioning: &Provisioning,
+    company: CompanyId,
+    channel_slug: &str,
 ) -> AppResult<Option<ProvisioningRefusal>> {
-    let company = provisioning.company.as_uuid();
-    if let AssistantAgent::New(spec) = &provisioning.agent {
-        let taken: bool = sqlx::query_scalar(
-            "SELECT EXISTS (SELECT 1 FROM agents WHERE company_id = $1 AND slug = $2)",
-        )
-        .bind(company)
-        .bind(spec.slug.trim().to_lowercase())
-        .fetch_one(&mut **tx)
-        .await?;
-        if taken {
-            return Ok(Some(ProvisioningRefusal::Conflict(format!(
-                "An agent named '{}' already exists in this company",
-                spec.slug.trim()
-            ))));
-        }
-    }
     let taken: bool = sqlx::query_scalar(
         "SELECT EXISTS (SELECT 1 FROM channel_slugs WHERE company_id = $1 AND slug = $2)",
     )
-    .bind(company)
-    .bind(provisioning.channel_slug.trim().to_lowercase())
+    .bind(company.as_uuid())
+    .bind(channel_slug.trim().to_lowercase())
     .fetch_one(&mut **tx)
     .await?;
     Ok(taken.then(|| {
         ProvisioningRefusal::Conflict(format!(
-            "The address '{}' is already used by a channel in this company",
-            provisioning.channel_slug.trim()
+            "The address '{}' is already used by a desk in this company",
+            channel_slug.trim()
         ))
     }))
 }
@@ -853,7 +826,7 @@ pub(crate) async fn assistant_channel_on(
     let provisioning = Provisioning {
         company,
         requester: caller,
-        agent: AssistantAgent::Existing(request.agent_slug),
+        agent_slug: request.agent_slug,
         channel_slug: request.channel_slug,
         channel_name: request.channel_name,
         reply_mode: request.reply_mode,
