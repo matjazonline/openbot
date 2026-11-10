@@ -1,8 +1,0 @@
-building the memory service in /Users/mac03/.codex/worktrees/60a0/openbot/services/memory
-    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.10s
-provisioned database memory_live_c744bbffd77d owned by memory_live_c744bbffd77d
-the service exited during startup
---- service log (last 40 lines) ---
-{"timestamp":"2026-11-10T05:07:06.476231Z","level":"ERROR","fields":{"message":"memory service failed","error":"the embedding model is unavailable: model artifact missing or invalid at /private/tmp/claude-501/-Users-mac03--codex-worktrees-60a0-openbot/6fedfb2e-40aa-486c-bd0b-051b5a3add7b/scratchpad/empty-model/onnx/model.onnx; run scripts/prepare-model.py --download (build network only) and point MEMORY_MODEL_DIR at the prepared directory: No such file or directory (os error 2)"},"target":"memory_service"}
-exit 1
-leftover query done

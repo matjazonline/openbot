@@ -1,4 +1,0 @@
-test adapters::postgres::operations_tests::memory_operations_auth_breaker_pauses_competing_workers_and_closes_on_success ... FAILED
-thread 'adapters::postgres::operations_tests::memory_operations_auth_breaker_pauses_competing_workers_and_closes_on_success' (24220104) panicked at src/adapters/postgres/operations_tests.rs:1270:5:
-test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 175 filtered out; finished in 0.31s
-exit=101

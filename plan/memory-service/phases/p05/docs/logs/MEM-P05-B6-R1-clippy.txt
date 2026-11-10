@@ -1,2 +1,0 @@
-    Checking open_bots v0.1.0 (/Users/mac03/.codex/worktrees/60a0/openbot)
-    Finished `dev` profile [unoptimized + debuginfo] target(s) in 31.21s

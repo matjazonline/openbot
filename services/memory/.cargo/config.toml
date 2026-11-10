@@ -1,4 +1,4 @@
-# Service-owned Cargo configuration (plan/memory-service implementation-decisions D1).
+# Service-owned Cargo configuration (plan/.archive/memory-service implementation-decisions D1).
 # Cargo also merges parent-directory configuration; scripts/boundary-check.sh fails when a parent
 # sets any key this file does not set itself, and always when a parent sets an array-valued flag.
 [env]

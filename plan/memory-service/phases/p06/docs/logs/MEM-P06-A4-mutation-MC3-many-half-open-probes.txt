@@ -1,6 +1,0 @@
-test application::provider_breaker::tests::memory_operations_breaker_opens_probes_once_doubles_and_closes ... FAILED
-test adapters::postgres::operations_tests::memory_operations_auth_breaker_pauses_competing_workers_and_closes_on_success ... FAILED
-thread 'application::provider_breaker::tests::memory_operations_breaker_opens_probes_once_doubles_and_closes' (24220550) panicked at src/application/provider_breaker.rs:173:9:
-thread 'adapters::postgres::operations_tests::memory_operations_auth_breaker_pauses_competing_workers_and_closes_on_success' (24220549) panicked at src/adapters/postgres/operations_tests.rs:1296:5:
-test result: FAILED. 0 passed; 2 failed; 0 ignored; 0 measured; 174 filtered out; finished in 0.88s
-exit=101

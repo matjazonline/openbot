@@ -1,3 +1,0 @@
-src/adapters/persistence/memory/lifecycle.rs
---- AND lifecycle.desired = 'present' AND lifecycle.state = 'settled'",
-+++ AND lifecycle.desired = 'present'",

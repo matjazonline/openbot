@@ -1,5 +1,0 @@
-service fmt --check exit 0
-openbot fmt --check exit 0
-bash -n (3 scripts) exit 0
-service clippy --all-targets -D warnings exit 0
-openbot clippy --all-targets -D warnings exit 0

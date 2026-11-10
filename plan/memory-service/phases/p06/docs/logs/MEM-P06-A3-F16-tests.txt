@@ -1,5 +1,0 @@
-test adapters::persistence::memory::delivery_tests::memory_integration_a_stopped_worker_claims_nothing ... ok
-test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::memory_integration_a_replacement_claim_fences_the_stale_saver_and_replays_one_intent ... ok
-test adapters::memory_service::tests::memory_integration_a_multi_scope_search_is_one_interactive_operation ... ok
-test adapters::persistence::memory::delivery_tests::memory_integration_a_completion_behind_a_row_lock_gives_up_and_is_reclaimed ... ok
-test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 3703 filtered out; finished in 2.85s

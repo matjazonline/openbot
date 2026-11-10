@@ -1,6 +1,0 @@
-memory_scope_ 43
-memory_access_level_ 25
-memory_integration_ 53
-memory_preparation_ 13
-memory_capture_ 16
-memory_integration_live_ 2

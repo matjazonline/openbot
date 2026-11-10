@@ -6,7 +6,7 @@ rust-version = "1.95"
 publish = false
 description = "Standalone memory service: tenants, namespaces, access levels and scoped credentials"
 
-# Its own workspace root wherever the directory is copied (plan/memory-service D1).
+# Its own workspace root wherever the directory is copied (plan/.archive/memory-service D1).
 [workspace]
 
 [lib]

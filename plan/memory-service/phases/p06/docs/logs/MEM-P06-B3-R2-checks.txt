@@ -1,4 +1,0 @@
-service clippy exit 0
-service fmt ok
-openbot clippy exit 0
-openbot fmt ok

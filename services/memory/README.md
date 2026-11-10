@@ -2,7 +2,7 @@
 
 Standalone Rust service: tenants, namespaces, ordered 0–9 access levels and scoped credentials,
 with an HTTP API (`/v1`, `/admin/v1`) and MCP (`/mcp`) generated from one operation registry.
-Design: `plan/memory-service/implementation-decisions.md` in the OpenBot repository. This
+Design: `plan/.archive/memory-service/implementation-decisions.md` in the OpenBot repository. This
 directory builds and tests on its own (`scripts/extracted-build.sh`).
 
 Status: tenants, namespaces, admin/provisioner and client credentials, grants, the

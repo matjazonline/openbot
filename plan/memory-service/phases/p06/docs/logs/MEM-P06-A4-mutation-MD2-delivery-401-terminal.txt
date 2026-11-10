@@ -1,8 +1,0 @@
-test adapters::persistence::memory::lifecycle_tests::restore::memory_operations_a_restored_service_without_the_stored_credential_gets_a_new_one ... ok
-test adapters::persistence::memory::lifecycle_tests::restore::memory_operations_a_redriven_absent_lifecycle_deletes_a_restored_namespace_again ... ok
-test adapters::persistence::memory::lifecycle_tests::restore::memory_operations_a_delivery_pending_through_a_reissue_is_delivered ... FAILED
-test adapters::persistence::memory::lifecycle_tests::restore::memory_operations_a_delivery_401_reverifies_the_namespace_credential ... ok
-thread 'adapters::persistence::memory::lifecycle_tests::restore::memory_operations_a_delivery_pending_through_a_reissue_is_delivered' (24297302) panicked at src/adapters/persistence/memory/restore_tests.rs:220:5:
-test result: FAILED. 3 passed; 1 failed; 0 ignored; 0 measured; 3715 filtered out; finished in 1.71s
-error: test failed, to rerun pass `--lib`
-exit=101
