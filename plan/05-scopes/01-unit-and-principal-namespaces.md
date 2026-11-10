@@ -21,12 +21,12 @@ created and retired with its owner; nothing else has one. Continues in
    service-side observation request carries `subject` as an opaque provenance string; the service
    needs no new field semantics.
 3. A trigger refuses a `principal` namespace for an `external` or `system` principal
-   (`principals_kind_check`, `init_schema.sql:932`), and a `unit` namespace for a unit of another
+   (`principals_kind_check`, `init_schema.sql:957`), and a `unit` namespace for a unit of another
    company, through the composite foreign keys the departments plan adds.
 
 ## Batch 01B Owners and lifecycle
 
-1. `NamespaceOwner` (`src/application/memory/settings.rs:164`) becomes
+1. `NamespaceOwner` (`src/application/memory/settings.rs:302`) becomes
    `Unit(DepartmentId) | Principal(PrincipalId)`. `MemoryStepScope`
    (`src/application/workflow/memory.rs:27`) becomes `Unit(UnitSelector) | Agent(Uuid)`, where
    `UnitSelector` is `Own | Root`, resolved at
@@ -37,7 +37,7 @@ created and retired with its owner; nothing else has one. Continues in
    company onboarding ([04-root-unit](../04-root-unit/01-root-department-and-membership.md)) call
    `ensure_namespace` for the unit; `create_agent_principal_on` and person principal creation call
    it for the principal. The lazy path in the memory tools runtime
-   (`provision_memory_scope`, `src/application/workflow/memory_tools/runtime.rs:102`) stays as the
+   (`provision_memory_scope`, `src/application/workflow/memory_tools/runtime.rs:116`) stays as the
    backstop for a tenant enabled after its departments exist, and provisions nothing else.
 3. Retirement: `delete_on` for a department calls `retire_namespaces_on` for its unit, as agent and
    user deletion already do (`agent.rs:472`, `user_lifecycle.rs:88`). Re-parenting a department

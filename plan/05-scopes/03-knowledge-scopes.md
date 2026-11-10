@@ -12,7 +12,7 @@ above. Continues in [04](04-integration-and-final-verification.md).
 
 ## Batch 03A Schema and search
 
-1. `knowledge_documents` (`init_schema.sql:11956`) gains `unit_id uuid NOT NULL` with a composite
+1. `knowledge_documents` (`init_schema.sql:12019`) gains `unit_id uuid NOT NULL` with a composite
    foreign key to `departments (company_id, id) ON DELETE RESTRICT`, and `knowledge_chunks`
    (`:11983`) carries it denormalized the way it carries `access_level`, so the search predicate
    needs no join. Uniqueness becomes `(company_id, unit_id, name_key, access_level)` and
