@@ -1,4 +1,4 @@
--- Memory service schema (plan/memory-service implementation-decisions D2).
+-- Memory service schema (plan/.archive/memory-service implementation-decisions D2).
 -- No backward compatibility: this single init migration is edited in place; a checksum mismatch
 -- means resetting the service database.
 --

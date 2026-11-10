@@ -15382,7 +15382,7 @@ END $$;
 CREATE TRIGGER integration_connect_guard BEFORE INSERT OR UPDATE ON integration_connect_attempts
     FOR EACH ROW EXECUTE FUNCTION integration_connect_guard();
 
--- Memory service client configuration (plan/memory-service implementation-decisions E2).
+-- Memory service client configuration (plan/.archive/memory-service implementation-decisions E2).
 -- OpenBot stores only connection state, per-namespace client credentials and the remote
 -- lifecycle; the memory corpus lives in the standalone service's own database.
 CREATE TABLE public.memory_tenants (
