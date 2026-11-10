@@ -1,5 +1,5 @@
 use super::*;
-#[path = "channel_reply_continuation_views_support.rs"]
+#[path = "channel_reply_continuation_views_test_support.rs"]
 mod support;
 use crate::adapters::persistence::workflow::tests::message_tests::support::{lease, runtime};
 use crate::application::workflow::{

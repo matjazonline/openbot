@@ -29,4 +29,19 @@ for runtime in rig rig_core rig_agent; do
     fi
     rm "$fixture/src/application/inline.rs"
 done
+# An RFC Message-ID literal: allowed in a test's helpers (`*_test_support.rs`), refused in
+# production code, including a helper-like name that is not a test name.
+mkdir -p "$fixture/src/adapters/persistence"
+printf 'fn id() -> String { format!("<answer-{}@partner.test>", 1) }\n' \
+    > "$fixture/src/adapters/persistence/reply_test_support.rs"
+bash "$fixture/scripts/transport-boundary-check.sh" > "$fixture/result" 2>&1
+for name in reply.rs reply_support.rs; do
+    cp "$fixture/src/adapters/persistence/reply_test_support.rs" "$fixture/src/adapters/persistence/$name"
+    if bash "$fixture/scripts/transport-boundary-check.sh" > "$fixture/result" 2>&1; then
+        echo "gate accepted an RFC Message-ID built in $name" >&2
+        exit 1
+    fi
+    grep -q 'an RFC Message-ID was constructed outside the email adapter' "$fixture/result"
+    rm "$fixture/src/adapters/persistence/$name"
+done
 echo 'runtime boundary gate regression tests passed'
