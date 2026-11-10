@@ -14,7 +14,12 @@ No active binding means messages are stored without starting that workflow. A dr
 
 ## What Agent Builder can create today
 
-The built-in `agent-builder` has `list_company_agents` and `create_agent_channel`. It can list existing agents and enabled models, then create **one agent plus one team-only channel** bound to the shipped autonomous or reviewed reply workflow. Autonomous sends the agent's answer; reviewed asks a human to approve, edit, or reject it before sending. Creation requires an owner or admin writing in the app, after explicit confirmation of the full specification. A library copy of Agent Builder itself creates only an agent; give that copy a channel/binding to converse with it.
+The built-in `agent-builder` has `list_company_agents` and `create_agent_channel`. Both answer only an owner or admin writing in the app; any other requester gets a refusal.
+
+- `list_company_agents` lists the company's agents and enabled models. Each agent names the departments it belongs to, with the roles it holds there (`departments: [{slug, name, roles}]`), and its own desk (`desk: {id, address}`, `null` once that desk was deleted). Pass `department` (a slug) to list only that department's members and role holders; an unknown slug is refused.
+- `create_agent_channel` creates **one agent with its own desk**: a team desk at the agent's slug, answered through the shipped autonomous reply workflow. Name another address in `channel_slug` for a reviewed desk or one with custom steps; that desk is created beside the default one, never instead of it. `department` (a slug) places the agent there as a member, and `role: "lead"` makes it that department's lead; without `department`, the agent joins the requester's department when the requester belongs to exactly one.
+
+Autonomous sends the agent's answer; reviewed asks a human to approve, edit, or reject it before sending. Creation needs explicit confirmation of the full specification. A library copy of Agent Builder, like every company agent, gets its own autonomous desk at its slug, where you converse with it.
 
 Agent Builder has no workflow-draft, publication, or arbitrary channel-creation tool. It can propose workflow steps or YAML for the **Workflows** editor. Use that editor to save, validate, publish, bind, and activate a custom workflow. Report those actions as completed only after they succeed.
 
@@ -22,7 +27,7 @@ Agent Builder has no workflow-draft, publication, or arbitrary channel-creation 
 
 1. Look for an existing agent that already owns the job. Define the outcome, users, example requests, responsibilities, non-goals, escalation conditions, needed facts, output format, and tone.
 2. Choose a distinct name and lowercase hyphenated slug, a short description, a complete operational system prompt, and an explicit enabled provider/model. Request only needed workflow tools. Attach only existing skills identified by exact company skill slug.
-3. Decide who may use the channel, what messages should trigger work, and whether sending needs review. The Builder's creation tool supports a team-only channel, the two reply modes and the custom steps below; other channel access or workflow designs need separate authoring.
+3. Decide who may use the channel, what messages should trigger work, and whether sending needs review. The Builder's creation tool supports the agent's own autonomous desk, a second team desk at another address for the reviewed mode or the custom steps below, and a department and role; other channel access or workflow designs need separate authoring.
 4. Show the final agent, channel, reply-mode and custom-step specification before asking for creation confirmation. Never imply a design is live merely because it was drafted.
 
 ## The agent base and custom steps

@@ -706,3 +706,229 @@ no-`draft`-step and resource-slot refusals) were accepted in R1. No item needs t
 
 - Asserting the user-configuration safety property with real lifecycle calls (`BindingService` +
   `configure_channel_reply`) rather than raw rows makes the test track the production rules.
+
+## 01DEP-P03-G3-R1 — architecture gate G3 (B3: plan 03C under C003/C004), decision revision r1
+
+### Identity
+
+- Date 2026-11-10. Workflow `implement-opus-reviewed-2_2`. Batch B3; stage: architecture gate.
+  Phase `p03`.
+- Reviewer B: Opus 5.5 (`claude-opus-5-5`), effort per TASK (xhigh), agent `ad409b2d3d149c2c6`.
+- Worktree `/Users/mac02/.codex/worktrees/2050/openbot`, HEAD `01608b1f`. The only changes are
+  COORDINATION.md, TASK.md and the new logs `coordination-r4.md`, `coordination-r5.md` and
+  `gate-B3-r1.md`.
+- `logs/gate-B3-r1.md` sha256 `84f90db5a109344c0bec1b3bffa29259315251b7584bfe628cded9c0cbafda64`
+  appears verbatim in `TASK.md`.
+- Coordination **revision 5** `0a83f1c0…d586` = `logs/coordination-r5.md`. I diffed it against r3:
+  it adds C003 and C004 (user decisions, 2026-11-10) and the p03 dispositions for C001/C002.
+  Checked at the start and before returning.
+
+### Coverage and evidence
+
+- **Requirements:** plan 03C items 0–6 and "Focused checks"; README decisions 4, 5 and 10;
+  C003 and C004.
+- **C004's code facts, all verified:**
+  - `DestinationKind` is only Channel, User or Reply (`message.rs:114-118`).
+  - `plan_channel` writes a system message into a new thread, with no delivery
+    (`message_planner.rs:288-326`).
+  - `INSERT INTO workflow_message_intents` exists only in `thread/inbound.rs:737`, and
+    `commit_inbound` is called only from ingest and the inbound event worker.
+  - A reply continues its source's trace (`message_planner.rs:246-276`).
+  - Routing refuses an internal origin whose trace contains the channel
+    (`ingest/routing.rs:288-291`, `LoopCycle`).
+- **D10:**
+  - `list_on` (`provisioning.rs:365-410`) uses a byte budget with a truncation flag and cut names.
+  - `PreparedTool::declaration` gives every non-knowledge tool the description
+    "Workflow tool {name}" (`agent_context.rs:71-82`), so a provisioning-specific description is
+    new but straightforward.
+  - `AgentDirectoryEntry` is served only behind `lock_company_on`, so it is admin-only
+    (`agent_authoring/reads.rs:59-97`). Adding charters causes no department-visibility leak.
+- **D11:**
+  - `candidate_on` / `build` / `PreparedAgent::new` produce the stored preamble.
+  - `scope::Facts.channel_id` is available.
+  - `restore_on` calls `with_frozen_history` before comparing, and `history_budget` depends on the
+    preamble (G3-F1).
+  - The frozen document's bound is 2 MiB, and a charter is at most 4096 bytes (schema 14273, 15379).
+  - Charter and names are written by admins only, so treating them as trusted is consistent with
+    agent instructions.
+- **D12:** `fixtures::ALL` and `snapshots`. The preamble's untrusted-context rule
+  (`agent.rs:380`). `TemplateCatalogue::shipped` (G3-F2).
+- **D13:** the docs list covers the stale sentences (`agent-builder-context.md:17`,
+  `custom_tools.md:37-41`) in files it already names.
+- **Not executed:** no cargo or SQL. This is a gate.
+
+### Outcome
+
+**Changes required** for decision revision r1. There is no PASS.
+
+- Actionable:
+  - 01DEP-P03-G3-F1 (Medium): the frozen-restore rule must rebuild the preamble from the saved
+    department before `with_frozen_history`;
+  - 01DEP-P03-G3-F2 (Low): fixture role text in untrusted context, wording that contradicts C004,
+    and the "authoring sample list" unresolved.
+- Optional: G3-F3 (roster on public department desks), G3-F4 (docs say framing follows desk
+  ownership).
+- **Sound as written:**
+  - C004's facts;
+  - D10's filter, fields, desk resolution and bounds;
+  - the `AgentDirectoryEntry` additions;
+  - D11's read location, content, bounds, placement and trust;
+  - the D13 list;
+  - the contract-impact table.
+- No item needs the user. G3-F3 stays inside the user's C003 decision.
+
+### Process and instruction feedback
+
+- Candidate rule (gates that add content to a frozen or replayed document): trace every derived
+  field of that document (here `preamble`, and the history budget computed from it) through the
+  restore path, not only the new field.
+
+## 01DEP-P03-G3-R2 — architecture gate G3 recheck (B3), decision revision r2
+
+### Identity
+
+- Date 2026-11-10. Workflow `implement-opus-reviewed-2_2`. Batch B3; stage: architecture gate
+  recheck. Phase `p03`.
+- Reviewer B: Opus 5.5 (`claude-opus-5-5`), effort per TASK (xhigh), agent `ad409b2d3d149c2c6`.
+- `logs/gate-B3-r2.md` sha256 `4aa241d522246d03781fe256eb8c2d815e7813c3550779cb167958657138357c`
+  appears verbatim in `TASK.md`; `gate-B3-r1.md` (`84f90db5…da64`) is unchanged. HEAD `01608b1f`,
+  with no source changes. Coordination revision 5 `0a83f1c0…d586`. Checked at the start and before
+  returning.
+
+### Coverage and evidence
+
+- `diff gate-B3-r1.md gate-B3-r2.md` shows changes only in the preface, D11 (pure preamble, lead
+  sentence, public desks, restore order), D12 (fixture context, header, mismatch), D13
+  (agent-authoring scope) and two verification rows.
+- I checked the restore order against `frozen.rs:15-36` and `agent_context.rs:18-53`. Once
+  `with_department(saved)` has rebuilt the preamble, `with_frozen_history`'s budget check and the
+  full-document compare both see the saved text. Both `freeze_on` and the ambiguous-resolution
+  `proof_on` go through `restore_on`.
+- **Not executed:** no cargo or SQL.
+
+### Outcome
+
+**PASS** for decision revision r2 (`logs/gate-B3-r2.md` sha256
+`4aa241d522246d03781fe256eb8c2d815e7813c3550779cb167958657138357c`). 01DEP-P03-G3-F1..F4 are all
+resolved, and none is open. No item needs the user.
+
+Implementation note for B3's batch review, not a finding: keep the lead sentence a function of
+the saved `DepartmentContext`, for example a stored lead flag. A public desk carries no roster, so
+the sentence cannot be derived from roster membership there.
+
+### Process and instruction feedback
+
+- r2 named the derived field (`preamble`) and the budget dependency explicitly, which made the
+  recheck a direct trace through two functions.
+
+## 01DEP-P03-B3-R1 — batch review B3 (plan 03C under C003/C004)
+
+### Identity
+
+- Date 2026-11-10. Workflow `implement-opus-reviewed-2_2`. Batch B3; stage: batch review. Phase `p03`.
+- Reviewer B: Opus 5.5 (`claude-opus-5-5`), effort per TASK (xhigh), agent `ad409b2d3d149c2c6`.
+- Worktree `/Users/mac02/.codex/worktrees/2050/openbot`, base/HEAD `01608b1f`, uncommitted: 22
+  modified source files, 4 docs, the plan file, and 7 new files (`department_roster.rs` and its
+  tests, `agent_department.rs` and its tests, `agent_history_department_tests.rs`,
+  `provisioning_directory_tests.rs`, `fixtures/department-lead.yaml`).
+- Artifact digest `241d6d8d955a1f236e384677c12f66cb37918ff980e2b3e1fef596b69c1524e9`, recomputed at
+  the start and before returning. Evidence valid (PASS 3, FAIL 2: the first affected run and the
+  intended mutation).
+- Gate r2 `4aa241d5…357c`; coordination revision 5 `0a83f1c0…d586`.
+
+### Coverage and evidence
+
+- **Read in full:** `department_roster.rs` (roster and desk SQL), `agent_department.rs`
+  (context and rendering), `fixtures/department-lead.yaml`.
+- **Read as diffs:**
+  - `preparation.rs`: `candidate_on` reads the context for every `agent.run` with a channel,
+    then calls `with_department`;
+  - `frozen.rs`: restore order saved department → `with_frozen_history` → compare;
+  - `agent.rs`: `preamble(selection, department)`, and `with_department` refused after frozen
+    history or for non-`agent.run` steps;
+  - `agent_context.rs` (declaration), `provisioning.rs` (list input, filter, departments, desk,
+    budget), `application/workflow/provisioning.rs` (schemas, description);
+  - `agent_authoring/directory.rs` and `reads.rs`, `authoring_reads.rs`, the picker route,
+    `mod.rs`/`infra/workflow.rs` (`app_domain`), `fixtures/mod.rs`;
+  - the four docs and the plan's "Status after p03" note.
+- **Desk identity checked.** An agent's desk is the `agent:{id}` record's channel while it
+  exists, at its `is_primary` slug. A department's desk is the `department:{id}` record's channel,
+  only while `department_id` matches. Both are consistent with B1/B2.
+  `departments.slug` is citext, so the filter is case-insensitive.
+- **`app_domain` checked.** Every production reader with desks gets the configured instance:
+  `WorkflowServices.persistence` serves the picker, the JSON directory (`catalog.rs:118-133`)
+  and agent preparation (`compose_handler`); `list_on` uses `templates.app_domain`. Local agents
+  do not use `PreparedAgent` and have no diff, so the six `cloudroom_*` failures (Node peer build
+  absent) are unrelated.
+- **VERSION 5 checked.** `agent_history_preparation_valid` restricts only the keys inside
+  `history`, not the top-level ones, so the additive `department` key is accepted. With the DB
+  reset there are no pre-change documents.
+- **Executed** (`openbot_dept_p03_test`, `SQLX_OFFLINE=true`, `--test-threads=4`):
+  - the focused set (`department_directory_ department_context_ department_lead_fixture
+    workflow_fixtures_ workflow_storage_ provisioning_lists refusals_and_results`): 38 listed,
+    38 passed (`logs/B3-R1-review-focused.txt`);
+  - the author's affected filters, with `agent_tests` narrowed to
+    `application::workflow::agent_tests` to leave out the unavailable `cloudroom_*` tests:
+    829 passed, 3 ignored (`logs/B3-R1-review-affected.txt`);
+  - `cargo check --lib --bins`, `fmt --check` and `--test source_modules`: all clean.
+- **Not run:** the full gate (I003), `stack-budget.sh`, clippy (the author reports it clean), the
+  `cloudroom_*` e2e tests (Node peer build absent), and migrations from scratch (unchanged).
+
+### Outcome
+
+**Changes required, narrowly**, for artifact `241d6d8d…24e9`. There is no PASS.
+
+- Actionable: **01DEP-P03-B3-F1 (Low, docs)**. The library-copy sentence in
+  `agent-builder-context.md` is false since B1, and the "Later edits…" sentence in
+  `agent-authoring.md` landed in the wrong paragraph.
+- **Sound as written:**
+  - the roster and desk SQL, with its bounds;
+  - the preparation change and the restore order, with mutation evidence;
+  - public desks (no roster);
+  - trust placement: admin-written text in the preamble, before the skills and the untrusted
+    notice;
+  - the stored lead flag;
+  - the picker route, which now reads the real entry and skips a vanished agent;
+  - the listing filter, fields, budget and description;
+  - the fixture (untrusted base context, header citing D11 and C004, not shipped);
+  - the inter-channel doc and the plan status note.
+- No item needs the user.
+
+### Process and instruction feedback
+
+- When a gate review names specific stale sentences for a later batch to fix, the batch's docs
+  check should grep for those exact sentences (B3-F1).
+
+## 01DEP-P03-B3-R2 — batch B3 correction recheck (B3-F1, docs only)
+
+### Identity
+
+- Date 2026-11-10. Workflow `implement-opus-reviewed-2_2`. Batch B3; stage: correction recheck.
+  Phase `p03`.
+- Reviewer B: Opus 5.5 (`claude-opus-5-5`), effort per TASK (xhigh), agent `ad409b2d3d149c2c6`.
+- Artifact digest `0db985062e8c8701d12d2a0b89c4eca83220d0bccce46c2a0ff154298682dbf1`, recomputed at
+  the start and before returning. Base/HEAD `01608b1f`. Evidence `logs/01DEP-P03-B3-R2.evidence.json`
+  validates (PASS 2).
+- Gate r2 `4aa241d5…357c` and coordination revision 5 `0a83f1c0…d586` are unchanged.
+
+### Coverage and evidence
+
+- **Read the corrected text:**
+  - `docs/agent-builder-context.md:22`: the library copy gets its own autonomous desk. A grep
+    finds no "creates only an agent" left in `docs/`.
+  - `docs/agent-authoring.md:96-115`: "Later edits…" and "The update contract…" close the create
+    paragraph again, and the department paragraph ends at the retry sentence.
+    `git diff --stat 01608b1f` shows +11/−0.
+  - `docs/custom_tools.md:47`: the quoted label now reads "Create assistant desk".
+- **Not run:** the Rust and database suites, because this correction touches docs only (AGENTS.md:
+  documentation-only changes do not require them). The source is the same as in B3-R1, where the
+  focused set (38) and the affected set (829) passed.
+
+### Outcome
+
+**PASS** for batch B3 at artifact `0db985062e8c8701d12d2a0b89c4eca83220d0bccce46c2a0ff154298682dbf1`.
+01DEP-P03-B3-F1 is resolved. No p03 finding is open. No item needs the user.
+
+### Process and instruction feedback
+
+- A docs-only correction with an add-only diff against the base made the recheck a short read.

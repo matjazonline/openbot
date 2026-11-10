@@ -558,7 +558,7 @@ async fn provisioning_lists_agents_and_models() {
     assert_eq!(
         listed["agents"],
         json!([{"slug": "support", "name": "Support", "description": "Answers customers.",
-            "provider": "openai", "model": "gpt-4o-mini"}])
+            "provider": "openai", "model": "gpt-4o-mini", "departments": [], "desk": null}])
     );
     assert_eq!(
         listed["models"],
@@ -1191,3 +1191,6 @@ async fn agent_default_desk_competing_builder_claimants_make_one_default_desk() 
     assert_eq!(a, b);
     assert_eq!(default_desks(&f).await, [a]);
 }
+
+#[path = "provisioning_directory_tests.rs"]
+mod directory;

@@ -30,9 +30,12 @@ const VERSION: u8 = 5;
 
 #[path = "agent_context.rs"]
 mod context;
+#[path = "agent_department.rs"]
+mod department;
 use crate::application::agent::{AgentModelToolName, AgentToolOrigin, ResolvedAgentTool};
 use crate::entities::agent_capability::AgentBindingSource;
 pub use context::AgentToolDeclaration;
+pub use department::*;
 
 /// The concrete dispatch edge resolved at preparation. A saved call follows this
 /// target; a later registry rebind is refused at dispatch rather than followed.
@@ -109,6 +112,7 @@ pub struct PreparedAgent {
     selection: ResolvedAgent,
     tools: Vec<PreparedTool>,
     preamble: String,
+    department: Option<DepartmentContext>,
     context: AgentLogicalInput,
     history_exchange: Option<AgentExchangeId>,
     history: Option<FrozenAgentHistory>,
@@ -151,7 +155,7 @@ impl PreparedAgent {
         if declared.windows(2).any(|pair| pair[0] == pair[1]) {
             return Err(invalid("Agent tool declarations collide"));
         }
-        let preamble = preamble(&selection);
+        let preamble = preamble(&selection, None);
         let context = AgentLogicalInput::new(context.clone())?;
         Ok(Self {
             version: VERSION,
@@ -159,6 +163,7 @@ impl PreparedAgent {
             selection,
             tools,
             preamble,
+            department: None,
             context,
             history_exchange: None,
             history: None,
@@ -182,6 +187,21 @@ impl PreparedAgent {
     }
     pub fn preamble(&self) -> &str {
         &self.preamble
+    }
+
+    /// The department context of an `agent.run` on a department-owned desk, with the preamble
+    /// rebuilt from it (01DEP-P03-D11). A frozen restore passes the saved one before its
+    /// history, whose budget counts the preamble.
+    pub fn with_department(mut self, department: Option<DepartmentContext>) -> AppResult<Self> {
+        if self.history.is_some() || (department.is_some() && self.step != ModelStep::AgentRun) {
+            return Err(invalid("Department context differs from the model step"));
+        }
+        self.preamble = preamble(&self.selection, department.as_ref());
+        self.department = department;
+        Ok(self)
+    }
+    pub fn department(&self) -> Option<&DepartmentContext> {
+        self.department.as_ref()
     }
 
     /// Exact structured input, before history selection or provider formatting.
@@ -370,8 +390,11 @@ fn prepared_tool(
     })
 }
 
-fn preamble(selection: &ResolvedAgent) -> String {
+fn preamble(selection: &ResolvedAgent, department: Option<&DepartmentContext>) -> String {
     let mut text = selection.agent().instructions.clone();
+    if let Some(department) = department {
+        department.render(&mut text);
+    }
     for skill in selection.skills() {
         text.push_str("\n\nSkill ");
         text.push_str(skill.skill.name.as_str());

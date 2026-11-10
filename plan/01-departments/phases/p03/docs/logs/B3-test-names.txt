@@ -1,0 +1,29 @@
+# test fns removed since 01608b1f (git diff, '-' fn lines in *.rs):
+-async fn list_on(tx: &mut Transaction<'_, Postgres>, company: CompanyId) -> AppResult<Value> {
+-fn preamble(selection: &ResolvedAgent) -> String {
+# (list_on and preamble are non-test functions, replaced by new signatures)
+# new test files:
+ M src/adapters/persistence/department_tests.rs
+ M src/adapters/persistence/workflow/agent_history_selection_tests.rs
+ M src/adapters/persistence/workflow/provisioning_dispatch_tests.rs
+ M src/adapters/persistence/workflow/provisioning_runtime_tests.rs
+ M src/application/workflow/agent_tests.rs
+ M src/application/workflow/provisioning_tests.rs
+ M src/application/workflow/sample/tests.rs
+?? src/adapters/persistence/department_roster_tests.rs
+?? src/adapters/persistence/workflow/agent_history_department_tests.rs
+?? src/adapters/persistence/workflow/provisioning_directory_tests.rs
+?? src/application/workflow/agent_department_tests.rs
+# added test fns (B3):
+async fn department_context_roster_lists_the_desks_around_the_department() {
+async fn department_context_roster_is_bounded() {
+async fn department_directory_lists_departments_roles_and_desks() {
+async fn department_directory_filters_by_one_department() {
+async fn department_directory_picker_entries_name_departments_and_the_desk() {
+async fn department_context_frozen_preparation_replays_the_department_it_froze() {
+fn department_context_follows_the_instructions_and_precedes_skills() {
+fn department_context_names_the_lead_only_for_its_run_and_no_roster_on_a_public_desk() {
+fn department_context_belongs_to_agent_runs_only() {
+fn department_directory_tool_description_names_departments_and_desks() {
++async fn department_context_reaches_the_lead_on_its_department_desk() {
++fn department_lead_fixture_runs_as_a_sample() {

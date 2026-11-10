@@ -17,6 +17,7 @@ use crate::application::workflow::registry::ToolContract;
 use crate::application::workflow::templates::{AgentWorkflow, CustomStep, MAX_CUSTOM_STEPS};
 use crate::application::workflow::tools::tool_error;
 use crate::domain::workflow::{CompanyId, TypeName};
+use crate::entities::department::DepartmentRole;
 use async_trait::async_trait;
 use serde::Deserialize;
 use serde_json::{Value, json};
@@ -48,10 +49,15 @@ pub const MAX_LISTED_MODELS: usize = 256;
 /// A listed agent's name and description are cut to these many characters.
 pub const MAX_LISTED_NAME_CHARS: usize = 120;
 pub const MAX_LISTED_DESCRIPTION_CHARS: usize = 300;
+/// The most departments one listed agent names, by slug.
+pub const MAX_LISTED_DEPARTMENTS: usize = 16;
 /// The serialized listing stays within this many bytes, under the 64 KiB a receipt may hold
 /// (F050): models first, then agents by slug, until the next entry would not fit.
 pub const MAX_LISTING_BYTES: usize = 48 * 1024;
 const MAX_REFUSAL_MESSAGE: usize = 2000;
+
+/// What the model is told `list_company_agents` returns (01DEP-P03-D10).
+pub const LIST_COMPANY_AGENTS_DESCRIPTION: &str = "List the company's agents and the models a new agent may use. Each agent names the departments it belongs to, with the roles it holds there: a department's members are the agents that list it. Pass department (a slug) to list only its members and role holders. An agent's desk is the address its own replies come from; it is null when that desk was deleted.";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ProvisioningKind {
@@ -109,9 +115,25 @@ pub fn provisioning_tool_schemas(kind: ProvisioningKind) -> (Value, Value) {
                         "description": {"type": ["string", "null"],
                             "maxLength": MAX_LISTED_DESCRIPTION_CHARS},
                         "provider": {"type": ["string", "null"]},
-                        "model": {"type": ["string", "null"]}
+                        "model": {"type": ["string", "null"]},
+                        "departments": {"type": "array", "maxItems": MAX_LISTED_DEPARTMENTS,
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "slug": {"type": "string"},
+                                    "name": {"type": "string", "maxLength": MAX_LISTED_NAME_CHARS},
+                                    "roles": {"type": "array", "items": {"enum": DepartmentRole::ALL
+                                        .map(DepartmentRole::as_str)}}
+                                },
+                                "required": ["slug", "name", "roles"],
+                                "additionalProperties": false
+                            }},
+                        "desk": {"type": ["object", "null"],
+                            "properties": {"id": {"type": "string"}, "address": {"type": "string"}},
+                            "required": ["id", "address"], "additionalProperties": false}
                     },
-                    "required": ["slug", "name", "description", "provider", "model"],
+                    "required": ["slug", "name", "description", "provider", "model", "departments",
+                        "desk"],
                     "additionalProperties": false
                 }},
                 "models": {"type": "array", "maxItems": MAX_LISTED_MODELS, "items": {
@@ -146,9 +168,14 @@ pub fn provisioning_tool_schemas(kind: ProvisioningKind) -> (Value, Value) {
         }),
     };
     let input = match kind {
-        ProvisioningKind::ListAgents => {
-            json!({"type": "object", "properties": {}, "additionalProperties": false})
-        }
+        ProvisioningKind::ListAgents => json!({
+            "type": "object",
+            "properties": {
+                "department": {"type": "string", "minLength": 1, "maxLength": 64,
+                    "description": "Slug of a department: only its members and role holders are listed."}
+            },
+            "additionalProperties": false
+        }),
         ProvisioningKind::CreateAgentChannel => json!({
             "type": "object",
             "properties": {

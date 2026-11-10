@@ -213,7 +213,9 @@ impl SqlLocalAction for ProvisioningEffects {
             return Ok(refusal.tool_error());
         }
         match kind {
-            ProvisioningKind::ListAgents => list_on(tx, company).await,
+            ProvisioningKind::ListAgents => {
+                list_on(tx, &self.templates, company, &request.arguments).await
+            }
             ProvisioningKind::CreateAgentChannel => {
                 let spec = CreateAgentChannel::parse(&request.arguments)?;
                 // Boxed: creation descends into publication and template compilation.
@@ -350,8 +352,9 @@ fn requester_source(source_key: &str) -> RequesterSource {
     }
 }
 
-/// One listed agent: slug, name, description, provider and model.
+/// One listed agent: id, slug, name, description, provider and model.
 type ListedAgent = (
+    Uuid,
     String,
     String,
     Option<String>,
@@ -359,10 +362,38 @@ type ListedAgent = (
     Option<String>,
 );
 
-/// The company's agents by slug and the models it can run, for the Builder (D2.1). Bounded
-/// (F050): names and descriptions are cut, and entries stop at `MAX_LISTING_BYTES`, models
-/// first because creation needs one; `truncated` says whether anything was left out.
-async fn list_on(tx: &mut Transaction<'_, Postgres>, company: CompanyId) -> AppResult<Value> {
+/// The company's agents by slug -- with their departments and desks, only one department's
+/// members and role holders when `department` names it (01DEP-P03-D10) -- and its keyed models.
+async fn list_on(
+    tx: &mut Transaction<'_, Postgres>,
+    templates: &ProvisioningDeployment,
+    company: CompanyId,
+    arguments: &Value,
+) -> AppResult<Value> {
+    use crate::adapters::persistence::department_roster::{
+        DeskAddresses, agent_departments_on, agent_desks_on,
+    };
+    let department = match arguments.get("department").and_then(Value::as_str) {
+        None => None,
+        Some(slug) => {
+            let id: Option<Uuid> = sqlx::query_scalar(
+                "SELECT id FROM departments WHERE company_id = $1 AND slug = $2",
+            )
+            .bind(company.as_uuid())
+            .bind(slug)
+            .fetch_optional(&mut **tx)
+            .await?;
+            match id {
+                Some(id) => Some(id),
+                None => {
+                    return Ok(ProvisioningRefusal::Invalid(format!(
+                        "No department has the slug '{slug}'"
+                    ))
+                    .tool_error());
+                }
+            }
+        }
+    };
     let mut budget = MAX_LISTING_BYTES;
     let mut truncated = false;
     let mut fits = |entry: &Value| {
@@ -383,22 +414,47 @@ async fn list_on(tx: &mut Transaction<'_, Postgres>, company: CompanyId) -> AppR
         models.push(entry);
     }
     let rows: Vec<ListedAgent> = sqlx::query_as(
-        "SELECT slug::text, name, description, provider, model FROM agents \
-         WHERE company_id = $1 ORDER BY slug LIMIT $2",
+        "SELECT agent.id, agent.slug::text, agent.name, agent.description, agent.provider, \
+           agent.model FROM agents AS agent \
+         WHERE agent.company_id = $1 AND ($2::uuid IS NULL OR EXISTS ( \
+           SELECT 1 FROM principals AS principal WHERE principal.company_id = agent.company_id \
+             AND principal.agent_id = agent.id AND ( \
+               EXISTS (SELECT 1 FROM department_members AS member \
+                 WHERE member.company_id = principal.company_id AND member.department_id = $2 \
+                   AND member.principal_id = principal.id) \
+               OR EXISTS (SELECT 1 FROM department_roles AS role \
+                 WHERE role.company_id = principal.company_id AND role.department_id = $2 \
+                   AND role.principal_id = principal.id)))) \
+         ORDER BY agent.slug LIMIT $3",
     )
     .bind(company.as_uuid())
+    .bind(department)
     .bind(MAX_LISTED_AGENTS as i64 + 1)
     .fetch_all(&mut **tx)
     .await?;
     truncated |= rows.len() > MAX_LISTED_AGENTS;
+    let rows: Vec<ListedAgent> = rows.into_iter().take(MAX_LISTED_AGENTS).collect();
+    let ids: Vec<Uuid> = rows.iter().map(|row| row.0).collect();
+    let mut departments = agent_departments_on(tx, company, &ids).await?;
+    let mut addresses = DeskAddresses::new(company, Some(&templates.app_domain));
+    let mut desks = agent_desks_on(tx, &mut addresses, &ids).await?;
+    let name = |name: &str| name.chars().take(MAX_LISTED_NAME_CHARS).collect::<String>();
     let mut agents = Vec::new();
-    for (slug, name, description, provider, model) in rows.into_iter().take(MAX_LISTED_AGENTS) {
+    for (id, slug, agent_name, description, provider, model) in rows {
+        let (placed, more) = departments.remove(&id).unwrap_or_default();
+        truncated |= more;
         let entry = json!({
             "slug": slug,
-            "name": name.chars().take(MAX_LISTED_NAME_CHARS).collect::<String>(),
+            "name": name(&agent_name),
             "description": description
                 .map(|text| text.chars().take(MAX_LISTED_DESCRIPTION_CHARS).collect::<String>()),
             "provider": provider, "model": model,
+            "departments": placed.iter().map(|department| json!({
+                "slug": department.slug,
+                "name": name(&department.name),
+                "roles": department.roles.iter().map(|role| role.as_str()).collect::<Vec<_>>(),
+            })).collect::<Vec<_>>(),
+            "desk": desks.remove(&id).map(|desk| json!({"id": desk.id.to_string(), "address": desk.address})),
         });
         if !fits(&entry) {
             truncated = true;

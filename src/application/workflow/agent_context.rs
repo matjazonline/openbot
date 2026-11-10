@@ -71,9 +71,14 @@ impl PreparedTool {
     pub fn declaration(&self) -> AgentToolDeclaration {
         AgentToolDeclaration {
             name: self.declared.clone(),
-            description: match self.target {
+            description: match &self.target {
                 AgentToolTarget::Knowledge => {
                     super::super::knowledge::KNOWLEDGE_TOOL_DESCRIPTION.into()
+                }
+                AgentToolTarget::Provisioning { name }
+                    if name.as_str() == super::super::provisioning::LIST_COMPANY_AGENTS =>
+                {
+                    super::super::provisioning::LIST_COMPANY_AGENTS_DESCRIPTION.into()
                 }
                 _ => format!("Workflow tool {}", self.name),
             },

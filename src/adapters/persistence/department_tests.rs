@@ -1035,3 +1035,6 @@ mod agent_desks;
 
 #[path = "department_lead_desk_tests.rs"]
 mod lead_desks;
+
+#[path = "department_roster_tests.rs"]
+mod roster;

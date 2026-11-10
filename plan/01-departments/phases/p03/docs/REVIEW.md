@@ -17,10 +17,14 @@ Review record for phase `p03` (`plan/01-departments/03-leads-and-coordination.md
 | 01DEP-P03-G2-R3 | 2026-11-10 | Architecture gate B2 recheck | Decision **r4**, `logs/gate-B2-r4.md` sha256 `51d4dee8d53b30ff8033d8373b06f07024bd26fcbcdf193c61062f9e74fd8553` (verbatim in TASK; r1–r3 kept); coordination r3 `880cac54…04b8`; HEAD `523732b7` | B, Opus 5.5, agent `ad409b2d3d149c2c6` | **PASS** for decision revision r4 | Resolved: G2-F2 (residual), F8, F9. None open |
 | 01DEP-P03-B2-R1 | 2026-11-10 | Batch review B2 (plan 03B), against gate r4 | Artifact digest `8fd91d0452986625ad448afcdbe382b456c75bcaeaa9cddef117523947535c9b` (base/HEAD `523732b7`, uncommitted; same exclusions); evidence `logs/01DEP-P03-B2-R1.evidence.json` valid; gate r4 `51d4dee8…8553`; coordination r3 | B, Opus 5.5, agent `ad409b2d3d149c2c6` | **Changes required** (no PASS; tests and naming only) | Actionable: B2-F1, F2 (Low, reported by A), B2-F3 (Low). Optional: B2-F4 |
 | 01DEP-P03-B2-R2 | 2026-11-10 | Batch B2 correction recheck (B2-F1..F4) | Artifact digest `31d169402e1d795115670b31b6399674904c1f0d41463afb0bdbe0c1378139ea` (base/HEAD `523732b7`, uncommitted; same exclusions); evidence `logs/01DEP-P03-B2-R2.evidence.json` valid; gate r4; coordination r3 | B, Opus 5.5, agent `ad409b2d3d149c2c6` | **PASS** for artifact `31d16940…39ea` | Resolved: B2-F1..F4. None open |
+| 01DEP-P03-G3-R1 | 2026-11-10 | Architecture gate B3 (DEP-P03-D10..D13) | Decision **r1**, `logs/gate-B3-r1.md` sha256 `84f90db5a109344c0bec1b3bffa29259315251b7584bfe628cded9c0cbafda64`; coordination **r5** `0a83f1c0…d586` (C003, C004); HEAD `01608b1f` | B, Opus 5.5, agent `ad409b2d3d149c2c6` | **Changes required** (no PASS for r1) | Actionable: G3-F1 (Medium), G3-F2 (Low). Optional: G3-F3, F4 |
+| 01DEP-P03-G3-R2 | 2026-11-10 | Architecture gate B3 recheck | Decision **r2**, `logs/gate-B3-r2.md` sha256 `4aa241d522246d03781fe256eb8c2d815e7813c3550779cb167958657138357c` (verbatim in TASK; r1 kept); coordination r5 `0a83f1c0…d586`; HEAD `01608b1f` | B, Opus 5.5, agent `ad409b2d3d149c2c6` | **PASS** for decision revision r2 | Resolved: G3-F1..F4. None open |
+| 01DEP-P03-B3-R1 | 2026-11-10 | Batch review B3 (plan 03C under C003/C004), against gate r2 | Artifact digest `241d6d8d955a1f236e384677c12f66cb37918ff980e2b3e1fef596b69c1524e9` (base/HEAD `01608b1f`, uncommitted; same exclusions); evidence `logs/01DEP-P03-B3-R1.evidence.json` valid; gate r2 `4aa241d5…357c`; coordination r5 | B, Opus 5.5, agent `ad409b2d3d149c2c6` | **Changes required, narrowly** (no PASS; docs only) | Actionable: B3-F1 (Low) |
+| 01DEP-P03-B3-R2 | 2026-11-10 | Batch B3 correction recheck (B3-F1, docs only) | Artifact digest `0db985062e8c8701d12d2a0b89c4eca83220d0bccce46c2a0ff154298682dbf1` (base/HEAD `01608b1f`, uncommitted; same exclusions); evidence `logs/01DEP-P03-B3-R2.evidence.json` valid; gate r2; coordination r5 | B, Opus 5.5, agent `ad409b2d3d149c2c6` | **PASS** for artifact `0db98506…dbf1` | Resolved: B3-F1. None open |
 
 ## Open findings
 
-- None after B2-R2. Batch B2 passed at artifact `31d16940…39ea`.
+- None after B3-R2. Batch B3 passed at artifact `0db98506…dbf1`. No p03 finding is open.
 
 ## Findings status
 
@@ -50,3 +54,8 @@ Review record for phase `p03` (`plan/01-departments/03-leads-and-coordination.md
 | 01DEP-P03-B2-F2 | Low | Resolved (B2-R2) |
 | 01DEP-P03-B2-F3 | Low | Resolved (B2-R2) |
 | 01DEP-P03-B2-F4 | Optional | Resolved (B2-R2) |
+| 01DEP-P03-G3-F1 | Medium | Resolved in r2 (G3-R2) |
+| 01DEP-P03-G3-F2 | Low | Resolved in r2 (G3-R2) |
+| 01DEP-P03-G3-F3 | Optional | Resolved in r2 (G3-R2) |
+| 01DEP-P03-G3-F4 | Optional | Resolved in r2 (G3-R2) |
+| 01DEP-P03-B3-F1 | Low | Resolved (B3-R2) |

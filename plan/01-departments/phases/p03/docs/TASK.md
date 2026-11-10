@@ -575,6 +575,175 @@ Full digest `31d169402e1d795115670b31b6399674904c1f0d41463afb0bdbe0c1378139ea`, 
 | clippy `--lib --tests -D warnings`, `fmt --check` | clean | (inline) |
 | test names since 523732b7 | none removed | `logs/B2-R2-test-names.txt` |
 
+## Architecture gate B3 — decisions (revision r2, 2026-11-10)
+
+Plan 03C.0 (directory filter), 03C.1-6, README decisions 4/5/10; coordination r5 (pinned
+`logs/coordination-r5.md`): **C003** (roster in the run context; directory tool stays admin-only)
+and **C004** (dispatch, escalation, round-trip and loop checks deferred to `channel.call`; no core
+messaging change) are user decisions taken at B3 startup. Builds on B1 `523732b7`, B2 `01608b1f`.
+r1 preserved in `logs/gate-B3-r1.md`; r2 answers `01DEP-P03-G3-F1..F4`.
+
+Plan/code mismatches: `AgentDirectoryEntry` is the authoring picker's list, not model-facing; the
+model-facing directory is the provisioning tool `list_company_agents` (admin requester only, C003);
+the intake schema of agent-workflow-call does not exist; `message.send` to a desk does not start
+that desk's workflow and a reply back to the lead is a loop refusal (C004).
+
+### DEP-P03-D10 Directory fields and the department filter
+- `list_company_agents` (`application/workflow/provisioning.rs` schemas, `persistence/workflow/
+  provisioning.rs` `list_on`): input gains optional `department` (slug); with it, only agents that
+  are members or role holders of that department are listed (unknown slug → `Invalid` tool
+  error). Each listed agent gains `departments: [{slug, name, roles}]` (its memberships and held
+  roles, ≤ 16, by slug) and `desk: {id, address} | null` -- the channel its `agent:{id}` record
+  names, at its current primary slug, `null` when that desk was deleted or no longer exists (never
+  recreated). Bounds: the existing 48 KiB budget and truncation flag, names cut as today. The
+  model-facing description of the tool (`PreparedTool::declaration`, provisioning target) states
+  that a department's members are the agents listing that department, and that an agent's `desk`
+  is where its own replies come from. Frozen builtin snapshot changes → DB reset.
+- `AgentDirectoryEntry` (authoring picker) gains `departments: Vec<DepartmentRef { id, name, slug,
+  charter, roles }>` and `desk: Option<String>` (the address as above); page key (slug) unchanged.
+  Rendering is phase 04; the JSON shape grows.
+
+### DEP-P03-D11 Department context in `agent.run` (C003)
+- For an `agent.run` whose run's channel (`workflow_runs.channel_id`) is owned by a department
+  (`channels.department_id`), preparation reads a `DepartmentContext { name, slug, charter, desk,
+  parent, children, members }` on its transaction (plain reads): the department's own desk
+  (`department:{id}` record, while it still belongs to it), its parent's name and desk, its child
+  departments' names and desks (≤ 20, by slug), and its agent members and role holders with their
+  own desks from `agent:{id}` (≤ 50, by slug); desks as `{id, address}`; truncation noted in the
+  text. People are not listed (no desk).
+- `PreparedAgent` gains `department: Option<DepartmentContext>` (serialized); the preamble is a
+  pure function of the selection and the department (`preamble(selection, department)`), and
+  renders the department **after the agent's own instructions and before skills**: name and
+  charter; when the run's agent holds the department's `lead` role, one sentence that it answers
+  as the department's lead (G3-F2); then the roster. The charter and names are company-managed,
+  so they are instructions, not untrusted data. The text lists addresses only; it does not say a
+  send to a desk starts that desk's work (C004).
+- **Public desks (G3-F3):** on a department-owned desk whose access mode is public, the context
+  carries the name, charter and lead sentence but no roster, so outsiders' conversations never
+  get internal desk addresses.
+- **Frozen once (G3-F1):** the preamble is a stored field and its length feeds the history budget
+  (`agent_context.rs` budget, `with_frozen_history`'s budget check). `restore_on` therefore
+  restores in this order: build the candidate with the live department → **replace it with the
+  saved `department` and rebuild the preamble** (`PreparedAgent::with_department`) →
+  `with_frozen_history(saved history)` → compare the whole document. A first preparation builds
+  with the live department and freezes the result. So a charter or roster edit between attempts
+  neither fails the retry nor changes what it sends. Runs without frozen history read it each
+  preparation, as they do the agent.
+
+### DEP-P03-D12 `department-lead.yaml` fixture
+- `src/application/workflow/fixtures/department-lead.yaml`: `context.history` → `agent.run` (agent
+  literal `lead`, the base's untrusted context only) → `data.map` reply. Its header says the lead
+  framing and roster come from the run's department context (D11, trusted system text), not from
+  the workflow, and that dispatch waits for `channel.call` (C004). Added to `fixtures::ALL` with
+  snapshots for the agent key `lead`, so the fixture tests and the sample tests compile it.
+- Plan/code mismatch (G3-F2): there is no authoring sample list apart from the shipped template
+  catalogue (`TemplateCatalogue::shipped`, two templates); the fixture is not offered there (it
+  would offer a workflow whose dispatch is deferred). Not a base template; `autonomous-response.yaml`
+  stays the base.
+
+### DEP-P03-D13 Docs and records
+- `docs/agent-builder-context.md`, `docs/custom_tools.md`: Builder `department`/`role` inputs and
+  the default/second desk rule; `list_company_agents` fields and filter; admin-only requester.
+- `docs/inter_channel_agent_communication.md`: a channel destination of `message.send` posts into
+  a new thread on that desk and starts none of its bindings; a reply back along a relay chain to
+  the desk that started it is a loop refusal; desk-to-desk dispatch waits for `channel.call`
+  (C004).
+- `docs/agent-authoring.md`: the department context a run on a department-owned desk gets; it
+  follows the desk's ownership, not the agent's membership -- a member agent's own default desk is
+  unowned, so its runs there get none (G3-F4); public desks get no roster.
+- Plan file 03: a "Status after p03" note under 03C items 2-4 citing C004.
+
+### Verification plan B3 (`department_directory_`, `department_context_`)
+| Criterion | Assertion |
+| --- | --- |
+| directory fields | `list_company_agents`: member and lead list their departments and roles; an agent in none lists `[]`; `desk` = its default desk address; after that desk is deleted, `desk` = null and no desk is recreated |
+| directory filter | `department` slug lists exactly its members and role holders; unknown slug → invalid tool error |
+| directory description | the provisioning tool declaration carries the department sentence |
+| picker entries | `AgentDirectoryEntry` lists departments with charter and roles and the desk address; page key (slug) and paging unchanged |
+| context content | a run on a department-owned desk: preamble = agent instructions, then department name/charter, the lead sentence for the lead's run only, the roster (own desk, parent desk, child desks, member desks), then skills; a run on an unowned desk has none; a public owned desk has no roster |
+| context bound | roster capped with a truncation note |
+| context frozen | the charter (and so the preamble length) edited between first preparation and a retry: the retry restores -- neither "Frozen history differs" nor "Frozen agent preparation changed" -- and sends the original charter |
+| fixture | `department-lead.yaml` compiles in the fixture and sample tests |
+| C004 | records and docs state the deferred checks; no `department_lead_round_trip_` / `department_lead_loop_` tests |
+
+### Contract impact B3
+| Changed contract | Producers / consumers | Disposition |
+| --- | --- | --- |
+| `list_company_agents` input/output schema | builtin snapshot, frozen agent revisions, Builder prompt/docs, existing listing tests | updated; DB reset |
+| `AgentDirectoryEntry` JSON | authoring picker routes/tests | fields added |
+| `PreparedAgent` serialization / frozen preparation | agent history freeze/restore, harness | `department` added; restore takes the saved one |
+| docs | as D13 | updated |
+
+## B3 implementation (artifact `241d6d8d…24e9`, base `01608b1f`)
+
+Full digest `241d6d8d955a1f236e384677c12f66cb37918ff980e2b3e1fef596b69c1524e9`; exclusions as B1 (phase records dir and COORDINATION.md).
+
+- **D10** `list_company_agents`: input `department` (slug; unknown → `Invalid` "No department has
+  the slug '…'"); each agent lists `departments: [{slug, name, roles}]` (≤ 16, `MAX_LISTED_DEPARTMENTS`;
+  more sets `truncated`) and `desk: {id, address} | null`; the model-facing description is
+  `LIST_COMPANY_AGENTS_DESCRIPTION` (`PreparedTool::declaration`). `AgentDirectoryEntry` gains
+  `departments: Vec<DepartmentRef { id, name, slug, charter, roles }>` and `desk: Option<String>`;
+  the picker route reads the selected agent's entry through `agent_directory_entry` instead of
+  building a partial one. Shared reads: `src/adapters/persistence/department_roster.rs`
+  (`agent_departments_on`, `agent_desks_on`, `DeskAddresses`): an agent's desk is the channel its
+  `agent:{id}` record names, at its current primary slug (`channel_slugs.is_primary`), while it
+  exists; a department's desk is the channel its `department:{id}` record names while the
+  department owns it.
+- **D11** `DepartmentContext { name, slug, charter, lead, roster: Option<DepartmentRoster> }`
+  (`application/workflow/agent_department.rs`; roster: own desk, parent, ≤ 20 children, ≤ 50
+  agents with lead flag and desk, `more_*` flags). `PreparedAgent.department` (serialized);
+  `PreparedAgent::with_department` rebuilds the preamble (`preamble(selection, department)`),
+  refused for non-`agent.run` steps and after frozen history. Preparation (`candidate_on`) reads
+  it with `department_context_on` for an `agent.run` whose run has a channel. Public desk → no
+  roster. `restore_on` applies the saved `department` before `with_frozen_history` (G3-F1).
+  The lead flag is stored (B's G3-R2 note), so the lead sentence needs no roster.
+- Desk addresses need the app domain in preparation and authoring reads:
+  `PostgresPersistence::with_app_domain` (set by `WorkflowEngine::new` beside the reply notices);
+  `DeskAddresses` asks for it only when a desk is listed, so readers that list no desk need none.
+- Prepared-document `VERSION` stays 5: the `department` key is additive (a document without it
+  restores as `None`), and the init schema pins version '5' in `agent_history_preparation_valid`
+  and the checkpoint check, so a bump would be a schema change with no reader that needs it.
+- **D12** `fixtures/department-lead.yaml` (`Fixture::DepartmentLead`, version 108, agent key
+  `lead`, step `lead`), in `fixtures::ALL`; not in `TemplateCatalogue::shipped`.
+- **D13** `docs/agent-builder-context.md` (Builder tools, default/second desk, department/role,
+  listing fields/filter, owner/admin only), `docs/custom_tools.md`,
+  `docs/inter_channel_agent_communication.md` (C004 note), `docs/agent-authoring.md` (context,
+  ownership not membership, public desks, retry), plan 03 "Status after p03" under 03C item 4.
+
+### Verification mapping B3 (actual)
+
+| Criterion | Test (decisive assertion) |
+| --- | --- |
+| directory fields | `department_directory_lists_departments_roles_and_desks` (lead: `[{sales, Sales, [lead]}]`, member `roles: []`, none → `[]`; desk = `{id of agent:{id} record, slug@company.domain}`; recorded desk deleted → `null`, channel count unchanged) |
+| directory filter | `department_directory_filters_by_one_department` (sales → [closer, scout]; support → [helper]; none → all four; unknown → `workflow.invalid_input` with message) |
+| directory description | `department_directory_tool_description_names_departments_and_desks` (declaration = `LIST_COMPANY_AGENTS_DESCRIPTION`; `department` parameter) |
+| picker entries | `department_directory_picker_entries_name_departments_and_the_desk` (page and `agent_directory_entry` give `DepartmentRef` with charter and `[Lead]`, desk address; `next` None) |
+| context content | `department_context_follows_the_instructions_and_precedes_skills` (exact preamble prefix: instructions, department, charter, lead sentence, roster lines, then skill, then untrusted notice; document carries `department`); `department_context_roster_lists_the_desks_around_the_department` (DB: own/parent/child/agent desks by address, lead flag per agent, people not listed; member's own desk → None; public → roster None); `department_context_reaches_the_lead_on_its_department_desk` (e2e: the scripted request's system text carries the exact block; the member's own-desk run has none) |
+| lead sentence / public | `department_context_names_the_lead_only_for_its_run_and_no_roster_on_a_public_desk` |
+| agent runs only | `department_context_belongs_to_agent_runs_only` |
+| context bound | `department_context_roster_is_bounded` (21 children / 51 agents → 20 / 50 by slug, `more_*` true) |
+| context frozen | `department_context_frozen_preparation_replays_the_department_it_froze` (longer charter between prepare and retry: retry Ready, same preamble and prepared document, frozen row unchanged); mutation check: without the saved department the retry fails "Frozen history differs from the prepared request" |
+| fixture | `department_lead_fixture_runs_as_a_sample` (Completed, output `{body}`, 1 model call); `workflow_fixtures_all_compile_and_freeze_with_real_child_content`, `workflow_fixtures_taking_a_message_accept_the_standard_message_input`, `workflow_storage_restores_all_frozen_fixtures_and_child_identity` iterate `ALL` |
+| C004 | no `department_lead_round_trip_` / `department_lead_loop_` tests; docs and plan note |
+
+Stand-in gaps: the deleted-desk case uses a recorded plain desk, because a default desk with its
+binding cannot be deleted through the product path (`ChannelPersistence::delete` refuses a desk with
+bindings); the read under test is the same. Picker JSON rendering is phase 04.
+
+### Checks B3 (`openbot_dept_p03_test`, unchanged schema; SQLX_OFFLINE=true; 4 threads)
+
+| Command | Result | Log |
+| --- | --- | --- |
+| affected: `agent_history_ provisioning department_ agent_default_desk_ workflow_agent_ workflow_model workflow_classify workflow_decide picker authoring sample workflow_fixtures_ workflow_storage_ ingress autonomous_agent channel_reply knowledge_e2e agent_tests onboarding builder agent_preparation` | 849 passed, 7 failed, 6 ignored: `refusals_and_results_are_both_valid_receipts` (its sample listing lacked the now-required `departments`/`desk`: contract change, test updated and extended); 6 `cloudroom_*` local-agent e2e tests (matched by `agent_tests`) panic "build the counted Node e2e peer before Rust tests" -- `integrations/cloudroom-plugin/build-tests/` absent here; local agents use their own preparation (no `PreparedAgent`) and have no diff since 01608b1f: **unavailable, unrelated** | `logs/B3-affected-1.txt` |
+| consumers of the listing: `agent_api_tests catalog_tests workflow_tool_registration agent::contract_tests registry::message_tests application::workflow::provisioning::tests ui_agents routes::agent routes::onboarding ui_companies` | 59 passed, 1 ignored | `logs/B3-affected-2.txt` |
+| focused final: `department_directory_ department_context_ department_lead_fixture workflow_fixtures_ workflow_storage_ provisioning_lists refusals_and_results` (`--locked --offline`) | 38 passed | `logs/B3-focused-final.txt`, `logs/B3-test-inventory.txt` |
+| mutation: `restore_on` without the saved department | FAIL as expected ("Frozen history differs from the prepared request"); restored | `logs/B3-frozen-mutation.txt` |
+| `clippy --all-targets -D warnings`; `fmt --check` | clean (after two row type aliases) | (inline) |
+| test names since 01608b1f | none removed; 12 added | `logs/B3-test-names.txt` |
+
+Not run: the full gate (`scripts/check.sh`, CI-only gates) per the user's "focused checks only"
+(I003); migrations unchanged in B3.
+
 ## Status
 
 - 2026-11-10: p03 started from 9291fcd5; B1 gate r1 written, awaiting B.
@@ -608,3 +777,21 @@ Full digest `31d169402e1d795115670b31b6399674904c1f0d41463afb0bdbe0c1378139ea`, 
   31d16940…39ea; recheck 01DEP-P03-B2-R2 requested.
 - 2026-11-10: B2-R2 **PASS** at 31d16940…39ea; root recomputed digest, coordination r3 unchanged,
   manifest valid. **B2 accepted in phase**; committed locally.
+- 2026-11-10: user decisions C003 (roster in context) and C004 (dispatch deferred to channel.call);
+  coordination r5. B3 gate r1 (DEP-P03-D10..D13) written; G3-R1 requested.
+- 2026-11-10: G3-R1 changes required (F1 Medium, F2 Low, F3/F4 optional). r2: restore order
+  (saved department → rebuilt preamble → frozen history → compare); lead framing in the trusted
+  context; fixture test-only, no catalogue entry; public desks without roster; docs note.
+- 2026-11-10: G3-R2 **PASS** for gate r2 (`logs/gate-B3-r2.md` 4aa241d5…357c); G3-F1..F4 resolved.
+  B note for the batch: the lead sentence derives from a stored lead flag in the saved
+  `DepartmentContext`, not from roster membership. B3 implementation started.
+- 2026-11-10: B3 implemented (D10–D13); artifact 241d6d8d…24e9 (base 01608b1f); evidence
+  `logs/01DEP-P03-B3-R1.evidence.json` valid; batch review 01DEP-P03-B3-R1 requested.
+- 2026-11-10: B3-R1 changes required (B3-F1 Low, docs): library-copy sentence in
+  agent-builder-context.md replaced (every copy gets its own desk, as rig.md says); "Later edits…"
+  moved back to the create paragraph in agent-authoring.md; optional: custom_tools.md button label
+  "Create assistant desk". Docs-only; artifact 0db98506…dbf1; recheck 01DEP-P03-B3-R2 requested.
+- 2026-11-10: B3-R2 **PASS** at 0db98506…dbf1; root recomputed the digest, evidence manifest
+  valid, coordination r5 unchanged through review. **B3 accepted in phase**; committed locally.
+  Coordination r6 (`logs/coordination-r6.md`, dff5898e…efe0): C003 and C004 p03 responses
+  satisfied. **p03 accepted in phase** (B1, B2, B3). Full repository gate not run (I003).

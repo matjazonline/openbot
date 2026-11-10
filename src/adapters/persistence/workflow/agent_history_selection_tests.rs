@@ -82,5 +82,8 @@ mod level;
 #[path = "agent_history_freeze_guard_tests.rs"]
 mod native;
 
+#[path = "agent_history_department_tests.rs"]
+mod department;
+
 #[path = "agent_history_private_context_tests.rs"]
 mod private;

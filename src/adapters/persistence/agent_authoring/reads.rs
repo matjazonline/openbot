@@ -64,7 +64,7 @@ impl AgentAuthoringReads for PostgresPersistence {
         bounded(async {
             let mut tx = super::super::agent_publication::begin_bounded(self).await?;
             super::super::agent_publication::lock_company_on(&mut tx, scope).await?;
-            let result = super::directory::page(&mut tx, scope, after).await?;
+            let result = super::directory::page(&mut tx, scope, self.app_domain(), after).await?;
             tx.commit().await?;
             Ok(result)
         })
@@ -89,7 +89,7 @@ impl AgentAuthoringReads for PostgresPersistence {
         bounded(async {
             let mut tx = super::super::agent_publication::begin_bounded(self).await?;
             super::super::agent_publication::lock_company_on(&mut tx, scope).await?;
-            let entry = super::directory::entry(&mut tx, scope, &key).await?;
+            let entry = super::directory::entry(&mut tx, scope, self.app_domain(), &key).await?;
             tx.commit().await?;
             Ok(entry)
         })

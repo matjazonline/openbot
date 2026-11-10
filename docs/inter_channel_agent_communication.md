@@ -43,7 +43,11 @@ senders only; any channel of the same company may relay into it, still bound by 
 and the loop rule below.
 
 From there the receiving channel's workflow bindings decide, by their message triggers, whether
-it starts a run. The relay itself starts no work. An intent that answers a message a run is
+it starts a run. The relay itself starts no work. A `message.send` step whose destination is a
+channel posts into a new thread on that channel as an outbound system note, which starts none of
+its bindings: one desk cannot hand work to another this way. Desk-to-desk dispatch, with an
+escalation and a round trip back to the sender, waits for `channel.call` (01-departments,
+coordination C004). An intent that answers a message a run is
 waiting on is offered to that run before ordinary admission (reply correlation,
 `application/workflow/message_admission.rs`).
 
@@ -59,7 +63,9 @@ send starts one at its own channel. Ingress refuses:
 Over SMTP the same trace travels as the `X-MailAgents-Channel-ID`, `X-MailAgents-Hop-Count`,
 `X-MailAgents-Correlation-ID` and `X-MailAgents-Trace` headers.
 
-So no two channels can bounce a message between themselves indefinitely.
+So no two channels can bounce a message between themselves indefinitely. It also means a reply
+travelling back along a relay chain to the channel that started it is refused as a cycle, which is
+one reason dispatch waits for `channel.call`.
 
 ## Invariants
 

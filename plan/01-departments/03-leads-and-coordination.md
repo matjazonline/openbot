@@ -122,6 +122,15 @@ list their nonzero selected counts before running them. Keep the full suite for 
    bounces back to the lead is refused when the channel reappears in the trace. Add a test with a
    two-department chain to show a reply chain of lead → member → lead is admitted (the reply
    continues the trace) and a new send lead → member → lead is refused.
+   **Status after p03 (coordination C004).** Items 2–4 did not hold against the code: a
+   `message.send` to a desk posts an outbound system note into a new thread there and starts none
+   of its bindings, and a reply back along the relay chain to the lead's desk is refused as a
+   cycle. Dispatch, escalation, the round trip and the loop test therefore wait for
+   `channel.call`; p03 made no core messaging change and has no `department_lead_round_trip_` or
+   `department_lead_loop_` tests. What p03 shipped instead (C003): the department context in
+   `agent.run` names the department's desks by address (item 1), and `department-lead.yaml`
+   (`fixtures::ALL`, not in the shipped template catalogue) is the agent base run by the lead,
+   whose framing comes from that context rather than from its prompt.
 5. People as leads or members see the department's desks in the UI and get its notifications
    through the grants from [02](02-desks-ownership-and-access.md); nothing further.
 6. When `channel.call` lands ([agent-workflow-call](../agent-workflow-call/README.md)), a lead can
