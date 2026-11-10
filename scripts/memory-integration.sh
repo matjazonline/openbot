@@ -68,7 +68,9 @@ trap cleanup EXIT
 
 echo "building the memory service in $service"
 (cd "$service" && cargo build --locked --bin memory-service)
-binary="$service/target/debug/memory-service"
+# Where cargo put it (CARGO_TARGET_DIR or a configured target-dir), not assumed to be ./target.
+binary="$(cd "$service" && cargo metadata --locked --format-version 1 --no-deps \
+  | python3 -I -c 'import json, sys; print(json.load(sys.stdin)["target_directory"])')/debug/memory-service"
 
 MEMORY_PSQL="$psql" MEMORY_PROVISION_ADMIN_URL="$MEMORY_INTEGRATION_ADMIN_URL" \
   MEMORY_PROVISION_DATABASE="$database" MEMORY_PROVISION_ROLE="$role" \

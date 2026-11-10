@@ -73,7 +73,9 @@ model="$dest/assets/model"
 echo "standalone-journey: building the extracted copy in $dest"
 ( cd "$dest" && scripts/boundary-check.sh && cargo build --locked --offline --bin memory-service ) >"$work/build.log" 2>&1 \
   || { tail -n 40 "$work/build.log" >&2; exit 1; }
-binary="$dest/target/debug/memory-service"
+# Where cargo put it (CARGO_TARGET_DIR or a configured target-dir), not assumed to be ./target.
+binary="$(cd "$dest" && cargo metadata --locked --offline --format-version 1 --no-deps \
+  | python3 -I -c 'import json, sys; print(json.load(sys.stdin)["target_directory"])')/debug/memory-service"
 
 MEMORY_PSQL="$psql" MEMORY_PROVISION_ADMIN_URL="$MEMORY_TEST_DATABASE_URL" \
   MEMORY_PROVISION_DATABASE="$database" MEMORY_PROVISION_ROLE="$role" \
