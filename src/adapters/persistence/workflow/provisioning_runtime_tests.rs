@@ -616,3 +616,137 @@ async fn reply_count(d: &Deployment) -> usize {
         "SELECT count(*) FROM channel_reply_decisions WHERE company_id=$1 AND state='published'"
     ).await as usize
 }
+
+/// 01DEP-P03-D8/D9 end to end: a department led by a person has a plain desk; when an agent takes
+/// the lead the desk answers through it, and after the lead moves to another agent the same desk
+/// and binding answer through the new lead.
+#[tokio::test]
+async fn department_lead_desk_answers_through_its_current_lead() {
+    use crate::adapters::persistence::department::PostgresDepartments;
+    use crate::application::ports::department::{
+        DepartmentPersistence, DepartmentScope, DepartmentWrite,
+    };
+    use crate::entities::department::DepartmentRole;
+    let d = Deployment::new(vec![
+        LlmTurn::text(r#"{"body": "From the first lead."}"#),
+        LlmTurn::text(r#"{"body": "From the second lead."}"#),
+    ])
+    .await;
+    let p = d.p();
+    let company = d.fixture.target.company;
+    let owner = d.fixture.target.actor;
+    let agents = crate::adapters::persistence::test_support::company_agents(p);
+    let mut leads = Vec::new();
+    for slug in ["first-lead", "second-lead"] {
+        let created = agents
+            .create(
+                owner,
+                company,
+                AgentWrite {
+                    name: slug.into(),
+                    slug: slug.into(),
+                    system_prompt: Some("Answer briefly.".into()),
+                    ..Default::default()
+                },
+                None,
+            )
+            .await
+            .unwrap();
+        register_scripted_agent_base_url(created.agent.id, &d.llm.base_url);
+        let principal: Uuid =
+            sqlx::query_scalar("SELECT id FROM principals WHERE company_id = $1 AND agent_id = $2")
+                .bind(company.as_uuid())
+                .bind(created.agent.id)
+                .fetch_one(p.pool())
+                .await
+                .unwrap();
+        leads.push((
+            created.agent.id,
+            crate::entities::transport::PrincipalId::new(principal),
+        ));
+    }
+    let departments = PostgresDepartments::new(
+        p.clone(),
+        crate::adapters::persistence::test_support::provisioning_templates(),
+    );
+    let scope = DepartmentScope {
+        actor: owner,
+        company,
+    };
+    let owner_principal: Uuid = sqlx::query_scalar(
+        "SELECT id FROM principals WHERE company_id = $1 AND user_id = $2 AND kind = 'person'",
+    )
+    .bind(company.as_uuid())
+    .bind(owner.user_id())
+    .fetch_one(p.pool())
+    .await
+    .unwrap();
+    let department = departments
+        .create(
+            scope,
+            DepartmentWrite {
+                name: "Ops".into(),
+                slug: "ops".into(),
+                ..DepartmentWrite::default()
+            },
+            Some(crate::entities::transport::PrincipalId::new(
+                owner_principal,
+            )),
+        )
+        .await
+        .unwrap();
+    departments
+        .assign_role(scope, department.id, DepartmentRole::Lead, leads[0].1)
+        .await
+        .unwrap();
+    let binding: Uuid = sqlx::query_scalar(
+        "SELECT (result->>'binding_id')::uuid FROM workflow_provisioning_commands \
+         WHERE company_id = $1 AND command_key = $2",
+    )
+    .bind(company.as_uuid())
+    .bind(format!("department:{}", department.id))
+    .fetch_one(p.pool())
+    .await
+    .unwrap();
+    let (_, email) = person(&d, "admin").await;
+    write(
+        &d,
+        &email,
+        "ops",
+        "Who answers?",
+        IngressOrigin::TrustedApplication,
+    )
+    .await;
+    Box::pin(d.run_until("the first lead answered", async || {
+        replied(&d, binding).await == 1
+    }))
+    .await;
+    departments
+        .assign_role(scope, department.id, DepartmentRole::Lead, leads[1].1)
+        .await
+        .unwrap();
+    write(
+        &d,
+        &email,
+        "ops",
+        "And now?",
+        IngressOrigin::TrustedApplication,
+    )
+    .await;
+    Box::pin(d.run_until("the second lead answered", async || {
+        replied(&d, binding).await == 2
+    }))
+    .await;
+    let answered_by: Vec<Uuid> = sqlx::query_scalar(
+        "SELECT exchange.agent_id FROM agent_history_exchanges AS exchange \
+         JOIN workflow_runs AS run ON run.company_id = exchange.company_id \
+          AND run.id = exchange.run_id \
+         WHERE run.binding_id = $1 ORDER BY run.created_at",
+    )
+    .bind(binding)
+    .fetch_all(p.pool())
+    .await
+    .unwrap();
+    assert_eq!(answered_by, [leads[0].0, leads[1].0]);
+    assert_eq!(d.llm.finish().await.unwrap(), 2);
+}

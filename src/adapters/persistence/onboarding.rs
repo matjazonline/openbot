@@ -182,7 +182,9 @@ impl Session {
         if !exists {
             create_department_with_id_on(
                 &mut self.tx,
+                &self.templates,
                 company,
+                WorkflowActor::authenticated(self.user_id)?,
                 department.id,
                 &department.write,
                 None,
@@ -233,7 +235,9 @@ impl Session {
                 .ok_or_else(|| AppError::Internal("Onboarded agent has no principal".into()))?;
         place_in_department_on(
             &mut self.tx,
+            &self.templates,
             CompanyId::new(self.company_id),
+            WorkflowActor::authenticated(self.user_id)?,
             department,
             crate::entities::transport::PrincipalId::new(principal),
             None,

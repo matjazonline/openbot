@@ -389,3 +389,320 @@ Residual notes, not findings:
 
 - Mutation evidence for both new guards (the gate-order test and the scan) made the corrections
   quick to accept. Candidate practice: a new guard ships with a recorded mutation that it catches.
+
+## 01DEP-P03-G2-R1 — architecture gate G2 (B2: plan 03B department desk and re-leading), decision revision r1
+
+### Identity
+
+- Date 2026-11-10. Workflow `implement-opus-reviewed-2_2`. Batch B2; stage: architecture gate.
+  Phase `p03`.
+- Reviewer B: Opus 5.5 (`claude-opus-5-5`), effort per TASK (xhigh), agent `ad409b2d3d149c2c6`.
+- Worktree `/Users/mac02/.codex/worktrees/2050/openbot`, HEAD `523732b7` (B1 committed). The only
+  changes are `TASK.md` and the new `logs/gate-B2-r1.md`.
+- Gated decisions DEP-P03-D7..D9 **r1** and "Verification plan B2": `logs/gate-B2-r1.md` sha256
+  `3ff959634457bc807196c3e7219b189a23ceb6b1cd0b8e28435f0177483891ce`. I compared the TASK section
+  against it.
+- Coordination revision 3 `880cac54…04b8`, unchanged. Checked at the start and before returning.
+
+### Coverage and evidence
+
+- **Requirements:** plan 03B.1–4; README decisions 4, 5, 7, 8, 9, 12.
+- **Code read:**
+  - `provisioning_native.rs` in full (`provision_on`, `provision_workflow_on`,
+    `provision_binding_on`);
+  - `channel_reply.rs` (`settings_on`, `bootstrap_native_on`, `configure_channel_reply`,
+    `lock_settings_accounts`, `authorize_settings` with its `SET LOCAL` timeouts, `selected_on`
+    requiring an active binding);
+  - `bindings.rs` (`save_binding_on`, `validate_change`, `check_run_as`, the message-binding cap of
+    8 per channel);
+  - `lifecycle/provisioned.rs` (`provisioned_binding` refuses resource slots, runs as the target
+    actor);
+  - `compiler/rebase.rs` `retarget_agent` (a literal-agent pointer only);
+  - `definitions.rs` (`save_draft`, `publish_on` publishing the current draft);
+  - `association.rs` (an allowlist desk needs a view grant for non-owners);
+  - `authority.rs` (`authorize_company` and `authorize_reviewer_on` lock other users'
+    member/principal rows);
+  - `department.rs` (`write_placement_on`, `update_department_on` slug change,
+    `begin_department_write`);
+  - `department_desks.rs` (`prelock_ownership_on`, `rederive_on`, `set_desk_ownership_on`);
+  - the demotion trigger (schema 15498-15519) and its writers (`user_lifecycle.rs`,
+    `company_invite.rs:566`, `agent.rs:405-440`);
+  - `channel.rs` owned-desk create sequence;
+  - the existence of `channel_reply_binding_inactive_before_ingress_has_visible_refusal_until_selection_cleared`.
+- **Checked and fine:**
+  - `validate_change` requires the active flag unchanged across a configuration change. D9's
+    sequence (reconfigure, then activate, then select) satisfies it and `selected_on`'s
+    active-only rule.
+  - Agent demotion cannot drop an agent lead silently: published agents cannot be deleted
+    (`agent_delete_error`). A demoted person lead needs no desk change.
+  - D8's early gate on the new desk in `set_desk_ownership_on` is uncontended, as the gate argues.
+  - Inside B1 creation-as-lead, D9 sees a published agent with its desk, as B1 guarantees. Errors
+    map through the Builder savepoint and the 400/409 routes as described.
+- **Not executed:** no cargo or SQL. This is a gate. The lock cycle in G2-F1 is derived from code,
+  with line citations.
+
+### Outcome
+
+**Changes required** for decision revision r1. There is no PASS.
+
+- Actionable:
+  - 01DEP-P03-G2-F1 (Medium): D9 runs after the gates and takes other users' authorization locks
+    after them, which can deadlock with account deletion; it has no stated lock sequence;
+  - 01DEP-P03-G2-F2 (Medium): run-as contradicts D7; a stale run-as, reviewers or members-only
+    visibility refuse an unrelated role change; resources are unstated;
+  - 01DEP-P03-G2-F3 (Medium): re-point publishes the current draft;
+  - 01DEP-P03-G2-F4 (Medium): D9 touches user-configured responders, and the slug-equality
+    identity fallback is fragile;
+  - 01DEP-P03-G2-F5 (Low): no contract-impact table, and the plan/code mismatches are unrecorded.
+- Optional: G2-F6 (reuse a paused binding instead of accumulating them), G2-F7 (verification
+  additions).
+- **Sound as written:**
+  - D7's wrapper and threading;
+  - D8's two creation paths, refusal mapping and lock order;
+  - D8's desk identity via the command row;
+  - the delete rule;
+  - D9's case structure and the pause semantics (clearing the selection);
+  - the refusal for a workflow with no reply step;
+  - the competing and delete verification rows.
+- **Possible user item:** G2-F4's durable identity for the plain desk would deviate from plan
+  03B.2's wording. If A prefers it over documenting the limitation, it needs confirmation.
+
+### Process and instruction feedback
+
+- Candidate rule (gates that reuse user-facing writers inside a larger transaction): list those
+  writers' authorization locks, including other users' rows, and place them in the lock sequence
+  (G2-F1).
+- Candidate rule: a gate whose effect acts on shared desk state (selected responders) states
+  whose state it may change (G2-F4).
+
+## 01DEP-P03-G2-R2 — architecture gate G2 recheck (B2), decision revision r3
+
+### Identity
+
+- Date 2026-11-10. Workflow `implement-opus-reviewed-2_2`. Batch B2; stage: architecture gate
+  recheck. Phase `p03`.
+- Reviewer B: Opus 5.5 (`claude-opus-5-5`), effort per TASK (xhigh), agent `ad409b2d3d149c2c6`.
+- Round input: the coordinator corrected it from r2 to **r3** mid-review. `logs/gate-B2-r3.md`
+  sha256 `bb6dcc95378586701cbe978277a65906f6893efec7460e613b3d533636dda745` appears verbatim in
+  `TASK.md`. `gate-B2-r2.md` (`d309c78e…dbdf`) and `gate-B2-r1.md` (`3ff95963…91ce`) are
+  unchanged. `diff r2 r3` shows only the heading, the preface and D9 "Where".
+- HEAD `523732b7`; only records changed. Coordination revision 3 `880cac54…04b8`. Checked at the
+  start and before returning.
+
+### Coverage and evidence
+
+- I read all of r2 and the r3 diff, and checked each of G2-F1..F7.
+- **r3's "after the sync" argument.** I tried to break it against the code:
+  - The inbound commit takes every gate before any row lock (`thread/inbound.rs:93-128`). Its
+    `binding_id`s are channel (transport) bindings, and `workflow_message_intents` has no FK to
+    `workflow_bindings` (schema 10893-10925). So no admission holds a row D9 wants while waiting
+    on a gate D9's transaction holds.
+  - Demotion (`user_lifecycle.rs`) waits on principals that the sync already holds.
+  - Settings, binding, workflow and agent writers hold the company lock.
+- **r3's "before fails" argument.** It is correct: a members-only department desk's row would be
+  locked `FOR UPDATE` before the sync takes its gate. My r1 G2-F1 "run it before the sync" was
+  wrong on that point.
+- **The residual.** The premise "authorizes only the actor" fails when B is activated or selected
+  without a reconfigure. `validate_change` keeps the configuration on Activate (`bindings.rs:93-112`).
+  `check_run_as` re-authorizes the stored run-as. `selected_on` authorizes
+  `configuration.run_as()` (`channel_reply.rs:251`). `lock_settings_accounts` adds the
+  responder's run-as (`:166-185`).
+- **F3 refinement.** No draft-discard operation exists (`editor.rs:196` only reloads the saved
+  draft). `workflow_versions.draft_revision` exists (schema 5867).
+- **F4.** Bindings are never deleted in production, so the owned B persists and case 2's fixed key
+  is safe.
+- **Not executed:** no cargo or SQL.
+
+### Outcome
+
+**Changes required, narrowly**, for decision revision r3. There is no PASS.
+
+- Still open: **01DEP-P03-G2-F2 (Medium, residual)**. Reconfigure B to run-as = actor before any
+  activation or selection that does not re-point it.
+- New: **01DEP-P03-G2-F8 (Low)**. Use a source-based check for unpublished edits, with a remedy
+  worded in operations that exist.
+- Optional: G2-F9 (deactivate an active owned B under a person lead; state the lock bracket in
+  procedure order).
+- Resolved: G2-F1 (r3 placement accepted), F3, F4, F5, F6, F7.
+- The coordinator's fallback, pre-acquiring the department desk's gate in the sync's sorted call,
+  is not needed once G2-F2's residual is closed.
+- No item needs the user. The F4 marker choice stays within 03B.2's "no new column or trigger",
+  and is recorded.
+
+### Process and instruction feedback
+
+- Reviewer self-correction: my r1 Required for G2-F1 prescribed a placement ("before the sync")
+  without checking the department desk's own row against its gate. A found the flaw. Candidate
+  practice: a reviewer's suggested fix gets the same lock-order check as the author's design.
+- Rechecks on a corrected revision go fastest when A supplies the pinned diff, as here (r2 → r3,
+  one section).
+
+## 01DEP-P03-G2-R3 — architecture gate G2 recheck (B2), decision revision r4
+
+### Identity
+
+- Date 2026-11-10. Workflow `implement-opus-reviewed-2_2`. Batch B2; stage: architecture gate
+  recheck. Phase `p03`.
+- Reviewer B: Opus 5.5 (`claude-opus-5-5`), effort per TASK (xhigh), agent `ad409b2d3d149c2c6`.
+- `logs/gate-B2-r4.md` sha256 `51d4dee8d53b30ff8033d8373b06f07024bd26fcbcdf193c61062f9e74fd8553`
+  appears verbatim in `TASK.md`. The r1–r3 copies are unchanged (`3ff95963…`, `d309c78e…`,
+  `bb6dcc95…`). HEAD `523732b7`; only records changed. Coordination revision 3 `880cac54…04b8`.
+  Checked at the start and before returning.
+
+### Coverage and evidence
+
+- `diff gate-B2-r3.md gate-B2-r4.md` shows the changes are limited to the preface, the D9 "Where"
+  lock list, D9 "What" (non-agent lead), "Re-point" (source comparison), "Run-as" (the residual)
+  and three verification rows.
+- **G2-F2 residual.** I checked the reconfigure-before-activate/select rule against
+  `validate_change` (`bindings.rs:93-112`: a Configuration change with the active flag unchanged
+  is accepted), `check_run_as` (`:181-215`: run-as = actor needs no owner check; the following
+  Activate keeps it), `selected_on` (`channel_reply.rs:233-251`) and `lock_settings_accounts`
+  (`:166-185`). After the reconfigure, all of them name only the actor. Deactivate skips
+  `check_run_as`, and clearing the selection locks only the actor.
+- **"Only the actor's account" premise.** I walked every D9 step: `publish_initial_on`
+  (`lock_company_on`), `save_draft_on` (`authorize_company`), compile/capture (shared reads, no
+  accounts), `publish_on`, binding changes, `configure_reply_on`, `bootstrap_native_on`, and the
+  allowlist `authorize_association` (the actor's own grant and account rows). With approval
+  policies refused, the premise holds, so r3's "after the sync" argument stands.
+- **G2-F8 and G2-F9.** I checked the new text and rows.
+- **Not executed:** no cargo or SQL.
+
+### Outcome
+
+**PASS** for decision revision r4 (`logs/gate-B2-r4.md` sha256
+`51d4dee8d53b30ff8033d8373b06f07024bd26fcbcdf193c61062f9e74fd8553`). All findings,
+01DEP-P03-G2-F1..F9, are resolved, and none is open. No item needs the user.
+
+Implementation notes for B2's batch review, not findings:
+
+- Map only the association `NotFound` to the invisible-desk message. A `NotFound` from
+  `verify_selection` (an archived workflow) is a different case.
+- Update the provisioning-commands table comment: a `department:{id}` row's `result.binding_id`
+  is updated by D9, not only replayed.
+
+### Process and instruction feedback
+
+- Four revisions converged because each recheck named a narrow residual, with file:line evidence
+  for the exact authorization call. Candidate practice: a premise stated in a lock argument
+  ("authorizes only the actor") gets checked step by step against the code path before the gate
+  passes.
+
+## 01DEP-P03-B2-R1 — batch review B2 (plan 03B: department desk and re-leading)
+
+### Identity
+
+- Date 2026-11-10. Workflow `implement-opus-reviewed-2_2`. Batch B2; stage: batch review. Phase `p03`.
+- Reviewer B: Opus 5.5 (`claude-opus-5-5`), effort per TASK (xhigh), agent `ad409b2d3d149c2c6`.
+- Worktree `/Users/mac02/.codex/worktrees/2050/openbot`, base/HEAD `523732b7`, uncommitted: 23
+  modified files and 2 new ones (`workflow/provisioning_department.rs`,
+  `department_lead_desk_tests.rs`).
+- Artifact digest `8fd91d0452986625ad448afcdbe382b456c75bcaeaa9cddef117523947535c9b`, recomputed at
+  the start and before returning. Evidence manifest valid (PASS 3, FAIL 1; the FAIL is the first
+  run, with the expected consequences).
+- Gate r4 `51d4dee8…8553`; coordination revision 3 `880cac54…04b8`.
+
+### Coverage and evidence
+
+- **Read in full:** `provisioning_department.rs`.
+- **Read as diffs:**
+  - `department.rs`: D7 wrapper, D8 call order, `follow_lead_on` after `write_placement_on` and
+    after `clear_department_role_on`'s sync, and the record deletion in `delete_department_on`;
+  - `channel_reply.rs` (`configure_reply_on`, `native_contract`);
+  - `definitions.rs` (`save_draft_on`);
+  - `lifecycle/provisioned.rs` (`provisioned_reconfiguration`, `provisioned_activation`);
+  - `provisioning_native.rs` (`select`; the existing caller passes `true`);
+  - the B1 callers, onboarding, setup and services, and the schema comment.
+- **Callers that keep their behaviour:**
+  - `configure_channel_reply` = begin → `configure_reply_on` → commit (the log line now precedes
+    the commit);
+  - `save_draft` = `authorize_company` → `save_draft_on`;
+  - `provision_on` passes `select = true`.
+- **D9 against gate r4:**
+  - The case tree matches.
+  - The no-change condition is active ∧ selected at B's current configuration revision ∧ runs A.
+  - The order is re-point → reconfigure to the actor → activate → select.
+  - `guard_on` refuses an approval policy, and maps only the explicit `authorize_association`'s
+    `NotFound`.
+  - `repoint_on` compares the draft source with the bound source.
+- **Lock checks beyond the gate:**
+  - Admission takes the company lock before it locks a binding (`admission.rs:22,213-215`).
+  - Inbound never locks `workflow_bindings`.
+  - A `NotFound` from `verify_selection` is not remapped.
+- **Executed** (`openbot_dept_p03_test`, `SQLX_OFFLINE=true`, `--test-threads=4`):
+  - `--list` for `department_desk_` + `agent_default_desk`: 53 tests;
+  - those 53: passed (`logs/B2-R1-review-focused.txt`);
+  - the competing filters five times in a row: 5/5, 7 tests each, which includes p02's because of
+    the B2-F1 collision;
+  - the author's full affected filter set: 686 passed, 1 ignored
+    (`logs/B2-R1-review-affected.txt`);
+  - `cargo check --lib --bins`, `fmt --check` and `--test source_modules`: all clean.
+- **Not run:** the full gate (I003), `stack-budget.sh`, clippy (the author reports it clean) and
+  migrations from scratch.
+
+### Outcome
+
+**Changes required** for artifact `8fd91d04…5c9b`. There is no PASS. All remaining items are Low
+and concern tests and naming. The production code matches gate r4.
+
+- Actionable:
+  - 01DEP-P03-B2-F1 (Low): wrong test prefix, colliding with p02 (reported by A);
+  - 01DEP-P03-B2-F2 (Low): no assertion that the lead agents' default desks are untouched
+    (reported by A);
+  - 01DEP-P03-B2-F3 (Low): the S ≠ B branch, which protects a user's own responder, is untested.
+- Optional: B2-F4 (the pause path's order differs from the gate's list; harmless).
+- **Accepted:**
+  - the fixture change (a real company agent as `worker`, `drop_desk`);
+  - the onboarding totals;
+  - the no-`draft`-step and resources stand-ins, which are code-reviewed one-line guards;
+  - the resources refusal applying only to a re-point, since reconfigure-to-actor carries the
+    binding's resources unchanged;
+  - the record deletion on department delete, which runs only after the desk is detached or
+    deleted.
+- No item needs the user.
+
+### Process and instruction feedback
+
+- Reviewer self-correction: I passed gate r4 without checking its verification prefix against
+  the plan's focused-check names (B2-F1). Candidate rule: a gate's verification plan uses the
+  plan's focused-check prefixes verbatim, and B checks for prefix collisions with earlier phases'
+  tests.
+
+## 01DEP-P03-B2-R2 — batch B2 correction recheck (B2-F1..F4)
+
+### Identity
+
+- Date 2026-11-10. Workflow `implement-opus-reviewed-2_2`. Batch B2; stage: correction recheck.
+  Phase `p03`.
+- Reviewer B: Opus 5.5 (`claude-opus-5-5`), effort per TASK (xhigh), agent `ad409b2d3d149c2c6`.
+- Artifact digest `31d169402e1d795115670b31b6399674904c1f0d41463afb0bdbe0c1378139ea`, recomputed at
+  the start and before returning. Base/HEAD `523732b7`, uncommitted; the same file set as R1.
+  Evidence `logs/01DEP-P03-B2-R2.evidence.json` validates (PASS 3).
+- Gate r4 `51d4dee8…8553`; coordination revision 3 `880cac54…04b8`.
+
+### Coverage and evidence
+
+- **Read:** TASK "B2 corrections for 01DEP-P03-B2-R1"; the pause path in `provisioning_department.rs`
+  (deactivate, then clear); the `own_desk` helper and its five uses; the new S ≠ B test in full; and
+  a scan for leftover `department_desk_` names (only p02's remain).
+- **Executed** (`openbot_dept_p03_test`, `SQLX_OFFLINE=true`, `--test-threads=4`):
+  - `--list department_lead_desk`: 14 tests, 1 of them competing;
+  - those 14: passed (`logs/B2-R2-review-lead-desk.txt`);
+  - the competing filters four times in a row: 4/4, 4 tests each (B2's 1 + B1's 3);
+  - affected `department onboarding provisioning channel_reply agent_default_desk
+    department_lead_desk binding member_removal user_deletion desk_wording
+    builtin_agent_library`: 515 passed (`logs/B2-R2-review-affected.txt`);
+  - `cargo check --lib --bins` and `fmt --check`: clean.
+- **Not run:** the full gate (I003, phase 05), `stack-budget.sh`, clippy (the author reports it
+  clean) and migrations from scratch.
+
+### Outcome
+
+**PASS** for batch B2 at artifact `31d169402e1d795115670b31b6399674904c1f0d41463afb0bdbe0c1378139ea`.
+01DEP-P03-B2-F1..F4 are all resolved, and none is open. The remaining code-review stand-ins (the
+no-`draft`-step and resource-slot refusals) were accepted in R1. No item needs the user.
+
+### Process and instruction feedback
+
+- Asserting the user-configuration safety property with real lifecycle calls (`BindingService` +
+  `configure_channel_reply`) rather than raw rows makes the test track the production rules.

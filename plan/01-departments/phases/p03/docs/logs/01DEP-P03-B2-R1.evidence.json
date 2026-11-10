@@ -1,0 +1,45 @@
+{
+  "version": 1,
+  "round": "01DEP-P03-B2-R1",
+  "artifact": "8fd91d0452986625ad448afcdbe382b456c75bcaeaa9cddef117523947535c9b",
+  "checks": [
+    {
+      "criteria": ["03B.1", "03B.2", "03B.3", "03B.4", "D7", "D8", "D9", "G2-F1", "G2-F2", "G2-F3", "G2-F4", "G2-F6", "G2-F7", "G2-F8", "G2-F9"],
+      "command": "cargo test --locked --offline --lib -- department_desk_ agent_default_desk --test-threads=4",
+      "fixture": "TEST_DATABASE_URL db openbot_dept_p03_test (recreated after the init-schema comment edit) + own_database; SQLX_OFFLINE=true; test-threads=4",
+      "status": "PASS",
+      "files": [
+        {"path": "logs/B2-focused-final.txt", "sha256": "1371a40c959ddf1d6575d8f76f8a5c157a1c7e456658f05192c9c0bbbdb3d66b"},
+        {"path": "logs/B2-test-inventory.txt", "sha256": "4803a7bf802adda62bd3efb770597fb09989cfcb93554eb260a0da72b47cb2da"},
+        {"path": "logs/B2-e2e-2.txt", "sha256": "a883ae18915e74fb27f5bd306ac912a3e36b9b5c5c19d4d597956ddc174c2b81"}
+      ]
+    },
+    {
+      "criteria": ["contract-impact"],
+      "command": "cargo test --locked --offline --lib -- department onboarding agent_default_desk --test-threads=4 (first run)",
+      "fixture": "openbot_dept_p03_test",
+      "status": "FAIL",
+      "files": [
+        {"path": "logs/B2-first-run.txt", "sha256": "328afe7a30f94ebec69145cc03bfac57bb1d992d70329301cd7db62abebb0d43"}
+      ]
+    },
+    {
+      "criteria": ["contract-impact"],
+      "command": "cargo test --locked --offline --lib -- department onboarding provisioning channel_reply definition binding assistant_channel desk_wording authorization routes::workflows agent_default_desk use_cases::agent routes::agent skill_tests member_removal user_deletion removed_membership template builtin_agent_library response_schema --test-threads=4",
+      "fixture": "openbot_dept_p03_test + own_database; SQLX_OFFLINE=true; test-threads=4",
+      "status": "PASS",
+      "files": [
+        {"path": "logs/B2-affected-1.txt", "sha256": "b935f193bf1df91ff6a82a2772cb22a5855cd819e696adeb46d40646688f9240"}
+      ]
+    },
+    {
+      "criteria": ["test-discovery"],
+      "command": "python3 scratchpad/testnames.py (test fn names HEAD 523732b7 vs worktree)",
+      "fixture": "git HEAD vs working tree",
+      "status": "PASS",
+      "files": [
+        {"path": "logs/B2-test-names.txt", "sha256": "bdb592c4b946dc5e3fc67a9bfc64db40b96a3d21e65a356914116777ca61f5fe"}
+      ]
+    }
+  ]
+}

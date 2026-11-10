@@ -25,11 +25,16 @@ use uuid::Uuid;
 use crate::adapters::persistence::PostgresPersistence;
 use crate::adapters::persistence::agent_publication::{begin_bounded, lock_company_on};
 use crate::adapters::persistence::department_desks::sync_department_grants_on;
+use crate::adapters::persistence::workflow::provisioning::{
+    ProvisioningDeployment, department_desk_key, follow_department_lead_on,
+    provision_department_desk_on,
+};
 use crate::app_error::{AppError, AppResult};
 use crate::application::agent::AgentCompanyScope;
 use crate::application::ports::department::{
     DepartmentEdit, DepartmentPersistence, DepartmentScope, DepartmentWrite,
 };
+use crate::application::workflow::WorkflowActor;
 use crate::domain::workflow::CompanyId;
 use crate::entities::creation::CreationProvenance;
 use crate::entities::department::{
@@ -265,21 +270,35 @@ async fn lock_principals_on(
     Ok(())
 }
 
-/// Create a department, with its lead when one is named. The caller holds the company write lock.
+/// Create a department with its desk, and its lead when one is named (01DEP-P03-D8). The caller
+/// holds the company write lock and `actor`'s account row.
 pub(crate) async fn create_department_on(
     tx: &mut Transaction<'_, Postgres>,
+    templates: &ProvisioningDeployment,
     company: CompanyId,
+    actor: WorkflowActor,
     write: &DepartmentWrite,
     lead: Option<PrincipalId>,
 ) -> AppResult<Department> {
-    create_department_with_id_on(tx, company, DepartmentId::random(), write, lead).await
+    create_department_with_id_on(
+        tx,
+        templates,
+        company,
+        actor,
+        DepartmentId::random(),
+        write,
+        lead,
+    )
+    .await
 }
 
 /// [`create_department_on`] under a caller-chosen id, for a creator that replays by id
 /// (onboarding's first department, 01DEP-P03-D4).
 pub(crate) async fn create_department_with_id_on(
     tx: &mut Transaction<'_, Postgres>,
+    templates: &ProvisioningDeployment,
     company: CompanyId,
+    actor: WorkflowActor,
     id: DepartmentId,
     write: &DepartmentWrite,
     lead: Option<PrincipalId>,
@@ -312,8 +331,27 @@ pub(crate) async fn create_department_with_id_on(
     .await
     .map_err(|error| slug_conflict(error, &write.slug))?;
     let department = Department::try_from(department)?;
+    // Boxed: an agent lead's desk descends into template compilation and publication.
+    Box::pin(provision_department_desk_on(
+        tx,
+        templates,
+        company,
+        actor,
+        &department,
+        lead,
+    ))
+    .await?;
     if let Some(lead) = lead {
-        assign_department_role_on(tx, company, department.id, DepartmentRole::Lead, lead).await?;
+        assign_department_role_on(
+            tx,
+            templates,
+            company,
+            actor,
+            department.id,
+            DepartmentRole::Lead,
+            lead,
+        )
+        .await?;
     }
     Ok(department)
 }
@@ -446,6 +484,14 @@ pub(crate) async fn delete_department_on(
     if let Some(parent) = current.parent_id {
         sync_department_grants_on(tx, company, &[parent]).await?;
     }
+    // Its desk is gone or detached by now (it owned none); so goes the record of it.
+    sqlx::query(
+        "DELETE FROM workflow_provisioning_commands WHERE company_id = $1 AND command_key = $2",
+    )
+    .bind(company.as_uuid())
+    .bind(department_desk_key(department))
+    .execute(&mut **tx)
+    .await?;
     Ok(())
 }
 
@@ -454,12 +500,24 @@ pub(crate) async fn delete_department_on(
 /// again changes nothing. The caller holds the company write lock.
 pub(crate) async fn assign_department_role_on(
     tx: &mut Transaction<'_, Postgres>,
+    templates: &ProvisioningDeployment,
     company: CompanyId,
+    actor: WorkflowActor,
     department: DepartmentId,
     role: DepartmentRole,
     principal: PrincipalId,
 ) -> AppResult<()> {
-    write_placement_on(tx, company, department, principal, false, Some(role)).await
+    write_placement_on(tx, company, department, principal, false, Some(role)).await?;
+    follow_lead_on(
+        tx,
+        templates,
+        company,
+        actor,
+        department,
+        role,
+        Some(principal),
+    )
+    .await
 }
 
 /// Make `principal` a member of the department and, with `role`, its holder of that role, as
@@ -469,12 +527,50 @@ pub(crate) async fn assign_department_role_on(
 /// write lock.
 pub(crate) async fn place_in_department_on(
     tx: &mut Transaction<'_, Postgres>,
+    templates: &ProvisioningDeployment,
     company: CompanyId,
+    actor: WorkflowActor,
     department: DepartmentId,
     principal: PrincipalId,
     role: Option<DepartmentRole>,
 ) -> AppResult<()> {
-    write_placement_on(tx, company, department, principal, true, role).await
+    write_placement_on(tx, company, department, principal, true, role).await?;
+    match role {
+        Some(role) => {
+            follow_lead_on(
+                tx,
+                templates,
+                company,
+                actor,
+                department,
+                role,
+                Some(principal),
+            )
+            .await
+        }
+        None => Ok(()),
+    }
+}
+
+/// After a `lead` write and its grant sync, the department desk follows the lead (01DEP-P03-D9):
+/// last, so the gates the sync took stay the last gates taken.
+async fn follow_lead_on(
+    tx: &mut Transaction<'_, Postgres>,
+    templates: &ProvisioningDeployment,
+    company: CompanyId,
+    actor: WorkflowActor,
+    department: DepartmentId,
+    role: DepartmentRole,
+    lead: Option<PrincipalId>,
+) -> AppResult<()> {
+    if role != DepartmentRole::Lead {
+        return Ok(());
+    }
+    // Boxed: re-pointing descends into template compilation and publication.
+    Box::pin(follow_department_lead_on(
+        tx, templates, company, actor, department, lead,
+    ))
+    .await
 }
 
 /// Membership and role rows for one principal, under the department row and the principals the
@@ -554,7 +650,9 @@ async fn write_placement_on(
 /// Take the role from `principal`. The caller holds the company write lock.
 pub(crate) async fn clear_department_role_on(
     tx: &mut Transaction<'_, Postgres>,
+    templates: &ProvisioningDeployment,
     company: CompanyId,
+    actor: WorkflowActor,
     department: DepartmentId,
     role: DepartmentRole,
     principal: PrincipalId,
@@ -578,7 +676,8 @@ pub(crate) async fn clear_department_role_on(
         )));
     }
     let reach = role_reach_on(tx, company, department).await?;
-    sync_department_grants_on(tx, company, &reach).await
+    sync_department_grants_on(tx, company, &reach).await?;
+    follow_lead_on(tx, templates, company, actor, department, role, None).await
 }
 
 /// Add `principal` to the department; adding a member again changes nothing. The caller holds
@@ -643,16 +742,40 @@ async fn role_reach_on(
         .collect())
 }
 
+/// Department persistence with the provisioning templates a department's desk is created and
+/// re-pointed with (01DEP-P03-D7).
+#[derive(Clone)]
+pub struct PostgresDepartments {
+    persistence: PostgresPersistence,
+    templates: ProvisioningDeployment,
+}
+impl PostgresDepartments {
+    pub fn new(persistence: PostgresPersistence, templates: ProvisioningDeployment) -> Self {
+        Self {
+            persistence,
+            templates,
+        }
+    }
+}
+
 #[async_trait]
-impl DepartmentPersistence for PostgresPersistence {
+impl DepartmentPersistence for PostgresDepartments {
     async fn create(
         &self,
         scope: DepartmentScope,
         write: DepartmentWrite,
         lead: Option<PrincipalId>,
     ) -> AppResult<Department> {
-        let mut tx = begin_department_write(self, scope).await?;
-        let department = create_department_on(&mut tx, scope.company, &write, lead).await?;
+        let mut tx = begin_department_write(&self.persistence, scope).await?;
+        let department = create_department_on(
+            &mut tx,
+            &self.templates,
+            scope.company,
+            scope.actor,
+            &write,
+            lead,
+        )
+        .await?;
         tx.commit().await?;
         Ok(department)
     }
@@ -663,14 +786,14 @@ impl DepartmentPersistence for PostgresPersistence {
         department: DepartmentId,
         edit: DepartmentEdit,
     ) -> AppResult<Department> {
-        let mut tx = begin_department_write(self, scope).await?;
+        let mut tx = begin_department_write(&self.persistence, scope).await?;
         let department = update_department_on(&mut tx, scope.company, department, &edit).await?;
         tx.commit().await?;
         Ok(department)
     }
 
     async fn delete(&self, scope: DepartmentScope, department: DepartmentId) -> AppResult<()> {
-        let mut tx = begin_department_write(self, scope).await?;
+        let mut tx = begin_department_write(&self.persistence, scope).await?;
         delete_department_on(&mut tx, scope.company, department).await?;
         tx.commit().await?;
         Ok(())
@@ -683,8 +806,17 @@ impl DepartmentPersistence for PostgresPersistence {
         role: DepartmentRole,
         principal: PrincipalId,
     ) -> AppResult<()> {
-        let mut tx = begin_department_write(self, scope).await?;
-        assign_department_role_on(&mut tx, scope.company, department, role, principal).await?;
+        let mut tx = begin_department_write(&self.persistence, scope).await?;
+        assign_department_role_on(
+            &mut tx,
+            &self.templates,
+            scope.company,
+            scope.actor,
+            department,
+            role,
+            principal,
+        )
+        .await?;
         tx.commit().await?;
         Ok(())
     }
@@ -696,8 +828,17 @@ impl DepartmentPersistence for PostgresPersistence {
         role: DepartmentRole,
         principal: PrincipalId,
     ) -> AppResult<()> {
-        let mut tx = begin_department_write(self, scope).await?;
-        clear_department_role_on(&mut tx, scope.company, department, role, principal).await?;
+        let mut tx = begin_department_write(&self.persistence, scope).await?;
+        clear_department_role_on(
+            &mut tx,
+            &self.templates,
+            scope.company,
+            scope.actor,
+            department,
+            role,
+            principal,
+        )
+        .await?;
         tx.commit().await?;
         Ok(())
     }
@@ -708,7 +849,7 @@ impl DepartmentPersistence for PostgresPersistence {
         department: DepartmentId,
         principal: PrincipalId,
     ) -> AppResult<()> {
-        let mut tx = begin_department_write(self, scope).await?;
+        let mut tx = begin_department_write(&self.persistence, scope).await?;
         add_department_member_on(&mut tx, scope.company, department, principal).await?;
         tx.commit().await?;
         Ok(())
@@ -720,7 +861,7 @@ impl DepartmentPersistence for PostgresPersistence {
         department: DepartmentId,
         principal: PrincipalId,
     ) -> AppResult<()> {
-        let mut tx = begin_department_write(self, scope).await?;
+        let mut tx = begin_department_write(&self.persistence, scope).await?;
         remove_department_member_on(&mut tx, scope.company, department, principal).await?;
         tx.commit().await?;
         Ok(())
@@ -737,7 +878,7 @@ impl DepartmentPersistence for PostgresPersistence {
         ))
         .bind(company.as_uuid())
         .bind(department.as_uuid())
-        .fetch_optional(&self.pool)
+        .fetch_optional(&self.persistence.pool)
         .await?
         .map(Department::try_from)
         .transpose()
@@ -749,7 +890,7 @@ impl DepartmentPersistence for PostgresPersistence {
              WHERE department.company_id = $1 ORDER BY department.slug, department.id"
         ))
         .bind(company.as_uuid())
-        .fetch_all(&self.pool)
+        .fetch_all(&self.persistence.pool)
         .await?
         .into_iter()
         .map(Department::try_from)
@@ -775,7 +916,7 @@ impl DepartmentPersistence for PostgresPersistence {
         ))
         .bind(company.as_uuid())
         .bind(user)
-        .fetch_all(&self.pool)
+        .fetch_all(&self.persistence.pool)
         .await?
         .into_iter()
         .map(Department::try_from)
@@ -794,7 +935,7 @@ impl DepartmentPersistence for PostgresPersistence {
         )
         .bind(company.as_uuid())
         .bind(department.as_uuid())
-        .fetch_all(&self.pool)
+        .fetch_all(&self.persistence.pool)
         .await?;
         Ok(rows
             .into_iter()
@@ -817,7 +958,7 @@ impl DepartmentPersistence for PostgresPersistence {
         )
         .bind(company.as_uuid())
         .bind(department.as_uuid())
-        .fetch_all(&self.pool)
+        .fetch_all(&self.persistence.pool)
         .await?;
         rows.into_iter()
             .map(|(role, principal_id)| {
@@ -841,7 +982,7 @@ impl DepartmentPersistence for PostgresPersistence {
         )
         .bind(company.as_uuid())
         .bind(principal.as_uuid())
-        .fetch_all(&self.pool)
+        .fetch_all(&self.persistence.pool)
         .await?;
         Ok(rows.into_iter().map(DepartmentId::new).collect())
     }
@@ -858,7 +999,7 @@ impl DepartmentPersistence for PostgresPersistence {
         )
         .bind(company.as_uuid())
         .bind(principal.as_uuid())
-        .fetch_all(&self.pool)
+        .fetch_all(&self.persistence.pool)
         .await?;
         rows.into_iter()
             .map(|(department_id, role)| {

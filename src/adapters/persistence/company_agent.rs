@@ -109,15 +109,23 @@ pub(crate) async fn create_company_agent_on(
     .await?
     .map_err(refusal_error)?;
     if let Some(placement) = placement {
-        place_in_department_on(tx, company, placement.department, principal, placement.role)
-            .await?;
+        place_in_department_on(
+            tx,
+            templates,
+            company,
+            actor,
+            placement.department,
+            principal,
+            placement.role,
+        )
+        .await?;
     }
     Ok(CreatedCompanyAgent { principal, desk })
 }
 
 /// A desk refusal as the error the creating route answers with, as "Create assistant channel"
 /// does: forbidden is not found, a taken address a conflict, anything invalid a bad request.
-fn refusal_error(refusal: ProvisioningRefusal) -> AppError {
+pub(crate) fn refusal_error(refusal: ProvisioningRefusal) -> AppError {
     match refusal {
         ProvisioningRefusal::Forbidden => AppError::NotFound("Company not found".into()),
         ProvisioningRefusal::Conflict(message) => AppError::Conflict(message),

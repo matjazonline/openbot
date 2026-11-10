@@ -1,0 +1,60 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.19s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-c4f538027eed5c31)
+
+running 53 tests
+test adapters::http::routes::channel::department_tests::department_desk_ownership_json_fields_are_kept_when_absent ... ok
+test adapters::http::routes::onboarding::tests::agent_default_desk_onboarding_completion_reads_back_the_default_desk ... ok
+test adapters::http::routes::agent::api_tests::agent_default_desk_json_create_places_the_agent ... ok
+test adapters::persistence::department::tests::agent_desks::agent_default_desk_competing_creators_of_one_slug_make_one_agent ... ok
+test adapters::persistence::department::tests::agent_desks::agent_default_desk_competing_lead_creation_takes_its_desk_gates_once ... ok
+test adapters::persistence::department::tests::agent_desks::agent_default_desk_creation_commits_the_agent_with_its_desk ... ok
+test adapters::persistence::department::tests::agent_desks::agent_default_desk_deletion_guards_are_unchanged ... ok
+test adapters::persistence::department::tests::agent_desks::agent_default_desk_refuses_a_library_copy_it_cannot_publish ... ok
+test adapters::persistence::department::tests::agent_desks::agent_default_desk_library_definitions_have_none_and_copies_do ... ok
+test adapters::persistence::department::tests::agent_desks::agent_default_desk_refuses_without_a_keyed_model ... ok
+test adapters::persistence::department::tests::agent_desks::agent_default_desk_places_the_agent_and_its_lead_role_with_grants ... ok
+test adapters::persistence::department::tests::agent_desks::agent_default_desk_refuses_a_taken_address_or_slug ... ok
+test adapters::persistence::company_agent::tests::agent_default_desk_company_agents_have_one_creation_path ... ok
+test adapters::persistence::department::tests::desks::department_desk_members_only_admits_members_and_the_owner_only ... ok
+test adapters::persistence::department::tests::desks::department_desk_members_only_form_saves_keep_allowlist_and_refuse_public ... ok
+test adapters::persistence::department::tests::desks::department_desk_competing_membership_and_ownership_edit_agree ... ok
+test adapters::persistence::department::tests::desks::department_desk_members_only_keeps_an_allowlist_entry_and_a_membership_apart ... ok
+test adapters::persistence::department::tests::desks::department_desk_competing_rederivation_behind_a_demotion_leaves_it_out ... ok
+test adapters::persistence::department::tests::desks::department_desk_members_only_reaches_one_step_up_and_down ... ok
+test adapters::persistence::department::tests::desks::department_desk_members_only_removal_revokes_access_and_notifications_in_one_commit ... ok
+test adapters::persistence::department::tests::desks::department_desk_members_only_removing_a_teammate_drops_only_derived_grants ... ok
+test adapters::persistence::department::tests::desks::department_desk_members_only_set_desk_ownership_on_takes_the_desk_edit_path ... ok
+test adapters::persistence::department::tests::desks::department_desk_ownership_blocks_deleting_its_department_until_detached ... ok
+test adapters::persistence::department::tests::desks::department_desk_competing_removal_and_demotion_of_one_principal_both_commit ... ok
+test adapters::persistence::department::tests::desks::department_desk_ownership_company_teardown_takes_owned_desks_with_it ... ok
+test adapters::persistence::department::tests::desks::department_desk_ownership_refuses_another_companys_department ... ok
+test adapters::persistence::department::tests::desks::department_desk_ownership_moving_or_opening_a_desk_rederives_its_grants ... ok
+test adapters::persistence::department::tests::lead_desks::department_desk_blocks_deleting_its_department_until_detached ... ok
+test adapters::persistence::department::tests::lead_desks::department_desk_agent_to_agent_repoints_the_same_binding ... ok
+test adapters::persistence::department::tests::lead_desks::department_desk_follows_an_agent_created_as_its_lead ... ok
+test adapters::persistence::department::tests::lead_desks::department_desk_follows_person_and_agent_leads_with_one_binding ... ok
+test adapters::persistence::department::tests::lead_desks::department_desk_run_as_moves_to_the_admin_who_changes_the_lead ... ok
+test adapters::persistence::department::tests::lead_desks::department_desk_competing_lead_changes_leave_the_holders_agent_answering ... ok
+test adapters::persistence::department::tests::lead_desks::department_desk_refuses_lead_changes_it_cannot_follow ... ok
+test adapters::persistence::department::tests::lead_desks::department_desk_taken_address_refuses_the_department ... ok
+test adapters::persistence::department::tests::lead_desks::department_desk_survives_a_rename_and_is_left_once_detached ... ok
+test adapters::persistence::department::tests::lead_desks::department_desk_with_a_person_lead_or_none_is_a_plain_team_desk ... ok
+test adapters::persistence::department::tests::lead_desks::department_desk_with_an_agent_lead_answers_on_it ... ok
+test adapters::persistence::onboarding::tests::agent_default_desk_onboarding_creates_and_replays_the_first_department ... ok
+test adapters::persistence::onboarding::tests::agent_default_desk_onboarding_taken_address_rejects_and_commits_nothing ... ok
+test adapters::persistence::onboarding::tests::agent_default_desk_onboarding_names_the_department_on_a_resubmission ... ok
+test adapters::persistence::onboarding::tests::agent_default_desk_onboarding_without_a_keyed_model_is_rejected ... ok
+test adapters::persistence::onboarding::tests::department_desk_onboarding_address_collision_with_an_agent_is_rejected ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::agent_default_desk_builder_creation_refusals_are_tool_errors ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::agent_default_desk_builder_refuses_other_settings_at_the_agents_slug ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::agent_default_desk_builder_provisions_another_desk_beside_the_default ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::agent_default_desk_builder_places_the_agent_in_a_department ... ok
+test application::use_cases::agent::tests::agent_default_desk_creation_goes_through_company_agents ... ok
+test application::use_cases::thread::tests::department_desk_relay::department_desk_members_only_thread_party_keeps_replying_after_removal ... ok
+test application::use_cases::thread::tests::department_desk_relay::department_desk_relay_into_a_members_only_desk_stays_trusted ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::agent_default_desk_builder_reuses_the_default_desk_at_the_agents_slug ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::agent_default_desk_competing_builder_claimants_make_one_default_desk ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::provisioning_runtime_tests::department_desk_answers_through_its_current_lead ... ok
+
+test result: ok. 53 passed; 0 failed; 0 ignored; 0 measured; 3804 filtered out; finished in 22.26s
+

@@ -1,0 +1,212 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.22s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-c4f538027eed5c31)
+
+running 30 tests
+test adapters::http::routes::channel::department_tests::department_desk_ownership_json_fields_are_kept_when_absent ... FAILED
+test adapters::persistence::department::tests::desks::department_desk_members_only_admits_members_and_the_owner_only ... FAILED
+test adapters::persistence::department::tests::desks::department_desk_members_only_form_saves_keep_allowlist_and_refuse_public ... FAILED
+test adapters::persistence::department::tests::desks::department_desk_members_only_keeps_an_allowlist_entry_and_a_membership_apart ... FAILED
+test adapters::persistence::department::tests::desks::department_desk_members_only_reaches_one_step_up_and_down ... FAILED
+test adapters::persistence::department::tests::desks::department_desk_members_only_removal_revokes_access_and_notifications_in_one_commit ... FAILED
+test adapters::persistence::department::tests::desks::department_desk_members_only_removing_a_teammate_drops_only_derived_grants ... FAILED
+test adapters::persistence::department::tests::desks::department_desk_members_only_set_desk_ownership_on_takes_the_desk_edit_path ... FAILED
+test adapters::persistence::department::tests::desks::department_desk_ownership_blocks_deleting_its_department_until_detached ... FAILED
+test adapters::persistence::department::tests::desks::department_desk_ownership_company_teardown_takes_owned_desks_with_it ... FAILED
+test adapters::persistence::department::tests::desks::department_desk_ownership_moving_or_opening_a_desk_rederives_its_grants ... FAILED
+test adapters::persistence::department::tests::desks::department_desk_ownership_refuses_another_companys_department ... FAILED
+test adapters::persistence::department::tests::lead_desks::department_desk_agent_to_agent_repoints_the_same_binding ... FAILED
+test adapters::persistence::department::tests::lead_desks::department_desk_blocks_deleting_its_department_until_detached ... FAILED
+test adapters::persistence::department::tests::desks::department_desk_competing_membership_and_ownership_edit_agree ... FAILED
+test adapters::persistence::department::tests::desks::department_desk_competing_rederivation_behind_a_demotion_leaves_it_out ... FAILED
+test adapters::persistence::department::tests::desks::department_desk_competing_removal_and_demotion_of_one_principal_both_commit ... FAILED
+test adapters::persistence::department::tests::lead_desks::department_desk_competing_lead_changes_leave_the_holders_agent_answering ... FAILED
+test adapters::persistence::department::tests::lead_desks::department_desk_follows_an_agent_created_as_its_lead ... FAILED
+test adapters::persistence::department::tests::lead_desks::department_desk_follows_person_and_agent_leads_with_one_binding ... FAILED
+test adapters::persistence::department::tests::lead_desks::department_desk_run_as_moves_to_the_admin_who_changes_the_lead ... FAILED
+test adapters::persistence::department::tests::lead_desks::department_desk_refuses_lead_changes_it_cannot_follow ... FAILED
+test adapters::persistence::department::tests::lead_desks::department_desk_survives_a_rename_and_is_left_once_detached ... FAILED
+test adapters::persistence::department::tests::lead_desks::department_desk_taken_address_refuses_the_department ... FAILED
+test adapters::persistence::department::tests::lead_desks::department_desk_with_a_person_lead_or_none_is_a_plain_team_desk ... FAILED
+test adapters::persistence::department::tests::lead_desks::department_desk_with_an_agent_lead_answers_on_it ... FAILED
+test application::use_cases::thread::tests::department_desk_relay::department_desk_relay_into_a_members_only_desk_stays_trusted ... ok
+test application::use_cases::thread::tests::department_desk_relay::department_desk_members_only_thread_party_keeps_replying_after_removal ... ok
+test adapters::persistence::onboarding::tests::department_desk_onboarding_address_collision_with_an_agent_is_rejected ... FAILED
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::provisioning_runtime_tests::department_desk_answers_through_its_current_lead ... FAILED
+
+failures:
+
+---- adapters::http::routes::channel::department_tests::department_desk_ownership_json_fields_are_kept_when_absent stdout ----
+
+thread 'adapters::http::routes::channel::department_tests::department_desk_ownership_json_fields_are_kept_when_absent' (40388309) panicked at src/adapters/persistence/test_support.rs:229:18:
+the test database accepts this checkout's migrations: ExecuteMigration(Database(PgDatabaseError { severity: Error, code: "42601", message: "syntax error at or near \"s\"", detail: None, hint: None, position: Some(Original(297984)), where: None, schema: None, table: None, column: None, data_type: None, constraint: None, file: Some("scan.l"), line: Some(1240), routine: Some("scanner_yyerror") }), 20260817000000)
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- adapters::persistence::department::tests::desks::department_desk_members_only_admits_members_and_the_owner_only stdout ----
+
+thread 'adapters::persistence::department::tests::desks::department_desk_members_only_admits_members_and_the_owner_only' (40388324) panicked at src/adapters/persistence/test_support.rs:229:18:
+the test database accepts this checkout's migrations: ExecuteMigration(Database(PgDatabaseError { severity: Error, code: "42601", message: "syntax error at or near \"s\"", detail: None, hint: None, position: Some(Original(297984)), where: None, schema: None, table: None, column: None, data_type: None, constraint: None, file: Some("scan.l"), line: Some(1240), routine: Some("scanner_yyerror") }), 20260817000000)
+
+---- adapters::persistence::department::tests::desks::department_desk_members_only_form_saves_keep_allowlist_and_refuse_public stdout ----
+
+thread 'adapters::persistence::department::tests::desks::department_desk_members_only_form_saves_keep_allowlist_and_refuse_public' (40388327) panicked at src/adapters/persistence/test_support.rs:229:18:
+the test database accepts this checkout's migrations: ExecuteMigration(Database(PgDatabaseError { severity: Error, code: "42601", message: "syntax error at or near \"s\"", detail: None, hint: None, position: Some(Original(297984)), where: None, schema: None, table: None, column: None, data_type: None, constraint: None, file: Some("scan.l"), line: Some(1240), routine: Some("scanner_yyerror") }), 20260817000000)
+
+---- adapters::persistence::department::tests::desks::department_desk_members_only_keeps_an_allowlist_entry_and_a_membership_apart stdout ----
+
+thread 'adapters::persistence::department::tests::desks::department_desk_members_only_keeps_an_allowlist_entry_and_a_membership_apart' (40388330) panicked at src/adapters/persistence/test_support.rs:229:18:
+the test database accepts this checkout's migrations: ExecuteMigration(Database(PgDatabaseError { severity: Error, code: "42601", message: "syntax error at or near \"s\"", detail: None, hint: None, position: Some(Original(297984)), where: None, schema: None, table: None, column: None, data_type: None, constraint: None, file: Some("scan.l"), line: Some(1240), routine: Some("scanner_yyerror") }), 20260817000000)
+
+---- adapters::persistence::department::tests::desks::department_desk_members_only_reaches_one_step_up_and_down stdout ----
+
+thread 'adapters::persistence::department::tests::desks::department_desk_members_only_reaches_one_step_up_and_down' (40388334) panicked at src/adapters/persistence/test_support.rs:229:18:
+the test database accepts this checkout's migrations: ExecuteMigration(Database(PgDatabaseError { severity: Error, code: "42601", message: "syntax error at or near \"s\"", detail: None, hint: None, position: Some(Original(297984)), where: None, schema: None, table: None, column: None, data_type: None, constraint: None, file: Some("scan.l"), line: Some(1240), routine: Some("scanner_yyerror") }), 20260817000000)
+
+---- adapters::persistence::department::tests::desks::department_desk_members_only_removal_revokes_access_and_notifications_in_one_commit stdout ----
+
+thread 'adapters::persistence::department::tests::desks::department_desk_members_only_removal_revokes_access_and_notifications_in_one_commit' (40388337) panicked at src/adapters/persistence/test_support.rs:229:18:
+the test database accepts this checkout's migrations: ExecuteMigration(Database(PgDatabaseError { severity: Error, code: "42601", message: "syntax error at or near \"s\"", detail: None, hint: None, position: Some(Original(297984)), where: None, schema: None, table: None, column: None, data_type: None, constraint: None, file: Some("scan.l"), line: Some(1240), routine: Some("scanner_yyerror") }), 20260817000000)
+
+---- adapters::persistence::department::tests::desks::department_desk_members_only_removing_a_teammate_drops_only_derived_grants stdout ----
+
+thread 'adapters::persistence::department::tests::desks::department_desk_members_only_removing_a_teammate_drops_only_derived_grants' (40388340) panicked at src/adapters/persistence/test_support.rs:229:18:
+the test database accepts this checkout's migrations: ExecuteMigration(Database(PgDatabaseError { severity: Error, code: "42601", message: "syntax error at or near \"s\"", detail: None, hint: None, position: Some(Original(297984)), where: None, schema: None, table: None, column: None, data_type: None, constraint: None, file: Some("scan.l"), line: Some(1240), routine: Some("scanner_yyerror") }), 20260817000000)
+
+---- adapters::persistence::department::tests::desks::department_desk_members_only_set_desk_ownership_on_takes_the_desk_edit_path stdout ----
+
+thread 'adapters::persistence::department::tests::desks::department_desk_members_only_set_desk_ownership_on_takes_the_desk_edit_path' (40388343) panicked at src/adapters/persistence/test_support.rs:229:18:
+the test database accepts this checkout's migrations: ExecuteMigration(Database(PgDatabaseError { severity: Error, code: "42601", message: "syntax error at or near \"s\"", detail: None, hint: None, position: Some(Original(297984)), where: None, schema: None, table: None, column: None, data_type: None, constraint: None, file: Some("scan.l"), line: Some(1240), routine: Some("scanner_yyerror") }), 20260817000000)
+
+---- adapters::persistence::department::tests::desks::department_desk_ownership_blocks_deleting_its_department_until_detached stdout ----
+
+thread 'adapters::persistence::department::tests::desks::department_desk_ownership_blocks_deleting_its_department_until_detached' (40388346) panicked at src/adapters/persistence/test_support.rs:229:18:
+the test database accepts this checkout's migrations: ExecuteMigration(Database(PgDatabaseError { severity: Error, code: "42601", message: "syntax error at or near \"s\"", detail: None, hint: None, position: Some(Original(297984)), where: None, schema: None, table: None, column: None, data_type: None, constraint: None, file: Some("scan.l"), line: Some(1240), routine: Some("scanner_yyerror") }), 20260817000000)
+
+---- adapters::persistence::department::tests::desks::department_desk_ownership_company_teardown_takes_owned_desks_with_it stdout ----
+
+thread 'adapters::persistence::department::tests::desks::department_desk_ownership_company_teardown_takes_owned_desks_with_it' (40388349) panicked at src/adapters/persistence/test_support.rs:229:18:
+the test database accepts this checkout's migrations: ExecuteMigration(Database(PgDatabaseError { severity: Error, code: "42601", message: "syntax error at or near \"s\"", detail: None, hint: None, position: Some(Original(297984)), where: None, schema: None, table: None, column: None, data_type: None, constraint: None, file: Some("scan.l"), line: Some(1240), routine: Some("scanner_yyerror") }), 20260817000000)
+
+---- adapters::persistence::department::tests::desks::department_desk_ownership_moving_or_opening_a_desk_rederives_its_grants stdout ----
+
+thread 'adapters::persistence::department::tests::desks::department_desk_ownership_moving_or_opening_a_desk_rederives_its_grants' (40388352) panicked at src/adapters/persistence/test_support.rs:229:18:
+the test database accepts this checkout's migrations: ExecuteMigration(Database(PgDatabaseError { severity: Error, code: "42601", message: "syntax error at or near \"s\"", detail: None, hint: None, position: Some(Original(297984)), where: None, schema: None, table: None, column: None, data_type: None, constraint: None, file: Some("scan.l"), line: Some(1240), routine: Some("scanner_yyerror") }), 20260817000000)
+
+---- adapters::persistence::department::tests::desks::department_desk_ownership_refuses_another_companys_department stdout ----
+
+thread 'adapters::persistence::department::tests::desks::department_desk_ownership_refuses_another_companys_department' (40388355) panicked at src/adapters/persistence/test_support.rs:229:18:
+the test database accepts this checkout's migrations: ExecuteMigration(Database(PgDatabaseError { severity: Error, code: "42601", message: "syntax error at or near \"s\"", detail: None, hint: None, position: Some(Original(297984)), where: None, schema: None, table: None, column: None, data_type: None, constraint: None, file: Some("scan.l"), line: Some(1240), routine: Some("scanner_yyerror") }), 20260817000000)
+
+---- adapters::persistence::department::tests::lead_desks::department_desk_agent_to_agent_repoints_the_same_binding stdout ----
+
+thread 'adapters::persistence::department::tests::lead_desks::department_desk_agent_to_agent_repoints_the_same_binding' (40388358) panicked at src/adapters/persistence/test_support.rs:229:18:
+the test database accepts this checkout's migrations: ExecuteMigration(Database(PgDatabaseError { severity: Error, code: "42601", message: "syntax error at or near \"s\"", detail: None, hint: None, position: Some(Original(297984)), where: None, schema: None, table: None, column: None, data_type: None, constraint: None, file: Some("scan.l"), line: Some(1240), routine: Some("scanner_yyerror") }), 20260817000000)
+
+---- adapters::persistence::department::tests::lead_desks::department_desk_blocks_deleting_its_department_until_detached stdout ----
+
+thread 'adapters::persistence::department::tests::lead_desks::department_desk_blocks_deleting_its_department_until_detached' (40388361) panicked at src/adapters/persistence/test_support.rs:229:18:
+the test database accepts this checkout's migrations: ExecuteMigration(Database(PgDatabaseError { severity: Error, code: "42601", message: "syntax error at or near \"s\"", detail: None, hint: None, position: Some(Original(297984)), where: None, schema: None, table: None, column: None, data_type: None, constraint: None, file: Some("scan.l"), line: Some(1240), routine: Some("scanner_yyerror") }), 20260817000000)
+
+---- adapters::persistence::department::tests::desks::department_desk_competing_membership_and_ownership_edit_agree stdout ----
+
+thread 'adapters::persistence::department::tests::desks::department_desk_competing_membership_and_ownership_edit_agree' (40388310) panicked at src/adapters/persistence/test_support.rs:313:10:
+a fresh database accepts the init schema: ExecuteMigration(Database(PgDatabaseError { severity: Error, code: "42601", message: "syntax error at or near \"s\"", detail: None, hint: None, position: Some(Original(297984)), where: None, schema: None, table: None, column: None, data_type: None, constraint: None, file: Some("scan.l"), line: Some(1240), routine: Some("scanner_yyerror") }), 20260817000000)
+
+---- adapters::persistence::department::tests::desks::department_desk_competing_rederivation_behind_a_demotion_leaves_it_out stdout ----
+
+thread 'adapters::persistence::department::tests::desks::department_desk_competing_rederivation_behind_a_demotion_leaves_it_out' (40388311) panicked at src/adapters/persistence/test_support.rs:313:10:
+a fresh database accepts the init schema: ExecuteMigration(Database(PgDatabaseError { severity: Error, code: "42601", message: "syntax error at or near \"s\"", detail: None, hint: None, position: Some(Original(297984)), where: None, schema: None, table: None, column: None, data_type: None, constraint: None, file: Some("scan.l"), line: Some(1240), routine: Some("scanner_yyerror") }), 20260817000000)
+
+---- adapters::persistence::department::tests::desks::department_desk_competing_removal_and_demotion_of_one_principal_both_commit stdout ----
+
+thread 'adapters::persistence::department::tests::desks::department_desk_competing_removal_and_demotion_of_one_principal_both_commit' (40388312) panicked at src/adapters/persistence/test_support.rs:313:10:
+a fresh database accepts the init schema: ExecuteMigration(Database(PgDatabaseError { severity: Error, code: "42601", message: "syntax error at or near \"s\"", detail: None, hint: None, position: Some(Original(297984)), where: None, schema: None, table: None, column: None, data_type: None, constraint: None, file: Some("scan.l"), line: Some(1240), routine: Some("scanner_yyerror") }), 20260817000000)
+
+---- adapters::persistence::department::tests::lead_desks::department_desk_competing_lead_changes_leave_the_holders_agent_answering stdout ----
+
+thread 'adapters::persistence::department::tests::lead_desks::department_desk_competing_lead_changes_leave_the_holders_agent_answering' (40388364) panicked at src/adapters/persistence/test_support.rs:313:10:
+a fresh database accepts the init schema: ExecuteMigration(Database(PgDatabaseError { severity: Error, code: "42601", message: "syntax error at or near \"s\"", detail: None, hint: None, position: Some(Original(297984)), where: None, schema: None, table: None, column: None, data_type: None, constraint: None, file: Some("scan.l"), line: Some(1240), routine: Some("scanner_yyerror") }), 20260817000000)
+
+---- adapters::persistence::department::tests::lead_desks::department_desk_follows_an_agent_created_as_its_lead stdout ----
+
+thread 'adapters::persistence::department::tests::lead_desks::department_desk_follows_an_agent_created_as_its_lead' (40388385) panicked at src/adapters/persistence/test_support.rs:229:18:
+the test database accepts this checkout's migrations: ExecuteMigration(Database(PgDatabaseError { severity: Error, code: "42601", message: "syntax error at or near \"s\"", detail: None, hint: None, position: Some(Original(297984)), where: None, schema: None, table: None, column: None, data_type: None, constraint: None, file: Some("scan.l"), line: Some(1240), routine: Some("scanner_yyerror") }), 20260817000000)
+
+---- adapters::persistence::department::tests::lead_desks::department_desk_follows_person_and_agent_leads_with_one_binding stdout ----
+
+thread 'adapters::persistence::department::tests::lead_desks::department_desk_follows_person_and_agent_leads_with_one_binding' (40388386) panicked at src/adapters/persistence/test_support.rs:229:18:
+the test database accepts this checkout's migrations: ExecuteMigration(Database(PgDatabaseError { severity: Error, code: "42601", message: "syntax error at or near \"s\"", detail: None, hint: None, position: Some(Original(297984)), where: None, schema: None, table: None, column: None, data_type: None, constraint: None, file: Some("scan.l"), line: Some(1240), routine: Some("scanner_yyerror") }), 20260817000000)
+
+---- adapters::persistence::department::tests::lead_desks::department_desk_run_as_moves_to_the_admin_who_changes_the_lead stdout ----
+
+thread 'adapters::persistence::department::tests::lead_desks::department_desk_run_as_moves_to_the_admin_who_changes_the_lead' (40388392) panicked at src/adapters/persistence/test_support.rs:229:18:
+the test database accepts this checkout's migrations: ExecuteMigration(Database(PgDatabaseError { severity: Error, code: "42601", message: "syntax error at or near \"s\"", detail: None, hint: None, position: Some(Original(297984)), where: None, schema: None, table: None, column: None, data_type: None, constraint: None, file: Some("scan.l"), line: Some(1240), routine: Some("scanner_yyerror") }), 20260817000000)
+
+---- adapters::persistence::department::tests::lead_desks::department_desk_refuses_lead_changes_it_cannot_follow stdout ----
+
+thread 'adapters::persistence::department::tests::lead_desks::department_desk_refuses_lead_changes_it_cannot_follow' (40388391) panicked at src/adapters/persistence/test_support.rs:229:18:
+the test database accepts this checkout's migrations: ExecuteMigration(Database(PgDatabaseError { severity: Error, code: "42601", message: "syntax error at or near \"s\"", detail: None, hint: None, position: Some(Original(297984)), where: None, schema: None, table: None, column: None, data_type: None, constraint: None, file: Some("scan.l"), line: Some(1240), routine: Some("scanner_yyerror") }), 20260817000000)
+
+---- adapters::persistence::department::tests::lead_desks::department_desk_survives_a_rename_and_is_left_once_detached stdout ----
+
+thread 'adapters::persistence::department::tests::lead_desks::department_desk_survives_a_rename_and_is_left_once_detached' (40388397) panicked at src/adapters/persistence/test_support.rs:229:18:
+the test database accepts this checkout's migrations: ExecuteMigration(Database(PgDatabaseError { severity: Error, code: "42601", message: "syntax error at or near \"s\"", detail: None, hint: None, position: Some(Original(297984)), where: None, schema: None, table: None, column: None, data_type: None, constraint: None, file: Some("scan.l"), line: Some(1240), routine: Some("scanner_yyerror") }), 20260817000000)
+
+---- adapters::persistence::department::tests::lead_desks::department_desk_taken_address_refuses_the_department stdout ----
+
+thread 'adapters::persistence::department::tests::lead_desks::department_desk_taken_address_refuses_the_department' (40388400) panicked at src/adapters/persistence/test_support.rs:229:18:
+the test database accepts this checkout's migrations: ExecuteMigration(Database(PgDatabaseError { severity: Error, code: "42601", message: "syntax error at or near \"s\"", detail: None, hint: None, position: Some(Original(297984)), where: None, schema: None, table: None, column: None, data_type: None, constraint: None, file: Some("scan.l"), line: Some(1240), routine: Some("scanner_yyerror") }), 20260817000000)
+
+---- adapters::persistence::department::tests::lead_desks::department_desk_with_a_person_lead_or_none_is_a_plain_team_desk stdout ----
+
+thread 'adapters::persistence::department::tests::lead_desks::department_desk_with_a_person_lead_or_none_is_a_plain_team_desk' (40388403) panicked at src/adapters/persistence/test_support.rs:229:18:
+the test database accepts this checkout's migrations: ExecuteMigration(Database(PgDatabaseError { severity: Error, code: "42601", message: "syntax error at or near \"s\"", detail: None, hint: None, position: Some(Original(297984)), where: None, schema: None, table: None, column: None, data_type: None, constraint: None, file: Some("scan.l"), line: Some(1240), routine: Some("scanner_yyerror") }), 20260817000000)
+
+---- adapters::persistence::department::tests::lead_desks::department_desk_with_an_agent_lead_answers_on_it stdout ----
+
+thread 'adapters::persistence::department::tests::lead_desks::department_desk_with_an_agent_lead_answers_on_it' (40388406) panicked at src/adapters/persistence/test_support.rs:229:18:
+the test database accepts this checkout's migrations: ExecuteMigration(Database(PgDatabaseError { severity: Error, code: "42601", message: "syntax error at or near \"s\"", detail: None, hint: None, position: Some(Original(297984)), where: None, schema: None, table: None, column: None, data_type: None, constraint: None, file: Some("scan.l"), line: Some(1240), routine: Some("scanner_yyerror") }), 20260817000000)
+
+---- adapters::persistence::onboarding::tests::department_desk_onboarding_address_collision_with_an_agent_is_rejected stdout ----
+
+thread 'adapters::persistence::onboarding::tests::department_desk_onboarding_address_collision_with_an_agent_is_rejected' (40388409) panicked at src/adapters/persistence/test_support.rs:313:10:
+a fresh database accepts the init schema: ExecuteMigration(Database(PgDatabaseError { severity: Error, code: "42601", message: "syntax error at or near \"s\"", detail: None, hint: None, position: Some(Original(297984)), where: None, schema: None, table: None, column: None, data_type: None, constraint: None, file: Some("scan.l"), line: Some(1240), routine: Some("scanner_yyerror") }), 20260817000000)
+
+---- adapters::persistence::workflow::tests::message_tests::ingress_tests::provisioning_runtime_tests::department_desk_answers_through_its_current_lead stdout ----
+
+thread 'adapters::persistence::workflow::tests::message_tests::ingress_tests::provisioning_runtime_tests::department_desk_answers_through_its_current_lead' (40388412) panicked at src/adapters/persistence/test_support.rs:313:10:
+a fresh database accepts the init schema: ExecuteMigration(Database(PgDatabaseError { severity: Error, code: "42601", message: "syntax error at or near \"s\"", detail: None, hint: None, position: Some(Original(297984)), where: None, schema: None, table: None, column: None, data_type: None, constraint: None, file: Some("scan.l"), line: Some(1240), routine: Some("scanner_yyerror") }), 20260817000000)
+
+
+failures:
+    adapters::http::routes::channel::department_tests::department_desk_ownership_json_fields_are_kept_when_absent
+    adapters::persistence::department::tests::desks::department_desk_competing_membership_and_ownership_edit_agree
+    adapters::persistence::department::tests::desks::department_desk_competing_rederivation_behind_a_demotion_leaves_it_out
+    adapters::persistence::department::tests::desks::department_desk_competing_removal_and_demotion_of_one_principal_both_commit
+    adapters::persistence::department::tests::desks::department_desk_members_only_admits_members_and_the_owner_only
+    adapters::persistence::department::tests::desks::department_desk_members_only_form_saves_keep_allowlist_and_refuse_public
+    adapters::persistence::department::tests::desks::department_desk_members_only_keeps_an_allowlist_entry_and_a_membership_apart
+    adapters::persistence::department::tests::desks::department_desk_members_only_reaches_one_step_up_and_down
+    adapters::persistence::department::tests::desks::department_desk_members_only_removal_revokes_access_and_notifications_in_one_commit
+    adapters::persistence::department::tests::desks::department_desk_members_only_removing_a_teammate_drops_only_derived_grants
+    adapters::persistence::department::tests::desks::department_desk_members_only_set_desk_ownership_on_takes_the_desk_edit_path
+    adapters::persistence::department::tests::desks::department_desk_ownership_blocks_deleting_its_department_until_detached
+    adapters::persistence::department::tests::desks::department_desk_ownership_company_teardown_takes_owned_desks_with_it
+    adapters::persistence::department::tests::desks::department_desk_ownership_moving_or_opening_a_desk_rederives_its_grants
+    adapters::persistence::department::tests::desks::department_desk_ownership_refuses_another_companys_department
+    adapters::persistence::department::tests::lead_desks::department_desk_agent_to_agent_repoints_the_same_binding
+    adapters::persistence::department::tests::lead_desks::department_desk_blocks_deleting_its_department_until_detached
+    adapters::persistence::department::tests::lead_desks::department_desk_competing_lead_changes_leave_the_holders_agent_answering
+    adapters::persistence::department::tests::lead_desks::department_desk_follows_an_agent_created_as_its_lead
+    adapters::persistence::department::tests::lead_desks::department_desk_follows_person_and_agent_leads_with_one_binding
+    adapters::persistence::department::tests::lead_desks::department_desk_refuses_lead_changes_it_cannot_follow
+    adapters::persistence::department::tests::lead_desks::department_desk_run_as_moves_to_the_admin_who_changes_the_lead
+    adapters::persistence::department::tests::lead_desks::department_desk_survives_a_rename_and_is_left_once_detached
+    adapters::persistence::department::tests::lead_desks::department_desk_taken_address_refuses_the_department
+    adapters::persistence::department::tests::lead_desks::department_desk_with_a_person_lead_or_none_is_a_plain_team_desk
+    adapters::persistence::department::tests::lead_desks::department_desk_with_an_agent_lead_answers_on_it
+    adapters::persistence::onboarding::tests::department_desk_onboarding_address_collision_with_an_agent_is_rejected
+    adapters::persistence::workflow::tests::message_tests::ingress_tests::provisioning_runtime_tests::department_desk_answers_through_its_current_lead
+
+test result: FAILED. 2 passed; 28 failed; 0 ignored; 0 measured; 3827 filtered out; finished in 0.83s
+
+error: test failed, to rerun pass `--lib`

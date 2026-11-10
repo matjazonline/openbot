@@ -86,3 +86,69 @@ pub fn provisioned_binding(
         },
     ])
 }
+
+/// `current` reconfigured onto `bundle` -- its own bundle, or a re-pointed version -- to run as
+/// `actor`, with its parameters, resources, trigger and active flag unchanged: the change
+/// `BindingService::configure` would prepare, for a department desk following its lead
+/// (01DEP-P03-D9). The caller holds the company lock and writes it on its own transaction.
+pub fn provisioned_reconfiguration(
+    actor: WorkflowActor,
+    current: &BindingState,
+    bundle: Arc<PublishedBundle>,
+) -> LifecycleResult<PreparedBinding> {
+    let old = &current.configuration;
+    let configuration = Arc::new(ConfiguredBinding::new(
+        BindingConfiguration {
+            id: old.id(),
+            revision: old
+                .revision()
+                .get()
+                .checked_add(1)
+                .and_then(BindingRevision::new)
+                .ok_or_else(missing)?,
+            company_id: old.company_id(),
+            params: old.params().clone(),
+            resources: old.resources().clone(),
+            run_as: actor,
+            message_trigger: old.message_trigger(),
+        },
+        bundle,
+    )?);
+    configuration.check_message_trigger(current.association)?;
+    Ok(PreparedBinding {
+        actor,
+        expected: Some(current.revision),
+        state: BindingState {
+            configuration,
+            association: current.association,
+            revision: next_state(current.revision)?,
+            active: current.active,
+        },
+    })
+}
+
+/// `current` activated or paused as it is configured: the change `BindingService::activate` or
+/// `deactivate` would prepare.
+pub fn provisioned_activation(
+    actor: WorkflowActor,
+    current: &BindingState,
+    active: bool,
+) -> LifecycleResult<PreparedBinding> {
+    Ok(PreparedBinding {
+        actor,
+        expected: Some(current.revision),
+        state: BindingState {
+            revision: next_state(current.revision)?,
+            active,
+            ..current.clone()
+        },
+    })
+}
+
+fn next_state(revision: BindingStateRevision) -> LifecycleResult<BindingStateRevision> {
+    Ok(revision
+        .get()
+        .checked_add(1)
+        .and_then(BindingStateRevision::new)
+        .ok_or_else(missing)?)
+}

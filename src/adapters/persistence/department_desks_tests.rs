@@ -250,6 +250,8 @@ async fn department_desk_ownership_blocks_deleting_its_department_until_detached
     let detached = save(&f, &kept, detach, None).await.unwrap();
     assert_eq!(detached.department_id, None);
     assert!(detached.settings_revision > kept.settings_revision);
+    // Its own desk too (01DEP-P03-D8): with it gone, the department owns no desk.
+    f.drop_desk(sales.id).await;
     f.use_cases
         .delete_department(f.owner, f.company, sales.id)
         .await

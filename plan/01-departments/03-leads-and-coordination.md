@@ -74,6 +74,14 @@ list their nonzero selected counts before running them. Keep the full suite for 
 4. Department delete runs after the department desk is detached or deleted by the user (decision
    9). The desk's own delete rules apply (`channel.rs:401`).
 
+   Factorings that turned out to be needed (p03 B2, gate `01DEP-P03-D9`): `apply` has no edit
+   path, so re-pointing is new code over the existing primitives -- `save_draft_on` (out of
+   `save_draft`), `configure_reply_on` and `native_contract` (out of `configure_channel_reply` and
+   `bootstrap_native_on`), `provisioned_reconfiguration` and `provisioned_activation` (beside
+   `provisioned_binding`), and `provision_workflow_on` reachable for an existing desk without the
+   reply bootstrap. Both desk kinds are marked by the `department:{id}` command row, which also
+   records the binding the department owns; a slug edit therefore never loses the desk.
+
 ## Batch 03C What a lead can see and do
 
 0. Placement. Every path that creates a company agent (the UI form, the JSON API, a library copy,

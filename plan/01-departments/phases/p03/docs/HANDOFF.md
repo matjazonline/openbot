@@ -15,9 +15,15 @@
   `a75c40e7…5798`; committed. Behaviour changes to report: library copies needing an unbound
   company tool are refused (03A.2); every creation needs a model connection; the Builder's reviewed
   desk / custom steps need a second address.
-- B2 (03B department desk + re-lead): gate draft in root scratchpad `p03-gate-B2-draft.md`; next.
+- **B2 accepted in phase** (03B department desk + re-lead): gate r4 PASS (G2-R3), batch PASS
+  (B2-R2) at artifact `31d16940…39ea`; committed. Behaviour changes to report: every department
+  gets a desk at its slug (taken address refuses the department); a department is deleted only
+  after its desk is detached or deleted; a lead change re-points/pauses only the binding the
+  department owns, refusing desks with unpublished edits, an approval policy, or that the admin
+  cannot see; a lead must be a publishable agent.
 - B3 (03C.1–6): not started.
 
 ## Next action
 
-Write B2 gate (D7–D9) into TASK, pin, send G2-R1 to B.
+Write the B3 gate (directory, department context in agent.run, lead fixture, dispatch/escalation/
+loop tests, docs), send G3-R1 to B.

@@ -73,7 +73,7 @@ pub(super) fn build(
         )),
         department: Arc::new(crate::use_cases::department::DepartmentUseCases::new(
             p.clone(),
-            p.clone(),
+            workflow.departments(),
         )),
         onboarding: Arc::new(crate::use_cases::onboarding::OnboardingUseCases::new(
             p.clone(),

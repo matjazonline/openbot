@@ -30,7 +30,15 @@ async fn department_desk_ownership_json_fields_are_kept_when_absent() {
     let Some(f) = Fixture::new().await else {
         return;
     };
-    let departments = DepartmentUseCases::new(f.persistence.clone(), f.persistence.clone());
+    let departments = DepartmentUseCases::new(
+        f.persistence.clone(),
+        Arc::new(
+            crate::adapters::persistence::department::PostgresDepartments::new(
+                f.persistence.as_ref().clone(),
+                crate::adapters::persistence::test_support::provisioning_templates(),
+            ),
+        ),
+    );
     let department = departments
         .create_department(
             f.owner.id,

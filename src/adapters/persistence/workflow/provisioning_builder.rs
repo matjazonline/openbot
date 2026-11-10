@@ -128,7 +128,9 @@ async fn builder_on(
     if let Some(placement) = placement {
         place_in_department_on(
             tx,
+            templates,
             company,
+            requester,
             placement.department,
             created.principal,
             placement.role,

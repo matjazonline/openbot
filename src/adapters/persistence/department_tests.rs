@@ -7,7 +7,8 @@ use sqlx::PgPool;
 
 use super::*;
 use crate::adapters::persistence::test_support::{
-    insert_company_with_owner, own_database, test_pool, wait_until_backends_are_blocked,
+    insert_company_with_owner, own_database, provisioning_templates, test_pool,
+    wait_until_backends_are_blocked,
 };
 use crate::application::use_cases::department::DepartmentUseCases;
 use crate::application::workflow::WorkflowActor;
@@ -17,6 +18,8 @@ use crate::entities::participant::GrantProvenance;
 /// principal and an external principal, plus a second company with an owner and a person.
 struct Departments {
     persistence: PostgresPersistence,
+    /// The department port over `persistence`, with the provisioning templates its desks need.
+    departments: PostgresDepartments,
     use_cases: DepartmentUseCases,
     company: Uuid,
     owner: Uuid,
@@ -77,6 +80,55 @@ async fn teammate(pool: &PgPool, company: Uuid, role: &str) -> (Uuid, PrincipalI
     (id, person(pool, company, id, role).await)
 }
 
+/// A company agent made the way production makes them (01DEP-P03-D1): published, with its
+/// default desk, so it can lead a department desk. The company gets a model connection for it.
+async fn company_agent(
+    persistence: &PostgresPersistence,
+    company: Uuid,
+    owner: Uuid,
+    slug: &str,
+) -> PrincipalId {
+    use crate::use_cases::agent::AgentWrite;
+    use crate::use_cases::company::{CompanyModelConnectionWrite, CompanyPersistence};
+    CompanyPersistence::replace_model_connections_for_user(
+        persistence,
+        owner,
+        company,
+        vec![CompanyModelConnectionWrite {
+            provider: "openai".into(),
+            api_key: Some("test-key".into()),
+            models: vec!["gpt-4o-mini".into(), "gpt-4o".into()],
+            is_default: true,
+        }],
+    )
+    .await
+    .unwrap();
+    let created = crate::adapters::persistence::test_support::company_agents(persistence)
+        .create(
+            WorkflowActor::authenticated(owner).unwrap(),
+            CompanyId::new(company),
+            AgentWrite {
+                name: format!("Agent {slug}"),
+                slug: slug.into(),
+                ..AgentWrite::default()
+            },
+            None,
+        )
+        .await
+        .expect("a company agent");
+    PrincipalId::new(
+        sqlx::query_scalar("SELECT id FROM principals WHERE company_id = $1 AND agent_id = $2")
+            .bind(company)
+            .bind(created.agent.id)
+            .fetch_one(persistence.pool())
+            .await
+            .unwrap(),
+    )
+}
+
+/// A bare agent row and principal, never published: a company path makes none since
+/// 01DEP-P03-D1, but deleting an agent still demotes its principal, and only an unpublished
+/// agent deletes.
 async fn agent_principal(pool: &PgPool, company: Uuid, slug: &str) -> PrincipalId {
     let agent = Uuid::new_v4();
     sqlx::query(
@@ -135,12 +187,14 @@ impl Departments {
         let stranger = user(&pool, "stranger").await;
         let foreign_owner = user(&pool, "foreign").await;
         let (foreign_company, foreign_principal) = company(&pool, foreign_owner).await;
+        let departments = PostgresDepartments::new(persistence.clone(), provisioning_templates());
         Self {
             use_cases: DepartmentUseCases::new(
                 Arc::new(persistence.clone()),
-                Arc::new(persistence.clone()),
+                Arc::new(departments.clone()),
             ),
-            agent_principal: agent_principal(&pool, company_id, "worker").await,
+            departments,
+            agent_principal: company_agent(&persistence, company_id, owner, "worker").await,
             external_principal: bare_principal(&pool, company_id, "external").await,
             system_principal: bare_principal(&pool, company_id, "system").await,
             persistence,
@@ -198,15 +252,36 @@ impl Departments {
             .await
     }
 
+    /// The department's own desk, as its `department:{id}` record names it (01DEP-P03-D8).
+    async fn desk_of(&self, department: DepartmentId) -> Uuid {
+        sqlx::query_scalar(
+            "SELECT (result->'channel'->>'id')::uuid FROM workflow_provisioning_commands \
+             WHERE company_id = $1 AND command_key = $2",
+        )
+        .bind(self.company)
+        .bind(format!("department:{department}"))
+        .fetch_one(self.pool())
+        .await
+        .expect("the department's desk is recorded")
+    }
+
+    /// Delete the department's own plain desk, which a department delete waits for (decision 9).
+    async fn drop_desk(&self, department: DepartmentId) {
+        use crate::application::ports::channel::ChannelPersistence;
+        ChannelPersistence::delete(&self.persistence, self.desk_of(department).await)
+            .await
+            .expect("a plain department desk deletes");
+    }
+
     async fn roles(&self, department: DepartmentId) -> Vec<DepartmentRoleHolder> {
-        self.persistence
+        self.departments
             .roles(CompanyId::new(self.company), department)
             .await
             .unwrap()
     }
 
     async fn members(&self, department: DepartmentId) -> Vec<PrincipalId> {
-        self.persistence
+        self.departments
             .members(CompanyId::new(self.company), department)
             .await
             .unwrap()
@@ -334,7 +409,7 @@ async fn department_write_round_trips_create_rename_reparent_and_delete() {
     let moved = f.reparent(care.id, Some(support.id)).await.unwrap();
     assert_eq!(moved.parent_id, Some(support.id));
     let read = f
-        .persistence
+        .departments
         .get(CompanyId::new(f.company), care.id)
         .await
         .unwrap()
@@ -343,12 +418,14 @@ async fn department_write_round_trips_create_rename_reparent_and_delete() {
     let rooted = f.reparent(care.id, None).await.unwrap();
     assert_eq!(rooted.parent_id, None);
 
+    // Its own desk goes first: a department owning a desk is not deleted (decision 9).
+    f.drop_desk(care.id).await;
     f.use_cases
         .delete_department(f.owner, f.company, care.id)
         .await
         .unwrap();
     assert!(
-        f.persistence
+        f.departments
             .get(CompanyId::new(f.company), care.id)
             .await
             .unwrap()
@@ -486,7 +563,7 @@ async fn department_write_assigns_replaces_and_clears_the_lead() {
         .unwrap();
     assert!(f.roles(department.id).await.is_empty());
     assert_eq!(
-        f.persistence
+        f.departments
             .roles_held(CompanyId::new(f.company), f.member_principal)
             .await
             .unwrap(),
@@ -512,7 +589,7 @@ async fn department_write_adds_and_removes_members() {
     expected.sort();
     assert_eq!(members, expected);
     assert_eq!(
-        f.persistence
+        f.departments
             .memberships(CompanyId::new(f.company), f.agent_principal)
             .await
             .unwrap(),
@@ -728,7 +805,7 @@ async fn department_write_refuses_members_and_strangers_with_not_found() {
         .await;
     assert!(matches!(read, Err(AppError::NotFound(_))), "{read:?}");
     assert!(
-        f.persistence
+        f.departments
             .get(CompanyId::new(f.foreign_company), foreign)
             .await
             .unwrap()
@@ -736,7 +813,7 @@ async fn department_write_refuses_members_and_strangers_with_not_found() {
         "nothing happened to the foreign department"
     );
     assert_eq!(
-        f.persistence
+        f.departments
             .get(CompanyId::new(f.company), department.id)
             .await
             .unwrap()
@@ -837,7 +914,7 @@ async fn department_write_persistence_reauthorizes_every_write_under_the_lock() 
         .await
         .unwrap();
     let before = (
-        f.persistence
+        f.departments
             .list_by_company(CompanyId::new(f.company))
             .await
             .unwrap(),
@@ -849,7 +926,7 @@ async fn department_write_persistence_reauthorizes_every_write_under_the_lock() 
             actor: WorkflowActor::authenticated(user).unwrap(),
             company: CompanyId::new(f.company),
         };
-        let p = &f.persistence;
+        let p = &f.departments;
         let results: Vec<AppResult<()>> = vec![
             p.create(scope, f.write("Sneaky", None), None)
                 .await
@@ -888,7 +965,7 @@ async fn department_write_persistence_reauthorizes_every_write_under_the_lock() 
         }
     }
     let after = (
-        f.persistence
+        f.departments
             .list_by_company(CompanyId::new(f.company))
             .await
             .unwrap(),
@@ -917,7 +994,8 @@ async fn department_write_removing_a_teammate_or_deleting_an_agent_leaves_their_
         )
         .await
         .unwrap();
-    for principal in [f.member_principal, f.agent_principal] {
+    let unpublished = agent_principal(f.pool(), f.company, "draft-only").await;
+    for principal in [f.member_principal, unpublished] {
         f.use_cases
             .add_member(f.owner, f.company, department.id, principal)
             .await
@@ -926,14 +1004,14 @@ async fn department_write_removing_a_teammate_or_deleting_an_agent_leaves_their_
     CompanyInvitePersistence::remove_member(&f.persistence, f.company, f.member)
         .await
         .expect("the member is removed from the company");
-    assert_eq!(f.members(department.id).await, vec![f.agent_principal]);
+    assert_eq!(f.members(department.id).await, vec![unpublished]);
     assert!(
         f.roles(department.id).await.is_empty(),
         "the lead left with them"
     );
 
     let agent: Uuid = sqlx::query_scalar("SELECT agent_id FROM principals WHERE id = $1")
-        .bind(f.agent_principal.as_uuid())
+        .bind(unpublished.as_uuid())
         .fetch_one(f.pool())
         .await
         .unwrap();
@@ -954,3 +1032,6 @@ mod desks;
 
 #[path = "department_agent_desks_tests.rs"]
 mod agent_desks;
+
+#[path = "department_lead_desk_tests.rs"]
+mod lead_desks;

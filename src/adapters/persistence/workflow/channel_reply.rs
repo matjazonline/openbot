@@ -44,7 +44,7 @@ impl SettingsRow {
     }
 }
 
-async fn settings_on(
+pub(super) async fn settings_on(
     db: &mut PgConnection,
     company: CompanyId,
     channel: RelatedChannelId,
@@ -88,18 +88,7 @@ pub(super) async fn bootstrap_native_on(
         responder: Some(ConfigureResponder {
             binding,
             expected_binding_revision: binding_state.revision,
-            contract: ChannelReplyContract {
-                format_version: 1,
-                subject: ReplyText::Literal {
-                    literal: "Response".into(),
-                },
-                body: ReplyText::Reference {
-                    r#ref: "/input/body"
-                        .to_owned()
-                        .try_into()
-                        .expect("native response reference"),
-                },
-            },
+            contract: native_contract(),
         }),
         approval_policy: None,
     };
@@ -131,35 +120,63 @@ impl ChannelReplies for PostgresPersistence {
         request: ConfigureChannelReply,
     ) -> AppResult<ChannelReplySettings> {
         let mut tx = self.pool.begin().await?;
-        lock_settings_accounts(&mut tx, &request).await?;
-        authorize_settings(&mut tx, request.company, request.channel, request.actor).await?;
-        sqlx::query("SELECT id FROM channels WHERE company_id=$1 AND id=$2 FOR UPDATE")
-            .bind(request.company.as_uuid())
-            .bind(request.channel.as_uuid())
-            .fetch_optional(&mut *tx)
-            .await?
-            .ok_or_else(missing)?;
-        let current = settings_on(&mut tx, request.company, request.channel).await?;
-        if current.as_ref().map(|value| value.revision) != request.expected {
-            return Err(conflict());
-        }
-        let responder = selected_on(&mut tx, &request).await?;
-        validate_reviewers(&mut tx, &request).await?;
-        let next = request
-            .expected
-            .map_or(0, ReplySettingsRevision::get)
-            .checked_add(1)
-            .ok_or_else(conflict)?;
-        let state = ChannelReplySettings {
-            revision: ReplySettingsRevision::try_from(next).map_err(|_| conflict())?,
-            responder,
-            approval_policy: request.approval_policy.clone(),
-        };
-        write_settings(&mut tx, &request, &state).await?;
+        let state = configure_reply_on(&mut tx, &request).await?;
         tx.commit().await?;
-        tracing::info!(company=%request.company.as_uuid(),channel=%request.channel.as_uuid(),
-            revision=next,"Channel responder configured");
         Ok(state)
+    }
+}
+
+/// One responder configuration on the caller's transaction: the accounts it names, the channel
+/// row, the expected revision, the selection and reviewer checks, then the write.
+/// `configure_channel_reply` and a department desk following its lead (01DEP-P03-D9) both
+/// configure through it.
+pub(super) async fn configure_reply_on(
+    tx: &mut Transaction<'_, Postgres>,
+    request: &ConfigureChannelReply,
+) -> AppResult<ChannelReplySettings> {
+    lock_settings_accounts(tx, request).await?;
+    authorize_settings(tx, request.company, request.channel, request.actor).await?;
+    sqlx::query("SELECT id FROM channels WHERE company_id=$1 AND id=$2 FOR UPDATE")
+        .bind(request.company.as_uuid())
+        .bind(request.channel.as_uuid())
+        .fetch_optional(&mut **tx)
+        .await?
+        .ok_or_else(missing)?;
+    let current = settings_on(tx, request.company, request.channel).await?;
+    if current.as_ref().map(|value| value.revision) != request.expected {
+        return Err(conflict());
+    }
+    let responder = selected_on(tx, request).await?;
+    validate_reviewers(tx, request).await?;
+    let next = request
+        .expected
+        .map_or(0, ReplySettingsRevision::get)
+        .checked_add(1)
+        .ok_or_else(conflict)?;
+    let state = ChannelReplySettings {
+        revision: ReplySettingsRevision::try_from(next).map_err(|_| conflict())?,
+        responder,
+        approval_policy: request.approval_policy.clone(),
+    };
+    write_settings(tx, request, &state).await?;
+    tracing::info!(company=%request.company.as_uuid(),channel=%request.channel.as_uuid(),
+        revision=next,"Channel responder configured");
+    Ok(state)
+}
+
+/// The reply a provisioned native workflow sends: its body, under the subject "Response".
+pub(super) fn native_contract() -> ChannelReplyContract {
+    ChannelReplyContract {
+        format_version: 1,
+        subject: ReplyText::Literal {
+            literal: "Response".into(),
+        },
+        body: ReplyText::Reference {
+            r#ref: "/input/body"
+                .to_owned()
+                .try_into()
+                .expect("native response reference"),
+        },
     }
 }
 

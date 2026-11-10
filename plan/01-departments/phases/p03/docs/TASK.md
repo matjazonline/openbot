@@ -314,6 +314,267 @@ Checks (TEST_DATABASE_URL `openbot_dept_p03_test`, SQLX_OFFLINE, 4 threads):
 | clippy `--lib --tests` and `--lib --bins` `-D warnings`; `fmt --check` | clean | (inline) |
 | test names HEAD vs tree | same 4 removed (accounted), 24 added | `logs/B1-R2-test-names.txt` |
 
+## Architecture gate B2 — decisions (revision r4, 2026-11-10)
+
+Plan 03B; README decisions 4, 8, 9, 12; coordination C001/C002 unaffected. Builds on accepted B1
+(`523732b7`: `create_company_agent_on`, `place_in_department_on`/`write_placement_on`,
+`Provisioning.agent_slug`). r1 preserved in `logs/gate-B2-r1.md`, r2 in `logs/gate-B2-r2.md`;
+r2 answers `01DEP-P03-G2-F1..F7`; r3 (root, before the G2-R2 verdict) moves the desk effect back
+after the grant sync -- see D9 "Where"; r3 is in `logs/gate-B2-r3.md`; r4 answers G2-F2 (residual),
+G2-F8 and G2-F9.
+
+Plan/code mismatches recorded here (F5): the plan's "Builder edit path (`apply`,
+`provisioning.rs:192`)" does not exist -- `apply` only lists and creates -- so re-pointing is new
+code over existing publication/binding primitives; the agent step is `REPLY_AGENT_STEP = "draft"`
+(not `reply`); `AssistantAgent::Existing` no longer exists (B1: `Provisioning.agent_slug`); plan
+03B.2 marks a person-lead desk by `department_id` + slug equality, which a slug edit breaks, so
+both desks are marked by the `department:{id}` command row instead (D8; no new column or trigger,
+as 03B.2 requires).
+
+### DEP-P03-D7 Templates and actor reach department writes (r2, unchanged in substance)
+- `create_department_on`, `create_department_with_id_on`, `assign_department_role_on`,
+  `clear_department_role_on`, `place_in_department_on` (and `write_placement_on`) take
+  `templates: &ProvisioningDeployment` and `actor: WorkflowActor`. The actor is the account whose
+  row the caller holds `FOR SHARE` and who is authorized under the company lock on every path
+  (department routes via `begin_department_write`, company-agent creation, onboarding session,
+  Builder action transaction).
+- `DepartmentPersistence` moves from `PostgresPersistence` to `PostgresDepartments { persistence,
+  templates }` (persistence/department.rs), built by `WorkflowServices::departments()` and passed
+  to `DepartmentUseCases::new` in setup; reads delegate unchanged. Tests construct it with
+  `test_support::provisioning_templates()`.
+
+### DEP-P03-D8 The department desk at creation, and its record (r2)
+- After the department row, in the same transaction, before any role write:
+  - lead is an agent principal → `assistant_channel_on(agent slug, "department:{id}",
+    slug/name = the department's, Autonomous)` (it writes the `department:{id}` command row with
+    the desk, workflow and binding ids); refusal → AppError (Conflict/BadRequest/NotFound), caller
+    rolls back; then `set_desk_ownership_on(desk, department_id = id, members_only = false)`.
+  - lead is a person or none → a plain team desk through the owned-desk create sequence
+    `channel.rs` `create` uses (F7): `prelock_ownership_on` → `insert_channel_row_on` (company
+    `add_3rd_party` default, enabled, ownership `{department, members_only: false}`) →
+    `insert_channel_slugs` → `write_channel_email_binding` → `sync_desk_grants_on`; a taken
+    address is pre-checked on `channel_slugs` → `Conflict("The address '{slug}' is already used by
+    a desk in this company")` (a unique violation also maps to Conflict). Then D8 writes the
+    `department:{id}` command row itself: digest over `{department, desk}`, actor = the actor,
+    result `{"channel": {"id", "slug", "address"}, "binding_id": null}`.
+- **The record (F4):** `workflow_provisioning_commands (company, 'department:{id}')` is the one
+  marker of the department desk and of the binding D8/D9 own: `result.channel.id` = the desk,
+  `result.binding_id` = the owned binding or null. D9 updates `result.binding_id` when it
+  provisions one (case 2). Desk identity = that channel while it exists and still has
+  `department_id = id`; otherwise none (detached or deleted -- later role changes touch no desk).
+  A department slug or name edit never renames or loses the desk. The table comment lists
+  `agent:{agent_id}` and `department:{id}`.
+- Lock order: company (held) → parent `FOR SHARE` → new department row → desk rows (new; the
+  agent lead's row `FOR UPDATE` via publication; the new desk's gate, uncontended) → the role
+  write (D9 then finds the owned binding already answering that agent: no change) → principals →
+  one sorted gate acquisition → rows.
+- Every create path gets a desk: routes/use case, onboarding's first department (its address can
+  collide with an agent's slug or desk → `Conflict` → `Rejected`, nothing committed; a replay
+  finds the department and its desk), and tests/fixtures that create departments.
+
+### DEP-P03-D9 Re-leading (r2)
+- **Where (F1, r3):** inside `write_placement_on` (role `lead`) and `clear_department_role_on`
+  (`lead`), **after the grant sync**. Sequence: account(actor) `FOR SHARE` → company →
+  department row `FOR UPDATE` → principals `FOR KEY SHARE` sorted → member and role rows → one
+  sorted gate acquisition → the reached members-only desks' channel rows `FOR UPDATE` → [desk
+  effect, in procedure order (F9): the lead agent row `FOR UPDATE` (publication) → workflow
+  draft/version rows → binding head/revision rows → the department desk's channel row `FOR UPDATE`
+  (re-entrant when it is members-only and reached) → its reply settings row; **the only account
+  it authorizes or locks is the actor's, already held** (r4: see "Run-as")].
+  - Why not before the sync (r2): the reply-settings write locks the department desk's channel
+    row `FOR UPDATE`. When that desk is members-only it is in the sync's reach, so the row would be
+    held before its gate: an inbound admission holding the gate shared and waiting on the row (its
+    message insert's FK lock), or a demotion holding a principal and updating the row, would close
+    a cycle with the sync waiting on that gate or principal.
+  - Why after is safe: G2-F1's cycle needed D9 to lock another account (a stored run-as or a
+    reviewer) after the principals; r2/r3 make the run-as the actor and refuse desks with an
+    approval policy, so D9 takes no account lock it does not already hold. Its channel row and
+    reply-settings locks follow the sync's row locks (same direction as every channel edit); the
+    lead agent row and workflow/binding rows are taken only by writers under the company lock,
+    which this transaction holds. Cost: the reached desks' gates are held through the re-point's
+    compile and publication (milliseconds; admissions into those desks wait, then re-check their
+    revision) -- the B1-F5 exception, stated here.
+- **What (F4):** the owned binding B = `department:{id}` `result.binding_id`; the selected
+  responder S = the desk's reply settings binding. D9 acts only when the desired state differs:
+  - new lead is an agent A:
+    - B exists, S ∈ {B, none}: if B is active, S = B and B's bound version already runs A → no
+      change. Otherwise re-point B to A if its version runs another agent (below), activate B if
+      paused, select B (F6: a paused B is reused, no new binding);
+    - B null, S none: provision the autonomous workflow and binding on the desk
+      (`provision_workflow_on` for an existing channel, key
+      `ProvisioningKey::command(company, "department:{id}")`, run-as = actor), select it
+      (bootstrap when no settings row, else `configure_reply_on`), record `binding_id`;
+    - S is a binding other than B (a user chose the responder) → no desk change.
+  - new lead is a person, or the role is cleared (F9): B active → deactivate B (a Deactivate
+    change re-authorizes no one), and when S = B also clear the selection (`configure_reply_on`,
+    responder `None`; a selected inactive responder makes every inbound message a visible
+    refusal). B already inactive, or no B → no desk change. A user's own responder S ≠ B is never
+    paused or cleared; person→person and person→none change nothing.
+- **Re-point (F3, F8):** the source re-targeted is **B's bound version's** source
+  (`retarget_agent(REPLY_AGENT_STEP = "draft", slug)`), never the current draft blindly: if the
+  workflow's current draft **source** differs from the bound version's source (unpublished edits;
+  revision numbers are not compared, so re-saving the bound content clears it) → refuse
+  `BadRequest("The department desk's workflow has edits its desk does not run; publish them and
+  bind the desk to the new version, or restore the bound version's content, before changing the
+  lead.")`. Otherwise save the retargeted source as the next draft
+  (`save_draft_on`, factored out of `save_draft`), compile/capture with `compiled`, publish a new
+  version (`provisioned_publication` + `publish_on`), `publish_initial_on(A)` first; reconfigure
+  B (configuration revision + 1, same params and trigger, run-as = actor, same active flag; new
+  `provisioned_reconfiguration` beside `provisioned_binding`), then activate if paused, then select
+  with the settings' current contract (`configure_reply_on`, factored out of
+  `configure_channel_reply`).
+- **Run-as and refusals (F2):** B's run-as becomes the actor: attribution of the department desk's
+  answers moves to whoever made the lead change (as for any binding reconfigured by an admin).
+  **r4 (residual):** an Activate change keeps the stored configuration (run-as included) and
+  `check_run_as`, `selected_on` and `lock_settings_accounts` all authorize or lock the binding's
+  stored run-as. So before **any** activation or selection of B, if B's stored run-as ≠ the actor,
+  B is first reconfigured (configuration revision + 1, the same bound version -- or the re-pointed
+  one -- same params and trigger, run-as = actor, same active flag). Then every authorization D9
+  causes names the actor only. (Deactivation and clearing the selection authorize no stored
+  run-as.)
+  Worded outcomes, each refusing the whole role change:
+  - the bound workflow has no `draft` agent step → `BadRequest("The department desk's workflow
+    has no agent reply step to hand to the new lead; edit its workflow or detach the desk
+    first.")`;
+  - its bound version declares resource slots → `BadRequest("The department desk's workflow
+    uses resources; change its lead in the workflow editor or detach the desk first.")`;
+  - the desk's reply settings carry an approval policy → `BadRequest("The department desk asks
+    reviewers to approve replies; remove that policy or detach the desk before changing the
+    lead.")` (this keeps D9 from authorizing other accounts under these locks, F1);
+  - the actor cannot see the desk (a members-only department desk without a grant, non-owner) →
+    `NotFound` from association is mapped to `BadRequest("You cannot see the department desk
+    '{slug}', so its replies cannot follow the new lead.")`;
+  - unpublished edits (above).
+- Failure: any error aborts the transaction (route → status; company-agent creation as lead →
+  whole creation refused; Builder → tool error per D5).
+
+### Verification plan B2 (`department_desk_`, `department_desk_competing_`)
+| Criterion | Assertion |
+| --- | --- |
+| 03B.1 agent lead | one desk at dept slug/name, `department_id` = dept, members_only false, published autonomous workflow on the lead, active binding, `department:{id}` row naming desk and binding |
+| 03B.1 person/no lead | team desk at slug, `department_id` set, `department:{id}` row with `binding_id` null, no workflow/binding |
+| 03B.1 refusal | taken address → Conflict; no department, desk, workflow, binding, role, command |
+| onboarding (F7) | onboarding's department gets its desk; slug colliding with the agent → Rejected, nothing; replay → same department and desk |
+| 03B.2 identity | department slug/name edit keeps the desk; detached/deleted desk → role change touches no desk |
+| agent→agent | same binding id, configuration revision + 1, new version whose `draft` step names the new agent, run-as = actor; settings select it; e2e: a scripted message to the department desk answered by the current lead before and after |
+| agent→person / cleared | B inactive, selection cleared; a message is stored with no refusal outcome |
+| person→agent | (plain desk) workflow + active binding provisioned, selected, `binding_id` recorded; e2e answered (F7) |
+| agent→person→agent | B re-pointed if needed, reactivated and reselected; no second binding (F6) |
+| run-as moves (G2-F2 r4) | A (set by admin X) → person → A (set by admin Y) after X lost admin: succeeds; B run-as = Y, active, selected |
+| lead not an agent, B active but unselected (F9) | B deactivated; selection untouched |
+| draft edits (F8) | draft source ≠ bound source → refused; after re-saving the bound content (revision moved, source equal) → re-lead succeeds |
+| user's own responder | S ≠ B: lead changes leave S and B untouched |
+| unpublished edits / no draft step / resources / approval policy / invisible desk | each refused with its message; nothing changed (role, binding, settings, versions) |
+| agent created as lead (B1 D1 + D9) | its own desk and the department desk both answered by it |
+| competing | two concurrent lead changes of one department (company lock): final responder = last writer, one active binding; a lead change racing an admission into a reached members-only desk takes its gates once (as B1-F1) |
+| delete | department with its desk → refused; after the desk is deleted or detached → ok |
+
+### Contract impact B2 (F5)
+| Changed contract | Producers / consumers | Disposition |
+| --- | --- | --- |
+| department create also creates its desk | department routes/use case, UI (phase 04), onboarding, p01/p02 tests and fixtures creating departments | all create a desk; tests asserting desk counts updated; slug collisions with existing desks/agents now Conflict |
+| department delete | every department now owns its desk → delete refused until the desk is detached/deleted (p02 rule) | p01/p02 delete tests detach or delete the desk first |
+| `_on` signatures (templates, actor) | `company_agent.rs`, Builder `provisioning_builder.rs`, onboarding session, department persistence | updated |
+| `DepartmentPersistence` construction | `infra/setup/accounts.rs`, route tests, persistence tests | `PostgresDepartments` |
+| `workflow_provisioning_commands` comment | init schema | lists `department:{id}` (DB reset) |
+| binding run-as on re-lead | department desk binding audit/attribution | moves to the actor (documented) |
+
+## B2 implementation (artifact `8fd91d04…5c9b`, base `523732b7`)
+
+Full digest `8fd91d0452986625ad448afcdbe382b456c75bcaeaa9cddef117523947535c9b`; exclusions as B1.
+
+- **D7** `PostgresDepartments { persistence, templates }` (department.rs) implements
+  `DepartmentPersistence`; `WorkflowServices::departments()`; setup wires it. `create_department_on`,
+  `create_department_with_id_on`, `assign_department_role_on`, `clear_department_role_on`,
+  `place_in_department_on` take `templates` + `actor`; `write_placement_on` is unchanged and the
+  lead effect runs after it (`follow_lead_on`). `delete_department_on` also deletes the
+  `department:{id}` record. p02's `expect(dead_code)` on `set_desk_ownership_on` removed.
+- **D8/D9** `src/adapters/persistence/workflow/provisioning_department.rs` (submodule of
+  provisioning): `department_desk_key`, `provision_department_desk_on` (agent lead →
+  `assistant_channel_on("department:{id}")` + `set_desk_ownership_on`; else plain desk in a
+  savepoint: prelock → insert row/slugs/email → `sync_desk_grants_on`, taken → Conflict, record
+  with `binding_id: null`), `follow_department_lead_on` (record → owned B, selected S; person/none
+  → deactivate active B, unselect when S = B; agent → leave a user's S, provision on a plain desk
+  (`provision_workflow_on(select = settings absent)` + select + record), or re-point
+  (`repoint_on`: bound source, draft-source check, `retarget_agent("draft")`, `save_draft_on`,
+  `compiled`, `publish_on`, `provisioned_reconfiguration`), reconfigure to run as the actor,
+  activate, select (`select_on`: bootstrap or `configure_reply_on`); `guard_on` refuses approval
+  policies and maps only the explicit association `NotFound`).
+- Factorings: `save_draft_on` (definitions.rs), `configure_reply_on` + `native_contract`
+  (channel_reply.rs; `settings_on` pub(super)), `provisioned_reconfiguration` +
+  `provisioned_activation` (lifecycle/provisioned.rs), `provision_workflow_on`/`provision_binding_on`
+  take `select`. Recorded in plan 03B item 4.
+- Callers: D1 (`company_agent.rs`), Builder, onboarding (department create + first placement)
+  pass templates/actor. Init schema: the commands table comment names `department:{id}` and that
+  the row is updated (DB reset).
+- Test fixture: `Departments.worker` is now a real company agent (`company_agent`, published, own
+  desk); `agent_principal` (bare) kept for the agent-delete test; `desk_of`/`drop_desk` helpers.
+
+### Verification mapping B2 (actual)
+
+| Criterion | Test (decisive assertion) |
+| --- | --- |
+| 03B.1 agent lead | `department_desk_with_an_agent_lead_answers_on_it` (desk slug/name/department/members_only false; binding active rev 1 run-as owner, `draft` = worker; selected) |
+| 03B.1 person/none | `department_desk_with_a_person_lead_or_none_is_a_plain_team_desk` (record binding null; no bindings; no settings) |
+| 03B.1 refusal | `department_desk_taken_address_refuses_the_department` (Conflict for agent/person/no lead; department, role, channel, command, binding counts unchanged) |
+| onboarding (F7) | `department_desk_onboarding_address_collision_with_an_agent_is_rejected` (Rejected, totals 0); `agent_default_desk_onboarding_creates_and_replays_the_first_department` (desk counted, replay stable) |
+| 03B.2 identity | `department_desk_survives_a_rename_and_is_left_once_detached` (desk keeps address; follows after rename; detached → untouched) |
+| agent→agent | `department_desk_agent_to_agent_repoints_the_same_binding` (same binding, config rev 2, run-as admin, `draft` = closer, selected at rev 2, 1 binding; repeat → no change) |
+| person/agent cycles (F6, F9) | `department_desk_follows_person_and_agent_leads_with_one_binding` (pause + unselect; reactivate + reselect, 1 binding; plain desk provision + record; unselected active B paused on clear) |
+| run-as moves (G2-F2) | `department_desk_run_as_moves_to_the_admin_who_changes_the_lead` (admin X removed; admin Y re-leads; active, run-as Y) |
+| refusals (F3, F8) | `department_desk_refuses_lead_changes_it_cannot_follow` (draft edits → refused, nothing changed; restored content → re-lead ok; approval policy → refused; members-only desk, admin without grant → refused) |
+| agent created as lead | `department_desk_follows_an_agent_created_as_its_lead` |
+| delete | `department_desk_blocks_deleting_its_department_until_detached` (refused, detach → deleted, record gone) |
+| competing | `department_desk_competing_lead_changes_leave_the_holders_agent_answering` (2 blocked on company lock; both apply; 1 binding; active on the holder's agent) |
+| e2e | `department_desk_answers_through_its_current_lead` (person → agent A → agent B; scripted messages answered; `agent_history_exchanges` = [A, B]) |
+
+Stand-in gaps: no test drives a workflow without a `draft` step or with resource slots (both
+need a hand-built bound version); those refusals are covered by code review only. No test makes a
+user's own responder S ≠ B (needs a second binding on the desk); the "S ≠ B → no change" branch is
+covered by code review only.
+
+### Checks B2 (`openbot_dept_p03_test` recreated after the comment edit; SQLX_OFFLINE; 4 threads)
+
+| Command | Result | Log |
+| --- | --- | --- |
+| `--list` `department_desk_ agent_default_desk` | 53 (30 `department_desk_`, 4 `competing_` incl. p02's) | `logs/B2-test-inventory.txt` |
+| `department onboarding agent_default_desk` (first) | FAIL 7 (expected: raw fixture agent cannot lead; every department owns its desk; counts), fixed | `logs/B2-first-run.txt` |
+| `department_desk_ agent_default_desk` (final) | 53 passed | `logs/B2-focused-final.txt` |
+| affected: `department onboarding provisioning channel_reply definition binding assistant_channel desk_wording authorization routes::workflows agent_default_desk use_cases::agent routes::agent skill_tests member_removal user_deletion removed_membership template builtin_agent_library response_schema` | 686 passed, 1 ignored | `logs/B2-affected-1.txt` |
+| e2e (after extending it to person → agent → agent) | passed | `logs/B2-e2e-2.txt` |
+| clippy `--lib --tests` / `--lib --bins` `-D warnings`; `fmt --check` | clean | (inline) |
+| test names since 523732b7 | none removed | `logs/B2-test-names.txt` |
+
+`B2-affected-1` ran before the e2e test was extended (test-only change, re-run alone).
+
+## B2 corrections for 01DEP-P03-B2-R1 (artifact `31d16940…39ea`)
+
+Full digest `31d169402e1d795115670b31b6399674904c1f0d41463afb0bdbe0c1378139ea`, same exclusions.
+
+- **F1**: B2 tests renamed to the plan's `department_lead_desk_` / `department_lead_desk_competing_`
+  (14 / 1; the p02 `department_desk_*` tests are no longer selected by them). The mapping above
+  reads with the new prefix.
+- **F2**: `own_desk` (agent:{id} desk, binding state, selection) asserted unchanged across creation
+  as lead (`…_with_an_agent_lead_answers_on_it`), agent→agent for both leads
+  (`…_agent_to_agent_repoints_the_same_binding`), agent→person→agent
+  (`…_follows_person_and_agent_leads_with_one_binding`); an agent created as lead keeps its own
+  desk and binding, active and selected (`…_follows_an_agent_created_as_its_lead`).
+- **F3**: `department_lead_desk_leaves_a_users_own_responder_alone`: a user's own binding (same
+  version, configured and activated through `BindingService`, selected with
+  `configure_channel_reply`) stays selected and unchanged through agent→agent and agent→person;
+  the owned binding is unchanged by agent→agent and paused by agent→person.
+- **F4 (optional, done)**: the pause path deactivates B before clearing the selection (binding
+  rows, then desk row and settings, as the gate's lock list).
+- Remaining stand-in gaps: no-`draft`-step and resource-slot refusals (code review, accepted by B).
+
+| Command | Result | Log |
+| --- | --- | --- |
+| `cargo test … department_lead_desk` | 14 passed | `logs/B2-R2-lead-desk-1.txt` |
+| `--list department_lead_desk agent_default_desk` | 14 + 23 | `logs/B2-R2-test-inventory.txt` |
+| `-- department onboarding provisioning channel_reply agent_default_desk department_lead_desk binding` | 502 passed | `logs/B2-R2-affected.txt` |
+| clippy `--lib --tests -D warnings`, `fmt --check` | clean | (inline) |
+| test names since 523732b7 | none removed | `logs/B2-R2-test-names.txt` |
+
 ## Status
 
 - 2026-11-10: p03 started from 9291fcd5; B1 gate r1 written, awaiting B.
@@ -332,3 +593,18 @@ Checks (TEST_DATABASE_URL `openbot_dept_p03_test`, SQLX_OFFLINE, 4 threads):
   addressed; artifact a75c40e7…5798; recheck 01DEP-P03-B1-R2 requested.
 - 2026-11-10: B1-R2 **PASS** at a75c40e7…5798; root recomputed digest, coordination r3 unchanged,
   manifest valid. **B1 accepted in phase**; committed locally.
+- 2026-11-10: B2 gate r1 (DEP-P03-D7..D9) written; G2-R1 requested.
+- 2026-11-10: G2-R1 changes required (F1–F4 Medium, F5 Low, F6/F7 optional). r2 written: desk effect
+  before principals/gates with full sequence; run-as = actor and worded refusals; re-point from the
+  bound version, refuse unpublished edits; owned binding recorded in `department:{id}` for both
+  desks; contract impact; F6 reuse paused binding; F7 rows. Awaiting G2-R2.
+- 2026-11-10: G2-R2 (against r3): r3 ordering confirmed; G2-F2 residual + G2-F8 open, F9 optional.
+  r4: reconfigure B to run as the actor before any activation/selection; compare draft source with
+  the bound version's; worded remedy; F9 deactivate active B when the lead is not an agent; lock
+  list in procedure order. Awaiting G2-R3.
+- 2026-11-10: G2-R3 PASS (r4). B2 implemented; artifact 8fd91d04…5c9b; batch review 01DEP-P03-B2-R1
+  requested.
+- 2026-11-10: B2-R1 changes required (F1–F3 Low, F4 optional); all four addressed; artifact
+  31d16940…39ea; recheck 01DEP-P03-B2-R2 requested.
+- 2026-11-10: B2-R2 **PASS** at 31d16940…39ea; root recomputed digest, coordination r3 unchanged,
+  manifest valid. **B2 accepted in phase**; committed locally.

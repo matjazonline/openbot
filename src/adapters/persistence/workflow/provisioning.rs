@@ -10,7 +10,12 @@ mod agent;
 use agent::provision_agent_on;
 #[path = "provisioning_builder.rs"]
 mod builder;
+#[path = "provisioning_department.rs"]
+mod department;
 use builder::create_agent_channel_on;
+pub(crate) use department::{
+    department_desk_key, follow_department_lead_on, provision_department_desk_on,
+};
 #[path = "provisioning_native.rs"]
 mod native;
 pub(crate) use native::ProvisionedAssistant;

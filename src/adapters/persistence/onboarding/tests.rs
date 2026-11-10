@@ -840,7 +840,7 @@ async fn agent_default_desk_onboarding_creates_and_replays_the_first_department(
         created[0].agent.id,
     )];
     assert_eq!(placements().await, placed);
-    assert_eq!(f.totals().await, (2, 2, 2));
+    assert_eq!(f.totals().await, (2, 3, 3));
     for name in ["Customer Care", "Renamed Care"] {
         let replayed = completed(
             f.service
@@ -851,7 +851,7 @@ async fn agent_default_desk_onboarding_creates_and_replays_the_first_department(
         .unwrap();
         assert_eq!(ids(&replayed), ids(&created));
         assert_eq!(placements().await, placed);
-        assert_eq!(f.totals().await, (2, 2, 2));
+        assert_eq!(f.totals().await, (2, 3, 3));
     }
     let departments: i64 =
         sqlx::query_scalar("SELECT count(*) FROM departments WHERE company_id = $1")
@@ -876,7 +876,7 @@ async fn agent_default_desk_onboarding_creates_and_replays_the_first_department(
             .unwrap(),
     );
     assert!(matches!(taken, Err(AppError::BadRequest(_))), "{taken:?}");
-    assert_eq!(f.totals().await, (2, 2, 2));
+    assert_eq!(f.totals().await, (2, 3, 3));
 }
 
 /// D4, F3: with no model connection (none exists without a key), onboarding is refused and
@@ -950,5 +950,30 @@ async fn agent_default_desk_onboarding_names_the_department_on_a_resubmission() 
     .await
     .unwrap();
     assert_eq!(placed, [("support".to_owned(), first[0].agent.id)]);
-    assert_eq!(f.totals().await, (1, 1, 1));
+    assert_eq!(f.totals().await, (1, 2, 2));
+}
+
+/// 01DEP-P03-D8 in onboarding: the named department's desk takes its address first, so an agent
+/// whose own desk would take the same address refuses the submission, and nothing is committed.
+#[tokio::test]
+async fn department_lead_desk_onboarding_address_collision_with_an_agent_is_rejected() {
+    let f = Fixture::new(false).await;
+    let library = f.library("desk", "Desk").await;
+    let outcome = f
+        .service
+        .onboard(
+            f.owner,
+            f.company,
+            OnboardingSubmission {
+                department_name: Some("Desk".into()),
+                ..f.submission(Uuid::new_v4(), &[library], false)
+            },
+        )
+        .await
+        .unwrap();
+    assert!(
+        matches!(&outcome, OnboardingOutcome::Rejected(message) if message.contains("'desk'")),
+        "{outcome:?}"
+    );
+    assert_eq!(f.totals().await, (0, 0, 0));
 }

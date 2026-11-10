@@ -79,7 +79,9 @@ pub(super) async fn provision_on(
     write_channel_email_binding(tx, company.as_uuid(), channel_id, &channel).await?;
 
     let native =
-        match provision_workflow_on(tx, templates, provisioning, &agent_slug, channel_id).await? {
+        match provision_workflow_on(tx, templates, provisioning, &agent_slug, channel_id, true)
+            .await?
+        {
             Ok(created) => created,
             Err(refusal) => return Ok(Err(refusal)),
         };
@@ -102,12 +104,16 @@ pub(super) async fn provision_on(
     }))
 }
 
-async fn provision_workflow_on(
+/// The reply-mode workflow on `agent_slug`, published, and its active binding on `channel_id`;
+/// with `select`, also the channel's first reply settings selecting it. A department desk that
+/// already has reply settings selects it itself (01DEP-P03-D9).
+pub(super) async fn provision_workflow_on(
     tx: &mut Transaction<'_, Postgres>,
     templates: &ProvisioningDeployment,
     provisioning: &Provisioning,
     agent_slug: &str,
     channel_id: Uuid,
+    select: bool,
 ) -> AppResult<Provisioned<NativeWorkflow>> {
     let company = provisioning.company;
     let requester = provisioning.requester;
@@ -164,7 +170,7 @@ async fn provision_workflow_on(
     .map_err(lifecycle_error)?;
     let bundle = super::definitions::publish_on(tx, &publication).await?;
 
-    let binding = provision_binding_on(tx, provisioning, channel_id, bundle).await?;
+    let binding = provision_binding_on(tx, provisioning, channel_id, bundle, select).await?;
     Ok(Ok(NativeWorkflow {
         workflow,
         version,
@@ -177,6 +183,7 @@ async fn provision_binding_on(
     provisioning: &Provisioning,
     channel_id: Uuid,
     bundle: Arc<PublishedBundle>,
+    select: bool,
 ) -> AppResult<WorkflowBindingId> {
     let company = provisioning.company;
     let requester = provisioning.requester;
@@ -203,13 +210,15 @@ async fn provision_binding_on(
         super::bindings::save_binding_on(tx, change).await?;
     }
 
-    super::channel_reply::bootstrap_native_on(
-        tx,
-        company,
-        RelatedChannelId::new(channel_id),
-        requester,
-        binding,
-    )
-    .await?;
+    if select {
+        super::channel_reply::bootstrap_native_on(
+            tx,
+            company,
+            RelatedChannelId::new(channel_id),
+            requester,
+            binding,
+        )
+        .await?;
+    }
     Ok(binding)
 }

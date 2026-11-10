@@ -205,6 +205,11 @@ async fn agent_default_desk_refuses_without_a_keyed_model() {
     let Some(f) = Departments::new().await else {
         return;
     };
+    sqlx::query("DELETE FROM company_model_connections WHERE company_id = $1")
+        .bind(f.company)
+        .execute(f.pool())
+        .await
+        .unwrap();
     let before = written(&f).await;
     let message = "Add a model connection with an API key before creating an agent: its desk answers on an explicit model.";
     assert!(matches!(

@@ -424,3 +424,448 @@ Common context for the B1 findings below:
 - **Resolution history:** 2026-11-10 open (optional). 2026-11-10 **resolved** (B1-R2, artifact `a75c40e7…5798`): onboarding places the first selected agent after all inserts,
   idempotently (`persistence/onboarding.rs:127-136`, `place`), and D1 gets no placement there;
   `agent_default_desk_onboarding_names_the_department_on_a_resubmission` asserts the placement.
+
+---
+
+# Architecture gate B2 — round `01DEP-P03-G2-R1`
+
+Common context for the G2 findings below:
+
+- Date 2026-11-10; batch B2 (plan 03B: the department desk and re-leading); stage: architecture
+  gate G2; round `01DEP-P03-G2-R1`.
+- Reviewer B: Opus 5.5 (`claude-opus-5-5`), effort per TASK (xhigh), agent `ad409b2d3d149c2c6`.
+- Worktree `/Users/mac02/.codex/worktrees/2050/openbot`, HEAD `523732b7` (B1 committed). The
+  working tree has only the TASK edit and the pinned gate copy.
+- Reviewed: decision revision **r1** (DEP-P03-D7..D9 + "Verification plan B2"), immutable copy
+  `logs/gate-B2-r1.md` sha256 `3ff959634457bc807196c3e7219b189a23ceb6b1cd0b8e28435f0177483891ce`.
+- Coordination revision 3 (`880cac54…04b8`).
+- Recheck round `01DEP-P03-G2-R2` (2026-11-10) reviewed decision revision **r3**, as the coordinator
+  corrected the round from r2. `logs/gate-B2-r3.md` sha256
+  `bb6dcc95378586701cbe978277a65906f6893efec7460e613b3d533636dda745` appears verbatim in `TASK.md`.
+  `gate-B2-r2.md` (`d309c78e…dbdf`) and `gate-B2-r1.md` (`3ff95963…91ce`) are unchanged. r3
+  differs from r2 only in D9 "Where". HEAD `523732b7`.
+- Recheck round `01DEP-P03-G2-R3` (2026-11-10) reviewed decision revision **r4**:
+  `logs/gate-B2-r4.md` sha256 `51d4dee8d53b30ff8033d8373b06f07024bd26fcbcdf193c61062f9e74fd8553`,
+  verbatim in `TASK.md`; r1–r3 copies unchanged. The r3 → r4 diff touches only the preface, the
+  D9 "Where" lock list, D9 "What" (non-agent lead), "Re-point" (source comparison),
+  "Run-as" (the residual) and three verification rows.
+
+---
+
+## 01DEP-P03-G2-F1 — Re-leading takes other users' locks after the desk gates, which can deadlock with an account deletion
+
+- **Classification:** actionable defect · **Medium** · lock protocol. D9 (with D7).
+- **Evidence:**
+  - D9 runs "after the grant sync", which means after `write_placement_on` has taken, in order:
+    - the department row `FOR UPDATE`;
+    - the involved principals `FOR KEY SHARE`;
+    - in `rederive_on`, the eligible principals, then the gates of the reached members-only desks
+      (exclusive), then those desks' rows `FOR UPDATE` (`department_desks.rs:230-262`).
+  - D9 then reuses the user-facing binding, reply and publication writers. Their authorization
+    locks other users' rows:
+    - `save_binding_on` → `check_run_as` → `authorize_company(run_as)` takes `company_members` and
+      `principals` `FOR SHARE OF member, principal` for the run-as (`authority.rs:45-68`,
+      `bindings.rs:181-200`). For an allowlist desk, `authorize_association` also locks the
+      run-as account (`association.rs:37-46`).
+    - D9 keeps "same params/run_as". The run-as is whoever provisioned the desk: the department's
+      creator for a D8 desk. When another admin re-leads, that is a different user.
+    - Re-selecting "the same contract and approval policy" re-validates reviewers
+      (`validate_reviewers` → `authorize_reviewer_on`: `company_members`/`principals FOR SHARE`).
+      Factoring `configure_reply_on` out of `configure_channel_reply` would also bring
+      `lock_settings_accounts` (`users … FOR SHARE`) after the company lock.
+  - Account deletion locks in the opposite order (`user_lifecycle.rs:14-38`): `users FOR UPDATE`,
+    then `company_members FOR UPDATE`, then `UPDATE principals SET kind='external'`. That update
+    fires `department_principal_demoted`, which deletes department rows and grants and updates
+    `channels.settings_revision` (schema 15498-15519).
+  - **Concrete cycle.** Let R be the stored run-as (or a reviewer) and a member of a department in
+    the role's reach.
+    - The re-lead already holds R's principal `FOR KEY SHARE` from `rederive_on`, and holds the
+      reached desks' rows. It then waits for `company_members(R)` `FOR SHARE`.
+    - Deleting R's account holds `company_members(R)` `FOR UPDATE` and waits for R's principal.
+      `kind` is a key column, so `FOR KEY SHARE` blocks the update (`department.rs:217-219`).
+  - D9 also puts workflow compilation, publication, binding and reply writes after the gates. That
+    is the gate-hold latency G1-F1 removed from B1.
+  - The gate states no lock sequence for D9. The one it states for D8 stops at the role write.
+- **Required:**
+  - Run the desk effect before the grant sync. Better, before `lock_principals_on` (for example,
+    first in `write_placement_on`, after the department row), so the gates stay last.
+  - State D9's full lock sequence and show that it composes with account deletion and member
+    removal (the demotion trigger), with agent publication and with inbound commits.
+  - Use run-as = actor. That is what D7 says, and it makes `authorize_company` and
+    `authorize_association` re-entrant (see G2-F2).
+  - For any other account D9 must authorize (approval-policy reviewers), either lock it in the
+    account phase at the start of the write, or do not re-validate it on a re-point.
+- **Instruction lesson:** (observation) reusing a user-facing writer inside a transaction carries
+  in its authorization locks on other users' rows. Candidate: a gate that reuses user-facing
+  writers inside a bigger transaction lists the rows those writers' authorization locks.
+- **Resolution history:** 2026-11-10 open (G2-R1). 2026-11-10 **resolved** (G2-R2, r3 D9 "Where"), with my r1 advice corrected:
+  - The desk effect stays after the grant sync, and the full lock sequence is stated. r3 is right
+    that my r1 "run it before the sync" is unsafe for a members-only department desk. The
+    reply-settings write would lock that desk's channel row `FOR UPDATE` before the sync takes
+    its gate. An admission holding the gate shared and then taking the row's FK lock, or a
+    demotion updating the row, closes a cycle.
+  - The "after" argument holds: inbound takes all gates before any row lock and never locks
+    workflow bindings (its `binding_id`s are channel bindings; intents have no FK to
+    `workflow_bindings`). Settings, binding and agent writers hold the company lock.
+  - The cost, gates held through compile and publication, is stated.
+  - The premise is "D9 authorizes only the actor". That premise is false on one path, tracked
+    in G2-F2.
+
+---
+
+## 01DEP-P03-G2-F2 — A stored run-as, a reviewer or desk visibility can make an unrelated lead change fail with a confusing error
+
+- **Classification:** actionable defect · **Medium** · contract / failure behaviour. D9 (vs D7).
+- **Evidence:**
+  - D7 says "the desk's binding runs as the actor who made the change". D9 case 1 keeps "same
+    params/run_as/trigger". The two contradict each other.
+  - `check_run_as` (`bindings.rs:181-215`) re-checks the stored run-as on every configuration and
+    activation. It must be a current owner or admin who can see the desk. Otherwise:
+    `BadRequest("The binding's run-as must be a current owner or admin who can see its channel")`.
+  - So when the department's creator is demoted or leaves, every later agent-to-agent re-lead of
+    that department is refused with a message about a binding the person never saw.
+  - The same happens for approval-policy reviewers that are no longer admins: "Final reply
+    reviewers must be company admins".
+  - **Visibility.** Department writers are owners or admins (`begin_department_write` →
+    `lock_company_on`). But if a user makes the department desk members-only (an ordinary desk
+    setting), a non-owner admin who is not a member, lead or parent lead has no view grant.
+    `authorize_association(actor)` in `save_binding_on` and in reply configuration then returns
+    `NotFound` (`association.rs:33-51`). The route answers 404 to a role change on a department the
+    admin can see.
+  - **Resources.** `provisioned_binding` refuses resource slots (`lifecycle/provisioned.rs:46-50`).
+    D9's `provisioned_reconfiguration` does not say whether it carries the binding's resources or
+    refuses a workflow that declares them.
+- **Required:**
+  - Make run-as = actor for every binding D9 configures or activates, as D7 states. Write down that
+    attribution moves to the admin who made the role change.
+  - State the outcome, with a worded error, for an actor who cannot see a members-only department
+    desk. Either refuse with a message that names the remedy, or define a trusted path.
+  - State how the approval policy and resources are carried over or refused.
+  - Add verification rows: re-lead by a second admin after the creator lost admin; re-lead of a
+    members-only department desk by an admin without a grant.
+- **Resolution history:** 2026-11-10 open (G2-R1). 2026-11-10 **partly resolved, still open** (G2-R2, r3):
+  - Done: run-as = actor on reconfiguration; worded refusals for a missing `draft` step,
+    resource slots, an approval policy and an invisible desk; the attribution move is stated.
+  - Remaining: when D9 activates or selects the owned binding B *without* re-pointing it, B
+    keeps its stored run-as. That happens when B is paused and already runs the new lead (agent
+    A → person → A), or B is active, runs A, and a user cleared the selection.
+  - On that path:
+    - `validate_change` requires an Activate change to keep the configuration (`bindings.rs:93-112`),
+      and `check_run_as` re-authorizes the stored run-as (`:181-200`);
+    - selection runs `selected_on` → `authorize_company(configuration.run_as())`
+      (`channel_reply.rs:233-251`);
+    - a configure factored from `configure_channel_reply` adds `lock_settings_accounts` on the
+      run-as (`:166-185`).
+  - So another user's `company_members`/`principals`/`users` rows are locked after the gates
+    and rows. That reopens the G2-F1 cycle against account deletion, and refuses the change if
+    that user is no longer an admin.
+  - **Required:** before activating or selecting B, reconfigure it (configuration revision + 1,
+    same version, run-as = actor) whenever its stored run-as differs from the actor. Then every
+    D9 path authorizes only the actor. Add a row: A → person (admin X) → A by admin Y, after X
+    lost admin.
+  2026-11-10 **resolved** (G2-R3, r4): before any activation or selection, B is reconfigured to run-as = actor
+  whenever its stored run-as differs: configuration revision + 1, same or re-pointed version, same
+  params, trigger and active flag. This checks out against the code:
+  - `validate_change` accepts that Configuration change, since the active flag is unchanged.
+  - `check_run_as` passes with run-as = actor and no owner check. The following Activate keeps
+    run-as = actor (`chosen` is false).
+  - `selected_on` and `lock_settings_accounts` then name only the actor.
+  - Deactivate skips `check_run_as`, and clearing the selection locks only the actor.
+  - A Deactivate still runs `authorize_association(actor)`, so an invisible members-only desk is
+    refused with D9's worded message there too. That is consistent.
+  - The new row covers A (X) → person → A (Y) after X lost admin.
+
+---
+
+## 01DEP-P03-G2-F3 — Re-pointing publishes the workflow's current draft, including unpublished edits
+
+- **Classification:** actionable defect · **Medium** · correctness. D9 case 1.
+- **Evidence:**
+  - D9 case 1: "read the workflow's current draft; `retarget_agent(...)`; save the draft …
+    at revision+1; `compiled` … ; `provisioned_publication` + `publish_on`".
+  - A workflow keeps one revisioned draft, separate from its published versions
+    (`definitions.rs:130-161`). `publish_on` publishes exactly the current draft (`:183-207`).
+  - So a role change would publish whatever unpublished edits a user left in the desk workflow's
+    draft, and bind the desk to them, without review.
+  - If the draft is invalid (saved mid-edit), the compile fails and the role change is refused for
+    an unrelated reason.
+  - The alternative, retargeting the bound version's source, would overwrite the user's draft. The
+    gate picks neither deliberately.
+- **Required:**
+  - Retarget the source of the version the responder binding is bound to.
+  - When the current draft differs from that version (unpublished edits), either refuse with a
+    worded error, or keep the draft untouched (if the lifecycle allows publishing from another
+    source). State which.
+  - Add verification rows: a re-lead with an unpublished draft edit, and with an invalid draft.
+- **Resolution history:** 2026-11-10 open (G2-R1). 2026-11-10 **resolved** (G2-R2, r2/r3 D9 "Re-point"): the source re-targeted is the
+  bound version's, and unpublished edits refuse with a message. Refinement in G2-F8.
+
+---
+
+## 01DEP-P03-G2-F4 — D9 acts on any selected responder, including one a user set up, and the slug-equality fallback can pick the wrong desk
+
+- **Classification:** actionable defect · **Medium** · correctness / scope. D8 identity, D9 cases 1
+  and 3.
+- **Evidence:**
+  - D9 defines "Responder = D's channel reply settings' selected binding". It acts on that binding
+    whoever created it:
+    - Case 3 (person lead or no lead) deactivates it. A person-to-person lead change, or clearing
+      a person lead, would therefore pause a responder a user configured on the department desk.
+    - Case 1 re-points a user's own workflow if it has a literal `draft` agent step. Otherwise it
+      refuses the whole role change.
+  - **Identity fallback** (D8): without the `department:{id}` row, the department desk is "the
+    channel with `department_id = id` whose primary slug equals the department's slug".
+    - Department slugs are mutable (`update_department_on` sets `slug`, `department.rs:322-351`),
+      and "Department rename does not rename the desk".
+    - After a slug change, a person-led or unled department's plain desk is no longer found, so the
+      next agent lead provisions nothing. That contradicts the verification row "renamed department
+      keeps desk".
+    - Another desk the department owns at the new slug becomes "the department desk". D9 would
+      then provision on it, re-point it or pause it.
+  - Plan 03B.2 prescribes slug equality for desks provisioned without `assistant_channel_on`, so a
+    durable marker for the plain desk would be a plan deviation.
+- **Required:**
+  - Limit D9 to bindings that D8 or D9 provisioned. Record them, for example the binding in the
+    `department:{id}` command result, and have case 2 write that row when none exists. Leave any
+    other selected responder untouched. Decide whether a lead change then refuses or only reports.
+  - Act only when the desired responder changes: agent A → agent B, agent → non-agent, or
+    non-agent → agent. Person → person changes nothing.
+  - For identity: either accept and document that a slug change detaches a plain desk's identity,
+    with a verification row asserting that no desk is touched; or record identity for the plain
+    desk too. The latter deviates from 03B.2's wording, so get coordinator/user confirmation first.
+  - Add verification rows: a user-configured responder on the department desk survives a
+    person-to-person change and a person-to-none change; another owned desk at the department's new
+    slug is not touched.
+- **Resolution history:** 2026-11-10 open (G2-R1). 2026-11-10 **resolved** (G2-R2, r2/r3 D8 "The record" + D9 "What"):
+  - The `department:{id}` command row marks both desk kinds; the plain desk's row has
+    `binding_id: null`. There is no slug fallback, and no new column or trigger.
+  - D9 acts only on the owned binding B, and only when the desired state differs. A
+    user-selected responder S ≠ B is never touched. Person → person and person → none change
+    nothing.
+  - The marker choice is recorded as a plan/code mismatch. I accept it as within 03B.2's "no new
+    column or trigger". D9 now rewrites the command row's `result.binding_id`. The table comment
+    should say a `department:{id}` result can change (not only be replayed).
+
+---
+
+## 01DEP-P03-G2-F5 — The B2 gate has no contract-impact table, and does not record the plan/code mismatches
+
+- **Classification:** actionable defect · **Low** · process / contract coverage (skill:
+  "records its criterion-to-assertion mapping and contract impact in TASK").
+- **Evidence:**
+  - Unlike B1 ("Contract impact B1"), r1 has no contract-impact table. B2 changes contracts with
+    consumers:
+    - Department create now also creates a desk. Affected: route and JSON responses, UI, onboarding
+      (its first department now gets a desk at its slug, before the agents), and the p01/p02 tests
+      and fixtures that count channels or create departments (`Departments::create`).
+    - Department delete is now refused until the desk is detached or deleted, so every department
+      is affected. Affected: the UI delete flow, and the p01/p02 delete tests.
+    - The `_on` signatures gain `templates` and `actor`. Callers: `company_agent.rs`,
+      `provisioning_builder.rs`, `persistence/onboarding.rs`, and the department routes and use
+      cases.
+    - `DepartmentPersistence` construction moves (setup, tests).
+    - The provisioning-commands table comment gains `department:{id}`.
+  - Plan/code mismatches the gate should record:
+    - Plan 03B.3 says to reuse "the publication path the Agent Builder uses when it edits an
+      existing agent channel's workflow (`apply`, `provisioning.rs:192`)". `apply` has no edit
+      path, only `ListAgents` and `CreateAgentChannel`.
+    - `REPLY_AGENT_STEP` is `"draft"` (`templates/catalogue.rs:14`), not `reply`.
+    - `AssistantAgent::Existing` no longer exists after B1 (`AssistantChannelRequest.agent_slug`).
+- **Required:**
+  - Add "Contract impact B2", with each consumer's disposition and focused check.
+  - Record the three mismatches.
+  - Note the onboarding collision: a selected agent whose slug equals the new department's slug is
+    now `Rejected`, because the address is taken.
+- **Resolution history:** 2026-11-10 open (G2-R1). 2026-11-10 **resolved** (G2-R2): "Contract impact B2" is added, and the three plan/code
+  mismatches plus the marker choice are recorded at the top.
+
+---
+
+## 01DEP-P03-G2-F6 — Each agent → person → agent cycle leaves another workflow and inactive binding behind
+
+- **Classification:** optional suggestion · Low · design simplification. D9 cases 2 and 3.
+- **Evidence:**
+  - Case 3 pauses the binding and clears the selection. The next agent lead is case 2: a new
+    workflow, version and binding under a fresh `department:{id}:lead:{uuid}` key.
+  - So each cycle adds one inactive binding and one workflow. The desk then cannot be deleted
+    until the user deletes them all, because desk deletion refuses a desk with bindings.
+  - Case 1's machinery (re-point, activate if paused, reselect) already handles a paused binding.
+- **Suggestion:** in case 2, when a D9-owned paused binding exists on the desk (G2-F4's record),
+  re-point and reactivate it instead of provisioning a new one. Keep fresh provisioning for a desk
+  with none.
+- **Resolution history:** 2026-11-10 open (optional). 2026-11-10 **resolved** (G2-R2): a paused B is re-pointed if needed and reactivated, never
+  re-provisioned. Case 2 provisions at most once per department, under the fixed key
+  `department:{id}`. Bindings cannot be deleted in production, so B persists.
+
+---
+
+## 01DEP-P03-G2-F7 — Add verification rows for the onboarding desk and the plain-desk insert
+
+- **Classification:** optional suggestion · Low · verification.
+- **Suggestions:**
+  - Onboarding: the first department gets its plain desk. A selected agent whose slug equals the
+    department slug gives `Rejected` with the taken-address message, and nothing is committed.
+    The replay creates no second desk.
+  - D8 person path: mirror `ChannelPersistence::create` for an owned desk
+    (`prelock_ownership_on` → `insert_channel_row_on` → `sync_desk_grants_on`, `channel.rs:349-363`),
+    rather than inserting the ownership columns without the p02 writer. State it in D8.
+  - e2e: after person → agent, a scripted message to the department desk is answered by the new
+    lead. The plan names the e2e only for agent → agent.
+- **Resolution history:** 2026-11-10 open (optional). 2026-11-10 **resolved** (G2-R2): rows added for the onboarding desk, slug collision and
+  replay; the plain desk uses the owned-desk create sequence; and an e2e answer after person →
+  agent.
+
+---
+
+## 01DEP-P03-G2-F8 — The "unpublished edits" check compares revision numbers, so its suggested fix doesn't clear it
+
+- **Classification:** actionable defect · **Low** · failure behaviour. r2/r3 D9 "Re-point".
+- **Evidence:**
+  - D9 refuses when "the workflow's current draft revision ≠ the bound version's `draft_revision`",
+    with "publish or discard them before changing the lead".
+  - There is no discard operation for a saved workflow draft. The editor's "Reload saved draft"
+    only drops unsaved browser changes (`pages/workflow_authoring/editor.rs:196`).
+  - The only way to "discard" is to save the bound version's content again. That raises the draft
+    revision, so the check still refuses.
+  - Publishing alone does not satisfy the check either: B stays bound to the old version until
+    someone reconfigures it. So a user who published a newer version without rebinding gets the
+    "unpublished edits" message.
+  - `workflow_versions.draft_revision` exists (schema 5863-5867), so the check is implementable. It
+    is just stricter than its message suggests.
+- **Required:**
+  - Compare the current draft's *source* with the bound version's source, not the revision
+    numbers. Then restoring the published content clears the refusal.
+  - Word the remedy with operations that exist. For example: "…has edits that are not on its
+    desk's bound version; publish them and bind the desk to the new version, or restore the bound
+    version's content, before changing the lead."
+  - Add a row: restore the content, then re-lead; it goes through.
+- **Resolution history:** 2026-11-10 open (G2-R2).
+  2026-11-10 **resolved** (G2-R3, r4): the check compares the draft source with the bound version's source; the
+  remedy names existing operations (publish and bind, or restore); a row asserts that re-saving
+  the bound content clears it.
+
+---
+
+## 01DEP-P03-G2-F9 — An owned binding left active under a person lead, and the bracketed lock order
+
+- **Classification:** optional suggestion · Low · D9 "What" / "Where" wording.
+- **Evidence and suggestions:**
+  - A person lead or cleared role pauses B only when S = B and B is active. If a user cleared the
+    selection (S none) or chose their own S while B stayed active, B keeps running the previous
+    agent on every message, with its output unsent. Consider deactivating an active owned B
+    whenever the desired state is "no agent", while still leaving S alone.
+  - r3 lists the desk effect's locks as "[channel row, reply settings, binding rows, workflow rows,
+    agent row]". The re-point procedure runs them in the opposite order: `publish_initial_on(A)`,
+    then draft, publish, binding, and the channel row and settings last. That is the order every
+    existing provisioning path uses. State the bracket in procedure order, so the implementation
+    and the lock argument match.
+- **Resolution history:** 2026-11-10 open (optional).
+  2026-11-10 **resolved** (G2-R3, r4): with a non-agent lead, an active B is always deactivated, and the selection
+  is cleared only when S = B; a row covers an active, unselected B. The "Where" lock list is in
+  procedure order (agent → workflow → binding → channel row → settings), and says only the
+  actor's account is locked or authorized. I verified that for every D9 step:
+  `publish_initial_on`, `save_draft_on`, publish, binding changes, `configure_reply_on`,
+  `bootstrap_native_on`/`selected_on`, and allowlist `authorize_association` (`FOR SHARE OF
+  access_grant, account` — the actor's own rows).
+
+---
+
+# Batch B2 review — round `01DEP-P03-B2-R1`
+
+Common context for the B2 findings below:
+
+- Date 2026-11-10; batch B2 (plan 03B: the department desk and re-leading), implemented against
+  gate r4 (`logs/gate-B2-r4.md` `51d4dee8…8553`); stage: batch review; round `01DEP-P03-B2-R1`.
+- Reviewer B: Opus 5.5 (`claude-opus-5-5`), effort per TASK (xhigh), agent `ad409b2d3d149c2c6`.
+- Worktree `/Users/mac02/.codex/worktrees/2050/openbot`, base/HEAD `523732b7`, uncommitted. Artifact
+  digest `8fd91d0452986625ad448afcdbe382b456c75bcaeaa9cddef117523947535c9b` (recomputed). Evidence
+  `logs/01DEP-P03-B2-R1.evidence.json` is valid.
+- Coordination revision 3 (`880cac54…04b8`).
+- Recheck round `01DEP-P03-B2-R2` (2026-11-10): artifact digest
+  `31d169402e1d795115670b31b6399674904c1f0d41463afb0bdbe0c1378139ea` (recomputed), base/HEAD
+  `523732b7`; evidence `logs/01DEP-P03-B2-R2.evidence.json` is valid.
+- B2-F1 and B2-F2 were reported by the coordinator (A) while preparing B3. I confirmed both
+  against the plan and the code, and record them here so they go into the same correction round.
+
+---
+
+## 01DEP-P03-B2-F1 — B2's tests use the wrong prefix, which also selects p02's tests (reported by A)
+
+- **Classification:** actionable defect · **Low** · verification naming.
+- **Evidence:**
+  - Plan 03 "Focused checks" names B2's check `department_lead_desk_`.
+  - Gate r4's verification plan, and the 11 tests in `department_lead_desk_tests.rs`, use
+    `department_desk_`. That prefix is already p02's (`department_desk_ownership_*`,
+    `department_desk_members_only_*`, in `department_desks_tests.rs` and
+    `channel_department_tests.rs`).
+  - So TASK's "30 `department_desk_`" counts p02 tests. My
+    `-- department_desk_competing agent_default_desk_competing` run selected 7 tests, which
+    includes p02's competing tests.
+  - I passed gate r4 without checking its prefix against the plan.
+- **Required:** rename B2's tests to `department_lead_desk_` and `department_lead_desk_competing_`.
+  Update TASK's verification mapping and inventory, and re-list the nonzero counts.
+- **Resolution history:** 2026-11-10 open (B2-R1). 2026-11-10 **resolved** (B2-R2, artifact `31d16940…39ea`): B2's tests are renamed. `--list department_lead_desk` gives 14, one of
+  them `department_lead_desk_competing_`, and the competing filter now selects 4 tests (1 + B1's 3)
+  instead of 7. The remaining `department_desk_*` names belong to p02 (`department_desks_tests.rs`,
+  `department_desk_relay_tests.rs`).
+
+---
+
+## 01DEP-P03-B2-F2 — No test checks that a lead agent's own default desk is left alone (reported by A)
+
+- **Classification:** actionable defect · **Low** · verification coverage.
+- **Evidence:**
+  - Plan 03's `department_lead_desk_` check requires: "Provisioning or re-leading never replaces
+    either lead agent's separate default desk."
+  - No B2 test asserts it. In code, D9 only touches the department desk's owned binding B
+    (`provisioning_department.rs:229-309`), so the property holds today, but nothing pins it.
+- **Required:** after creation as lead, agent → agent, and agent → person, assert that each lead
+  agent's `agent:{id}` desk and binding are unchanged. That means the same binding id, active, the
+  same configuration revision, and still selected.
+- **Resolution history:** 2026-11-10 open (B2-R1). 2026-11-10 **resolved** (B2-R2, artifact `31d16940…39ea`): the `own_desk` helper captures the `agent:{id}` desk, its binding state and
+  the selection. It is asserted unchanged after creation as lead, after agent → agent (both leads)
+  and after agent → person → agent, and an agent created as lead keeps its own desk active and
+  selected.
+
+---
+
+## 01DEP-P03-B2-F3 — The branch that leaves a user-chosen responder alone is untested
+
+- **Classification:** actionable defect · **Low** · verification coverage (gate r4 row "user's own
+  responder").
+- **Evidence:**
+  - TASK lists "a user's own responder S ≠ B" as a stand-in gap, "covered by code review only".
+  - The branch is the safety property G2-F4 introduced (`provisioning_department.rs:273-275` for
+    an agent lead; the person path deactivates an active B but leaves S). It is the one place B2
+    must not change user configuration, and gate r4 has a verification row for it.
+  - A second responder is reachable with existing primitives: a published workflow bound to the
+    department desk, activated, and selected through `configure_channel_reply`. Those are the
+    same lifecycle calls that `channel_reply_binding_integrity_tests.rs` makes.
+- **Required:** a `department_lead_desk_` test with a user's selected responder S ≠ B on the
+  department desk. Assert that agent → agent leaves S selected and S and B unchanged, and that
+  agent → person leaves S selected and unchanged (B deactivated if it was active, per r4).
+- The other two stand-ins (no `draft` step, resource slots) are one-line guards
+  (`provisioning_department.rs:369-373, 385-389`). Covering them by review is acceptable.
+- **Resolution history:** 2026-11-10 open (B2-R1). 2026-11-10 **resolved** (B2-R2, artifact `31d16940…39ea`): `department_lead_desk_leaves_a_users_own_responder_alone`. A user's own
+  binding is configured and activated through `BindingService` and selected through
+  `configure_channel_reply`. It stays selected and unchanged through agent → agent and agent →
+  person; the owned binding is unchanged by agent → agent and paused by agent → person, as r4
+  requires.
+
+---
+
+## 01DEP-P03-B2-F4 — The pause path runs in a different order from the gate's lock list
+
+- **Classification:** optional suggestion · Low · consistency.
+- **Evidence:**
+  - For a non-agent lead, `follow_department_lead_on` first clears the selection
+    (`configure_reply_on`: desk row `FOR UPDATE` and settings), and only then deactivates B
+    (`provisioning_department.rs:253-271`). r4's "Where" list says binding → channel row →
+    settings.
+  - This is harmless. Every transaction that locks `workflow_bindings` rows holds the company
+    lock first. Admission's `authorize_company` takes `companies FOR NO KEY UPDATE`
+    (`admission.rs:22`, `authority.rs:52-53`), and inbound commits never lock workflow bindings.
+- **Suggestion:** deactivate first and then clear the selection, or say in the module doc that
+  the pause path's order is free because all binding lockers hold the company lock.
+- **Resolution history:** 2026-11-10 open (optional). 2026-11-10 **resolved** (B2-R2, artifact `31d16940…39ea`): the pause path now deactivates B first, then clears the selection
+  (`provisioning_department.rs:253-272`), which is the gate's lock order.

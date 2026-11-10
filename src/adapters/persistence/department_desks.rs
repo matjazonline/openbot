@@ -347,10 +347,6 @@ pub(crate) async fn sync_desk_grants_on(
 /// Set a desk's ownership inside the caller's transaction, which holds the company write lock:
 /// the one way another writer (a department creating its desk) changes it, so it takes the same
 /// locks, applies the same members-only rule and re-derives the same grants as a desk edit.
-#[cfg_attr(
-    not(test),
-    expect(dead_code, reason = "phase 03 creates department desks through it")
-)]
 pub(crate) async fn set_desk_ownership_on(
     tx: &mut Transaction<'_, Postgres>,
     company: CompanyId,

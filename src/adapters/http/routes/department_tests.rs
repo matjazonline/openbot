@@ -7,7 +7,12 @@ use axum::http::StatusCode;
 fn use_cases(f: &Fixture) -> Arc<DepartmentUseCases> {
     Arc::new(DepartmentUseCases::new(
         f.persistence.clone(),
-        f.persistence.clone(),
+        Arc::new(
+            crate::adapters::persistence::department::PostgresDepartments::new(
+                f.persistence.as_ref().clone(),
+                crate::adapters::persistence::test_support::provisioning_templates(),
+            ),
+        ),
     ))
 }
 
@@ -136,7 +141,12 @@ async fn department_routes_hide_foreign_companies_and_refuse_members_and_strange
     // A failing company lookup is a server error, never read as "not yours".
     let failing = Arc::new(DepartmentUseCases::new(
         Arc::new(crate::use_cases::company_test_support::MockCompanyPersistence::failing()),
-        f.persistence.clone(),
+        Arc::new(
+            crate::adapters::persistence::department::PostgresDepartments::new(
+                f.persistence.as_ref().clone(),
+                crate::adapters::persistence::test_support::provisioning_templates(),
+            ),
+        ),
     ));
     denied(
         create_department_json(
