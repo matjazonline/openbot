@@ -1,0 +1,10 @@
+    Checking tokio-rustls v0.26.4
+    Checking hyper-rustls v0.27.9
+    Checking lettre v0.11.23
+    Checking reqwest v0.13.4
+    Checking rig-core v0.42.0
+    Checking rmcp v1.8.0
+    Checking rig-agent v0.42.0
+    Checking open_bots v0.1.0 (/Users/mac03/dev/openbot)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1m 01s
+query data written to .sqlx in the current directory; please check this into version control

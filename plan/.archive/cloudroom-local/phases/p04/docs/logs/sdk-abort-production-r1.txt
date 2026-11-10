@@ -1,0 +1,71 @@
+{
+  "artifact": {
+    "revision": "d8b3cc3a16bb4b06fc99d8e543d40f1087d1e815",
+    "patches": [
+      {
+        "sha256": "c201acedcbe1003a3867507e7fb4138c4171d7f5fa0c2971c4e182800cd58ca4",
+        "sourcePath": "gui/apps/app/src/components/Onboarding.tsx",
+        "sourceSha256": "d2aebaadf687bc3863f645acd2dff5add1fb943219afe0dec4f5a9ac2836496d"
+      },
+      {
+        "sha256": "1a8782db46c9450974cadede95d32c76ad1d3ffa6eb9bb53db97315df6228451",
+        "sourcePath": "gui/packages/sdk/src/areas/threads.ts",
+        "sourceSha256": "87c13f25884f240e7b94267d497d82fd1a8cc50398783e63185064aa846d8fe3"
+      }
+    ],
+    "artifactDigest": "5e39394f19f1a45fa500c3232fd3679bdfad5d421328e3410c4413974cd7c370"
+  },
+  "results": [
+    {
+      "method": "spawn",
+      "cut": "headers",
+      "cancelled": true
+    },
+    {
+      "method": "spawn",
+      "cut": "body",
+      "cancelled": true
+    },
+    {
+      "method": "send",
+      "cut": "headers",
+      "cancelled": true
+    },
+    {
+      "method": "send",
+      "cut": "body",
+      "cancelled": true
+    },
+    {
+      "method": "stop",
+      "cut": "headers",
+      "cancelled": true
+    },
+    {
+      "method": "stop",
+      "cut": "body",
+      "cancelled": true
+    },
+    {
+      "method": "archive",
+      "cut": "headers",
+      "cancelled": true
+    },
+    {
+      "method": "archive",
+      "cut": "body",
+      "cancelled": true
+    },
+    {
+      "method": "archiveAll",
+      "cut": "headers",
+      "cancelled": true
+    },
+    {
+      "method": "archiveAll",
+      "cut": "body",
+      "cancelled": true
+    }
+  ],
+  "nativeEffects": "NOT EXERCISED"
+}

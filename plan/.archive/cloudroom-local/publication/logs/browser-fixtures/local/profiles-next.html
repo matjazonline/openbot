@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Local agents - Mail Agents</title>
+    <link href="/assets/app.css?v=15fd1246bba1c736" rel="stylesheet" type="text/css" />
+    <style>
+        .loading-spinner {
+            -webkit-mask-image: none;
+            mask-image: none;
+            background-color: transparent;
+            box-sizing: border-box;
+            border: 2px solid currentColor;
+            border-right-color: transparent;
+            border-radius: 50%;
+            animation: spinner-rotate 0.7s linear infinite;
+        }
+        @keyframes spinner-rotate { to { transform: rotate(360deg); } }
+
+        .loading-dots { animation: loading-fade 1.2s ease-in-out infinite; }
+        @keyframes loading-fade { 50% { opacity: 0.35; } }
+
+        /* An icon-only button has no room beside its glyph, so the spinner stands in for it
+           rather than crowding in next to it. */
+        [data-busy-icon-only] > :not([data-request-spinner]) { display: none !important; }
+
+        @media (prefers-reduced-motion: reduce) {
+            .loading-spinner { animation-duration: 2s; }
+            .loading-dots { animation-duration: 3s; }
+        }
+
+        .brand-logo-on-light { display: none; }
+        [data-theme="light"] .brand-logo-on-dark { display: none; }
+        [data-theme="light"] .brand-logo-on-light { display: block; }
+
+        [data-theme="dark"] {
+            --color-primary: oklch(50% 0.19 264.05);
+            --color-primary-content: oklch(96% 0.02 264.05);
+            --color-info: oklch(66% 0.13 232.661);
+        }
+
+        :root, [data-theme] { --radius-field: .5rem !important; }
+
+        .input:focus, .input:focus-within,
+        .select:focus, .select:focus-within, .select:open,
+        .textarea:focus, .textarea:focus-within,
+        .file-input:focus, .file-input:focus-within { outline-offset: -1px; }
+
+        .form-control > .label { white-space: normal; }
+
+        :root {
+            color-scheme: light dark;
+            font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+                "Segoe UI", sans-serif;
+            font-synthesis: none;
+            text-rendering: optimizeLegibility;
+        }
+
+        body {
+            background-image:
+                radial-gradient(circle at 18% -10%, color-mix(in oklab, var(--color-primary) 9%, transparent), transparent 28rem),
+                linear-gradient(135deg, color-mix(in oklab, var(--color-base-200) 35%, transparent), transparent 42%);
+        }
+
+        ::selection {
+            background: color-mix(in oklab, var(--color-primary) 28%, transparent);
+        }
+
+        :where(a, button, input, select, textarea):focus-visible {
+            outline: 2px solid var(--color-primary);
+            outline-offset: 2px;
+        }
+
+        .app-topbar {
+            background: color-mix(in oklab, var(--color-base-100) 88%, transparent);
+            box-shadow: 0 1px 0 color-mix(in oklab, var(--color-base-content) 7%, transparent);
+            backdrop-filter: blur(18px) saturate(140%);
+        }
+
+        .app-rail {
+            scrollbar-width: none;
+            background: color-mix(in oklab, var(--color-base-200) 86%, var(--color-base-300));
+        }
+        .app-rail::-webkit-scrollbar { display: none; }
+        .app-rail .btn {
+            position: relative;
+            min-height: 2.75rem;
+            transition: background-color 160ms ease, color 160ms ease, transform 160ms ease;
+        }
+        .app-rail .btn:hover { transform: translateY(-1px); }
+        .app-rail .btn-primary::before {
+            position: absolute;
+            left: -.55rem;
+            width: 3px;
+            height: 1.5rem;
+            border-radius: 999px;
+            background: currentColor;
+            content: "";
+        }
+
+        aside.bg-base-200 {
+            background: color-mix(in oklab, var(--color-base-200) 90%, transparent);
+        }
+
+        .workspace-heading h2 {
+            letter-spacing: -.025em;
+        }
+
+        .menu :where(li > a, li > button) {
+            border-radius: .625rem;
+            transition: background-color 140ms ease, color 140ms ease, transform 140ms ease;
+        }
+        .menu :where(li > a, li > button):hover { transform: translateX(1px); }
+        .menu .menu-active {
+            box-shadow: inset 3px 0 0 var(--color-primary);
+            font-weight: 650;
+        }
+
+        .card, .modal-box, section.rounded-box {
+            border-color: color-mix(in oklab, var(--color-base-content) 10%, transparent);
+            box-shadow: 0 1px 2px color-mix(in oklab, #000 10%, transparent),
+                0 12px 32px color-mix(in oklab, #000 5%, transparent);
+        }
+
+        .btn { font-weight: 650; letter-spacing: -.01em; }
+        .badge { font-weight: 650; }
+        .table :where(th) {
+            font-size: .6875rem;
+            letter-spacing: .06em;
+            text-transform: uppercase;
+            opacity: .65;
+        }
+
+        * { scrollbar-color: color-mix(in oklab, var(--color-base-content) 18%, transparent) transparent; }
+
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                scroll-behavior: auto !important;
+                transition-duration: .01ms !important;
+                animation-duration: .01ms !important;
+                animation-iteration-count: 1 !important;
+            }
+        }
+
+        .thread-row.thread-replied .thread-activity { display: none; }
+
+        .mailbox-compact-header, .mailbox-sidebar-close { display: none; }
+
+        @media (max-width: 79.999rem) {
+            #mailbox-sidebar {
+                display: none;
+                position: fixed;
+                z-index: 35;
+                top: 4rem;
+                bottom: 0;
+                left: 4rem;
+                box-shadow: 12px 0 32px color-mix(in oklab, #000 22%, transparent);
+            }
+            #mailbox-sidebar.mailbox-sidebar-open { display: flex; }
+            .mailbox-compact-header { display: flex; }
+            .mailbox-sidebar-close { display: inline-flex; }
+        }
+
+        @media (max-width: 47.999rem) {
+            #mailbox-sidebar {
+                left: 0;
+                width: min(20rem, 85vw);
+                z-index: 46;
+            }
+        }
+
+        /* `dvh` follows a mobile browser's collapsing toolbars; `vh` does not, and leaves the
+           composer under the address bar. The `vh` line is the fallback for browsers without it. */
+        .app-shell { height: 100vh; height: 100dvh; }
+
+        #rail-backdrop { display: none; }
+        .ui-mobile-only, .ui-mobile-back, .rail-label { display: none; }
+
+        @media (max-width: 47.999rem) {
+            .ui-desktop-only { display: none; }
+            .ui-mobile-only { display: inline-flex; }
+            body[data-pane="detail"] .ui-mobile-back { display: inline-flex; }
+
+            /* The rail slides in over the workspace, wide enough here to name its destinations --
+               a column of unlabelled glyphs is affordable beside content, not on top of it. */
+            .app-rail {
+                position: fixed;
+                top: 4rem;
+                bottom: 0;
+                left: 0;
+                z-index: 47;
+                width: 15rem;
+                align-items: stretch;
+                transform: translateX(-100%);
+                transition: transform 180ms ease;
+                box-shadow: 12px 0 32px color-mix(in oklab, #000 28%, transparent);
+            }
+            body[data-rail="open"] .app-rail { transform: none; }
+            .app-rail .btn {
+                width: 100%;
+                justify-content: flex-start;
+                gap: .75rem;
+                padding-inline: .75rem;
+            }
+            .app-rail .btn-primary::before { left: .125rem; }
+            .rail-label { display: inline; }
+
+            #rail-backdrop {
+                display: block;
+                position: fixed;
+                inset: 4rem 0 0 0;
+                z-index: 46;
+                background: color-mix(in oklab, #000 45%, transparent);
+                opacity: 0;
+                pointer-events: none;
+                transition: opacity 180ms ease;
+            }
+            body[data-rail="open"] #rail-backdrop { opacity: 1; pointer-events: auto; }
+
+            /* Stacking the workspace lets a column that is on its own take the full window, and
+               lets the two that are not sit above one another instead of shoulder to shoulder. */
+            .app-workspace { flex-direction: column; }
+
+            .ui-pane-list, .ui-pane-detail {
+                width: 100%;
+                min-width: 0;
+                min-height: 0;
+                flex: 1 1 auto;
+                border-right-width: 0;
+            }
+            body[data-pane="detail"] .ui-pane-list { display: none; }
+            body:not([data-pane="detail"]) .ui-pane-detail { display: none; }
+
+            .ui-split { flex-direction: column; }
+            .ui-pane-stacked {
+                width: 100%;
+                flex: 0 0 auto;
+                max-height: 45vh;
+                overflow-y: auto;
+                border-right-width: 0;
+                border-bottom: 1px solid var(--color-base-300);
+            }
+        }
+</style>
+    <script src="/assets/theme-init.js?v=ef0341756532658d"></script>
+    <script src="/assets/htmx-2.0.4.min.js" defer></script>
+    <script src="/assets/htmx-ext-sse-2.2.3.js" defer></script>
+</head>
+<body class="h-full overflow-hidden bg-base-100 text-base-content">
+<main class="h-full overflow-auto p-6 mx-auto max-w-5xl space-y-6">
+        <a class="link" href="/ui/companies?company_id=9a5126fa-9f6c-42c4-9972-bbc955dda5b0">Company settings</a>
+        <h1 class="text-2xl font-bold">Local agents · Cloudroom local</h1>
+        <p>Cloudroom runs native agents under the machine's local account. Local profiles are separate from Openbot agents and use the local account's files, tools, provider logins and permission policy.</p>
+        <section class="space-y-4"><h2 class="text-xl font-semibold">Company machines</h2><p>Keep the Cloudroom server, host daemon and Openbot plugin running. Disabling or revoking a machine prevents new work; it does not prove disconnected native work stopped.</p><form method="post" action="/ui/companies/9a5126fa-9f6c-42c4-9972-bbc955dda5b0/local-agents/pairings" data-submit="busy-once" data-pending-label="Working…" class="space-y-3"><button type="submit" class="btn btn-primary"><svg data-progress class="hidden size-4 shrink-0 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg><span data-label>Create pairing code</span></button></form><ul></ul><div class="grid gap-4 md:grid-cols-2"><article class="card card-border bg-base-100 p-4 space-y-2"><a class="link font-semibold" href="/ui/companies/9a5126fa-9f6c-42c4-9972-bbc955dda5b0/local-agents?machine=b40b3264-22ff-4ec8-98f3-f5f6ae50902b">disposable test machine</a><p>enabled · Last seen Never</p><p class="font-mono text-xs break-all">b40b3264-22ff-4ec8-98f3-f5f6ae50902b</p><div class="flex flex-wrap gap-3"><form method="post" action="/ui/companies/9a5126fa-9f6c-42c4-9972-bbc955dda5b0/local-agents/machines/b40b3264-22ff-4ec8-98f3-f5f6ae50902b/state" data-submit="busy-once" data-pending-label="Working…" class="space-y-3"><input type="hidden" name="change" value="disable"><button type="submit" class="btn btn-primary"><svg data-progress class="hidden size-4 shrink-0 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg><span data-label>Disable new work</span></button></form><form method="post" action="/ui/companies/9a5126fa-9f6c-42c4-9972-bbc955dda5b0/local-agents/machines/b40b3264-22ff-4ec8-98f3-f5f6ae50902b/state" data-submit="busy-once" data-pending-label="Working…" class="space-y-3"><input type="hidden" name="change" value="revoke"><button type="submit" class="btn btn-primary"><svg data-progress class="hidden size-4 shrink-0 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg><span data-label>Revoke machine credential</span></button></form></div><form method="post" action="/ui/companies/9a5126fa-9f6c-42c4-9972-bbc955dda5b0/local-agents/pairings" data-submit="busy-once" data-pending-label="Working…" class="space-y-3"><input type="hidden" name="replace" value="b40b3264-22ff-4ec8-98f3-f5f6ae50902b"><button type="submit" class="btn btn-primary"><svg data-progress class="hidden size-4 shrink-0 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg><span data-label>Create replacement pairing code</span></button></form></article></div><article class="card card-border p-4 space-y-3"><h3 class="font-semibold">disposable test machine</h3><p>Offline</p><p>1 unsettled native effects · 1 outstanding commands</p><p>0 permission waits · 0 uncertain server outcomes · 0 reconciliation gaps</p><p>Oldest outstanding command: 2026-11-08T16:57:07.119795+00:00. Last matching native success: No successful native task recorded.</p><p>Server queue has admission capacity. Local journal pressure is reported by the plugin status command.</p><p>A connection test checks plugin reachability and catalog exchange. Only an explicit native task establishes provider execution. Offline work waits until its saved deadline; it never moves to another machine.</p><form method="post" action="/ui/companies/9a5126fa-9f6c-42c4-9972-bbc955dda5b0/local-agents/machines/b40b3264-22ff-4ec8-98f3-f5f6ae50902b/test" data-submit="busy-once" data-pending-label="Working…" class="space-y-3"><input type="hidden" name="request_id" value="01a1bc17-9f4d-7368-9591-7fbecb04f1c6"><button type="submit" class="btn btn-primary"><svg data-progress class="hidden size-4 shrink-0 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg><span data-label>Test connection / Refresh catalog</span></button></form><p>Catalog observed at 2026-11-08T16:57:07.100675+00:00. Advertised availability is not proof of a working provider login.</p><ul><li>codex: 1 advertised models</li></ul><form method="post" action="/ui/companies/9a5126fa-9f6c-42c4-9972-bbc955dda5b0/local-agents/machines/b40b3264-22ff-4ec8-98f3-f5f6ae50902b/projects" data-submit="busy-once" data-pending-label="Working…" class="space-y-3"><label class="flex gap-2 items-center"><input type="checkbox" class="checkbox" name="project" value="proj_test" checked>proj_test</label><button type="submit" class="btn btn-primary"><svg data-progress class="hidden size-4 shrink-0 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg><span data-label>Save enabled projects</span></button></form></article></section><section class="space-y-4"><h2 class="text-xl font-semibold">Local agent profiles</h2><p>Profiles select an exact machine, enabled project, provider and model. Accepted sessions keep their original selection when a profile is edited.</p><ul class="space-y-3"><li class="flex flex-wrap items-center gap-3"><a class="link" href="/ui/companies/9a5126fa-9f6c-42c4-9972-bbc955dda5b0/local-agents?profile=fb372e18-ff45-4a96-b690-63053852f18a&amp;channel=93aad44b-f3fe-4a48-83eb-3db33e921d82&amp;conversation=26760b52-7f03-4fb3-adfb-0c1728294a78">Paging profile 100</a><span>codex · gpt-6-luna · project proj_test</span><code class="select-all text-xs">fb372e18-ff45-4a96-b690-63053852f18a</code><form method="post" action="/ui/companies/9a5126fa-9f6c-42c4-9972-bbc955dda5b0/local-agents/profiles/fb372e18-ff45-4a96-b690-63053852f18a/delete" data-submit="busy-once" data-pending-label="Working…" class="space-y-3"><button type="submit" class="btn btn-primary"><svg data-progress class="hidden size-4 shrink-0 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg><span data-label>Delete unused profile</span></button></form></li><li class="flex flex-wrap items-center gap-3"><a class="link" href="/ui/companies/9a5126fa-9f6c-42c4-9972-bbc955dda5b0/local-agents?profile=fda7d378-af70-44db-b4b1-1743f4eac636&amp;channel=93aad44b-f3fe-4a48-83eb-3db33e921d82&amp;conversation=26760b52-7f03-4fb3-adfb-0c1728294a78">Paging profile 82</a><span>codex · gpt-6-luna · project proj_test</span><code class="select-all text-xs">fda7d378-af70-44db-b4b1-1743f4eac636</code><form method="post" action="/ui/companies/9a5126fa-9f6c-42c4-9972-bbc955dda5b0/local-agents/profiles/fda7d378-af70-44db-b4b1-1743f4eac636/delete" data-submit="busy-once" data-pending-label="Working…" class="space-y-3"><button type="submit" class="btn btn-primary"><svg data-progress class="hidden size-4 shrink-0 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg><span data-label>Delete unused profile</span></button></form></li></ul><article class="card card-border p-4 space-y-4"><h3 class="font-semibold">New profile</h3><form method="get" action="/ui/companies/9a5126fa-9f6c-42c4-9972-bbc955dda5b0/local-agents" class="space-y-3"><input type="hidden" name="machine" value="b40b3264-22ff-4ec8-98f3-f5f6ae50902b"><input type="hidden" name="channel" value="93aad44b-f3fe-4a48-83eb-3db33e921d82"><input type="hidden" name="conversation" value="26760b52-7f03-4fb3-adfb-0c1728294a78"><label class="block">Provider<select class="select w-full" name="provider"><option value="codex" selected>codex</option></select></label><label class="block">Model<select class="select w-full" name="model"><option value="gpt-6-luna" selected>gpt-6-luna</option></select></label><button type="submit" class="btn btn-ghost">Choose provider / model</button></form><form method="post" action="/ui/companies/9a5126fa-9f6c-42c4-9972-bbc955dda5b0/local-agents/profiles" data-submit="busy-once" data-pending-label="Working…" class="space-y-3"><input type="hidden" name="machine_id" value="b40b3264-22ff-4ec8-98f3-f5f6ae50902b"><input type="hidden" name="provider" value="codex"><input type="hidden" name="model" value="gpt-6-luna"><label class="block">Profile name<input class="input w-full" name="name" maxlength="128" required value=""></label><label class="block">Enabled project<select class="select w-full" name="project" required><option value="proj_test">proj_test</option></select></label><label class="block">Reasoning<select class="select w-full" name="reasoning" required><option value="none">none</option><option value="low">low</option><option value="high">high</option></select></label><p>Workspace: existing project directory. Permissions: provider defaults. Native prompts are answered in Cloudroom.</p><button type="submit" class="btn btn-primary"><svg data-progress class="hidden size-4 shrink-0 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg><span data-label>Save profile</span></button></form></article></section><section class="space-y-4"><h2 class="text-xl font-semibold">Start native work for Conversation &lt;img src=x onerror=alert(1)&gt;</h2><form method="post" action="/ui/companies/9a5126fa-9f6c-42c4-9972-bbc955dda5b0/local-agents/sessions" data-submit="busy-once" data-pending-label="Working…" class="space-y-3"><input type="hidden" name="request_id" value="01a1bc17-9f4d-7368-9591-7fbfbeaa0b02"><input type="hidden" name="conversation_id" value="26760b52-7f03-4fb3-adfb-0c1728294a78"><label class="block">Local profile<select name="profile_id" class="select w-full" required><option value="fb372e18-ff45-4a96-b690-63053852f18a">Paging profile 100</option><option value="fda7d378-af70-44db-b4b1-1743f4eac636">Paging profile 82</option></select></label><label class="block">Prompt<textarea name="prompt" class="textarea w-full" required maxlength="32768" rows="4"></textarea></label><p>This starts a native CLI agent with the profile's local files and permissions. Only this bounded prompt is sent; Openbot conversation history and tool authority are not added.</p><button type="submit" class="btn btn-primary"><svg data-progress class="hidden size-4 shrink-0 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg><span data-label>Start native agent</span></button></form><form method="get" action="/ui/companies/9a5126fa-9f6c-42c4-9972-bbc955dda5b0/local-agents" class="flex flex-wrap gap-3"><label>Open a local session reference<input class="input" name="session" required maxlength="36" aria-label="Local session ID"></label><button class="btn" type="submit">Open session</button></form></section><section class="space-y-4"><h2 class="text-xl font-semibold">Session <span class="font-mono select-all">01a1bc17-9f29-73ba-8d48-c8c91161fa78</span></h2><p>Original profile: <code class="select-all">2ea49c6a-e165-4e97-a794-724015a89476</code> · codex / gpt-6-luna</p><label class="block">Cloudroom thread ID<input class="input w-full font-mono" readonly value="thread_management"></label><p>Copy this ID and open the thread in Cloudroom on the machine. A remote browser cannot open that machine's localhost UI.</p><form method="post" action="/ui/companies/9a5126fa-9f6c-42c4-9972-bbc955dda5b0/local-agents/sessions/01a1bc17-9f29-73ba-8d48-c8c91161fa78/commands" data-submit="busy-once" data-pending-label="Working…" class="space-y-3"><input type="hidden" name="request_id" value="01a1bc17-9f4d-7368-9591-7fc082e5160c"><input type="hidden" name="kind" value="send"><label class="block">Follow-up prompt<textarea class="textarea w-full" name="prompt" required maxlength="32768" rows="3"></textarea></label><button type="submit" class="btn btn-primary"><svg data-progress class="hidden size-4 shrink-0 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg><span data-label>Send explicit follow-up</span></button></form><p>Stop and archive are thread-wide: they can affect work started in the local UI. They never complete or restart an Openbot workflow.</p><div class="flex flex-wrap gap-3"><form method="post" action="/ui/companies/9a5126fa-9f6c-42c4-9972-bbc955dda5b0/local-agents/sessions/01a1bc17-9f29-73ba-8d48-c8c91161fa78/commands" data-submit="busy-once" data-pending-label="Working…" class="space-y-3"><input type="hidden" name="request_id" value="01a1bc17-9f4d-7368-9591-7fc17241661f"><input type="hidden" name="kind" value="inspect"><button type="submit" class="btn btn-primary"><svg data-progress class="hidden size-4 shrink-0 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg><span data-label>Inspect thread</span></button></form><form method="post" action="/ui/companies/9a5126fa-9f6c-42c4-9972-bbc955dda5b0/local-agents/sessions/01a1bc17-9f29-73ba-8d48-c8c91161fa78/commands" data-submit="busy-once" data-pending-label="Working…" class="space-y-3"><input type="hidden" name="request_id" value="01a1bc17-9f4d-7368-9591-7fc28aa9cbe2"><input type="hidden" name="kind" value="stop"><button type="submit" class="btn btn-primary"><svg data-progress class="hidden size-4 shrink-0 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg><span data-label>Stop entire thread</span></button></form><form method="post" action="/ui/companies/9a5126fa-9f6c-42c4-9972-bbc955dda5b0/local-agents/sessions/01a1bc17-9f29-73ba-8d48-c8c91161fa78/commands" data-submit="busy-once" data-pending-label="Working…" class="space-y-3"><input type="hidden" name="request_id" value="01a1bc17-9f4d-7368-9591-7fc30f05a170"><input type="hidden" name="kind" value="archive"><button type="submit" class="btn btn-primary"><svg data-progress class="hidden size-4 shrink-0 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg><span data-label>Archive entire thread</span></button></form></div><p>Native permission requests must be answered in Cloudroom. A waiting or disconnected native agent is not a completed operation.</p><div class="space-y-4"><article class="card card-border p-4 space-y-2"><h3 class="font-mono select-all">01a1bc17-9f29-73ba-8d48-c8c91161fa78</h3><p>Direct request · waiting_for_input · deadline 2026-11-08T17:27:07.118120+00:00</p><p>Measured usage: Unavailable</p><p>Waiting for input or permission. Respond in Cloudroom on the machine.</p><h4 class="font-semibold">Prompt</h4><pre class="whitespace-pre-wrap break-words">explicit task</pre><h4 class="font-semibold">Bounded output</h4><pre class="whitespace-pre-wrap break-words">Result &lt;img src=x onerror=alert(1)&gt;</pre></article></div></section></main>
+    <script src="/assets/app.js?v=9828dce3548f483c"></script>
+</body>
+</html>

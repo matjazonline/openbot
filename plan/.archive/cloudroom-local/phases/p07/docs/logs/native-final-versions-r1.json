@@ -1,0 +1,14 @@
+[
+  {
+    "provider": "codex",
+    "version": "codex-cli 0.166.0"
+  },
+  {
+    "provider": "claude",
+    "version": "2.1.319 (Claude Code)"
+  },
+  {
+    "provider": "opencode",
+    "version": "1.19.5"
+  }
+]

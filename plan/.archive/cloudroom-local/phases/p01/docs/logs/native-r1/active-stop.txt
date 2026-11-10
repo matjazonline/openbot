@@ -1,0 +1,1 @@
+{"threadId":"thr_3f7ej72rxx","turnId":"daadcd8ad4-t1","terminal":["interrupted"],"threadWideStop":true}

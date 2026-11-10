@@ -1,0 +1,24 @@
+   Compiling open_bots v0.1.0 (/Users/mac03/dev/openbot)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2m 02s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-27a3d10d41cba73d)
+
+running 2 tests
+
+thread 'adapters::persistence::workflow::tests::local_agent_tests::cloudroom_workflow_result_bounds_utf8_and_classifies_native_uncertainty' (17710149) panicked at src/adapters/persistence/workflow/local_agent_tests.rs:88:22:
+expected local park: Completed(Err(WorkflowFailure { failure: StepFailure { knowledge_refusal: None, class: Retryable, code: FailureCode("local_agent.storage_unavailable"), diagnostic: None }, safety: SafeToRetry }))
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+thread 'adapters::persistence::workflow::tests::local_agent_tests::cloudroom_workflow_competing_claims_park_one_operation_and_fresh_claim_consumes_once' (17710148) panicked at src/adapters/persistence/workflow/local_agent_tests.rs:88:22:
+expected local park: Completed(Err(WorkflowFailure { failure: StepFailure { knowledge_refusal: None, class: Retryable, code: FailureCode("local_agent.storage_unavailable"), diagnostic: None }, safety: SafeToRetry }))
+test adapters::persistence::workflow::tests::local_agent_tests::cloudroom_workflow_result_bounds_utf8_and_classifies_native_uncertainty ... FAILED
+test adapters::persistence::workflow::tests::local_agent_tests::cloudroom_workflow_competing_claims_park_one_operation_and_fresh_claim_consumes_once ... FAILED
+
+failures:
+
+failures:
+    adapters::persistence::workflow::tests::local_agent_tests::cloudroom_workflow_competing_claims_park_one_operation_and_fresh_claim_consumes_once
+    adapters::persistence::workflow::tests::local_agent_tests::cloudroom_workflow_result_bounds_utf8_and_classifies_native_uncertainty
+
+test result: FAILED. 0 passed; 2 failed; 0 ignored; 0 measured; 3276 filtered out; finished in 1.31s
+
+error: test failed, to rerun pass `--lib`

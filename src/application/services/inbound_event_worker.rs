@@ -660,6 +660,7 @@ fn classify_commit_error(error: &AppError) -> (InboundEventErrorClass, bool) {
         AppError::KnowledgeTrigger { .. }
         | AppError::KnowledgeRelease { .. }
         | AppError::Execution(_)
+        | AppError::McpAuthentication
         | AppError::BadRequest(_)
         | AppError::NotFound(_)
         | AppError::Forbidden(_)

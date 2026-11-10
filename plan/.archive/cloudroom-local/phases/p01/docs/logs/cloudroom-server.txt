@@ -1,0 +1,87 @@
+[11:31:45] INFO: [server] Server listening {"bindHost":"127.0.0.1","port":46986,"dataDir":"/tmp/openbot-cloudroom-p01-profile"}
+[11:31:45] INFO: [server] plugin custom-instructions@0.1.0 loaded
+[11:31:45] INFO: [server] plugin accounts: rebuilding frontend bundle (built with SDK unknown, running SDK is 0.6.50)
+[11:31:45] INFO: [server] plugin machine-ssh@0.1.0 loaded
+[11:31:45] INFO: [server] plugin provider-usage: rebuilding frontend bundle (built with SDK unknown, running SDK is 0.6.50)
+[11:31:45] INFO: [server] plugin pdf-preview: rebuilding frontend bundle (built with SDK unknown, running SDK is 0.6.50)
+[11:31:45] INFO: [server] plugin monaco-editor: rebuilding frontend bundle (built with SDK unknown, running SDK is 0.6.50)
+[11:31:45] INFO: [server] plugin time-in-cloudroom: rebuilding frontend bundle (built with SDK unknown, running SDK is 0.6.50)
+[11:31:45] INFO: [server] plugin push-notifications: rebuilding frontend bundle (built with SDK unknown, running SDK is 0.6.50)
+[11:31:45] INFO: [server] plugin drafts: rebuilding frontend bundle (built with SDK unknown, running SDK is 0.6.50)
+[11:31:45] INFO: [server] plugin scheduled-send: rebuilding frontend bundle (built with SDK unknown, running SDK is 0.6.50)
+[11:31:45] INFO: [server] plugin side-chat: rebuilding frontend bundle (built with SDK unknown, running SDK is 0.6.50)
+[11:31:45] INFO: [server] plugin environment-project-checkout: rebuilding frontend bundle (built with SDK unknown, running SDK is 0.6.50)
+[11:31:45] INFO: [server] plugin connect: rebuilding frontend bundle (built with SDK unknown, running SDK is 0.6.50)
+[11:31:45] INFO: [server] plugin inline-vis: rebuilding frontend bundle (built with SDK unknown, running SDK is 0.6.50)
+[11:31:45] INFO: [server] plugin environment-git-worktree: rebuilding frontend bundle (built with SDK unknown, running SDK is 0.6.50)
+[11:31:45] INFO: [server] plugin gpu: rebuilding frontend bundle (built with SDK unknown, running SDK is 0.6.50)
+[11:31:45] INFO: [server] plugin provider-retry: rebuilding frontend bundle (built with SDK unknown, running SDK is 0.6.50)
+[11:31:45] INFO: [server] plugin keep-awake: rebuilding frontend bundle (built with SDK unknown, running SDK is 0.6.50)
+[11:31:45] INFO: [server] plugin secrets: rebuilding frontend bundle (built with SDK unknown, running SDK is 0.6.50)
+[11:31:45] INFO: [server] plugin automations: rebuilding frontend bundle (built with SDK unknown, running SDK is 0.6.50)
+[11:31:45] INFO: [server] plugin computer-use: rebuilding frontend bundle (built with SDK unknown, running SDK is 0.6.50)
+[11:31:45] INFO: [server] plugin bb-guide@0.1.0 loaded
+[11:31:45] INFO: [server] plugin provider-pi: rebuilding frontend bundle (built with SDK unknown, running SDK is 0.6.50)
+[11:31:46] INFO: [server] plugin time-in-cloudroom@0.1.0 loaded
+[11:31:46] INFO: [server] plugin pdf-preview@0.1.0 loaded
+[11:31:46] INFO: [server] plugin push-notifications@0.1.0 loaded
+[11:31:46] INFO: [server] plugin drafts@0.1.0 loaded
+[11:31:46] WARN: [server] marketplace bb-community refresh dropped 1 catalog entry whose id matches a bundled plugin: provider-usage
+[11:31:46] INFO: [server] plugin provider-retry@0.1.0 loaded
+[11:31:46] INFO: [server] plugin side-chat@0.1.0 loaded
+[11:31:46] INFO: [server] plugin gpu@0.1.0 loaded
+[11:31:47] INFO: [server] plugin inline-vis@0.1.0 loaded
+[11:31:47] INFO: [server] plugin scheduled-send@0.1.0 loaded
+[11:31:47] INFO: [server] plugin accounts@0.1.0 loaded
+[11:31:47] INFO: [server] plugin provider-usage@0.1.0 loaded
+[11:31:47] INFO: [server] plugin monaco-editor@0.1.0 loaded
+[11:31:47] INFO: [server] plugin secrets@0.1.0 loaded
+[11:31:47] INFO: [server] plugin connect@0.1.0 loaded
+[11:31:48] INFO: [server] plugin automations@0.1.0 loaded
+[11:31:49] INFO: [server] plugin environment-personal-workspace@0.1.0 loaded
+[11:31:50] INFO: [server] plugin provider-codex@0.1.0 loaded
+[11:31:50] INFO: [server] plugin environment-git-worktree@0.1.0 loaded
+[11:31:50] INFO: [server] plugin provider-claude-code@0.1.0 loaded
+[11:31:50] INFO: [server] plugin computer-use@0.1.0 loaded
+[11:31:50] INFO: [server] plugin keep-awake@0.1.0 loaded
+[11:31:50] INFO: [server] plugin environment-project-checkout@0.1.0 loaded
+[11:31:50] INFO: [server] plugin provider-pi@0.1.0 loaded
+[11:31:50] INFO: [server] Event loop stalled {"intervalMs":5000,"maxDelayMs":1002.4,"meanDelayMs":39.9,"p99DelayMs":520.9,"resolutionMs":20,"thresholdMs":500,"currentWork":null,"lastWork":"GET /api/v1/hosts","lastWorkMs":0.6,"slowestWork":null,"slowestWorkMs":null,"cpuMs":5289.7,"gcMs":152.4,"maxGcMs":7.5,"heapUsedMb":580,"rssMb":997}
+[11:31:50] INFO: [server] plugin provider-acp@0.1.0 loaded
+[11:37:13] INFO: [server] plugin openbot-compatibility-probe@0.1.0 loaded
+[11:37:21] WARN: [server] Failed to resolve host for provider discovery {"errorCode":"host_unavailable","errorMessage":"Local host daemon is not initialized","errorStatus":502}
+[11:37:45] INFO: [server] plugin openbot-compatibility-probe@0.1.0 loaded
+[11:38:07] WARN: [server] Failed to resolve host for provider discovery {"errorCode":"host_unavailable","errorMessage":"Host is not connected","errorStatus":502,"errorDetails":{"reason":"disconnected","hostStatus":"disconnected","suspendedAt":null,"destroyedAt":null}}
+[11:39:36] INFO: [server] plugin openbot-compatibility-probe@0.1.0 loaded
+[11:39:46] WARN: [server] Unable to inspect project source; continuing without a Git remote anchor {"hostId":"host_x39f5jia3f","path":"/tmp/openbot-cloudroom-p01-workspace"}
+    err: {
+      "type": "ApiError",
+      "message": "Host is not connected",
+      "stack":
+          Error: Host is not connected
+              at throwOnlineRpcError (/private/tmp/openbot-cloudroom-d8b3cc3/gui/apps/server/src/services/hosts/online-rpc.ts:371:11)
+              at <anonymous> (/private/tmp/openbot-cloudroom-d8b3cc3/gui/apps/server/src/services/hosts/online-rpc.ts:261:45)
+              at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+              at async callHostOnlineRpcWithRetry (/private/tmp/openbot-cloudroom-d8b3cc3/gui/apps/server/src/services/hosts/online-rpc.ts:237:20)
+      "status": 502,
+      "body": {
+        "type": "Object",
+        "message": "Host is not connected",
+        "code": "host_unavailable",
+        "retryable": false
+      }
+    }
+[11:39:46] WARN: [server] [plugin:openbot-compatibility-probe] cli openbot-proof failed: HTTP 502: Host is not connected
+[11:39:46] INFO: [server] Project summary inference failed; using fallback model {"attempt":1,"errorCode":"host_unavailable","fallbackModel":"codex/gpt-6-luna","maxAttempts":2,"model":"claude-code/claude-haiku-5-5","reason":"failure","folder":"/tmp/openbot-cloudroom-p01-workspace"}
+[11:39:46] WARN: [server] Project summary inference failed {"attempts":2,"durationMs":252,"maxAttempts":2,"model":"codex/gpt-6-luna","folder":"/tmp/openbot-cloudroom-p01-workspace","errorCode":"host_unavailable","errorMessage":"Host is not connected","errorName":"Error","errorStatus":502,"reason":"failed"}
+[11:40:39] INFO: [server] Session opened {"sessionId":"hses_9iezccsttk","hostId":"host_x39f5jia3f","replacedSessionId":null}
+[11:40:39] INFO: [server] Daemon WebSocket opened {"sessionId":"hses_9iezccsttk","hostId":"host_x39f5jia3f"}
+[11:40:42] INFO: [server] Provider model catalog refresh settled {"hostId":"host_x39f5jia3f","providerId":"codex","scope":"host","durationMs":2142,"outcome":"success","modelCount":8,"changed":true}
+[11:40:43] WARN: [server] Provider model catalog refresh settled {"hostId":"host_x39f5jia3f","providerId":"pi","scope":"host","durationMs":162,"outcome":"failed","errorCode":"command_failed","errorMessage":"Could not find the pi CLI on this host. Install @earendil-works/pi-coding-agent and retry.","errorStatus":502,"errorRetryable":false,"changed":true}
+[11:40:43] INFO: [server] Provider model catalog refresh settled {"hostId":"host_x39f5jia3f","providerId":"claude-code","scope":"host","durationMs":2394,"outcome":"success","modelCount":20,"changed":true}
+[11:40:43] WARN: [server] Provider model catalog refresh settled {"hostId":"host_x39f5jia3f","providerId":"acp-cursor","scope":"host","durationMs":216,"outcome":"missing_executable","errorCode":"missing_executable","errorMessage":"spawn cursor-agent ENOENT","errorStatus":502,"errorRetryable":false,"changed":true}
+[11:40:55] WARN: [server] [plugin:openbot-compatibility-probe] cli openbot-proof failed: HTTP 500: Thread thr_jyfz7e9g5h has no stored execution model
+[11:41:13] WARN: [server] Provider model catalog refresh settled {"hostId":"host_x39f5jia3f","providerId":"acp-opencode","scope":"host","durationMs":30003,"outcome":"timeout","errorCode":"command_timeout","errorMessage":"Timed out waiting for command result","errorStatus":504,"changed":true}
+[11:41:13] INFO: [server] Provider model catalog prewarm pass finished {"hostId":"host_x39f5jia3f","providerCount":5,"durationMs":33423}
+[11:41:56] INFO: [server] plugin openbot-compatibility-probe@0.1.0 loaded
+[11:48:57] INFO: [server] Daemon WebSocket closed {"sessionId":"hses_9iezccsttk"}

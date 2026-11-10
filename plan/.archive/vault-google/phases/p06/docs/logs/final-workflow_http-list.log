@@ -1,0 +1,30 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.22s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-048b7abd3ed0c794)
+adapters::mcp::policy::tests::workflow_http_connector_uses_pinned_addresses_without_resolving_hostname_again: test
+adapters::mcp::policy::tests::workflow_http_resolved_dns_rejects_any_prohibited_answer_and_rebinding: test
+adapters::persistence::credential_rotation::tests::http_tests::workflow_http_rotation_inventory_preserves_context_and_is_idempotent: test
+adapters::persistence::credential_rotation::tests::http_tests::workflow_http_rotation_stale_ciphertext_cannot_overwrite_normal_writer: test
+adapters::persistence::workflow::tests::http_tests::authority_tests::workflow_http_admission_rechecks_bound_operation_after_activation: test
+adapters::persistence::workflow::tests::http_tests::authority_tests::workflow_http_binding_checks_exact_selected_connection_contract: test
+adapters::persistence::workflow::tests::http_tests::vault_tests::execution::vault_workflow_http_competing_claimants_have_one_business_entry: test
+adapters::persistence::workflow::tests::http_tests::vault_tests::execution::vault_workflow_http_ownership_lost_during_preparation_sends_nothing: test
+adapters::persistence::workflow::tests::http_tests::vault_tests::execution::vault_workflow_http_preparation_failure_leaves_intent_without_remote_effect: test
+adapters::persistence::workflow::tests::http_tests::vault_tests::execution::vault_workflow_http_uncertain_send_is_not_dispatched_twice: test
+adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::gateway::vault_workflow_http_google_refresh_waits_for_approval_then_keeps_native_receipt: test
+adapters::persistence::workflow::tests::http_tests::workflow_http_crash_before_marker_retries_and_after_marker_reconciles: test
+adapters::persistence::workflow::tests::http_tests::workflow_http_current_revocation_and_protection_prevent_network: test
+adapters::persistence::workflow::tests::http_tests::workflow_http_foreign_credential_fk_and_nonadmin_authority_fail_closed: test
+adapters::persistence::workflow::tests::http_tests::workflow_http_publication_rejects_forged_policy_and_registration_revocation: test
+adapters::persistence::workflow::tests::http_tests::workflow_http_real_publication_admission_receipt_restart_and_competitors: test
+adapters::persistence::workflow::tests::http_tests::workflow_http_registered_tool_and_direct_model_call_share_receipt: test
+adapters::persistence::workflow::tests::http_tests::workflow_http_remote_failure_remains_unknown_without_second_entry: test
+adapters::persistence::workflow::tests::http_tests::workflow_http_secret_is_encrypted_scoped_and_revision_competitors_have_one_winner: test
+adapters::workflow_http::tests::workflow_http_default_denies_special_addresses_and_operator_scope_is_exact: test
+adapters::workflow_http::tests::workflow_http_origin_and_request_authority_cannot_be_replaced: test
+adapters::workflow_http::tests::workflow_http_pending_actual_request_is_dropped_on_cancellation: test
+adapters::workflow_http::tests::workflow_http_redirect_errors_and_oversize_never_produce_receipts: test
+adapters::workflow_http::tests::workflow_http_response_redacts_secret_and_sensitive_headers_before_output: test
+adapters::workflow_http::tests::workflow_http_scalar_secret_echoes_are_redacted: test
+adapters::workflow_http::tests::workflow_http_stalled_body_hits_read_deadline: test
+
+26 tests, 0 benchmarks

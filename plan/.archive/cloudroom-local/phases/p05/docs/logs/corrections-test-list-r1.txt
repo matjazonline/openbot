@@ -1,0 +1,45 @@
+   Compiling open_bots v0.1.0 (/Users/mac03/dev/openbot)
+error[E0599]: no associated function or constant named `new` found for struct `domain::local_agents::identities::EventSequence` in the current scope
+   --> src/adapters/persistence/workflow/local_agent_tests.rs:247:50
+    |
+247 |                         sequence: EventSequence::new(native.sequence).unwrap(),
+    |                                                  ^^^ associated function or constant not found in `domain::local_agents::identities::EventSequence`
+    |
+   ::: src/domain/local_agents/identities.rs:113:9
+    |
+113 |         pub struct $name(u64);
+    |         ---------------------- associated function or constant `new` not found for this struct
+    |
+    = help: items from traits can only be used if the trait is implemented and in scope
+    = note: the following traits define an item `new`, perhaps you need to implement one of them:
+            candidate #1: `Bit`
+            candidate #2: `BoundKey`
+            candidate #3: `KeyInit`
+            candidate #4: `KeyIvInit`
+            candidate #5: `ModelLister`
+            candidate #6: `VariableOutput`
+            candidate #7: `VariableOutputCore`
+            candidate #8: `ahash::HashMapExt`
+            candidate #9: `ahash::HashSetExt`
+            candidate #10: `aws_lc_rs::aead::BoundKey`
+            candidate #11: `fluent_uri::internal::RiRef`
+            candidate #12: `hmac::Mac`
+            candidate #13: `itertools::adaptors::coalesce::CountItem`
+            candidate #14: `mail_auth::hickory_resolver::hickory_proto::Executor`
+            candidate #15: `mail_auth::zip::read::magic_finder::FinderDirection`
+            candidate #16: `ndarray::data_traits::DataOwned`
+            candidate #17: `parking_lot_core::thread_parker::ThreadParkerT`
+            candidate #18: `rand::distr::uniform::UniformSampler`
+            candidate #19: `rand::distributions::uniform::UniformSampler`
+            candidate #20: `sha2::Digest`
+            candidate #21: `tendril::tendril::Atomicity`
+            candidate #22: `tendril::tendril::Atomicity`
+            candidate #23: `vsimd::isa::InstructionSet`
+help: there is a method `ne` with a similar name
+    |
+247 -                         sequence: EventSequence::new(native.sequence).unwrap(),
+247 +                         sequence: EventSequence::ne(native.sequence).unwrap(),
+    |
+
+For more information about this error, try `rustc --explain E0599`.
+error: could not compile `open_bots` (lib test) due to 1 previous error

@@ -1,0 +1,11 @@
+{
+  "status": "PASS",
+  "command": [
+    "npm",
+    "ci",
+    "--omit=dev"
+  ],
+  "cwd": "/private/var/folders/n2/5y7x75r92zl0ll90154hxdzr0000gn/T/openbot-cloudroom-p07-final-package-uuw4ohc8",
+  "originalFailure": "npm11 prefix on macOS symlinked temp directory; production native-peer installs use cwd, as exercised for all3providers",
+  "sourceChanged": false
+}

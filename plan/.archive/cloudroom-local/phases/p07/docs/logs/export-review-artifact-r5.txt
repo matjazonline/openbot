@@ -1,0 +1,28 @@
+/Users/mac03/dev/openbot/plan/cloudroom-local/phases/p06/docs/logs/p06-r3-source.patch:4051: trailing whitespace.
+ 
+/Users/mac03/dev/openbot/plan/cloudroom-local/phases/p06/docs/logs/p06-r3-source.patch:4056: trailing whitespace.
+ 
+/Users/mac03/dev/openbot/plan/cloudroom-local/phases/p06/docs/logs/p06-r3-source.patch:7970: new blank line at EOF.
++
+warning: 3 lines add whitespace errors.
+{
+  "version": 1,
+  "reviewBaseCommit": "97e5d60dc538e26c7cb976a8d63772eed80baff2",
+  "prerequisite": "c52a03aec4aaa4fbc55afcf807c77e8814aa4eedffa05f3d727b3217723d3def",
+  "prerequisitePatchSha256": "8eca418baf77034c3811056c03e537b51818c5e226878daf5c5ae4af1ae0f9a3",
+  "prerequisiteTree": "/var/folders/n2/5y7x75r92zl0ll90154hxdzr0000gn/T/openbot-cloudroom-p06-review-base-1ahog6h5",
+  "exclusions": [
+    "plan/cloudroom-local/COORDINATION.md",
+    "plan/cloudroom-local/phases/p01/docs",
+    "plan/cloudroom-local/phases/p02/docs",
+    "plan/cloudroom-local/phases/p03/docs",
+    "plan/cloudroom-local/phases/p04/docs",
+    "plan/cloudroom-local/phases/p05/docs",
+    "plan/cloudroom-local/phases/p06/docs",
+    "plan/cloudroom-local/phases/p07/docs"
+  ],
+  "fullPatch": "p07-r5-source.patch",
+  "fullPatchSha256": "133ad998a0a81bddc0e43fb5bade30eb68b45b2d2d62fa72da4f5331e6c8baf1",
+  "deltaPatch": "p07-r5-delta.patch",
+  "deltaPatchSha256": "a1944f2c751e7b411391b5ffed29e4f66686963d24cfe70566f813d7e1864a21"
+}

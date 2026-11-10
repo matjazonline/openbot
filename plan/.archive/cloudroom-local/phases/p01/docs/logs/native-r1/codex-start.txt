@@ -1,0 +1,1 @@
+{"threadId":"thr_3f7ej72rxx","projectId":"proj_65t4tfudn5","marker":"OPENBOT_SMOKE_fd1dbad52d4390a5398841d3","model":"gpt-6-luna","providerId":"codex","status":"starting"}

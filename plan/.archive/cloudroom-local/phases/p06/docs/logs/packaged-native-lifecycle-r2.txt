@@ -1,0 +1,9 @@
+file:///Users/mac03/dev/openbot/plan/cloudroom-local/phases/p06/docs/logs/packaged-native-lifecycle-r2.mjs:58
+  throw new Error('native lifecycle smoke condition timed out');
+        ^
+
+Error: native lifecycle smoke condition timed out
+    at until (file:///Users/mac03/dev/openbot/plan/cloudroom-local/phases/p06/docs/logs/packaged-native-lifecycle-r2.mjs:58:9)
+    at async file:///Users/mac03/dev/openbot/plan/cloudroom-local/phases/p06/docs/logs/packaged-native-lifecycle-r2.mjs:73:17
+
+Node.js v24.21.0

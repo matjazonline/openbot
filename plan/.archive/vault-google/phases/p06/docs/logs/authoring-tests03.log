@@ -1,0 +1,36 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+   Compiling open_bots v0.1.0 (/Users/mac02/.codex/worktrees/1133/openbot)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 56.43s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-048b7abd3ed0c794)
+
+running 6 tests
+test adapters::http::routes::connection_levels::tests::authoring_tests::vault_authoring_http_setup_rejects_credentials_and_unrecognized_fields ... ok
+test application::workflow::sample::tests::gmail_tests::vault_authoring_gmail_examples_compile_and_execute_only_scripted_effects ... FAILED
+test application::workflow::sample::tests::gmail_tests::vault_authoring_reviewed_mime_is_valid_base64url_and_keeps_reply_headers ... ok
+test adapters::http::routes::ui_vault_bindings::tests::authoring::vault_authoring_foreign_company_cannot_inspect_a_connection_source ... ok
+test adapters::http::routes::connection_levels::tests::authoring_tests::vault_authoring_http_setup_scopes_connection_and_registration_and_checks_revision ... ok
+test adapters::http::routes::ui_vault_bindings::tests::authoring::vault_authoring_picker_is_owner_scoped_and_only_exposes_approved_metadata ... FAILED
+
+failures:
+
+---- application::workflow::sample::tests::gmail_tests::vault_authoring_gmail_examples_compile_and_execute_only_scripted_effects stdout ----
+
+thread 'application::workflow::sample::tests::gmail_tests::vault_authoring_gmail_examples_compile_and_execute_only_scripted_effects' (36602449) panicked at src/application/workflow/sample/tests.rs:58:10:
+called `Result::unwrap()` on an `Err` value: Diagnostic { code: "binding.type", message: "Literal does not match destination schema", field_path: "/steps/select/with/value/message_id", span: SourceSpan { start: 1196, end: 1197, line: 1, column: 1197 }, instance_path: None, schema_path: None }
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- adapters::http::routes::ui_vault_bindings::tests::authoring::vault_authoring_picker_is_owner_scoped_and_only_exposes_approved_metadata stdout ----
+
+thread 'adapters::http::routes::ui_vault_bindings::tests::authoring::vault_authoring_picker_is_owner_scoped_and_only_exposes_approved_metadata' (36602448) panicked at src/adapters/http/routes/vault_authoring_route_tests.rs:54:5:
+assertion `left != right` failed
+  left: 200
+ right: 200
+
+
+failures:
+    adapters::http::routes::ui_vault_bindings::tests::authoring::vault_authoring_picker_is_owner_scoped_and_only_exposes_approved_metadata
+    application::workflow::sample::tests::gmail_tests::vault_authoring_gmail_examples_compile_and_execute_only_scripted_effects
+
+test result: FAILED. 4 passed; 2 failed; 0 ignored; 0 measured; 3569 filtered out; finished in 1.65s
+
+error: test failed, to rerun pass `--lib`

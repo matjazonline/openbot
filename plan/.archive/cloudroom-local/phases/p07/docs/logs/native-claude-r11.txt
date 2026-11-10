@@ -1,0 +1,16 @@
+
+running 1 test
+observed gated transaction pids=[69488] blocker=70572 elapsed_ms=204
+
+thread 'adapters::persistence::workflow::tests::local_agent_tests::e2e::native::cloudroom_e2e_native_claude_packaged_plugin_pairing_workflow_ui_restart_followup_stop' (18770146) panicked at src/adapters/persistence/workflow/local_agent_native_interaction_tests.rs:19:13:
+native permission scenario completed before requesting input
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test adapters::persistence::workflow::tests::local_agent_tests::e2e::native::cloudroom_e2e_native_claude_packaged_plugin_pairing_workflow_ui_restart_followup_stop ... FAILED
+
+failures:
+
+failures:
+    adapters::persistence::workflow::tests::local_agent_tests::e2e::native::cloudroom_e2e_native_claude_packaged_plugin_pairing_workflow_ui_restart_followup_stop
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 3326 filtered out; finished in 55.40s
+

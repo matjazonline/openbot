@@ -1,0 +1,21 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.20s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-048b7abd3ed0c794)
+
+running 13 tests
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::channel_reply_e2e::channel_reply_e2e_quiet_ingress_has_no_owner_and_in_app_reply_has_no_transport ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::channel_reply_e2e::channel_reply_e2e_provider_retry_keeps_execution_and_wire_identity ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::channel_reply_e2e::channel_reply_e2e_provider_unknown_survives_worker_reconstruction_without_resend ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::channel_reply_e2e::channel_reply_e2e_automatic_replies_each_message_once_with_observers ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::channel_reply_e2e::channel_reply_e2e_selected_binding_manual_and_schedule_runs_never_inherit_destination ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::channel_reply_e2e::hitl::channel_reply_e2e_current_transport_revocation_blocks_final_after_human_wait ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::channel_reply_e2e::hitl::channel_reply_e2e_protected_final_requires_exact_current_approval ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::channel_reply_e2e::channel_reply_e2e_silence_preserves_result_and_explicit_final_has_no_duplicate ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::channel_reply_e2e::recovery::channel_reply_e2e_committed_intent_survives_reconstruction_without_its_wakeup ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::channel_reply_e2e::hitl::channel_reply_e2e_grandchild_human_wait_returns_to_the_only_response_owner ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::channel_reply_e2e::recovery::channel_reply_e2e_remote_acceptance_before_receipt_keeps_unknown_after_shutdown ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::channel_reply_e2e::hitl::channel_reply_e2e_two_waits_in_one_thread_route_answers_without_new_runs ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::channel_reply_e2e::hitl::channel_reply_e2e_question_rounds_resume_same_owner_with_frozen_contract ... ok
+
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 3380 filtered out; finished in 20.10s
+

@@ -1,0 +1,5 @@
+
+> @get-bb/plugin-sdk@0.6.50 build /private/tmp/openbot-cloudroom-d8b3cc3/gui/packages/plugin-sdk
+> node scripts/build-runtime.mjs
+
+Built 21 @get-bb/plugin-sdk runtime entries.

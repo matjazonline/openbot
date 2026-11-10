@@ -16,6 +16,7 @@ impl IntoResponse for AppError {
             AppError::DatabaseTimeout(_) => "database_timeout",
             AppError::WorkflowGuard(_) => "workflow_guard",
             AppError::InvalidCredentials => "invalid_credentials",
+            AppError::McpAuthentication => "mcp_authentication",
             AppError::ServiceUnavailable(_) => "service_unavailable",
             AppError::BadRequest(_) => "bad_request",
             AppError::NotFound(_) => "not_found",
@@ -51,6 +52,11 @@ impl IntoResponse for AppError {
             AppError::InvalidCredentials => {
                 (StatusCode::UNAUTHORIZED, "Invalid credentials").into_response()
             }
+            AppError::McpAuthentication => (
+                StatusCode::UNPROCESSABLE_ENTITY,
+                "MCP service rejected the configured credentials",
+            )
+                .into_response(),
             AppError::ServiceUnavailable(_) => (
                 StatusCode::SERVICE_UNAVAILABLE,
                 "Service is busy. Try again shortly.",

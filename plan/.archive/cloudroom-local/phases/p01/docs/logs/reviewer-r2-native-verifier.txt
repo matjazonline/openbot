@@ -1,0 +1,1 @@
+PASS: 3 real native providers/UI, correlated terminal turns, nonempty replay/pagination, approval denial, answered question, active thread-wide stop, optional manual setup

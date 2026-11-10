@@ -1,0 +1,4 @@
+
+> @cloudroom/cli@0.0.1 build /private/tmp/openbot-cloudroom-d8b3cc3/gui/apps/cli
+> node ../../scripts/build-node-entry.mjs src/index.ts dist/index.js --clean-dist --split
+

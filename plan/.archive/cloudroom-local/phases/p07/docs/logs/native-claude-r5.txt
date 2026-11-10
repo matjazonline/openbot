@@ -1,0 +1,6 @@
+
+running 1 test
+test adapters::persistence::workflow::tests::local_agent_tests::e2e::native::cloudroom_e2e_native_claude_packaged_plugin_pairing_workflow_ui_restart_followup_stop ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3323 filtered out; finished in 51.88s
+

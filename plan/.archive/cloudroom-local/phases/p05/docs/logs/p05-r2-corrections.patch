@@ -1,0 +1,1537 @@
+diff --git a/migrations/20260817000000_init_schema.sql b/migrations/20260817000000_init_schema.sql
+index c19e0b84..bafacb0e 100644
+--- a/migrations/20260817000000_init_schema.sql
++++ b/migrations/20260817000000_init_schema.sql
+@@ -13770,6 +13770,7 @@ CREATE TABLE public.workflow_local_agent_calls (
+     fence_expires_at timestamptz,
+     effect_kind text NOT NULL DEFAULT 'local_agent' CHECK (effect_kind='local_agent'),
+     ready_at timestamptz,
++    workflow_outcome text CHECK (workflow_outcome IN ('succeeded','failed','cancelled','expired','uncertain')),
+     created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
+     PRIMARY KEY (company_id,run_id,execution_id),
+     UNIQUE (company_id,invocation_id),
+@@ -13791,7 +13792,8 @@ CREATE TABLE public.workflow_local_agent_calls (
+         REFERENCES public.workflow_action_dispatches(company_id,run_id,execution_id,invocation_id,argument_digest,id,effect_kind),
+     CHECK (num_nonnulls(machine_id,installation_id,session_id,operation_id,wait_id,dispatch_id,fence_expires_at) IN (0,7)),
+     CHECK (operation_id IS NULL OR operation_id=invocation_id),
+-    CHECK (ready_at IS NULL OR operation_id IS NOT NULL)
++    CHECK (ready_at IS NULL OR operation_id IS NOT NULL),
++    CHECK ((ready_at IS NULL)=(workflow_outcome IS NULL))
+ );
+ 
+ CREATE FUNCTION public.workflow_local_agent_call_guard() RETURNS trigger LANGUAGE plpgsql AS $$
+@@ -13801,13 +13803,17 @@ BEGIN
+             IS DISTINCT FROM (OLD.company_id,OLD.run_id,OLD.execution_id,OLD.invocation_id,OLD.argument_digest,OLD.profile_id,OLD.created_at)
+             OR (OLD.operation_id IS NOT NULL AND (NEW.machine_id,NEW.installation_id,NEW.session_id,NEW.operation_id,NEW.wait_id,NEW.dispatch_id,NEW.fence_expires_at)
+                 IS DISTINCT FROM (OLD.machine_id,OLD.installation_id,OLD.session_id,OLD.operation_id,OLD.wait_id,OLD.dispatch_id,OLD.fence_expires_at))
+-            OR (OLD.ready_at IS NOT NULL AND NEW.ready_at IS DISTINCT FROM OLD.ready_at)
++            OR (OLD.ready_at IS NOT NULL AND ROW(NEW.ready_at,NEW.workflow_outcome) IS DISTINCT FROM ROW(OLD.ready_at,OLD.workflow_outcome))
+         THEN RAISE EXCEPTION 'local workflow call identity is immutable' USING ERRCODE='23514', CONSTRAINT='workflow_guard:local_agent_identity'; END IF;
+     END IF;
+     IF NEW.ready_at IS NOT NULL AND NOT EXISTS (
+         SELECT 1 FROM local_agent_operations AS operation WHERE operation.company_id=NEW.company_id
+             AND operation.id=NEW.operation_id AND operation.outcome IS NOT NULL
+     ) THEN RAISE EXCEPTION 'local workflow wake requires a settled operation' USING ERRCODE='23514', CONSTRAINT='workflow_guard:local_agent_wake'; END IF;
++    IF NEW.ready_at IS NOT NULL AND (TG_OP='INSERT' OR OLD.ready_at IS NULL) AND NOT EXISTS (
++        SELECT 1 FROM local_agent_operations AS operation WHERE operation.company_id=NEW.company_id AND operation.id=NEW.operation_id
++            AND NEW.workflow_outcome=CASE WHEN operation.deadline<=NEW.ready_at THEN 'expired' ELSE operation.outcome END
++    ) THEN RAISE EXCEPTION 'local workflow disposition must match its first terminal observation' USING ERRCODE='23514', CONSTRAINT='workflow_guard:local_agent_disposition'; END IF;
+     RETURN NEW;
+ END $$;
+ CREATE TRIGGER workflow_local_agent_call_guard BEFORE INSERT OR UPDATE ON public.workflow_local_agent_calls
+@@ -13815,8 +13821,10 @@ CREATE TRIGGER workflow_local_agent_call_guard BEFORE INSERT OR UPDATE ON public
+ 
+ -- Receipt/output and wake readiness share the operation writer's transaction, including expiry.
+ CREATE FUNCTION public.workflow_local_agent_outcome_wake() RETURNS trigger LANGUAGE plpgsql AS $$
++DECLARE observed_at timestamptz := clock_timestamp();
+ BEGIN
+-    UPDATE workflow_local_agent_calls AS call SET ready_at=clock_timestamp()
++    UPDATE workflow_local_agent_calls AS call SET ready_at=observed_at,
++        workflow_outcome=CASE WHEN NEW.deadline<=observed_at THEN 'expired' ELSE NEW.outcome END
+         WHERE call.company_id=NEW.company_id AND call.operation_id=NEW.id AND call.ready_at IS NULL;
+     RETURN NEW;
+ END $$;
+diff --git a/scripts/tests/local-agents-browser.mjs b/scripts/tests/local-agents-browser.mjs
+index b61c2ee7..6ff27011 100644
+--- a/scripts/tests/local-agents-browser.mjs
++++ b/scripts/tests/local-agents-browser.mjs
+@@ -9,6 +9,7 @@ const directory = process.env.CLOUDROOM_MANAGEMENT_BROWSER_FIXTURES;
+ assert.ok(directory, 'Run dump_cloudroom_management_browser_fixtures against owned PostgreSQL');
+ const fixture = name => readFileSync(`${directory}/${name}`);
+ const metadata = JSON.parse(fixture('metadata.json'));
++const paging = JSON.parse(fixture('profiles-navigation.json'));
+ const root = new URL('../../', import.meta.url);
+ const csp = readFileSync(new URL('src/adapters/http/security.rs', root), 'utf8').match(/const CSP: &str = "([^"]+)";/)[1];
+ 
+@@ -35,7 +36,10 @@ test('local profile and session forms escape native output and acknowledge accep
+       } catch { response.writeHead(404).end(); }
+       return;
+     }
+-    response.writeHead(200, { 'content-type': 'text/html', 'content-security-policy': csp }).end(fixture('page.html'));
++    const file = url.searchParams.get('profile') === paging.profile ? 'profiles-selected.html'
++      : url.searchParams.get('after_profile') === paging.cursor ? 'profiles-next.html'
++      : url.searchParams.get('conversation') === paging.conversation ? 'profiles-first.html' : 'page.html';
++    response.writeHead(200, { 'content-type': 'text/html', 'content-security-policy': csp }).end(fixture(file));
+   });
+   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+   const browser = await chromium.launch(process.env.CHROME_PATH ? { executablePath: process.env.CHROME_PATH } : {});
+@@ -48,11 +52,12 @@ test('local profile and session forms escape native output and acknowledge accep
+       if (message.text().startsWith('LOCAL_FORM_STATE ')) submissions.push(JSON.parse(message.text().slice(17)));
+     });
+     await page.goto(`http://127.0.0.1:${server.address().port}/ui/companies/${metadata.company}/local-agents`);
+-    await page.evaluate(() => document.addEventListener('submit', event => {
++    const observeSubmits = () => page.evaluate(() => document.addEventListener('submit', event => {
+       const form = event.target;
+       console.info('LOCAL_FORM_STATE ' + JSON.stringify({ busy: form.getAttribute('aria-busy'),
+         disabled: form.querySelector('button').getAttribute('aria-disabled') }));
+     }));
++    await observeSubmits();
+     await expect(page.locator('main img')).toHaveCount(0);
+     await expect(page.getByText('Result <img src=x onerror=alert(1)>', { exact: true })).toBeVisible();
+     await expect(page.getByText('Measured usage: Unavailable', { exact: true })).toBeVisible();
+@@ -83,6 +88,23 @@ test('local profile and session forms escape native output and acknowledge accep
+     release();
+     await page.waitForURL('**/sessions');
+     await page.waitForLoadState('load');
++    const base = `http://127.0.0.1:${server.address().port}/ui/companies/${paging.company}/local-agents`;
++    await page.goto(`${base}?channel=${paging.channel}&conversation=${paging.conversation}`);
++    await page.getByRole('link', { name: 'More profiles', exact: true }).click();
++    assert.equal(new URL(page.url()).searchParams.get('conversation'), paging.conversation);
++    await page.getByRole('link', { name: paging.name, exact: true }).click();
++    assert.equal(new URL(page.url()).searchParams.get('conversation'), paging.conversation);
++    await expect(form.locator('[name=profile_id]')).toHaveValue(paging.profile);
++    await expect(form.locator('[name=conversation_id]')).toHaveValue(paging.conversation);
++    await observeSubmits();
++    await form.locator('textarea').fill('Use the selected later-page profile');
++    await form.getByRole('button').click({ noWaitAfter: true });
++    await expect.poll(() => writes.length).toBe(2);
++    assert.equal(writes[1].fields.get('profile_id'), paging.profile);
++    assert.equal(writes[1].fields.get('conversation_id'), paging.conversation);
++    release();
++    await page.waitForURL('**/sessions');
++    await page.waitForLoadState('load');
+     assert.deepEqual(errors, []);
+   } finally {
+     release?.();
+diff --git a/src/adapters/http/pages/local_agents/mod.rs b/src/adapters/http/pages/local_agents/mod.rs
+index 1e248de9..ac31627c 100644
+--- a/src/adapters/http/pages/local_agents/mod.rs
++++ b/src/adapters/http/pages/local_agents/mod.rs
+@@ -49,6 +49,17 @@ pub fn page(view: &Page<'_>) -> String {
+ fn base(company: Uuid) -> String {
+     format!("/ui/companies/{company}/local-agents")
+ }
++fn navigation(view: &Page<'_>, query: &str) -> String {
++    let context = view.conversation.map_or_else(String::new, |thread| {
++        format!("&channel={}&conversation={}", thread.channel_id, thread.id)
++    });
++    format!("{}?{query}{context}", base(view.company.id))
++}
++fn conversation_fields(view: &Page<'_>) -> String {
++    view.conversation.map_or_else(String::new, |thread| format!(
++        r#"<input type="hidden" name="channel" value="{}"><input type="hidden" name="conversation" value="{}">"#,
++        thread.channel_id, thread.id))
++}
+ fn request_id() -> Uuid {
+     Uuid::new_v4()
+ }
+diff --git a/src/adapters/http/pages/local_agents/profiles.rs b/src/adapters/http/pages/local_agents/profiles.rs
+index 7989ca55..e54638b8 100644
+--- a/src/adapters/http/pages/local_agents/profiles.rs
++++ b/src/adapters/http/pages/local_agents/profiles.rs
+@@ -2,8 +2,9 @@ use super::*;
+ 
+ pub(super) fn render(view: &Page<'_>) -> String {
+     let base = base(view.company.id);
+-    let rows=view.profiles.entries.iter().map(|profile|format!(r#"<li class="flex flex-wrap items-center gap-3"><a class="link" href="{base}?profile={id}">{name}</a><span>{provider} · {model} · project {project}</span><code class="select-all text-xs">{id}</code>{delete}</li>"#,
++    let rows=view.profiles.entries.iter().map(|profile|format!(r#"<li class="flex flex-wrap items-center gap-3"><a class="link" href="{link}">{name}</a><span>{provider} · {model} · project {project}</span><code class="select-all text-xs">{id}</code>{delete}</li>"#,
+         id=profile.id,name=text(&profile.name),provider=text(&enum_value(&profile.selection.provider)),model=text(profile.selection.model.as_str()),project=text(profile.selection.project_id.as_str()),
++        link=attr(&navigation(view,&format!("profile={}",profile.id))),
+         delete=form(&format!("{base}/profiles/{}/delete",profile.id),"","Delete unused profile"))).collect::<String>();
+     let next = if view.profiles.truncated {
+         view.profiles
+@@ -11,8 +12,8 @@ pub(super) fn render(view: &Page<'_>) -> String {
+             .last()
+             .map_or_else(String::new, |profile| {
+                 format!(
+-                    r#"<a class="link" href="{base}?after_profile={}">More profiles</a>"#,
+-                    profile.id
++                    r#"<a class="link" href="{}">More profiles</a>"#,
++                    attr(&navigation(view, &format!("after_profile={}", profile.id)))
+                 )
+             })
+     } else {
+@@ -88,8 +89,9 @@ fn editor(view: &Page<'_>) -> String {
+         )
+     });
+     let picker = format!(
+-        r#"<form method="get" action="{base}" class="space-y-3"><input type="hidden" name="machine" value="{machine}">{profile_hidden}<label class="block">Provider<select class="select w-full" name="provider">{providers}</select></label><label class="block">Model<select class="select w-full" name="model">{models}</select></label><button type="submit" class="btn btn-ghost">Choose provider / model</button></form>"#,
+-        machine = machine.machine.id
++        r#"<form method="get" action="{base}" class="space-y-3"><input type="hidden" name="machine" value="{machine}">{profile_hidden}{context}<label class="block">Provider<select class="select w-full" name="provider">{providers}</select></label><label class="block">Model<select class="select w-full" name="model">{models}</select></label><button type="submit" class="btn btn-ghost">Choose provider / model</button></form>"#,
++        machine = machine.machine.id,
++        context = conversation_fields(view)
+     );
+     let projects = runtime
+         .projects
+diff --git a/src/adapters/http/pages/local_agents/sessions.rs b/src/adapters/http/pages/local_agents/sessions.rs
+index a64942eb..3d8bf49a 100644
+--- a/src/adapters/http/pages/local_agents/sessions.rs
++++ b/src/adapters/http/pages/local_agents/sessions.rs
+@@ -15,7 +15,21 @@ pub(super) fn start(view: &Page<'_>) -> String {
+         .profiles
+         .entries
+         .iter()
+-        .map(|profile| option(&profile.id.to_string(), &profile.name, false))
++        .chain(view.profile.filter(|profile| {
++            !view
++                .profiles
++                .entries
++                .iter()
++                .any(|entry| entry.id == profile.id)
++        }))
++        .map(|profile| {
++            option(
++                &profile.id.to_string(),
++                &profile.name,
++                view.profile
++                    .is_some_and(|selected| selected.id == profile.id),
++            )
++        })
+         .collect::<String>();
+     let fields = format!(
+         r#"<input type="hidden" name="request_id" value="{request}"><input type="hidden" name="conversation_id" value="{conversation}"><label class="block">Local profile<select name="profile_id" class="select w-full" required>{profiles}</select></label><label class="block">Prompt<textarea name="prompt" class="textarea w-full" required maxlength="32768" rows="4"></textarea></label><p>This starts a native CLI agent with the profile's local files and permissions. Only this bounded prompt is sent; Openbot conversation history and tool authority are not added.</p>"#,
+diff --git a/src/adapters/http/routes/ui_local_agents_tests.rs b/src/adapters/http/routes/ui_local_agents_tests.rs
+index 0183fa0f..d48c9671 100644
+--- a/src/adapters/http/routes/ui_local_agents_tests.rs
++++ b/src/adapters/http/routes/ui_local_agents_tests.rs
+@@ -1,4 +1,8 @@
+ use super::*;
++use crate::application::ports::{
++    channel::{ChannelPersistence, ChannelWrite},
++    thread::ThreadPersistence,
++};
+ 
+ fn form_request(path: &str, cookie: &HeaderValue, fields: &[(&str, String)]) -> Request<Body> {
+     let mut result = request(Method::POST, path, cookie, json!({}));
+@@ -24,8 +28,7 @@ async fn html(response: Response) -> String {
+     .unwrap()
+ }
+ 
+-#[tokio::test]
+-async fn cloudroom_management_ui_native_forms_parse_save_start_and_render_original_session() {
++async fn profile_fixture() -> (Fixture, LocalAgentProfile) {
+     let f = Fixture::new().await.unwrap();
+     let paired = f.pair(f.company).await;
+     f.install_catalog(&paired).await;
+@@ -40,10 +43,11 @@ async fn cloudroom_management_ui_native_forms_parse_save_start_and_render_origin
+         .await
+         .unwrap();
+     f.cases.save_profile(f.owner, &profile).await.unwrap();
+-    let (app, authority) = app(&f);
+-    let cookie = cookie(&f, &authority, f.owner).await;
+-    let base = format!("/ui/companies/{}/local-agents", f.company);
+-    let fields = [
++    (f, profile)
++}
++
++fn profile_fields(profile: &LocalAgentProfile) -> Vec<(&'static str, String)> {
++    vec![
+         ("name", "Edited <profile>".to_owned()),
+         ("machine_id", profile.selection.machine_id.to_string()),
+         ("project", profile.selection.project_id.to_string()),
+@@ -64,7 +68,123 @@ async fn cloudroom_management_ui_native_forms_parse_save_start_and_render_origin
+                 .unwrap()
+                 .to_owned(),
+         ),
++    ]
++}
++
++async fn readable_conversation(f: &Fixture) -> crate::domain::entities::thread::Thread {
++    let channel = ChannelPersistence::create(
++        f.persistence.as_ref(),
++        f.company,
++        ChannelWrite {
++            name: "Paging conversation".into(),
++            slug: format!("paging-{}", Uuid::new_v4().simple()),
++            ..Default::default()
++        },
++    )
++    .await
++    .unwrap();
++    let id = Uuid::new_v4();
++    sqlx::query("INSERT INTO threads(id,company_id,channel_id,subject) VALUES($1,$2,$3,'Paging conversation')")
++        .bind(id).bind(f.company).bind(channel.id).execute(&f.database.pool).await.unwrap();
++    f.persistence.get_thread_by_id(id).await.unwrap().unwrap()
++}
++
++#[tokio::test]
++async fn cloudroom_management_ui_later_profile_page_and_selection_keep_authorized_start_conversation()
++ {
++    let (f, profile) = profile_fixture().await;
++    sqlx::query("INSERT INTO local_agent_profiles(company_id,id,machine_id,name,selection) SELECT $1,gen_random_uuid(),$2,'Paging profile '||number::text,$3 FROM generate_series(1,101) AS number")
++        .bind(f.company).bind(profile.selection.machine_id.as_uuid()).bind(serde_json::to_value(&profile.selection).unwrap()).execute(&f.database.pool).await.unwrap();
++    let (target,name):(Uuid,String)=sqlx::query_as("SELECT id,name FROM local_agent_profiles WHERE company_id=$1 AND id<>$2 ORDER BY id DESC LIMIT 1")
++        .bind(f.company).bind(profile.id.as_uuid()).fetch_one(&f.database.pool).await.unwrap();
++    let thread = readable_conversation(&f).await;
++    let (channel, conversation) = (thread.channel_id, thread.id);
++    let (app, authority) = app(&f);
++    let cookie = cookie(&f, &authority, f.owner).await;
++    let base = format!("/ui/companies/{}/local-agents", f.company);
++    let first = html(
++        app.clone()
++            .oneshot(request(
++                Method::GET,
++                &format!("{base}?channel={channel}&conversation={conversation}"),
++                &cookie,
++                json!({}),
++            ))
++            .await
++            .unwrap(),
++    )
++    .await;
++    let next = link(&first, "More profiles");
++    let query = url::Url::parse(&format!("http://localhost{next}")).unwrap();
++    assert!(
++        query
++            .query_pairs()
++            .any(|(key, value)| key == "conversation" && value == conversation.to_string())
++    );
++    let second = html(
++        app.clone()
++            .oneshot(request(Method::GET, &next, &cookie, json!({})))
++            .await
++            .unwrap(),
++    )
++    .await;
++    let selected = link(&second, &name);
++    let selected = html(
++        app.clone()
++            .oneshot(request(Method::GET, &selected, &cookie, json!({})))
++            .await
++            .unwrap(),
++    )
++    .await;
++    assert!(selected.contains(&format!("<option value=\"{target}\" selected>")));
++    assert!(selected.contains(&format!(
++        "name=\"conversation_id\" value=\"{conversation}\""
++    )));
++    let id = Uuid::new_v4();
++    let fields = [
++        ("request_id", id.to_string()),
++        ("profile_id", target.to_string()),
++        ("conversation_id", conversation.to_string()),
++        ("prompt", "Use the later-page profile".to_owned()),
+     ];
++    let response = app
++        .oneshot(form_request(&format!("{base}/sessions"), &cookie, &fields))
++        .await
++        .unwrap();
++    assert_eq!(response.status(), StatusCode::SEE_OTHER);
++    let saved: (Uuid, Uuid) =
++        sqlx::query_as("SELECT profile_id,conversation_id FROM local_agent_sessions WHERE id=$1")
++            .bind(id)
++            .fetch_one(&f.database.pool)
++            .await
++            .unwrap();
++    assert_eq!(saved, (target, conversation));
++}
++
++fn link(html: &str, label: &str) -> String {
++    assert!(
++        html.contains(&format!(">{label}</a>")),
++        "Expected rendered navigation link {label}: {html}"
++    );
++    html.split(&format!(">{label}</a>"))
++        .next()
++        .unwrap()
++        .rsplit("href=\"")
++        .next()
++        .unwrap()
++        .split('"')
++        .next()
++        .unwrap()
++        .replace("&amp;", "&")
++}
++
++#[tokio::test]
++async fn cloudroom_management_ui_native_forms_parse_save_start_and_render_original_session() {
++    let (f, profile) = profile_fixture().await;
++    let (app, authority) = app(&f);
++    let cookie = cookie(&f, &authority, f.owner).await;
++    let base = format!("/ui/companies/{}/local-agents", f.company);
++    let fields = profile_fields(&profile);
+     let response = app
+         .clone()
+         .oneshot(form_request(
+@@ -143,20 +263,7 @@ async fn cloudroom_management_ui_native_forms_parse_save_start_and_render_origin
+ 
+ #[tokio::test]
+ async fn cloudroom_management_ui_foreign_selection_and_form_mutations_cannot_cross_company() {
+-    let f = Fixture::new().await.unwrap();
+-    let paired = f.pair(f.company).await;
+-    f.install_catalog(&paired).await;
+-    let profile = f.profile(paired.receipt.machine.id);
+-    f.cases
+-        .set_projects(
+-            f.owner,
+-            f.company,
+-            paired.receipt.machine.id,
+-            std::slice::from_ref(&profile.selection.project_id),
+-        )
+-        .await
+-        .unwrap();
+-    f.cases.save_profile(f.owner, &profile).await.unwrap();
++    let (f, profile) = profile_fixture().await;
+     let pairing = f
+         .cases
+         .create_pairing(f.owner, f.company, None)
+@@ -166,7 +273,7 @@ async fn cloudroom_management_ui_foreign_selection_and_form_mutations_cannot_cro
+     let cookie = cookie(&f, &authority, f.owner).await;
+     let base = format!("/ui/companies/{}/local-agents", f.foreign);
+     for query in [
+-        format!("machine={}", paired.receipt.machine.id),
++        format!("machine={}", profile.selection.machine_id),
+         format!("profile={}", profile.id),
+     ] {
+         assert_eq!(
+@@ -186,22 +293,22 @@ async fn cloudroom_management_ui_foreign_selection_and_form_mutations_cannot_cro
+     let mutations = [
+         (
+             format!("{base}/pairings"),
+-            vec![("replace", paired.receipt.machine.id.to_string())],
++            vec![("replace", profile.selection.machine_id.to_string())],
+         ),
+         (
+             format!("{base}/pairings/{}/cancel", pairing.attempt.id),
+             vec![],
+         ),
+         (
+-            format!("{base}/machines/{}/state", paired.receipt.machine.id),
++            format!("{base}/machines/{}/state", profile.selection.machine_id),
+             vec![("change", "disable".into())],
+         ),
+         (
+-            format!("{base}/machines/{}/projects", paired.receipt.machine.id),
++            format!("{base}/machines/{}/projects", profile.selection.machine_id),
+             vec![("project", profile.selection.project_id.to_string())],
+         ),
+         (
+-            format!("{base}/machines/{}/test", paired.receipt.machine.id),
++            format!("{base}/machines/{}/test", profile.selection.machine_id),
+             vec![("request_id", Uuid::new_v4().to_string())],
+         ),
+         (format!("{base}/profiles/{}/delete", profile.id), vec![]),
+diff --git a/src/adapters/persistence/local_agents/management/tests.rs b/src/adapters/persistence/local_agents/management/tests.rs
+index 859c7731..33b706df 100644
+--- a/src/adapters/persistence/local_agents/management/tests.rs
++++ b/src/adapters/persistence/local_agents/management/tests.rs
+@@ -410,4 +410,46 @@ async fn dump_cloudroom_management_browser_fixtures() {
+     std::fs::write(root.join("app.js"), pages::application_javascript()).unwrap();
+     std::fs::write(root.join("theme-init.js"), pages::theme_init_javascript()).unwrap();
+     std::fs::write(root.join("metadata.json"),json!({"company":s.f.company,"machine":profile.selection.machine_id,"profile":profile.id,"session":id,"conversation":s.conversation}).to_string()).unwrap();
++    write_profile_navigation(&s, &root, &view).await;
++}
++
++async fn write_profile_navigation(
++    s: &Setup,
++    root: &std::path::Path,
++    view: &crate::adapters::http::pages::local_agents::Page<'_>,
++) {
++    use crate::adapters::http::pages::local_agents;
++    let p = &s.f.persistence;
++    sqlx::query("INSERT INTO local_agent_profiles(company_id,id,machine_id,name,selection) SELECT $1,gen_random_uuid(),$2,'Paging profile '||number::text,$3 FROM generate_series(1,101) AS number")
++        .bind(s.f.company).bind(s.profile.selection.machine_id.as_uuid()).bind(encode(&s.profile.selection).unwrap()).execute(&s.f.database.pool).await.unwrap();
++    let first = p.list_profiles(s.f.owner, s.f.company, None).await.unwrap();
++    let cursor = first.entries.last().unwrap().id;
++    let second = p
++        .list_profiles(s.f.owner, s.f.company, Some(cursor))
++        .await
++        .unwrap();
++    let chosen = second
++        .entries
++        .iter()
++        .find(|profile| profile.id != s.profile.id)
++        .unwrap();
++    for (name, profiles, selected) in [
++        ("profiles-first.html", &first, None),
++        ("profiles-next.html", &second, None),
++        ("profiles-selected.html", &first, Some(chosen)),
++    ] {
++        let page = local_agents::Page {
++            profiles,
++            profile: selected,
++            ..*view
++        };
++        std::fs::write(root.join(name), local_agents::page(&page)).unwrap();
++    }
++    std::fs::write(
++        root.join("profiles-navigation.json"),
++        json!({"company":s.f.company,"channel":view.conversation.unwrap().channel_id,
++        "conversation":view.conversation.unwrap().id,"cursor":cursor,"profile":chosen.id,"name":chosen.name})
++        .to_string(),
++    )
++    .unwrap();
+ }
+diff --git a/src/adapters/persistence/local_agents/protocol/mod.rs b/src/adapters/persistence/local_agents/protocol/mod.rs
+index 663a6d10..ba2d8a4a 100644
+--- a/src/adapters/persistence/local_agents/protocol/mod.rs
++++ b/src/adapters/persistence/local_agents/protocol/mod.rs
+@@ -63,6 +63,9 @@ struct OperationDb {
+ const OUTSTANDING_OPERATION_SQL: &str = "(outcome IS NULL OR (outcome='uncertain' AND \
+     command->>'kind' IN ('create','send') AND COALESCE(observed_turn_state NOT IN ('completed','failed','stopped'),true)))";
+ 
++// Every expiry producer preserves possible physical work until native terminal proof.
++pub(in crate::adapters::persistence) const EXPIRATION_OUTCOME_SQL: &str = "CASE WHEN operation.delivery_attempted_at IS NULL AND operation.dispatch->>'kind'='not_dispatched' THEN 'expired' ELSE 'uncertain' END";
++
+ fn operation_columns() -> String {
+     format!(
+         "id,origin,command,deadline,payload_digest,dispatch,outcome,session_id,actor_id,delivery_attempted_at, \
+@@ -247,9 +250,9 @@ impl LocalProtocolStore for PostgresPersistence {
+             return Err(AppError::BadRequest("invalid expiration batch".into()));
+         }
+         let mut tx = begin(&self.pool).await?;
+-        let result=sqlx::query("WITH due AS (SELECT company_id,id FROM local_agent_operations WHERE outcome IS NULL AND deadline<=clock_timestamp() ORDER BY deadline,id LIMIT $1 FOR UPDATE SKIP LOCKED) \
+-            UPDATE local_agent_operations AS operation SET outcome=CASE WHEN operation.delivery_attempted_at IS NULL AND operation.dispatch->>'kind'='not_dispatched' THEN 'expired' ELSE 'uncertain' END \
+-            FROM due WHERE operation.company_id=due.company_id AND operation.id=due.id AND operation.outcome IS NULL")
++        let result=sqlx::query(&format!("WITH due AS (SELECT company_id,id FROM local_agent_operations WHERE outcome IS NULL AND deadline<=clock_timestamp() ORDER BY deadline,id LIMIT $1 FOR UPDATE SKIP LOCKED) \
++            UPDATE local_agent_operations AS operation SET outcome={EXPIRATION_OUTCOME_SQL} \
++            FROM due WHERE operation.company_id=due.company_id AND operation.id=due.id AND operation.outcome IS NULL"))
+             .bind(i64::from(limit)).execute(&mut *tx).await?;
+         tx.commit().await?;
+         Ok(result.rows_affected() as u16)
+diff --git a/Users/mac03/dev/openbot/src/adapters/persistence/workflow/local_agent_continuation_tests.rs b/src/adapters/persistence/workflow/local_agent_continuation_tests.rs
+new file mode 100644
+index 00000000..69822e85
+--- /dev/null
++++ b/src/adapters/persistence/workflow/local_agent_continuation_tests.rs
+@@ -0,0 +1,351 @@
++use super::*;
++use crate::application::local_agents::workflow::{LocalRunInputs, LocalRunProgress};
++use crate::application::ports::channel::{ChannelPersistence, ChannelWrite};
++use crate::application::workflow::actions::ActionService;
++use std::time::Duration;
++
++async fn original(s: &Setup) -> SessionId {
++    let p = &s.fixture.persistence;
++    let claim = s.claim().await;
++    s.park(&claim).await;
++    s.native_success().await;
++    p.resume_wait(s.scope).await.unwrap();
++    let next = s.claim().await;
++    let output = s
++        .handler()
++        .execute(&WorkflowStepKind(KIND.into()), &next)
++        .await
++        .completed_result()
++        .unwrap();
++    let session =
++        SessionId::new(Uuid::parse_str(output["session_id"].as_str().unwrap()).unwrap()).unwrap();
++    p.complete_io(FencedWorkflowResult {
++        fence: next.fence,
++        output,
++        policy: lease(),
++    })
++    .await
++    .unwrap()
++    .unwrap();
++    session
++}
++
++fn inputs(profile: ProfileId, session: SessionId) -> Value {
++    json!({"profile_id":{"literal":profile},"session_id":{"literal":session},"prompt":{"literal":"explicit workflow follow-up"}})
++}
++
++async fn invoke(
++    s: &Setup,
++    claim: &ClaimedWorkflow,
++) -> crate::app_error::AppResult<LocalRunProgress> {
++    let inputs: LocalRunInputs = serde_json::from_value(claim.activation.inputs.clone()).unwrap();
++    ActionService::new(local_agents::PostgresLocalAgentWorkflow::new(
++        s.fixture.persistence.clone(),
++        Some(super::super::approval_test_support::notices(
++            &s.fixture.persistence,
++        )),
++    ))
++    .run_local_agent(claim, &inputs, lease())
++    .await
++}
++
++#[tokio::test]
++async fn cloudroom_workflow_explicit_continuation_keeps_frozen_selection_and_approval_after_profile_edit()
++ {
++    let s = Setup::new().await;
++    let p = &s.fixture.persistence;
++    let session = original(&s).await;
++    let mut with = inputs(s.profile.id, session);
++    with["approval"] = json!({"literal":{"reviewers":[{"kind":"user","id":s.fixture.target.actor.user_id()}],"deadline":(chrono::Utc::now()+chrono::Duration::minutes(20)).to_rfc3339()}});
++    let scope = s
++        .activate(s.fixture.target.actor, with, RelatedAssociation::Company)
++        .await;
++    let claim = p
++        .claim_io(scope, WorkflowWorkerId(Uuid::new_v4()), lease())
++        .await
++        .unwrap()
++        .unwrap();
++    assert!(matches!(
++        invoke(&s, &claim).await.unwrap(),
++        LocalRunProgress::Suspended(_)
++    ));
++    let before:Value=sqlx::query_scalar("SELECT jsonb_build_object('digest',argument_digest,'operation',operation) FROM workflow_action_intents WHERE run_id=$1")
++        .bind(scope.run.as_uuid()).fetch_one(p.pool()).await.unwrap();
++    let mut edited = s.profile.clone();
++    edited.selection.policy.reasoning = LocalReasoningLevel::High;
++    p.save_profile(s.fixture.target.actor.user_id(), &edited)
++        .await
++        .unwrap();
++    let command =
++        super::super::approval_test_support::command(p, scope, s.fixture.target.actor, "approve")
++            .await;
++    p.submit_decision(command).await.unwrap();
++    let next = p
++        .claim_io(scope, WorkflowWorkerId(Uuid::new_v4()), lease())
++        .await
++        .unwrap()
++        .unwrap();
++    assert!(matches!(
++        invoke(&s, &next).await.unwrap(),
++        LocalRunProgress::Suspended(_)
++    ));
++    let after:Value=sqlx::query_scalar("SELECT jsonb_build_object('digest',argument_digest,'operation',operation) FROM workflow_action_intents WHERE run_id=$1")
++        .bind(scope.run.as_uuid()).fetch_one(p.pool()).await.unwrap();
++    assert_eq!(before, after);
++    assert_eq!(
++        after["operation"]["arguments"]["selection"],
++        serde_json::to_value(&s.profile.selection).unwrap()
++    );
++    let native = s.native_started().await;
++    let command: Value =
++        sqlx::query_scalar("SELECT command FROM local_agent_operations WHERE id=$1")
++            .bind(native.operation.as_uuid())
++            .fetch_one(p.pool())
++            .await
++            .unwrap();
++    assert_eq!(command["kind"], "send");
++    assert_eq!(command["session_id"], json!(session));
++    s.native_complete(&native).await;
++    p.resume_wait(scope).await.unwrap();
++    let final_claim = p
++        .claim_io(scope, WorkflowWorkerId(Uuid::new_v4()), lease())
++        .await
++        .unwrap()
++        .unwrap();
++    assert!(matches!(
++        invoke(&s, &final_claim).await.unwrap(),
++        LocalRunProgress::Completed(_)
++    ));
++    let sessions: i64 = sqlx::query_scalar("SELECT count(*) FROM local_agent_sessions")
++        .fetch_one(p.pool())
++        .await
++        .unwrap();
++    assert_eq!(sessions, 1);
++}
++
++#[tokio::test]
++async fn cloudroom_workflow_continuation_refuses_other_profile_and_other_original_association() {
++    let s = Setup::new().await;
++    let p = &s.fixture.persistence;
++    let session = original(&s).await;
++    let mut other = s.profile.clone();
++    other.id = ProfileId::new(Uuid::new_v4()).unwrap();
++    other.name = "Other profile".into();
++    p.save_profile(s.fixture.target.actor.user_id(), &other)
++        .await
++        .unwrap();
++    let channel = ChannelPersistence::create(
++        p,
++        s.scope.company.as_uuid(),
++        ChannelWrite {
++            name: "Other scope".into(),
++            slug: format!("scope-{}", Uuid::new_v4().simple()),
++            ..Default::default()
++        },
++    )
++    .await
++    .unwrap();
++    for (profile, association) in [
++        (other.id, RelatedAssociation::Company),
++        (
++            s.profile.id,
++            RelatedAssociation::Channel(crate::application::workflow::RelatedChannelId::new(
++                channel.id,
++            )),
++        ),
++    ] {
++        let scope = s
++            .activate(
++                s.fixture.target.actor,
++                inputs(profile, session),
++                association,
++            )
++            .await;
++        let claim = p
++            .claim_io(scope, WorkflowWorkerId(Uuid::new_v4()), lease())
++            .await
++            .unwrap()
++            .unwrap();
++        assert!(matches!(
++            invoke(&s, &claim).await,
++            Err(AppError::NotFound(_))
++        ));
++    }
++    assert_eq!(s.rows().await["operations"], 1);
++}
++
++async fn admin(s: &Setup) -> WorkflowActor {
++    let user: Uuid = sqlx::query_scalar(
++        "SELECT user_id FROM company_members WHERE company_id=$1 AND role='admin'",
++    )
++    .bind(s.scope.company.as_uuid())
++    .fetch_one(s.fixture.persistence.pool())
++    .await
++    .unwrap();
++    WorkflowActor::authenticated(user).unwrap()
++}
++
++#[tokio::test]
++async fn cloudroom_workflow_continuation_refuses_withdrawn_original_private_access() {
++    let s = Setup::configured(|_, _| {}, TestAssociation::PrivateConversation).await;
++    let p = &s.fixture.persistence;
++    let session = original(&s).await;
++    let actor = admin(&s).await;
++    sqlx::query("UPDATE users SET email_verified_at=CURRENT_TIMESTAMP WHERE id=$1")
++        .bind(actor.user_id())
++        .execute(p.pool())
++        .await
++        .unwrap();
++    let (channel, thread): (Uuid, Uuid) =
++        sqlx::query_as("SELECT channel_id,thread_id FROM workflow_runs WHERE id=$1")
++            .bind(s.scope.run.as_uuid())
++            .fetch_one(p.pool())
++            .await
++            .unwrap();
++    sqlx::query("INSERT INTO channel_principal_grants(company_id,channel_id,principal_id,capability,provenance) SELECT $1,$2,id,'view','configured_allowlist' FROM principals WHERE company_id=$1 AND user_id=$3")
++        .bind(s.scope.company.as_uuid()).bind(channel).bind(actor.user_id()).execute(p.pool()).await.unwrap();
++    assert!(
++        crate::application::local_agents::management::LocalAgentManagementStore::read_session(
++            p,
++            actor.user_id(),
++            s.scope.company.as_uuid(),
++            session
++        )
++        .await
++        .is_ok()
++    );
++    let association = RelatedAssociation::Thread {
++        channel_id: crate::application::workflow::RelatedChannelId::new(channel),
++        thread_id: crate::application::workflow::RelatedThreadId::new(thread),
++    };
++    let scope = s
++        .activate(actor, inputs(s.profile.id, session), association)
++        .await;
++    let claim = p
++        .claim_io(scope, WorkflowWorkerId(Uuid::new_v4()), lease())
++        .await
++        .unwrap()
++        .unwrap();
++    sqlx::query("DELETE FROM channel_principal_grants WHERE company_id=$1 AND channel_id=$2 AND principal_id IN (SELECT id FROM principals WHERE company_id=$1 AND user_id=$3)")
++        .bind(s.scope.company.as_uuid()).bind(channel).bind(actor.user_id()).execute(p.pool()).await.unwrap();
++    assert!(matches!(
++        invoke(&s, &claim).await,
++        Err(AppError::NotFound(_))
++    ));
++    assert_eq!(s.rows().await["operations"], 1);
++}
++
++async fn wait_for_lock(s: &Setup) {
++    tokio::time::timeout(Duration::from_secs(3),async {
++        loop {
++            let waiting:i64=sqlx::query_scalar("SELECT count(*) FROM pg_stat_activity WHERE datname=current_database() AND wait_event_type='Lock'")
++                .fetch_one(s.fixture.persistence.pool()).await.unwrap();
++            if waiting>0 {return;}
++            tokio::time::sleep(Duration::from_millis(5)).await;
++        }
++    }).await.unwrap();
++}
++
++#[tokio::test]
++async fn cloudroom_workflow_first_delivery_role_withdrawal_race_refuses_new_and_reconciles_attempted_work()
++ {
++    for attempted in [false, true] {
++        let s = Setup::new().await;
++        let p = &s.fixture.persistence;
++        let actor = admin(&s).await;
++        let scope=s.activate(actor,json!({"profile_id":{"literal":s.profile.id},"prompt":{"literal":"authorized workflow effect"}}),RelatedAssociation::Company).await;
++        let claim = p
++            .claim_io(scope, WorkflowWorkerId(Uuid::new_v4()), lease())
++            .await
++            .unwrap()
++            .unwrap();
++        s.park(&claim).await;
++        let (fence, _) = s.peer().await;
++        assert!(p.finish_reconciliation(fence).await.unwrap());
++        let id: Uuid = sqlx::query_scalar(
++            "SELECT operation_id FROM workflow_local_agent_calls WHERE run_id=$1",
++        )
++        .bind(scope.run.as_uuid())
++        .fetch_one(p.pool())
++        .await
++        .unwrap();
++        if attempted {
++            assert!(
++                p.pending_commands(fence)
++                    .await
++                    .unwrap()
++                    .iter()
++                    .any(|delivery| delivery.operation.id().as_uuid() == id)
++            );
++        }
++        let mut blocker = p.pool().begin().await.unwrap();
++        sqlx::query("SELECT id FROM companies WHERE id=$1 FOR NO KEY UPDATE")
++            .bind(s.scope.company.as_uuid())
++            .execute(&mut *blocker)
++            .await
++            .unwrap();
++        let pending = p.pending_commands(fence);
++        let withdraw = async {
++            wait_for_lock(&s).await;
++            sqlx::query(
++                "UPDATE company_members SET role='member' WHERE company_id=$1 AND user_id=$2",
++            )
++            .bind(s.scope.company.as_uuid())
++            .bind(actor.user_id())
++            .execute(&mut *blocker)
++            .await
++            .unwrap();
++            blocker.commit().await.unwrap();
++        };
++        let (deliveries, ()) = tokio::join!(pending, withdraw);
++        let deliveries = deliveries.unwrap();
++        let delivered = deliveries
++            .iter()
++            .find(|delivery| delivery.operation.id().as_uuid() == id);
++        if attempted {
++            assert!(matches!(
++                delivered.unwrap().mode,
++                crate::application::local_agents::protocol::DeliveryMode::Reconcile
++            ));
++        } else {
++            assert!(delivered.is_none());
++            let attempted: bool = sqlx::query_scalar(
++                "SELECT delivery_attempted_at IS NOT NULL FROM local_agent_operations WHERE id=$1",
++            )
++            .bind(id)
++            .fetch_one(p.pool())
++            .await
++            .unwrap();
++            assert!(!attempted);
++        }
++    }
++}
++
++#[tokio::test]
++async fn cloudroom_workflow_call_origin_foreign_key_refuses_direct_link_even_without_immutable_guard()
++ {
++    let s = Setup::new().await;
++    let p = &s.fixture.persistence;
++    let claim = s.claim().await;
++    s.park(&claim).await;
++    let mut tx = p.pool().begin().await.unwrap();
++    sqlx::query(
++        "ALTER TABLE local_agent_operations DISABLE TRIGGER local_operation_inputs_immutable",
++    )
++    .execute(&mut *tx)
++    .await
++    .unwrap();
++    let error =
++        sqlx::query("UPDATE local_agent_operations SET origin='direct' WHERE origin='workflow'")
++            .execute(&mut *tx)
++            .await
++            .unwrap_err();
++    assert!(
++        error
++            .as_database_error()
++            .unwrap()
++            .is_foreign_key_violation(),
++        "the composite call FK independently prevents cross-origin linkage"
++    );
++    tx.rollback().await.unwrap();
++}
+diff --git a/Users/mac03/dev/openbot/src/adapters/persistence/workflow/local_agent_correction_tests.rs b/src/adapters/persistence/workflow/local_agent_correction_tests.rs
+new file mode 100644
+index 00000000..a4fd3f9e
+--- /dev/null
++++ b/src/adapters/persistence/workflow/local_agent_correction_tests.rs
+@@ -0,0 +1,313 @@
++use super::*;
++use crate::application::local_agents::management::{
++    ControlSession, LocalAgentManagementStore, SessionCommand,
++};
++use crate::application::workflow::polling::{PollPolicy, WorkflowFairPolling};
++use std::time::Duration;
++use tokio::sync::Notify;
++use tokio_util::sync::CancellationToken;
++
++fn runner<'a, H: WorkflowHandler>(
++    p: &'a PostgresPersistence,
++    handler: &'a H,
++) -> WorkflowWorker<'a, PostgresPersistence, H> {
++    WorkflowWorker {
++        port: p,
++        handler,
++        notices: None,
++        worker: WorkflowWorkerId(Uuid::new_v4()),
++        lease: lease(),
++        poll: PollPolicy::new(Duration::from_millis(50), 8).unwrap(),
++        active_jobs: None,
++        monitoring: None,
++    }
++}
++
++async fn finish(s: &Setup, expected: &str, count: i64) {
++    tokio::time::timeout(Duration::from_secs(8), async {
++        loop {
++            let rows: i64 = sqlx::query_scalar("SELECT count(*) FROM workflow_runs WHERE state=$1")
++                .bind(expected)
++                .fetch_one(s.fixture.persistence.pool())
++                .await
++                .unwrap();
++            if rows == count {
++                return;
++            }
++            tokio::time::sleep(Duration::from_millis(20)).await;
++        }
++    })
++    .await
++    .expect("actual production worker must discover and settle local work before its deadline");
++}
++
++#[tokio::test]
++async fn cloudroom_workflow_actual_fair_poll_worker_discovers_native_result_and_completes_once() {
++    let s = Setup::new().await;
++    let p = &s.fixture.persistence;
++    let claim = s.claim().await;
++    s.park(&claim).await;
++    assert!(
++        p.poll_fair(WorkflowWorkerId(Uuid::new_v4()), 8)
++            .await
++            .unwrap()
++            .candidates
++            .is_empty()
++    );
++    s.native_success().await;
++    let page = p
++        .poll_fair(WorkflowWorkerId(Uuid::new_v4()), 8)
++        .await
++        .unwrap();
++    assert_eq!(page.candidates.len(), 1);
++    assert_eq!(page.candidates[0].scope, s.scope);
++    let handler = s.handler();
++    let worker = runner(p, &handler);
++    let wake = Notify::new();
++    let stop = CancellationToken::new();
++    tokio::join!(worker.run(&wake, &stop), async {
++        finish(&s, "succeeded", 1).await;
++        stop.cancel();
++    });
++    assert!(
++        p.poll_fair(WorkflowWorkerId(Uuid::new_v4()), 8)
++            .await
++            .unwrap()
++            .candidates
++            .is_empty()
++    );
++    assert_eq!(
++        s.rows().await,
++        json!({"calls":1,"operations":1,"intents":1,"markers":1,"receipts":1,"waits":1})
++    );
++    let attempts: i64 = sqlx::query_scalar("SELECT count(*) FROM task_attempts")
++        .fetch_one(p.pool())
++        .await
++        .unwrap();
++    assert_eq!(attempts, 2, "one parked attempt and one fresh result claim");
++}
++
++#[tokio::test]
++async fn cloudroom_workflow_first_uncertain_disposition_survives_late_success_before_and_after_wake()
++ {
++    for after_wake in [false, true] {
++        let s = Setup::new().await;
++        let p = &s.fixture.persistence;
++        let claim = s.claim().await;
++        s.park(&claim).await;
++        let native = s.native_started().await;
++        s.native_observe(&native, native.sequence + 1, TurnState::Missing)
++            .await;
++        assert_eq!(
++            p.machine_runtime(
++                s.fixture.target.actor.user_id(),
++                s.scope.company.as_uuid(),
++                s.profile.selection.machine_id
++            )
++            .await
++            .unwrap()
++            .unsettled_effects,
++            1
++        );
++        if after_wake {
++            assert!(matches!(
++                p.resume_wait(s.scope).await.unwrap(),
++                WaitProgress::Continued
++            ));
++        }
++        s.native_observe(&native, native.sequence + 2, TurnState::Completed)
++            .await;
++        assert_eq!(
++            p.machine_runtime(
++                s.fixture.target.actor.user_id(),
++                s.scope.company.as_uuid(),
++                s.profile.selection.machine_id
++            )
++            .await
++            .unwrap()
++            .unsettled_effects,
++            0
++        );
++        let handler = s.handler();
++        let worker = runner(p, &handler);
++        let wake = Notify::new();
++        let stop = CancellationToken::new();
++        tokio::join!(worker.run(&wake, &stop), async {
++            finish(&s, "failed", 1).await;
++            stop.cancel();
++        });
++        let result:Value=sqlx::query_scalar("SELECT jsonb_build_object('workflow',call.workflow_outcome,'native',operation.outcome,'text',operation.output,'receipt',receipt.result->>'status') FROM workflow_local_agent_calls AS call JOIN local_agent_operations AS operation ON operation.company_id=call.company_id AND operation.id=call.operation_id JOIN workflow_action_receipts AS receipt ON receipt.company_id=call.company_id AND receipt.invocation_id=call.invocation_id")
++            .fetch_one(p.pool()).await.unwrap();
++        assert_eq!(
++            result,
++            json!({"workflow":"uncertain","native":"succeeded","text":"native output","receipt":"uncertain"})
++        );
++        let messages: i64 = sqlx::query_scalar("SELECT count(*) FROM message_deliveries")
++            .fetch_one(p.pool())
++            .await
++            .unwrap();
++        assert_eq!(messages, 0);
++    }
++}
++
++async fn advance_clock(s: &Setup) {
++    let p = s.fixture.persistence.pool();
++    // Only this owned test database shadows SQL's clock. Frozen operations/digests
++    // and all production guards remain unchanged while local deadlines become due.
++    sqlx::raw_sql("CREATE SCHEMA cloudroom_test_clock; CREATE FUNCTION cloudroom_test_clock.clock_timestamp() RETURNS timestamptz LANGUAGE sql VOLATILE AS $$ SELECT pg_catalog.clock_timestamp()+interval '31 minutes' $$;")
++        .execute(p).await.unwrap();
++    let mut connections = Vec::new();
++    for _ in 0..p.options().get_max_connections() {
++        let mut connection = p.acquire().await.unwrap();
++        sqlx::query("SET search_path=cloudroom_test_clock,public,pg_catalog")
++            .execute(&mut *connection)
++            .await
++            .unwrap();
++        connections.push(connection);
++    }
++    drop(connections);
++}
++
++struct NativeQueue {
++    scopes: Vec<ActivationRequest>,
++    native: Vec<NativeTurn>,
++    sequence: u64,
++}
++
++async fn eight_started(s: &Setup) -> NativeQueue {
++    let p = &s.fixture.persistence;
++    let mut scopes = vec![s.scope];
++    for _ in 1..8 {
++        scopes.push(s.activate(s.fixture.target.actor,json!({"profile_id":{"literal":s.profile.id},"prompt":{"literal":"bounded native task"}}),RelatedAssociation::Company).await);
++    }
++    for scope in &scopes {
++        let claim = p
++            .claim_io(*scope, WorkflowWorkerId(Uuid::new_v4()), lease())
++            .await
++            .unwrap()
++            .unwrap();
++        s.park(&claim).await;
++    }
++    let (fence, mut sequence) = s.peer().await;
++    assert!(p.finish_reconciliation(fence).await.unwrap());
++    let deliveries = p.pending_commands(fence).await.unwrap();
++    let mut native = Vec::new();
++    for delivery in deliveries
++        .iter()
++        .filter(|delivery| delivery.operation.command().is_effect())
++    {
++        let turn = s
++            .native_received(fence, &delivery.operation, sequence)
++            .await;
++        sequence = turn.sequence;
++        native.push(turn);
++    }
++    assert_eq!(native.len(), 8);
++    NativeQueue {
++        scopes,
++        native,
++        sequence,
++    }
++}
++
++async fn expire_with_worker(s: &Setup, scopes: &[ActivationRequest]) {
++    let p = &s.fixture.persistence;
++    assert!(matches!(
++        p.resume_wait(scopes[0]).await.unwrap(),
++        WaitProgress::Continued
++    ));
++    let first:String=sqlx::query_scalar("SELECT operation.outcome FROM local_agent_operations AS operation JOIN workflow_local_agent_calls AS call ON call.company_id=operation.company_id AND call.operation_id=operation.id WHERE call.run_id=$1")
++        .bind(scopes[0].run.as_uuid()).fetch_one(p.pool()).await.unwrap();
++    assert_eq!(
++        first, "uncertain",
++        "the workflow expiry writer must preserve possibly running native work"
++    );
++    let handler = s.handler();
++    let worker = runner(p, &handler);
++    let wake = Notify::new();
++    let stop = CancellationToken::new();
++    tokio::join!(worker.run(&wake, &stop), async {
++        p.expire_operations(100).await.unwrap();
++        finish(s, "failed", 8).await;
++        stop.cancel();
++    });
++}
++
++#[tokio::test]
++async fn cloudroom_workflow_competing_expiry_keeps_eight_attempted_native_effects_until_positive_evidence()
++ {
++    let s = Setup::new().await;
++    let p = &s.fixture.persistence;
++    let NativeQueue {
++        scopes,
++        mut native,
++        sequence,
++    } = eight_started(&s).await;
++    advance_clock(&s).await;
++    expire_with_worker(&s, &scopes).await;
++    let runtime = p
++        .machine_runtime(
++            s.fixture.target.actor.user_id(),
++            s.scope.company.as_uuid(),
++            s.profile.selection.machine_id,
++        )
++        .await
++        .unwrap();
++    assert_eq!(runtime.unsettled_effects, 8);
++    let outcomes: Vec<String> = sqlx::query_scalar(
++        "SELECT workflow_outcome FROM workflow_local_agent_calls ORDER BY invocation_id",
++    )
++    .fetch_all(p.pool())
++    .await
++    .unwrap();
++    assert_eq!(outcomes, vec!["expired"; 8]);
++    let request = ControlSession {
++        actor: s.fixture.target.actor.user_id(),
++        company: s.scope.company.as_uuid(),
++        session_id: SessionId::new(native[0].operation.as_uuid()).unwrap(),
++        request_id: OperationId::new(Uuid::new_v4()).unwrap(),
++        command: SessionCommand::Send {
++            prompt: LocalPrompt::try_from("explicit ninth effect".to_owned()).unwrap(),
++        },
++    };
++    assert!(matches!(
++        p.control_session(&request).await,
++        Err(AppError::Conflict(_))
++    ));
++    assert_eq!(s.rows().await["operations"], 8);
++    let (replacement, _) = s.peer().await;
++    let mut turn = native.remove(0);
++    turn.fence = replacement;
++    s.native_observe(&turn, sequence + 1, TurnState::Completed)
++        .await;
++    assert_eq!(
++        p.machine_runtime(
++            s.fixture.target.actor.user_id(),
++            s.scope.company.as_uuid(),
++            s.profile.selection.machine_id
++        )
++        .await
++        .unwrap()
++        .unsettled_effects,
++        7
++    );
++    assert!(
++        p.control_session(&request).await.is_ok(),
++        "the exact ninth request can admit only after positive physical-terminal evidence frees a slot"
++    );
++    assert_eq!(s.rows().await["operations"], 9);
++    assert!(
++        p.claim_io(s.scope, WorkflowWorkerId(Uuid::new_v4()), lease())
++            .await
++            .unwrap()
++            .is_none()
++    );
++    let receipt: String = sqlx::query_scalar(
++        "SELECT result->>'status' FROM workflow_action_receipts WHERE invocation_id=$1",
++    )
++    .bind(turn.operation.as_uuid())
++    .fetch_one(p.pool())
++    .await
++    .unwrap();
++    assert_eq!(receipt, "expired");
++}
+diff --git a/src/adapters/persistence/workflow/local_agent_tests.rs b/src/adapters/persistence/workflow/local_agent_tests.rs
+index fb9115f7..76a25581 100644
+--- a/src/adapters/persistence/workflow/local_agent_tests.rs
++++ b/src/adapters/persistence/workflow/local_agent_tests.rs
+@@ -1,15 +1,15 @@
+ //! Real SQL/worker integration. Native outcomes here are server-side fixtures, not
+ //! evidence that a provider or the Cloudroom runtime executed a prompt.
+ use super::action_outcome_support::CompletedOutcome;
+-use super::message_tests::support::{admitted_as, bound, lease, published};
++use super::message_tests::support::{admitted_as, bound, lease};
+ use super::*;
+ use crate::adapters::persistence::local_agents::protocol::test_support::agent;
+ use crate::adapters::persistence::local_agents::test_support::Fixture as MachineFixture;
+ use crate::adapters::persistence::local_agents::test_support::Paired;
+ use crate::application::local_agents::workflow::{KIND, LocalAgentHandler};
+ use crate::application::local_agents::{
+-    ConnectionFence, LocalMachineStore,
+-    protocol::{JournalHello, LocalProtocolStore},
++    ConnectionFence, LocalCatalog, LocalMachineStore,
++    protocol::{JournalHello, JournalObservation, LocalProtocolStore},
+ };
+ use crate::application::workflow::completion::WorkflowCompletion;
+ use crate::application::workflow::decisions::WorkflowDecisions;
+@@ -25,11 +25,17 @@ mod behavior;
+ #[path = "local_agent_resolution_tests.rs"]
+ mod resolution;
+ 
++#[path = "local_agent_continuation_tests.rs"]
++mod continuation;
++#[path = "local_agent_correction_tests.rs"]
++mod corrections;
++
+ struct Setup {
+     fixture: Fixture,
+     profile: LocalAgentProfile,
+     scope: ActivationRequest,
+     paired: Paired,
++    journal_id: Uuid,
+ }
+ 
+ struct NativeTurn {
+@@ -37,6 +43,7 @@ struct NativeTurn {
+     operation: OperationId,
+     thread: CloudroomThreadId,
+     turn: CloudroomTurnId,
++    sequence: u64,
+ }
+ 
+ enum TestAssociation {
+@@ -102,7 +109,7 @@ impl Setup {
+         let mut inputs =
+             json!({"profile_id":{"literal":profile.id},"prompt":{"literal":"bounded native task"}});
+         customize(&mut inputs, fixture.target.actor.user_id());
+-        let version = published(&fixture, KIND, inputs).await;
++        let version = publish_local(&fixture, inputs).await;
+         let binding = bound(&fixture, version).await;
+         let scope = admitted_as(&fixture, binding, association, "local-step").await;
+         Self {
+@@ -110,6 +117,7 @@ impl Setup {
+             profile,
+             scope,
+             paired: machine,
++            journal_id: Uuid::new_v4(),
+         }
+     }
+     fn handler(&self) -> LocalAgentHandler<local_agents::PostgresLocalAgentWorkflow> {
+@@ -131,6 +139,25 @@ impl Setup {
+             .unwrap()
+             .unwrap()
+     }
++    async fn activate(
++        &self,
++        actor: WorkflowActor,
++        inputs: Value,
++        association: RelatedAssociation,
++    ) -> ActivationRequest {
++        let fixture = Fixture {
++            _db: self.fixture._db.clone(),
++            persistence: self.fixture.persistence.clone(),
++            target: DefinitionTarget {
++                actor,
++                workflow: WorkflowId::new(Uuid::new_v4()),
++                ..self.fixture.target
++            },
++        };
++        let version = publish_local(&fixture, inputs).await;
++        let binding = bound(&fixture, version).await;
++        admitted_as(&fixture, binding, association, &Uuid::new_v4().to_string()).await
++    }
+     async fn park(&self, claim: &ClaimedWorkflow) -> WaitId {
+         let inputs = serde_json::from_value(claim.activation.inputs.clone()).unwrap();
+         let actions = crate::application::workflow::actions::ActionService::new(
+@@ -158,7 +185,7 @@ impl Setup {
+             .bind(state).bind(text).bind(self.scope.company.as_uuid()).bind(self.scope.run.as_uuid()).execute(self.fixture.persistence.pool()).await.unwrap();
+     }
+ 
+-    async fn native_started(&self) -> NativeTurn {
++    async fn peer(&self) -> (ConnectionFence, u64) {
+         let p = &self.fixture.persistence;
+         let fence = p
+             .acquire_connection(
+@@ -169,28 +196,94 @@ impl Setup {
+             .await
+             .unwrap()
+             .unwrap();
++        let sequence: i64 = sqlx::query_scalar(
++            "SELECT acknowledged_sequence FROM local_machines WHERE company_id=$1 AND id=$2",
++        )
++        .bind(self.scope.company.as_uuid())
++        .bind(self.profile.selection.machine_id.as_uuid())
++        .fetch_one(p.pool())
++        .await
++        .unwrap();
+         p.connect_journal(
+             fence,
+             &JournalHello {
+                 version: 1,
+                 installation_id: fence.machine.installation_id,
+-                journal_id: Uuid::new_v4(),
+-                journal_sequence: 0,
++                journal_id: self.journal_id,
++                journal_sequence: sequence as u64,
+             },
+         )
+         .await
+         .unwrap();
++        (fence, sequence as u64)
++    }
++
++    async fn native_started(&self) -> NativeTurn {
++        let p = &self.fixture.persistence;
++        let (fence, sequence) = self.peer().await;
+         assert!(p.finish_reconciliation(fence).await.unwrap());
+-        let command = p
+-            .pending_commands(fence)
+-            .await
+-            .unwrap()
+-            .into_iter()
++        let deliveries = p.pending_commands(fence).await.unwrap();
++        let command = deliveries
++            .iter()
+             .find(|delivery| delivery.operation.command().is_effect())
+             .expect("authorized saved workflow command");
+-        let id = command.operation.id();
+-        let thread = CloudroomThreadId::try_from("thread_workflow_test".to_owned()).unwrap();
+-        let turn = CloudroomTurnId::try_from("turn_workflow_test".to_owned()).unwrap();
++        let mut native = self
++            .native_received(fence, &command.operation, sequence)
++            .await;
++        for delivery in deliveries.iter().filter(|delivery| {
++            matches!(
++                delivery.operation.command(),
++                LocalCommand::RefreshCatalog {}
++            )
++        }) {
++            let catalog:Value=sqlx::query_scalar("SELECT catalog FROM local_machine_capabilities WHERE company_id=$1 AND machine_id=$2 ORDER BY sequence DESC LIMIT 1")
++                .bind(self.scope.company.as_uuid()).bind(self.profile.selection.machine_id.as_uuid()).fetch_one(p.pool()).await.unwrap();
++            let catalog: LocalCatalog = serde_json::from_value(catalog).unwrap();
++            native.sequence += 1;
++            assert_eq!(
++                p.accept_observation(
++                    fence,
++                    &agent(
++                        native.sequence,
++                        delivery.operation.id(),
++                        LocalEvidence::Receipt {}
++                    )
++                )
++                .await
++                .unwrap(),
++                native.sequence
++            );
++            native.sequence += 1;
++            assert_eq!(
++                p.accept_observation(
++                    fence,
++                    &JournalObservation::Catalog {
++                        sequence: EventSequence::try_from(native.sequence).unwrap(),
++                        operation_id: delivery.operation.id(),
++                        catalog
++                    }
++                )
++                .await
++                .unwrap(),
++                native.sequence
++            );
++        }
++        native
++    }
++
++    async fn native_received(
++        &self,
++        fence: ConnectionFence,
++        operation: &LocalAgentOperation,
++        sequence: u64,
++    ) -> NativeTurn {
++        let p = &self.fixture.persistence;
++        let id = operation.id();
++        let thread = match operation.command() {
++            LocalCommand::Send { thread_id, .. } => thread_id.clone(),
++            _ => CloudroomThreadId::try_from(format!("thread_{}", id.as_uuid().simple())).unwrap(),
++        };
++        let turn = CloudroomTurnId::try_from(format!("turn_{}", id.as_uuid().simple())).unwrap();
+         let observations = [
+             LocalEvidence::Receipt {},
+             LocalEvidence::SubmissionIntent {},
+@@ -204,14 +297,15 @@ impl Setup {
+             },
+         ];
+         for (index, evidence) in observations.into_iter().enumerate() {
+-            let observation = agent(index as u64 + 1, id, evidence);
++            let through = sequence + index as u64 + 1;
++            let observation = agent(through, id, evidence);
+             assert_eq!(
+                 p.accept_observation(fence, &observation).await.unwrap(),
+-                index as u64 + 1
++                through
+             );
+             assert_eq!(
+                 p.accept_observation(fence, &observation).await.unwrap(),
+-                index as u64 + 1
++                through
+             );
+         }
+         NativeTurn {
+@@ -219,18 +313,24 @@ impl Setup {
+             operation: id,
+             thread,
+             turn,
++            sequence: sequence + 3,
+         }
+     }
+ 
+     async fn native_complete(&self, native: &NativeTurn) {
++        self.native_observe(native, native.sequence + 1, TurnState::Completed)
++            .await;
++    }
++    async fn native_observe(&self, native: &NativeTurn, sequence: u64, state: TurnState) {
+         let observation = agent(
+-            4,
++            sequence,
+             native.operation,
+             LocalEvidence::Turn {
+                 thread_id: native.thread.clone(),
+                 turn_id: native.turn.clone(),
+-                state: TurnState::Completed,
+-                output: Some(LocalOutput::try_from("native output".to_owned()).unwrap()),
++                state,
++                output: (state == TurnState::Completed)
++                    .then(|| LocalOutput::try_from("native output".to_owned()).unwrap()),
+                 truncated: false,
+                 usage: None,
+             },
+@@ -242,7 +342,7 @@ impl Setup {
+                     .accept_observation(native.fence, &observation)
+                     .await
+                     .unwrap(),
+-                4
++                sequence
+             );
+         }
+     }
+@@ -368,3 +468,28 @@ async fn cloudroom_workflow_result_bounds_utf8_and_classifies_native_uncertainty
+         }
+     }
+ }
++
++async fn publish_local(fixture: &Fixture, inputs: Value) -> VersionId {
++    let mut source: Value = serde_json::from_str(&registry::example(KIND).unwrap().source).unwrap();
++    source["workflow_id"] = json!(fixture.target.workflow.to_string());
++    source["steps"]["start"]["with"] = inputs;
++    let version = VersionId::new(Uuid::new_v4());
++    let service = DefinitionService::new(
++        Preflight,
++        fixture.persistence.clone(),
++        WorkflowSourceDecoder,
++        step_builtins::StepBuiltinPublicationDirectory {
++            persistence: fixture.persistence.clone(),
++        },
++    );
++    fixture
++        .publish_source(
++            &service,
++            fixture.target.workflow,
++            source.to_string(),
++            version,
++        )
++        .await
++        .unwrap();
++    version
++}
+diff --git a/src/adapters/persistence/workflow/local_agents/continuation.rs b/src/adapters/persistence/workflow/local_agents/continuation.rs
+index c4899cb4..e5b4c414 100644
+--- a/src/adapters/persistence/workflow/local_agents/continuation.rs
++++ b/src/adapters/persistence/workflow/local_agents/continuation.rs
+@@ -70,7 +70,8 @@ pub(in crate::adapters::persistence::workflow) async fn resume_on(
+         }
+         Err(error) => return Err(error),
+     }
+-    sqlx::query("UPDATE local_agent_operations SET outcome='expired' WHERE company_id=$1 AND id=$2 AND outcome IS NULL AND deadline<=clock_timestamp()")
++    let expiration = crate::adapters::persistence::local_agents::protocol::EXPIRATION_OUTCOME_SQL;
++    sqlx::query(&format!("UPDATE local_agent_operations AS operation SET outcome={expiration} WHERE company_id=$1 AND id=$2 AND outcome IS NULL AND deadline<=clock_timestamp()"))
+         .bind(scope.company.as_uuid()).bind(call.invocation_id).execute(&mut **tx).await?;
+     wait_commit::continue_delivery(tx, scope, wait)
+         .await
+@@ -107,7 +108,7 @@ struct NativeResult {
+     operation_id: Uuid,
+     session_id: Uuid,
+     thread_id: Option<String>,
+-    outcome: Option<String>,
++    workflow_outcome: Option<String>,
+     output: Option<String>,
+     output_truncated: bool,
+     measured_usage: Option<Value>,
+@@ -124,13 +125,13 @@ pub(super) async fn result_on(
+         return Ok(saved);
+     }
+     let scope = request.scope();
+-    let result = sqlx::query_as::<_, NativeResult>("SELECT operation.id AS operation_id,call.session_id,session.thread_id,operation.outcome,operation.output,operation.output_truncated,operation.measured_usage,wait.state AS wait_state FROM workflow_local_agent_calls AS call JOIN local_agent_operations AS operation ON operation.company_id=call.company_id AND operation.id=call.operation_id JOIN local_agent_sessions AS session ON session.company_id=call.company_id AND session.id=call.session_id JOIN workflow_waits AS wait ON wait.company_id=call.company_id AND wait.id=call.wait_id WHERE call.company_id=$1 AND call.run_id=$2 AND call.execution_id=$3 AND call.invocation_id=$4")
++    let result = sqlx::query_as::<_, NativeResult>("SELECT operation.id AS operation_id,call.session_id,session.thread_id,call.workflow_outcome,operation.output,operation.output_truncated,operation.measured_usage,wait.state AS wait_state FROM workflow_local_agent_calls AS call JOIN local_agent_operations AS operation ON operation.company_id=call.company_id AND operation.id=call.operation_id JOIN local_agent_sessions AS session ON session.company_id=call.company_id AND session.id=call.session_id JOIN workflow_waits AS wait ON wait.company_id=call.company_id AND wait.id=call.wait_id WHERE call.company_id=$1 AND call.run_id=$2 AND call.execution_id=$3 AND call.invocation_id=$4")
+         .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(scope.execution.as_uuid()).bind(call.invocation_id).fetch_one(&mut *db).await?;
+     if result.wait_state != "completed" {
+         return Err(conflict());
+     }
+     let outcome: OperationOutcome =
+-        serde_json::from_value(json!(result.outcome.as_ref().ok_or_else(invalid)?))
++        serde_json::from_value(json!(result.workflow_outcome.as_ref().ok_or_else(invalid)?))
+             .map_err(|_| invalid())?;
+     let result = bounded_result(result, outcome)?;
+     let result = validate_action_result(action, result)?;
+diff --git a/src/adapters/persistence/workflow/local_agents/mod.rs b/src/adapters/persistence/workflow/local_agents/mod.rs
+index ccee2ec8..94e8f5be 100644
+--- a/src/adapters/persistence/workflow/local_agents/mod.rs
++++ b/src/adapters/persistence/workflow/local_agents/mod.rs
+@@ -203,9 +203,7 @@ impl action_dispatch::SqlActionAuthority for LocalActionAuthority {
+             .await?;
+         }
+         let locked = shared::lock_profile_on(tx, action.scope().company, args.profile_id).await?;
+-        if locked.machine.state != MachineState::Enabled
+-            || locked.profile.selection != args.selection
+-        {
++        if locked.machine.state != MachineState::Enabled {
+             return Err(conflict());
+         }
+         shared::validate_selection_on(
+diff --git a/src/adapters/persistence/workflow/polling.rs b/src/adapters/persistence/workflow/polling.rs
+index a8628017..d676a93a 100644
+--- a/src/adapters/persistence/workflow/polling.rs
++++ b/src/adapters/persistence/workflow/polling.rs
+@@ -143,6 +143,10 @@ pub(super) const CANDIDATES_SQL: &str = concat!(
+                                   ON receipt.company_id = action.company_id AND receipt.invocation_id = action.invocation_id
+                                 WHERE action.company_id = wait.company_id AND action.execution_id = wait.execution_id
+                                   AND action.wait_id = wait.id)
++                            OR EXISTS (SELECT 1 FROM workflow_local_agent_calls AS call
++                                WHERE call.company_id=wait.company_id AND call.run_id=wait.run_id
++                                  AND call.execution_id=wait.execution_id AND call.wait_id=wait.id
++                                  AND call.ready_at IS NOT NULL)
+                             OR workflow_action_has_evidence_conflict(wait.company_id, wait.execution_id)))))
+                   )) OR "#,
+     message_receipt_candidates!(),

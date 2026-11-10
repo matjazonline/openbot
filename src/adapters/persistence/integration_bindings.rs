@@ -1,6 +1,7 @@
 //! Openbot's host consent adapter. User/company/connection locks precede module
 //! locks. No credential column or token is read here.
 use super::{PostgresPersistence, integrations::PostgresVault};
+mod source;
 use crate::{
     adapters::integrations::owner::{client_namespace, company_binding},
     app_error::{AppError, AppResult},
@@ -88,12 +89,19 @@ async fn proposal_on(tx: &mut Transaction<'_, Postgres>, id: Uuid) -> AppResult<
     sqlx::query_as::<_,ProposalRow>("SELECT proposal.id,proposal.company_id,company.name AS company_name,proposal.connection_id,proposal.kind,proposal.administrator_id,proposal.connection_revision,proposal.app_id,proposal.app_policy,proposal.destination FROM integration_binding_proposals AS proposal JOIN companies AS company ON company.id=proposal.company_id WHERE proposal.id=$1 AND NOT proposal.consumed AND proposal.expires_at>clock_timestamp()")
         .bind(id).fetch_optional(&mut **tx).await?.ok_or_else(denied)
 }
-async fn member_on(tx: &mut Transaction<'_, Postgres>, company: Uuid, user: Uuid) -> AppResult<()> {
+pub(super) async fn member_on(
+    tx: &mut Transaction<'_, Postgres>,
+    company: Uuid,
+    user: Uuid,
+) -> AppResult<()> {
     let person:Option<Uuid>=sqlx::query_scalar("SELECT member.user_id FROM company_members AS member JOIN principals AS principal ON principal.company_id=member.company_id AND principal.user_id=member.user_id WHERE member.company_id=$1 AND member.user_id=$2 AND principal.kind='person' FOR SHARE OF member,principal")
         .bind(company).bind(user).fetch_optional(&mut **tx).await?;
     person.map(|_| ()).ok_or_else(denied)
 }
-async fn users_on(tx: &mut Transaction<'_, Postgres>, mut ids: Vec<Uuid>) -> AppResult<()> {
+pub(super) async fn users_on(
+    tx: &mut Transaction<'_, Postgres>,
+    mut ids: Vec<Uuid>,
+) -> AppResult<()> {
     ids.sort_unstable();
     ids.dedup();
     let found: Vec<Uuid> =
@@ -135,6 +143,13 @@ async fn destination_on(
 }
 #[async_trait]
 impl IntegrationBindings for PostgresIntegrationBindings {
+    async fn source_info(
+        &self,
+        actor: Uuid,
+        target: BindingTarget,
+    ) -> AppResult<BindingSourceInfo> {
+        Box::pin(self.inspect_source(actor, target)).await
+    }
     async fn propose(&self, actor: Uuid, c: ProposeBinding) -> AppResult<BindingProposal> {
         let app_policy = self.vault.registry.policy(&c.app)?;
         let mut tx = self.persistence.pool().begin().await?;

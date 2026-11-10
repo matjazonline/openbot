@@ -1,0 +1,40 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.19s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-048b7abd3ed0c794)
+
+running 22 tests
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::remote_tests::workflow_action_dispatch_expired_entry_oracle_rejects_polled_provider ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::remote_tests::workflow_action_dispatch_committed_marker_ambiguous_ack_retry_restart_reclaim_never_send ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::remote_tests::workflow_action_dispatch_delayed_first_poll_checks_monotonic_window ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::remote_tests::workflow_action_dispatch_pending_run_deadline_oracle_rejects_lease_limited_entry ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::remote_tests::workflow_action_dispatch_service_post_marker_revoke_cancel_zero_provider_polls ... ok
+PROVEN scenario=(q) fence loss=expiry attempt=1 branch=adopted_then_refused
+PROVEN scenario=(r) applies=true early=true attempt=1 branch=resolved_adopted
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::remote_tests::workflow_action_dispatch_pending_actual_provider_dropped_on_loss_cancel_deadline ... ok
+PROVEN scenario=(s) cancel=true attempt=1 branch=lapsed
+PROVEN scenario=(q) fence loss=cancel attempt=1 branch=adopted_then_refused
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::resolution_tests::workflow_action_dispatch_resolution_adopted_reservation_refused_after_fence_loss ... ok
+PROVEN scenario=(r) applies=true early=false attempt=1 branch=resolved_adopted
+PROVEN scenario=(s) cancel=false attempt=1 branch=lapsed
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::resolution_tests::workflow_action_dispatch_resolution_lapsed_reservation_stays_unknown ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::resolution_tests::workflow_action_dispatch_resolution_stalled_local_effect_once ... ok
+PROVEN scenario=(q) applies=true attempt=1 branch=adopted
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::sql_tests::workflow_action_dispatch_saved_model_tool_and_step_share_effect_wrong_digest_refused ... ok
+PROVEN scenario=(r) applies=false early=true attempt=1 branch=resolved_not_applied
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::sql_tests::workflow_action_dispatch_revokers_wait_for_local_effect_and_receipt_commit ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::sql_tests::workflow_action_dispatch_sql_deferred_run_deadline_rejects_effect_and_receipt ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::sql_tests::workflow_action_dispatch_sql_provenance_foreign_keys_and_receipt_linkage ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::workflow_action_dispatch_competing_local_and_restart_receipt ... ok
+PROVEN scenario=(q) applies=false attempt=1 branch=not_applied
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::resolution_tests::workflow_action_dispatch_resolution_stalled_reservation_adopted ... ok
+PROVEN scenario=(r) applies=false early=false attempt=1 branch=resolved_not_applied
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::resolution_tests::workflow_action_dispatch_resolution_competing_reservers_one_dispatch ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::workflow_action_dispatch_sql_commit_expiry_and_append_only_facts ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::workflow_action_dispatch_stale_fences_scopes_protection_and_errors ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::workflow_action_dispatch_remote_marker_crash_response_and_no_replay ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::workflow_action_dispatch_local_faults_rollback_every_write ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::workflow_action_dispatch_post_marker_revocation_cancel_and_expiry_refuse_entry ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::workflow_action_dispatch_waiting_revokers_recheck_current_authority ... ok
+
+test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 3555 filtered out; finished in 22.93s
+

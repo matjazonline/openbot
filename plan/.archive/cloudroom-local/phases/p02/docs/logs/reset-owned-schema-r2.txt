@@ -1,0 +1,1 @@
+PASS: reset only the two named phase-owned databases, no compatibility migration

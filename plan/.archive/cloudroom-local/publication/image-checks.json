@@ -1,0 +1,63 @@
+[
+  {
+    "name": "image-start",
+    "command": [
+      "limactl",
+      "start",
+      "--tty=false",
+      "--name=img",
+      "--vm-type=vz",
+      "--arch=aarch64",
+      "--cpus=2",
+      "--memory=6",
+      "--disk=12",
+      "--mount-only=/private/tmp/obpub-m8sfhp0f/context",
+      "--set",
+      ".mounts[0].writable=false | .ssh.forwardAgent=false | .ssh.loadDotSSHPubKeys=false",
+      "--set",
+      ".images = [{\"location\": \"https://cloud-images.ubuntu.com/releases/resolute/release-20260927/ubuntu-26.04-server-cloudimg-arm64.img\", \"arch\": \"aarch64\", \"digest\": \"sha256:63a93bd5a8d76e33b15ceb5daa3657bd79be804748051ab178e643b0f5da22e7\"}]",
+      "--timeout=10m",
+      "template:docker"
+    ],
+    "status": "PASS",
+    "exit": 0,
+    "seconds": 54.08,
+    "log": "logs/image-start.log"
+  },
+  {
+    "name": "image-build",
+    "command": [
+      "limactl",
+      "shell",
+      "img",
+      "--",
+      "docker",
+      "build",
+      "--progress=plain",
+      "--tag",
+      "openbot-cloudroom-publication:verified",
+      "/private/tmp/obpub-m8sfhp0f/context"
+    ],
+    "status": "PASS",
+    "exit": 0,
+    "seconds": 851.34,
+    "log": "logs/image-build.log"
+  },
+  {
+    "name": "image-check",
+    "command": [
+      "limactl",
+      "shell",
+      "img",
+      "--",
+      "python3",
+      "/private/tmp/obpub-m8sfhp0f/context/scripts/check-knowledge-image.py",
+      "--image",
+      "openbot-cloudroom-publication:verified"
+    ],
+    "status": "FAIL",
+    "exit": 1,
+    "seconds": 4.13,
+    "log": "logs/image-check.log"
+  }
+]

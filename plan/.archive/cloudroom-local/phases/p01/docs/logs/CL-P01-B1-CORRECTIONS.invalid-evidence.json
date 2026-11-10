@@ -1,0 +1,173 @@
+{
+  "version": 1,
+  "round": "CL-P01-B1-CORRECTIONS",
+  "artifact": "bb7ece5de7bde5aa35d2311949099cba0988522511590945bead4152f7b5ba3f",
+  "checks": [
+    {
+      "criteria": [
+        "AC1-lifecycle",
+        "AC1-positive-recovery",
+        "AC1-two-clients",
+        "AC2-Codex-queued-UI"
+      ],
+      "command": "node integrations/cloudroom-plugin/compatibility/run-probe.mjs /tmp/openbot-cloudroom-d8b3cc3 plan/cloudroom-local/phases/p01/docs/logs/reproducible-probe-r6",
+      "fixture": "p01-owned disposable fixtures, macOS/Node 24.21.0; no provider inference",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/reproducible-probe-r6.txt",
+          "sha256": "97b7a6b6f476cd879d691926df781b8491a99ba76fb41faece2b98d1392c9920"
+        },
+        {
+          "path": "logs/reproducible-probe-r6/result.json",
+          "sha256": "51c835ff4c93c4b84f294fcc6507a1b320c7df6a7c7746e76f3d05077d3c14d9"
+        },
+        {
+          "path": "logs/reproducible-probe-r6/queued.txt",
+          "sha256": "0d3e9c0930cd602ee27c4191ad24ad5b89a025352e659a7bd3ad14921f668d17"
+        },
+        {
+          "path": "logs/reproducible-probe-r6/catalog.txt",
+          "sha256": "119159b1fcb26f8dcf3b65a65a61ead6ba2cfa50270aac70fd098af1d1153f3d"
+        },
+        {
+          "path": "logs/reproducible-probe-r6/shared-check.txt",
+          "sha256": "8ce3b853d308dbf6b44122a2ac0b182bc966feedbe9d33f257c3bc8d24a2165b"
+        },
+        {
+          "path": "logs/reproducible-probe-r6/recovery.txt",
+          "sha256": "085b774f9d111b31e92c2f4d10c68f6783eaaa2196e5b887a1c2ba93c78ae1ad"
+        },
+        {
+          "path": "logs/reproducible-probe-r6/before-restart.txt",
+          "sha256": "6fafbcd401c00936a9d4f525d352769edd86b9b3ed5e39487adc92be83323e5a"
+        },
+        {
+          "path": "logs/reproducible-probe-r6/after-restart.txt",
+          "sha256": "cd58b84b58a813872ce34c6d333f749a3ecd2a52e70e3f9e70562cb1b91630f7"
+        },
+        {
+          "path": "logs/reproducible-probe-r6/ui-thread.json",
+          "sha256": "e64b6f5445e3682fd46e9e2ed3c57bd5751e046a9a01e1e3c5f3f19a20a947ee"
+        },
+        {
+          "path": "logs/reproducible-probe-r6/ui-thread.png",
+          "sha256": "a17c881dc1962edf0413e17fb9543ae30117ff3a545c0fa35583b4f8d5e29412"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC3",
+        "AC4",
+        "F2"
+      ],
+      "command": "CARGO_INCREMENTAL=0 cargo test --locked --offline --lib cloudroom_",
+      "fixture": "p01-owned disposable fixtures, macOS/Node 24.21.0; no provider inference",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/rust-contract-tests-r3-final.txt",
+          "sha256": "9e42ac299dd2cc43dee66bde4494a176643525ee36617b8ffe9d42cb986146b2"
+        },
+        {
+          "path": "logs/rust-test-list-r3-final.txt",
+          "sha256": "2e3090d61ff5bd20ee22caf389762bdeebb3ea735beaaa9e80822d2d1ead6b0f"
+        },
+        {
+          "path": "logs/test-move-map-r3.json",
+          "sha256": "a54863faf46233362e720497510d42909c27f18c9e7b1a064fb6a95056604c0a"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "F3"
+      ],
+      "command": "node --test integrations/cloudroom-plugin/compatibility/check-source.test.mjs",
+      "fixture": "p01-owned disposable fixtures, macOS/Node 24.21.0; no provider inference",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/source-guard-tests-r2.txt",
+          "sha256": "70479e5f3a370532b69303069e7e1750c154bfb8f3f0db0288f3ccdaee809160"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC3",
+        "AC4"
+      ],
+      "command": "CARGO_INCREMENTAL=0 cargo clippy --locked --offline --all-targets -- -D warnings",
+      "fixture": "p01-owned disposable fixtures, macOS/Node 24.21.0; no provider inference",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/clippy-r4.txt",
+          "sha256": "67ad6f7076763b0c050c469cc197ce7cdcf4650deb487d83444bdb20539b10db"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC3",
+        "AC4"
+      ],
+      "command": "cargo fmt --all -- --check; git diff --check",
+      "fixture": "p01-owned disposable fixtures, macOS/Node 24.21.0; no provider inference",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/format-r2.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": "logs/whitespace-r2.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC1"
+      ],
+      "command": "TypeScript tsc --noEmit against bundled public SDK 0.6.50 declarations",
+      "fixture": "p01-owned disposable fixtures, macOS/Node 24.21.0; no provider inference",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/probe-typecheck-r5.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC1-native",
+        "AC2",
+        "F1"
+      ],
+      "command": "Native provider tasks, active stop/permission/turn correlation, nonempty execution-event replay, three-provider UI and Linux",
+      "fixture": "p01-owned disposable fixtures, macOS/Node 24.21.0; no provider inference",
+      "status": "NOT EXERCISED",
+      "files": [],
+      "reason": "Pending user response to explicit existing-local-login authorization/scope question. Queued-only proof does not exercise native turns. No Linux test environment assigned."
+    },
+    {
+      "criteria": [
+        "module-wiring-guidance"
+      ],
+      "command": "cargo test --locked --offline --test source_modules",
+      "fixture": "p01-owned disposable fixtures, macOS/Node 24.21.0; no provider inference",
+      "status": "NOT EXERCISED",
+      "files": [
+        {
+          "path": "logs/source-modules-r2.txt",
+          "sha256": "9572f07da4b1ba698720c7f22b9599e18b2d374442ec0ae20c0d12e07eab7a5b"
+        }
+      ],
+      "reason": "Installed skill reference names a test target absent in this checkout. All added modules are wired and compiled by current all-target Clippy and 9 discovered focused tests."
+    }
+  ]
+}

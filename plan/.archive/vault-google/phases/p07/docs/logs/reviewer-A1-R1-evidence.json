@@ -1,0 +1,17 @@
+{
+  "round": "VG-P07-A1-R1",
+  "utc": "2026-11-08T08:34:34.519146+00:00",
+  "head": "ace526fd8259ec53c5199ffa7555a1a99dcba58e",
+  "source_digest": "d9d84e7e35bc0a1d603f6f57bf2ac6ba5a9c95a133611bba00b432fe31533b71",
+  "exclusions": [
+    "plan/vault-google/COORDINATION.md",
+    "plan/vault-google/phases/p06/docs",
+    "plan/vault-google/phases/p07/docs"
+  ],
+  "coordination_revision": 22,
+  "coordination_sha256": "0aa370bf14f26f755be1f362e0c2af9064760f526692b7a6dd7e154d485957db",
+  "decision": "VG-P07-D1/r1",
+  "decision_sha256": "241766fb8efd2af70cbdc5c8d8a5e7dcb23dcd4db63e7db3c1e52b4937049484",
+  "verdict": "architecture PASS",
+  "runtime_checks": "none; phase07 unimplemented"
+}

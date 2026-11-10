@@ -139,6 +139,35 @@ pub fn authorize_dispatch(
     authorize_credential(account, grant, expected, host.kind)
 }
 
+#[derive(Clone, Copy)]
+pub struct ConfigurationAuthorityFacts {
+    pub owner_is_member: bool,
+    pub administrator_can_edit: bool,
+    pub connection_enabled: bool,
+    pub connection_revision: ConnectionRevision,
+    pub catalog_revision: CatalogRevision,
+}
+
+/// Configuration may inspect a catalog but cannot authorize a business invocation.
+pub fn authorize_configuration(
+    account: &ConnectedAccount,
+    grant: &UseGrant,
+    expected: &AuthorizationSnapshot,
+    owner: &AccountOwner,
+    facts: ConfigurationAuthorityFacts,
+) -> IntegrationResult<()> {
+    if &account.owner != owner
+        || !facts.owner_is_member
+        || !facts.administrator_can_edit
+        || !facts.connection_enabled
+        || facts.connection_revision != expected.connection_revision
+        || facts.catalog_revision != expected.catalog_revision
+    {
+        return Err(IntegrationError::Denied);
+    }
+    authorize_credential(account, grant, expected, InvocationKind::DeterministicMcp)
+}
+
 #[derive(Debug, Clone, Copy)]
 pub struct GrantAuthorityFacts {
     pub owner_is_member: bool,

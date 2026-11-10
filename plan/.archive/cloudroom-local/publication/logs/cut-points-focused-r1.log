@@ -1,0 +1,7 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+
+running 1 test
+test adapters::persistence::workflow::tests::local_agent_tests::e2e::cloudroom_e2e_cut_points_reconstruct_server_plugin_and_workers_without_blind_native_retry ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3760 filtered out; finished in 34.41s
+

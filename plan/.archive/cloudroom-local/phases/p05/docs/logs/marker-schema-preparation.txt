@@ -1,0 +1,36 @@
+329:            workflow_action_retry_safe(NEW.company_id,NEW.workflow_execution_id) IS FALSE THEN
+1988:            expected_state:=CASE WHEN workflow_action_retry_safe(episode.company_id,episode.execution_id) IS FALSE THEN 'waiting' ELSE 'failed' END;
+2064:                    AND workflow_action_retry_safe(NEW.company_id,NEW.execution_id) IS DISTINCT FROM false)
+2066:                        AND workflow_action_retry_safe(NEW.company_id,NEW.execution_id) IS FALSE))
+2280:    IF NEW.effect_kind='message' THEN
+2352:    IF NEW.effect_kind='local' AND NOT EXISTS (
+2383:    IF marker.effect_kind='message' THEN
+2393:    IF marker.effect_kind<>'remote' OR NEW.observed_at<marker.created_at
+2485:    IF NOT FOUND OR marker.effect_kind<>'remote'
+2662:    IF NOT FOUND OR (NEW.effect_kind='remote' AND NOT (owner.state IN ('failed','cancelled')
+2694:            AND workflow_action_retry_safe(company,execution.id) IS TRUE
+2765:    IF NOT FOUND OR marker.effect_kind<>'remote' OR marker.replay_subject IS NULL THEN RETURN false; END IF;
+2831:-- Name: workflow_action_retry_safe(uuid, uuid); Type: FUNCTION; Schema: public; Owner: -
+2834:CREATE FUNCTION public.workflow_action_retry_safe(company uuid, execution uuid) RETURNS boolean
+2892:            AND workflow_action_retry_safe(company,execution.id) IS DISTINCT FROM false
+3056:        AND marker.id=NEW.dispatch_id AND marker.effect_kind='message'
+3108:                    AND receipt.effect_kind='message' AND receipt.result->>'status'=NEW.state))
+3124:    -- MAX_MESSAGE_ACTIONS_PER_EXECUTION = 128, the workflow_action_retry_safe proof ceiling.
+4524:    effect_kind text NOT NULL,
+4530:    CONSTRAINT workflow_action_dispatches_effect_kind_check CHECK ((effect_kind = ANY (ARRAY['local'::text, 'remote'::text, 'message'::text]))),
+4626:    effect_kind text NOT NULL,
+4631:    CONSTRAINT workflow_action_receipt_kind CHECK ((((effect_kind = 'local'::text) AND (remote_entry_id IS NULL) AND (reconciliation_evidence_id IS NULL)) OR ((effect_kind = 'remote'::text) AND ((((remote_entry_id IS NOT NULL))::integer + ((reconciliation_evidence_id IS NOT NULL))::integer) = 1)) OR ((effect_kind = 'message'::text) AND (remote_entry_id IS NULL) AND (reconciliation_evidence_id IS NULL)))),
+4647:    effect_kind text NOT NULL,
+4650:    CONSTRAINT workflow_action_reconciliations_effect_kind_check CHECK ((effect_kind = ANY (ARRAY['remote'::text, 'message'::text]))),
+4666:    effect_kind text DEFAULT 'message'::text NOT NULL,
+4681:    CONSTRAINT workflow_message_actions_effect_kind_check CHECK ((effect_kind = 'message'::text)),
+4699:            WHEN (marker.effect_kind = 'message'::text) THEN
+4850:    effect_kind text DEFAULT 'remote'::text NOT NULL,
+4854:    CONSTRAINT workflow_action_remote_entries_effect_kind_check CHECK ((effect_kind = 'remote'::text))
+6818:    ADD CONSTRAINT workflow_action_dispatches_company_id_run_id_execution_id_i_key UNIQUE (company_id, run_id, execution_id, invocation_id, argument_digest, id, effect_kind);
+8935:CREATE TRIGGER workflow_message_admission_guard BEFORE INSERT ON public.workflow_action_dispatches FOR EACH ROW WHEN ((new.effect_kind = 'message'::text)) EXECUTE FUNCTION public.workflow_message_admission_guard();
+8995:CREATE TRIGGER workflow_message_receipt_guard BEFORE INSERT ON public.workflow_action_receipts FOR EACH ROW WHEN ((new.effect_kind = 'message'::text)) EXECUTE FUNCTION public.workflow_message_receipt_guard();
+10384:    ADD CONSTRAINT workflow_action_receipts_company_id_run_id_execution_id_in_fkey FOREIGN KEY (company_id, run_id, execution_id, invocation_id, argument_digest, dispatch_id, effect_kind) REFERENCES public.workflow_action_dispatches(company_id, run_id, execution_id, invocation_id, argument_digest, id, effect_kind) ON DELETE CASCADE;
+10392:    ADD CONSTRAINT workflow_action_reconciliatio_company_id_run_id_execution__fkey FOREIGN KEY (company_id, run_id, execution_id, invocation_id, argument_digest, dispatch_id, effect_kind) REFERENCES public.workflow_action_dispatches(company_id, run_id, execution_id, invocation_id, argument_digest, id, effect_kind) ON DELETE CASCADE;
+10408:    ADD CONSTRAINT workflow_action_remote_entrie_company_id_run_id_execution__fkey FOREIGN KEY (company_id, run_id, execution_id, invocation_id, argument_digest, dispatch_id, effect_kind) REFERENCES public.workflow_action_dispatches(company_id, run_id, execution_id, invocation_id, argument_digest, id, effect_kind) ON DELETE CASCADE;
+10714:    ADD CONSTRAINT workflow_message_action_marker FOREIGN KEY (company_id, run_id, execution_id, invocation_id, argument_digest, dispatch_id, effect_kind) REFERENCES public.workflow_action_dispatches(company_id, run_id, execution_id, invocation_id, argument_digest, id, effect_kind) ON DELETE CASCADE;

@@ -58,6 +58,15 @@ class BoundaryTests(unittest.TestCase):
             (root/'mod.rs').write_text('mod tests;')
             self.assertTrue(boundary.violations(root))
 
+    def test_pure_mcp_policy_types_do_not_admit_live_agent_capabilities(self):
+        self.check('use crate::application::workflow::agent::{McpErrorPolicy, McpResultSource};',True)
+        for source in [
+            'use crate::application::workflow::agent::*;',
+            'use crate::application::workflow::agent::PreparedAgent;',
+            'use crate::application::workflow::agent::AgentPreparation;',
+            'fn run(){crate::application::workflow::agent::prepare_agent();}',
+        ]:self.check(source,False)
+
     def test_shared_dependency_walker_is_checked(self):
         with TemporaryDirectory() as temporary:
             app=Path(temporary)/'application'

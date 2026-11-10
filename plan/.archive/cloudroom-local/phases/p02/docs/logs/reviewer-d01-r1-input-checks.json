@@ -1,0 +1,8 @@
+{
+  "decision": "CL-P02-D01/r1",
+  "sha256": "13b2f0a7b3624927f825a90960d73a09f7a58cf036b091f2c50fc6eaa483172e",
+  "coordinationRevision": 5,
+  "coordinationPinnedCopy": "MATCH",
+  "sourceDigest": "cfc3dd8052971597cce455f3c7013a5051c0abb74aed605b490017c547d93233",
+  "checks": "read-only source/requirements inspection; no database or implementation checks run"
+}

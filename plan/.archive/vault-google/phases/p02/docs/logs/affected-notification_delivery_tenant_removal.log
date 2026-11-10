@@ -1,0 +1,10 @@
+$ cargo test --locked --offline --lib notification_delivery_tenant_removal
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.19s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-048b7abd3ed0c794)
+
+running 2 tests
+test adapters::persistence::delivery::tests::tenant_tests::notification_delivery_tenant_removal_first_producer_finds_no_member ... ok
+test adapters::persistence::delivery::tests::tenant_tests::notification_delivery_tenant_removal_waits_for_a_producer_and_cancels_its_notice ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 3059 filtered out; finished in 0.88s
+

@@ -89,7 +89,7 @@ async fn bind_child_resource(setup: &ToolSetup, resource: RuntimeResourceId) -> 
         &setup.fixture,
         "with-child-resource",
         source.to_string(),
-        message::MessagePublicationDirectory {
+        step_builtins::StepBuiltinPublicationDirectory {
             persistence: p.clone(),
         },
     )

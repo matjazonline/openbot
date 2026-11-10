@@ -1,0 +1,28 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+   Compiling open_bots v0.1.0 (/Users/mac02/.codex/worktrees/1133/openbot)
+error[E0369]: binary operation `>` cannot be applied to type `domain::integrations::ids::AuthorizationRevision`
+   --> src/adapters/persistence/workflow/vault_tests/renewal/failures.rs:71:44
+    |
+ 71 |     assert!(current.authorization_revision > f.account.authorization_revision);
+    |             ------------------------------ ^ -------------------------------- domain::integrations::ids::AuthorizationRevision
+    |             |
+    |             domain::integrations::ids::AuthorizationRevision
+    |
+note: an implementation of `PartialOrd` might be missing for `domain::integrations::ids::AuthorizationRevision`
+   --> src/domain/integrations/ids.rs:86:9
+    |
+ 86 |         pub struct $name(i64);
+    |         ^^^^^^^^^^^^^^^^^^^^^^ must implement `PartialOrd`
+...
+119 | version!(AuthorizationRevision);
+    | ------------------------------- in this macro invocation
+    = note: this error originates in the macro `version` (in Nightly builds, run with -Z macro-backtrace for more info)
+help: consider annotating `domain::integrations::ids::AuthorizationRevision` with `#[derive(PartialEq, PartialOrd)]`
+   --> src/domain/integrations/ids.rs:86:1
+    |
+ 86 +         #[derive(PartialEq, PartialOrd)]
+ 87 |         pub struct $name(i64);
+    |
+
+For more information about this error, try `rustc --explain E0369`.
+error: could not compile `open_bots` (lib test) due to 1 previous error

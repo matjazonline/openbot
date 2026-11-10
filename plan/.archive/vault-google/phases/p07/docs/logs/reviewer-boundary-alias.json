@@ -1,0 +1,6 @@
+{
+  "checker_sha256": "c050987a8004bcc39bc80619b6a6306806e6de26e310a405bd6be52eaacb7927",
+  "fixture": "use secrecy::{SecretString as PrivateSecret, ExposeSecret};\npub struct Leaked { value: PrivateSecret }\nimpl serde::Serialize for Leaked {\n fn serialize<S: serde::Serializer>(&self, serializer: S)->Result<S::Ok,S::Error> {\n  serializer.serialize_str(self.value.expose_secret())\n }\n}\npub enum Reply { Leak(Leaked) }\n",
+  "observed_violations": [],
+  "expected": "reject serializable credential-bearing result"
+}

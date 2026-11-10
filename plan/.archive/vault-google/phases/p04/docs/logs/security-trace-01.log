@@ -1,0 +1,13 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.18s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-048b7abd3ed0c794)
+
+running 5 tests
+test adapters::resend_api::inbound::tests::security_trace_redaction_provider_refusal_keeps_class_without_signed_url ... ok
+test adapters::http::routes::ui_team::trace_tests::security_trace_redaction_team_query_is_not_a_handler_span_field ... ok
+test infra::app::tests::security_trace_redaction_middleware_keeps_status_without_callback_or_webhook_secret ... ok
+test infra::app::tests::security_trace_redaction_request_span_has_no_raw_target_fallback ... ok
+test infra::app::tests::security_trace_redaction_production_filter_keeps_routes_without_secret_markers ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 3291 filtered out; finished in 0.01s
+

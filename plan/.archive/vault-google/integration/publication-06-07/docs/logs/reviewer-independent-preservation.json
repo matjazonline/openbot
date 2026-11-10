@@ -1,0 +1,54 @@
+{
+  "tracked_old_vault_files": 1250,
+  "only_changed_archival_files": [
+    "plan/vault-google/07-integration-verification-and-operations.md",
+    "plan/vault-google/COORDINATION.md",
+    "plan/vault-google/README.md"
+  ],
+  "upstream_nonplan_files_verified_identical_or_deleted": [
+    ".agents/skills/implement-2.2-system-improvement/SKILL.md",
+    ".agents/skills/implement-astra-reviewed-2-2/SKILL.md",
+    ".agents/skills/implement-astra-reviewed-2-2/agents/openai.yaml",
+    ".agents/skills/implement-astra-reviewed-2-2/references/benchmarking.md",
+    ".agents/skills/implement-astra-reviewed-2-2/references/concurrent-phases.md",
+    ".agents/skills/implement-astra-reviewed-2-2/references/context.md",
+    ".agents/skills/implement-astra-reviewed-2-2/references/findings.md",
+    ".agents/skills/implement-astra-reviewed-2-2/references/review-notes.md",
+    ".agents/skills/implement-astra-reviewed-2-2/references/reviewer-assignment.md",
+    ".agents/skills/implement-astra-reviewed-2-2/scripts/snapshot.sh",
+    ".agents/skills/implement-astra-reviewed-2.2/SKILL.md",
+    ".agents/skills/implement-astra-reviewed-2.2/agents/openai.yaml",
+    ".agents/skills/implement-astra-reviewed-2.2/references/benchmarking.md",
+    ".agents/skills/implement-astra-reviewed-2.2/references/concurrent-phases.md",
+    ".agents/skills/implement-astra-reviewed-2.2/references/context.md",
+    ".agents/skills/implement-astra-reviewed-2.2/references/findings.md",
+    ".agents/skills/implement-astra-reviewed-2.2/references/review-notes.md",
+    ".agents/skills/implement-astra-reviewed-2.2/references/reviewer-assignment.md",
+    ".agents/skills/implement-astra-reviewed-2.2/scripts/snapshot.sh",
+    ".agents/skills/implement-plan-phases/SKILL.md",
+    ".claude/skills/implement-opus-2_2-system-improvement/SKILL.md",
+    ".claude/skills/implement-opus-reviewed-2_2/SKILL.md",
+    ".claude/skills/implement-opus-reviewed-2_2/references/benchmarking.md",
+    ".claude/skills/implement-opus-reviewed-2_2/references/concurrent-phases.md",
+    ".claude/skills/implement-opus-reviewed-2_2/references/context.md",
+    ".claude/skills/implement-opus-reviewed-2_2/references/findings.md",
+    ".claude/skills/implement-opus-reviewed-2_2/references/review-notes.md",
+    ".claude/skills/implement-opus-reviewed-2_2/references/reviewer-assignment.md",
+    ".claude/skills/implement-opus-reviewed-2_2/scripts/snapshot.sh",
+    "Cargo.lock",
+    "Cargo.toml",
+    "docs/workflow-verification.md",
+    "scripts/check-workflow-evidence.py",
+    "scripts/check.sh",
+    "scripts/tests/workflow-evidence.py",
+    "tests/source_modules.rs"
+  ],
+  "ci_named_steps_preserved": {
+    "83b493e203e43bbd956f47326e17ee407b4dcc96": 31,
+    "22c94cf6fcb9d7bcce14eda2a59df58223699e7f": 31
+  },
+  "only_expanded_step": [
+    "Transport abstraction boundary"
+  ],
+  "pending_merge_parent": "22c94cf6fcb9d7bcce14eda2a59df58223699e7f"
+}

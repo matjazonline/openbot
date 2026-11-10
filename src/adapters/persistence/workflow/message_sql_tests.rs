@@ -475,11 +475,11 @@ async fn workflow_message_sql_effect_wait_must_match_its_run_and_action() {
         ))
         .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(scope.execution.as_uuid())
         .execute(setup.pool()).await.unwrap_err();
-        assert!(
-            error
-                .to_string()
-                .contains("must belong to one message action"),
-            "{error}"
+        let database = error.as_database_error().expect("database guard rejection");
+        assert_eq!(database.code().as_deref(), Some("23514"));
+        assert_eq!(
+            database.constraint(),
+            Some("workflow_guard:workflow_effect_wait_guard")
         );
     }
 }

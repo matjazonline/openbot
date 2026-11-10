@@ -1,0 +1,76 @@
+{
+  "artifact": "1033301ab60d3c96e0e86148137a8255dc1b3156887ff7cdc3c7b30632e86916",
+  "manifest_files": [
+    {
+      "path": "plan/cloudroom-local/phases/p03/docs/logs/test-list-r4.txt",
+      "valid": true
+    },
+    {
+      "path": "plan/cloudroom-local/phases/p03/docs/logs/tests-r1.txt",
+      "valid": true
+    },
+    {
+      "path": "plan/cloudroom-local/phases/p03/docs/logs/test-inventory-b1-r1.json",
+      "valid": true
+    },
+    {
+      "path": "plan/cloudroom-local/phases/p03/docs/logs/auth-list-r1.txt",
+      "valid": true
+    },
+    {
+      "path": "plan/cloudroom-local/phases/p03/docs/logs/auth-tests-r1.txt",
+      "valid": true
+    },
+    {
+      "path": "plan/cloudroom-local/phases/p03/docs/logs/association-list-r1.txt",
+      "valid": true
+    },
+    {
+      "path": "plan/cloudroom-local/phases/p03/docs/logs/association-tests-r1.txt",
+      "valid": true
+    },
+    {
+      "path": "plan/cloudroom-local/phases/p03/docs/logs/migrate-r2.txt",
+      "valid": true
+    },
+    {
+      "path": "plan/cloudroom-local/phases/p03/docs/logs/sqlx-prepare-r3.txt",
+      "valid": true
+    },
+    {
+      "path": "plan/cloudroom-local/phases/p03/docs/logs/clippy-r3.txt",
+      "valid": true
+    },
+    {
+      "path": "plan/cloudroom-local/phases/p03/docs/logs/format-final-r1.txt",
+      "valid": true
+    },
+    {
+      "path": "plan/cloudroom-local/phases/p03/docs/logs/whitespace-final-r1.txt",
+      "valid": true
+    },
+    {
+      "path": "plan/cloudroom-local/phases/p03/docs/logs/tests-preliminary-r1.txt",
+      "valid": true
+    },
+    {
+      "path": "plan/cloudroom-local/phases/p03/docs/logs/tests-preliminary-r2.txt",
+      "valid": true
+    },
+    {
+      "path": "plan/cloudroom-local/phases/p03/docs/logs/clippy-r1.txt",
+      "valid": true
+    }
+  ],
+  "inventory": {
+    "before": 33,
+    "after": 69,
+    "removed": []
+  },
+  "coordination_pin_matches": true,
+  "coordination_sha256": "2dc6d71ad5c15c287141003b96029c8d2367b75221a20f39ee2a7624da9e889d",
+  "reviewer_execution": {
+    "reviewer-b1-r1-uncertain-test.txt": "\nrunning 1 test\ntest adapters::persistence::local_agents::protocol::capacity_tests::cloudroom_commands_uncertain_native_work_keeps_capacity_until_known_terminal_evidence ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3262 filtered out; finished in 0.56s\n\n",
+    "reviewer-b1-r1-replay-test.txt": "\nrunning 1 test\ntest adapters::http::routes::local_machine_connection::tests::cloudroom_connection_lost_ack_reconnect_rewraps_receipt_and_rejects_old_envelope ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3262 filtered out; finished in 1.07s\n\n"
+  }
+}

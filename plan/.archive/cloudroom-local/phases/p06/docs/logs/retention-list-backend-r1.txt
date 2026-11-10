@@ -1,0 +1,24 @@
+   Compiling uuid v1.26.1
+   Compiling sqlx-core v0.8.6
+   Compiling uuid-simd v0.8.0
+   Compiling jsonschema v0.33.0
+   Compiling sqlx-postgres v0.8.6
+   Compiling sqlx v0.8.6
+   Compiling open_bots v0.1.0 (/Users/mac03/dev/openbot)
+error[E0599]: no method named `clone` found for struct `application::local_agents::management::StartSession` in the current scope
+   --> src/adapters/persistence/local_agents/retention_tests.rs:196:23
+    |
+196 |             ..request.clone()
+    |                       ^^^^^ method not found in `application::local_agents::management::StartSession`
+    |
+   ::: src/application/local_agents/management.rs:67:1
+    |
+ 67 | pub struct StartSession {
+    | ----------------------- method `clone` not found for this struct
+    |
+    = help: items from traits can only be used if the trait is implemented and in scope
+    = note: the following trait defines an item `clone`, perhaps you need to implement it:
+            candidate #1: `Clone`
+
+For more information about this error, try `rustc --explain E0599`.
+error: could not compile `open_bots` (lib test) due to 1 previous error

@@ -1,0 +1,20 @@
+[
+  {
+    "attempt": 1,
+    "status": "PASS",
+    "seconds": 3.39,
+    "file": "logs/stock-local-resolution-before-fix-1.txt"
+  },
+  {
+    "attempt": 2,
+    "status": "PASS",
+    "seconds": 3.49,
+    "file": "logs/stock-local-resolution-before-fix-2.txt"
+  },
+  {
+    "attempt": 3,
+    "status": "PASS",
+    "seconds": 3.45,
+    "file": "logs/stock-local-resolution-before-fix-3.txt"
+  }
+]

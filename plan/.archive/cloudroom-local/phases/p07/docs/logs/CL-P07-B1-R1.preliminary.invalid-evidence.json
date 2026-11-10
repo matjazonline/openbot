@@ -1,0 +1,112 @@
+{
+  "version": 1,
+  "round": "CL-P07-B1-R1-preliminary",
+  "artifact": "02c3f5520a7bc34e29b260adc6cda9b1d5c1f94a7e2e937f1a8811482a3f776f",
+  "checks": [
+    {
+      "criteria": [
+        "AC1",
+        "AC2",
+        "AC3"
+      ],
+      "command": "npm --prefix integrations/cloudroom-plugin test / typecheck / test:guards",
+      "fixture": "Node24.21.0/npm11.19.0, real SQLite/WSS and counted public SDK; 89 tests +4 guards",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/plugin-sparse-r2.txt",
+          "sha256": "8d8163689a277f44d88c42c9e66aa6d1eff32a67eaa537edc41917fb334975e9"
+        },
+        {
+          "path": "logs/plugin-typecheck-active-stop-r1.txt",
+          "sha256": "2a76b0b41aed0a0cb5fa95cac7cc06b64b1ae4106faf0279b855bd394e7dadab"
+        },
+        {
+          "path": "logs/source-guards-sparse-r1.txt",
+          "sha256": "0a269b99be97691c5b46c7b73f9c477796083b050569dbac71aa86f8dfb5321d"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC1",
+        "AC4"
+      ],
+      "command": "explicit authorized native runner run-native-r5.py; exact ignored cloudroom_e2e_native_{codex,claude,opencode} tests",
+      "fixture": "owned PG18.6 loopback56388; disposable paired production plugin profiles; actual supported CLI logins; package b3ec0f39a9ba9f66ecb1a7dd78968eb40d1ed2ff7eaeee3bb53dc23a02a41251",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/native-results-r5.json",
+          "sha256": "29b17c49938ff1d5a2479b00656854c7a681b9afe20c823d1224d8b416b54f3d"
+        },
+        {
+          "path": "logs/native-codex-r5.txt",
+          "sha256": "e55a2dab5136eeb64af5b95908c9a2359effc5d7a566beef63fed98226f7fffe"
+        },
+        {
+          "path": "logs/native-claude-r5.txt",
+          "sha256": "b63bc74da6a66601d0bad477c2e4385395c512f8942ebd888d9fbcda2ac49745"
+        },
+        {
+          "path": "logs/native-opencode-r5.txt",
+          "sha256": "d840c1f5e1c8e3074dbd4e04646a0c502af43b819dedde83620538046cdd3599"
+        },
+        {
+          "path": "logs/native-r5/codex/result.json",
+          "sha256": "1b4bbc0ae2b1452b5e97a6b09c77b2e20a3031eedf4b3ec936cc46df35cbb74c"
+        },
+        {
+          "path": "logs/native-r5/claude-code/result.json",
+          "sha256": "b2e63c884c0e760052e99bb98a4b6de7572e4d1a3cd139889c17554c5330b56a"
+        },
+        {
+          "path": "logs/native-r5/acp-opencode/result.json",
+          "sha256": "a84647efc4a4525f6dc5428dd46cf4791b266cf633a7f8e23a710a2408fd3b3c"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC3",
+        "AC6"
+      ],
+      "command": "reproducible package; npm ci --omit=dev in real extracted runtime cwd",
+      "fixture": "exact final package, private disposable directory; first --prefix on macOS symlink path failed, corrected documented cwd installation passes",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/package-sparse-r1.txt",
+          "sha256": "d8e0f4ac87db20202bea2884e197e149f48b6d9f3847ebb5e92afc7cf866c030"
+        },
+        {
+          "path": "logs/final-plugin-runtime-install-r2.txt",
+          "sha256": "651e8978cb393ebe279f02f92dc542e91a103861de605b442f0453dde070bfe4"
+        },
+        {
+          "path": "logs/final-plugin-runtime-install-r2.json",
+          "sha256": "e1c6d4d0bfeb6deb9ea12468bd9cdc7fc27cd032bfbf997ff95457768f6c3c4c"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC5"
+      ],
+      "command": "final-verify-r1.py final repository gate",
+      "fixture": "fresh owned final databases in final-databases-r1.json; final-results-r1.json records evolving execution",
+      "status": "NOT EXERCISED",
+      "reason": "Final gate is running; final immutable manifest will replace this preliminary pointer before acceptance."
+    },
+    {
+      "criteria": [
+        "AC4",
+        "AC5"
+      ],
+      "command": "Linux native and Docker image/knowledge memory checks",
+      "fixture": "macOS workspace",
+      "status": "NOT EXERCISED",
+      "reason": "User explicitly left native Linux acceptance unverified; Docker unavailable, image check separately unverified."
+    }
+  ]
+}

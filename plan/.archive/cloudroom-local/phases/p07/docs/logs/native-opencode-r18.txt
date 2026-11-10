@@ -1,0 +1,8 @@
+
+running 1 test
+observed gated transaction pids=[25103] blocker=26135 elapsed_ms=2
+test adapters::persistence::workflow::tests::local_agent_tests::e2e::native::cloudroom_e2e_native_opencode_packaged_plugin_pairing_workflow_ui_restart_followup_stop has been running for over 60 seconds
+test adapters::persistence::workflow::tests::local_agent_tests::e2e::native::cloudroom_e2e_native_opencode_packaged_plugin_pairing_workflow_ui_restart_followup_stop ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3326 filtered out; finished in 70.54s
+

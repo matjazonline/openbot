@@ -30,7 +30,7 @@ mod agent_manifest;
 mod agent_origin;
 mod agent_preparation;
 pub mod agent_publication;
-mod association;
+pub(super) mod association;
 mod authoring_reads;
 pub(crate) mod authority;
 mod batch;
@@ -75,6 +75,7 @@ pub(crate) mod knowledge;
 mod knowledge_release;
 mod lease;
 mod lease_claim;
+pub mod local_agents;
 pub mod mcp;
 mod memory_steps;
 pub mod message;
@@ -91,6 +92,7 @@ mod run_views;
 #[cfg(test)]
 pub(crate) mod schedule_test_support;
 mod schedules;
+pub mod step_builtins;
 #[cfg(test)]
 mod tests;
 /// The uncertain HTTP action the reconciliation route tests start from (P08-D3).
@@ -168,8 +170,4 @@ mod storage_retention;
 mod sample_capture;
 pub use sample_capture::SampleCapture;
 
-#[cfg_attr(
-    not(test),
-    expect(dead_code, reason = "Final business dispatch is wired in phase06")
-)]
 pub(crate) mod integration_authority;

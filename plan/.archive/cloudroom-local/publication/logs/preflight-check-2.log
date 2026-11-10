@@ -1,0 +1,40 @@
+   Compiling proc-macro2 v1.0.101
+    Checking unicode-ident v1.0.18
+   Compiling quote v1.0.47
+    Checking open_bots v0.1.0 (/private/tmp/openbot-cloudroom-publication)
+    Checking syn v2.0.119
+error[E0614]: type `sqlx::PgConnection` cannot be dereferenced
+  --> src/adapters/persistence/workflow/wait_commit.rs:72:73
+   |
+72 |             .bind(&wait.correlation).bind(wait.deadline).fetch_one(&mut **db).await?
+   |                                                                         ^^^^ can't be dereferenced
+
+error[E0308]: mismatched types
+  --> src/adapters/persistence/workflow/wait_commit.rs:92:57
+   |
+92 |         if let Some(progress) = local_agents::resume_on(db, scope, wait.id).await? {
+   |                                 ----------------------- ^^ expected `&mut Transaction<'_, Postgres>`, found `&mut PgConnection`
+   |                                 |
+   |                                 arguments to this function are incorrect
+   |
+   = note: expected mutable reference `&mut sqlx::Transaction<'_, sqlx::Postgres>`
+              found mutable reference `&mut sqlx::PgConnection`
+note: function defined here
+  --> src/adapters/persistence/workflow/local_agents/continuation.rs:17:57
+   |
+17 | pub(in crate::adapters::persistence::workflow) async fn resume_on(
+   |                                                         ^^^^^^^^^
+18 |     tx: &mut Transaction<'_, Postgres>,
+   |     ----------------------------------
+
+error[E0614]: type `sqlx::PgConnection` cannot be dereferenced
+   --> src/adapters/persistence/workflow/wait_commit.rs:128:155
+    |
+128 | ...correlation).bind(recorded_by).fetch_optional(&mut **db).await?;
+    |                                                       ^^^^ can't be dereferenced
+
+Some errors have detailed explanations: E0308, E0614.
+For more information about an error, try `rustc --explain E0308`.
+error: could not compile `open_bots` (lib) due to 3 previous errors
+warning: build failed, waiting for other jobs to finish...
+error: could not compile `open_bots` (lib test) due to 3 previous errors

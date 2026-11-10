@@ -1,0 +1,194 @@
+{
+  "version": 1,
+  "round": "CL-P05-B1-R1",
+  "artifact": "5e3cb39493d6068a837125789a1cb5f6165c45b77af547ecf90ae3e0ed91c505",
+  "checks": [
+    {
+      "criteria": [
+        "AC1",
+        "AC2",
+        "AC3",
+        "AC4",
+        "AC5",
+        "AC6"
+      ],
+      "command": "cargo test --locked --offline --lib cloudroom_ -- --list; target/debug/deps/open_bots-27a3d10d41cba73d cloudroom_ --nocapture",
+      "fixture": "owned PostgreSQL18.6 loopback56388;104 discovered,103 passed, explicit browser generator ignored",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/cloudroom-test-list-r8.txt",
+          "sha256": "f0e44bfa5f349044ea5db111cd158663531bc02344268800cf6ffad10d08bb06"
+        },
+        {
+          "path": "logs/cloudroom-tests-r10.txt",
+          "sha256": "859e6f2b2f1d1d106179f343f62b3edbd2aeddc79838510a2bbf3102dd77f103"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC3",
+        "AC4",
+        "AC5",
+        "AC6"
+      ],
+      "command": "target/debug/deps/open_bots-27a3d10d41cba73d adapters::persistence::workflow::tests::message_tests:: --nocapture",
+      "fixture": "owned migrated PostgreSQL databases;303 affected shared message/native/workflow tests",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/message-regressions-management-r1.txt",
+          "sha256": "3dab110d2601046ba5bbe336c28c95b0220b6c881d69a19d6637c2f7d6812898"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC3",
+        "AC6"
+      ],
+      "command": "target/debug/deps/open_bots-27a3d10d41cba73d application::workflow::registry:: --nocapture",
+      "fixture": "28 registry assertions; native handler contracts retained",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/registry-management-r1.txt",
+          "sha256": "35195825066ad5b9be231698187bb22fffa733ffab3292e4acf78089a328ce07"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC1",
+        "AC2",
+        "AC6"
+      ],
+      "command": "CLOUDROOM_MANAGEMENT_BROWSER_FIXTURES=<phase browser-r2> target/debug/deps/open_bots-27a3d10d41cba73d dump_cloudroom_management_browser_fixtures --ignored --nocapture; node --test scripts/tests/local-agents-browser.mjs",
+      "fixture": "owned PG projections and actual Rust HTML/scripts; Chromium with production CSP and current compiled CSS; fixture HTTP response only",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/browser-fixtures-r2.txt",
+          "sha256": "2bf7ae65d9d30fd6441abfe4faa4a9d058c1d9b5f5469ea3b35698e05a5ac12c"
+        },
+        {
+          "path": "logs/browser-test-r5.txt",
+          "sha256": "df83cb5ac9f0f38d4be57382d7dd7f4721cb2ec926f90af50acaedd47b6a6c04"
+        },
+        {
+          "path": "logs/browser-r2/page.html",
+          "sha256": "12d2c817fc34a809f83234ee009fbfea1ccabd8a7ec4af9ca4b2ff08f16141f2"
+        },
+        {
+          "path": "logs/browser-r2/app.js",
+          "sha256": "d16cde30526cc2c9711c020d625c231c375a253a9d8d92f3d3250ab9583f9dda"
+        },
+        {
+          "path": "logs/browser-r2/theme-init.js",
+          "sha256": "b23ad4c72d7f288bfa1df3666ae18c4087fb8f6118f6b4187b3173bd4705c0c6"
+        },
+        {
+          "path": "logs/browser-r2/metadata.json",
+          "sha256": "005b20871333a782c4905275b7ef6cd2631d7ccbdfde7694b3e320a86bb78f06"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC1",
+        "AC4",
+        "AC6"
+      ],
+      "command": "reset owned build/test public schemas; cargo sqlx migrate run --database-url <owned database>",
+      "fixture": "fresh disposable openbot_cloudroom_build and openbot_cloudroom_test only",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/reset-management-schema-r1.txt",
+          "sha256": "ab6824c3268895e60aee00eb351c2694a1c32fe68e0a4540f89ea781e3e1af3c"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC1",
+        "AC2",
+        "AC3",
+        "AC4",
+        "AC6"
+      ],
+      "command": "SQLX_OFFLINE=false cargo sqlx prepare -- --all-targets",
+      "fixture": "owned build DB; no .sqlx changes",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/sqlx-management-r2.txt",
+          "sha256": "b7fdc8e63eb4f01adfafbe5d4f793d5731dd448bcc2cb1a234abcc6e36005b8b"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC6"
+      ],
+      "command": "SQLX_OFFLINE=true cargo clippy --locked --offline --all-targets -- -D warnings",
+      "fixture": "locked local cache; all Cargo targets",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/clippy-management-r3.txt",
+          "sha256": "bfa111b89abc10820ccdbf8e23df6f2c5024869142617e293e6c4c8d37c2d77f"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC6"
+      ],
+      "command": "cargo fmt --all -- --check; git diff --check",
+      "fixture": "current implementation tree",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/format-management-r3.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": "logs/whitespace-management-r3.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC1",
+        "AC6"
+      ],
+      "command": "npm run check:css",
+      "fixture": "regenerated tracked assets/app.css",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/css-management-r3.txt",
+          "sha256": "4546f9159d039f6ac68aa74fc86f22d6ce1d2dfbe57861372083115b8d9e97c6"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC5",
+        "AC6"
+      ],
+      "command": "python3 scripts/workflow-sample-boundary.py",
+      "fixture": "actual production sample dispatch/capture source; no production fallback",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/sample-boundary-r1.txt",
+          "sha256": "228c0f0f23407594379b257a3e3684550f2f3eb1741d27acbc9be312e22e6d2d"
+        }
+      ]
+    }
+  ]
+}

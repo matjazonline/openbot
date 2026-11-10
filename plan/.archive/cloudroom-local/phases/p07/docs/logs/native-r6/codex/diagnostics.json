@@ -1,0 +1,606 @@
+{
+  "stage": "deny",
+  "commands": [
+    {
+      "id": "38dff2dd-eaf7-42de-96d0-95ef4a695998",
+      "kind": "refresh_catalog",
+      "stage": "terminal",
+      "sdkCalls": 0,
+      "thread": null,
+      "request": null,
+      "turn": null,
+      "queue": null,
+      "cursor": 0,
+      "correlationConflict": 0,
+      "nativeState": null,
+      "sequence": 2,
+      "evidence": null
+    },
+    {
+      "id": "c81feb51-3030-4177-8d27-c0f302691403",
+      "kind": "create",
+      "stage": "terminal",
+      "sdkCalls": 1,
+      "thread": "thr_are9xrm2yz",
+      "request": "creq_unhuyq66kv",
+      "turn": "daac081edd-t1",
+      "queue": null,
+      "cursor": 30,
+      "correlationConflict": 0,
+      "nativeState": "completed",
+      "sequence": 7,
+      "evidence": "turn"
+    },
+    {
+      "id": "2be2cf32-1a1a-4f66-91a8-bbf62ffc4893",
+      "kind": "refresh_catalog",
+      "stage": "terminal",
+      "sdkCalls": 0,
+      "thread": null,
+      "request": null,
+      "turn": null,
+      "queue": null,
+      "cursor": 0,
+      "correlationConflict": 0,
+      "nativeState": null,
+      "sequence": 9,
+      "evidence": null
+    },
+    {
+      "id": "01a1bb12-67f3-77e4-92ab-bcd289584f52",
+      "kind": "send",
+      "stage": "terminal",
+      "sdkCalls": 1,
+      "thread": "thr_are9xrm2yz",
+      "request": "creq_5exdqzwam3",
+      "turn": "da19eb278b-t1",
+      "queue": null,
+      "cursor": 48,
+      "correlationConflict": 0,
+      "nativeState": "completed",
+      "sequence": 14,
+      "evidence": "turn"
+    },
+    {
+      "id": "01a1bb12-999b-71d3-87d1-17040b2ddbad",
+      "kind": "send",
+      "stage": "observing",
+      "sdkCalls": 1,
+      "thread": "thr_are9xrm2yz",
+      "request": "creq_ce4k6usstj",
+      "turn": "da9fb2849c-t2",
+      "queue": null,
+      "cursor": 72,
+      "correlationConflict": 0,
+      "nativeState": "waiting_for_input",
+      "sequence": 19,
+      "evidence": "turn"
+    },
+    {
+      "id": "9206c022-549f-4bf1-9035-3f3ba2008460",
+      "kind": "refresh_catalog",
+      "stage": "terminal",
+      "sdkCalls": 0,
+      "thread": null,
+      "request": null,
+      "turn": null,
+      "queue": null,
+      "cursor": 0,
+      "correlationConflict": 0,
+      "nativeState": null,
+      "sequence": 21,
+      "evidence": null
+    }
+  ],
+  "events": [
+    {
+      "seq": 1,
+      "type": "client/turn/requested",
+      "scope": {
+        "kind": "thread"
+      },
+      "request": "creq_unhuyq66kv",
+      "source": "spawn",
+      "operation": "c81feb51-3030-4177-8d27-c0f302691403"
+    },
+    {
+      "seq": 2,
+      "type": "client/thread/start",
+      "scope": {
+        "kind": "thread"
+      },
+      "source": "spawn"
+    },
+    {
+      "seq": 3,
+      "type": "system/thread-provisioning",
+      "scope": {
+        "kind": "thread"
+      },
+      "status": "active"
+    },
+    {
+      "seq": 4,
+      "type": "system/thread-provisioning",
+      "scope": {
+        "kind": "thread"
+      },
+      "status": "active"
+    },
+    {
+      "seq": 5,
+      "type": "system/thread-provisioning",
+      "scope": {
+        "kind": "thread"
+      },
+      "status": "active"
+    },
+    {
+      "seq": 6,
+      "type": "system/thread-provisioning",
+      "scope": {
+        "kind": "thread"
+      },
+      "status": "active"
+    },
+    {
+      "seq": 7,
+      "type": "system/thread-provisioning",
+      "scope": {
+        "kind": "thread"
+      },
+      "status": "active"
+    },
+    {
+      "seq": 8,
+      "type": "system/thread-provisioning",
+      "scope": {
+        "kind": "thread"
+      },
+      "status": "completed"
+    },
+    {
+      "seq": 9,
+      "type": "thread/identity",
+      "scope": {
+        "kind": "thread"
+      }
+    },
+    {
+      "seq": 10,
+      "type": "thread/started",
+      "scope": {
+        "kind": "thread"
+      }
+    },
+    {
+      "seq": 11,
+      "type": "thread/identity",
+      "scope": {
+        "kind": "thread"
+      }
+    },
+    {
+      "seq": 12,
+      "type": "provider.env-resolved",
+      "scope": {
+        "kind": "thread"
+      }
+    },
+    {
+      "seq": 13,
+      "type": "turn/started",
+      "scope": {
+        "kind": "turn",
+        "turnId": "daac081edd-t1"
+      }
+    },
+    {
+      "seq": 14,
+      "type": "turn/input/accepted",
+      "scope": {
+        "kind": "turn",
+        "turnId": "daac081edd-t1"
+      },
+      "clientRequest": "creq_unhuyq66kv"
+    },
+    {
+      "seq": 15,
+      "type": "item/started",
+      "scope": {
+        "kind": "turn",
+        "turnId": "daac081edd-t1"
+      },
+      "itemType": "commandExecution"
+    },
+    {
+      "seq": 16,
+      "type": "item/completed",
+      "scope": {
+        "kind": "turn",
+        "turnId": "daac081edd-t1"
+      },
+      "itemType": "commandExecution"
+    },
+    {
+      "seq": 17,
+      "type": "thread/tokenUsage/updated",
+      "scope": {
+        "kind": "turn",
+        "turnId": "daac081edd-t1"
+      }
+    },
+    {
+      "seq": 18,
+      "type": "thread/contextWindowUsage/updated",
+      "scope": {
+        "kind": "turn",
+        "turnId": "daac081edd-t1"
+      }
+    },
+    {
+      "seq": 19,
+      "type": "provider/rateLimits/updated",
+      "scope": {
+        "kind": "thread"
+      }
+    },
+    {
+      "seq": 20,
+      "type": "item/started",
+      "scope": {
+        "kind": "turn",
+        "turnId": "daac081edd-t1"
+      },
+      "itemType": "agentMessage"
+    },
+    {
+      "seq": 21,
+      "type": "item/agentMessage/delta",
+      "scope": {
+        "kind": "turn",
+        "turnId": "daac081edd-t1"
+      }
+    },
+    {
+      "seq": 25,
+      "type": "item/completed",
+      "scope": {
+        "kind": "turn",
+        "turnId": "daac081edd-t1"
+      },
+      "itemType": "agentMessage"
+    },
+    {
+      "seq": 26,
+      "type": "thread/tokenUsage/updated",
+      "scope": {
+        "kind": "turn",
+        "turnId": "daac081edd-t1"
+      }
+    },
+    {
+      "seq": 27,
+      "type": "thread/contextWindowUsage/updated",
+      "scope": {
+        "kind": "turn",
+        "turnId": "daac081edd-t1"
+      }
+    },
+    {
+      "seq": 28,
+      "type": "provider/rateLimits/updated",
+      "scope": {
+        "kind": "thread"
+      }
+    },
+    {
+      "seq": 29,
+      "type": "provider/unhandled",
+      "scope": {
+        "kind": "thread"
+      }
+    },
+    {
+      "seq": 30,
+      "type": "turn/completed",
+      "scope": {
+        "kind": "turn",
+        "turnId": "daac081edd-t1"
+      },
+      "status": "completed"
+    },
+    {
+      "seq": 31,
+      "type": "client/turn/requested",
+      "scope": {
+        "kind": "thread"
+      },
+      "request": "creq_5exdqzwam3",
+      "source": "tell",
+      "operation": "01a1bb12-67f3-77e4-92ab-bcd289584f52"
+    },
+    {
+      "seq": 32,
+      "type": "thread/identity",
+      "scope": {
+        "kind": "thread"
+      }
+    },
+    {
+      "seq": 33,
+      "type": "provider.env-resolved",
+      "scope": {
+        "kind": "thread"
+      }
+    },
+    {
+      "seq": 34,
+      "type": "thread/contextWindowUsage/updated",
+      "scope": {
+        "kind": "thread"
+      }
+    },
+    {
+      "seq": 35,
+      "type": "thread/extensionState/updated",
+      "scope": {
+        "kind": "thread"
+      }
+    },
+    {
+      "seq": 36,
+      "type": "turn/started",
+      "scope": {
+        "kind": "turn",
+        "turnId": "da19eb278b-t1"
+      }
+    },
+    {
+      "seq": 37,
+      "type": "turn/input/accepted",
+      "scope": {
+        "kind": "turn",
+        "turnId": "da19eb278b-t1"
+      },
+      "clientRequest": "creq_5exdqzwam3"
+    },
+    {
+      "seq": 38,
+      "type": "item/started",
+      "scope": {
+        "kind": "turn",
+        "turnId": "da19eb278b-t1"
+      },
+      "itemType": "agentMessage"
+    },
+    {
+      "seq": 39,
+      "type": "item/agentMessage/delta",
+      "scope": {
+        "kind": "turn",
+        "turnId": "da19eb278b-t1"
+      }
+    },
+    {
+      "seq": 43,
+      "type": "item/completed",
+      "scope": {
+        "kind": "turn",
+        "turnId": "da19eb278b-t1"
+      },
+      "itemType": "agentMessage"
+    },
+    {
+      "seq": 44,
+      "type": "thread/tokenUsage/updated",
+      "scope": {
+        "kind": "turn",
+        "turnId": "da19eb278b-t1"
+      }
+    },
+    {
+      "seq": 45,
+      "type": "thread/contextWindowUsage/updated",
+      "scope": {
+        "kind": "turn",
+        "turnId": "da19eb278b-t1"
+      }
+    },
+    {
+      "seq": 46,
+      "type": "provider/rateLimits/updated",
+      "scope": {
+        "kind": "thread"
+      }
+    },
+    {
+      "seq": 47,
+      "type": "provider/unhandled",
+      "scope": {
+        "kind": "thread"
+      }
+    },
+    {
+      "seq": 48,
+      "type": "turn/completed",
+      "scope": {
+        "kind": "turn",
+        "turnId": "da19eb278b-t1"
+      },
+      "status": "completed"
+    },
+    {
+      "seq": 49,
+      "type": "client/turn/requested",
+      "scope": {
+        "kind": "thread"
+      },
+      "request": "creq_evfjqygzzy",
+      "source": "tell"
+    },
+    {
+      "seq": 50,
+      "type": "thread/identity",
+      "scope": {
+        "kind": "thread"
+      }
+    },
+    {
+      "seq": 51,
+      "type": "provider.env-resolved",
+      "scope": {
+        "kind": "thread"
+      }
+    },
+    {
+      "seq": 52,
+      "type": "thread/contextWindowUsage/updated",
+      "scope": {
+        "kind": "thread"
+      }
+    },
+    {
+      "seq": 53,
+      "type": "thread/extensionState/updated",
+      "scope": {
+        "kind": "thread"
+      }
+    },
+    {
+      "seq": 54,
+      "type": "turn/started",
+      "scope": {
+        "kind": "turn",
+        "turnId": "da9fb2849c-t1"
+      }
+    },
+    {
+      "seq": 55,
+      "type": "turn/input/accepted",
+      "scope": {
+        "kind": "turn",
+        "turnId": "da9fb2849c-t1"
+      },
+      "clientRequest": "creq_evfjqygzzy"
+    },
+    {
+      "seq": 56,
+      "type": "item/started",
+      "scope": {
+        "kind": "turn",
+        "turnId": "da9fb2849c-t1"
+      },
+      "itemType": "agentMessage"
+    },
+    {
+      "seq": 57,
+      "type": "item/agentMessage/delta",
+      "scope": {
+        "kind": "turn",
+        "turnId": "da9fb2849c-t1"
+      }
+    },
+    {
+      "seq": 61,
+      "type": "item/completed",
+      "scope": {
+        "kind": "turn",
+        "turnId": "da9fb2849c-t1"
+      },
+      "itemType": "agentMessage"
+    },
+    {
+      "seq": 62,
+      "type": "thread/tokenUsage/updated",
+      "scope": {
+        "kind": "turn",
+        "turnId": "da9fb2849c-t1"
+      }
+    },
+    {
+      "seq": 63,
+      "type": "thread/contextWindowUsage/updated",
+      "scope": {
+        "kind": "turn",
+        "turnId": "da9fb2849c-t1"
+      }
+    },
+    {
+      "seq": 64,
+      "type": "provider/rateLimits/updated",
+      "scope": {
+        "kind": "thread"
+      }
+    },
+    {
+      "seq": 65,
+      "type": "provider/unhandled",
+      "scope": {
+        "kind": "thread"
+      }
+    },
+    {
+      "seq": 66,
+      "type": "turn/completed",
+      "scope": {
+        "kind": "turn",
+        "turnId": "da9fb2849c-t1"
+      },
+      "status": "completed"
+    },
+    {
+      "seq": 67,
+      "type": "client/turn/requested",
+      "scope": {
+        "kind": "thread"
+      },
+      "request": "creq_ce4k6usstj",
+      "source": "tell",
+      "operation": "01a1bb12-999b-71d3-87d1-17040b2ddbad"
+    },
+    {
+      "seq": 68,
+      "type": "turn/started",
+      "scope": {
+        "kind": "turn",
+        "turnId": "da9fb2849c-t2"
+      }
+    },
+    {
+      "seq": 69,
+      "type": "turn/input/accepted",
+      "scope": {
+        "kind": "turn",
+        "turnId": "da9fb2849c-t2"
+      },
+      "clientRequest": "creq_ce4k6usstj"
+    },
+    {
+      "seq": 70,
+      "type": "item/started",
+      "scope": {
+        "kind": "turn",
+        "turnId": "da9fb2849c-t2"
+      },
+      "itemType": "commandExecution"
+    },
+    {
+      "seq": 71,
+      "type": "system/interaction/lifecycle",
+      "scope": {
+        "kind": "turn",
+        "turnId": "da9fb2849c-t2"
+      }
+    },
+    {
+      "seq": 72,
+      "type": "item/started",
+      "scope": {
+        "kind": "turn",
+        "turnId": "da9fb2849c-t2"
+      },
+      "itemType": "commandExecution"
+    }
+  ]
+}

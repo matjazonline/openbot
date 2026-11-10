@@ -4,6 +4,13 @@
 > when needed. Do not add data backfills, dual reads/writes, legacy decoders, compatibility shims,
 > or staged rollouts for existing data.
 
+> **Organization plans, 2026-11-09.** Department desks are channels and need nothing new here.
+> Once [03-principal-addresses](../03-principal-addresses/README.md) lands, a Slack direct message
+> to an agent resolves to that agent's principal address and a direct thread, not to a desk, and a
+> linked Slack identity is the person principal. Members-only desks from
+> [01-departments](../01-departments/README.md) derive their grants from department membership,
+> which the conversation-membership access policy must not override.
+
 This directory turns `plan/slack-peer-transport-architecture-review.md` into an implementation
 sequence. Each numbered file is one independently reviewable step. Complete the files in order;
 do not begin the Slack phase until the abstraction gate in step 11 passes.

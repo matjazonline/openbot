@@ -1,0 +1,22 @@
+{
+  "artifact": "02c3f5520a7bc34e29b260adc6cda9b1d5c1f94a7e2e937f1a8811482a3f776f",
+  "actual_delta_files_and_blobs_match": true,
+  "files": [
+    ".github/workflows/ci.yml",
+    "integrations/cloudroom-plugin/OPERATIONS.md",
+    "integrations/cloudroom-plugin/README.md",
+    "integrations/cloudroom-plugin/compatibility/manifest.json",
+    "integrations/cloudroom-plugin/scripts/build.mjs",
+    "integrations/cloudroom-plugin/src/turns.ts",
+    "integrations/cloudroom-plugin/test/e2e-peer.ts",
+    "integrations/cloudroom-plugin/test/native-peer.ts",
+    "integrations/cloudroom-plugin/test/sdk.test.ts",
+    "src/adapters/http/routes/local_machine_connection/connection_tests.rs",
+    "src/adapters/http/routes/local_machine_connection/tls_tests.rs",
+    "src/adapters/persistence/workflow/local_agent_e2e_tests.rs",
+    "src/adapters/persistence/workflow/local_agent_native_e2e_tests.rs",
+    "src/adapters/persistence/workflow/local_agent_tests.rs"
+  ],
+  "authority_r35_equal": true,
+  "preliminary_evidence_files_verified": 13
+}

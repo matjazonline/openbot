@@ -1,0 +1,34 @@
+{
+  "round": "CL-P07-B1-R2",
+  "artifact": "bd92212d24d49b9d937eac2c52723eae45085cdb81abc36d12c262dcdf33cbe9",
+  "manifest": "logs/CL-P07-B1-R2.final-v2.evidence.json",
+  "manifestSha256": "e2a6e4e4e99acf8755b469574c6242585d9ede9267c89eac6f62570eda7fc70e",
+  "declaredStatuses": {
+    "PASS": 65,
+    "NOT EXERCISED": 2
+  },
+  "uniqueEvidenceFiles": 124,
+  "evidenceChecker": "PASS; statuses are not automatically acceptance",
+  "inventory": {
+    "count": 3332,
+    "unchangedFromPostNative": true
+  },
+  "authorityRevision": 36,
+  "authorityPinEqual": true,
+  "authoritySha256": "3ed667621aec61ec3d889dd7835dfc0f6970ffe5a113cfc0f4496daf6ba19187",
+  "decisionSha256": "dc0193397f4e0435210249647dd3504199f0cc937f3a3b73c8eff84cbdf40dd0",
+  "head": "97e5d60dc538e26c7cb976a8d63772eed80baff2",
+  "branch": "main",
+  "exclusions": [
+    "plan/cloudroom-local/COORDINATION.md",
+    "plan/cloudroom-local/phases/p01/docs",
+    "plan/cloudroom-local/phases/p02/docs",
+    "plan/cloudroom-local/phases/p03/docs",
+    "plan/cloudroom-local/phases/p04/docs",
+    "plan/cloudroom-local/phases/p05/docs",
+    "plan/cloudroom-local/phases/p06/docs",
+    "plan/cloudroom-local/phases/p07/docs"
+  ],
+  "snapshotMatches": true,
+  "historicalAggregateValidation": "NOT CLAIMED; unrecoverable R1 install output explicitly retained as limitation"
+}

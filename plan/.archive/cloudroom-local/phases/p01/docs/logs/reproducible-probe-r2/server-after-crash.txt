@@ -1,0 +1,43 @@
+[12:03:59] WARN: [server] Unsupported inference provider {"provider":"codex"}
+[12:03:59] INFO: [server] Thread metadata inference failed; using fallback model {"attempt":1,"errorCode":"ai_service_invalid_response","fallbackModel":"claude-code/claude-haiku-5-5","maxAttempts":3,"model":"codex/gpt-5.6-luna","reason":"failure","threadId":"thr_syvcikzzx8"}
+[12:03:59] INFO: [server] Server listening {"bindHost":"127.0.0.1","port":61274,"dataDir":"/var/folders/n2/5y7x75r92zl0ll90154hxdzr0000gn/T/openbot-cloudroom-proof-D0aLMz/profile"}
+[12:03:59] INFO: [server] plugin custom-instructions@0.1.0 loaded
+[12:03:59] INFO: [server] plugin machine-ssh@0.1.0 loaded
+[12:03:59] INFO: [server] plugin openbot-compatibility-probe@0.1.0 loaded
+[12:03:59] INFO: [server] plugin bb-guide@0.1.0 loaded
+[12:03:59] INFO: [server] plugin time-in-cloudroom@0.1.0 loaded
+[12:03:59] INFO: [server] plugin drafts@0.1.0 loaded
+[12:03:59] INFO: [server] plugin side-chat@0.1.0 loaded
+[12:03:59] INFO: [server] plugin pdf-preview@0.1.0 loaded
+[12:03:59] INFO: [server] plugin scheduled-send@0.1.0 loaded
+[12:03:59] WARN: [server] Unsupported inference provider {"provider":"claude-code"}
+[12:03:59] INFO: [server] Thread metadata inference failed; using fallback model {"attempt":2,"errorCode":"ai_service_invalid_response","fallbackModel":"claude-code/claude-haiku-5-5","maxAttempts":3,"model":"claude-code/claude-haiku-5-5","reason":"failure","threadId":"thr_syvcikzzx8"}
+[12:03:59] INFO: [server] plugin accounts@0.1.0 loaded
+[12:03:59] INFO: [server] plugin push-notifications@0.1.0 loaded
+[12:03:59] INFO: [server] plugin provider-usage@0.1.0 loaded
+[12:03:59] INFO: [server] plugin inline-vis@0.1.0 loaded
+[12:03:59] INFO: [server] plugin gpu@0.1.0 loaded
+[12:03:59] INFO: [server] plugin provider-retry@0.1.0 loaded
+[12:03:59] INFO: [server] plugin secrets@0.1.0 loaded
+[12:03:59] INFO: [server] plugin connect@0.1.0 loaded
+[12:03:59] INFO: [server] plugin monaco-editor@0.1.0 loaded
+[12:03:59] WARN: [server] Unsupported inference provider {"provider":"codex"}
+[12:03:59] INFO: [server] Thread metadata inference completed with fallback model {"attempts":3,"durationMs":506,"maxAttempts":3,"model":"codex/gpt-5.6-luna","reason":"transient-failure","timeoutMs":30000,"threadId":"thr_syvcikzzx8"}
+[12:03:59] WARN: [server] Thread metadata inference returned no result {"attempts":3,"durationMs":506,"reason":"no-result","threadId":"thr_syvcikzzx8"}
+[12:03:59] INFO: [server] Thread title retry scheduled {"threadId":"thr_syvcikzzx8","attempts":1,"nextAttemptAt":1794049449833}
+[12:03:59] INFO: [server] Session opened {"sessionId":"hses_wenhiautkx","hostId":"host_szbqmt9ach","replacedSessionId":"hses_mgze4sif98"}
+[12:03:59] INFO: [server] Daemon WebSocket opened {"sessionId":"hses_wenhiautkx","hostId":"host_szbqmt9ach"}
+[12:04:00] INFO: [server] plugin automations@0.1.0 loaded
+[12:04:02] INFO: [server] plugin environment-personal-workspace@0.1.0 loaded
+[12:04:02] INFO: [server] plugin environment-project-checkout@0.1.0 loaded
+[12:04:03] INFO: [server] plugin keep-awake@0.1.0 loaded
+[12:04:03] INFO: [server] plugin environment-git-worktree@0.1.0 loaded
+[12:04:03] INFO: [server] plugin computer-use@0.1.0 loaded
+[12:04:03] INFO: [server] plugin provider-codex@0.1.0 loaded
+[12:04:03] INFO: [server] plugin provider-pi@0.1.0 loaded
+[12:04:03] INFO: [server] plugin provider-acp@0.1.0 loaded
+[12:04:03] INFO: [server] plugin provider-claude-code@0.1.0 loaded
+[12:04:04] INFO: [server] Event loop stalled {"intervalMs":5000,"maxDelayMs":793.2,"meanDelayMs":30.1,"p99DelayMs":122.9,"resolutionMs":20,"thresholdMs":500,"currentWork":"POST /api/v1/plugins/openbot-compatibility-probe/cli > plugin:openbot-compatibility-probe cli openbot-proof | GET /api/v1/system/providers","lastWork":"ws:daemon host-rpc.response","lastWorkMs":0.9,"slowestWork":"ws:daemon host-rpc.response","slowestWorkMs":1.3,"cpuMs":2714.2,"gcMs":65.5,"maxGcMs":6.8,"heapUsedMb":342,"rssMb":363}
+[12:04:04] INFO: [server] Slow API request {"durationMs":3940.3,"method":"GET","path":"/api/v1/system/providers","status":200}
+[12:04:04] INFO: [server] Slow API request {"durationMs":3957.4,"method":"POST","path":"/api/v1/plugins/openbot-compatibility-probe/cli","status":200}
+[12:04:04] INFO: [server] Daemon WebSocket closed {"sessionId":"hses_wenhiautkx"}

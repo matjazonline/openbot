@@ -1,0 +1,92 @@
+[
+  {
+    "receipt": "wave11-1-run.json",
+    "exit": 0,
+    "result": "ok. 9 passed; 0 failed; 0 ignored; 0 measured; 3618 filtered out; finished in 14.91s"
+  },
+  {
+    "receipt": "wave11-2-run.json",
+    "exit": 0,
+    "result": "ok. 22 passed; 0 failed; 0 ignored; 0 measured; 3605 filtered out; finished in 24.27s"
+  },
+  {
+    "receipt": "wave11-3-run.json",
+    "exit": 0,
+    "result": "ok. 11 passed; 0 failed; 0 ignored; 0 measured; 3616 filtered out; finished in 27.00s"
+  },
+  {
+    "receipt": "wave11-4-run.json",
+    "exit": 0,
+    "result": "ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3626 filtered out; finished in 0.67s"
+  },
+  {
+    "receipt": "wave11-5-run.json",
+    "exit": 0,
+    "result": "ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3626 filtered out; finished in 1.10s"
+  },
+  {
+    "receipt": "final-existing12-1-run.json",
+    "exit": 0,
+    "result": "ok. 18 passed; 0 failed; 0 ignored; 0 measured; 3609 filtered out; finished in 11.56s"
+  },
+  {
+    "receipt": "final-existing12-10-run.json",
+    "exit": 0,
+    "result": "ok. 14 passed; 0 failed; 0 ignored; 0 measured; 3613 filtered out; finished in 4.99s"
+  },
+  {
+    "receipt": "final-existing12-11-run.json",
+    "exit": 0,
+    "result": "ok. 15 passed; 0 failed; 0 ignored; 0 measured; 3612 filtered out; finished in 7.04s"
+  },
+  {
+    "receipt": "final-existing12-2-run.json",
+    "exit": 0,
+    "result": "ok. 22 passed; 0 failed; 0 ignored; 0 measured; 3605 filtered out; finished in 12.16s"
+  },
+  {
+    "receipt": "final-existing12-3-run.json",
+    "exit": 0,
+    "result": "ok. 5 passed; 0 failed; 0 ignored; 0 measured; 3622 filtered out; finished in 2.57s"
+  },
+  {
+    "receipt": "final-existing12-4-run.json",
+    "exit": 0,
+    "result": "ok. 7 passed; 0 failed; 0 ignored; 0 measured; 3620 filtered out; finished in 2.18s"
+  },
+  {
+    "receipt": "final-existing12-5-run.json",
+    "exit": 0,
+    "result": "ok. 6 passed; 0 failed; 0 ignored; 0 measured; 3621 filtered out; finished in 7.75s"
+  },
+  {
+    "receipt": "final-existing12-6-run.json",
+    "exit": 0,
+    "result": "ok. 12 passed; 0 failed; 0 ignored; 0 measured; 3615 filtered out; finished in 17.29s"
+  },
+  {
+    "receipt": "final-existing12-7-run.json",
+    "exit": 0,
+    "result": "ok. 6 passed; 0 failed; 0 ignored; 0 measured; 3621 filtered out; finished in 2.73s"
+  },
+  {
+    "receipt": "final-existing12-8-run.json",
+    "exit": 101,
+    "result": "FAILED. 13 passed; 1 failed; 0 ignored; 0 measured; 3613 filtered out; finished in 4.74s"
+  },
+  {
+    "receipt": "final-existing12-9-run.json",
+    "exit": 0,
+    "result": "ok. 3 passed; 0 failed; 0 ignored; 0 measured; 3624 filtered out; finished in 1.47s"
+  },
+  {
+    "receipt": "final-storage13.json",
+    "exit": 0,
+    "result": "ok. 14 passed; 0 failed; 0 ignored; 0 measured; 3613 filtered out; finished in 6.32s"
+  },
+  {
+    "receipt": "final-browser11.json",
+    "exit": 0,
+    "result": null
+  }
+]

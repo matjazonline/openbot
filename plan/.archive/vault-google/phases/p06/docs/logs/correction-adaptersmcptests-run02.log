@@ -1,0 +1,17 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.18s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-048b7abd3ed0c794)
+
+running 9 tests
+test adapters::mcp::tests::mcp_dropped_call_sends_protocol_cancellation_and_joins_cleanup ... ok
+test adapters::mcp::tests::mcp_authentication_redirect_and_lost_effect_are_sanitized_and_never_retried ... ok
+test adapters::mcp::tests::mcp_initializes_discovers_and_explicitly_calls_json_and_sse_then_shuts_down ... ok
+test adapters::mcp::tests::mcp_output_schema_and_call_envelope_redact_secrets_without_fetching_links ... ok
+test adapters::mcp::tests::mcp_endpoint_permit_wait_expires_without_consuming_global_capacity ... ok
+test adapters::mcp::tests::mcp_shutdown_joins_an_abandoned_session_and_closes_admission ... ok
+test adapters::mcp::tests::mcp_repeated_pagination_cursor_fails_without_calling_a_tool ... ok
+test adapters::mcp::tests::mcp_discovery_rejects_duplicates_external_schemas_secret_echoes_and_oversized_data ... ok
+test adapters::mcp::tests::mcp_busy_endpoint_waiters_leave_global_capacity_and_shutdown_promptly ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 3575 filtered out; finished in 0.10s
+

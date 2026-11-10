@@ -1,0 +1,490 @@
+--- r1/integrations/cloudroom-plugin/README.md
++++ r2/integrations/cloudroom-plugin/README.md
+@@ -39,6 +39,9 @@
+ network requests; a lost response resumes the same claim. A paired secret with a lost or changed
+ journal fails closed. Keep the profile, journal and secret state together. Automatic re-pairing,
+ identity reset, arbitrary thread import and destructive history cleanup are not supported.
++If an initial pairing is definitively rejected, its input and rejected candidate are cleared;
++enter a fresh Openbot pairing code and reload the plugin to retry. Incomplete responses keep the
++original candidate and must recover that same claim. Rejection never resets an initialized journal.
+ 
+ An operation receives a visible `[Openbot operation …]` header. Follow-up prompts use Cloudroom's
+ queue. Only the exact originating request and accepted native turn can complete the operation;
+--- r1/integrations/cloudroom-plugin/src/enrollment.ts
++++ r2/integrations/cloudroom-plugin/src/enrollment.ts
+@@ -49,8 +49,8 @@
+   }
+   return ids;
+ }
+-export async function readBoundedJson(response: Response, limit: number): Promise<unknown> {
+-  if (!response.body) throw new Error('empty HTTP response');
++async function readBoundedBody(response: Response, limit: number): Promise<Buffer> {
++  if (!response.body) return Buffer.alloc(0);
+   const declared = Number(response.headers.get('content-length'));
+   if (declared > limit) { await response.body.cancel(); throw new Error('HTTP response bound'); }
+   const reader = response.body.getReader(); const parts: Uint8Array[] = []; let bytes = 0;
+@@ -62,9 +62,12 @@
+       if (bytes > limit) throw new Error('HTTP response bound');
+       parts.push(result.value);
+     }
+-    return JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(Buffer.concat(parts)));
++    return Buffer.concat(parts);
+   } catch (error) { await reader.cancel().catch(() => {}); throw error; }
+   finally { reader.releaseLock(); }
++}
++export async function readBoundedJson(response: Response, limit: number): Promise<unknown> {
++  return JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(await readBoundedBody(response, limit)));
+ }
+ function validatePending(value: Pending): void {
+   if (canonicalOrigin(value.origin) !== value.origin || value.request.installation_id !== value.installation_id
+@@ -78,7 +81,7 @@
+     throw new ConfigurationRequired('Pairing settings changed; restore the approved origin or repair pairing');
+   }
+ }
+-async function exchange(settings: SettingsStore, candidate: Pending, signal: AbortSignal, fetcher: typeof fetch) {
++async function exchange(settings: SettingsStore, journal: Journal, candidate: Pending, signal: AbortSignal, fetcher: typeof fetch) {
+   await currentCandidate(settings, candidate);
+   signal.throwIfAborted();
+   const bounded = AbortSignal.any([signal, AbortSignal.timeout(LIMITS.handshakeMs)]);
+@@ -92,9 +95,19 @@
+   const enrolled = await fetcher(`${candidate.origin}/v1/local-machines/pair`, { method: 'POST', redirect: 'error', signal: bounded,
+     headers: { 'content-type': 'application/json' }, body: JSON.stringify(candidate.request) });
+   if (!enrolled.ok) {
+-    await enrolled.body?.cancel();
++    // Only a completely received rejection disposes an initial candidate. A
++    // truncated/failed response retains its exact original recovery identity.
++    await readBoundedBody(enrolled, 16 * 1024);
+     if (enrolled.status === 400 || enrolled.status === 401 || enrolled.status === 403 || enrolled.status === 404) {
+-      throw new ConfigurationRequired('Pairing was not accepted; recover or repair this pending enrollment');
++      await currentCandidate(settings, candidate); signal.throwIfAborted();
++      if (journal.initialized()) throw new RecoveryRequired();
++      // Clear input before the authoritative candidate: an interruption between
++      // these separate secret writes cannot accidentally enroll the old code as
++      // a new installation. An ambiguous Pending record is never cleared here.
++      await settings.experimental_set({ pairingCode: null });
++      await currentCandidate(settings, candidate); signal.throwIfAborted();
++      await settings.experimental_set({ enrollment: null });
++      throw new ConfigurationRequired('Pairing was not accepted; enter a new pairing code to retry');
+     }
+     throw new Error('pairing unavailable');
+   }
+@@ -124,7 +137,7 @@
+   }
+   validatePending(state);
+   if (origin !== state.origin) throw new ConfigurationRequired('Pending enrollment belongs to the original approved origin');
+-  const receipt = await exchange(settings, state, signal, fetcher);
++  const receipt = await exchange(settings, journal, state, signal, fetcher);
+   if (receipt.company_id !== receipt.machine.company_id || receipt.machine.installation_id !== state.installation_id
+       || receipt.machine.state === 'revoked') throw new RecoveryRequired();
+   await currentCandidate(settings, state);
+--- r1/integrations/cloudroom-plugin/src/sdk.ts
++++ r2/integrations/cloudroom-plugin/src/sdk.ts
+@@ -208,6 +208,12 @@
+         return stateUpdate(update.record, { kind: 'turn', thread_id: record.threadId, turn_id: update.record.turnId,
+           state: 'waiting_for_input', output: null, truncated: update.record.truncated, usage: update.record.usage });
+       }
++      if (update.record.nativeState === 'waiting_for_input' && interactions.some(interaction => interaction.threadId === record.threadId
++          && interaction.turnId === update.record.turnId && interaction.status === 'resolved')) {
++        update.record.nativeState = 'running';
++        return stateUpdate(update.record, { kind: 'turn', thread_id: record.threadId, turn_id: update.record.turnId,
++          state: 'running', output: null, truncated: update.record.truncated, usage: update.record.usage });
++      }
+     }
+     return update;
+   }
+--- r1/integrations/cloudroom-plugin/src/server.ts
++++ r2/integrations/cloudroom-plugin/src/server.ts
+@@ -1,7 +1,7 @@
+ import type { BbPluginApi } from '@get-bb/plugin-sdk';
+ import { Connector } from './connector.js';
+ import { Dispatcher } from './dispatcher.js';
+-import { canonicalOrigin, ConfigurationRequired, defineSettings, recoverEnrollment, selectedProjects } from './enrollment.js';
++import { canonicalOrigin, ConfigurationRequired, defineSettings, recoverEnrollment, selectedProjects, type SettingsStore } from './enrollment.js';
+ import { JOURNAL_SCHEMA, Journal } from './journal.js';
+ import { acquireProfileLock } from './lock.js';
+ import { CloudroomSdk, sdkSignal } from './sdk.js';
+@@ -12,22 +12,35 @@
+   const journal = new Journal(db);
+   let selected: string[] = []; let connector: Connector | undefined;
+   let running: AbortController | undefined;
++  const expectedSecrets = new Set<string | undefined>();
++  const enrollmentSettings: SettingsStore = { get: () => settings.get(),
++    experimental_set: async patch => {
++      running?.signal.throwIfAborted();
++      const ownSecret = Object.hasOwn(patch, 'enrollment'); const nextSecret = patch.enrollment ?? undefined;
++      if (ownSecret) expectedSecrets.add(nextSecret);
++      try { return await settings.experimental_set(patch); }
++      finally { if (ownSecret) expectedSecrets.delete(nextSecret); }
++    } };
+   const sdk = new CloudroomSdk(bb, journal, () => selected);
+   settings.onChange((next, prev) => {
+-    if (next.openbotOrigin !== prev.openbotOrigin || next.enrollment !== prev.enrollment
++    if (next.openbotOrigin !== prev.openbotOrigin
++        || (next.enrollment !== prev.enrollment && !expectedSecrets.has(next.enrollment))
+         || next.selectedProjects !== prev.selectedProjects) running?.abort(new ConfigurationRequired('Connector settings changed; reload plugin'));
+   });
+   bb.background.service('openbot-connector', {
+     async start(signal) {
+       const release = acquireProfileLock(db.name); const stop = new AbortController();
+       const lifetime = AbortSignal.any([signal, stop.signal]);
++      running = stop;
+       try {
+         const values = await settings.get(); canonicalOrigin(values.openbotOrigin);
+         selected = selectedProjects(values.selectedProjects ?? '');
+-        // Enrollment writes its own secret settings. Register the settings-change
+-        // cancellation only after those ordered writes have completed.
+-        const paired = await recoverEnrollment(settings, journal, lifetime);
+-        lifetime.throwIfAborted(); running = stop;
++        const paired = await recoverEnrollment(enrollmentSettings, journal, lifetime);
++        const current = await settings.get(); lifetime.throwIfAborted();
++        if (canonicalOrigin(current.openbotOrigin) !== paired.binding.origin
++            || current.selectedProjects !== values.selectedProjects || current.enrollment !== JSON.stringify(paired)) {
++          throw new ConfigurationRequired('Connector settings changed; reload plugin');
++        }
+         connector = new Connector(new Dispatcher(journal, sdk));
+         await connector.run(paired, lifetime);
+         if (stop.signal.aborted && !signal.aborted) throw new ConfigurationRequired('Connector settings changed; reload plugin');
+--- r1/integrations/cloudroom-plugin/test/enrollment.test.ts
++++ r2/integrations/cloudroom-plugin/test/enrollment.test.ts
+@@ -20,7 +20,8 @@
+       if (cut === 'before-pending' && state === 'pending') process.kill(process.pid, 'SIGKILL');
+       writeFileSync(`${path}.tmp`, JSON.stringify(values), { mode: 0o600 }); renameSync(`${path}.tmp`, path);
+       if ((cut === 'pending' && state === 'pending') || (cut === 'paired' && state === 'paired')
+-          || (cut === 'cleaned' && values.pairingCode === undefined)) process.kill(process.pid, 'SIGKILL');
++          || (cut === 'cleaned' && values.pairingCode === undefined)
++          || (cut === 'rejected' && values.pairingCode === undefined && state === 'empty')) process.kill(process.pid, 'SIGKILL');
+       return values as Values;
+     } };
+ }
+@@ -52,7 +53,9 @@
+   const db = new Database(join(directory, 'data.db')); db.pragma('journal_mode=WAL');
+   const journal = new Journal(db); const original = journal.initialize.bind(journal);
+   journal.initialize = binding => { original(binding); if (cut === 'journal') process.kill(process.pid, 'SIGKILL'); };
+-  await recoverEnrollment(store(directory, cut), journal, new AbortController().signal, exchange(directory, cut));
++  const fetcher = process.env.OPENBOT_ENROLLMENT_REJECT ? (async (_url, init) => new Response(null,
++    { status: init?.method === 'POST' ? 400 : 404 })) as typeof fetch : exchange(directory, cut);
++  await recoverEnrollment(store(directory, cut), journal, new AbortController().signal, fetcher);
+   db.close(); process.exit(0);
+ }
+ for (const cut of ['before-pending', 'pending', 'server-commit', 'receipt', 'journal', 'paired', 'cleaned']) {
+@@ -101,3 +104,79 @@
+     assert.equal(network, 1);
+   } finally { f.close(); }
+ });
++for (const status of [400, 401, 403, 404]) {
++  test(`complete initial pairing ${status} clears rejected input and explicit replacement starts a fresh attempt`, async () => {
++    const f = fixture({ initialized: false });
++    try {
++      writeFileSync(join(f.directory, 'settings.json'), JSON.stringify({ openbotOrigin: f.binding.origin,
++        machineName: 'Disposable', selectedProjects: '', pairingCode: 'b'.repeat(32) }), { mode: 0o600 });
++      writeFileSync(join(f.directory, 'ids.json'), JSON.stringify(f.binding));
++      let rejected: Record<string, string> | undefined;
++      await assert.rejects(recoverEnrollment(store(f.directory), f.journal, new AbortController().signal,
++        (async (_url, init) => { if (init?.method === 'POST') { rejected = JSON.parse(init.body as string); return new Response(null, { status }); }
++          return new Response(null, { status: 404 }); }) as typeof fetch), /enter a new pairing code/);
++      const cleared = await store(f.directory).get(); assert.equal(cleared.pairingCode, undefined); assert.equal(cleared.enrollment, undefined);
++      assert.equal(f.journal.initialized(), false);
++      await store(f.directory).experimental_set({ pairingCode: 'c'.repeat(32), machineName: 'Replacement' });
++      const paired = await recoverEnrollment(store(f.directory), f.journal, new AbortController().signal, exchange(f.directory));
++      assert.notEqual(paired.binding.installation_id, rejected!.installation_id);
++      const receipt = JSON.parse(readFileSync(join(f.directory, 'server.json'), 'utf8')); assert.equal(receipt.machine.name, 'Replacement');
++      assert.equal((await store(f.directory).get()).pairingCode, undefined);
++    } finally { f.close(); }
++  });
++}
++for (const failure of ['transport', 'incomplete_rejection']) {
++  test(`${failure} retains original pending secrets and ignores replacement input until outcome is resolved`, async () => {
++    const f = fixture({ initialized: false });
++    try {
++      writeFileSync(join(f.directory, 'settings.json'), JSON.stringify({ openbotOrigin: f.binding.origin,
++        machineName: 'Disposable', selectedProjects: '', pairingCode: 'd'.repeat(32) }), { mode: 0o600 });
++      writeFileSync(join(f.directory, 'ids.json'), JSON.stringify(f.binding));
++      await assert.rejects(recoverEnrollment(store(f.directory), f.journal, new AbortController().signal,
++        (async (_url, init) => {
++          if (init?.method !== 'POST') return new Response(null, { status: 404 });
++          if (failure === 'transport') throw new Error('response lost');
++          return new Response(new ReadableStream({ start(controller) { controller.enqueue(Buffer.from('partial')); controller.error(new Error('incomplete body')); } }), { status: 400 });
++        }) as typeof fetch));
++      const before = await store(f.directory).get(); const original = JSON.parse(before.enrollment!);
++      assert.equal(before.pairingCode, 'd'.repeat(32)); assert.equal(original.request.code, 'd'.repeat(32));
++      await store(f.directory).experimental_set({ pairingCode: 'e'.repeat(32) });
++      const paired = await recoverEnrollment(store(f.directory), f.journal, new AbortController().signal, exchange(f.directory));
++      assert.equal(paired.binding.installation_id, original.installation_id); assert.equal(paired.credential, original.credential);
++    } finally { f.close(); }
++  });
++}
++for (const cut of ['cleaned', 'rejected']) {
++  test(`actual process interruption during definitive rejection ${cut} cannot enroll stale input as a new identity`, async () => {
++    const f = fixture({ initialized: false });
++    try {
++      writeFileSync(join(f.directory, 'settings.json'), JSON.stringify({ openbotOrigin: f.binding.origin,
++        machineName: 'Disposable', selectedProjects: '', pairingCode: 'f'.repeat(32) }), { mode: 0o600 });
++      writeFileSync(join(f.directory, 'ids.json'), JSON.stringify(f.binding)); f.journal.db.close();
++      const crashed = spawnSync(process.execPath, [fileURLToPath(import.meta.url)], { env: { ...process.env,
++        OPENBOT_ENROLLMENT_WORKER: f.directory, OPENBOT_ENROLLMENT_CUT: cut, OPENBOT_ENROLLMENT_REJECT: '1' }, timeout: 10_000 });
++      assert.equal(crashed.signal, 'SIGKILL', crashed.stderr.toString());
++      const prior = await store(f.directory).get(); assert.equal(prior.pairingCode, undefined);
++      const reopened = f.open(); let posts = 0;
++      await assert.rejects(recoverEnrollment(store(f.directory), reopened, new AbortController().signal,
++        (async (_url, init) => { if (init?.method === 'POST') { posts++; return new Response(null, { status: 400 }); } return new Response(null, { status: 404 }); }) as typeof fetch));
++      assert.equal(posts, cut === 'cleaned' ? 1 : 0); assert.equal(reopened.initialized(), false);
++      assert.equal((await store(f.directory).get()).enrollment, undefined);
++    } finally { f.close(); }
++  });
++}
++test('a complete rejection cannot clear a Pending record or secret input once its journal is initialized', async () => {
++  const f = fixture({ initialized: false });
++  try {
++    writeFileSync(join(f.directory, 'settings.json'), JSON.stringify({ openbotOrigin: f.binding.origin,
++      machineName: 'Disposable', selectedProjects: '', pairingCode: '1'.repeat(32) }), { mode: 0o600 });
++    await assert.rejects(recoverEnrollment(store(f.directory), f.journal, new AbortController().signal,
++      (async () => { throw new Error('network interrupted'); }) as typeof fetch));
++    const prior = await store(f.directory).get(); const pending = JSON.parse(prior.enrollment!);
++    f.journal.initialize({ ...f.binding, installation_id: pending.installation_id, journal_id: pending.journal_id });
++    await assert.rejects(recoverEnrollment(store(f.directory), f.journal, new AbortController().signal,
++      (async (_url, init) => new Response(null, { status: init?.method === 'POST' ? 400 : 404 })) as typeof fetch), /recovery/);
++    assert.equal((await store(f.directory).get()).enrollment, prior.enrollment);
++    assert.equal((await store(f.directory).get()).pairingCode, prior.pairingCode); assert(f.journal.initialized());
++  } finally { f.close(); }
++});
+--- r1/integrations/cloudroom-plugin/test/native-queue-fixture.ts
++++ r2/integrations/cloudroom-plugin/test/native-queue-fixture.ts
+@@ -0,0 +1,44 @@
++import assert from 'node:assert/strict';
++import type { BbPluginApi } from '@get-bb/plugin-sdk';
++import { nativeFixture, event } from './native-fixture.js';
++import { fixture } from './support.js';
++type Send = BbPluginApi['sdk']['threads']['send'];
++type Prompt = { input: string; request: string; turn: string; queue: string };
++
++// Test the native queue authority, not a second queue in the plugin. This models
++// the inspected upstream queue-if-active decision at SDK entry: start when idle,
++// otherwise append; accepted native requests appear when the queued item starts.
++export function nativeQueueFixture(f: ReturnType<typeof fixture>) {
++  const n = nativeFixture(f.journal, f.selection); const pending: Prompt[] = []; const started: string[] = [];
++  let active: Prompt | undefined; let next = 0;
++  let beforeSend: (() => void) | undefined; let loseResponse = false;
++  const emit = (type: Parameters<typeof event>[1], data: unknown, turn?: string) => {
++    n.state.events.push(event((n.state.events.at(-1)?.seq ?? 0) + 1, type, data, turn));
++  };
++  const start = (prompt: Prompt) => {
++    assert(!active); active = prompt; started.push(prompt.input); n.state.thread.status = 'active';
++    emit('client/turn/requested', { input: [{ type: 'text', text: prompt.input, mentions: [] }], source: 'tell', requestId: prompt.request });
++    emit('turn/input/accepted', { clientRequestId: prompt.request }, prompt.turn);
++  };
++  const preexisting = (kind: 'human' | 'openbot') => start({ input: kind === 'human' ? 'Human authorized work'
++    : '[Openbot operation 11111111-1111-1111-1111-111111111111]\nEarlier local work', request: `request_${kind}`, turn: `turn_${kind}`, queue: '' });
++  const finish = (text: string) => {
++    assert(active); const turn = active.turn;
++    emit('item/completed', { item: { type: 'agentMessage', id: `item_${turn}`, text } }, turn);
++    emit('turn/completed', { status: 'completed' }, turn); active = undefined; n.state.thread.status = 'idle';
++    const next = pending.shift(); if (next) start(next);
++  };
++  const originalSend = n.bb.sdk.threads.send.bind(n.bb.sdk.threads);
++  n.bb.sdk.threads.send = (async args => {
++    await originalSend(args); assert.equal(args.mode, 'queue-if-active');
++    const hook = beforeSend; beforeSend = undefined; hook?.();
++    const block = args.input[0]; assert(block?.type === 'text');
++    const prompt: Prompt = { input: block.text, request: `request_native_${++next}`, turn: `turn_native_${next}`, queue: `queue_native_${next}` };
++    const queued = active !== undefined;
++    if (queued) pending.push(prompt); else start(prompt);
++    if (loseResponse) { loseResponse = false; throw new Error('native accepted then SDK response lost'); }
++    return queued ? { delivery: 'queued', queuedMessage: { id: prompt.queue } } : { delivery: 'sent' };
++  }) as Send;
++  return { ...n, pending, started, preexisting, finish,
++    beforeSend: (hook: () => void) => { beforeSend = hook; }, loseNextResponse: () => { loseResponse = true; } };
++}
+--- r1/integrations/cloudroom-plugin/test/queue.test.ts
++++ r2/integrations/cloudroom-plugin/test/queue.test.ts
+@@ -0,0 +1,78 @@
++import test from 'node:test';
++import assert from 'node:assert/strict';
++import { Dispatcher } from '../src/dispatcher.js';
++import { CloudroomSdk } from '../src/sdk.js';
++import { nativeInput } from '../src/protocol.js';
++import { nativeQueueFixture } from './native-queue-fixture.js';
++import { fixture, operation, send } from './support.js';
++const context = { signal: new AbortController().signal, canDispatch: () => true };
++
++for (const initial of ['idle', 'human', 'openbot'] as const) {
++  test(`native ${initial} admission preserves prompt order, queue identity and separate originating turns`, async () => {
++    const f = fixture(); const command = send(); f.journal.bindSession(command.session_id, command.thread_id, f.selection);
++    const n = nativeQueueFixture(f); if (initial !== 'idle') n.preexisting(initial);
++    const d = new Dispatcher(f.journal, n.sdk); const first = operation({ ...command, prompt: 'first local request' });
++    const second = operation({ ...command, prompt: 'second local request' });
++    try {
++      await d.process({ operation: first, mode: 'dispatch' }, context);
++      await d.process({ operation: second, mode: 'dispatch' }, context);
++      const receipt = f.journal.get(first.id)!.lastObservation!;
++      assert(receipt.kind === 'agent' && receipt.observation.evidence.kind === 'submission');
++      assert.equal(receipt.observation.evidence.state, initial === 'idle' ? 'accepted' : 'queued');
++      assert.equal(f.journal.get(first.id)!.queueId, initial === 'idle' ? null : 'queue_native_1');
++      assert.equal(f.journal.get(second.id)!.queueId, 'queue_native_2');
++      await d.tick(context.signal); assert.equal(f.journal.get(second.id)!.turnId, null);
++      assert.equal(f.journal.capacity().effects, 2);
++      if (initial !== 'idle') {
++        assert.equal(f.journal.get(first.id)!.turnId, null);
++        n.finish('preexisting human or Openbot result'); await d.tick(context.signal);
++        assert.notEqual(f.journal.get(first.id)!.stage, 'terminal'); assert.notEqual(f.journal.get(second.id)!.stage, 'terminal');
++      }
++      assert.equal(f.journal.get(first.id)!.turnId, 'turn_native_1');
++      n.finish('first local result'); await d.tick(context.signal);
++      assert.equal(f.journal.get(first.id)!.nativeState, 'completed');
++      assert.equal(f.journal.get(second.id)!.turnId, 'turn_native_2'); assert.notEqual(f.journal.get(second.id)!.stage, 'terminal');
++      n.finish('second local result'); await d.tick(context.signal);
++      const results = [first, second].map(op => f.journal.get(op.id)!.lastObservation!);
++      for (const result of results) assert(result.kind === 'agent' && result.observation.evidence.kind === 'turn');
++      assert.deepEqual(results.map(result => result.kind === 'agent' && result.observation.evidence.kind === 'turn' ? result.observation.evidence.output : null), ['first local result', 'second local result']);
++      assert.deepEqual(n.started.slice(initial === 'idle' ? 0 : 1), [nativeInput(first), nativeInput(second)]);
++      assert.equal(n.calls.length, 2); assert.equal(f.journal.capacity().effects, 0);
++    } finally { f.close(); }
++  });
++}
++for (const race of ['idle_to_busy', 'busy_to_idle'] as const) {
++  test(`native queue ${race} race is decided at admission without steering or a second SDK call`, async () => {
++    const f = fixture(); const command = send(); f.journal.bindSession(command.session_id, command.thread_id, f.selection);
++    const n = nativeQueueFixture(f); if (race === 'busy_to_idle') n.preexisting('human');
++    n.beforeSend(() => { if (race === 'idle_to_busy') n.preexisting('human'); else n.finish('human completed before send entry'); });
++    const d = new Dispatcher(f.journal, n.sdk); const op = operation(command);
++    try {
++      await d.process({ operation: op, mode: 'dispatch' }, context);
++      const receipt = f.journal.get(op.id)!.lastObservation!;
++      assert(receipt.kind === 'agent' && receipt.observation.evidence.kind === 'submission');
++      assert.equal(receipt.observation.evidence.state, race === 'idle_to_busy' ? 'queued' : 'accepted');
++      await d.tick(context.signal); assert.notEqual(f.journal.get(op.id)!.stage, 'terminal');
++      if (race === 'idle_to_busy') { assert.equal(f.journal.get(op.id)!.turnId, null); n.finish('human answer'); await d.tick(context.signal); }
++      n.finish('race-owned local answer'); await d.tick(context.signal);
++      assert.equal(f.journal.get(op.id)!.nativeState, 'completed'); assert.equal(n.calls.length, 1);
++    } finally { f.close(); }
++  });
++}
++test('accepted native queue work survives lost SDK response and replay with one mutation and original order', async () => {
++  const f = fixture(); const command = send(); f.journal.bindSession(command.session_id, command.thread_id, f.selection);
++  const n = nativeQueueFixture(f); n.preexisting('human'); n.loseNextResponse(); const op = operation(command);
++  try {
++    const d = new Dispatcher(f.journal, n.sdk); await d.process({ operation: op, mode: 'dispatch' }, context);
++    assert.equal(f.journal.get(op.id)!.stage, 'uncertain'); assert.equal(n.pending.length, 1); assert.equal(n.calls.length, 1);
++    f.journal.db.close(); const reopened = f.open();
++    const restored = new Dispatcher(reopened, new CloudroomSdk(n.bb, reopened, () => [f.selection.project_id]));
++    await restored.process({ operation: op, mode: 'reconcile' }, context);
++    assert.equal(n.calls.length, 1); assert.equal(reopened.get(op.id)!.turnId, null);
++    n.finish('human result'); await restored.tick(context.signal);
++    assert.equal(reopened.get(op.id)!.turnId, 'turn_native_1'); assert.notEqual(reopened.get(op.id)!.stage, 'terminal');
++    n.finish('recovered local result'); await restored.tick(context.signal);
++    assert.equal(reopened.get(op.id)!.nativeState, 'completed'); assert.equal(n.calls.length, 1);
++    assert.deepEqual(n.started, ['Human authorized work', nativeInput(op)]);
++  } finally { f.close(); }
++});
+--- r1/integrations/cloudroom-plugin/test/sdk.test.ts
++++ r2/integrations/cloudroom-plugin/test/sdk.test.ts
+@@ -89,6 +89,30 @@
+     for (let i = 0; i < 30; i++) await d.tick(context.signal);
+     assert.equal(f.journal.sequence(), sequence); assert.equal(f.journal.capacity().effects, 1);
+     assert.equal(f.journal.get(op.id)!.stage, 'uncertain'); assert.equal(n.calls.length, 1);
++  } finally { f.close(); }
++});
++test('resolved matching permission updates running without item event across journal reopen', async () => {
++  const f = fixture(); const command = send(); f.journal.bindSession(command.session_id, command.thread_id, f.selection);
++  const n = nativeFixture(f.journal, f.selection); const d = new Dispatcher(f.journal, n.sdk); const op = operation(command);
++  try {
++    await d.process({ operation: op, mode: 'dispatch' }, context);
++    n.state.events = completed(nativeInput(op)).slice(0, 2);
++    n.state.interactions = [{ threadId: command.thread_id, turnId: 'turn_owned', status: 'pending' }];
++    await d.tick(context.signal); const pending = f.journal.sequence();
++    n.state.interactions[0] = { threadId: command.thread_id, turnId: 'turn_owned', status: 'resolving' };
++    await d.tick(context.signal); assert.equal(f.journal.sequence(), pending);
++    n.state.interactions.push({ threadId: command.thread_id, turnId: 'turn_human', status: 'resolved' });
++    await d.tick(context.signal); assert.equal(f.journal.get(op.id)!.nativeState, 'waiting_for_input');
++    f.journal.db.close(); const reopened = f.open();
++    const continued = new Dispatcher(reopened, new CloudroomSdk(n.bb, reopened, () => [f.selection.project_id]));
++    n.state.interactions[0] = { threadId: command.thread_id, turnId: 'turn_owned', status: 'resolved' };
++    n.state.events.push(event(3, 'system/interaction/lifecycle', { interaction: { id: 'permission', status: 'resolved' } }, 'turn_owned'));
++    await continued.tick(context.signal); assert.equal(reopened.get(op.id)!.nativeState, 'running');
++    assert.notEqual(reopened.get(op.id)!.stage, 'terminal'); const resolved = reopened.sequence();
++    await continued.tick(context.signal); assert.equal(reopened.sequence(), resolved);
++    n.state.events.push(event(4, 'turn/completed', { status: 'completed' }, 'turn_owned'));
++    await continued.tick(context.signal); assert.equal(reopened.get(op.id)!.nativeState, 'completed');
++    assert.equal(n.calls.length, 1);
+   } finally { f.close(); }
+ });
+ for (const cause of ['model', 'provider', 'project', 'expired', 'gate', 'foreign'] as const) {
+--- r1/integrations/cloudroom-plugin/test/startup.test.ts
++++ r2/integrations/cloudroom-plugin/test/startup.test.ts
+@@ -0,0 +1,77 @@
++import test from 'node:test';
++import assert from 'node:assert/strict';
++import type { BbPluginApi } from '@get-bb/plugin-sdk';
++import openbot from '../src/server.js';
++import { Connector } from '../src/connector.js';
++import { fixture, operation, send } from './support.js';
++import { nativeFixture } from './native-fixture.js';
++
++for (const stage of ['paired', 'enrolling']) for (const setting of ['selectedProjects', 'openbotOrigin', 'enrollment']) {
++  test(`startup ${stage} ${setting} change prevents connector and native admission`, async () => {
++    const f = fixture({ initialized: stage === 'paired' });
++    const command = send(); if (stage === 'paired') f.journal.bindSession(command.session_id, command.thread_id, f.selection);
++    const n = nativeFixture(f.journal, f.selection); const op = operation(command);
++    let values: Record<string, string> = { openbotOrigin: f.binding.origin, machineName: 'Disposable', selectedProjects: f.selection.project_id,
++      ...(stage === 'paired' ? { enrollment: JSON.stringify({ state: 'paired', version: 1, binding: f.binding, credential: 'a'.repeat(64) }) }
++        : { pairingCode: 'b'.repeat(32) }) };
++    let changed: (next: any, prev: any) => void = () => {}; let start!: (signal: AbortSignal) => Promise<void>; let reads = 0;
++    let pause!: () => void; const paused = new Promise<void>(resolve => { pause = resolve; });
++    let resume!: () => void; const resumed = new Promise<void>(resolve => { resume = resolve; });
++    const bb = { ...n.bb, storage: { database: () => f.journal.db, migrate: () => {} },
++      settings: { define: () => ({ get: async () => {
++        if (++reads === 2 && stage === 'paired') { pause(); await resumed; }
++        return { ...values };
++      }, experimental_set: async (patch: Record<string, string | null>) => {
++        const old = values; values = { ...values };
++        for (const [key, value] of Object.entries(patch)) { if (value === null) delete values[key]; else values[key] = value; }
++        changed(values, old); return { ...values };
++      }, onChange: (listener: typeof changed) => { changed = listener; } }) },
++      background: { service: (_name: string, service: { start: typeof start }) => { start = service.start; } }, cli: { register: () => {} },
++    } as unknown as BbPluginApi;
++    const originalRun = Connector.prototype.run; let entered = false;
++    Connector.prototype.run = async function (_paired, signal) {
++      entered = true; await this.dispatcher.process({ operation: op, mode: 'dispatch' }, { signal, canDispatch: () => true });
++    };
++    const originalFetch = globalThis.fetch;
++    if (stage === 'enrolling') globalThis.fetch = (async (_url, init) => {
++      if (init?.method !== 'POST') return new Response(null, { status: 404 });
++      pause(); await resumed;
++      const pending = JSON.parse(values.enrollment ?? '{}');
++      return Response.json({ company_id: f.binding.company_id, company_name: 'Disposable', machine: { id: f.binding.machine_id,
++        company_id: f.binding.company_id, installation_id: pending.installation_id ?? f.binding.installation_id, name: 'Disposable',
++        state: 'enabled', credential_generation: 1, last_seen_at: null, capabilities_sequence: null } });
++    }) as typeof fetch;
++    try {
++      await openbot(bb); const running = start(new AbortController().signal); const rejection = assert.rejects(running);
++      await paused; const old = values; values = { ...values, [setting]: setting === 'selectedProjects' ? ''
++        : setting === 'openbotOrigin' ? 'https://changed.example' : '{}' };
++      changed(values, old); resume(); await rejection;
++      assert.equal(entered, false); assert.equal(n.calls.length, 0);
++      if (stage === 'paired') assert.equal(f.journal.sequence(), 0); else assert.equal(f.journal.initialized(), false);
++    } finally { resume(); Connector.prototype.run = originalRun; globalThis.fetch = originalFetch; f.close(); }
++  });
++}
++test('legitimate internal Pending to Paired secret writes do not cancel connector startup', async () => {
++  const f = fixture({ initialized: false }); const n = nativeFixture(f.journal, f.selection);
++  let values: Record<string, string> = { openbotOrigin: f.binding.origin, machineName: 'Disposable', selectedProjects: f.selection.project_id, pairingCode: 'c'.repeat(32) };
++  let changed: (next: any, prev: any) => void = () => {}; let start!: (signal: AbortSignal) => Promise<void>;
++  const bb = { ...n.bb, storage: { database: () => f.journal.db, migrate: () => {} }, settings: { define: () => ({
++    get: async () => ({ ...values }), experimental_set: async (patch: Record<string, string | null>) => {
++      const old = values; values = { ...values };
++      for (const [key, value] of Object.entries(patch)) { if (value === null) delete values[key]; else values[key] = value; }
++      changed(values, old); return { ...values };
++    }, onChange: (listener: typeof changed) => { changed = listener; } }) },
++    background: { service: (_name: string, service: { start: typeof start }) => { start = service.start; } }, cli: { register: () => {} },
++  } as unknown as BbPluginApi;
++  const originalFetch = globalThis.fetch; const originalRun = Connector.prototype.run; let entered = false;
++  globalThis.fetch = (async (_url, init) => {
++    if (init?.method !== 'POST') return new Response(null, { status: 404 });
++    const pending = JSON.parse(values.enrollment!);
++    return Response.json({ company_id: f.binding.company_id, company_name: 'Disposable', machine: { id: f.binding.machine_id,
++      company_id: f.binding.company_id, installation_id: pending.installation_id, name: 'Disposable', state: 'enabled',
++      credential_generation: 1, last_seen_at: null, capabilities_sequence: null } });
++  }) as typeof fetch;
++  Connector.prototype.run = async function (_paired, signal) { signal.throwIfAborted(); entered = true; };
++  try { await openbot(bb); await start(new AbortController().signal); assert(entered); assert(f.journal.initialized()); assert.equal(values.pairingCode, undefined); }
++  finally { globalThis.fetch = originalFetch; Connector.prototype.run = originalRun; f.close(); }
++});

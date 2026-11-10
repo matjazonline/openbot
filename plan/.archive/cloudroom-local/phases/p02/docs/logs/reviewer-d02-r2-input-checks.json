@@ -1,0 +1,11 @@
+{
+  "decision": "CL-P02-D02/r2",
+  "decision_sha256": "e0566cb98e19ea430d0e3e6228b122d291287eb5cdc2f739a1e9e24231c4b72c",
+  "source_digest": "e707ccc09d026a257ace8fa7f7837af425564736dc3ccac9e6f25942d842372e",
+  "coordination_revision": 7,
+  "coordination_sha256": "c25a1eb0e035c9c520d2fe6be0666b29364bee4338d08b3d76986d4123c760ae",
+  "pinned_coordination_byte_identical": true,
+  "pre_fix_log_sha256": "bfe954ad12155b0f17a123d2949142d4f26f002679b2b9370e53f30001a490a8",
+  "pre_fix_inspected_result": "1 failed, 0 passed: operation payload digest mismatch",
+  "reviewer_runtime_tests_executed": false
+}

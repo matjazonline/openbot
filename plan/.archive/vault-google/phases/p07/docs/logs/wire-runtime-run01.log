@@ -1,0 +1,22 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.64s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-048b7abd3ed0c794)
+
+running 14 tests
+test adapters::persistence::workflow::tests::http_tests::vault_tests::execution::wire::integration_service_contract_http_local_cancel_is_not_replaced_by_decoded_context ... ok
+test adapters::persistence::workflow::tests::mcp_tests::support::renewal::gateway_tests::wire_tests::integration_service_contract_mcp_deadline_cancels_preparation_and_closes_without_dispatch ... ok
+test adapters::persistence::workflow::tests::mcp_tests::support::renewal::gateway_tests::wire_tests::integration_service_contract_mcp_roundtrip_preserves_live_revocation_after_catalog_wait ... ok
+test adapters::persistence::workflow::tests::http_tests::vault_tests::execution::wire::integration_service_contract_http_static_methods_keep_native_effect_and_redaction ... ok
+test adapters::persistence::workflow::tests::mcp_tests::support::renewal::gateway_tests::wire_tests::integration_service_contract_mcp_stale_catalog_uses_the_original_live_host_authority ... ok
+test adapters::persistence::workflow::tests::mcp_tests::support::renewal::gateway_tests::wire_tests::integration_service_contract_mcp_real_host_receipts_survive_roundtrip_and_lost_replies ... ok
+test application::integrations::tests::service_contract::integration_service_contract_execution_identity_is_bound_to_the_local_context_reference ... ok
+test application::integrations::tests::service_contract::integration_service_contract_large_local_catalog_has_explicit_transport_overflow ... ok
+test application::integrations::tests::service_contract::integration_service_contract_metadata_and_sensitive_submission_commands_round_trip ... ok
+test application::integrations::tests::service_contract::integration_service_contract_outcomes_are_exclusive_bounded_and_identity_checked ... ok
+test application::integrations::tests::service_contract::integration_service_contract_unknown_protocol_fields_depth_and_bounds_fail_closed ... ok
+test adapters::persistence::workflow::tests::mcp_tests::support::renewal::gateway_tests::wire_tests::integration_service_contract_mcp_uncertain_effect_never_gains_a_retry_from_serialization ... ok
+test adapters::persistence::workflow::tests::mcp_tests::support::renewal::gateway_tests::wire_tests::integration_service_contract_mcp_unknown_protocol_foreign_owner_and_local_cancel_send_nothing ... ok
+test adapters::persistence::workflow::tests::mcp_tests::support::renewal::gateway_tests::wire_tests::integration_service_contract_owner_discovery_keeps_genuine_context_and_rejects_credential_echo ... ok
+
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 3584 filtered out; finished in 8.02s
+

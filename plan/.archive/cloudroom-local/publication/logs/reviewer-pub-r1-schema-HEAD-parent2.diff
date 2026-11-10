@@ -1,0 +1,524 @@
+diff --git a/migrations/20260817000000_init_schema.sql b/migrations/20260817000000_init_schema.sql
+index 3597f8b5..4b83f473 100644
+--- a/migrations/20260817000000_init_schema.sql
++++ b/migrations/20260817000000_init_schema.sql
+@@ -186,2 +186,12 @@ BEGIN
+                                     AND wait.reason = 'effect' AND wait.state = 'waiting'))
++                        OR (attempt.stop_reason='local_agent_parked' AND execution.completed_at IS NULL
++                            AND execution.committed_route IS NULL AND run.state='waiting' AND run.waiting_reason='effect'
++                            AND OLD.continuation_count < workflow_job_continuation_limit()
++                            AND EXISTS (SELECT 1 FROM workflow_local_agent_calls AS call
++                                JOIN workflow_waits AS wait ON wait.company_id=call.company_id AND wait.id=call.wait_id
++                                JOIN workflow_action_dispatches AS marker ON marker.company_id=call.company_id AND marker.id=call.dispatch_id
++                                WHERE call.company_id=execution.company_id AND call.run_id=run.id AND call.execution_id=execution.id
++                                    AND marker.job_id=OLD.id AND marker.attempt_number=OLD.attempt_ordinal
++                                    AND marker.worker_id=OLD.worker_id AND marker.execution_generation=OLD.execution_generation
++                                    AND wait.reason='effect' AND wait.state='waiting' AND wait.deadline>clock_timestamp()))
+                         OR (attempt.stop_reason='question_parked' AND execution.completed_at IS NULL
+@@ -263,2 +273,17 @@ BEGIN
+                     AND wait.reason='effect' AND wait.state='completed'
++            ) OR EXISTS (
++                SELECT 1 FROM workflow_local_agent_calls AS call
++                JOIN workflow_executions AS execution ON execution.company_id=call.company_id AND execution.id=call.execution_id
++                JOIN workflow_runs AS run ON run.company_id=call.company_id AND run.id=call.run_id
++                JOIN workflow_waits AS wait ON wait.company_id=call.company_id AND wait.id=call.wait_id
++                JOIN workflow_action_dispatches AS marker ON marker.company_id=call.company_id AND marker.id=call.dispatch_id
++                JOIN local_agent_operations AS operation ON operation.company_id=call.company_id AND operation.id=call.operation_id
++                JOIN task_attempts AS attempt ON attempt.task_id=OLD.id AND attempt.attempt_number=OLD.attempt_ordinal
++                WHERE call.company_id=NEW.company_id AND call.execution_id=NEW.workflow_execution_id
++                    AND execution.completed_at IS NULL AND execution.committed_route IS NULL
++                    AND run.state='running' AND run.deadline>clock_timestamp()
++                    AND attempt.status='completed' AND attempt.stop_reason='local_agent_parked'
++                    AND marker.job_id=OLD.id AND marker.attempt_number=OLD.attempt_ordinal
++                    AND wait.reason='effect' AND wait.state='completed'
++                    AND call.ready_at IS NOT NULL AND operation.outcome IS NOT NULL
+             ) OR EXISTS (
+@@ -2303,2 +2328,28 @@ BEGIN
+     PERFORM id FROM task_attempts WHERE task_id=NEW.job_id AND attempt_number=NEW.attempt_number FOR UPDATE;
++    IF NEW.effect_kind='local_agent' THEN
++        IF NOT EXISTS (
++            SELECT 1 FROM workflow_local_agent_calls AS call
++            JOIN workflow_runs AS run ON run.company_id=call.company_id AND run.id=call.run_id
++            JOIN workflow_executions AS execution ON execution.company_id=call.company_id AND execution.id=call.execution_id
++            JOIN workflow_waits AS wait ON wait.company_id=call.company_id AND wait.id=call.wait_id
++            JOIN local_agent_operations AS operation ON operation.company_id=call.company_id AND operation.id=call.operation_id
++            JOIN workflow_action_intents AS intent ON intent.company_id=call.company_id AND intent.id=call.invocation_id
++            JOIN background_tasks AS job ON job.company_id=call.company_id AND job.id=NEW.job_id
++            JOIN task_attempts AS attempt ON attempt.task_id=job.id AND attempt.attempt_number=NEW.attempt_number
++            WHERE call.company_id=NEW.company_id AND call.run_id=NEW.run_id AND call.execution_id=NEW.execution_id
++                AND call.invocation_id=NEW.invocation_id AND call.dispatch_id=NEW.id AND call.argument_digest=NEW.argument_digest
++                AND intent.operation_key='local_agent.run' AND call.fence_expires_at>clock_timestamp()
++                AND run.state='waiting' AND run.waiting_reason='effect' AND run.deadline>clock_timestamp()
++                AND execution.completed_at IS NULL AND execution.committed_route IS NULL
++                AND job.workflow_execution_id=execution.id AND job.status='completed'
++                AND job.worker_id IS NULL AND job.execution_generation IS NULL AND job.lock_expires_at IS NULL
++                AND attempt.status='completed' AND attempt.stop_reason='local_agent_parked'
++                AND attempt.worker_id=NEW.worker_id AND attempt.execution_generation=NEW.execution_generation
++                AND wait.run_id=run.id AND wait.execution_id=execution.id AND wait.reason='effect' AND wait.state='waiting'
++                AND wait.deadline=operation.deadline AND operation.deadline>clock_timestamp()
++                AND operation.session_id=call.session_id AND operation.delivery_attempted_at IS NULL
++                AND operation.outcome IS NULL AND call.ready_at IS NULL
++        ) THEN RAISE EXCEPTION 'local workflow dispatch requires its atomic park' USING ERRCODE='23514', CONSTRAINT='workflow_guard:local_agent_dispatch'; END IF;
++        RETURN NEW;
++    END IF;
+     IF NEW.effect_kind='message' THEN
+@@ -3288,3 +3339,3 @@ $$;
+ --
+--- Name: workflow_message_effect_wait_guard(); Type: FUNCTION; Schema: public; Owner: -
++-- Name: workflow_effect_wait_guard(); Type: FUNCTION; Schema: public; Owner: -
+ --
+@@ -3328,3 +3379,3 @@ END $$;
+ 
+-CREATE FUNCTION public.workflow_message_effect_wait_guard() RETURNS trigger
++CREATE FUNCTION public.workflow_effect_wait_guard() RETURNS trigger
+     LANGUAGE plpgsql
+@@ -3333,7 +3384,16 @@ BEGIN
+     IF NEW.event_name IS NOT NULL OR NEW.correlation IS NOT NULL OR NEW.notification_intent IS NOT NULL
+-        OR NOT EXISTS(SELECT 1 FROM workflow_runs AS run WHERE run.company_id=NEW.company_id
+-            AND run.id=NEW.run_id AND run.deadline=NEW.deadline)
+-        OR NOT EXISTS(SELECT 1 FROM workflow_message_actions AS action WHERE action.company_id=NEW.company_id
+-            AND action.run_id=NEW.run_id AND action.execution_id=NEW.execution_id AND action.wait_id=NEW.id)
+-    THEN RAISE EXCEPTION 'workflow effect wait must belong to one message action' USING ERRCODE='23514', CONSTRAINT='workflow_guard:workflow_message_effect_wait_guard'; END IF;
++        OR (SELECT count(*) FROM (
++            SELECT action.wait_id FROM workflow_message_actions AS action
++            JOIN workflow_runs AS run ON run.company_id=action.company_id AND run.id=action.run_id
++            WHERE action.company_id=NEW.company_id AND action.run_id=NEW.run_id
++                AND action.execution_id=NEW.execution_id AND action.wait_id=NEW.id AND run.deadline=NEW.deadline
++            UNION ALL
++            SELECT call.wait_id FROM workflow_local_agent_calls AS call
++            JOIN local_agent_operations AS operation ON operation.company_id=call.company_id AND operation.id=call.operation_id
++            JOIN workflow_runs AS run ON run.company_id=call.company_id AND run.id=call.run_id
++            WHERE call.company_id=NEW.company_id AND call.run_id=NEW.run_id
++                AND call.execution_id=NEW.execution_id AND call.wait_id=NEW.id
++                AND operation.deadline=NEW.deadline AND NEW.deadline<=run.deadline
++        ) AS owners) <> 1
++    THEN RAISE EXCEPTION 'workflow effect wait requires exactly one scoped effect owner and its deadline' USING ERRCODE='23514', CONSTRAINT='workflow_guard:workflow_effect_wait_guard'; END IF;
+     RETURN NEW;
+@@ -4310,3 +4370,3 @@ CREATE TABLE public.task_attempts (
+         WHEN 'processing' THEN stop_reason IS NULL
+-        WHEN 'completed' THEN stop_reason IS NOT NULL AND stop_reason IN ('completed','effect_parked','question_parked','approval_parked','child_parked','agent_turn_parked')
++        WHEN 'completed' THEN stop_reason IS NOT NULL AND stop_reason IN ('completed','effect_parked','question_parked','approval_parked','child_parked','local_agent_parked','agent_turn_parked')
+         WHEN 'failed' THEN stop_reason IS NULL OR stop_reason IN ('timed_out','lease_lost')
+@@ -4558,3 +4618,3 @@ CREATE TABLE public.workflow_action_dispatches (
+     CONSTRAINT workflow_action_dispatches_current_policy_check CHECK (((jsonb_typeof(current_policy) = 'object'::text) AND (octet_length((current_policy)::text) <= 524288))),
+-    CONSTRAINT workflow_action_dispatches_effect_kind_check CHECK ((effect_kind = ANY (ARRAY['local'::text, 'remote'::text, 'message'::text]))),
++    CONSTRAINT workflow_action_dispatches_effect_kind_check CHECK ((effect_kind = ANY (ARRAY['local'::text, 'remote'::text, 'message'::text, 'local_agent'::text]))),
+     CONSTRAINT workflow_action_dispatches_replay_subject_check CHECK (((octet_length(replay_subject) >= 1) AND (octet_length(replay_subject) <= 524288)))
+@@ -4659,3 +4719,3 @@ CREATE TABLE public.workflow_action_receipts (
+     reconciliation_evidence_id uuid,
+-    CONSTRAINT workflow_action_receipt_kind CHECK ((((effect_kind = 'local'::text) AND (remote_entry_id IS NULL) AND (reconciliation_evidence_id IS NULL)) OR ((effect_kind = 'remote'::text) AND ((((remote_entry_id IS NOT NULL))::integer + ((reconciliation_evidence_id IS NOT NULL))::integer) = 1)) OR ((effect_kind = 'message'::text) AND (remote_entry_id IS NULL) AND (reconciliation_evidence_id IS NULL)))),
++    CONSTRAINT workflow_action_receipt_kind CHECK ((((effect_kind IN ('local'::text,'local_agent'::text)) AND (remote_entry_id IS NULL) AND (reconciliation_evidence_id IS NULL)) OR ((effect_kind = 'remote'::text) AND ((((remote_entry_id IS NOT NULL))::integer + ((reconciliation_evidence_id IS NOT NULL))::integer) = 1)) OR ((effect_kind = 'message'::text) AND (remote_entry_id IS NULL) AND (reconciliation_evidence_id IS NULL)))),
+     CONSTRAINT workflow_action_receipts_result_check CHECK ((octet_length((result)::text) <= 131072))
+@@ -8999,3 +9059,3 @@ CREATE TRIGGER workflow_message_destination_in_app BEFORE INSERT ON public.workf
+ --
+--- Name: workflow_waits workflow_message_effect_wait_guard; Type: TRIGGER; Schema: public; Owner: -
++-- Name: workflow_waits workflow_effect_wait_guard; Type: TRIGGER; Schema: public; Owner: -
+ --
+@@ -9006,3 +9066,3 @@ CREATE CONSTRAINT TRIGGER workflow_model_tool_wait_continuation AFTER UPDATE ON
+ 
+-CREATE TRIGGER workflow_message_effect_wait_guard BEFORE INSERT ON public.workflow_waits FOR EACH ROW WHEN ((new.reason = 'effect'::text)) EXECUTE FUNCTION public.workflow_message_effect_wait_guard();
++CREATE TRIGGER workflow_effect_wait_guard BEFORE INSERT ON public.workflow_waits FOR EACH ROW WHEN ((new.reason = 'effect'::text)) EXECUTE FUNCTION public.workflow_effect_wait_guard();
+ 
+@@ -13554,2 +13614,402 @@ CREATE CONSTRAINT TRIGGER workflow_question_provider_entry_guard AFTER UPDATE ON
+ 
++-- Cloudroom installation reservations survive company deletion. The historical company UUID
++-- is an immutable tombstone, not a live authorization reference; live resources have company FKs.
++CREATE TABLE public.local_installations (
++    installation_id uuid PRIMARY KEY CHECK (installation_id <> '00000000-0000-0000-0000-000000000000'),
++    company_id uuid NOT NULL,
++    paired_at timestamptz NOT NULL DEFAULT clock_timestamp(),
++    UNIQUE (company_id, installation_id)
++);
++
++CREATE TABLE public.local_machines (
++    id uuid PRIMARY KEY,
++    company_id uuid NOT NULL REFERENCES public.companies(id) ON DELETE CASCADE,
++    installation_id uuid NOT NULL UNIQUE,
++    name text NOT NULL CHECK (octet_length(name) BETWEEN 1 AND 128 AND name = btrim(name)),
++    state text NOT NULL DEFAULT 'enabled' CHECK (state IN ('enabled','disabled','revoked')),
++    credential_generation bigint NOT NULL DEFAULT 1 CHECK (credential_generation > 0),
++    last_seen_at timestamptz,
++    last_native_success_at timestamptz,
++    last_connection_issue text CHECK (last_connection_issue IN ('incompatible_protocol','recovery_required','connection_failed')),
++    capabilities_sequence bigint CHECK (capabilities_sequence > 0),
++    connection_generation bigint NOT NULL DEFAULT 0 CHECK (connection_generation >= 0),
++    connection_owner uuid,
++    connection_expires_at timestamptz,
++    acknowledged_sequence bigint NOT NULL DEFAULT 0 CHECK (acknowledged_sequence >= 0),
++    journal_id uuid CHECK (journal_id <> '00000000-0000-0000-0000-000000000000'),
++    reconciled_generation bigint NOT NULL DEFAULT 0 CHECK (reconciled_generation >= 0),
++    journal_generation bigint NOT NULL DEFAULT 0 CHECK (journal_generation >= 0),
++    created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
++    revoked_at timestamptz,
++    UNIQUE (company_id, id),
++    UNIQUE (company_id, id, installation_id),
++    FOREIGN KEY (company_id, installation_id) REFERENCES public.local_installations(company_id, installation_id),
++    CHECK ((connection_owner IS NULL) = (connection_expires_at IS NULL)),
++    CHECK (connection_owner IS NULL OR connection_generation > 0),
++    CHECK (reconciled_generation <= connection_generation),
++    CHECK (journal_generation <= connection_generation),
++    CHECK ((state = 'revoked') = (revoked_at IS NOT NULL)),
++    CHECK (state <> 'revoked' OR connection_owner IS NULL)
++);
++
++CREATE TABLE public.local_pairings (
++    id uuid PRIMARY KEY,
++    company_id uuid NOT NULL REFERENCES public.companies(id) ON DELETE CASCADE,
++    actor_id uuid REFERENCES public.users(id) ON DELETE SET NULL,
++    code_hash bytea NOT NULL UNIQUE CHECK (octet_length(code_hash) = 32),
++    created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
++    expires_at timestamptz NOT NULL,
++    consumed_at timestamptz,
++    revoked_at timestamptz,
++    installation_id uuid,
++    machine_id uuid,
++    claim_verifier bytea UNIQUE CHECK (octet_length(claim_verifier) = 32),
++    credential_verifier bytea CHECK (octet_length(credential_verifier) = 32),
++    FOREIGN KEY (company_id, machine_id, installation_id) REFERENCES public.local_machines(company_id, id, installation_id) ON DELETE CASCADE,
++    CHECK (expires_at > created_at),
++    CHECK ((consumed_at IS NULL AND num_nonnulls(installation_id,machine_id,claim_verifier,credential_verifier) = 0)
++        OR (consumed_at IS NOT NULL AND num_nonnulls(installation_id,machine_id,claim_verifier,credential_verifier) = 4))
++);
++
++CREATE TABLE public.local_machine_credentials (
++    company_id uuid NOT NULL,
++    machine_id uuid NOT NULL,
++    generation bigint NOT NULL CHECK (generation > 0),
++    verifier bytea NOT NULL UNIQUE CHECK (octet_length(verifier) = 32),
++    created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
++    revoked_at timestamptz,
++    PRIMARY KEY (company_id, machine_id, generation),
++    FOREIGN KEY (company_id, machine_id) REFERENCES public.local_machines(company_id, id) ON DELETE CASCADE
++);
++
++CREATE TABLE public.local_machine_capabilities (
++    company_id uuid NOT NULL,
++    machine_id uuid NOT NULL,
++    installation_id uuid NOT NULL,
++    sequence bigint NOT NULL CHECK (sequence > 0),
++    observed_at timestamptz NOT NULL DEFAULT clock_timestamp(),
++    catalog jsonb NOT NULL CHECK (jsonb_typeof(catalog) = 'object' AND octet_length(catalog::text) <= 4194304),
++    PRIMARY KEY (company_id, machine_id, installation_id, sequence),
++    FOREIGN KEY (company_id, machine_id, installation_id) REFERENCES public.local_machines(company_id, id, installation_id) ON DELETE CASCADE
++);
++ALTER TABLE public.local_machines ADD CONSTRAINT local_machine_capability_reference
++    FOREIGN KEY (company_id,id,installation_id,capabilities_sequence)
++    REFERENCES public.local_machine_capabilities(company_id,machine_id,installation_id,sequence)
++    DEFERRABLE INITIALLY DEFERRED;
++
++CREATE TABLE public.local_machine_projects (
++    company_id uuid NOT NULL,
++    machine_id uuid NOT NULL,
++    project_id text NOT NULL CHECK (project_id ~ '^[A-Za-z0-9_.:-]{1,128}$'),
++    PRIMARY KEY (company_id,machine_id,project_id),
++    FOREIGN KEY (company_id,machine_id) REFERENCES public.local_machines(company_id,id) ON DELETE CASCADE
++);
++
++CREATE TABLE public.local_agent_profiles (
++    id uuid NOT NULL,
++    company_id uuid NOT NULL,
++    machine_id uuid NOT NULL,
++    name text NOT NULL CHECK (octet_length(name) BETWEEN 1 AND 128 AND name = btrim(name)),
++    selection jsonb NOT NULL CHECK ((jsonb_typeof(selection) = 'object' AND selection->>'machine_id' = machine_id::text) IS TRUE),
++    PRIMARY KEY (company_id,id),
++    FOREIGN KEY (company_id,machine_id) REFERENCES public.local_machines(company_id,id) ON DELETE CASCADE
++);
++
++CREATE TABLE public.local_agent_sessions (
++    id uuid NOT NULL,
++    company_id uuid NOT NULL,
++    machine_id uuid NOT NULL,
++    installation_id uuid NOT NULL,
++    profile_id uuid NOT NULL,
++    selection jsonb NOT NULL CHECK ((jsonb_typeof(selection) = 'object' AND selection->>'machine_id' = machine_id::text) IS TRUE),
++    conversation_id uuid,
++    workflow_run_id uuid,
++    thread_id text CHECK (thread_id ~ '^[A-Za-z0-9_.:-]{1,128}$'),
++    created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
++    PRIMARY KEY (company_id,id),
++    UNIQUE (installation_id,thread_id),
++    UNIQUE (company_id,profile_id,id),
++    UNIQUE (company_id,machine_id,installation_id,id),
++    FOREIGN KEY (company_id,machine_id,installation_id) REFERENCES public.local_machines(company_id,id,installation_id) ON DELETE CASCADE,
++    FOREIGN KEY (company_id,profile_id) REFERENCES public.local_agent_profiles(company_id,id),
++    FOREIGN KEY (company_id,conversation_id) REFERENCES public.threads(company_id,id),
++    FOREIGN KEY (company_id,workflow_run_id) REFERENCES public.workflow_runs(company_id,id),
++    CHECK (num_nonnulls(conversation_id,workflow_run_id) = 1)
++);
++
++-- This physical-state predicate owns capacity, reconciliation and retention semantics.
++CREATE FUNCTION public.local_operation_is_outstanding(operation_command jsonb, operation_outcome text, native_state text)
++RETURNS boolean LANGUAGE sql IMMUTABLE PARALLEL SAFE AS $$
++    SELECT operation_outcome IS NULL OR (operation_outcome='uncertain'
++        AND operation_command->>'kind' IN ('create','send')
++        AND COALESCE(native_state NOT IN ('completed','failed','stopped'),true))
++$$;
++
++CREATE TABLE public.local_agent_operations (
++    id uuid NOT NULL,
++    company_id uuid NOT NULL,
++    machine_id uuid NOT NULL,
++    installation_id uuid NOT NULL,
++    session_id uuid,
++    logical_key text NOT NULL CHECK (octet_length(logical_key) BETWEEN 1 AND 256),
++    actor_id uuid REFERENCES public.users(id) ON DELETE SET NULL,
++    origin text NOT NULL DEFAULT 'direct' CHECK (origin IN ('direct','workflow')),
++    command jsonb NOT NULL CHECK (jsonb_typeof(command) = 'object'),
++    payload_digest text NOT NULL CHECK (payload_digest ~ '^[0-9a-f]{64}$'),
++    deadline timestamptz NOT NULL,
++    -- Set before the first transport write; a lost receipt does not prove non-delivery.
++    delivery_attempted_at timestamptz,
++    last_observed_generation bigint NOT NULL DEFAULT 0 CHECK (last_observed_generation >= 0),
++    dispatch jsonb NOT NULL DEFAULT '{"kind":"not_dispatched"}'::jsonb,
++    outcome text CHECK (outcome IN ('succeeded','failed','cancelled','expired','uncertain')),
++    output text CHECK (octet_length(output) <= 262144),
++    output_truncated boolean NOT NULL DEFAULT false,
++    observed_turn_state text CHECK (observed_turn_state IN ('queued','running','waiting_for_input','completed','failed','stopped','missing')),
++    measured_usage jsonb CHECK (jsonb_typeof(measured_usage) = 'object'),
++    settled_at timestamptz,
++    created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
++    PRIMARY KEY (company_id,id),
++    UNIQUE (company_id,machine_id,logical_key),
++    UNIQUE (company_id,machine_id,installation_id,id),
++    UNIQUE (company_id,machine_id,installation_id,id,origin),
++    FOREIGN KEY (company_id,machine_id,installation_id) REFERENCES public.local_machines(company_id,id,installation_id) ON DELETE CASCADE,
++    FOREIGN KEY (company_id,machine_id,installation_id,session_id) REFERENCES public.local_agent_sessions(company_id,machine_id,installation_id,id),
++    CHECK (origin<>'workflow' OR command->>'kind' IN ('create','send')),
++    CHECK ((command->>'kind' IN ('create','send','inspect','stop_thread','archive_thread','refresh_catalog')) IS TRUE),
++    CHECK (((command->>'kind' = 'refresh_catalog') = (session_id IS NULL)) IS TRUE),
++    CONSTRAINT local_operation_command_session CHECK ((command->>'kind'='refresh_catalog' OR command->>'session_id'=session_id::text) IS TRUE),
++    CONSTRAINT local_operation_create_machine CHECK ((command->>'kind'<>'create' OR command->'selection'->>'machine_id'=machine_id::text) IS TRUE),
++    CHECK ((dispatch->>'kind' IN ('not_dispatched','accepted_locally','submission_intent','native_identity','catalog_snapshot')) IS TRUE),
++    CHECK ((settled_at IS NULL)=public.local_operation_is_outstanding(command,outcome,observed_turn_state))
++);
++
++CREATE FUNCTION public.local_operation_settlement() RETURNS trigger LANGUAGE plpgsql AS $$
++BEGIN
++    IF TG_OP='UPDATE' AND NEW.settled_at IS DISTINCT FROM OLD.settled_at THEN
++        RAISE EXCEPTION 'native settlement time is server owned' USING ERRCODE='23514';
++    END IF;
++    IF public.local_operation_is_outstanding(NEW.command,NEW.outcome,NEW.observed_turn_state) THEN
++        IF TG_OP='UPDATE' AND OLD.settled_at IS NOT NULL THEN
++            RAISE EXCEPTION 'physically settled native work cannot reopen' USING ERRCODE='23514';
++        END IF;
++        NEW.settled_at := NULL;
++    ELSE
++        IF TG_OP='UPDATE' THEN NEW.settled_at := COALESCE(OLD.settled_at,clock_timestamp());
++        ELSE NEW.settled_at := clock_timestamp(); END IF;
++    END IF;
++    RETURN NEW;
++END $$;
++CREATE TRIGGER local_operation_settlement BEFORE INSERT OR UPDATE ON public.local_agent_operations
++    FOR EACH ROW EXECUTE FUNCTION public.local_operation_settlement();
++CREATE INDEX local_agent_settlement_retention ON public.local_agent_operations(settled_at,company_id,id)
++    WHERE settled_at IS NOT NULL;
++
++CREATE FUNCTION public.local_machine_native_success() RETURNS trigger LANGUAGE plpgsql AS $$
++BEGIN
++    IF NEW.settled_at IS NOT NULL AND NEW.command->>'kind' IN ('create','send')
++        AND NEW.dispatch->>'kind'='native_identity' AND NEW.observed_turn_state='completed' THEN
++        UPDATE local_machines SET last_native_success_at=NEW.settled_at
++            WHERE company_id=NEW.company_id AND id=NEW.machine_id
++                AND (last_native_success_at IS NULL OR last_native_success_at<NEW.settled_at);
++    END IF;
++    RETURN NEW;
++END $$;
++CREATE TRIGGER local_machine_native_success AFTER INSERT OR UPDATE ON public.local_agent_operations
++    FOR EACH ROW EXECUTE FUNCTION public.local_machine_native_success();
++
++CREATE TABLE public.local_agent_observations (
++    company_id uuid NOT NULL,
++    machine_id uuid NOT NULL,
++    installation_id uuid NOT NULL,
++    sequence bigint NOT NULL CHECK (sequence > 0),
++    operation_id uuid NOT NULL,
++    digest text NOT NULL CHECK (digest ~ '^[0-9a-f]{64}$'),
++    observation jsonb CHECK (jsonb_typeof(observation) = 'object' AND octet_length(observation::text) <= 2097152),
++    accepted_at timestamptz NOT NULL DEFAULT clock_timestamp(),
++    PRIMARY KEY (company_id,installation_id,sequence),
++    FOREIGN KEY (company_id,machine_id,installation_id,operation_id) REFERENCES public.local_agent_operations(company_id,machine_id,installation_id,id) ON DELETE CASCADE
++);
++
++CREATE INDEX local_agent_observation_detail_retention ON public.local_agent_observations(accepted_at,company_id,sequence)
++    WHERE observation IS NOT NULL;
++
++-- A workflow execution owns one frozen preparation before approval, then one native effect wait.
++CREATE TABLE public.workflow_local_agent_calls (
++    company_id uuid NOT NULL,
++    run_id uuid NOT NULL,
++    execution_id uuid NOT NULL,
++    invocation_id uuid NOT NULL,
++    argument_digest text NOT NULL CHECK (argument_digest ~ '^[0-9a-f]{64}$'),
++    profile_id uuid NOT NULL,
++    machine_id uuid,
++    installation_id uuid,
++    session_id uuid,
++    operation_id uuid,
++    operation_origin text NOT NULL DEFAULT 'workflow' CHECK (operation_origin='workflow'),
++    wait_id uuid,
++    dispatch_id uuid,
++    fence_expires_at timestamptz,
++    effect_kind text NOT NULL DEFAULT 'local_agent' CHECK (effect_kind='local_agent'),
++    ready_at timestamptz,
++    workflow_outcome text CHECK (workflow_outcome IN ('succeeded','failed','cancelled','expired','uncertain')),
++    created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
++    PRIMARY KEY (company_id,run_id,execution_id),
++    UNIQUE (company_id,invocation_id),
++    UNIQUE (company_id,operation_id),
++    UNIQUE (company_id,wait_id),
++    FOREIGN KEY (company_id,run_id,execution_id,invocation_id,argument_digest)
++        REFERENCES public.workflow_action_intents(company_id,run_id,execution_id,id,argument_digest) ON DELETE CASCADE,
++    FOREIGN KEY (company_id,profile_id) REFERENCES public.local_agent_profiles(company_id,id),
++    FOREIGN KEY (company_id,machine_id,installation_id,operation_id,operation_origin)
++        REFERENCES public.local_agent_operations(company_id,machine_id,installation_id,id,origin),
++    FOREIGN KEY (company_id,machine_id,installation_id,session_id)
++        REFERENCES public.local_agent_sessions(company_id,machine_id,installation_id,id),
++    FOREIGN KEY (company_id,profile_id,session_id) REFERENCES public.local_agent_sessions(company_id,profile_id,id),
++    -- Link the scoped call before the wait's immediate owner guard runs. The cycle
++    -- must be complete at COMMIT; the dispatch commit guard proves the atomic park.
++    FOREIGN KEY (company_id,run_id,execution_id,wait_id)
++        REFERENCES public.workflow_waits(company_id,run_id,execution_id,id) DEFERRABLE INITIALLY DEFERRED,
++    FOREIGN KEY (company_id,run_id,execution_id,invocation_id,argument_digest,dispatch_id,effect_kind)
++        REFERENCES public.workflow_action_dispatches(company_id,run_id,execution_id,invocation_id,argument_digest,id,effect_kind),
++    CHECK (num_nonnulls(machine_id,installation_id,session_id,operation_id,wait_id,dispatch_id,fence_expires_at) IN (0,7)),
++    CHECK (operation_id IS NULL OR operation_id=invocation_id),
++    CHECK (ready_at IS NULL OR operation_id IS NOT NULL),
++    CHECK ((ready_at IS NULL)=(workflow_outcome IS NULL))
++);
++
++-- Terminal call archival breaks closed cross-tree references without granting an effect receipt.
++CREATE TABLE public.workflow_local_agent_retention_proofs (
++    company_id uuid NOT NULL,
++    run_id uuid NOT NULL,
++    execution_id uuid NOT NULL,
++    invocation_id uuid NOT NULL,
++    argument_digest text NOT NULL,
++    dispatch_id uuid NOT NULL,
++    effect_kind text NOT NULL DEFAULT 'local_agent' CHECK (effect_kind='local_agent'),
++    settled_at timestamptz NOT NULL,
++    PRIMARY KEY (company_id,invocation_id),
++    FOREIGN KEY (company_id,run_id,execution_id,invocation_id,argument_digest,dispatch_id,effect_kind)
++        REFERENCES public.workflow_action_dispatches(company_id,run_id,execution_id,invocation_id,argument_digest,id,effect_kind)
++        ON DELETE CASCADE
++);
++CREATE FUNCTION public.workflow_local_agent_retention_proof_guard() RETURNS trigger LANGUAGE plpgsql AS $$
++BEGIN
++    IF TG_OP='UPDATE' THEN
++        RAISE EXCEPTION 'native retention proof is immutable' USING ERRCODE='23514';
++    END IF;
++    IF NOT EXISTS (
++        SELECT 1 FROM workflow_local_agent_calls AS call
++        JOIN workflow_runs AS run ON run.company_id=call.company_id AND run.id=call.run_id
++        JOIN local_agent_operations AS operation ON operation.company_id=call.company_id AND operation.id=call.operation_id
++        WHERE (call.company_id,call.run_id,call.execution_id,call.invocation_id,call.argument_digest,call.dispatch_id)
++            =(NEW.company_id,NEW.run_id,NEW.execution_id,NEW.invocation_id,NEW.argument_digest,NEW.dispatch_id)
++            AND run.state IN ('succeeded','failed','cancelled') AND run.finished_at<clock_timestamp()-interval '90 days'
++            AND operation.settled_at=NEW.settled_at AND operation.settled_at<clock_timestamp()-interval '90 days'
++            AND NOT public.local_operation_is_outstanding(operation.command,operation.outcome,operation.observed_turn_state)
++    ) THEN RAISE EXCEPTION 'native retention proof requires its old terminal owner and physical evidence' USING ERRCODE='23514'; END IF;
++    RETURN NEW;
++END $$;
++CREATE TRIGGER workflow_local_agent_retention_proof_guard BEFORE INSERT OR UPDATE ON public.workflow_local_agent_retention_proofs
++    FOR EACH ROW EXECUTE FUNCTION public.workflow_local_agent_retention_proof_guard();
++
++CREATE FUNCTION public.workflow_local_agent_call_guard() RETURNS trigger LANGUAGE plpgsql AS $$
++BEGIN
++    IF TG_OP='UPDATE' THEN
++        IF (NEW.company_id,NEW.run_id,NEW.execution_id,NEW.invocation_id,NEW.argument_digest,NEW.profile_id,NEW.created_at)
++            IS DISTINCT FROM (OLD.company_id,OLD.run_id,OLD.execution_id,OLD.invocation_id,OLD.argument_digest,OLD.profile_id,OLD.created_at)
++            OR (OLD.operation_id IS NOT NULL AND (NEW.machine_id,NEW.installation_id,NEW.session_id,NEW.operation_id,NEW.wait_id,NEW.dispatch_id,NEW.fence_expires_at)
++                IS DISTINCT FROM (OLD.machine_id,OLD.installation_id,OLD.session_id,OLD.operation_id,OLD.wait_id,OLD.dispatch_id,OLD.fence_expires_at))
++            OR (OLD.ready_at IS NOT NULL AND ROW(NEW.ready_at,NEW.workflow_outcome) IS DISTINCT FROM ROW(OLD.ready_at,OLD.workflow_outcome))
++        THEN RAISE EXCEPTION 'local workflow call identity is immutable' USING ERRCODE='23514', CONSTRAINT='workflow_guard:local_agent_identity'; END IF;
++    END IF;
++    IF NEW.ready_at IS NOT NULL AND NOT EXISTS (
++        SELECT 1 FROM local_agent_operations AS operation WHERE operation.company_id=NEW.company_id
++            AND operation.id=NEW.operation_id AND operation.outcome IS NOT NULL
++    ) THEN RAISE EXCEPTION 'local workflow wake requires a settled operation' USING ERRCODE='23514', CONSTRAINT='workflow_guard:local_agent_wake'; END IF;
++    IF NEW.ready_at IS NOT NULL AND (TG_OP='INSERT' OR OLD.ready_at IS NULL) AND NOT EXISTS (
++        SELECT 1 FROM local_agent_operations AS operation WHERE operation.company_id=NEW.company_id AND operation.id=NEW.operation_id
++            AND NEW.workflow_outcome=CASE WHEN operation.deadline<=NEW.ready_at THEN 'expired' ELSE operation.outcome END
++    ) THEN RAISE EXCEPTION 'local workflow disposition must match its first terminal observation' USING ERRCODE='23514', CONSTRAINT='workflow_guard:local_agent_disposition'; END IF;
++    RETURN NEW;
++END $$;
++CREATE TRIGGER workflow_local_agent_call_guard BEFORE INSERT OR UPDATE ON public.workflow_local_agent_calls
++    FOR EACH ROW EXECUTE FUNCTION public.workflow_local_agent_call_guard();
++
++-- Receipt/output and wake readiness share the operation writer's transaction, including expiry.
++CREATE FUNCTION public.workflow_local_agent_outcome_wake() RETURNS trigger LANGUAGE plpgsql AS $$
++DECLARE observed_at timestamptz := clock_timestamp();
++BEGIN
++    UPDATE workflow_local_agent_calls AS call SET ready_at=observed_at,
++        workflow_outcome=CASE WHEN NEW.deadline<=observed_at THEN 'expired' ELSE NEW.outcome END
++        WHERE call.company_id=NEW.company_id AND call.operation_id=NEW.id AND call.ready_at IS NULL;
++    RETURN NEW;
++END $$;
++CREATE TRIGGER workflow_local_agent_outcome_wake AFTER UPDATE OF outcome ON public.local_agent_operations
++    FOR EACH ROW WHEN (NEW.outcome IS NOT NULL AND OLD.outcome IS DISTINCT FROM NEW.outcome)
++    EXECUTE FUNCTION public.workflow_local_agent_outcome_wake();
++
++-- A native effect turn cannot settle another operation; this enforces identity, not a query optimization.
++CREATE UNIQUE INDEX local_agent_effect_turn_identity ON public.local_agent_operations
++    (installation_id,(dispatch->>'thread_id'),(dispatch->>'turn_id'))
++    WHERE command->>'kind' IN ('create','send') AND dispatch->>'kind'='native_identity'
++        AND dispatch->>'turn_id' IS NOT NULL;
++CREATE UNIQUE INDEX local_agent_session_creation ON public.local_agent_operations(company_id,session_id)
++    WHERE command->>'kind'='create';
++
++CREATE TABLE public.local_pair_budgets (
++    identity_key bytea PRIMARY KEY CHECK (octet_length(identity_key) = 32),
++    attempts smallint NOT NULL CHECK (attempts BETWEEN 1 AND 12),
++    window_ends_at timestamptz NOT NULL
++);
++
++CREATE FUNCTION public.local_installation_identity_immutable() RETURNS trigger LANGUAGE plpgsql AS $$
++BEGIN
++    RAISE EXCEPTION 'installation reservations cannot be changed or released' USING ERRCODE='23514';
++END $$;
++CREATE TRIGGER local_installation_identity_immutable BEFORE UPDATE OR DELETE ON public.local_installations
++    FOR EACH ROW EXECUTE FUNCTION public.local_installation_identity_immutable();
++
++CREATE FUNCTION public.local_operation_inputs_immutable() RETURNS trigger LANGUAGE plpgsql AS $$
++BEGIN
++    IF ROW(NEW.company_id,NEW.machine_id,NEW.installation_id,NEW.session_id,NEW.logical_key,NEW.origin,NEW.command,NEW.payload_digest,NEW.deadline)
++        IS DISTINCT FROM ROW(OLD.company_id,OLD.machine_id,OLD.installation_id,OLD.session_id,OLD.logical_key,OLD.origin,OLD.command,OLD.payload_digest,OLD.deadline)
++        OR (OLD.delivery_attempted_at IS NOT NULL AND NEW.delivery_attempted_at IS DISTINCT FROM OLD.delivery_attempted_at)
++        OR (NEW.actor_id IS DISTINCT FROM OLD.actor_id AND NEW.actor_id IS NOT NULL)
++    THEN RAISE EXCEPTION 'local operation inputs are immutable' USING ERRCODE='23514'; END IF;
++    RETURN NEW;
++END $$;
++CREATE TRIGGER local_operation_inputs_immutable BEFORE UPDATE ON public.local_agent_operations
++    FOR EACH ROW EXECUTE FUNCTION public.local_operation_inputs_immutable();
++
++CREATE FUNCTION public.local_session_inputs_immutable() RETURNS trigger LANGUAGE plpgsql AS $$
++BEGIN
++    IF ROW(NEW.company_id,NEW.machine_id,NEW.installation_id,NEW.profile_id,NEW.selection,NEW.conversation_id,NEW.workflow_run_id)
++        IS DISTINCT FROM ROW(OLD.company_id,OLD.machine_id,OLD.installation_id,OLD.profile_id,OLD.selection,OLD.conversation_id,OLD.workflow_run_id)
++        OR (OLD.thread_id IS NOT NULL AND NEW.thread_id IS DISTINCT FROM OLD.thread_id)
++    THEN RAISE EXCEPTION 'local session inputs and native identity are immutable' USING ERRCODE='23514'; END IF;
++    RETURN NEW;
++END $$;
++CREATE TRIGGER local_session_inputs_immutable BEFORE UPDATE ON public.local_agent_sessions
++    FOR EACH ROW EXECUTE FUNCTION public.local_session_inputs_immutable();
++
++
++CREATE FUNCTION public.local_workflow_operation_owner() RETURNS trigger LANGUAGE plpgsql AS $$
++BEGIN
++    IF NEW.origin='workflow' AND NOT EXISTS (
++        SELECT 1 FROM workflow_local_agent_calls AS call
++        JOIN workflow_action_dispatches AS marker ON marker.company_id=call.company_id AND marker.id=call.dispatch_id
++        JOIN workflow_action_intents AS intent ON intent.company_id=call.company_id AND intent.id=call.invocation_id
++        JOIN workflow_waits AS wait ON wait.company_id=call.company_id AND wait.id=call.wait_id
++        JOIN local_agent_sessions AS session ON session.company_id=call.company_id AND session.id=call.session_id
++        WHERE call.company_id=NEW.company_id AND call.machine_id=NEW.machine_id AND call.installation_id=NEW.installation_id
++            AND call.operation_id=NEW.id AND call.operation_origin=NEW.origin AND call.session_id=NEW.session_id
++            AND marker.effect_kind='local_agent' AND wait.run_id=call.run_id AND wait.execution_id=call.execution_id
++            AND session.workflow_run_id IS NOT NULL AND intent.operation_key='local_agent.run'
++            AND intent.operation#>>'{context,actor}'=NEW.actor_id::text
++    ) THEN RAISE EXCEPTION 'workflow native operation requires its atomic shared action owner' USING ERRCODE='23514', CONSTRAINT='workflow_guard:local_workflow_operation_owner'; END IF;
++    RETURN NULL;
++END $$;
++CREATE CONSTRAINT TRIGGER local_workflow_operation_owner AFTER INSERT ON public.local_agent_operations
++    DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION public.local_workflow_operation_owner();
++
+ -- Response/delivery changes wake existing readers; events carry identities, never payloads.

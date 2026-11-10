@@ -1,0 +1,25 @@
+
+running 20 tests
+test adapters::persistence::workflow::tests::admission_tests::batch_tests::child_runtime_tests::workflow_call_runs_through_the_worker_and_fair_poll ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::capacity_tests::fairness_tests::acceptance_tests::workflow_fairness_deleted_company_hints_are_inert_and_cursors_retire ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::capacity_tests::fairness_tests::acceptance_tests::workflow_fairness_cleanup_skips_explicitly_locked_stale_parents ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::capacity_tests::fairness_tests::acceptance_tests::workflow_fairness_faults_roll_back_cursor_demand_and_activation ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::capacity_tests::fairness_tests::acceptance_tests::workflow_fairness_schema_enforces_cursor_owner_and_single_offer ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::capacity_tests::fairness_tests::acceptance_tests::workflow_fairness_discovery_never_waits_for_run_or_capacity_locks ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::eligibility_tests::claim_fairness_tests::workflow_action_reconciliation_claim_fairness_descendant_first_claim_with_ancestors_locked ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::capacity_tests::fairness_tests::acceptance_tests::workflow_fairness_claim_waiting_for_run_does_not_hold_capacity ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::capacity_tests::fairness_tests::worker_tests::mixed_tests::workflow_fairness_real_loop_mixes_full_unsupported_poison_wait_hung_and_refill ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::capacity_tests::fairness_tests::worker_tests::workflow_fairness_complementary_workers_reach_actual_supported_dispatch ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::capacity_tests::fairness_tests::worker_tests::workflow_fairness_worker_stops_full_page_at_first_denied_demand ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::eligibility_tests::claim_fairness_tests::child_policy_tests::workflow_action_reconciliation_claim_fairness_child_policy_records_proof_without_schedule ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::capacity_tests::fairness_tests::worker_tests::workflow_fairness_sustained_refill_dispatches_quiet_handlers_in_bounded_turns ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::capacity_tests::fairness_tests::workflow_fairness_abandoned_offer_and_stale_withdrawal_are_bounded ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::capacity_tests::fairness_tests::workflow_fairness_full_wait_preserves_age_then_protects_quiet_retry ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::capacity_tests::fairness_tests::workflow_fairness_invalid_offer_is_cleaned_before_older_invalid_history ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::capacity_tests::fairness_tests::workflow_fairness_open_offer_survives_older_company_becoming_uncapped ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::capacity_tests::fairness_tests::workflow_fairness_worker_traversals_and_finite_horizons_are_independent ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::message_intent_claims_are_fair_across_tenants ... ok
+test adapters::persistence::workflow::tests::local_agent_tests::corrections::cloudroom_workflow_actual_fair_poll_worker_discovers_native_result_and_completes_once ... ok
+
+test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 3287 filtered out; finished in 11.22s
+

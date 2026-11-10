@@ -503,40 +503,6 @@ async fn source_relay_on(
     }))
 }
 
-/// Authoring selection of the trusted built-ins. Requires current owner/admin authority.
-pub struct MessagePublicationDirectory {
-    pub persistence: PostgresPersistence,
-}
-#[async_trait]
-impl PublicationDirectory for MessagePublicationDirectory {
-    async fn capture(
-        &self,
-        actor: WorkflowActor,
-        draft: &CompanyWorkflowDraft,
-    ) -> AppResult<PublicationDependencies> {
-        let mut tx = begin_http(&self.persistence).await?;
-        super::authority::authorize_company(&mut tx, draft.company(), actor).await?;
-        tx.commit().await?;
-        message_builtins(draft.company())
-    }
-}
-
-/// Every publication's message capture: both trusted built-ins, whatever the draft's steps
-/// (assistant provisioning starts its capture from these too, p08 D2.3).
-pub(super) fn message_builtins(company: CompanyId) -> AppResult<PublicationDependencies> {
-    Ok(PublicationDependencies {
-        snapshots: publication::DependencySnapshots {
-            tools: vec![
-                builtin_message_snapshot(company, MessageKind::Send)?,
-                builtin_message_snapshot(company, MessageKind::Reply)?,
-                builtin_message_snapshot(company, MessageKind::Ask)?,
-            ],
-            ..Default::default()
-        },
-        children: vec![],
-    })
-}
-
 /// Resolve the same exact-source route used by explicit message.reply.
 pub(super) async fn final_reply_route_on(
     db: &mut PgConnection,

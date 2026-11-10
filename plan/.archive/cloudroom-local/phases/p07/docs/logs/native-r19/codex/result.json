@@ -1,0 +1,129 @@
+{
+  "activeNativeStopMatchedInterruptedTurn": true,
+  "actualUi": true,
+  "actualWorkflowWorkers": 2,
+  "afterRestart": {
+    "event": "snapshot",
+    "requests": 1,
+    "terminals": [
+      {
+        "status": "completed",
+        "turn": "da582121ad-t1"
+      }
+    ],
+    "thread": "thr_b9symnepiz",
+    "turns": [
+      "da582121ad-t1"
+    ]
+  },
+  "beforeRestart": {
+    "event": "snapshot",
+    "requests": 1,
+    "terminals": [
+      {
+        "status": "completed",
+        "turn": "da582121ad-t1"
+      }
+    ],
+    "thread": "thr_b9symnepiz",
+    "turns": [
+      "da582121ad-t1"
+    ]
+  },
+  "explicitThreadStopAndArchiveAccepted": true,
+  "fileAccess": true,
+  "final": {
+    "event": "snapshot",
+    "requests": 6,
+    "terminals": [
+      {
+        "status": "completed",
+        "turn": "da582121ad-t1"
+      },
+      {
+        "status": "completed",
+        "turn": "daeb9fbc87-t1"
+      },
+      {
+        "status": "completed",
+        "turn": "daeb9fbc87-t2"
+      },
+      {
+        "status": "completed",
+        "turn": "daeb9fbc87-t3"
+      },
+      {
+        "status": "completed",
+        "turn": "daeb9fbc87-t4"
+      },
+      {
+        "status": "interrupted",
+        "turn": "daeb9fbc87-t5"
+      }
+    ],
+    "thread": "thr_b9symnepiz",
+    "turns": [
+      "da582121ad-t1",
+      "daeb9fbc87-t1",
+      "daeb9fbc87-t2",
+      "daeb9fbc87-t3",
+      "daeb9fbc87-t4",
+      "daeb9fbc87-t5"
+    ]
+  },
+  "isolatedLoggedOutProvider": {
+    "isolation": {
+      "credentialEnvironmentRemoved": [
+        "OPENAI_API_KEY",
+        "CODEX_API_KEY",
+        "OPENAI_ACCESS_TOKEN",
+        "ANTHROPIC_API_KEY",
+        "ANTHROPIC_AUTH_TOKEN",
+        "CLAUDE_CODE_OAUTH_TOKEN",
+        "OPENCODE_AUTH_JSON",
+        "OPENCODE_CONFIG_CONTENT"
+      ],
+      "event": "logged_out",
+      "isolatedProviderConfiguration": true,
+      "nativeLoginStatus": 1,
+      "parentLoginUntouched": true,
+      "provider": "codex"
+    },
+    "nativeOperation": "9de933a1-0480-4f6f-9f62-99a39a0b2f21",
+    "originalWorkflowUnchanged": true,
+    "sdkCalls": 1,
+    "status": "PASS",
+    "successfulReceipts": 0,
+    "workflow": "failed"
+  },
+  "linux": "NOT EXERCISED on this host",
+  "nativeHumanPermission": {
+    "actualUiPermissionDenied": true,
+    "independentHumanTurn": "daeb9fbc87-t4",
+    "openbotWaitingForMatchingInput": true,
+    "outcome": "succeeded",
+    "ownTurn": "daeb9fbc87-t3",
+    "sdkCalls": 1,
+    "status": "PASS"
+  },
+  "nativeStopIsNotAnAtomicTargetedTurnGuarantee": true,
+  "outputRecoveredAfterNativeOutputBeforeServerReceipt": true,
+  "platform": "macos",
+  "productionPlugin": true,
+  "provider": "codex",
+  "realPairingHttp": true,
+  "selection": {
+    "machine_id": "982628da-1e26-4149-b6a0-57c7caeef8fb",
+    "model": "gpt-6-luna",
+    "policy": {
+      "permissions": "provider_default",
+      "reasoning": "low",
+      "workspace": "project_directory"
+    },
+    "project_id": "proj_5k78hdcryy",
+    "provider": "codex"
+  },
+  "session": "8936dc0f-2487-470e-a498-6ed5381d50d0",
+  "status": "PASS",
+  "thread": "thr_b9symnepiz"
+}

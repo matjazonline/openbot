@@ -1,6 +1,15 @@
 //! Guarded Streamable HTTP adapter. All rmcp types stay behind the application session port.
+mod connection;
+mod errors;
 mod http;
+#[cfg(test)]
+pub(crate) mod pinned_fixture;
 pub mod policy;
+mod preparation;
+#[cfg(test)]
+pub(crate) mod preparation_test_server;
+#[cfg(test)]
+pub(crate) mod preparation_tests;
 mod worker;
 use crate::{
     app_error::{AppError, AppResult},
@@ -71,62 +80,23 @@ impl McpClient for HttpMcpClient {
         endpoint: &McpEndpoint,
         token: Option<SecretString>,
     ) -> AppResult<Box<dyn McpSession>> {
-        let (endpoint_permit, permit) = self.permits(endpoint).await?;
-        let http = self.policy.client(endpoint).await?;
-        let mut config =
-            StreamableHttpClientTransportConfig::with_uri(endpoint.as_str().to_owned());
-        config.auth_header = token.as_ref().map(|t| t.expose_secret().to_owned());
-        config.allow_stateless = true;
-        config.reinit_on_expired_session = false;
-        config.channel_buffer_capacity = 8;
-        let remaining = Arc::new(std::sync::atomic::AtomicUsize::new(MAX_MCP_DISCOVERY_BYTES));
-        let transport = StreamableHttpClientTransport::with_client(
-            http::BoundedHttp {
-                client: http,
-                remaining: remaining.clone(),
-            },
-            config,
-        );
-        let (session, receiver) = worker::ProxySession::channel();
-        let (ready, initialized) = tokio::sync::oneshot::channel();
-        let mut workers = self.workers.lock().await;
-        while let Some(result) = workers.try_join_next() {
-            if result.is_err() {
-                tracing::warn!("MCP worker failed");
-            }
-        }
-        if self.shutdown.is_cancelled() {
-            return Err(failed("MCP client is shutting down"));
-        }
-        let shutdown = self.shutdown.clone();
-        workers.spawn(async move {
-            let result = tokio::time::timeout(Duration::from_secs(30), ().serve(transport))
-                .await
-                .map_err(|_| failed("MCP initialization timed out"))
-                .and_then(|r| r.map_err(|_| failed("MCP initialization failed")));
-            match result {
-                Ok(client) => {
-                    let session = Session {
-                        client,
-                        _permit: permit,
-                        _endpoint_permit: endpoint_permit,
-                        token,
-                        remaining,
-                        pending_call: Default::default(),
-                    };
-                    let _ = ready.send(Ok(()));
-                    worker::run(session, receiver, shutdown).await;
-                }
-                Err(error) => {
-                    let _ = ready.send(Err(error));
-                }
-            }
-        });
-        drop(workers);
-        initialized
+        self.connect_control(endpoint, token, preparation::Control::owned(&self.shutdown))
             .await
-            .map_err(|_| failed("MCP initialization failed"))??;
-        Ok(Box::new(session))
+            .map_err(|error| match error {
+                crate::application::services::mcp_client::McpPreparationFailure::Authentication => {
+                    AppError::McpAuthentication
+                }
+                error => failed(&error.to_string()),
+            })
+    }
+    async fn connect_prepared(
+        &self,
+        endpoint: &McpEndpoint,
+        token: SecretString,
+        work: crate::application::services::mcp_client::McpPreparation,
+    ) -> crate::application::services::mcp_client::McpPreparationResult<Box<dyn McpSession>> {
+        let control = preparation::Control::prepared(&self.shutdown, work);
+        self.connect_control(endpoint, Some(token), control).await
     }
 }
 struct Session {
@@ -136,6 +106,9 @@ struct Session {
     token: Option<SecretString>,
     remaining: Arc<std::sync::atomic::AtomicUsize>,
     pending_call: std::sync::Mutex<Option<rmcp::model::RequestId>>,
+    stop: tokio_util::sync::CancellationToken,
+    finished: Option<tokio::sync::oneshot::Receiver<()>>,
+    cleanup: http::Cleanup,
 }
 impl Session {
     fn reject_secret(&self, value: &Value) -> AppResult<()> {
@@ -163,7 +136,7 @@ impl Session {
                     params
                 }))
                 .await
-                .map_err(|_| failed("MCP discovery failed"))?;
+                .map_err(|error| errors::service(error, "MCP discovery failed"))?;
             for tool in page.tools {
                 let name = McpToolName::try_from(tool.name.into_owned())
                     .map_err(|_| failed("Invalid MCP tool name"))?;
@@ -233,7 +206,7 @@ impl McpSession for Session {
                 rmcp::service::PeerRequestOptions::no_options(),
             )
             .await
-            .map_err(|_| failed("MCP effect indeterminate; do not retry"))?;
+            .map_err(|error| errors::service(error, "MCP effect indeterminate; do not retry"))?;
         *self
             .pending_call
             .lock()
@@ -247,7 +220,7 @@ impl McpSession for Session {
         }
         let result = response
             .map_err(|_| failed("MCP effect indeterminate; do not retry"))?
-            .map_err(|_| failed("MCP effect indeterminate; do not retry"))?;
+            .map_err(|error| errors::service(error, "MCP effect indeterminate; do not retry"))?;
         let rmcp::model::ServerResult::CallToolResult(result) = result else {
             return Err(failed("MCP effect indeterminate; do not retry"));
         };
@@ -255,9 +228,21 @@ impl McpSession for Session {
     }
     async fn close(mut self: Box<Self>) -> AppResult<()> {
         self.cancel_pending().await;
-        self.client
+        self.stop.cancel();
+        let closed = self
+            .client
             .close_with_timeout(Duration::from_secs(35))
+            .await;
+        if let Some(finished) = self.finished.take() {
+            finished
+                .await
+                .map_err(|_| failed("MCP HTTP cleanup failed"))?;
+        }
+        self.cleanup
+            .finish()
             .await
+            .map_err(|_| failed("MCP session cleanup failed"))?;
+        closed
             .map_err(|_| failed("MCP shutdown failed"))?
             .ok_or_else(|| failed("MCP shutdown timed out"))?;
         Ok(())
@@ -266,6 +251,9 @@ impl McpSession for Session {
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod doop_tests;
 
 impl Session {
     /// The typed boundary: `_meta` and unknown remote fields are dropped by rmcp's model,

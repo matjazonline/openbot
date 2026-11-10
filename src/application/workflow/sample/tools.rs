@@ -29,6 +29,8 @@ impl Session {
         path: &SamplePath,
         response: &ScriptedResponse,
     ) -> AppResult<()> {
+        use super::super::agent::{McpErrorPolicy, McpResultSource};
+        let policy = McpErrorPolicy::from_inputs(&activation.inputs)?;
         let key = activation
             .inputs
             .get("agent")
@@ -58,14 +60,15 @@ impl Session {
                 bundle.company_id(),
                 tool,
             )?;
-            if matches!(
-                tool.binding.source,
-                crate::entities::agent_capability::AgentBindingSource::Mcp { .. }
-            ) {
-                snapshot.contract.output_schema =
-                    super::super::registry::mcp_tool_result(&snapshot.contract.output_schema);
-            }
-            self.tool(
+            let source = match tool.binding.source {
+                crate::entities::agent_capability::AgentBindingSource::Mcp { .. } => {
+                    snapshot.contract.output_schema =
+                        super::super::registry::mcp_tool_result(&snapshot.contract.output_schema);
+                    McpResultSource::Mcp
+                }
+                _ => McpResultSource::Other,
+            };
+            let output = self.tool(
                 bundle,
                 frame,
                 &path.child(format!("tool-{}:{}", index + 1, call.name.as_str())),
@@ -73,6 +76,7 @@ impl Session {
                 call.input.clone(),
                 call.output.clone(),
             )?;
+            policy.check_result(source, &output)?;
         }
         Ok(())
     }
@@ -87,6 +91,11 @@ impl Session {
     ) -> AppResult<Value> {
         validate(&tool.contract.input_schema, &input)?;
         let (output, kind) = match tool.kind() {
+            ToolKind::LocalAgent => {
+                return Err(refused(
+                    "Local agents are workflow steps, not selectable tools",
+                ));
+            }
             ToolKind::Workflow(pin) => {
                 if fixture.is_some() {
                     return Err(refused(

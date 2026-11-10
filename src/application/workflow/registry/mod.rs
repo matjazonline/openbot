@@ -21,6 +21,7 @@ use crate::application::workflow::compiler::{
 use crate::domain::workflow::{
     Binding, ResourceName, Routes, StepId, TypeName, VersionId, WorkflowId,
 };
+pub(crate) use actions::action_approval_schema;
 pub(crate) use actions::message_tool_schemas;
 pub(crate) use checks::InputCheck;
 pub use facts::{CatalogueFacts, ChildContract, ToolContract};
@@ -30,7 +31,7 @@ use schemas::*;
 use serde_json::{Value, json};
 use std::collections::{BTreeMap, BTreeSet};
 
-pub const CONTRACT_REVISION: &str = "workflow-catalogue-v1.8";
+pub const CONTRACT_REVISION: &str = "workflow-catalogue-v1.9";
 pub const MAX_FACTS: usize = 256;
 pub const MAX_SELECTIONS: usize = 128;
 /// Explicit reviewers of one `decision.human` (user decision Q1, 05-D2 §2): at most this many
@@ -53,17 +54,19 @@ pub const MAX_IDENTIFIER: usize = 128;
 pub const MAX_PATH: usize = 2048;
 pub const MAX_DEADLINE: usize = 64;
 pub const MAX_CORRELATION: usize = 256;
-pub const TYPES: [&str; 21] = [
+pub const TYPES: [&str; 23] = [
     "context.history",
     "memory.load",
     "memory.save",
     "ai.classify",
     "jev.evaluate",
     "agent.run",
+    "local_agent.run",
     "decision.rule",
     "decision.human",
     "decision.agent",
     "data.map",
+    "data.url",
     "channel.no_reply",
     "http.request",
     "tool.call",
@@ -345,7 +348,7 @@ impl<'a> Registration<'a> {
         }
         let contract = match self.name() {
             "http.request" | "tool.call" | "mcp.call" | "message.send" | "message.reply"
-            | "message.ask" => self.action()?,
+            | "message.ask" | "local_agent.run" => self.action()?,
             "workflow.call" | "flow.repeat" => self.child()?,
             _ => self.basic()?,
         };

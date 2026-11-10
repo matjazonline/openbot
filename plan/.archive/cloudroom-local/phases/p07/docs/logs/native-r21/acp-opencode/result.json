@@ -1,0 +1,149 @@
+{
+  "activeNativeStopMatchedInterruptedTurn": true,
+  "actualUi": true,
+  "actualWorkflowWorkers": 2,
+  "afterRestart": {
+    "archived": false,
+    "event": "snapshot",
+    "requests": 1,
+    "terminals": [
+      {
+        "status": "completed",
+        "turn": "da5f3f1832-t1"
+      }
+    ],
+    "thread": "thr_a8afueuaet",
+    "turns": [
+      "da5f3f1832-t1"
+    ]
+  },
+  "beforeRestart": {
+    "archived": false,
+    "event": "snapshot",
+    "requests": 1,
+    "terminals": [
+      {
+        "status": "completed",
+        "turn": "da5f3f1832-t1"
+      }
+    ],
+    "thread": "thr_a8afueuaet",
+    "turns": [
+      "da5f3f1832-t1"
+    ]
+  },
+  "explicitThreadControlsAdmitted": true,
+  "fileAccess": true,
+  "final": {
+    "archived": true,
+    "controls": [
+      {
+        "command": {
+          "kind": "stop"
+        },
+        "outcome": "succeeded",
+        "sdkCalls": 1
+      },
+      {
+        "command": {
+          "kind": "archive"
+        },
+        "outcome": "succeeded",
+        "sdkCalls": 1
+      }
+    ],
+    "event": "snapshot",
+    "requests": 6,
+    "terminals": [
+      {
+        "status": "completed",
+        "turn": "da5f3f1832-t1"
+      },
+      {
+        "status": "completed",
+        "turn": "daadc36aac-t1"
+      },
+      {
+        "status": "completed",
+        "turn": "daccc24c1d-t1"
+      },
+      {
+        "status": "interrupted",
+        "turn": "daccc24c1d-t2"
+      },
+      {
+        "status": "completed",
+        "turn": "da5e0cde21-t1"
+      },
+      {
+        "status": "interrupted",
+        "turn": "da5e0cde21-t2"
+      }
+    ],
+    "thread": "thr_a8afueuaet",
+    "turns": [
+      "da5f3f1832-t1",
+      "daadc36aac-t1",
+      "daccc24c1d-t1",
+      "daccc24c1d-t2",
+      "da5e0cde21-t1",
+      "da5e0cde21-t2"
+    ]
+  },
+  "isolatedLoggedOutProvider": {
+    "isolation": {
+      "credentialEnvironmentRemoved": [
+        "OPENAI_API_KEY",
+        "CODEX_API_KEY",
+        "OPENAI_ACCESS_TOKEN",
+        "ANTHROPIC_API_KEY",
+        "ANTHROPIC_AUTH_TOKEN",
+        "CLAUDE_CODE_OAUTH_TOKEN",
+        "OPENCODE_AUTH_JSON",
+        "OPENCODE_CONFIG_CONTENT"
+      ],
+      "event": "logged_out",
+      "isolatedProviderConfiguration": true,
+      "nativeLoginStatus": 0,
+      "parentLoginUntouched": true,
+      "provider": "acp-opencode"
+    },
+    "nativeOperation": "15a748a8-44dc-4a77-8405-119b484c37c9",
+    "originalWorkflowUnchanged": true,
+    "sdkCalls": 1,
+    "status": "PASS",
+    "successfulReceipts": 0,
+    "workflow": "failed"
+  },
+  "linux": "NOT EXERCISED on this host",
+  "nativeHumanPermission": {
+    "actualUiPermissionDenied": true,
+    "independentHumanTurn": "da5e0cde21-t1",
+    "openbotWaitingForMatchingInput": true,
+    "outcome": "cancelled",
+    "ownTurn": "daccc24c1d-t2",
+    "sdkCalls": 1,
+    "status": "PASS"
+  },
+  "nativeStopIsNotAnAtomicTargetedTurnGuarantee": true,
+  "nativeThreadArchived": true,
+  "outputRecoveredAfterNativeOutputBeforeServerReceipt": true,
+  "platform": "macos",
+  "productionPlugin": true,
+  "provider": "acp-opencode",
+  "realPairingHttp": true,
+  "selection": {
+    "machine_id": "7f4299ec-94d3-4294-9771-90d880af3a2a",
+    "model": "openai/gpt-6-luna",
+    "policy": {
+      "permissions": "provider_default",
+      "reasoning": "low",
+      "workspace": "project_directory"
+    },
+    "project_id": "proj_6eck8pmxiy",
+    "provider": "acp-opencode"
+  },
+  "session": "dd44f0b9-07cb-4c51-b7dc-fd7c9ca0fb35",
+  "status": "PASS",
+  "thread": "thr_a8afueuaet"
+}

@@ -1,0 +1,1 @@
+rmcp 1.8.0 WorkerTransport.close remains pending after cancel while waiting for the first handshake message; no HTTP request was submitted

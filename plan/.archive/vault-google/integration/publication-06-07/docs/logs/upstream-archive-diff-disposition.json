@@ -1,0 +1,7 @@
+{
+  "failure": "git diff --cached --check against source HEAD sees incoming upstream archive moves/raw diff fixtures",
+  "sample_path": "plan/.archived/03-channel-handles-send/phases/p06/docs/logs/CHS-P06-B1-R1-tracked.diff",
+  "byte_identical_to_origin_main": true,
+  "sha256": "98ba62bd17705496d6b7109e015d7d1bc7ad6b0baaa23184079bfa4845f7ce47",
+  "disposition": "Leave upstream raw evidence unchanged. Meaningful publication delta whitespace check is git diff origin/main --check; no product whitespace exemption added."
+}

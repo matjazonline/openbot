@@ -1,0 +1,12 @@
+{
+  "owner": "root/cloudroom-publication",
+  "directory": "/private/tmp/obpub-m8sfhp0f",
+  "limaHome": "/private/tmp/obpub-m8sfhp0f/i",
+  "name": "img",
+  "image": "openbot-cloudroom-publication:verified",
+  "context": "/private/tmp/obpub-m8sfhp0f/context",
+  "cpus": 2,
+  "memoryGiB": 6,
+  "mountWritable": false,
+  "nativeLinuxProviderAcceptance": "NOT EXERCISED/user waived"
+}

@@ -57,9 +57,15 @@ impl ScriptedResponse {
 }
 
 type RequestCheck = Box<dyn FnOnce(&ScriptedRequest) -> Result<(), &'static str> + Send>;
+type ResponseBuilder =
+    Box<dyn FnOnce(&ScriptedRequest) -> Result<ScriptedResponse, &'static str> + Send>;
+enum ResponseSource {
+    Fixed(ScriptedResponse),
+    Computed(ResponseBuilder),
+}
 pub struct ScriptedExchange {
     check: RequestCheck,
-    response: ScriptedResponse,
+    response: ResponseSource,
 }
 impl ScriptedExchange {
     pub fn new(
@@ -68,9 +74,37 @@ impl ScriptedExchange {
     ) -> Self {
         Self {
             check: Box::new(check),
-            response,
+            response: ResponseSource::Fixed(response),
         }
     }
+
+    /// Derive a fixture reply from the checked request, including actual tool receipt IDs.
+    pub fn computed(
+        check: impl FnOnce(&ScriptedRequest) -> Result<(), &'static str> + Send + 'static,
+        response: impl FnOnce(&ScriptedRequest) -> Result<ScriptedResponse, &'static str>
+        + Send
+        + 'static,
+    ) -> Self {
+        Self {
+            check: Box::new(check),
+            response: ResponseSource::Computed(Box::new(response)),
+        }
+    }
+}
+
+fn validate_response(response: &ScriptedResponse) -> Result<(), &'static str> {
+    if response.body.len() > MAX_REQUEST_BYTES
+        || response.headers.len() > 32
+        || response
+            .headers
+            .iter()
+            .map(|(name, value)| name.len() + value.len() + 4)
+            .sum::<usize>()
+            > 16 * 1024
+    {
+        return Err("fixture response exceeds fixed bounds");
+    }
+    Ok(())
 }
 
 pub struct ScriptedLlm {
@@ -134,17 +168,9 @@ impl Drop for ScriptedLlm {
 pub async fn scripted_scenario(exchanges: Vec<ScriptedExchange>) -> ScriptedLlm {
     assert!(exchanges.len() <= MAX_EXCHANGES);
     for exchange in &exchanges {
-        assert!(exchange.response.body.len() <= MAX_REQUEST_BYTES);
-        assert!(exchange.response.headers.len() <= 32);
-        assert!(
-            exchange
-                .response
-                .headers
-                .iter()
-                .map(|(name, value)| name.len() + value.len() + 4)
-                .sum::<usize>()
-                <= 16 * 1024
-        );
+        if let ResponseSource::Fixed(response) = &exchange.response {
+            validate_response(response).expect("bounded fixed fixture response");
+        }
     }
     let listener = TcpListener::bind("127.0.0.1:0")
         .await
@@ -242,10 +268,16 @@ async fn exchange_one(
     sender: &mpsc::Sender<Value>,
 ) -> Result<(), String> {
     (exchange.check)(&request).map_err(|reason| format!("request mismatch: {reason}"))?;
+    let mut response = match exchange.response {
+        ResponseSource::Fixed(response) => response,
+        ResponseSource::Computed(build) => {
+            build(&request).map_err(|_| "computed fixture response rejected")?
+        }
+    };
+    validate_response(&response)?;
     sender
         .try_send(request.body)
         .map_err(|_| "scenario capture capacity exceeded")?;
-    let mut response = exchange.response;
     if let Some((arrived, release)) = response.barrier.take() {
         let _ = arrived.send(());
         release.await.map_err(|_| "scenario barrier dropped")?;

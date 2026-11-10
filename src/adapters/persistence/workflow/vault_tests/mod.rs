@@ -62,6 +62,20 @@ pub(super) async fn attach(
     vault: &PostgresVault,
     account: &integration::ConnectedAccount,
 ) -> UseGrant {
+    Box::pin(attach_source(
+        setup,
+        vault,
+        account,
+        integration::AppId::parse("static-bearer").unwrap(),
+    ))
+    .await
+}
+pub(super) async fn attach_source(
+    setup: &Setup,
+    vault: &PostgresVault,
+    account: &integration::ConnectedAccount,
+    app: integration::AppId,
+) -> UseGrant {
     let p = &setup.fixture.persistence;
     let host = PostgresIntegrationBindings {
         persistence: p.clone(),
@@ -81,7 +95,7 @@ pub(super) async fn attach(
                 company: setup.fixture.target.company.as_uuid(),
                 connection: current.id,
                 kind: BindingKind::Http,
-                app: integration::AppId::parse("static-bearer").unwrap(),
+                app,
                 expected_revision: current.revision,
             },
         )
@@ -202,6 +216,7 @@ fn changed_policy(vault: &PostgresVault, change: usize) -> PostgresVault {
                 client_secret_reference: None,
             },
             app: AppDefinition {
+                    transport: crate::application::integrations::destinations::AppTransportPolicy::OwnerApproved,
                 id: integration::AppId::parse("static-bearer").unwrap(),
                 provider: integration::ProviderId::parse("static-bearer").unwrap(),
                 config: integration::AuthConfigId::parse("static-bearer").unwrap(),
@@ -236,3 +251,5 @@ mod temporal;
 mod membership_race;
 
 mod renewal;
+
+mod execution;

@@ -1,0 +1,244 @@
+{
+  "agents": [],
+  "input": {
+    "title": "Synthetic document",
+    "brief": "Draft a short synthetic project brief."
+  },
+  "params": {
+    "expected_bot_id": "synthetic-bot",
+    "expected_workspace_id": "synthetic-workspace",
+    "action_approval": {
+      "reviewers": [
+        {
+          "kind": "user",
+          "id": "00000000-0000-0000-0000-000000000006"
+        }
+      ],
+      "deadline": "2030-01-01T00:00:00Z"
+    },
+    "doop_origin": "https://doop.example.test",
+    "result_destinations": [
+      {
+        "kind": "user",
+        "id": "00000000-0000-0000-0000-000000000006"
+      }
+    ]
+  },
+  "scripts": [
+    {
+      "workflow_id": "6722b695-1d1e-4a7f-bb22-ef4b6c090301",
+      "step": "profile",
+      "responses": [
+        {
+          "output": {
+            "content": [
+              {
+                "type": "text",
+                "text": "{\"id\": \"synthetic-bot\", \"managed_workspace_id\": \"synthetic-workspace\", \"name\": \"Synthetic bot\"}"
+              }
+            ],
+            "structuredContent": {
+              "id": "synthetic-bot",
+              "managed_workspace_id": "synthetic-workspace",
+              "name": "Synthetic bot"
+            },
+            "isError": false
+          }
+        }
+      ]
+    },
+    {
+      "workflow_id": "6722b695-1d1e-4a7f-bb22-ef4b6c090301",
+      "step": "create",
+      "responses": [
+        {
+          "output": {
+            "content": [
+              {
+                "type": "text",
+                "text": "{\"id\":\"synthetic-canvas\",\"name\":\"Synthetic document\",\"url\":\"/c/synthetic-canvas\",\"workspace_id\":\"synthetic-workspace\"}"
+              }
+            ],
+            "structuredContent": {
+              "id": "synthetic-canvas",
+              "name": "Synthetic document",
+              "url": "/c/synthetic-canvas",
+              "workspace_id": "synthetic-workspace"
+            },
+            "isError": false
+          },
+          "approval": true
+        }
+      ]
+    },
+    {
+      "workflow_id": "6722b695-1d1e-4a7f-bb22-ef4b6c090301",
+      "step": "read_created",
+      "responses": [
+        {
+          "output": {
+            "content": [
+              {
+                "type": "text",
+                "text": "{\"canvas\":{\"id\":\"synthetic-canvas\",\"name\":\"Synthetic document\",\"url\":\"/c/synthetic-canvas\"},\"workspace_id\":\"synthetic-workspace\",\"frames\":[]}"
+              }
+            ],
+            "structuredContent": {
+              "canvas": {
+                "id": "synthetic-canvas",
+                "name": "Synthetic document",
+                "url": "/c/synthetic-canvas"
+              },
+              "workspace_id": "synthetic-workspace",
+              "frames": []
+            },
+            "isError": false
+          }
+        }
+      ]
+    },
+    {
+      "workflow_id": "6722b695-1d1e-4a7f-bb22-ef4b6c090301",
+      "step": "edit",
+      "responses": [
+        {
+          "output": {
+            "canvas_id": "synthetic-canvas",
+            "status": "draft",
+            "summary": "Synthetic draft; visual review not performed."
+          },
+          "approval": true,
+          "tools": [
+            {
+              "name": "get_canvas",
+              "input": {
+                "canvas_id": "synthetic-canvas"
+              },
+              "output": {
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "{\"canvas\":{\"id\":\"synthetic-canvas\",\"name\":\"Synthetic document\",\"url\":\"/c/synthetic-canvas\"},\"workspace_id\":\"synthetic-workspace\",\"frames\":[]}"
+                  }
+                ],
+                "structuredContent": {
+                  "canvas": {
+                    "id": "synthetic-canvas",
+                    "name": "Synthetic document",
+                    "url": "/c/synthetic-canvas"
+                  },
+                  "workspace_id": "synthetic-workspace",
+                  "frames": []
+                },
+                "isError": false
+              }
+            },
+            {
+              "name": "create_frame",
+              "input": {
+                "canvas_id": "synthetic-canvas",
+                "name": "Draft",
+                "html": "<h1>Synthetic brief</h1>",
+                "width": 800,
+                "height": 1000,
+                "agent_name": "Openbot document editor"
+              },
+              "output": {
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "{\"frame\":{\"id\":\"synthetic-frame\"}}"
+                  }
+                ],
+                "structuredContent": {
+                  "frame": {
+                    "id": "synthetic-frame"
+                  }
+                },
+                "isError": false
+              }
+            },
+            {
+              "name": "get_frame",
+              "input": {
+                "frame_id": "synthetic-frame"
+              },
+              "output": {
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "{\"frame\":{\"id\":\"synthetic-frame\",\"html\":\"<h1>Synthetic brief</h1>\"}}"
+                  }
+                ],
+                "structuredContent": {
+                  "frame": {
+                    "id": "synthetic-frame",
+                    "html": "<h1>Synthetic brief</h1>"
+                  }
+                },
+                "isError": false
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "workflow_id": "6722b695-1d1e-4a7f-bb22-ef4b6c090301",
+      "step": "read_final",
+      "responses": [
+        {
+          "output": {
+            "content": [
+              {
+                "type": "text",
+                "text": "{\"canvas\":{\"id\":\"synthetic-canvas\",\"name\":\"Synthetic document\",\"url\":\"/c/synthetic-canvas\"},\"workspace_id\":\"synthetic-workspace\",\"frames\":[{\"id\":\"synthetic-frame\",\"name\":\"Draft\",\"width\":800,\"height\":1000,\"image_url\":\"/synthetic.png\",\"url\":\"/c/synthetic-canvas\",\"empty\":false}]}"
+              }
+            ],
+            "structuredContent": {
+              "canvas": {
+                "id": "synthetic-canvas",
+                "name": "Synthetic document",
+                "url": "/c/synthetic-canvas"
+              },
+              "workspace_id": "synthetic-workspace",
+              "frames": [
+                {
+                  "id": "synthetic-frame",
+                  "name": "Draft",
+                  "width": 800,
+                  "height": 1000,
+                  "image_url": "/synthetic.png",
+                  "url": "/c/synthetic-canvas",
+                  "empty": false
+                }
+              ]
+            },
+            "isError": false
+          }
+        }
+      ]
+    },
+    {
+      "workflow_id": "6722b695-1d1e-4a7f-bb22-ef4b6c090301",
+      "step": "notify",
+      "responses": [
+        {
+          "output": {
+            "status": "accepted",
+            "messages": [
+              {
+                "status": "accepted",
+                "message_id": "00000000-0000-0000-0000-000000000008",
+                "destination": {
+                  "kind": "user",
+                  "id": "00000000-0000-0000-0000-000000000006"
+                }
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

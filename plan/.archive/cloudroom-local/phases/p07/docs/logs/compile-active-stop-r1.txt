@@ -1,0 +1,3 @@
+   Compiling open_bots v0.1.0 (/Users/mac03/dev/openbot)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2m 11s
+  Executable unittests src/lib.rs (target/debug/deps/open_bots-50aeda0c9f5dbc3a)

@@ -1,0 +1,11 @@
+{
+  "status": "historical evidence lost",
+  "affectedManifest": "CL-P07-B1-R1.preliminary.evidence.json",
+  "affectedFile": "final-plugin-runtime-install-r2.txt",
+  "expectedOriginalSha256": "651e8978cb393ebe279f02f92dc542e91a103861de605b442f0453dde070bfe4",
+  "cause": "Author reused the earlier manual correction filename in final-verify-r2.py; overwritten stdout cannot be recovered.",
+  "recoveryAttempt": "Hashed phase records; searched exact retained output ranges in original root session tool log. No original bytes recovered; no output regenerated.",
+  "newVerificationFile": "final-r2-plugin-runtime-install.txt",
+  "newVerificationSha256": "c05e89134e4d2358fb87c91dc1d880e4ac3f2609a3d0b6d05cfdccb61318be92",
+  "disposition": "Historical R1 preliminary manifest remains unmodified and invalid for this entry. Current installation evidence for new archive is independently exercised and retained under the unique new path; final manifest uses it. No claim that all historical manifests validate."
+}

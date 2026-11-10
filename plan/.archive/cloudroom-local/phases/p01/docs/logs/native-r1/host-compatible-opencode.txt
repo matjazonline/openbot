@@ -1,0 +1,14 @@
+[21:22:55] INFO: [host-daemon] Host daemon connecting {"serverUrl":"http://127.0.0.1:46986","dataDir":"/tmp/openbot-cloudroom-p01-profile"}
+[21:22:55] INFO: [host-daemon] Connected to server {"serverUrl":"http://127.0.0.1:46986","sessionId":"hses_5fktgag32u"}
+[21:22:55] INFO: [host-daemon] Host daemon started {"serverUrl":"http://127.0.0.1:46986","identity":{"hostId":"host_x39f5jia3f","hostName":"openbot-p01-disposable","instanceId":"0aa8e19b-6bdd-49a8-9b02-b286741e3d34"}}
+[21:22:55] INFO: [host-daemon] Host plugin worker ready {"serverUrl":"http://127.0.0.1:46986","pluginId":"keep-awake","startupDurationMs":90}
+[21:23:46] INFO: [host-daemon] Host plugin worker ready {"serverUrl":"http://127.0.0.1:46986","pluginId":"provider-acp","startupDurationMs":936}
+[21:24:04] INFO: [host-daemon] Host plugin worker ready {"serverUrl":"http://127.0.0.1:46986","pluginId":"environment-project-checkout","startupDurationMs":113}
+[21:24:04] INFO: [host-daemon] Host plugin worker ready {"serverUrl":"http://127.0.0.1:46986","pluginId":"provider-claude-code","startupDurationMs":528}
+[21:27:55] INFO: [host-daemon] Host plugin worker stopped {"serverUrl":"http://127.0.0.1:46986","pluginId":"keep-awake","reason":"host plugin worker became idle","uptimeMs":300098,"exitCode":0,"signal":null,"forceKilled":false}
+[21:28:49] INFO: [host-daemon] Shutting down host daemon {"serverUrl":"http://127.0.0.1:46986","mode":"shutdown","reason":"SIGTERM"}
+[21:28:49] INFO: [host-daemon] Host plugin worker stopped {"serverUrl":"http://127.0.0.1:46986","pluginId":"environment-project-checkout","reason":"host daemon shutting down","uptimeMs":284798,"exitCode":null,"signal":"SIGTERM","forceKilled":false}
+[21:28:49] WARN: [host-daemon] Watcher child exited; respawning {"serverUrl":"http://127.0.0.1:46986","activeSubscriptions":1}
+[21:28:49] INFO: [host-daemon] Host plugin worker stopped {"serverUrl":"http://127.0.0.1:46986","pluginId":"provider-acp","reason":"host daemon shutting down","uptimeMs":303953,"exitCode":null,"signal":"SIGTERM","forceKilled":false}
+[21:28:49] INFO: [host-daemon] Host plugin worker stopped {"serverUrl":"http://127.0.0.1:46986","pluginId":"provider-claude-code","reason":"host daemon shutting down","uptimeMs":284840,"exitCode":null,"signal":"SIGTERM","forceKilled":false}
+[21:28:49] INFO: [host-daemon] Disconnected from server {"serverUrl":"http://127.0.0.1:46986","code":1001,"reason":"server-shutdown"}

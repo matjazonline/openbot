@@ -1,0 +1,27 @@
+{
+  "status": "PASS",
+  "actions": [
+    {
+      "resource": "task Lima VM/home",
+      "path": "/private/tmp/ob7-dq_2z0jj",
+      "status": "removed"
+    },
+    {
+      "resource": "failed pre-start Lima home",
+      "path": "/private/var/folders/n2/5y7x75r92zl0ll90154hxdzr0000gn/T/openbot-cloudroom-p07-lima-kfprd8o4",
+      "status": "removed"
+    },
+    {
+      "resource": "temporary Cargo tee wrapper",
+      "path": "/private/tmp/ob7-stack-obe2uczd",
+      "status": "removed"
+    },
+    {
+      "resource": "owned disposable PostgreSQL cluster",
+      "path": "/private/var/folders/n2/5y7x75r92zl0ll90154hxdzr0000gn/T/openbot-cloudroom-pg-nijvmkm7",
+      "port": 56388,
+      "status": "stopped and removed"
+    }
+  ],
+  "preserved": "all unmerged source, review/evidence, native artifacts, prepared Cloudroom, ordinary logins/other clusters"
+}

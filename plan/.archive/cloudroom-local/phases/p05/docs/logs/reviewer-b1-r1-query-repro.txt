@@ -1,0 +1,16 @@
+BEGIN
+CREATE TABLE
+CREATE TABLE
+CREATE TABLE
+CREATE TABLE
+CREATE TABLE
+CREATE TABLE
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+psql:plan/cloudroom-local/phases/p05/docs/logs/reviewer-b1-r1-query-repro.sql:71: ERROR:  column child.terminal_wakeup_sequence does not exist
+LINE 42:                               AND child.terminal_wakeup_sequ...
+                                           ^

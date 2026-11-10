@@ -1,6 +1,8 @@
 //! Entry-scoped credential transactions. SQLx and plaintext never leave this adapter.
 mod commit;
 mod locked;
+mod subject;
+use subject::CredentialUse;
 mod rotating;
 mod write;
 use super::{PostgresVault, accounts};
@@ -19,7 +21,11 @@ use uuid::Uuid;
 type Tx = Transaction<'static, Postgres>;
 fn db_error(error: sqlx::Error) -> ResolutionError {
     match error.as_database_error().and_then(|e| e.code()).as_deref() {
-        Some("55P03" | "57014") => ResolutionError::Retry(RetryReason::LockBusy, None),
+        Some("55P03") => {
+            super::observations::Event::LockTimeout.emit();
+            ResolutionError::Retry(RetryReason::LockBusy, None)
+        }
+        Some("57014") => ResolutionError::Retry(RetryReason::LockBusy, None),
         _ => super::storage_error(error).into(),
     }
 }
@@ -38,7 +44,7 @@ fn resolved(
     payload: &SecretString,
     generation: CredentialGeneration,
     expires_at: Option<DateTime<Utc>>,
-    i: &AuthorizedInvocation,
+    i: &CredentialUse<'_>,
 ) -> ResolutionResult<ResolvedCredential> {
     use crate::application::integrations::private::InjectionMethod;
     use crate::domain::integrations::authority::InvocationKind;
@@ -58,7 +64,7 @@ fn resolved(
     let session_policy = entry.renewal.session_policy();
     Ok(ResolvedCredential {
         injection,
-        authorization: i.authorization.clone(),
+        authorization: (*i.authorization).clone(),
         generation,
         expires_at,
         session_policy,
@@ -66,8 +72,7 @@ fn resolved(
 }
 async fn under_lock(
     vault: &PostgresVault,
-    i: &AuthorizedInvocation,
-    context: &ExecutionContext,
+    i: &CredentialUse<'_>,
     work: &RenewalWork,
 ) -> ResolutionResult<ResolvedCredential> {
     let mut s = locked::lock(vault, i, work).await?;
@@ -92,6 +97,7 @@ async fn under_lock(
         RenewalStrategy::NoRenewal => {
             let result = resolved(vault, &s, &s.payload, s.versions.generation, None, i)?;
             s.tx.rollback().await.map_err(db_error)?;
+            super::observations::Event::CacheHit.emit();
             return Ok(result);
         }
         RenewalStrategy::ReusableRefresh(p) | RenewalStrategy::StrictRotating(p) => p.clone(),
@@ -107,6 +113,7 @@ async fn under_lock(
                 i,
             )?;
             s.tx.rollback().await.map_err(db_error)?;
+            super::observations::Event::CacheHit.emit();
             Ok(result)
         }
         RenewalDecision::Cooldown(at) => {
@@ -115,7 +122,7 @@ async fn under_lock(
         RenewalDecision::Request => match &entry.renewal {
             RenewalStrategy::StrictRotating(_) => {
                 let pending = rotating::reserve(vault, s, work).await?;
-                rotating::execute(vault, &pending, i, context, work).await
+                rotating::execute(vault, &pending, i, work).await
             }
             _ => write::request(vault, s, i, work).await,
         },
@@ -128,27 +135,46 @@ impl CredentialResolver for PostgresVault {
         i: &AuthorizedInvocation,
         context: &ExecutionContext,
     ) -> ResolutionResult<ResolvedCredential> {
+        Box::pin(self.resolve_credential(&CredentialUse::business(i, context))).await
+    }
+}
+impl PostgresVault {
+    pub(crate) async fn resolve_configuration_credential(
+        &self,
+        context: &crate::application::integrations::OwnerDiscoveryContext,
+    ) -> ResolutionResult<ResolvedCredential> {
+        Box::pin(self.resolve_credential(&CredentialUse::configuration(context))).await
+    }
+    async fn resolve_credential(
+        &self,
+        i: &CredentialUse<'_>,
+    ) -> ResolutionResult<ResolvedCredential> {
         let deadline = i.deadline.min(Utc::now() + chrono::Duration::seconds(30));
         let remaining = (deadline - Utc::now())
             .to_std()
             .map_err(|_| IntegrationError::Denied)?;
+        let cancellation = i.cancellation();
         let work = RenewalWork {
             deadline,
-            cancellation: context.cancellation.clone(),
+            cancellation: cancellation.clone(),
         };
-        tokio::select! { biased;
-            _=context.cancellation.cancelled()=>Err(ResolutionError::Cancelled),
+        let result = tokio::select! { biased;
+            _=cancellation.cancelled()=>Err(ResolutionError::Cancelled),
             _=tokio::time::sleep(remaining)=>Err(ResolutionError::Retry(RetryReason::Unavailable,None)),
             result=async {
-                self.final_dispatch_guard(i,context).await?;
-                let resolved=Box::pin(under_lock(self,i,context,&work)).await?;
-                self.final_dispatch_guard(i,context).await?;
+                i.check(self).await?;
+                let resolved=Box::pin(under_lock(self,i,&work)).await?;
+                i.check(self).await?;
                 if resolved.expires_at.is_some_and(|e|e<Utc::now()+chrono::Duration::seconds(60)) {
                     return Err(ResolutionError::Retry(RetryReason::TokenMargin,None));
                 }
                 Ok(resolved)
             }=>result,
+        };
+        if let Err(error) = result {
+            super::observations::Event::ResolutionFailed(error).emit();
         }
+        result
     }
 }
 

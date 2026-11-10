@@ -1,0 +1,14 @@
+[
+  {
+    "provider": "codex",
+    "status": "PASS",
+    "seconds": 105.83,
+    "file": "logs/native-codex-r19.txt"
+  },
+  {
+    "provider": "claude",
+    "status": "FAIL",
+    "seconds": 25.62,
+    "file": "logs/native-claude-r19.txt"
+  }
+]

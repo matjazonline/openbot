@@ -1,0 +1,6 @@
+{
+  "filesChecked": 1517,
+  "contextArchiveSha256": "68afb4065879a5e7e6de9e248194e9f44574064a767890370b04eec90f9e2f14",
+  "mismatches": [],
+  "scope": "host source versus manifest only; VM/image build still owned by root"
+}

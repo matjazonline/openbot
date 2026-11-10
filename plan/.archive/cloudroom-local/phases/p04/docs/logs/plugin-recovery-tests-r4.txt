@@ -1,0 +1,60 @@
+
+> bb-plugin-openbot-local@0.1.0 test
+> node scripts/build.mjs --test && node test/run.mjs
+
+built 5 test entries
+✔ real trusted WSS reconnect rewraps immutable outbox and native tracking continues offline without duplicate SDK calls (1106.908833ms)
+✔ authorization rejection stops reconnect attempts and never enters the SDK (5.668042ms)
+✔ shutdown during a stalled TLS handshake joins network and dispatcher within the host drain (14.351542ms)
+✔ real WSS rejects stale_identity before journal receipt or SDK entry (26.770625ms)
+✔ real WSS rejects changed_digest before journal receipt or SDK entry (25.725ms)
+✔ real WSS rejects binary before journal receipt or SDK entry (26.40875ms)
+✔ real WSS rejects unknown_field before journal receipt or SDK entry (27.801459ms)
+✔ public plugin service reload joins SDK work before storage closes and settings changes stop admission (312.8355ms)
+✔ configuration refuses non-origin URL http:// (0.90925ms)
+✔ configuration refuses non-origin URL https:// (0.073625ms)
+✔ configuration refuses non-origin URL https://path (0.05625ms)
+✔ configuration refuses non-origin URL https:// (0.103ms)
+✔ configuration refuses non-origin URL https:// (0.136042ms)
+✔ configuration canonicalizes HTTPS and refuses arbitrary project paths/duplicates/bounds (0.987958ms)
+✔ user UTF8 prompt bound remains32KiB with fixed native operation header (3.44275ms)
+✔ actual peer command decoder canonicalizes field order and rejects hash/date/field changes (0.3965ms)
+✔ chunk transport roundtrips the exact2MiB limit and rejects overflow before send (20.856083ms)
+✔ chunks reject interleaving, invalid UTF8/base64, unsafe integers and time expiry (2.449416ms)
+✔ real SQLite survives receipt/intent reopen and replay keeps immutable payloads (9.321875ms)
+✔ competing stale intent claimants have exactly one durable SDK entry marker (4.626125ms)
+✔ missing command under reconcile enters durable recovery without a fresh SDK claim (3.321ms)
+✔ acknowledgment cannot forget an unknown future or restore an already-pruned cursor (2.997833ms)
+✔ preflight refusal is durable but cannot follow the SDK intent cut (4.59425ms)
+✔ fixed4096 history bound fails controlled admission and never allocates a dangling sequence (1289.32675ms)
+✔ real process interruption at enrollment before-pending recovers the same durable claim (111.848666ms)
+✔ real process interruption at enrollment pending recovers the same durable claim (60.572166ms)
+✔ real process interruption at enrollment server-commit recovers the same durable claim (73.026292ms)
+✔ real process interruption at enrollment receipt recovers the same durable claim (133.155167ms)
+✔ real process interruption at enrollment journal recovers the same durable claim (71.478292ms)
+✔ real process interruption at enrollment paired recovers the same durable claim (71.561792ms)
+✔ real process interruption at enrollment cleaned recovers the same durable claim (70.329083ms)
+✔ changed origin never receives a saved pending credential or pairing claim (2.795209ms)
+✔ real competing connector processes exclude each other and OS releases graceful and killed owners (364.056042ms)
+✔ create freezes explicit local checkout/provider/model and duplicate concurrent delivery submits once (28.160333ms)
+✔ lost send response reopens intent and recovers exact turn without sending again (7.656792ms)
+✔ spawn gap recovers positive plugin metadata, while absent threads never recreate (10.634959ms)
+✔ human turn, idle thread and unrelated permission prompts cannot complete or take ownership (4.8615ms)
+✔ preflight model refusal is durable before any SDK mutation (3.988541ms)
+✔ preflight provider refusal is durable before any SDK mutation (2.883417ms)
+✔ preflight project refusal is durable before any SDK mutation (3.541833ms)
+✔ preflight expired refusal is durable before any SDK mutation (2.943709ms)
+✔ preflight gate refusal is durable before any SDK mutation (2.317ms)
+✔ preflight foreign refusal is durable before any SDK mutation (2.843542ms)
+✔ unknown work consumes eight effect slots but explicit mapped-thread stop retains headroom (17.315ms)
+✔ service abort cancels actual SDK wait and retains ambiguous intent without broad stop (6.956041ms)
+✔ matching terminal output stays within UTF8 bound and unknown usage remains null (17.072917ms)
+✔ ambiguous duplicate matching requests cannot attribute a human or second turn (1.980958ms)
+ℹ tests 47
+ℹ suites 0
+ℹ pass 47
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1644.641208

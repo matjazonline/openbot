@@ -1,0 +1,181 @@
+{
+  "version": 1,
+  "round": "VG-PUB67-B1-R1",
+  "artifact": "b0ae9af5c07980a42dac601855f7998facb8c431e8b978f8df8980dd7823f02a",
+  "checks": [
+    {
+      "criteria": [
+        "PUB1"
+      ],
+      "command": "cargo fmt --all -- --check",
+      "fixture": "no database required; owned cache serialized",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/fmt.log",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "PUB1",
+        "PUB3"
+      ],
+      "command": "cargo check --locked --offline --all-targets",
+      "fixture": "no database required; owned cache serialized",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/offline.log",
+          "sha256": "e47672801cb139a088a1e293fad87512544c9d26c41b86df07ec41d4852fe17c"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "PUB1",
+        "PUB3"
+      ],
+      "command": "cargo clippy --locked --offline --all-targets -- -D warnings",
+      "fixture": "no database required; owned cache serialized",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/clippy.log",
+          "sha256": "f86754c250be40a409ba1af5fd2ac246855381396e7765d6d548618c8cea3bf4"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "PUB1",
+        "PUB3"
+      ],
+      "command": "env RUST_MIN_STACK=2097152 bash scripts/test-network-isolation.sh cargo test --locked --offline --test source_modules",
+      "fixture": "no database required; owned cache serialized",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/reachability.log",
+          "sha256": "3dc47150e66c925e2fd8a1ba61febff9d2b43bead3f147d3b0c6e1a1e5d2c126"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "PUB1",
+        "PUB3"
+      ],
+      "command": "python3 scripts/tests/integration-boundary.py",
+      "fixture": "no database required; owned cache serialized",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/integration-mutations.log",
+          "sha256": "9b719fed5726303eaec0fa388c15324c30d24749e650042b8d09bef52209edd4"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "PUB1",
+        "PUB3"
+      ],
+      "command": "python3 scripts/integration-boundary.py",
+      "fixture": "no database required; owned cache serialized",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/integration-boundary.log",
+          "sha256": "9f55dabd846b9377bfba6441b555d4ae8090f5b38d967ea08d6c338e9346f00a"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "PUB2",
+        "PUB3"
+      ],
+      "command": "python3 scripts/check-integration-docs.py",
+      "fixture": "no database required; owned cache serialized",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/docs-final.log",
+          "sha256": "b0b02f4660be8d4a391486646f7a9898d0cc7c8544cb640fcca196cb3414d43c"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "PUB2",
+        "PUB3"
+      ],
+      "command": "python3 scripts/tests/workflow-evidence.py",
+      "fixture": "no database required; owned cache serialized",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/evidence-fixtures.log",
+          "sha256": "4d5e85ba7e2b0060eaeadd1b342bad3b30ce7b3603e895493e03c769782c0b98"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "PUB2",
+        "PUB3"
+      ],
+      "command": "python3 scripts/check-workflow-evidence.py --tracked-manifests --require-tracked",
+      "fixture": "no database required; owned cache serialized",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/evidence-retention.log",
+          "sha256": "1732d4c16c441ef33b17d800a73ef854b9bb386c18014c6e45349158b7226dfd"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "PUB1",
+        "PUB2"
+      ],
+      "command": "git diff origin/main --check",
+      "fixture": "no database required; owned cache serialized",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/whitespace.log",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "PUB1",
+        "PUB2"
+      ],
+      "command": "python3 plan/.archive/vault-google/integration/publication-06-07/docs/logs/verify-publication.py",
+      "fixture": "no database required; owned cache serialized",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/preservation.log",
+          "sha256": "53ecef36742d3a41af521f4f58123cfc0a68249c2c592a154abe4fd95e24ff5d"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "PUB4"
+      ],
+      "command": "git push origin HEAD:main; verify remote main identity",
+      "fixture": "ordinary fast-forward main after independent source acceptance",
+      "status": "NOT EXERCISED",
+      "reason": "Release action deliberately follows technical review/acceptance. Root must perform and record it before declaring user task complete.",
+      "files": []
+    }
+  ]
+}

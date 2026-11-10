@@ -1,5 +1,6 @@
 //! MCP settings share the UI shell and use native POST forms as well as the JSON API.
 use super::{escape_html_attr as esc, escape_html_text};
+use crate::application::use_cases::mcp::schema_fingerprint;
 use crate::entities::mcp::*;
 use uuid::Uuid;
 
@@ -71,17 +72,19 @@ pub fn detail(company: Uuid, connection: &CompanyMcpConnection, draft: &Definiti
     } else {
         String::new()
     };
-    let refresh = if matches!(connection.auth, McpAuth::Integration(_)) {
-        "<p>Vault catalogue discovery requires its credential owner's authorization.</p>"
-            .to_string()
-    } else {
+    let refresh = format!(
+        r#"<form data-submit="busy-once" data-pending-label="Refreshing tools…" method="post" action="/ui/companies/{company}/mcp-connections/{id}/refresh"><input type="hidden" name="expected_revision" value="{revision}">{button}</form>"#,
+        button = button("Test connection / Refresh tools"),
+    );
+    let source = if connection.endpoint.as_str().starts_with("https://") {
         format!(
-            r#"<form data-submit="busy-once" data-pending-label="Working…" method="post" action="/ui/companies/{company}/mcp-connections/{id}/refresh"><input type="hidden" name="expected_revision" value="{revision}">{button}</form>"#,
-            button = button("Test connection / Refresh tools")
+            "<a class=\"link\" href=\"/ui/companies/{company}/connection-credentials/mcp/{id}\">Choose credential source</a>"
         )
+    } else {
+        "<p>Vault credentials require an HTTPS endpoint.</p>".into()
     };
     format!(
-        r#"<a class="link" href="/ui/companies/{company}/mcp-connections">All MCP servers</a><p>Endpoint identity is immutable; authentication changes require a fresh review.</p>{fields}{credentials}{refresh}<p>Refresh removes grants for missing or changed schemas. Review tools before granting them again.</p><form data-submit="busy-once" data-pending-label="Working…" method="post" action="/ui/companies/{company}/mcp-connections/{id}/delete"><input type="hidden" name="expected_revision" value="{revision}">{delete}</form>"#,
+        r#"<a class="link" href="/ui/companies/{company}/mcp-connections">All MCP servers</a><p>Endpoint identity is immutable; authentication changes require a fresh review.</p>{fields}{credentials}{source}{refresh}<p>Refresh removes grants for missing or changed schemas. Review tools before granting them again.</p><form data-submit="busy-once" data-pending-label="Working…" method="post" action="/ui/companies/{company}/mcp-connections/{id}/delete"><input type="hidden" name="expected_revision" value="{revision}">{delete}</form>"#,
         refresh = refresh,
         delete = button("Delete server")
     )
@@ -96,10 +99,10 @@ fn definition_form(
         .unwrap_or_else(|| format!("/ui/companies/{company}/mcp-connections"));
     let grants = connection.map(|c| c.discovered_tools.iter().map(|tool| {
         let checked = if draft.grants.iter().any(|g| g == tool.name.as_str()) {" checked"}else{""};
-        format!("<label class=\"flex gap-2\"><input class=\"checkbox\" type=\"checkbox\" name=\"grants\" value=\"{}\"{checked}>{}</label><p>{}</p><details><summary>Input schema</summary><pre class=\"overflow-auto\">{}</pre></details>",esc(tool.name.as_str()),escape_html_text(tool.name.as_str()),escape_html_text(&tool.description),escape_html_text(&tool.input_schema.to_string()))
+        format!("<label class=\"flex gap-2\"><input class=\"checkbox\" type=\"checkbox\" name=\"grants\" value=\"{}\"{checked}>{}</label><p>{}</p>{}",esc(tool.name.as_str()),escape_html_text(tool.name.as_str()),escape_html_text(&tool.description),schema_review(tool))
     }).collect::<String>()).unwrap_or_default();
     format!(
-        r#"<form data-submit="busy-once" data-pending-label="Working…" method="post" action="{action}" class="space-y-3"><input type="hidden" name="expected_revision" value="{revision}"><label class="block">Name<input class="input w-full" name="slug" required maxlength="100" value="{slug}"></label><label class="block">Endpoint URL<input class="input w-full" type="url" name="endpoint_url" required maxlength="2048" value="{endpoint}"></label><label class="block">Authentication<select class="select" name="auth_type"><option value="none">None</option><option value="bearer"{bearer}>Bearer token</option>{integration}</select></label><label class="flex gap-2"><input class="checkbox" type="checkbox" name="enabled"{enabled}>Enabled</label><fieldset class="space-y-2"><legend>Granted tools</legend>{grants}</fieldset>{button}</form>"#,
+        r#"<form data-submit="busy-once" data-pending-label="Working…" method="post" action="{action}" class="space-y-3"><input type="hidden" name="expected_revision" value="{revision}"><p>Catalogue revision {revision}</p><label class="block">Name<input class="input w-full" name="slug" required maxlength="100" value="{slug}"></label><label class="block">Endpoint URL<input class="input w-full" type="url" name="endpoint_url" required maxlength="2048" value="{endpoint}"></label><label class="block">Authentication<select class="select" name="auth_type"><option value="none">None</option><option value="bearer"{bearer}>Bearer token</option>{integration}</select></label><label class="flex gap-2"><input class="checkbox" type="checkbox" name="enabled"{enabled}>Enabled</label><fieldset class="space-y-2"><legend>Granted tools</legend>{grants}</fieldset>{button}</form>"#,
         integration = if connection.is_some_and(|c| matches!(c.auth, McpAuth::Integration(_))) {
             format!(
                 "<option value=\"integration\"{}>Vault (owner approved)</option>",
@@ -126,6 +129,28 @@ fn definition_form(
             ""
         },
         button = button("Save definition")
+    )
+}
+
+fn schema_review(tool: &McpDiscoveredTool) -> String {
+    let output = tool
+        .output_schema
+        .as_ref()
+        .map(serde_json::Value::to_string)
+        .unwrap_or_else(|| {
+            "Not declared by the server. The generic MCP result envelope applies.".into()
+        });
+    let output_fingerprint = tool
+        .output_schema
+        .as_ref()
+        .map(schema_fingerprint)
+        .unwrap_or_else(|| "Not declared".into());
+    format!(
+        "<details><summary>Input schema</summary><p>Fingerprint <code>{}</code></p><pre class=\"overflow-auto\">{}</pre></details><details><summary>Output schema</summary><p>Fingerprint <code>{}</code></p><pre class=\"overflow-auto\">{}</pre></details>",
+        escape_html_text(&schema_fingerprint(&tool.input_schema)),
+        escape_html_text(&tool.input_schema.to_string()),
+        escape_html_text(&output_fingerprint),
+        escape_html_text(&output),
     )
 }
 fn button(label: &str) -> String {

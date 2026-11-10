@@ -1,0 +1,1 @@
+{"reconciled":true,"attempts":1,"newSpawnCalls":0,"source":"pluginMetadata"}

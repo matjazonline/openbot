@@ -1,0 +1,10 @@
+{
+  "origin": "b8c46300",
+  "functionsExactlyEqual": [
+    "rendered_markup_carries_no_inline_javascript",
+    "inline_event_attribute"
+  ],
+  "offendingFileExactlyEqual": "src/adapters/http/pages/workflow_authoring/sample.rs",
+  "baselineExecutedCount": 1,
+  "disposition": "Inherited source scanner flags hostile cfg(test) input, not production inline script; no zero-test evidence credited."
+}

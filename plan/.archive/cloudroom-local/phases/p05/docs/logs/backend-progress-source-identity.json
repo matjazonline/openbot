@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "base_commit": "97e5d60dc538e26c7cb976a8d63772eed80baff2",
+  "artifact_digest": "e967b0adb919a51c689b99350b2cac39544e88b470952a22ac1365767eb558a1",
+  "exclusions": [
+    "plan/cloudroom-local/COORDINATION.md",
+    "plan/cloudroom-local/phases/p01/docs",
+    "plan/cloudroom-local/phases/p02/docs",
+    "plan/cloudroom-local/phases/p03/docs",
+    "plan/cloudroom-local/phases/p04/docs",
+    "plan/cloudroom-local/phases/p05/docs",
+    "plan/cloudroom-local/phases/p06/docs",
+    "plan/cloudroom-local/phases/p07/docs"
+  ],
+  "status": "UNACCEPTED progress checkpoint",
+  "snapshot_output": "backend-progress-source-identity.txt"
+}

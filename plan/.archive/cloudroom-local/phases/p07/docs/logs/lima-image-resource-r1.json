@@ -1,0 +1,29 @@
+{
+  "owner": "root/cloudroom-local/p07/image-verification",
+  "directory": "/private/var/folders/n2/5y7x75r92zl0ll90154hxdzr0000gn/T/openbot-cloudroom-p07-lima-kfprd8o4",
+  "limaHome": "/private/var/folders/n2/5y7x75r92zl0ll90154hxdzr0000gn/T/openbot-cloudroom-p07-lima-kfprd8o4/instances",
+  "name": "p07-image",
+  "command": [
+    "limactl",
+    "start",
+    "--tty=false",
+    "--name=p07-image",
+    "--vm-type=vz",
+    "--arch=aarch64",
+    "--cpus=2",
+    "--memory=4",
+    "--disk=12",
+    "--mount-only=/Users/mac03/dev/openbot",
+    "--set",
+    ".mounts[0].writable=false | .ssh.forwardAgent=false | .ssh.loadDotSSHPubKeys=false",
+    "--set",
+    ".images = [{\"location\": \"https://cloud-images.ubuntu.com/releases/resolute/release-20260927/ubuntu-26.04-server-cloudimg-arm64.img\", \"arch\": \"aarch64\", \"digest\": \"sha256:63a93bd5a8d76e33b15ceb5daa3657bd79be804748051ab178e643b0f5da22e7\"}]",
+    "--timeout=10m",
+    "template:docker"
+  ],
+  "sourceArtifact": "1b45290aa64d13e0a82057a37aeadeb99105ad8382e596aae1e30124088098be",
+  "nativeLinuxInference": "NOT EXERCISED/user waived",
+  "startStatus": "FAIL",
+  "startExit": 1,
+  "startSeconds": 0.08
+}

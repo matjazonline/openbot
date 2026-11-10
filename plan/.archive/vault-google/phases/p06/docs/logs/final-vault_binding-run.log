@@ -1,0 +1,22 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.22s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-048b7abd3ed0c794)
+
+running 14 tests
+test adapters::persistence::agent_publication::tests::http::vault_binding_agent_publication_refuses_an_integration_http_source ... ok
+test adapters::persistence::agent_publication::tests::mcp::vault_binding_agent_publication_refuses_an_integration_mcp_source ... ok
+test adapters::http::routes::ui_vault_bindings::tests::vault_binding_browser_consent_is_authenticated_csrf_protected_bounded_and_one_shot ... ok
+test adapters::persistence::workflow::tests::http_tests::vault_tests::bindings::vault_binding_cap_competing_creators_reconfirmation_and_pagination ... ok
+test adapters::persistence::workflow::tests::http_tests::vault_tests::bindings::vault_binding_database_rejects_partial_sources_and_cross_owner_references ... ok
+test adapters::persistence::workflow::tests::http_tests::vault_tests::bindings::vault_binding_company_teardown_preserves_other_real_company_grants_and_private_account ... ok
+test adapters::persistence::workflow::tests::http_tests::vault_tests::bindings::vault_binding_member_removal_readdition_repeated_teardown_and_owner_unbind ... ok
+test adapters::persistence::workflow::tests::http_tests::vault_tests::bindings::vault_binding_missing_consent_destination_and_shape_denials_are_non_mutating ... ok
+test adapters::persistence::workflow::tests::http_tests::vault_tests::bindings::vault_binding_owner_confirmation_and_admin_cannot_use_another_owners_account ... ok
+test adapters::persistence::workflow::tests::http_tests::vault_tests::bindings::vault_binding_proposal_cap_competing_creators_and_expiry_pruning ... ok
+test adapters::persistence::workflow::tests::http_tests::vault_tests::bindings::vault_binding_same_private_account_has_separate_http_and_mcp_grants ... ok
+test adapters::persistence::workflow::tests::http_tests::vault_tests::membership_race::vault_binding_membership_revocation_covers_consent_created_while_delete_waits ... ok
+test adapters::persistence::workflow::tests::http_tests::vault_tests::policies::vault_binding_old_proposal_cannot_confirm_changed_app_policy_or_destination ... ok
+test adapters::persistence::workflow::tests::mcp_tests::vault_authority_tests::vault_binding_mcp_definition_edits_preserve_the_confirmed_source_and_refuse_substitution ... ok
+
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 3562 filtered out; finished in 5.21s
+

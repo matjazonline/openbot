@@ -1,0 +1,1 @@
+{"marker":"OPENBOT_SMOKE_ac1b670a9acc1db0088859b4","delivery":"sent","permissionTarget":"/var/folders/n2/5y7x75r92zl0ll90154hxdzr0000gn/T/openbot-permission-smoke-JsBlwJ/smoke.txt"}

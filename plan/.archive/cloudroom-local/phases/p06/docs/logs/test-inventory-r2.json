@@ -1,0 +1,21 @@
+{
+  "beforeArtifact": "c7dfb6034c5f3f5001e107ac94a008da7fc55b88054af8208cfa1b79a6685664",
+  "beforeCount": 113,
+  "afterCount": 125,
+  "removed": [],
+  "added": [
+    "adapters::persistence::local_agents::protocol::command_tests::cloudroom_commands_readiness_stays_open_for_new_delivery_but_not_replacement",
+    "adapters::persistence::local_agents::retention_tests::cloudroom_lifecycle_mapping_retirement_is_bounded_read_only_and_current_installation_fenced",
+    "adapters::persistence::local_agents::retention_tests::cloudroom_management_durable_status_distinguishes_queue_permission_uncertainty_gaps_and_native_success",
+    "adapters::persistence::local_agents::retention_tests::cloudroom_retention_competing_collectors_remove_only_bounded_old_summaries_and_keep_unknown_work",
+    "adapters::persistence::local_agents::retention_tests::cloudroom_retention_new_manual_requests_require_current_timestamp_and_replay_current_identity",
+    "adapters::persistence::local_agents::retention_tests::cloudroom_retention_saved_old_manual_replay_survives_age_then_collected_id_cannot_create_again",
+    "adapters::persistence::local_agents::retention_tests::cloudroom_retention_unknown_native_work_survives_and_compacted_receipt_replays_under_current_fence",
+    "adapters::persistence::workflow::tests::local_agent_tests::retention::cloudroom_retention_cancelled_workflow_needs_guarded_old_physical_proof_without_a_success_receipt",
+    "adapters::persistence::workflow::tests::local_agent_tests::retention::cloudroom_retention_prepared_and_queued_continuation_preserves_old_original_session",
+    "adapters::persistence::workflow::tests::local_agent_tests::retention::cloudroom_retention_two_terminal_roots_with_reciprocal_native_sessions_eventually_retire",
+    "adapters::persistence::workflow::tests::local_agent_tests::retention::peer::cloudroom_lifecycle_real_server_plugin_retention_preserves_prepared_and_unseen_queued_work_once",
+    "application::local_agents::lifecycle::tests::cloudroom_lifecycle_retention_shutdown_cancels_the_actual_pending_port_future"
+  ],
+  "note": "All accepted p05 local test names retained. Current count includes one explicitly exercised browser fixture generator."
+}

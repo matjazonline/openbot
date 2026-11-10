@@ -1,0 +1,22 @@
+   Compiling open_bots v0.1.0 (/Users/mac03/dev/openbot)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2m 02s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-50aeda0c9f5dbc3a)
+
+running 1 test
+test adapters::persistence::workflow::tests::local_agent_tests::e2e::native::cloudroom_e2e_native_codex_packaged_plugin_pairing_workflow_ui_restart_followup_stop has been running for over 60 seconds
+
+thread 'adapters::persistence::workflow::tests::local_agent_tests::e2e::native::cloudroom_e2e_native_codex_packaged_plugin_pairing_workflow_ui_restart_followup_stop' (18327283) panicked at src/adapters/persistence/workflow/local_agent_native_e2e_tests.rs:340:17:
+assertion `left == right` failed
+  left: Uncertain
+ right: Succeeded
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test adapters::persistence::workflow::tests::local_agent_tests::e2e::native::cloudroom_e2e_native_codex_packaged_plugin_pairing_workflow_ui_restart_followup_stop ... FAILED
+
+failures:
+
+failures:
+    adapters::persistence::workflow::tests::local_agent_tests::e2e::native::cloudroom_e2e_native_codex_packaged_plugin_pairing_workflow_ui_restart_followup_stop
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 3323 filtered out; finished in 68.01s
+
+error: test failed, to rerun pass `--lib`

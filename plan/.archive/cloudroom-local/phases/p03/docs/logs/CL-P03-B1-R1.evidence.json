@@ -1,0 +1,173 @@
+{
+  "version": 1,
+  "round": "CL-P03-B1-R1",
+  "artifact": "1033301ab60d3c96e0e86148137a8255dc1b3156887ff7cdc3c7b30632e86916",
+  "checks": [
+    {
+      "criteria": [
+        "AC1",
+        "AC2",
+        "AC3",
+        "AC4",
+        "AC5"
+      ],
+      "command": "CARGO_INCREMENTAL=0 SQLX_OFFLINE=true cargo test --locked --offline --lib cloudroom_ -- --list; CARGO_INCREMENTAL=0 SQLX_OFFLINE=true cargo test --locked --offline --lib cloudroom_",
+      "fixture": "owned PostgreSQL18 loopback56388, per-test owned databases, real WS and certificate-validated local WSS; 69 nonzero tests; ALLOW_MISSING_DATABASE_URL unset",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/test-list-r4.txt",
+          "sha256": "fd0f45471383cb282193a13c2536d4d177c418f75867b641757bde3fd5695406"
+        },
+        {
+          "path": "logs/tests-r1.txt",
+          "sha256": "1f767004cc2229fa27ad5037a1e8911aeebf43fb2927f493a6b959382eaccaab"
+        },
+        {
+          "path": "logs/test-inventory-b1-r1.json",
+          "sha256": "2333c65b02e256a9a955a11512e99f5365ca9cf390e549c7955bf45d6cb3fbaa"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC1",
+        "AC6"
+      ],
+      "command": "CARGO_INCREMENTAL=0 SQLX_OFFLINE=true cargo test --locked --offline --lib adapters::http::auth_admission -- --list; CARGO_INCREMENTAL=0 SQLX_OFFLINE=true cargo test --locked --offline --lib adapters::http::auth_admission",
+      "fixture": "10 nonzero shared auth-admission tests",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/auth-list-r1.txt",
+          "sha256": "586bc3dc7dfd60566899a4724d1d94cd8aa8ea5eb36e362d0258a317086139da"
+        },
+        {
+          "path": "logs/auth-tests-r1.txt",
+          "sha256": "9e3f71a53cc44fda2982f756ebd78b945767377c8f57597eea8f11648e7ee365"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC2",
+        "AC6"
+      ],
+      "command": "CARGO_INCREMENTAL=0 SQLX_OFFLINE=true cargo test --locked --offline --lib workflow_binding_sql_association_matches_domain_visibility_and_management -- --list; CARGO_INCREMENTAL=0 SQLX_OFFLINE=true cargo test --locked --offline --lib workflow_binding_sql_association_matches_domain_visibility_and_management",
+      "fixture": "owned task database; 1 nonzero existing association regression",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/association-list-r1.txt",
+          "sha256": "6442223fcccf27b702deb6a3687084765ef08b90bbf67c59f64de9a25246b4b9"
+        },
+        {
+          "path": "logs/association-tests-r1.txt",
+          "sha256": "221baad7ce1afa4314c6af305de8202d515766dc9a2a8336a8d4afb8bfeb20a3"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC6"
+      ],
+      "command": "cargo sqlx migrate run; CARGO_INCREMENTAL=0 SQLX_OFFLINE=false cargo sqlx prepare -- --all-targets; CARGO_INCREMENTAL=0 SQLX_OFFLINE=true cargo clippy --locked --offline --all-targets -- -D warnings",
+      "fixture": "fresh owned openbot_cloudroom_build schema on loopback56388; final alltarget compilation and metadata",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/migrate-r2.txt",
+          "sha256": "43490a16b6fa42d1d4ea1ec59f9105775153ac3cf93f65fd6fb9cd36d993e73e"
+        },
+        {
+          "path": "logs/sqlx-prepare-r3.txt",
+          "sha256": "1b7aeec7137c4a796c460846cb5b3856f56baad4996bb59014d9691cbe1ecbdf"
+        },
+        {
+          "path": "logs/clippy-r3.txt",
+          "sha256": "a91b37d8e5f91c92e383030d7b873449039d20ced34e3444d6ae1627654dc681"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC6"
+      ],
+      "command": "cargo fmt --all -- --check; git diff --check",
+      "fixture": "frozen current source",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/format-final-r1.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": "logs/whitespace-final-r1.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC1",
+        "AC3"
+      ],
+      "command": "cargo test --locked --offline --lib cloudroom_",
+      "fixture": "historical preliminary fixture-order failure corrected; current69 pass",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/tests-preliminary-r1.txt",
+          "sha256": "a948a7923251160cb91ac98ca8096875015517944573bfe208fb4fb35319cb43"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC1",
+        "AC4"
+      ],
+      "command": "cargo test --locked --offline --lib cloudroom_",
+      "fixture": "historical preliminary test helper used5s while asserting10s hello; helper corrected, current69 pass",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/tests-preliminary-r2.txt",
+          "sha256": "976f7f71d3e69531f2a62f401e9a4b845be00efee85737f3f562140000db6caf"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC6"
+      ],
+      "command": "cargo clippy --locked --offline --all-targets -- -D warnings",
+      "fixture": "historical two collapsible-if and large enum warnings corrected; clippy-r3 pass",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/clippy-r1.txt",
+          "sha256": "9403a5b991996efc03f36a97ab98de263b7d6d563354055c36af406c69e88ee7"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "CL-I005"
+      ],
+      "command": "native headless Linux smoke acceptance",
+      "fixture": "macOS host",
+      "status": "NOT EXERCISED",
+      "reason": "User explicitly chose Leave Linux acceptance unverified; Linux support remains in scope."
+    },
+    {
+      "criteria": [
+        "AC5"
+      ],
+      "command": "production workflow parked continuation and atomic wake",
+      "fixture": "p05 dependent phase",
+      "status": "NOT EXERCISED",
+      "reason": "Workflow-origin admission is deliberately refused until phase05 implements the approved atomic approval/parking/wake consumer. No p03 workflow acceptance claimed."
+    }
+  ]
+}

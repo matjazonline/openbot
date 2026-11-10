@@ -1,0 +1,14 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.18s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-048b7abd3ed0c794)
+
+running 6 tests
+test adapters::http::routes::connection_levels::tests::authoring_tests::vault_authoring_http_setup_rejects_credentials_and_unrecognized_fields ... ok
+test application::workflow::sample::tests::gmail_tests::vault_authoring_gmail_examples_compile_and_execute_only_scripted_effects ... ok
+test application::workflow::sample::tests::gmail_tests::vault_authoring_reviewed_mime_is_valid_base64url_and_keeps_reply_headers ... ok
+test adapters::http::routes::connection_levels::tests::authoring_tests::vault_authoring_http_setup_scopes_connection_and_registration_and_checks_revision ... ok
+test adapters::http::routes::ui_vault_bindings::tests::authoring::vault_authoring_picker_is_owner_scoped_and_only_exposes_approved_metadata ... ok
+test adapters::http::routes::ui_vault_bindings::tests::authoring::vault_authoring_foreign_company_cannot_inspect_a_connection_source ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 3570 filtered out; finished in 1.41s
+

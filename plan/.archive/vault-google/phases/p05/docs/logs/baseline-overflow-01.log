@@ -1,0 +1,20 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+   Compiling open_bots v0.1.0 (/private/tmp/vault-vf2-baseline-6e7e44ec34be/worktree)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2m 22s
+     Running unittests src/lib.rs (/Users/mac02/.codex/worktrees/1133/openbot/target/debug/deps/open_bots-048b7abd3ed0c794)
+
+running 1 test
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::acceptance_tests::revision_tests::workflow_control_revision_overflow_refuses_without_partial_writes ... 
+thread 'adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::acceptance_tests::revision_tests::workflow_control_revision_overflow_refuses_without_partial_writes' (35637275) panicked at src/adapters/persistence/workflow/control_revision_tests.rs:85:48:
+called `Result::unwrap()` on an `Err` value: Database(PgDatabaseError { severity: Error, code: "55006", message: "cannot ALTER TABLE \"workflow_runs\" because it has pending trigger events", detail: None, hint: None, position: None, where: None, schema: None, table: None, column: None, data_type: None, constraint: None, file: Some("tablecmds.c"), line: Some(4444), routine: Some("CheckTableNotInUse") })
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+FAILED
+
+failures:
+
+failures:
+    adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::acceptance_tests::revision_tests::workflow_control_revision_overflow_refuses_without_partial_writes
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 3193 filtered out; finished in 0.97s
+
+error: test failed, to rerun pass `--lib`

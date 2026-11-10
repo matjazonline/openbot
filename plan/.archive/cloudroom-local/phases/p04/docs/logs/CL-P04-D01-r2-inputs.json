@@ -1,0 +1,33 @@
+{
+  "sourceDigest": "1e4f5b2148970677a7f1c388fa5a38cc52b1e7685061a4fac15857ea6b1325d9",
+  "files": [
+    {
+      "path": "CL-P04-D01-r2.md",
+      "sha256": "ac2213e981379e881a11df17c41e9a090564dc66f52da48dce3f7e6769c3baa0"
+    },
+    {
+      "path": "CL-P04-D01-sdk-abort.patch",
+      "sha256": "1a8782db46c9450974cadede95d32c76ad1d3ffa6eb9bb53db97315df6228451"
+    },
+    {
+      "path": "CL-P04-D01-sdk-abort-identity.json",
+      "sha256": "da6009975a3e4935a2ad8b36ea49bdbf256f93a810593b6eb08afc042d761372"
+    },
+    {
+      "path": "coordination-r14-d01.md",
+      "sha256": "f4a6e7963af8e3d3e1cf4252fe32f0e9039afc0b61dc9a93e16d28a214178a80"
+    },
+    {
+      "path": "native-lock-probe.cjs",
+      "sha256": "69e6599100eb12a5fdc3a984cb146d0eba6fb1866d07438ab913e78a343a89a7"
+    },
+    {
+      "path": "native-lock-proof-r1.txt",
+      "sha256": "fa956ab64d8aac4f1f560d27efb86ed86915b55a623ed06606e2f2cda628e6fd"
+    },
+    {
+      "path": "cloudroom-source-guard-r1.txt",
+      "sha256": "348b33dae2479e33edc52209060a7874b05bb74376f96fd9fcd356967f38f5c4"
+    }
+  ]
+}

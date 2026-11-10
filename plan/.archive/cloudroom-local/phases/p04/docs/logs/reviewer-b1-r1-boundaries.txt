@@ -1,0 +1,3 @@
+{"case":"project withdrawal during startup","configuredProjects":"","connectorEntered":true,"mutationCallsAfterWithdrawal":1,"durableSdkCalls":1,"transport":"Connector.run replaced by direct production Dispatcher.process; public SDK stand-in, no network/native effect"}
+{"case":"resolved permission with no item event","interactions":"resolved","nativeState":"waiting_for_input","limitation":"synthetic public SDK fixture; no native scheduler assertion"}
+{"case":"definitive enrollment rejection","status":400,"rejectedInputRetained":true,"enteredReplacementCodeIgnored":true,"pendingStillContainsRejectedCode":true,"journalInitialized":false,"transport":"synthetic complete HTTP status/response; no network"}

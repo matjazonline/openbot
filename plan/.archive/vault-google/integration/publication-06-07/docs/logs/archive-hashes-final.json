@@ -1,0 +1,10 @@
+{
+  "original_files": 1620,
+  "byte_identical_historical_records": true,
+  "permitted_live_doc_changes": [
+    "07-integration-verification-and-operations.md",
+    "COORDINATION.md",
+    "README.md"
+  ],
+  "links": 57
+}

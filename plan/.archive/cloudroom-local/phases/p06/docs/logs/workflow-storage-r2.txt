@@ -1,0 +1,27 @@
+
+running 21 tests
+test adapters::persistence::workflow::tests::admission_tests::storage_tests::protection_tests::run_retention_deferred_job_provenance_still_rejects_native_commit ... ok
+test adapters::persistence::workflow::tests::admission_tests::storage_tests::protection_tests::run_retention_external_rerun_blocks_referent_until_independent_root_is_removed ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::storage_checkpoint_tests::run_retention_native_checkpoint_model_usage_and_tree_rollback_then_retry ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::storage_checkpoint_tests::run_retention_native_checkpoint_and_model_usage_delete_with_only_owned_jobs ... ok
+test adapters::persistence::workflow::tests::admission_tests::storage_tests::protection_tests::run_retention_protects_open_decision_until_its_wait_closes ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::eligibility_tests::claim_sql_tests::storage_reconciliation_tests::run_retention_consumed_old_proof_cannot_close_a_later_remote_entry ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::eligibility_tests::claim_sql_tests::storage_reconciliation_tests::run_retention_evidence_conflict_keeps_terminal_tree_even_with_exact_receipt ... ok
+test adapters::persistence::workflow::tests::admission_tests::storage_tests::protection_tests::run_retention_shutdown_rolls_back_the_actual_inflight_archive_and_delete ... ok
+test adapters::persistence::workflow::tests::admission_tests::storage_tests::report_tests::run_retention_reports_preserve_categories_filters_time_prices_and_live_union ... ok
+test adapters::persistence::workflow::tests::admission_tests::storage_tests::retry_tests::run_retention_first_fences_waiting_production_retry_without_partial_archive ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::eligibility_tests::claim_sql_tests::storage_reconciliation_tests::run_retention_historical_not_applied_closure_survives_retry_grant_expiry ... ok
+test adapters::persistence::workflow::tests::admission_tests::storage_tests::retry_tests::run_retention_retry_first_revival_owns_and_preserves_live_work ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::eligibility_tests::claim_sql_tests::storage_reconciliation_tests::run_retention_unknown_effect_is_protected_while_complete_not_applied_proof_closes_it ... ok
+test adapters::persistence::workflow::tests::admission_tests::storage_tests::run_retention_archive_guards_refuse_forgery_duplicates_and_mutation ... ok
+test adapters::persistence::workflow::tests::admission_tests::storage_tests::report_tests::run_retention_report_global_scan_cap_applies_before_filters_across_sources ... ok
+test adapters::persistence::workflow::tests::admission_tests::storage_tests::run_retention_competing_collectors_delete_exactly_once ... ok
+test adapters::persistence::workflow::tests::admission_tests::storage_tests::run_retention_complete_tree_jobs_usage_and_idempotent_retry ... ok
+test adapters::persistence::workflow::tests::admission_tests::storage_tests::run_retention_global_cursor_skips_protected_prefix_and_keeps_young_live ... ok
+test adapters::persistence::workflow::tests::admission_tests::storage_tests::run_retention_rollback_after_runs_before_jobs_preserves_every_owner ... ok
+test adapters::persistence::workflow::tests::message_tests::storage_message_tests::run_retention_pending_message_consumption_keeps_terminal_tree ... ok
+test adapters::persistence::workflow::tests::admission_tests::storage_tests::boundary_tests::run_retention_native_schema_100001_members_reaches_delete_without_activation_cutoff has been running for over 60 seconds
+test adapters::persistence::workflow::tests::admission_tests::storage_tests::boundary_tests::run_retention_native_schema_100001_members_reaches_delete_without_activation_cutoff ... ok
+
+test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 3297 filtered out; finished in 169.66s
+

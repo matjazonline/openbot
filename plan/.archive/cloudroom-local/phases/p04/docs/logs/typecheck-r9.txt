@@ -1,0 +1,6 @@
+
+> bb-plugin-openbot-local@0.1.0 typecheck
+> tsc --noEmit
+
+src/sdk.ts(157,101): error TS2345: Argument of type '{ activity: { activeBackgroundAgentCount: number; activeBackgroundCommandCount: number; activeGoalCount: number; activePlanModeCount: number; activeWorkflowCount: number; }; archivedAt: number | null; ... 34 more ...; teleportLocalStep?: "stopping" | ... 3 more ... | undefined; }' is not assignable to parameter of type 'ThreadGetResult'.
+  Type '{ activity: { activeBackgroundAgentCount: number; activeBackgroundCommandCount: number; activeGoalCount: number; activePlanModeCount: number; activeWorkflowCount: number; }; archivedAt: number | null; ... 34 more ...; teleportLocalStep?: "stopping" | ... 3 more ... | undefined; }' is missing the following properties from type '{ activeBackgroundAgentCount: number; archivedAt: number | null; canSpawnChild: boolean; createdAt: number; deletedAt: number | null; environmentId: string | null; id: string; lastReadAt: number | null; ... 22 more ...; teleportLocalStep?: "stopping" | ... 3 more ... | undefined; }': activeBackgroundAgentCount, canSpawnChild, queuedMessageCount

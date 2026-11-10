@@ -1,0 +1,21 @@
+{
+  "valid": 26,
+  "invalid": [
+    {
+      "file": "plan/.archive/cloudroom-local/phases/p01/docs/logs/CL-P01-B1-CORRECTIONS.evidence.json",
+      "error": "evidence hash mismatch: logs/rust-test-list-r3-final.txt"
+    },
+    {
+      "file": "plan/.archive/cloudroom-local/phases/p01/docs/logs/CL-P01-B1-R2.evidence.json",
+      "error": "evidence hash mismatch: logs/rust-test-list-r3-final.txt"
+    },
+    {
+      "file": "plan/.archive/cloudroom-local/phases/p07/docs/logs/CL-P07-B1-R1.preliminary.evidence.json",
+      "error": "evidence hash mismatch: logs/final-plugin-runtime-install-r2.txt"
+    },
+    {
+      "file": "plan/.archive/cloudroom-local/phases/p07/docs/logs/CL-P07-B1-R2.final.evidence.json",
+      "error": "check 1 command must be a nonempty string"
+    }
+  ]
+}

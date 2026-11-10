@@ -1,0 +1,592 @@
+{
+  "pattern": "enqueue_operation",
+  "filesSearched": 1626,
+  "totalHits": 50,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/local_agents/protocol/recovery_tests.rs#admission",
+        "name": "admission",
+        "kind": "function",
+        "path": "src/adapters/persistence/local_agents/protocol/recovery_tests.rs",
+        "span": "L9-L38"
+      },
+      "path": "src/adapters/persistence/local_agents/protocol/recovery_tests.rs",
+      "inDegree": 6,
+      "hits": [
+        {
+          "line": 19,
+          "text": "let operation = c.f.persistence.enqueue_operation(&request).await.unwrap();"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/local_agents/protocol/recovery_tests.rs#reconnect_uncertain",
+        "name": "reconnect_uncertain",
+        "kind": "function",
+        "path": "src/adapters/persistence/local_agents/protocol/recovery_tests.rs",
+        "span": "L40-L86"
+      },
+      "path": "src/adapters/persistence/local_agents/protocol/recovery_tests.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 62,
+          "text": ".enqueue_operation(&c.admission(c.send()))"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/local_machine_connection/connection_failure_tests.rs#cloudroom_connection_partial_terminal_output_replays_after_shutdown_without_early_ack",
+        "name": "cloudroom_connection_partial_terminal_output_replays_after_shutdown_without_early_ack",
+        "kind": "function",
+        "path": "src/adapters/http/routes/local_machine_connection/connection_failure_tests.rs",
+        "span": "L169-L229"
+      },
+      "path": "src/adapters/http/routes/local_machine_connection/connection_failure_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 178,
+          "text": ".enqueue_operation(&c.admission(c.send()))"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/local_machine_connection/connection_recovery_tests.rs#cloudroom_connection_uncertain_reconnect_withholds_new_effect_until_reconciled",
+        "name": "cloudroom_connection_uncertain_reconnect_withholds_new_effect_until_reconciled",
+        "kind": "function",
+        "path": "src/adapters/http/routes/local_machine_connection/connection_recovery_tests.rs",
+        "span": "L4-L66"
+      },
+      "path": "src/adapters/http/routes/local_machine_connection/connection_recovery_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 13,
+          "text": ".enqueue_operation(&c.admission(c.send()))"
+        },
+        {
+          "line": 32,
+          "text": ".enqueue_operation(&c.admission(c.send()))"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/local_machine_connection/connection_resource_tests.rs#cloudroom_connection_shutdown_cancels_slow_consumer_and_keeps_possible_delivery_uncertain",
+        "name": "cloudroom_connection_shutdown_cancels_slow_consumer_and_keeps_possible_delivery_uncertain",
+        "kind": "function",
+        "path": "src/adapters/http/routes/local_machine_connection/connection_resource_tests.rs",
+        "span": "L136-L201"
+      },
+      "path": "src/adapters/http/routes/local_machine_connection/connection_resource_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 180,
+          "text": ".enqueue_operation(&c.admission(large.clone()))"
+        },
+        {
+          "line": 186,
+          "text": ".enqueue_operation(&c.admission(large.clone()))"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/local_machine_connection/connection_submission_tests.rs#cloudroom_submission_actual_websocket_accepts_thread_before_native_turn",
+        "name": "cloudroom_submission_actual_websocket_accepts_thread_before_native_turn",
+        "kind": "function",
+        "path": "src/adapters/http/routes/local_machine_connection/connection_submission_tests.rs",
+        "span": "L4-L60"
+      },
+      "path": "src/adapters/http/routes/local_machine_connection/connection_submission_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 13,
+          "text": ".enqueue_operation(&c.admission(c.send()))"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/local_machine_connection/connection_tests.rs#cloudroom_connection_lost_ack_reconnect_rewraps_receipt_and_rejects_old_envelope",
+        "name": "cloudroom_connection_lost_ack_reconnect_rewraps_receipt_and_rejects_old_envelope",
+        "kind": "function",
+        "path": "src/adapters/http/routes/local_machine_connection/connection_tests.rs",
+        "span": "L306-L384"
+      },
+      "path": "src/adapters/http/routes/local_machine_connection/connection_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 315,
+          "text": ".enqueue_operation(&c.admission(c.send()))"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/local_machine_connection/tls_tests.rs#cloudroom_connection_real_wss_validates_certificate_and_commits_result",
+        "name": "cloudroom_connection_real_wss_validates_certificate_and_commits_result",
+        "kind": "function",
+        "path": "src/adapters/http/routes/local_machine_connection/tls_tests.rs",
+        "span": "L144-L228"
+      },
+      "path": "src/adapters/http/routes/local_machine_connection/tls_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 192,
+          "text": ".enqueue_operation(&c.admission(c.send()))"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/local_agents/protocol/admission_failure_tests.rs#cloudroom_commands_accepted_controls_still_bound_the_outstanding_queue",
+        "name": "cloudroom_commands_accepted_controls_still_bound_the_outstanding_queue",
+        "kind": "function",
+        "path": "src/adapters/persistence/local_agents/protocol/admission_failure_tests.rs",
+        "span": "L4-L49"
+      },
+      "path": "src/adapters/persistence/local_agents/protocol/admission_failure_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 10,
+          "text": ".enqueue_operation(&c.admission(LocalCommand::Inspect {"
+        },
+        {
+          "line": 37,
+          "text": "c.f.persistence.enqueue_operation(&extra).await,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/local_agents/protocol/admission_failure_tests.rs#cloudroom_commands_live_actor_withdrawal_races_first_dispatch_without_false_refusal",
+        "name": "cloudroom_commands_live_actor_withdrawal_races_first_dispatch_without_false_refusal",
+        "kind": "function",
+        "path": "src/adapters/persistence/local_agents/protocol/admission_failure_tests.rs",
+        "span": "L52-L86"
+      },
+      "path": "src/adapters/persistence/local_agents/protocol/admission_failure_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 58,
+          "text": "let operation = c.f.persistence.enqueue_operation(&admission).await.unwrap();"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/local_agents/protocol/admission_failure_tests.rs#cloudroom_commands_foreign_session_and_observation_are_missing_to_an_authorized_manager",
+        "name": "cloudroom_commands_foreign_session_and_observation_are_missing_to_an_authorized_manager",
+        "kind": "function",
+        "path": "src/adapters/persistence/local_agents/protocol/admission_failure_tests.rs",
+        "span": "L89-L126"
+      },
+      "path": "src/adapters/persistence/local_agents/protocol/admission_failure_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 98,
+          "text": "c.f.persistence.enqueue_operation(&admission).await,"
+        },
+        {
+          "line": 107,
+          "text": "let operation = c.f.persistence.enqueue_operation(&admission).await.unwrap();"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/local_agents/protocol/admission_failure_tests.rs#cloudroom_commands_create_binds_once_and_logical_replay_survives_native_mapping",
+        "name": "cloudroom_commands_create_binds_once_and_logical_replay_survives_native_mapping",
+        "kind": "function",
+        "path": "src/adapters/persistence/local_agents/protocol/admission_failure_tests.rs",
+        "span": "L129-L192"
+      },
+      "path": "src/adapters/persistence/local_agents/protocol/admission_failure_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 136,
+          "text": "let operation = c.f.persistence.enqueue_operation(&admission).await.unwrap();"
+        },
+        {
+          "line": 139,
+          "text": ".enqueue_operation(&c.admission(create))"
+        },
+        {
+          "line": 174,
+          "text": "let replay = c.f.persistence.enqueue_operation(&admission).await.unwrap();"
+        },
+        {
+          "line": 189,
+          "text": "c.f.persistence.enqueue_operation(&mapped).await,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/local_agents/protocol/capacity_tests.rs#cloudroom_commands_uncertain_native_work_keeps_capacity_until_known_terminal_evidence",
+        "name": "cloudroom_commands_uncertain_native_work_keeps_capacity_until_known_terminal_evidence",
+        "kind": "function",
+        "path": "src/adapters/persistence/local_agents/protocol/capacity_tests.rs",
+        "span": "L4-L80"
+      },
+      "path": "src/adapters/persistence/local_agents/protocol/capacity_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 12,
+          "text": ".enqueue_operation(&c.admission(c.send()))"
+        },
+        {
+          "line": 40,
+          "text": ".enqueue_operation(&c.admission(c.send()))"
+        },
+        {
+          "line": 45,
+          "text": ".enqueue_operation(&c.admission(LocalCommand::Inspect {"
+        },
+        {
+          "line": 77,
+          "text": ".enqueue_operation(&c.admission(c.send()))"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/local_agents/protocol/command_tests.rs#cloudroom_commands_competing_logical_invocations_reuse_frozen_operation",
+        "name": "cloudroom_commands_competing_logical_invocations_reuse_frozen_operation",
+        "kind": "function",
+        "path": "src/adapters/persistence/local_agents/protocol/command_tests.rs",
+        "span": "L8-L55"
+      },
+      "path": "src/adapters/persistence/local_agents/protocol/command_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 23,
+          "text": "c.f.persistence.enqueue_operation(&admission).await.unwrap()"
+        },
+        {
+          "line": 27,
+          "text": "c.f.persistence.enqueue_operation(&replay).await.unwrap()"
+        },
+        {
+          "line": 52,
+          "text": "c.f.persistence.enqueue_operation(&replay).await,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/local_agents/protocol/command_tests.rs#cloudroom_commands_competing_capacity_keeps_eight_control_slots",
+        "name": "cloudroom_commands_competing_capacity_keeps_eight_control_slots",
+        "kind": "function",
+        "path": "src/adapters/persistence/local_agents/protocol/command_tests.rs",
+        "span": "L58-L106"
+      },
+      "path": "src/adapters/persistence/local_agents/protocol/command_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 64,
+          "text": ".enqueue_operation(&c.admission(c.send()))"
+        },
+        {
+          "line": 73,
+          "text": "c.f.persistence.enqueue_operation(&a).await"
+        },
+        {
+          "line": 77,
+          "text": "c.f.persistence.enqueue_operation(&b).await"
+        },
+        {
+          "line": 83,
+          "text": ".enqueue_operation(&c.admission(LocalCommand::Inspect {"
+        },
+        {
+          "line": 95,
+          "text": "c.f.persistence.enqueue_operation(&extra).await,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/local_agents/protocol/command_tests.rs#cloudroom_commands_withdrawal_refuses_untouched_but_reconciles_possible_delivery",
+        "name": "cloudroom_commands_withdrawal_refuses_untouched_but_reconciles_possible_delivery",
+        "kind": "function",
+        "path": "src/adapters/persistence/local_agents/protocol/command_tests.rs",
+        "span": "L109-L160"
+      },
+      "path": "src/adapters/persistence/local_agents/protocol/command_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 115,
+          "text": ".enqueue_operation(&c.admission(c.send()))"
+        },
+        {
+          "line": 123,
+          "text": ".enqueue_operation(&c.admission(c.send()))"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/local_agents/protocol/mod.rs#enqueue_operation",
+        "name": "enqueue_operation",
+        "kind": "function",
+        "path": "src/adapters/persistence/local_agents/protocol/mod.rs",
+        "span": "L235-L240"
+      },
+      "path": "src/adapters/persistence/local_agents/protocol/mod.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 235,
+          "text": "async fn enqueue_operation("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/local_agents/protocol/observation_failure_tests.rs#cloudroom_observations_lease_expiry_is_rechecked_after_an_actual_row_lock_wait",
+        "name": "cloudroom_observations_lease_expiry_is_rechecked_after_an_actual_row_lock_wait",
+        "kind": "function",
+        "path": "src/adapters/persistence/local_agents/protocol/observation_failure_tests.rs",
+        "span": "L5-L40"
+      },
+      "path": "src/adapters/persistence/local_agents/protocol/observation_failure_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 11,
+          "text": ".enqueue_operation(&c.admission(c.send()))"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/local_agents/protocol/observation_failure_tests.rs#cloudroom_observations_competing_sequence_claims_commit_only_one_content",
+        "name": "cloudroom_observations_competing_sequence_claims_commit_only_one_content",
+        "kind": "function",
+        "path": "src/adapters/persistence/local_agents/protocol/observation_failure_tests.rs",
+        "span": "L43-L87"
+      },
+      "path": "src/adapters/persistence/local_agents/protocol/observation_failure_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 49,
+          "text": ".enqueue_operation(&c.admission(c.send()))"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/local_agents/protocol/observation_failure_tests.rs#cloudroom_observations_thread_stop_is_separate_and_allowed_after_disable",
+        "name": "cloudroom_observations_thread_stop_is_separate_and_allowed_after_disable",
+        "kind": "function",
+        "path": "src/adapters/persistence/local_agents/protocol/observation_failure_tests.rs",
+        "span": "L90-L184"
+      },
+      "path": "src/adapters/persistence/local_agents/protocol/observation_failure_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 96,
+          "text": ".enqueue_operation(&c.admission(c.send()))"
+        },
+        {
+          "line": 121,
+          "text": ".enqueue_operation(&c.admission(c.send()))"
+        },
+        {
+          "line": 127,
+          "text": ".enqueue_operation(&c.admission(LocalCommand::StopThread {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/local_agents/protocol/observation_failure_tests.rs#cloudroom_observations_one_native_turn_cannot_settle_two_operations",
+        "name": "cloudroom_observations_one_native_turn_cannot_settle_two_operations",
+        "kind": "function",
+        "path": "src/adapters/persistence/local_agents/protocol/observation_failure_tests.rs",
+        "span": "L187-L232"
+      },
+      "path": "src/adapters/persistence/local_agents/protocol/observation_failure_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 193,
+          "text": ".enqueue_operation(&c.admission(c.send()))"
+        },
+        {
+          "line": 198,
+          "text": ".enqueue_operation(&c.admission(c.send()))"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/local_agents/protocol/observation_failure_tests.rs#cloudroom_observations_late_result_is_audit_without_successful_wait",
+        "name": "cloudroom_observations_late_result_is_audit_without_successful_wait",
+        "kind": "function",
+        "path": "src/adapters/persistence/local_agents/protocol/observation_failure_tests.rs",
+        "span": "L235-L303"
+      },
+      "path": "src/adapters/persistence/local_agents/protocol/observation_failure_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 246,
+          "text": "let operation = c.f.persistence.enqueue_operation(&request).await.unwrap();"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/local_agents/protocol/observation_tests.rs#cloudroom_observations_lost_ack_replay_uses_current_fence_and_same_payload",
+        "name": "cloudroom_observations_lost_ack_replay_uses_current_fence_and_same_payload",
+        "kind": "function",
+        "path": "src/adapters/persistence/local_agents/protocol/observation_tests.rs",
+        "span": "L7-L68"
+      },
+      "path": "src/adapters/persistence/local_agents/protocol/observation_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 13,
+          "text": ".enqueue_operation(&c.admission(c.send()))"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/local_agents/protocol/observation_tests.rs#cloudroom_observations_matching_turn_result_is_durable_and_human_turn_cannot_replace_it",
+        "name": "cloudroom_observations_matching_turn_result_is_durable_and_human_turn_cannot_replace_it",
+        "kind": "function",
+        "path": "src/adapters/persistence/local_agents/protocol/observation_tests.rs",
+        "span": "L104-L217"
+      },
+      "path": "src/adapters/persistence/local_agents/protocol/observation_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 110,
+          "text": ".enqueue_operation(&c.admission(c.send()))"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/local_agents/protocol/recovery_tests.rs#cloudroom_observations_preflight_refusals_before_intent_are_definitive",
+        "name": "cloudroom_observations_preflight_refusals_before_intent_are_definitive",
+        "kind": "function",
+        "path": "src/adapters/persistence/local_agents/protocol/recovery_tests.rs",
+        "span": "L268-L314"
+      },
+      "path": "src/adapters/persistence/local_agents/protocol/recovery_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 276,
+          "text": ".enqueue_operation(&c.admission(c.send()))"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/local_agents/protocol/submission_tests.rs#cloudroom_submission_queued_thread_maps_once_without_completing_native_work",
+        "name": "cloudroom_submission_queued_thread_maps_once_without_completing_native_work",
+        "kind": "function",
+        "path": "src/adapters/persistence/local_agents/protocol/submission_tests.rs",
+        "span": "L33-L114"
+      },
+      "path": "src/adapters/persistence/local_agents/protocol/submission_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 41,
+          "text": ".enqueue_operation(&c.admission(create))"
+        },
+        {
+          "line": 77,
+          "text": ".enqueue_operation(&c.admission(control))"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/local_agents/protocol/submission_tests.rs#cloudroom_submission_requires_intent_and_preserves_known_turn_and_foreign_binding",
+        "name": "cloudroom_submission_requires_intent_and_preserves_known_turn_and_foreign_binding",
+        "kind": "function",
+        "path": "src/adapters/persistence/local_agents/protocol/submission_tests.rs",
+        "span": "L117-L186"
+      },
+      "path": "src/adapters/persistence/local_agents/protocol/submission_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 123,
+          "text": ".enqueue_operation(&c.admission(c.send()))"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/local_agents/protocol/submission_tests.rs#cloudroom_submission_missing_and_late_identity_preserve_uncertainty_and_capacity",
+        "name": "cloudroom_submission_missing_and_late_identity_preserve_uncertainty_and_capacity",
+        "kind": "function",
+        "path": "src/adapters/persistence/local_agents/protocol/submission_tests.rs",
+        "span": "L189-L263"
+      },
+      "path": "src/adapters/persistence/local_agents/protocol/submission_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 200,
+          "text": "let operation = c.f.persistence.enqueue_operation(&admission).await.unwrap();"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/local_agents/protocol.rs#enqueue_operation",
+        "name": "enqueue_operation",
+        "kind": "function",
+        "path": "src/application/local_agents/protocol.rs",
+        "span": "L245-L248"
+      },
+      "path": "src/application/local_agents/protocol.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 245,
+          "text": "async fn enqueue_operation("
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 15,
+    "baselineChars": 118177
+  }
+}

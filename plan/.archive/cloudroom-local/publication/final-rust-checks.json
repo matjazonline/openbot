@@ -1,0 +1,44 @@
+[
+  {
+    "name": "full-suite",
+    "command": [
+      "scripts/test-network-isolation.sh",
+      "cargo",
+      "test",
+      "--locked",
+      "--offline",
+      "--all-targets"
+    ],
+    "fixture": "owned UTF8 PostgreSQL18.6 port56390",
+    "status": "FAIL",
+    "exit": 101,
+    "seconds": 1627.46,
+    "log": "logs/full-suite.log"
+  },
+  {
+    "name": "stack-budget",
+    "command": [
+      "scripts/test-network-isolation.sh",
+      "scripts/stack-budget.sh",
+      "--offline"
+    ],
+    "fixture": "owned UTF8 PostgreSQL18.6 port56390",
+    "status": "FAIL",
+    "exit": 101,
+    "seconds": 1336.87,
+    "log": "logs/stack-budget.log"
+  },
+  {
+    "name": "lease-budget",
+    "command": [
+      "scripts/test-network-isolation.sh",
+      "scripts/lease-budget.sh",
+      "--offline"
+    ],
+    "fixture": "owned UTF8 PostgreSQL18.6 port56390",
+    "status": "PASS",
+    "exit": 0,
+    "seconds": 204.77,
+    "log": "logs/lease-budget.log"
+  }
+]

@@ -1,0 +1,8 @@
+[
+  {
+    "provider": "opencode",
+    "status": "FAIL",
+    "seconds": 124.75,
+    "file": "logs/native-opencode-r17.txt"
+  }
+]

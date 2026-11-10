@@ -1,0 +1,16 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.18s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-ed6f58dd3efb6ea2)
+
+running 9 tests
+test adapters::http::auth_admission::tests::security_auth_limits_metric_rollup_uses_fixed_kinds_and_saturating_counts ... ok
+test adapters::http::auth_admission::tests::security_auth_limits_every_costly_route_is_classified ... ok
+test adapters::http::auth_admission::tests::security_auth_limits_trusted_proxy_requires_one_ip ... ok
+test adapters::http::auth_admission::tests::security_auth_limits_body_is_rejected_before_handler ... ok
+test adapters::http::auth_admission::tests::security_auth_limits_untrusted_forwarded_source_cannot_escape_budget ... ok
+test adapters::http::auth_admission::tests::security_auth_limits_head_oauth_requests_consume_the_budget ... ok
+test adapters::http::auth_admission::tests::security_auth_limits_competing_claimants_share_last_active_slot ... ok
+test adapters::http::auth_admission::tests::security_auth_limits_encoded_profile_kind_uses_matched_route_budget ... ok
+test adapters::http::auth_admission::tests::security_auth_limits_stalled_body_times_out_without_reaching_handler ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 3214 filtered out; finished in 0.08s
+

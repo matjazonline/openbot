@@ -1,0 +1,23 @@
+error[E0277]: `dyn McpSession` doesn't implement `Debug`
+  --> plan/vault-google/phases/p06/docs/logs/reviewer-mcp-connect-cancel.rs:27:63
+   |
+27 |   arrived_rx.await.unwrap(); task.abort(); assert!(task.await.unwrap_err().is_cancelled());
+   |                                                               ^^^^^^^^^^ the trait `Debug` is not implemented for `dyn McpSession`
+   |
+   = help: the following other types implement trait `Debug`:
+             dyn ammonia::AttributeFilter
+             dyn rustls::verify::ClientCertVerifier
+             dyn rustls::verify::ServerCertVerifier
+             dyn std::any::Any + std::marker::Send + std::marker::Sync
+             dyn std::any::Any + std::marker::Send
+             dyn std::any::Any
+             dyn tracing_core::field::Value
+   = note: required for `Box<dyn McpSession>` to implement `Debug`
+   = note: 1 redundant requirement hidden
+   = note: required for `Result<Box<dyn McpSession>, AppError>` to implement `Debug`
+note: required by a bound in `Result::<T, E>::unwrap_err`
+  --> /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/result.rs:1324:4
+
+error: aborting due to 1 previous error
+
+For more information about this error, try `rustc --explain E0277`.

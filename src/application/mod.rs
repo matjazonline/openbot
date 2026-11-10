@@ -3,6 +3,7 @@ pub mod app_error;
 pub mod attention;
 pub mod integrations;
 pub mod knowledge;
+pub mod local_agents;
 pub mod memory;
 pub mod message_outcomes;
 pub mod model_providers;

@@ -1,0 +1,13 @@
+$ cargo test --locked --offline --lib vault_contract_
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.20s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-048b7abd3ed0c794)
+
+running 5 tests
+test application::integrations::tests::vault_contract_revision_table_separates_refresh_rewrap_and_authorization ... ok
+test application::integrations::tests::vault_contract_identifier_and_page_bounds_survive_deserialization ... ok
+test application::integrations::tests::vault_contract_metadata_is_bounded_and_has_no_credential_fields ... ok
+test application::integrations::tests::vault_contract_static_credential_bound_is_aggregate_and_inclusive ... ok
+test application::integrations::tests::vault_contract_managed_scope_and_aggregate_bounds ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 3058 filtered out; finished in 0.00s
+

@@ -247,34 +247,9 @@ impl McpPersistence for PostgresPersistence {
         expected_revision: i64,
         write: McpConnectionWrite,
     ) -> AppResult<CompanyMcpConnection> {
-        write.validate()?;
         let mut tx = self.pool.begin().await?;
         lock_company(&mut tx, company_id).await?;
-        let old = get_connection(&mut tx, company_id, id).await?;
-        if matches!(write.auth, McpAuth::Integration(_)) && write.auth != old.auth {
-            return Err(invalid("Confirm an integration binding through its owner"));
-        }
-        if old.revision != expected_revision {
-            return Err(conflict());
-        }
-        if old.endpoint != write.endpoint {
-            return Err(crate::use_cases::mcp::endpoint_fixed());
-        }
-        let rebind = old.auth != write.auth;
-        if rebind {
-            sqlx::query(
-                "DELETE FROM company_mcp_credentials WHERE company_id = $1 AND connection_id = $2",
-            )
-            .bind(company_id)
-            .bind(id)
-            .execute(&mut *tx)
-            .await?;
-        }
-        sqlx::query("UPDATE company_mcp_connections SET slug = $3, endpoint_url = $4, enabled = $5, auth_type = $6, integration_account_id=CASE WHEN $6='integration' THEN integration_account_id ELSE NULL END,integration_grant_id=CASE WHEN $6='integration' THEN integration_grant_id ELSE NULL END,integration_authorization=CASE WHEN $6='integration' THEN integration_authorization ELSE NULL END,integration_grant_revision=CASE WHEN $6='integration' THEN integration_grant_revision ELSE NULL END, discovery_json = $7, revision = revision + 1, credential_revision = credential_revision + $8 WHERE company_id = $1 AND id = $2")
-            .bind(company_id).bind(id).bind(write.slug.as_str()).bind(write.endpoint.as_str()).bind(write.enabled).bind(write.auth.as_str())
-            .bind(serde_json::to_value(&write.discovered_tools).map_err(|_| invalid("Invalid discovery"))?).bind(i64::from(rebind)).execute(&mut *tx).await?;
-        replace_grants(&mut tx, company_id, id, &write.tool_grants).await?;
-        let result = get_connection(&mut tx, company_id, id).await?;
+        let result = Box::pin(update_on(&mut tx, company_id, id, expected_revision, write)).await?;
         tx.commit().await?;
         Ok(result)
     }
@@ -389,3 +364,41 @@ impl McpCredentialPersistence for PostgresPersistence {
         Ok(token)
     }
 }
+
+async fn update_on(
+    tx: &mut Transaction<'_, Postgres>,
+    company_id: Uuid,
+    id: Uuid,
+    expected_revision: i64,
+    write: McpConnectionWrite,
+) -> AppResult<CompanyMcpConnection> {
+    write.validate()?;
+    let old = get_connection(tx, company_id, id).await?;
+    if matches!(write.auth, McpAuth::Integration(_)) && write.auth != old.auth {
+        return Err(invalid("Confirm an integration binding through its owner"));
+    }
+    if old.revision != expected_revision {
+        return Err(conflict());
+    }
+    if old.endpoint != write.endpoint {
+        return Err(crate::use_cases::mcp::endpoint_fixed());
+    }
+    let rebind = old.auth != write.auth;
+    if rebind {
+        sqlx::query(
+            "DELETE FROM company_mcp_credentials WHERE company_id = $1 AND connection_id = $2",
+        )
+        .bind(company_id)
+        .bind(id)
+        .execute(&mut **tx)
+        .await?;
+    }
+    sqlx::query("UPDATE company_mcp_connections SET slug = $3, endpoint_url = $4, enabled = $5, auth_type = $6, integration_account_id=CASE WHEN $6='integration' THEN integration_account_id ELSE NULL END,integration_grant_id=CASE WHEN $6='integration' THEN integration_grant_id ELSE NULL END,integration_authorization=CASE WHEN $6='integration' THEN integration_authorization ELSE NULL END,integration_grant_revision=CASE WHEN $6='integration' THEN integration_grant_revision ELSE NULL END, discovery_json = $7, revision = revision + 1, credential_revision = credential_revision + $8 WHERE company_id = $1 AND id = $2")
+            .bind(company_id).bind(id).bind(write.slug.as_str()).bind(write.endpoint.as_str()).bind(write.enabled).bind(write.auth.as_str())
+            .bind(serde_json::to_value(&write.discovered_tools).map_err(|_| invalid("Invalid discovery"))?).bind(i64::from(rebind)).execute(&mut **tx).await?;
+    replace_grants(tx, company_id, id, &write.tool_grants).await?;
+    let result = get_connection(tx, company_id, id).await?;
+    Ok(result)
+}
+
+pub(crate) mod discovery;

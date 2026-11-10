@@ -1,0 +1,1 @@
+{"threadId":"thr_rvbjg3dc7k","projectId":"proj_cybxr9p8jc","marker":"OPENBOT_SMOKE_5401ccfb14346893473d4841","model":"claude-haiku-5-5","providerId":"claude-code","status":"starting"}

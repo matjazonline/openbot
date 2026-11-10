@@ -1,0 +1,13 @@
+{
+  "owner": "root/cloudroom-local/p07/stock-r2",
+  "directory": "/private/tmp/ob7-stack-obe2uczd",
+  "testDatabase": "openbot_cl_stock_3d206a88a0",
+  "buildDatabase": "openbot_cl_final_build_8a72675493",
+  "port": 56388,
+  "realCargo": "/Users/mac03/.cargo/bin/cargo",
+  "wrapper": "logs/cargo-stream-wrapper-r1.sh",
+  "timeoutSeconds": 3600,
+  "sourceArtifact": "bd92212d24d49b9d937eac2c52723eae45085cdb81abc36d12c262dcdf33cbe9",
+  "activeName": "stock-correction-full-r2",
+  "activePid": 16512
+}

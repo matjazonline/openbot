@@ -1,0 +1,1 @@
+PASS: pinned source plus the approved UI patch only

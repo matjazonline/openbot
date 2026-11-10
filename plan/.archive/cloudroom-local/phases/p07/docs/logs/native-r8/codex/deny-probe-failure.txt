@@ -1,0 +1,41 @@
+/Users/mac03/dev/openbot/node_modules/playwright/lib/matchers/expect.js:221
+        return matcher.call(target, ...args);
+                       ^
+
+Je [Error]: expect(locator).toBeVisible() failed
+
+Locator:  getByRole('button', { name: 'Deny', exact: true })
+Expected: visible
+Received: <element(s) not found>
+Timeout:  30000ms
+
+Call log:
+[2m  - Expect "to.be.visible" with timeout 30000ms[22m
+[2m  - waiting for getByRole('button', { name: 'Deny', exact: true })[22m
+
+    at Proxy.<anonymous> (/Users/mac03/dev/openbot/node_modules/playwright/lib/matchers/expect.js:221:24)
+    at file:///Users/mac03/dev/openbot/integrations/cloudroom-plugin/compatibility/prove-native-ui.mjs:29:73 {
+  matcherResult: {
+    message: 'expect(locator).toBeVisible() failed\n' +
+      '\n' +
+      "Locator:  getByRole('button', { name: 'Deny', exact: true })\n" +
+      'Expected: visible\n' +
+      'Received: <element(s) not found>\n' +
+      'Timeout:  30000ms\n' +
+      '\n' +
+      'Call log:\n' +
+      '\x1B[2m  - Expect "to.be.visible" with timeout 30000ms\x1B[22m\n' +
+      "\x1B[2m  - waiting for getByRole('button', { name: 'Deny', exact: true })\x1B[22m\n",
+    pass: false,
+    actual: '<element(s) not found>',
+    name: 'toBeVisible',
+    expected: 'visible',
+    log: [
+      '  - Expect "to.be.visible" with timeout 30000ms',
+      "  - waiting for getByRole('button', { name: 'Deny', exact: true })"
+    ],
+    timeout: 30000
+  }
+}
+
+Node.js v24.21.0

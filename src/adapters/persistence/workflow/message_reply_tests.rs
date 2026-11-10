@@ -123,7 +123,7 @@ async fn asked_via(s: &Intents, ask: Ask, then: Then, park: bool) -> Asked {
         Preflight,
         p.clone(),
         WorkflowSourceDecoder,
-        message::MessagePublicationDirectory {
+        step_builtins::StepBuiltinPublicationDirectory {
             persistence: p.clone(),
         },
     );

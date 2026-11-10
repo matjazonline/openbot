@@ -1,0 +1,173 @@
+{
+  "artifact": "8ce396f8ef9b731cb1f33846c82a30de0e8d9852623618e8fec9218375267cc4",
+  "new_family_tests": 42,
+  "affected_existing_family_tests": 122,
+  "families": [
+    {
+      "filter": "integration_portability_",
+      "nonzero_list": 9,
+      "passed": 9,
+      "list_receipt": "wave11-1-list.json",
+      "run_receipt": "wave11-1-run.json"
+    },
+    {
+      "filter": "integration_service_contract_",
+      "nonzero_list": 22,
+      "passed": 22,
+      "list_receipt": "wave11-2-list.json",
+      "run_receipt": "wave11-2-run.json"
+    },
+    {
+      "filter": "vault_google_e2e_",
+      "nonzero_list": 11,
+      "passed": 11,
+      "list_receipt": "wave11-3-list.json",
+      "run_receipt": "wave11-3-run.json"
+    },
+    {
+      "filter": "integration_renewal_",
+      "nonzero_list": 18,
+      "passed": 18,
+      "list_receipt": "final-existing12-1-list.json",
+      "run_receipt": "final-existing12-1-run.json"
+    },
+    {
+      "filter": "google_refresh_",
+      "nonzero_list": 22,
+      "passed": 22,
+      "list_receipt": "final-existing12-2-list.json",
+      "run_receipt": "final-existing12-2-run.json"
+    },
+    {
+      "filter": "google_connection_lifecycle_",
+      "nonzero_list": 5,
+      "passed": 5,
+      "list_receipt": "final-existing12-3-list.json",
+      "run_receipt": "final-existing12-3-run.json"
+    },
+    {
+      "filter": "integration_gateway_",
+      "nonzero_list": 7,
+      "passed": 7,
+      "list_receipt": "final-existing12-4-list.json",
+      "run_receipt": "final-existing12-4-run.json"
+    },
+    {
+      "filter": "vault_workflow_http_",
+      "nonzero_list": 6,
+      "passed": 6,
+      "list_receipt": "final-existing12-5-list.json",
+      "run_receipt": "final-existing12-5-run.json"
+    },
+    {
+      "filter": "vault_workflow_mcp_",
+      "nonzero_list": 12,
+      "passed": 12,
+      "list_receipt": "final-existing12-6-list.json",
+      "run_receipt": "final-existing12-6-run.json"
+    },
+    {
+      "filter": "vault_rotation_",
+      "nonzero_list": 6,
+      "passed": 6,
+      "list_receipt": "final-existing12-7-list.json",
+      "run_receipt": "final-existing12-7-run.json"
+    },
+    {
+      "filter": "vault_storage_",
+      "nonzero_list": 14,
+      "passed": 14,
+      "list_receipt": "final-existing12-8-list.json",
+      "run_receipt": "final-storage13.json"
+    },
+    {
+      "filter": "vault_management_",
+      "nonzero_list": 3,
+      "passed": 3,
+      "list_receipt": "final-existing12-9-list.json",
+      "run_receipt": "final-existing12-9-run.json"
+    },
+    {
+      "filter": "vault_binding_",
+      "nonzero_list": 14,
+      "passed": 14,
+      "list_receipt": "final-existing12-10-list.json",
+      "run_receipt": "final-existing12-10-run.json"
+    },
+    {
+      "filter": "vault_dispatch_authority_",
+      "nonzero_list": 15,
+      "passed": 15,
+      "list_receipt": "final-existing12-11-list.json",
+      "run_receipt": "final-existing12-11-run.json"
+    }
+  ],
+  "checks": [
+    "final-fmt",
+    "final-diff",
+    "final-offline",
+    "final-clippy12",
+    "final-migrations",
+    "final-prepare",
+    "final-prepare-check",
+    "final-browser11",
+    "final-transport-fixtures",
+    "final-sample-fixtures",
+    "final-sample",
+    "closure13-fmt",
+    "closure13-diff",
+    "closure13-clippy",
+    "closure13-zero",
+    "closure13-reviewed",
+    "closure13-boundary-fixtures",
+    "closure13-boundary",
+    "closure13-docs"
+  ],
+  "new_markup_fixtures": [
+    {
+      "command": [
+        "env",
+        "RUST_MIN_STACK=2097152",
+        "RUST_TEST_THREADS=1",
+        "VAULT_AUTHORING_BROWSER_FIXTURES=/Users/mac02/.codex/worktrees/1133/openbot/plan/vault-google/phases/p07/docs/logs/vault-browser-11",
+        "bash",
+        "scripts/test-network-isolation.sh",
+        "cargo",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "vault_authoring_picker_is_owner_scoped_and_only_exposes_approved_metadata"
+      ],
+      "cwd": "/Users/mac02/.codex/worktrees/1133/openbot",
+      "database": "vault_google_p07_1133_a3bcb2497b",
+      "exit": 0,
+      "seconds": 0.94,
+      "log": "/Users/mac02/.codex/worktrees/1133/openbot/plan/vault-google/phases/p07/docs/logs/wave11-4-run.log"
+    },
+    {
+      "command": [
+        "env",
+        "RUST_MIN_STACK=2097152",
+        "RUST_TEST_THREADS=1",
+        "VAULT_AUTHORING_BROWSER_FIXTURES=/Users/mac02/.codex/worktrees/1133/openbot/plan/vault-google/phases/p07/docs/logs/vault-browser-11",
+        "bash",
+        "scripts/test-network-isolation.sh",
+        "cargo",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "vault_authoring_owner_forms_and_reconnect_states_emit_real_browser_markup"
+      ],
+      "cwd": "/Users/mac02/.codex/worktrees/1133/openbot",
+      "database": "vault_google_p07_1133_a3bcb2497b",
+      "exit": 0,
+      "seconds": 1.37,
+      "log": "/Users/mac02/.codex/worktrees/1133/openbot/plan/vault-google/phases/p07/docs/logs/wave11-5-run.log"
+    }
+  ],
+  "browser": "final-browser11.json:4 PASS",
+  "known_unrelated_failure": "baseline-transport-disposition.json",
+  "reuse": "Two helper-only e2e refactors superseded by closure13 exact test reruns; storage source-policy correction superseded by final-storage13. All other actual fixture/environment/source evidence unchanged. No full suite or live provider smoke."
+}

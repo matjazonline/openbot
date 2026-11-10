@@ -1,0 +1,10 @@
+{
+  "head": "97e5d60dc538e26c7cb976a8d63772eed80baff2",
+  "snapshot": [
+    "base:   97e5d60dc538e26c7cb976a8d63772eed80baff2",
+    "digest: c7dfb6034c5f3f5001e107ac94a008da7fc55b88054af8208cfa1b79a6685664"
+  ],
+  "decision_sha256": "80af23ff756f56440f9952ee7e69d757d337e5ecf8f18210597d156266f6215a",
+  "authority_equal": true,
+  "authority_sha256": "928b7bf5fcf9f6991457805a667fd684c81b6c12211f2ed2c5ba27192685a5e8"
+}

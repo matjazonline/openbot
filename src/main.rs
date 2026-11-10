@@ -164,6 +164,8 @@ async fn run_credential_rotation() -> anyhow::Result<()> {
 
 /// Every file carrying the "No backward compatibility" note, logged at startup.
 const NO_BACKWARD_COMPATIBILITY_NOTES: &[&str] = &[
+    "plan/.archived/workflow-foundation/09-authoring-and-operations-ui.md",
+    "plan/.archived/workflow-foundation/README.md",
     "AGENTS.md",
     "src/adapters/persistence/AGENTS.md",
     "plan/.archived/fix-01-run-agent-query/01-agent-run-filter.md",
@@ -209,6 +211,47 @@ const NO_BACKWARD_COMPATIBILITY_NOTES: &[&str] = &[
     "plan/.archived/04-autonomous-agent-history/05-callers-continuations-and-channel-integration.md",
     "plan/.archived/04-autonomous-agent-history/06-history-views-retention-and-operations.md",
     "plan/.archived/04-autonomous-agent-history/07-integration-and-verification.md",
+    "plan/agent-workflow-call/README.md",
+    "plan/agent-workflow-call/01-contracts-and-authority.md",
+    "plan/agent-workflow-call/02-target-snapshots-and-dependency-scopes.md",
+    "plan/agent-workflow-call/03-child-execution-and-agent-continuation.md",
+    "plan/agent-workflow-call/04-response-ownership-and-review.md",
+    "plan/agent-workflow-call/05-authoring-inspection-and-samples.md",
+    "plan/agent-workflow-call/06-integration-and-final-verification.md",
+    "plan/01-departments/README.md",
+    "plan/01-departments/01-departments-and-membership.md",
+    "plan/01-departments/02-desks-ownership-and-access.md",
+    "plan/01-departments/03-leads-and-coordination.md",
+    "plan/01-departments/04-ui-and-docs.md",
+    "plan/01-departments/05-integration-and-final-verification.md",
+    "plan/02-workflow-roles/README.md",
+    "plan/02-workflow-roles/01-role-references-and-publication.md",
+    "plan/02-workflow-roles/02-admission-resolution-and-snapshots.md",
+    "plan/02-workflow-roles/03-reviewers-and-ui.md",
+    "plan/02-workflow-roles/04-escalation-and-reassignment.md",
+    "plan/02-workflow-roles/05-integration-and-final-verification.md",
+    "plan/03-principal-addresses/README.md",
+    "plan/03-principal-addresses/01-unified-addresses.md",
+    "plan/03-principal-addresses/02-direct-threads-and-bindings.md",
+    "plan/03-principal-addresses/03-agent-default-binding-and-relay.md",
+    "plan/03-principal-addresses/04-integration-and-final-verification.md",
+    "plan/04-root-unit/README.md",
+    "plan/04-root-unit/01-root-department-and-membership.md",
+    "plan/04-root-unit/02-access-modes.md",
+    "plan/04-root-unit/03-integration-and-final-verification.md",
+    "plan/05-scopes/README.md",
+    "plan/05-scopes/01-unit-and-principal-namespaces.md",
+    "plan/05-scopes/02-scope-resolution-and-tools.md",
+    "plan/05-scopes/03-knowledge-scopes.md",
+    "plan/05-scopes/04-integration-and-final-verification.md",
+    "plan/06-delegated-administration/README.md",
+    "plan/06-delegated-administration/01-predicate-and-owners.md",
+    "plan/06-delegated-administration/02-routes-ui-and-audit.md",
+    "plan/06-delegated-administration/03-integration-and-final-verification.md",
+    "plan/07-unit-resources/README.md",
+    "plan/07-unit-resources/01-ownership-and-selection.md",
+    "plan/07-unit-resources/02-models-budgets-and-usage.md",
+    "plan/07-unit-resources/03-integration-and-final-verification.md",
     "plan/attribution-service/01-application-boundaries-and-contracts.md",
     "plan/attribution-service/02-independent-application-foundation.md",
     "plan/attribution-service/03-single-sign-on-and-company-access.md",
@@ -219,14 +262,14 @@ const NO_BACKWARD_COMPATIBILITY_NOTES: &[&str] = &[
     "plan/attribution-service/08-analytics-and-attribution-dashboard.md",
     "plan/attribution-service/09-operations-retention-and-separate-deployment.md",
     "plan/attribution-service/10-integration-verification-and-pilot.md",
-    "plan/cloudroom-local/README.md",
-    "plan/cloudroom-local/01-contracts-and-cloudroom-compatibility.md",
-    "plan/cloudroom-local/02-company-machines-and-pairing.md",
-    "plan/cloudroom-local/03-outbound-connection-and-durable-protocol.md",
-    "plan/cloudroom-local/04-cloudroom-plugin-and-session-recovery.md",
-    "plan/cloudroom-local/05-openbot-management-and-workflows.md",
-    "plan/cloudroom-local/06-local-setup-and-operations.md",
-    "plan/cloudroom-local/07-integration-and-verification.md",
+    "plan/.archive/cloudroom-local/README.md",
+    "plan/.archive/cloudroom-local/01-contracts-and-cloudroom-compatibility.md",
+    "plan/.archive/cloudroom-local/02-company-machines-and-pairing.md",
+    "plan/.archive/cloudroom-local/03-outbound-connection-and-durable-protocol.md",
+    "plan/.archive/cloudroom-local/04-cloudroom-plugin-and-session-recovery.md",
+    "plan/.archive/cloudroom-local/05-openbot-management-and-workflows.md",
+    "plan/.archive/cloudroom-local/06-local-setup-and-operations.md",
+    "plan/.archive/cloudroom-local/07-integration-and-verification.md",
     "plan/db_improve/05-deferred-until-traffic.md",
     "plan/db_improve/improve-key-credentials.md",
     "plan/db_improve/run-agent-link-table.md",
@@ -245,23 +288,20 @@ const NO_BACKWARD_COMPATIBILITY_NOTES: &[&str] = &[
     "plan/evals/05-graders-and-hard-gates.md",
     "plan/evals/06-comparisons-and-authoring.md",
     "plan/evals/07-verification-and-operations.md",
-    "plan/fix-app/README.md",
-    "plan/fix-app/01-identity-and-ownership.md",
-    "plan/fix-app/02-silent-stalls.md",
-    "plan/fix-app/03-workflow-database-guards.md",
-    "plan/fix-app/04-authorization-in-application.md",
-    "plan/fix-app/05-tenant-integrity.md",
-    "plan/fix-app/06-workflow-storage-growth.md",
-    "plan/fix-app/07-application-layering.md",
-    "plan/fix-app/08-schema-cleanup.md",
+    "plan/.archived/fix-app/README.md",
+    "plan/.archived/fix-app/01-identity-and-ownership.md",
+    "plan/.archived/fix-app/02-silent-stalls.md",
+    "plan/.archived/fix-app/03-workflow-database-guards.md",
+    "plan/.archived/fix-app/04-authorization-in-application.md",
+    "plan/.archived/fix-app/05-tenant-integrity.md",
+    "plan/.archived/fix-app/06-workflow-storage-growth.md",
+    "plan/.archived/fix-app/07-application-layering.md",
+    "plan/.archived/fix-app/08-schema-cleanup.md",
     "plan/fix-file-access/README.md",
     "plan/fix-file-access/01-resource-ownership-and-policy.md",
     "plan/fix-file-access/02-media-authorization-and-caching.md",
     "plan/fix-file-access/03-rendering-and-export.md",
     "plan/fix-file-access/04-verification-and-deployment.md",
-    "plan/hindsight_remaining_work.md",
-    "plan/hydradb/01-preserve-memory-scope-isolation.md",
-    "plan/hydradb/06-make-memory-ingestion-durable.md",
     "plan/memory-service/README.md",
     "plan/memory-service/01-service-boundaries-and-contracts.md",
     "plan/memory-service/02-rust-application-and-storage.md",
@@ -271,9 +311,7 @@ const NO_BACKWARD_COMPATIBILITY_NOTES: &[&str] = &[
     "plan/memory-service/06-operations-and-verification.md",
     "plan/memory-service/implementation-decisions.md",
     "plan/memory_management/general_plan_instructions.md",
-    "plan/opencode_microvm_sandbox_plan.md",
     "plan/outreach_allowlist_plan.md",
-    "plan/shodh_memory_provider.md",
     "plan/slack-integration/README.md",
     "plan/standard-operating-procedures/README.md",
     "plan/standard-operating-procedures/01-shared-contracts-and-workflow-integration.md",
@@ -284,15 +322,14 @@ const NO_BACKWARD_COMPATIBILITY_NOTES: &[&str] = &[
     "plan/standard-operating-procedures/06-debriefs-and-improvement-backlog.md",
     "plan/standard-operating-procedures/07-controlled-improvement-experiments.md",
     "plan/standard-operating-procedures/08-integration-verification-and-release.md",
-    "plan/tenant-owned-execution-backends.md",
-    "plan/vault-google/README.md",
-    "plan/vault-google/01-contracts-and-ownership.md",
-    "plan/vault-google/02-vault-storage-and-management.md",
-    "plan/vault-google/03-connection-bindings-and-authority.md",
-    "plan/vault-google/04-google-authorization.md",
-    "plan/vault-google/05-token-resolution-and-refresh.md",
-    "plan/vault-google/06-workflow-integration-and-authoring.md",
-    "plan/vault-google/07-integration-verification-and-operations.md",
+    "plan/.archive/vault-google/README.md",
+    "plan/.archive/vault-google/01-contracts-and-ownership.md",
+    "plan/.archive/vault-google/02-vault-storage-and-management.md",
+    "plan/.archive/vault-google/03-connection-bindings-and-authority.md",
+    "plan/.archive/vault-google/04-google-authorization.md",
+    "plan/.archive/vault-google/05-token-resolution-and-refresh.md",
+    "plan/.archive/vault-google/06-workflow-integration-and-authoring.md",
+    "plan/.archive/vault-google/07-integration-verification-and-operations.md",
 ];
 
 async fn serve() -> anyhow::Result<()> {
@@ -330,6 +367,10 @@ async fn serve() -> anyhow::Result<()> {
     };
     let mut knowledge_shutdown_handle =
         supervise_knowledge_shutdown(app_state.knowledge.clone(), shutdown_tx.subscribe());
+    let mut local_machine_shutdown_handle = supervise_local_machine_shutdown(
+        app_state.local_machine_connections.clone(),
+        shutdown_tx.subscribe(),
+    );
     let mut workflow_handles = workflow.spawn(&workflow_shutdown);
 
     // The runtime panel samples the workflow worker slots and the jobs they hold (p08 D4.8).
@@ -415,6 +456,10 @@ async fn serve() -> anyhow::Result<()> {
     let mut mailbox_listener_handle = mailbox_listener_handle;
     tokio::join!(
         join_background("knowledge indexing", &mut knowledge_shutdown_handle),
+        join_background(
+            "local machine connections",
+            &mut local_machine_shutdown_handle
+        ),
         join_background("runtime metric sampler", &mut runtime_sampler_handle),
         join_background("session cleanup", &mut session_cleanup_handle),
         join_background("inbound event worker", &mut inbound_event_worker_handle),
@@ -431,6 +476,20 @@ async fn serve() -> anyhow::Result<()> {
     );
 
     Ok(())
+}
+
+fn supervise_local_machine_shutdown(
+    connections: Arc<
+        open_bots::adapters::http::routes::local_machine_connection::LocalMachineConnections,
+    >,
+    mut shutdown: tokio::sync::broadcast::Receiver<()>,
+) -> tokio::task::JoinHandle<()> {
+    tokio::spawn(async move {
+        let _ = shutdown.recv().await;
+        if connections.shutdown().await.is_err() {
+            warn!("Local machine connections exceeded their shutdown drain");
+        }
+    })
 }
 
 fn supervise_knowledge_shutdown(

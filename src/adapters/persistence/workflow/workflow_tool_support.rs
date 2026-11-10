@@ -489,7 +489,7 @@ pub(super) async fn publish_parent(fixture: &Fixture, key: &str) -> LifecycleRes
         fixture,
         key,
         source,
-        message::MessagePublicationDirectory { persistence: p },
+        step_builtins::StepBuiltinPublicationDirectory { persistence: p },
     )
     .await
 }

@@ -1,0 +1,11 @@
+{
+  "observations": {},
+  "oldKnownCargoAndTestPids": [
+    29499,
+    29501
+  ],
+  "currentPsExit": 1,
+  "currentOldProcesses": "",
+  "currentPeerProcesses": [],
+  "note": "Retained child-absence observation occurred before the new streamed-run launch; the earlier VM-stop command also checked that no task peer processes remained. No historical process-group ID was captured, so no stronger retroactive group assertion is made."
+}

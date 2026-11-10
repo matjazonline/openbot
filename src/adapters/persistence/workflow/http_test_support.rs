@@ -284,6 +284,14 @@ pub(super) async fn claimed(
     target: BindingTarget,
     association: RelatedAssociation,
 ) -> ClaimedWorkflow {
+    Box::pin(claimed_with_key(fixture, target, association, "http-run")).await
+}
+pub(super) async fn claimed_with_key(
+    fixture: &Fixture,
+    target: BindingTarget,
+    association: RelatedAssociation,
+    key: &str,
+) -> ClaimedWorkflow {
     let p = &fixture.persistence;
     let company = fixture.target.company;
     let actor = fixture.target.actor;
@@ -301,7 +309,7 @@ pub(super) async fn claimed(
             .unwrap(),
             correlation_id: CorrelationId::new(),
             binding_id: target.binding,
-            idempotency_key: IdempotencyKey::parse("http-run").unwrap(),
+            idempotency_key: IdempotencyKey::parse(key).unwrap(),
             input: json!({}),
             rerun_of: None,
             delivery_policy: crate::application::workflow::DeliveryPolicy::Deliver,

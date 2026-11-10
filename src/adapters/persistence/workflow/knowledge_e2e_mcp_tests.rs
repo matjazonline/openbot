@@ -27,6 +27,9 @@ fn install_client(j: &mut SalesJourney, server: &mcp_fixture::McpServer) {
     let engine = WorkflowEngine::new(
         p.clone(),
         WorkflowEngineSetup {
+            integrations: Arc::new(
+                crate::application::integrations::unavailable::UnavailableIntegrations,
+            ),
             config: &config,
             composer: DeliveryComposer::new(renderers, Arc::new(p)),
             mcp_client: mcp_fixture::guarded_client(&server.url),

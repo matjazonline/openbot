@@ -1,0 +1,33 @@
+{
+  "records": [
+    {
+      "original_path": "plan/.archive/cloudroom-local/phases/p01/docs/logs/CL-P01-B1-CORRECTIONS.evidence.json",
+      "retained_path": "plan/.archive/cloudroom-local/phases/p01/docs/logs/CL-P01-B1-CORRECTIONS.invalid-evidence.json",
+      "sha256": "a927e8dabcfdcb8b72f21b030cdd90144c9a7690c4957ad84f4c30c52d3d6597",
+      "validation_error": "evidence hash mismatch: logs/rust-test-list-r3-final.txt",
+      "status": "invalid historical record; never current acceptance evidence"
+    },
+    {
+      "original_path": "plan/.archive/cloudroom-local/phases/p01/docs/logs/CL-P01-B1-R2.evidence.json",
+      "retained_path": "plan/.archive/cloudroom-local/phases/p01/docs/logs/CL-P01-B1-R2.invalid-evidence.json",
+      "sha256": "60e11582d3eaab7894b6f926bd4133a35c7a44406933c1c60bce695d7e2e93de",
+      "validation_error": "evidence hash mismatch: logs/rust-test-list-r3-final.txt",
+      "status": "invalid historical record; never current acceptance evidence"
+    },
+    {
+      "original_path": "plan/.archive/cloudroom-local/phases/p07/docs/logs/CL-P07-B1-R1.preliminary.evidence.json",
+      "retained_path": "plan/.archive/cloudroom-local/phases/p07/docs/logs/CL-P07-B1-R1.preliminary.invalid-evidence.json",
+      "sha256": "7ed1e524e65e6f0e1804195c5dff1a840e528d551bdc2de708f3ecab64181aa9",
+      "validation_error": "evidence hash mismatch: logs/final-plugin-runtime-install-r2.txt",
+      "status": "invalid historical record; never current acceptance evidence"
+    },
+    {
+      "original_path": "plan/.archive/cloudroom-local/phases/p07/docs/logs/CL-P07-B1-R2.final.evidence.json",
+      "retained_path": "plan/.archive/cloudroom-local/phases/p07/docs/logs/CL-P07-B1-R2.final.invalid-evidence.json",
+      "sha256": "5ae405cd7dffd53db471224cf0a7008d419768d3d2cb42765220d953dd880fec",
+      "validation_error": "check 1 command must be a nonempty string",
+      "status": "invalid historical record; never current acceptance evidence"
+    }
+  ],
+  "policy": "Preserve invalid historical manifest bytes under an explicit invalid-evidence filename. The CI .evidence.json contract applies to valid retained manifests; these four records remain discoverable here and are not claimed valid."
+}

@@ -18,7 +18,13 @@ impl HistoryThread {
     async fn new() -> Self {
         Box::pin(Self::in_fixture(Fixture::new().await)).await
     }
-    async fn in_fixture(fixture: Fixture) -> Self {
+    fn in_fixture(fixture: Fixture) -> impl std::future::Future<Output = Self> {
+        Self::with_policy(fixture, None)
+    }
+    async fn with_policy(
+        fixture: Fixture,
+        mcp_error_policy: Option<crate::application::workflow::agent::McpErrorPolicy>,
+    ) -> Self {
         let mut s = Intents::in_fixture(fixture).await;
         s.fixture.persistence = PostgresPersistence::with_credential_cipher(
             s.pool().clone(),
@@ -52,7 +58,16 @@ impl HistoryThread {
         .await
         .unwrap();
         s.fixture.publish_agent(agent.id).await;
-        let binding = history_binding(&mut s, "history").await;
+        let binding = history_contract_binding(
+            &mut s,
+            "history",
+            HistoryContract {
+                input: crate::application::workflow::triggers::MessageTriggerInput::schema(),
+                output: json!({"type":"string"}),
+                mcp_error_policy,
+            },
+        )
+        .await;
         Self {
             s,
             agent: agent.id,
@@ -110,6 +125,7 @@ async fn history_binding(s: &mut Intents, agent_key: &str) -> WorkflowBindingId 
         HistoryContract {
             input: crate::application::workflow::triggers::MessageTriggerInput::schema(),
             output: json!({"type":"string"}),
+            mcp_error_policy: None,
         },
     )
     .await
@@ -118,6 +134,7 @@ async fn history_binding(s: &mut Intents, agent_key: &str) -> WorkflowBindingId 
 struct HistoryContract {
     input: Value,
     output: Value,
+    mcp_error_policy: Option<crate::application::workflow::agent::McpErrorPolicy>,
 }
 
 async fn history_contract_binding(
@@ -133,6 +150,9 @@ async fn history_contract_binding(
     source["steps"]["start"]["with"]["agent"] = json!({"literal":agent_key});
     source["steps"]["start"]["with"]["context"] = json!({"ref":"/input"});
     source["steps"]["start"]["with"]["output_schema"] = json!({"literal":contract.output});
+    if let Some(policy) = contract.mcp_error_policy {
+        source["steps"]["start"]["with"]["mcp_error_policy"] = json!({"literal":policy});
+    }
     let p = s.p();
     let definitions = DefinitionService::new(
         Preflight,

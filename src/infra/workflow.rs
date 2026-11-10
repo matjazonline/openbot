@@ -145,6 +145,9 @@ pub struct ProductionHandler {
     history: WorkflowHistoryRuntime<PostgresPersistence>,
     /// Present only while the memory service is configured.
     memory: Option<crate::application::workflow::memory::MemoryStepRuntime<PostgresPersistence>>,
+    local_agent: crate::application::local_agents::workflow::LocalAgentHandler<
+        crate::adapters::persistence::workflow::local_agents::PostgresLocalAgentWorkflow,
+    >,
 }
 
 impl ProductionHandler {
@@ -155,12 +158,13 @@ impl ProductionHandler {
         if let Some(memory) = self.memory.as_ref().filter(|memory| memory.supports(kind)) {
             return Some(memory);
         }
-        let handlers: [&dyn WorkflowHandler; 5] = [
+        let handlers: [&dyn WorkflowHandler; 6] = [
             &self.agent,
             self.http.as_ref(),
             self.mcp.as_ref(),
             self.message.as_ref(),
             &self.history,
+            &self.local_agent,
         ];
         handlers.into_iter().find(|handler| handler.supports(kind))
     }
@@ -206,6 +210,7 @@ pub struct WorkflowEngine {
 
 /// Named composition inputs keep the shared model explicit and avoid positional domain/URL arguments.
 pub struct WorkflowEngineSetup<'a> {
+    pub integrations: Arc<dyn crate::application::integrations::ExecutionGateway>,
     pub config: &'a crate::infra::config::AppConfig,
     pub composer: DeliveryComposer,
     pub mcp_client: Arc<dyn McpClient>,
@@ -229,17 +234,19 @@ fn compose_tools(
     templates: &ProvisioningDeployment,
     lease: LeasePolicy,
 ) -> ToolRuntimes {
-    let http = Arc::new(HttpRuntime::with_approvals(
+    let http = Arc::new(HttpRuntime::with_integrations(
         persistence.clone(),
         setup.http_destinations.clone(),
         lease,
         Some(notices.clone()),
+        setup.integrations.clone(),
     ));
-    let mcp = Arc::new(McpRuntime::with_approvals(
+    let mcp = Arc::new(McpRuntime::with_integrations(
         persistence.clone(),
         setup.mcp_client.clone(),
         lease,
         Some(notices.clone()),
+        setup.integrations.clone(),
     ));
     let message = Arc::new(MessageRuntime::with_approvals(
         persistence.clone(),
@@ -299,6 +306,13 @@ fn compose_handler(
         message: tools.message,
         history: WorkflowHistoryRuntime::new(persistence.clone()),
         memory: None,
+        local_agent: crate::application::local_agents::workflow::LocalAgentHandler::new(
+            crate::adapters::persistence::workflow::local_agents::PostgresLocalAgentWorkflow::new(
+                persistence.clone(),
+                Some(notices.clone()),
+            ),
+            lease,
+        ),
     }))
 }
 
@@ -470,7 +484,7 @@ impl WorkflowEngine {
     /// Start workflow slots, the intent worker, schedule materializer and metrics sampler
     /// under `shutdown`. The caller keeps the handles and joins them on shutdown.
     pub fn spawn(&self, shutdown: &CancellationToken) -> Vec<(&'static str, JoinHandle<()>)> {
-        let mut handles = Vec::with_capacity(self.slots + 6);
+        let mut handles = Vec::with_capacity(self.slots + 7);
         let vault = crate::adapters::persistence::integrations::PostgresVault::new(
             self.services.persistence.clone(),
         );
@@ -547,6 +561,18 @@ impl WorkflowEngine {
             "workflow final reply publisher",
             tokio::spawn(async move { publisher.run(&publisher_shutdown).await }),
         ));
+        let local_persistence = self.services.persistence.clone();
+        let local_shutdown = shutdown.clone();
+        handles.push((
+            "local-agent retention",
+            tokio::spawn(async move {
+                crate::application::local_agents::lifecycle::run(
+                    &local_persistence,
+                    &local_shutdown,
+                )
+                .await;
+            }),
+        ));
         handles.push(self.spawn_storage(shutdown));
         if let Some(memory) = self.memory_lifecycle.clone() {
             let memory_shutdown = shutdown.clone();
@@ -621,6 +647,37 @@ impl WorkflowEngine {
         self
     }
     pub(crate) fn for_tests(persistence: PostgresPersistence) -> Self {
+        Self::for_tests_with_integrations(
+            persistence,
+            Arc::new(crate::application::integrations::unavailable::UnavailableIntegrations),
+        )
+    }
+    pub(crate) fn for_tests_with_integrations(
+        persistence: PostgresPersistence,
+        integrations: Arc<dyn crate::application::integrations::ExecutionGateway>,
+    ) -> Self {
+        let client = Arc::new(crate::adapters::mcp::HttpMcpClient::new(
+            crate::adapters::mcp::policy::EndpointPolicy::default(),
+        ));
+        Self::for_tests_with_clients(persistence, integrations, client)
+    }
+
+    pub(crate) fn for_tests_with_mcp(
+        persistence: PostgresPersistence,
+        client: Arc<dyn McpClient>,
+    ) -> Self {
+        Self::for_tests_with_clients(
+            persistence,
+            Arc::new(crate::application::integrations::unavailable::UnavailableIntegrations),
+            client,
+        )
+    }
+
+    fn for_tests_with_clients(
+        persistence: PostgresPersistence,
+        integrations: Arc<dyn crate::application::integrations::ExecutionGateway>,
+        client: Arc<dyn McpClient>,
+    ) -> Self {
         use crate::adapters::protocols::email::EmailRenderer;
         use crate::application::transport::ports::TransportRenderers;
         let renderers = Arc::new(
@@ -629,9 +686,6 @@ impl WorkflowEngine {
                 .unwrap(),
         );
         let composer = DeliveryComposer::new(renderers, Arc::new(persistence.clone()));
-        let client = Arc::new(crate::adapters::mcp::HttpMcpClient::new(
-            crate::adapters::mcp::policy::EndpointPolicy::default(),
-        ));
         let config = crate::infra::config::AppConfig {
             app_domain_name: "agents.test".into(),
             ..crate::infra::config::AppConfig::for_test()
@@ -645,6 +699,7 @@ impl WorkflowEngine {
         Self::new(
             persistence,
             WorkflowEngineSetup {
+                integrations,
                 config: &config,
                 composer,
                 mcp_client: client,
@@ -940,8 +995,8 @@ mod tests {
                 .unwrap();
         }
         assert_eq!(
-            task_count, 7,
-            "one slot, metrics, intent, final publication, schedule, storage and integration teardown workers"
+            task_count, 8,
+            "one slot, metrics, intent, final publication, schedule, workflow storage, local-agent storage and integration teardown workers"
         );
     }
 

@@ -1,0 +1,32 @@
+{
+  "status": "PASS",
+  "directory": "/var/folders/n2/5y7x75r92zl0ll90154hxdzr0000gn/T/openbot-packaged-smoke-Eq4yjA",
+  "profile": "/var/folders/n2/5y7x75r92zl0ll90154hxdzr0000gn/T/openbot-packaged-smoke-Eq4yjA/profile",
+  "plugin": "/var/folders/n2/5y7x75r92zl0ll90154hxdzr0000gn/T/openbot-packaged-smoke-Eq4yjA/plugin",
+  "workspace": "/var/folders/n2/5y7x75r92zl0ll90154hxdzr0000gn/T/openbot-packaged-smoke-Eq4yjA/workspace",
+  "ports": [
+    50472,
+    50473,
+    50474
+  ],
+  "artifact": "/tmp/openbot-cloudroom-p06-artifacts-final-r2/bb-plugin-openbot-local-0.2.0.tgz",
+  "sha256": "3df1730528eaae9087be9b51a07e249b3ea537e68fd3c4d9490362af4b4970fc",
+  "platform": "darwin",
+  "node": "v24.21.0",
+  "projectId": "proj_56na2jndee",
+  "threadId": "thr_m2bm8aeiym",
+  "initialTurnId": "dae590477e-t1",
+  "submissionCountBeforeRestart": 2,
+  "submissionCountAfterRestart": 2,
+  "stoppedByServiceShutdown": "NOT INFERRED; explicit thread-wide stop requested after restart",
+  "productionPluginNativeInference": "NOT EXERCISED; this is a public CLI provider task for launcher lifecycle, not paired connector acceptance",
+  "steps": [
+    "packaged server/host/UI boot",
+    "native Codex task reads only disposable project file and matches its accepted turn",
+    "bounded packaged wrapper shutdown while native shell work is active",
+    "restart preserves thread/turn history with zero new native submissions",
+    "explicit broad stop/archive and plugin removal preserve workspace"
+  ],
+  "output": "{\"component\":\"cloudroom-local\",\"stage\":\"services\",\"state\":\"ready\"}\n{\"component\":\"cloudroom-local\",\"stage\":\"services\",\"state\":\"stopped\"}\n{\"component\":\"cloudroom-local\",\"stage\":\"services\",\"state\":\"ready\"}\n{\"component\":\"cloudroom-local\",\"stage\":\"services\",\"state\":\"stopped\"}\n",
+  "linux": "NOT EXERCISED"
+}

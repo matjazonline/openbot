@@ -1,0 +1,11 @@
+
+running 6 tests
+test adapters::persistence::local_agents::management::tests::cloudroom_management_profile_pages_are_complete_without_cross_company_rows ... ok
+test adapters::persistence::local_agents::management::tests::cloudroom_management_private_and_foreign_session_reads_and_every_control_fail_closed ... ok
+test adapters::persistence::local_agents::management::tests::cloudroom_management_competing_starts_freeze_one_session_and_replay_before_profile_edits ... ok
+test adapters::persistence::local_agents::management::tests::cloudroom_management_controls_keep_disabled_headroom_and_stable_request_actor ... ok
+test adapters::persistence::local_agents::management::tests::cloudroom_management_recent_output_is_bounded_and_usage_remains_unavailable ... ok
+test adapters::persistence::local_agents::management::tests::cloudroom_management_connection_diagnostics_are_fenced_and_do_not_claim_provider_execution ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 3278 filtered out; finished in 2.51s
+

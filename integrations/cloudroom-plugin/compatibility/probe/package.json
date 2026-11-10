@@ -1,0 +1,13 @@
+{
+  "name": "bb-plugin-openbot-compatibility-probe",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": { "node": "24.21.0", "bbPluginSdk": "=0.6.50" },
+  "bb": {
+    "name": "Openbot disposable compatibility probe",
+    "description": "Public SDK checks in a disposable profile; never requests provider inference.",
+    "branding": { "icon": "Plug" },
+    "server": "./server.ts"
+  }
+}

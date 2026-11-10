@@ -1,0 +1,47 @@
+   Compiling tungstenite v0.26.2
+   Compiling tokio-tungstenite v0.26.2
+   Compiling axum v0.8.4
+   Compiling axum-extra v0.10.1
+   Compiling open_bots v0.1.0 (/Users/mac03/dev/openbot)
+error[E0599]: no method named `machine` found for struct `std::sync::Arc<persistence::PostgresPersistence>` in the current scope
+   --> src/adapters/http/routes/local_machine_connection/connection_tests.rs:130:18
+    |
+129 | /             c.f.persistence
+130 | |                 .machine(c.f.company, c.paired.receipt.machine.id)
+    | |_________________-^^^^^^^
+    |
+    = help: items from traits can only be used if the trait is in scope
+help: trait `LocalAgentRead` which provides `machine` is implemented but not in scope; perhaps you want to import it
+    |
+  1 + use crate::application::local_agents::ports::LocalAgentRead;
+    |
+help: there is a method `list_machines` with a similar name
+    |
+130 -                 .machine(c.f.company, c.paired.receipt.machine.id)
+130 +                 .list_machines(c.f.company, c.paired.receipt.machine.id)
+    |
+
+error[E0599]: no method named `capabilities` found for struct `std::sync::Arc<persistence::PostgresPersistence>` in the current scope
+   --> src/adapters/http/routes/local_machine_connection/connection_tests.rs:136:18
+    |
+135 | /             c.f.persistence
+136 | |                 .capabilities(
+    | |_________________-^^^^^^^^^^^^
+    |
+    = help: items from traits can only be used if the trait is in scope
+help: there is a method `load_capabilities` with a similar name, but with different arguments
+   --> src/application/use_cases/skill.rs:144:5
+    |
+144 | /     async fn load_capabilities(
+145 | |         &self,
+146 | |         company_id: Uuid,
+147 | |         agent_id: Uuid,
+148 | |     ) -> AppResult<Option<StoredAgentCapabilities>>;
+    | |____________________________________________________^
+help: trait `LocalAgentRead` which provides `capabilities` is implemented but not in scope; perhaps you want to import it
+    |
+  1 + use crate::application::local_agents::ports::LocalAgentRead;
+    |
+
+For more information about this error, try `rustc --explain E0599`.
+error: could not compile `open_bots` (lib test) due to 2 previous errors

@@ -1,0 +1,5 @@
+time="2026-11-08T18:06:46+01:00" level=info msg="The vz driver process seems already stopped"
+time="2026-11-08T18:06:46+01:00" level=info msg="The host agent process seems already stopped"
+time="2026-11-08T18:06:46+01:00" level=info msg="Removing *.pid *.sock *.tmp under `/private/tmp/obpub-m8sfhp0f/i/img`"
+time="2026-11-08T18:06:46+01:00" level=info msg="Removing `/private/tmp/obpub-m8sfhp0f/i/img/boot-session.tmp`"
+time="2026-11-08T18:06:51+01:00" level=info msg="Deleted `img` (`/private/tmp/obpub-m8sfhp0f/i/img`)"

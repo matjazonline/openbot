@@ -1,0 +1,22 @@
+[
+  {
+    "name": "production-image-build",
+    "command": [
+      "limactl",
+      "shell",
+      "img",
+      "--",
+      "docker",
+      "build",
+      "--progress=plain",
+      "--tag",
+      "openbot-cloudroom-p07-knowledge:r2",
+      "/tmp/openbot-p07-image"
+    ],
+    "status": "FAIL",
+    "exit": 1,
+    "seconds": 1.01,
+    "file": "logs/lima-image-build-r2.txt",
+    "image": "openbot-cloudroom-p07-knowledge:r2"
+  }
+]

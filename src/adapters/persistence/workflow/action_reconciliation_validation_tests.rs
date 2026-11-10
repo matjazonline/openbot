@@ -181,6 +181,7 @@ fn pending_source_result(
         Err(error) => panic!("Pending source error at {:?}: {error:?}", started.elapsed()),
         Ok(result) => {
             let variant = match result {
+                RemoteDispatchObservation::PreparationFailed(_) => "PreparationFailed",
                 RemoteDispatchObservation::Committed(_) => "Committed",
                 RemoteDispatchObservation::ApprovalParked(_) => "ApprovalParked",
                 RemoteDispatchObservation::ApprovalRequired => "ApprovalRequired",

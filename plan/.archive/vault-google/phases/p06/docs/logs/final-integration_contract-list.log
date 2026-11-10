@@ -1,0 +1,10 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.23s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-048b7abd3ed0c794)
+application::integrations::tests::integration_contract_gateway_arguments_and_safe_return_are_bounded: test
+application::integrations::tests::integration_contract_managed_google_is_typed_and_shared_between_apps: test
+application::integrations::tests::integration_contract_operation_headers_cannot_override_adapter_credentials: test
+application::integrations::tests::integration_contract_static_json_whitespace_cannot_bypass_shape_validation: test
+application::integrations::tests::integration_contract_static_payloads_require_registered_shape_and_injection: test
+application::integrations::tests::integration_contract_unknown_registry_and_method_schema_mismatch_fail_closed: test
+
+6 tests, 0 benchmarks

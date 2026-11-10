@@ -1,0 +1,11 @@
+{
+  "archiveSha256": "b3ec0f39a9ba9f66ecb1a7dd78968eb40d1ed2ff7eaeee3bb53dc23a02a41251",
+  "byteIdenticalCurrentPackageInputs": [
+    "README.md",
+    "OPERATIONS.md",
+    "compatibility/manifest.json",
+    "dist/server.js"
+  ],
+  "nativeRunsUseArchive": "run-native-r5.py",
+  "uiHelperInspected": "prove-ui.mjs:21-53 actual API thread ID and visible exact marker; no API stand-ins"
+}

@@ -1,0 +1,10 @@
+   Compiling open_bots v0.1.0 (/Users/mac02/.codex/worktrees/1133/openbot)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1m 06s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-048b7abd3ed0c794)
+adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::vault_gmail::vault_google_e2e_different_login_mailbox_callback_reads_thread_and_passes_selected_data_to_model: test
+adapters::persistence::workflow::tests::http_tests::vault_tests::execution::native_portability::native_journeys::vault_google_e2e_reviewed_supplied_mime_resumes_after_expiry_with_same_approval: test
+adapters::persistence::workflow::tests::http_tests::vault_tests::execution::native_portability::native_journeys::vault_google_e2e_stalled_refresh_rechecks_disconnect_membership_rebind_and_operation: test
+adapters::persistence::workflow::tests::http_tests::vault_tests::execution::native_portability::shared_runtime::vault_google_e2e_two_pools_http_mcp_share_one_refresh_and_cache_without_sharing_a_session: test
+adapters::persistence::workflow::tests::http_tests::vault_tests::execution::native_portability::vault_google_e2e_owner_consent_reuses_one_private_secret_in_two_native_workflows: test
+
+5 tests, 0 benchmarks

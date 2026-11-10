@@ -1,0 +1,39 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+   Compiling open_bots v0.1.0 (/Users/mac02/.codex/worktrees/1133/openbot)
+error[E0432]: unresolved import `crate::application::workflow::authoring::SampleDefinitionCapture`
+ --> src/adapters/persistence/workflow/vault_tests/renewal/gateway.rs:8:9
+  |
+8 |     use crate::application::workflow::authoring::SampleDefinitionCapture;
+  |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ no `SampleDefinitionCapture` in `application::workflow::authoring`
+  |
+help: consider importing this trait instead
+  |
+8 -     use crate::application::workflow::authoring::SampleDefinitionCapture;
+8 +     use crate::application::workflow::sample_capture::SampleDefinitionCapture;
+  |
+
+error[E0599]: no method named `capture` found for struct `SampleCapture` in the current scope
+  --> src/adapters/persistence/workflow/vault_tests/renewal/gateway.rs:38:35
+   |
+38 |     let sealed = Box::pin(capture.capture(fixture.target, draft.draft.revision(), request))
+   |                                   ^^^^^^^ method not found in `SampleCapture`
+   |
+  ::: src/application/workflow/sample_capture.rs:9:14
+   |
+ 9 |     async fn capture(
+   |              ------- the method is available for `SampleCapture` here
+   |
+  ::: src/adapters/persistence/workflow/sample_capture.rs:24:1
+   |
+24 | pub struct SampleCapture {
+   | ------------------------ method `capture` not found for this struct
+   |
+   = help: items from traits can only be used if the trait is in scope
+help: trait `SampleDefinitionCapture` which provides `capture` is implemented but not in scope; perhaps you want to import it
+   |
+ 1 + use crate::application::workflow::sample_capture::SampleDefinitionCapture;
+   |
+
+Some errors have detailed explanations: E0432, E0599.
+For more information about an error, try `rustc --explain E0432`.
+error: could not compile `open_bots` (lib test) due to 2 previous errors

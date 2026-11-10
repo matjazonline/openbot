@@ -1,0 +1,13 @@
+{
+  "status": "RESPONDED",
+  "elapsedSeconds": 0.17,
+  "stage": "ACP initialize, stdin kept open; no inference",
+  "resultKeys": [
+    "protocolVersion",
+    "agentCapabilities",
+    "authMethods",
+    "agentInfo"
+  ],
+  "protocolVersion": 1,
+  "errorCode": null
+}

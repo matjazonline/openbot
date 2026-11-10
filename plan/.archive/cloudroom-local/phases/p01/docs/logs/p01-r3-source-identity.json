@@ -1,0 +1,7 @@
+{
+  "base": "97e5d60dc538e26c7cb976a8d63772eed80baff2",
+  "artifact": "cfc3dd8052971597cce455f3c7013a5051c0abb74aed605b490017c547d93233",
+  "patchSha256": "ab5f1623087bcbf077dfd0651c30d32b41e454506198c274f31ee80b3a9531e9",
+  "patch": "logs/p01-r3-source.patch",
+  "appliesToBaseIndex": true
+}

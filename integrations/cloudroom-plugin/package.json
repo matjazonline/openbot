@@ -1,0 +1,66 @@
+{
+  "name": "bb-plugin-openbot-local",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "license": "UNLICENSED",
+  "engines": {
+    "node": "24.21.0",
+    "bbPluginSdk": "=0.6.50"
+  },
+  "packageManager": "npm@11.19.0",
+  "bb": {
+    "name": "Openbot local agents",
+    "description": "Company-owned native sessions through the local Cloudroom server.",
+    "branding": {
+      "icon": "Plug"
+    },
+    "server": "./dist/server.js"
+  },
+  "files": [
+    "dist",
+    "npm-shrinkwrap.json",
+    "types",
+    "compatibility/manifest.json",
+    "compatibility/patches",
+    "compatibility/check-source.mjs",
+    "compatibility/UPSTREAM-LICENSE",
+    "compatibility/UPSTREAM-NOTICE",
+    "services/run.mjs",
+    "services/processes.mjs",
+    "services/profile.mjs",
+    "services/cloudroom-local.service",
+    "services/com.openbot.cloudroom-local.plist",
+    "scripts/prepare-runtime.mjs",
+    "README.md",
+    "OPERATIONS.md"
+  ],
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "build": "node scripts/build.mjs",
+    "test": "node scripts/build.mjs && node scripts/build.mjs --test && node test/run.mjs",
+    "test:guards": "node --test compatibility/check-source.test.mjs",
+    "package": "node scripts/package.mjs"
+  },
+  "dependencies": {
+    "fs-ext": "2.1.1",
+    "ws": "8.22.1",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@types/fs-ext": "2.0.3",
+    "@types/ws": "8.18.1",
+    "@types/node": "22.19.10",
+    "@types/better-sqlite3": "7.6.13",
+    "@types/react": "19.2.13",
+    "better-sqlite3": "12.10.0",
+    "hono": "4.13.17",
+    "typescript": "npm:@typescript/typescript6@6.0.2",
+    "esbuild": "0.28.1"
+  },
+  "allowScripts": {
+    "fs-ext@2.1.1": true,
+    "better-sqlite3@12.10.0": true,
+    "esbuild@0.28.1": true
+  }
+}

@@ -24,6 +24,7 @@ PURE = {
     'publication::MAX_DEPENDENCIES', 'publication::store_bundle', 'publication::AgentUseMode', 'agent_contract::agent_action_snapshot',
     'publication::ToolKind::Workflow', 'publication::ActionEffect::Read', 'publication::ActionEffect::Write',
     'registry::ModelStep', 'registry::mcp_tool_result', 'mcp::mcp_result_is_error',
+    'agent::McpErrorPolicy', 'agent::McpResultSource',
 }
 EXTERNAL = {'serde', 'serde_json', 'uuid', 'chrono', 'sha2'}
 SAMPLE = 'crate::application::workflow::sample'

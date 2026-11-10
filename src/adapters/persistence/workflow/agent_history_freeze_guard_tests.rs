@@ -367,3 +367,73 @@ async fn memory_access_level_history_freeze_lowers_for_inexact_exchanges() {
     assert!(bits.iter().all(|bit| !bit), "{bits:?}");
     assert!(!exact(pool, scope.company, scope.run).await);
 }
+#[tokio::test]
+async fn doop_agent_database_first_freeze_binds_current_version_and_trusted_mcp_policy() {
+    use crate::application::workflow::agent::McpErrorPolicy;
+    for mcp_policy in [None, Some(McpErrorPolicy::FailStep)] {
+        let case = Box::pin(NativeCase::with_policy(1, mcp_policy)).await;
+        let valid = case
+            .target
+            .prepared
+            .spec(case.target.claim.fence)
+            .unwrap()
+            .prepared;
+        let row_before = case.raw_target().await;
+        let state_before = freeze_state(&case, &case.target.claim).await;
+        let mut old = valid.clone();
+        old["version"] = json!(5);
+        let mut missing = valid.clone();
+        missing.as_object_mut().unwrap().remove("mcp_error_policy");
+        let mut invalid = valid.clone();
+        invalid["mcp_error_policy"] = json!("ignore");
+        let mut changed = valid.clone();
+        changed["mcp_error_policy"] = match mcp_policy {
+            None => json!("fail_step"),
+            Some(_) => json!("observe"),
+        };
+        for document in [old, missing, invalid, changed] {
+            let error = case
+                .write(&document)
+                .await
+                .expect_err("forged first freeze");
+            assert_eq!(
+                error.as_database_error().unwrap().code().as_deref(),
+                Some("23514")
+            );
+            assert_eq!(case.raw_target().await, row_before);
+            assert_eq!(freeze_state(&case, &case.target.claim).await, state_before);
+        }
+        assert_eq!(case.write(&valid).await.unwrap().rows_affected(), 1);
+        let restored = case
+            .f
+            .s
+            .p()
+            .prepare_agent(&case.target.claim, policy())
+            .await
+            .unwrap()
+            .expect_ready();
+        assert_eq!(
+            restored
+                .prepared
+                .spec(case.target.claim.fence)
+                .unwrap()
+                .prepared,
+            valid
+        );
+    }
+}
+#[tokio::test]
+async fn doop_agent_current_preparation_reaches_ready_before_model_io() {
+    let f = Box::pin(HistoryThread::new()).await;
+    let claim = f.next().await;
+    let launch =
+        f.s.p()
+            .prepare_agent(&claim, policy())
+            .await
+            .unwrap()
+            .expect_ready();
+    assert_eq!(
+        launch.prepared.spec(claim.fence).unwrap().prepared["version"],
+        6
+    );
+}

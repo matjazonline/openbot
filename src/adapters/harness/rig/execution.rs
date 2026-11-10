@@ -74,6 +74,9 @@ pub(super) struct Execution<'a> {
 impl Execution<'_> {
     pub(super) async fn drive(&mut self) -> AppResult<Driven> {
         loop {
+            self.binding
+                .prepared
+                .validate_mcp_results(&self.checkpoint.invocations)?;
             if tokio::time::Instant::now() >= self.deadline {
                 return Err(AppError::Timeout("Rig deadline exceeded".into()));
             }

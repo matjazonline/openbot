@@ -1,0 +1,3 @@
+Installing openbot-compatibility-probe@0.1.0 from /Users/mac03/dev/openbot/integrations/cloudroom-plugin/compatibility/probe
+Plugins are full-trust code running inside the Cloudroom server. They can read all local Cloudroom data, including other plugins' secrets.
+Error: HTTP 422: invalid plugin package.json (bb.description): Invalid input: expected string, received undefined

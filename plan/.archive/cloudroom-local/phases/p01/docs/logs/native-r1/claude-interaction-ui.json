@@ -1,0 +1,249 @@
+{
+  "buttons": [
+    {
+      "text": "",
+      "aria": "Go back"
+    },
+    {
+      "text": "",
+      "aria": "Go forward"
+    },
+    {
+      "text": "New thread",
+      "aria": "New thread (⇧ ⌘ O)"
+    },
+    {
+      "text": "Plugins",
+      "aria": null
+    },
+    {
+      "text": "Skills",
+      "aria": null
+    },
+    {
+      "text": "More",
+      "aria": "More sidebar navigation"
+    },
+    {
+      "text": "",
+      "aria": "Set up Cloudroom"
+    },
+    {
+      "text": "",
+      "aria": "Thread actions"
+    },
+    {
+      "text": "Report a bug",
+      "aria": null
+    },
+    {
+      "text": "Share",
+      "aria": "Share thread"
+    },
+    {
+      "text": "",
+      "aria": "Show right panel (⌘ J)"
+    },
+    {
+      "text": "",
+      "aria": "Copy message"
+    },
+    {
+      "text": "",
+      "aria": "Include context"
+    },
+    {
+      "text": "",
+      "aria": "Message actions"
+    },
+    {
+      "text": "Provisioned thread",
+      "aria": null
+    },
+    {
+      "text": "Thought",
+      "aria": null
+    },
+    {
+      "text": "",
+      "aria": "Copy message"
+    },
+    {
+      "text": "",
+      "aria": "Include context"
+    },
+    {
+      "text": "",
+      "aria": "Message actions"
+    },
+    {
+      "text": "",
+      "aria": "Copy message"
+    },
+    {
+      "text": "",
+      "aria": "Include context"
+    },
+    {
+      "text": "",
+      "aria": "Message actions"
+    },
+    {
+      "text": "Thought",
+      "aria": null
+    },
+    {
+      "text": "",
+      "aria": "Copy message"
+    },
+    {
+      "text": "",
+      "aria": "Include context"
+    },
+    {
+      "text": "",
+      "aria": "Message actions"
+    },
+    {
+      "text": "",
+      "aria": "Copy message"
+    },
+    {
+      "text": "",
+      "aria": "Include context"
+    },
+    {
+      "text": "",
+      "aria": "Message actions"
+    },
+    {
+      "text": "",
+      "aria": "Copy message"
+    },
+    {
+      "text": "",
+      "aria": "Include context"
+    },
+    {
+      "text": "",
+      "aria": "Message actions"
+    },
+    {
+      "text": "",
+      "aria": "Copy message"
+    },
+    {
+      "text": "",
+      "aria": "Include context"
+    },
+    {
+      "text": "",
+      "aria": "Message actions"
+    },
+    {
+      "text": "Ran 1 command",
+      "aria": null
+    },
+    {
+      "text": "",
+      "aria": "Copy message"
+    },
+    {
+      "text": "",
+      "aria": "Include context"
+    },
+    {
+      "text": "",
+      "aria": "Copy message"
+    },
+    {
+      "text": "",
+      "aria": "Include context"
+    },
+    {
+      "text": "Thought",
+      "aria": null
+    },
+    {
+      "text": "",
+      "aria": "Scroll to latest event"
+    },
+    {
+      "text": "",
+      "aria": "Collapse prompt box"
+    },
+    {
+      "text": "",
+      "aria": "Prompt actions"
+    },
+    {
+      "text": "Failed to load models",
+      "aria": "Provider and model (⇧ ⌘ M)"
+    },
+    {
+      "text": "",
+      "aria": "Start voice input"
+    },
+    {
+      "text": "",
+      "aria": "Stop run"
+    },
+    {
+      "text": "Environment:\nproject-checkout (not installed)",
+      "aria": "Environment actions"
+    },
+    {
+      "text": "",
+      "aria": "New thread in this environment"
+    },
+    {
+      "text": "",
+      "aria": "Context window 5% used"
+    },
+    {
+      "text": "",
+      "aria": "Thread table of contents"
+    },
+    {
+      "text": "Info",
+      "aria": "Show thread info panel"
+    },
+    {
+      "text": "",
+      "aria": "Open new tab (⌘ T)"
+    },
+    {
+      "text": "",
+      "aria": "Maximize pane"
+    },
+    {
+      "text": "",
+      "aria": "Hide right panel (⌘ J)"
+    },
+    {
+      "text": "None",
+      "aria": null
+    },
+    {
+      "text": "",
+      "aria": "New thread in this environment"
+    },
+    {
+      "text": "/var/folders/n2/5y7x75r92zl0ll90154hxdzr0000gn/T/openbot-native-smoke-UxDoA5",
+      "aria": "Copy directory"
+    },
+    {
+      "text": "Toggle Sidebar",
+      "aria": "Toggle sidebar (⌘ B)"
+    },
+    {
+      "text": "Show more",
+      "aria": null
+    },
+    {
+      "text": "",
+      "aria": "Dismiss notification"
+    }
+  ],
+  "body": "New thread\nPlugins\nSkills\nMore\nSettings\n\nOpenbot claude-code smoke\n\nReport a bug\nShare\n\nThis is an authorized disposable integration smoke test. Reply with exactly OPENBOT_SMOKE_5401ccfb14346893473d4841. Do not use tools, change files, or start subagents.\n\n8:40 PM\nProvisioned thread\nWorked for\n357ms\nThought\n\nOPENBOT_SMOKE_5401ccfb14346893473d4841\n\n8:40 PM\n\nThis is an authorized disposable integration smoke test. Reply with exactly OPENBOT_SMOKE_9634c185e84efc5f29f3179e. Do not use tools, change files, or start subagents.\n\n8:40 PM\nWorked for\n157ms\nThought\n\nOPENBOT_SMOKE_9634c185e84efc5f29f3179e\n\n8:41 PM\n\nThis is an authorized disposable integration smoke test. Reply with exactly OPENBOT_SMOKE_66956b7649ec987d6974261d. Do not use tools, change files, or start subagents.\n\n8:44 PM\nWorked for\n393ms\n\nOPENBOT_SMOKE_66956b7649ec987d6974261d\n\n8:44 PM\n\nDisposable local permission smoke: use your shell tool once to run exactly curl --max-time 5 --silent http://127.0.0.1:46986/api/v1/system/version then reply exactly OPENBOT_SMOKE_4fdedba3d5e6d52fc30905b4. Do not read or change files, use other URLs, or start subagents.\n\n8:49 PM\nWorked for\n4s\nRan 1 command\n\nOPENBOT_SMOKE_4fdedba3d5e6d52fc30905b4\n\n8:49 PM\n\nDisposable interaction test: invoke your AskUserQuestion tool to ask 'Continue the disposable Openbot smoke test?' with choices 'Continue smoke' and 'Stop smoke'. Wait for the answer, then reply exactly OPENBOT_SMOKE_9f68eb2055bb98d36b57825b. Do not use other tools, change files, access network, or start subagents.\n\n8:51 PM\nThought\nWaiting for answer\nContinue the disposable Openbot smoke test?\nWorking...\nDrop image here\n@ to tag an Agent\n\n\n\n\nFailed to load models\nEnvironment:\nproject-checkout (not installed)\nInfo\nParent\nNone\nEnvironment\nproject-checkout (not installed)\nDirectory\n/var/folders/n2/5y7x75r92zl0ll90154hxdzr0000gn/T/openbot-native-smoke-UxDoA5\nToggle Sidebar\nCouldn’t sync tabs\nHTTP 401: Cloudroom refused this request because the caller could not prove it runs outside a sandbox. If a sandboxed agent sent it, run the command outside the sandbox (the user must approve it), or switch the thread to Full access.\nShow more"
+}

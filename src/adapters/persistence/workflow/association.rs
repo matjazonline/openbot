@@ -3,7 +3,7 @@ use super::*;
 /// Company/member/principal locks are acquired by authorize_company first.
 /// Channel settings writers update the channel before replacing grants; direct
 /// grant revocation conflicts with the granted row's SHARE lock below.
-pub(super) async fn authorize_association(
+pub(in crate::adapters::persistence) async fn authorize_association(
     tx: &mut PgConnection,
     company: CompanyId,
     actor: WorkflowActor,

@@ -1,0 +1,83 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+   Compiling open_bots v0.1.0 (/Users/mac02/.codex/worktrees/1133/openbot)
+error[E0599]: no method named `unwrap` found for enum `JsonValue` in the current scope
+   --> src/adapters/persistence/workflow/vault_tests/execution.rs:156:27
+    |
+156 |         assert_eq!(result.unwrap()["body"]["accepted"], true);
+    |                           ^^^^^^ method not found in `JsonValue`
+
+error[E0599]: no method named `unwrap` found for enum `JsonValue` in the current scope
+   --> src/adapters/persistence/workflow/vault_tests/execution.rs:175:14
+    |
+171 | /         Box::pin(runtime.run(&setup.kind, &setup.claim))
+172 | |             .await
+173 | |             .completed_result()
+    | |              ------------------ method `unwrap` is available on `std::result::Result<JsonValue, application::workflow::lease::WorkflowFailure>`
+174 | |             .unwrap()
+175 | |             .unwrap();
+    | |             -^^^^^^ method not found in `JsonValue`
+    | |_____________|
+    |
+
+error[E0599]: no method named `unwrap_err` found for enum `JsonValue` in the current scope
+   --> src/adapters/persistence/workflow/vault_tests/execution.rs:197:14
+    |
+193 | /         Box::pin(runtime(&setup, &vault, transport.clone()).run(&setup.kind, &setup.claim))
+194 | |             .await
+195 | |             .completed_result()
+    | |              ------------------ method `unwrap_err` is available on `std::result::Result<JsonValue, application::workflow::lease::WorkflowFailure>`
+196 | |             .unwrap()
+197 | |             .unwrap_err();
+    | |             -^^^^^^^^^^ method not found in `JsonValue`
+    | |_____________|
+    |
+
+error[E0599]: no method named `is_err` found for enum `JsonValue` in the current scope
+   --> src/adapters/persistence/workflow/vault_tests/execution.rs:219:18
+    |
+215 | /             Box::pin(runtime.run(&setup.kind, &setup.claim))
+216 | |                 .await
+217 | |                 .completed_result()
+    | |                  ------------------ method `is_err` is available on `std::result::Result<JsonValue, application::workflow::lease::WorkflowFailure>`
+218 | |                 .unwrap()
+219 | |                 .is_err()
+    | |_________________-^^^^^^
+    |
+help: there is a method `is_array` with a similar name
+    |
+219 -                 .is_err()
+219 +                 .is_array()
+    |
+
+error[E0599]: no method named `is_ok` found for enum `JsonValue` in the current scope
+   --> src/adapters/persistence/workflow/vault_tests/execution.rs:241:43
+    |
+241 |     assert!(a.completed_result().unwrap().is_ok() || b.completed_result().unwrap().is_ok());
+    |               ------------------          ^^^^^ method not found in `JsonValue`
+    |               |
+    |               method `is_ok` is available on `std::result::Result<JsonValue, application::workflow::lease::WorkflowFailure>`
+
+error[E0599]: no method named `is_ok` found for enum `JsonValue` in the current scope
+   --> src/adapters/persistence/workflow/vault_tests/execution.rs:241:84
+    |
+241 |     assert!(a.completed_result().unwrap().is_ok() || b.completed_result().unwrap().is_ok());
+    |                                                        ------------------          ^^^^^ method not found in `JsonValue`
+    |                                                        |
+    |                                                        method `is_ok` is available on `std::result::Result<JsonValue, application::workflow::lease::WorkflowFailure>`
+
+error[E0599]: no method named `is_err` found for enum `JsonValue` in the current scope
+   --> src/adapters/persistence/workflow/vault_tests/execution.rs:274:48
+    |
+274 |     assert!(result.completed_result().unwrap().is_err());
+    |                    ------------------          ^^^^^^
+    |                    |
+    |                    method `is_err` is available on `std::result::Result<JsonValue, application::workflow::lease::WorkflowFailure>`
+    |
+help: there is a method `is_array` with a similar name
+    |
+274 -     assert!(result.completed_result().unwrap().is_err());
+274 +     assert!(result.completed_result().unwrap().is_array());
+    |
+
+For more information about this error, try `rustc --explain E0599`.
+error: could not compile `open_bots` (lib test) due to 7 previous errors

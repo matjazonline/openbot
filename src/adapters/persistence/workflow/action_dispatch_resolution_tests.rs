@@ -17,7 +17,7 @@ use tokio::time::Instant;
 async fn workflow_action_dispatch_resolution_stalled_local_effect_once() {
     let _injected = Injected::mark();
     for applies in [true, false] {
-        let (f, request) = setup().await;
+        let (f, request) = gated().await;
         let lease = request.lease;
         let (mut observer, _) = connect(&f).await;
         let mut gate = Gate::arm(
@@ -236,6 +236,9 @@ fn exists(result: &AppResult<RemoteDispatchObservation>) -> bool {
 /// For failure messages: the observation has no Debug.
 fn describe(result: &AppResult<RemoteDispatchObservation>) -> String {
     match result {
+        Ok(RemoteDispatchObservation::PreparationFailed(reason)) => {
+            format!("PreparationFailed({reason:?})")
+        }
         Ok(RemoteDispatchObservation::Committed(_)) => "Committed".into(),
         Ok(RemoteDispatchObservation::PossibleDispatchExists) => "PossibleDispatchExists".into(),
         Ok(RemoteDispatchObservation::ApprovalParked(_)) => "ApprovalParked".into(),

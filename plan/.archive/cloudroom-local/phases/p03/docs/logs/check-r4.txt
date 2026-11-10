@@ -1,0 +1,39 @@
+    Checking tungstenite v0.26.2
+    Checking tokio-tungstenite v0.26.2
+    Checking axum v0.8.4
+    Checking axum-extra v0.10.1
+    Checking open_bots v0.1.0 (/Users/mac03/dev/openbot)
+error[E0432]: unresolved import `tokio_util::task::TaskTrackerToken`
+  --> src/adapters/http/routes/local_machine_connection/mod.rs:24:25
+   |
+24 |     task::{TaskTracker, TaskTrackerToken},
+   |                         ^^^^^^^^^^^^^^^^ no `TaskTrackerToken` in `task`
+   |
+help: a similar name exists in the module
+   |
+24 -     task::{TaskTracker, TaskTrackerToken},
+24 +     task::{TaskTracker, TaskTracker},
+   |
+
+error[E0599]: no method named `close` found for struct `axum::extract::ws::WebSocket` in the current scope
+   --> src/adapters/http/routes/local_machine_connection/mod.rs:182:56
+    |
+182 |         let _ = timeout(Duration::from_secs(1), socket.close()).await;
+    |                                                        ^^^^^ method not found in `axum::extract::ws::WebSocket`
+    |
+   ::: /Users/mac03/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/futures-util-0.3.31/src/sink/mod.rs:183:8
+    |
+183 |     fn close(&mut self) -> Close<'_, Self, Item>
+    |        ----- the method is available for `axum::extract::ws::WebSocket` here
+    |
+    = help: items from traits can only be used if the trait is in scope
+help: trait `SinkExt` which provides `close` is implemented but not in scope; perhaps you want to import it
+    |
+  2 + use futures::SinkExt;
+    |
+
+Some errors have detailed explanations: E0432, E0599.
+For more information about an error, try `rustc --explain E0432`.
+error: could not compile `open_bots` (lib) due to 2 previous errors
+warning: build failed, waiting for other jobs to finish...
+error: could not compile `open_bots` (lib test) due to 2 previous errors

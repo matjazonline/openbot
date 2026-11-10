@@ -1,0 +1,10 @@
+{
+  "owner": "/root cloudroom-local p04; explicit serial handover from accepted p03 HANDOFF",
+  "postgresBin": "/opt/homebrew/opt/postgresql@18/bin",
+  "dataDirectory": "/var/folders/n2/5y7x75r92zl0ll90154hxdzr0000gn/T/openbot-cloudroom-pg-nijvmkm7",
+  "port": 56388,
+  "bind": "127.0.0.1",
+  "buildDatabase": "postgres://mac03@127.0.0.1:56388/openbot_cloudroom_build",
+  "testDatabase": "postgres://mac03@127.0.0.1:56388/openbot_cloudroom_test",
+  "productionData": false
+}

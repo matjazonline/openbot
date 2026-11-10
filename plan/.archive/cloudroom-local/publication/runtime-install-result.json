@@ -1,0 +1,12 @@
+{
+  "command": [
+    "npm",
+    "ci",
+    "--omit=dev"
+  ],
+  "directory": "/tmp/obpub-runtime-nigzqzl3",
+  "exit": 0,
+  "status": "PASS",
+  "seconds": 4.65,
+  "log": "logs/plugin-runtime-install.log"
+}

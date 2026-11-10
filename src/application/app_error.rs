@@ -35,6 +35,9 @@ pub enum AppError {
     #[error("Invalid credentials")]
     InvalidCredentials,
 
+    #[error("MCP service rejected the configured credentials")]
+    McpAuthentication,
+
     #[error("Service unavailable: {0}")]
     ServiceUnavailable(String),
 
@@ -86,6 +89,8 @@ impl From<anyhow::Error> for AppError {
 pub enum ExecutionFailure {
     #[error("structured final response is invalid")]
     InvalidOutput,
+    #[error("MCP tool failed under the workflow completion policy")]
+    McpToolFailed,
     #[error("execution budget exhausted")]
     Budget,
     #[error("model repeated tool calls whose results no longer change")]

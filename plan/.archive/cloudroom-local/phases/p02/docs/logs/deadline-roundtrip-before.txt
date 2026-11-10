@@ -1,0 +1,22 @@
+   Compiling open_bots v0.1.0 (/Users/mac03/dev/openbot)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1m 50s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-ed6f58dd3efb6ea2)
+
+running 1 test
+test adapters::persistence::local_agents::machine_tests::cloudroom_company_operation_deadline_round_trip_preserves_digest ... FAILED
+
+failures:
+
+---- adapters::persistence::local_agents::machine_tests::cloudroom_company_operation_deadline_round_trip_preserves_digest stdout ----
+
+thread 'adapters::persistence::local_agents::machine_tests::cloudroom_company_operation_deadline_round_trip_preserves_digest' (17279021) panicked at src/adapters/persistence/local_agents/machine_tests.rs:469:10:
+a stored frozen operation must decode with its original digest: Error("operation payload digest mismatch", line: 0, column: 0)
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    adapters::persistence::local_agents::machine_tests::cloudroom_company_operation_deadline_round_trip_preserves_digest
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 3220 filtered out; finished in 0.64s
+
+error: test failed, to rerun pass `--lib`

@@ -6,6 +6,7 @@ mod dispatch;
 mod effect;
 mod failure;
 mod freeze;
+mod local_agents;
 mod reconciliation;
 mod replay;
 mod service;

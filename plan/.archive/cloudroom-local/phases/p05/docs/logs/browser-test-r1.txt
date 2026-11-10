@@ -1,0 +1,32 @@
+✖ local profile and session forms escape native output and acknowledge accepted writes (5900.938709ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 6126.931208
+
+✖ failing tests:
+
+test at scripts/tests/local-agents-browser.mjs:15:1
+✖ local profile and session forms escape native output and acknowledge accepted writes (5900.938709ms)
+  Error: expect(locator).toHaveAttribute(expected) failed
+  
+  Locator: locator('form[action$="/sessions"]').filter({ has: locator('textarea[name=prompt]') })
+  Expected string: "true"
+  Received string: ""
+  Timeout: 5000ms
+  
+  Call log:
+  [2m  - Expect "to.have.attribute.value" with timeout 5000ms[22m
+  [2m  - waiting for locator('form[action$="/sessions"]').filter({ has: locator('textarea[name=prompt]') })[22m
+  [2m    - waiting for" http://127.0.0.1:61151/ui/companies/87f36838-4e39-4f1f-ab29-518e4b89158e/local-agents/sessions" navigation to finish...[22m
+  
+      at Proxy.<anonymous> (/Users/mac03/dev/openbot/node_modules/playwright/lib/matchers/expect.js:221:24)
+      at TestContext.<anonymous> (file:///Users/mac03/dev/openbot/scripts/tests/local-agents-browser.mjs:68:24)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    matcherResult: { name: 'toHaveAttribute', expected: 'true', message: `expect(locator).toHaveAttribute(expected) failed\n\nLocator: locator('form[action$="/sessions"]').filter({ has: locator('textarea[name=prompt]') })\nExpected string: "true"\nReceived string: ""\nTimeout: 5000ms\n\nCall log:\n\x1B[2m  - Expect "to.have.attribute.value" with timeout 5000ms\x1B[22m\n\x1B[2m  - waiting for locator('form[action$="/sessions"]').filter({ has: locator('textarea[name=prompt]') })\x1B[22m\n\x1B[2m    - waiting for" http://127.0.0.1:61151/ui/companies/87f36838-4e39-4f1f-ab29-518e4b89158e/local-agents/sessions" navigation to finish...\x1B[22m\n`, pass: false, actual: undefined, log: [ '  - Expect "to.have.attribute.value" with timeout 5000ms', `  - waiting for locator('form[action$="/sessions"]').filter({ has: locator('textarea[name=prompt]') })`, '    - waiting for" http://127.0.0.1:61151/ui/companies/87f36838-4e39-4f1f-ab29-518e4b89158e/local-agents/sessions" navigation to finish...' ], timeout: 5000 }
+  }

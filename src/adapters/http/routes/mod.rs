@@ -14,6 +14,9 @@ mod connection_levels;
 pub mod health;
 mod knowledge;
 mod live_updates;
+pub mod local_agents;
+pub mod local_machine_connection;
+pub mod local_machines;
 pub mod mcp;
 mod model_usage;
 pub mod monitoring;
@@ -30,6 +33,7 @@ pub mod ui_dashboard;
 pub mod ui_deliveries;
 mod ui_internal_notes;
 pub mod ui_invites;
+pub mod ui_local_agents;
 pub mod ui_mcp;
 pub mod ui_message_diagnostics;
 pub mod ui_profile;
@@ -84,10 +88,13 @@ pub fn router(sessions: Arc<SessionAuthority>) -> Router<AppState> {
         .merge(user::protected_router())
         .merge(apple_auth::protected_router())
         .merge(company::router())
+        .merge(local_machines::protected_router())
+        .merge(local_agents::router())
         .merge(mcp::router())
         .merge(connection_levels::router())
         .merge(knowledge::router())
         .merge(ui_mcp::router())
+        .merge(ui_local_agents::router())
         .merge(company_invite::router())
         .merge(channel::router())
         .merge(schedule::router())
@@ -125,6 +132,8 @@ pub fn router(sessions: Arc<SessionAuthority>) -> Router<AppState> {
         .merge(user::public_router())
         .merge(apple_auth::public_router())
         .merge(webhooks::router())
+        .merge(local_machines::public_router())
+        .merge(local_machine_connection::router())
         .merge(protected)
 }
 

@@ -1,0 +1,8 @@
+{
+  "pid": 1235,
+  "signal": "SIGSTOP parent only",
+  "reason": "Preserve current old-artifact child check through completion before coherent B1 fixture corrections and later cargo/build checks",
+  "childContinues": true,
+  "lastCompleted": "inventory",
+  "time": 1794137448.687437
+}

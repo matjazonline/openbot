@@ -1,0 +1,8 @@
+{
+  "status": "PASS",
+  "removed": [
+    "/private/tmp/obpub-m8sfhp0f",
+    "/private/tmp/openbot-cloudroom-publication/target"
+  ],
+  "preserved": "All retained image proof/source hashes; ordinary Lima homes and provider accounts untouched"
+}

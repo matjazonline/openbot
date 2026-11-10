@@ -6,6 +6,11 @@ use crate::{
 use async_trait::async_trait;
 use secrecy::SecretString;
 use serde_json::Value;
+#[path = "mcp_preparation.rs"]
+mod preparation;
+pub use preparation::*;
+
+pub(crate) mod observation;
 
 #[async_trait]
 pub trait McpClient: Send + Sync {
@@ -18,6 +23,14 @@ pub trait McpClient: Send + Sync {
         endpoint: &McpEndpoint,
         token: Option<SecretString>,
     ) -> AppResult<Box<dyn McpSession>>;
+    /// Cooperatively cancel actual preparation and await its cleanup before returning failure.
+    /// Authority is required at every authenticated request boundary after waits.
+    async fn connect_prepared(
+        &self,
+        endpoint: &McpEndpoint,
+        token: SecretString,
+        work: McpPreparation,
+    ) -> McpPreparationResult<Box<dyn McpSession>>;
 }
 
 #[async_trait]

@@ -1,0 +1,1 @@
+{"threadId":"thr_qpcyjarksr","projectId":"proj_rrfgqw256u","marker":"OPENBOT_SMOKE_0dac25e4d4e4bef5a1e87d27","model":"google/gemini-2.5-computer-use-preview-10-2025","providerId":"acp-opencode","status":"starting"}

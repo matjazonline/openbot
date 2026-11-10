@@ -1,0 +1,14 @@
+    Checking open_bots v0.1.0 (/Users/mac03/dev/openbot)
+warning: associated function `local_agent` is never used
+  --> src/application/workflow/actions/local_agents.rs:15:19
+   |
+14 | impl FrozenAction {
+   | ----------------- associated function in this implementation
+15 |     pub(crate) fn local_agent(request: ActionRequest) -> AppResult<Self> {
+   |                   ^^^^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `open_bots` (lib) generated 1 warning
+warning: `open_bots` (lib test) generated 1 warning (1 duplicate)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 57.23s

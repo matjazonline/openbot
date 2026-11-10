@@ -81,7 +81,7 @@ async fn pending_using(
         Preflight,
         s.p().clone(),
         WorkflowSourceDecoder,
-        message::MessagePublicationDirectory {
+        step_builtins::StepBuiltinPublicationDirectory {
             persistence: s.p().clone(),
         },
     );

@@ -1,0 +1,73 @@
+{
+  "actualUi": true,
+  "actualWorkflowWorkers": 2,
+  "afterRestart": {
+    "event": "snapshot",
+    "requests": 1,
+    "terminals": [
+      {
+        "status": "completed",
+        "turn": "dabd6c5843-t1"
+      }
+    ],
+    "thread": "thr_zdxcasc4t7",
+    "turns": [
+      "dabd6c5843-t1"
+    ]
+  },
+  "beforeRestart": {
+    "event": "snapshot",
+    "requests": 1,
+    "terminals": [
+      {
+        "status": "completed",
+        "turn": "dabd6c5843-t1"
+      }
+    ],
+    "thread": "thr_zdxcasc4t7",
+    "turns": [
+      "dabd6c5843-t1"
+    ]
+  },
+  "explicitThreadStopAndArchiveAccepted": true,
+  "fileAccess": true,
+  "final": {
+    "event": "snapshot",
+    "requests": 2,
+    "terminals": [
+      {
+        "status": "completed",
+        "turn": "dabd6c5843-t1"
+      },
+      {
+        "status": "completed",
+        "turn": "da17e66e3d-t1"
+      }
+    ],
+    "thread": "thr_zdxcasc4t7",
+    "turns": [
+      "dabd6c5843-t1",
+      "da17e66e3d-t1"
+    ]
+  },
+  "linux": "NOT EXERCISED on this host",
+  "nativeStopIsNotAnAtomicTargetedTurnGuarantee": true,
+  "platform": "macos",
+  "productionPlugin": true,
+  "provider": "codex",
+  "realPairingHttp": true,
+  "selection": {
+    "machine_id": "a7d88c02-5b79-427b-9e0a-a67a8f43e8ea",
+    "model": "gpt-6-luna",
+    "policy": {
+      "permissions": "provider_default",
+      "reasoning": "low",
+      "workspace": "project_directory"
+    },
+    "project_id": "proj_u57ew8uzfx",
+    "provider": "codex"
+  },
+  "session": "913b678e-a093-415f-874b-3c8bced7b398",
+  "status": "PASS",
+  "thread": "thr_zdxcasc4t7"
+}

@@ -1,0 +1,96 @@
+[20:46:36] INFO: [server] Server listening {"bindHost":"127.0.0.1","port":46986,"dataDir":"/tmp/openbot-cloudroom-p01-profile"}
+[20:46:36] INFO: [server] plugin custom-instructions@0.1.0 loaded
+[20:46:36] INFO: [server] plugin machine-ssh@0.1.0 loaded
+[20:46:36] INFO: [server] plugin openbot-compatibility-probe@0.1.0 loaded
+[20:46:36] INFO: [server] plugin bb-guide@0.1.0 loaded
+[20:46:36] INFO: [server] plugin side-chat@0.1.0 loaded
+[20:46:36] INFO: [server] plugin time-in-cloudroom@0.1.0 loaded
+[20:46:36] INFO: [server] plugin drafts@0.1.0 loaded
+[20:46:36] INFO: [server] plugin pdf-preview@0.1.0 loaded
+[20:46:36] INFO: [server] plugin scheduled-send@0.1.0 loaded
+[20:46:37] INFO: [server] plugin provider-usage@0.1.0 loaded
+[20:46:37] INFO: [server] plugin push-notifications@0.1.0 loaded
+[20:46:37] INFO: [server] plugin accounts@0.1.0 loaded
+[20:46:37] INFO: [server] plugin inline-vis@0.1.0 loaded
+[20:46:37] INFO: [server] plugin gpu@0.1.0 loaded
+[20:46:37] INFO: [server] plugin secrets@0.1.0 loaded
+[20:46:37] INFO: [server] plugin provider-retry@0.1.0 loaded
+[20:46:37] INFO: [server] plugin connect@0.1.0 loaded
+[20:46:37] INFO: [server] plugin monaco-editor@0.1.0 loaded
+[20:46:37] INFO: [server] Session opened {"sessionId":"hses_72fzh33dha","hostId":"host_x39f5jia3f","replacedSessionId":"hses_mptmmxrqfd"}
+[20:46:37] INFO: [server] Daemon WebSocket opened {"sessionId":"hses_72fzh33dha","hostId":"host_x39f5jia3f"}
+[20:46:37] INFO: [server] plugin automations@0.1.0 loaded
+[20:46:39] INFO: [server] plugin keep-awake@0.1.0 loaded
+[20:46:39] INFO: [server] plugin environment-personal-workspace@0.1.0 loaded
+[20:46:39] INFO: [server] plugin environment-git-worktree@0.1.0 loaded
+[20:46:39] INFO: [server] plugin computer-use@0.1.0 loaded
+[20:46:39] INFO: [server] plugin environment-project-checkout@0.1.0 loaded
+[20:46:40] INFO: [server] plugin provider-codex@0.1.0 loaded
+[20:46:40] INFO: [server] plugin provider-pi@0.1.0 loaded
+[20:46:40] INFO: [server] plugin provider-acp@0.1.0 loaded
+[20:46:40] INFO: [server] plugin provider-claude-code@0.1.0 loaded
+[20:46:41] INFO: [server] Event loop stalled {"intervalMs":5000,"maxDelayMs":629.7,"meanDelayMs":26.5,"p99DelayMs":111.7,"resolutionMs":20,"thresholdMs":500,"currentWork":null,"lastWork":"ws:daemon host-rpc.response","lastWorkMs":0.3,"slowestWork":"ws:daemon host-rpc.response","slowestWorkMs":1,"cpuMs":2501.8,"gcMs":67.8,"maxGcMs":8.7,"heapUsedMb":392,"rssMb":684}
+[20:46:41] INFO: [server] Provider model catalog refresh settled {"hostId":"host_x39f5jia3f","providerId":"claude-code","scope":"host","durationMs":783,"outcome":"success","modelCount":20,"changed":false}
+[20:46:42] WARN: [server] Provider model catalog refresh settled {"hostId":"host_x39f5jia3f","providerId":"pi","scope":"host","durationMs":134,"outcome":"failed","errorCode":"command_failed","errorMessage":"Could not find the pi CLI on this host. Install @earendil-works/pi-coding-agent and retry.","errorStatus":502,"errorRetryable":false,"changed":true}
+[20:46:42] WARN: [server] Provider model catalog refresh settled {"hostId":"host_x39f5jia3f","providerId":"acp-cursor","scope":"host","durationMs":186,"outcome":"missing_executable","errorCode":"missing_executable","errorMessage":"spawn cursor-agent ENOENT","errorStatus":502,"errorRetryable":false,"changed":true}
+[20:46:42] INFO: [server] Provider model catalog refresh settled {"hostId":"host_x39f5jia3f","providerId":"codex","scope":"host","durationMs":1182,"outcome":"success","modelCount":8,"changed":false}
+[20:47:12] WARN: [server] Provider model catalog refresh settled {"hostId":"host_x39f5jia3f","providerId":"acp-opencode","scope":"host","durationMs":30002,"outcome":"timeout","errorCode":"command_timeout","errorMessage":"Timed out waiting for command result","errorStatus":504,"changed":true}
+[20:47:12] INFO: [server] Provider model catalog prewarm pass finished {"hostId":"host_x39f5jia3f","providerCount":5,"durationMs":34995}
+[20:47:12] INFO: [server] Provider model catalog prewarm pass finished {"hostId":"host_x39f5jia3f","providerCount":5,"durationMs":2}
+[20:48:59] INFO: [server] plugin openbot-compatibility-probe@0.1.0 loaded
+[20:51:05] INFO: [server] plugin openbot-compatibility-probe@0.1.0 loaded
+[20:51:57] INFO: [server] plugin openbot-compatibility-probe@0.1.0 loaded
+[20:54:23] INFO: [server] plugin openbot-compatibility-probe@0.1.0 loaded
+[20:56:53] INFO: [server] UI perf {"metric":"app_ready","ms":635,"threadId":"thr_3f7ej72rxx"}
+[20:56:55] INFO: [server] Slow API request {"durationMs":1206.8,"method":"GET","path":"/api/v1/system/usage-limits","status":200}
+[20:56:55] INFO: [server] Slow API request {"durationMs":1167.3,"method":"GET","path":"/api/v1/system/usage-limits","status":200}
+[20:56:55] INFO: [server] Slow API request {"durationMs":1175.1,"method":"POST","path":"/api/v1/plugins/provider-codex/rpc/provider-usage.v1.getResource","status":200}
+[20:56:55] INFO: [server] Provider model catalog refresh settled {"hostId":"host_x39f5jia3f","providerId":"codex","scope":"host","durationMs":1321,"outcome":"success","modelCount":8,"changed":false}
+[20:56:55] INFO: [server] Slow API request {"durationMs":1797.8,"method":"GET","path":"/api/v1/system/usage-limits","status":200}
+[20:56:55] INFO: [server] Slow API request {"durationMs":1805.9,"method":"POST","path":"/api/v1/plugins/provider-claude-code/rpc/provider-usage.v1.getResource","status":200}
+[20:56:55] INFO: [server] Slow API request {"durationMs":1830.2,"method":"POST","path":"/api/v1/plugins/provider-usage/rpc/getUsage","status":200}
+[20:56:56] INFO: [server] Slow API request {"durationMs":2461.8,"method":"GET","path":"/api/v1/hosts/host_x39f5jia3f/provider-clis/status","status":200}
+[20:58:23] INFO: [server] UI perf {"metric":"app_ready","ms":563,"threadId":"thr_3f7ej72rxx"}
+[20:58:24] INFO: [server] Slow API request {"durationMs":1572.1,"method":"GET","path":"/api/v1/hosts/host_x39f5jia3f/provider-clis/status","status":200}
+[20:59:14] INFO: [server] UI perf {"metric":"app_ready","ms":575,"threadId":"thr_3f7ej72rxx"}
+[20:59:15] INFO: [server] Slow API request {"durationMs":1128.9,"method":"GET","path":"/api/v1/hosts/host_x39f5jia3f/provider-clis/status","status":200}
+[21:12:24] INFO: [server] UI perf {"metric":"app_ready","ms":562,"threadId":"thr_3f7ej72rxx"}
+[21:12:25] INFO: [server] Provider model catalog refresh settled {"hostId":"host_x39f5jia3f","providerId":"codex","scope":"host","durationMs":951,"outcome":"success","modelCount":8,"changed":false}
+[21:12:25] INFO: [server] Slow API request {"durationMs":1147.4,"method":"GET","path":"/api/v1/system/usage-limits","status":200}
+[21:12:26] INFO: [server] Slow API request {"durationMs":1270.8,"method":"GET","path":"/api/v1/system/usage-limits","status":200}
+[21:12:26] INFO: [server] Slow API request {"durationMs":1333.1,"method":"POST","path":"/api/v1/plugins/provider-claude-code/rpc/provider-usage.v1.getResource","status":200}
+[21:12:26] INFO: [server] Slow API request {"durationMs":1401.7,"method":"POST","path":"/api/v1/plugins/provider-usage/rpc/getUsage","status":200}
+[21:12:26] INFO: [server] Slow API request {"durationMs":1988.9,"method":"GET","path":"/api/v1/hosts/host_x39f5jia3f/provider-clis/status","status":200}
+[21:14:36] INFO: [server] UI perf {"metric":"app_ready","ms":528,"threadId":"thr_3f7ej72rxx"}
+[21:14:37] INFO: [server] Slow API request {"durationMs":1554.7,"method":"GET","path":"/api/v1/hosts/host_x39f5jia3f/provider-clis/status","status":200}
+[21:14:39] INFO: [server] Provider model catalog refresh settled {"hostId":"host_x39f5jia3f","providerId":"claude-code","scope":"host","durationMs":391,"outcome":"success","modelCount":20,"changed":false}
+[21:14:40] INFO: [server] Slow API request {"durationMs":1093.6,"method":"GET","path":"/api/v1/hosts/host_x39f5jia3f/provider-clis/status","status":200}
+[21:18:16] INFO: [server] UI perf {"metric":"app_ready","ms":540,"threadId":"thr_rvbjg3dc7k"}
+[21:18:18] INFO: [server] Slow API request {"durationMs":1048.7,"method":"GET","path":"/api/v1/system/usage-limits","status":200}
+[21:18:18] INFO: [server] Slow API request {"durationMs":1217.7,"method":"POST","path":"/api/v1/plugins/provider-claude-code/rpc/provider-usage.v1.getResource","status":200}
+[21:18:18] INFO: [server] Slow API request {"durationMs":1259.8,"method":"POST","path":"/api/v1/plugins/provider-usage/rpc/getUsage","status":200}
+[21:18:18] INFO: [server] Slow API request {"durationMs":2277.2,"method":"GET","path":"/api/v1/hosts/host_x39f5jia3f/provider-clis/status","status":200}
+[21:21:18] INFO: [server] Slow API request {"durationMs":1585.2,"method":"GET","path":"/api/v1/hosts/host_x39f5jia3f/provider-clis/status","status":200}
+[21:21:36] INFO: [server] UI perf {"metric":"app_ready","ms":575,"threadId":"thr_rvbjg3dc7k"}
+[21:21:36] INFO: [server] Slow API request {"durationMs":1242.9,"method":"GET","path":"/api/v1/hosts/host_x39f5jia3f/provider-clis/status","status":200}
+[21:21:39] INFO: [server] Slow API request {"durationMs":3851.4,"method":"POST","path":"/api/v1/cloudroom/account/prompt-suggestion","status":200}
+[21:21:39] INFO: [server] Slow API request {"durationMs":3710.1,"method":"POST","path":"/api/v1/cloudroom/account/prompt-suggestion","status":200}
+[21:22:54] INFO: [server] Daemon WebSocket closed {"sessionId":"hses_72fzh33dha"}
+[21:22:55] INFO: [server] Session opened {"sessionId":"hses_5fktgag32u","hostId":"host_x39f5jia3f","replacedSessionId":"hses_72fzh33dha"}
+[21:22:55] INFO: [server] Daemon WebSocket opened {"sessionId":"hses_5fktgag32u","hostId":"host_x39f5jia3f"}
+[21:22:55] INFO: [server] Provider model catalog prewarm pass finished {"hostId":"host_x39f5jia3f","providerCount":5,"durationMs":2}
+[21:23:16] WARN: [server] [plugin:openbot-compatibility-probe] cli openbot-proof failed: provider catalog failed: timeout
+[21:23:18] INFO: [server] Provider model catalog refresh settled {"hostId":"host_x39f5jia3f","providerId":"acp-opencode","scope":"host","durationMs":1295,"outcome":"success","modelCount":58,"changed":true}
+[21:23:45] INFO: [server] plugin provider-acp@0.1.0 loaded
+[21:23:45] INFO: [server] Slow API request {"durationMs":1650.4,"method":"POST","path":"/api/v1/plugins/reload","status":200}
+[21:23:45] INFO: [server] Provider model catalog prewarm pass finished {"hostId":"host_x39f5jia3f","providerCount":5,"durationMs":100}
+[21:24:05] INFO: [server] Thread lifecycle event not applied {"detail":"no transition for run.started from status active","event":"run.started","reason":"illegal-transition","threadId":"thr_qpcyjarksr"}
+[21:24:49] INFO: [server] plugin openbot-compatibility-probe@0.1.0 loaded
+[21:25:03] WARN: [server] [plugin:openbot-compatibility-probe] cli openbot-proof failed: HTTP 400: Provider acp-opencode does not support none reasoning level. Supported reasoning levels: low, medium, high, xhigh, max.
+[21:25:33] INFO: [server] plugin openbot-compatibility-probe@0.1.0 loaded
+[21:25:35] INFO: [server] Thread lifecycle event not applied {"detail":"no transition for run.started from status active","event":"run.started","reason":"illegal-transition","threadId":"thr_b5aydp5pc8"}
+[21:26:33] INFO: [server] UI perf {"metric":"app_ready","ms":580,"threadId":"thr_b5aydp5pc8"}
+[21:26:34] INFO: [server] Slow API request {"durationMs":1719.9,"method":"GET","path":"/api/v1/hosts/host_x39f5jia3f/provider-clis/status","status":200}
+[21:26:36] INFO: [server] Slow API request {"durationMs":3279,"method":"POST","path":"/api/v1/cloudroom/account/prompt-suggestion","status":200}
+[21:26:36] INFO: [server] Slow API request {"durationMs":3227,"method":"POST","path":"/api/v1/cloudroom/account/prompt-suggestion","status":200}
+[21:28:49] INFO: [server] Daemon WebSocket closed {"sessionId":"hses_5fktgag32u"}

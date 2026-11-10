@@ -27,8 +27,7 @@ fn decode(raw: &SecretString) -> IntegrationResult<Payload> {
     }
     let p: Payload =
         serde_json::from_str(raw.expose_secret()).map_err(|_| IntegrationError::Credential)?;
-    if p.client.as_str() != "strict-client"
-        || p.permissions.len() > MAX_SCOPES
+    if p.permissions.len() > MAX_SCOPES
         || p.refresh.expose_secret().is_empty()
         || p.token.expose_secret().is_empty()
     {
@@ -44,24 +43,37 @@ fn encode(p: &Payload) -> IntegrationResult<SecretString> {
     Ok(SecretString::from(text))
 }
 use serde_json::json;
-struct Adapter;
+struct Adapter {
+    client: ExternalSubject,
+}
+impl Adapter {
+    fn payload(&self, raw: &SecretString) -> IntegrationResult<Payload> {
+        let payload = decode(raw)?;
+        if payload.client != self.client {
+            return Err(IntegrationError::Credential);
+        }
+        Ok(payload)
+    }
+}
 impl CredentialAdapter for Adapter {
     fn policy_identity(&self, _: &AppDefinition) -> IntegrationResult<String> {
-        Ok("workspace-strict-bearer/v1".into())
+        Ok(format!(
+            "workspace-strict-bearer/v1/{}",
+            self.client.as_str()
+        ))
     }
     fn validate_use(&self, raw: &SecretString, app: &AppDefinition) -> IntegrationResult<()> {
-        let p = decode(raw)?;
+        let p = self.payload(raw)?;
         if app.capabilities.iter().any(|c| !p.permissions.contains(c)) {
             return Err(IntegrationError::Denied);
         }
         Ok(())
     }
     fn validate(&self, raw: &SecretString) -> IntegrationResult<Option<ExternalIdentity>> {
-        let p = decode(raw)?;
-        let key = format!(
-            "{:x}",
-            Sha256::digest(format!("{}/{}", p.workspace.as_str(), p.client.as_str()))
-        );
+        let p = self.payload(raw)?;
+        let identity = serde_json::to_vec(&(&p.workspace, &p.client))
+            .map_err(|_| IntegrationError::Credential)?;
+        let key = format!("{:x}", Sha256::digest(identity));
         Ok(Some(ExternalIdentity {
             kind: ExternalIdentityKind::parse("workspace-installation")?,
             subject: p.workspace,
@@ -69,8 +81,8 @@ impl CredentialAdapter for Adapter {
         }))
     }
     fn validate_cache_update(&self, u: CredentialCacheUpdate<'_>) -> IntegrationResult<()> {
-        let a = decode(u.previous)?;
-        let b = decode(u.replacement)?;
+        let a = self.payload(u.previous)?;
+        let b = self.payload(u.replacement)?;
         if a.workspace != b.workspace
             || a.client != b.client
             || a.permissions.into_iter().collect::<BTreeSet<_>>()
@@ -83,13 +95,14 @@ impl CredentialAdapter for Adapter {
     fn injection(&self, raw: &SecretString) -> IntegrationResult<TypedInjection> {
         Ok(TypedInjection {
             method: InjectionMethod::Bearer,
-            value: decode(raw)?.token,
+            value: self.payload(raw)?.token,
         })
     }
 }
 struct Strategy {
     client: reqwest::Client,
     endpoint: String,
+    authorization_client: ExternalSubject,
 }
 #[derive(Deserialize)]
 struct Reply {
@@ -115,7 +128,7 @@ impl RenewalProvider for Strategy {
         now: DateTime<Utc>,
     ) -> ResolutionResult<RenewalDecision> {
         let p = decode(raw)?;
-        if p.generation != generation {
+        if p.generation != generation || p.client != self.authorization_client {
             return Err(IntegrationError::Credential.into());
         }
         if p.expires_at >= now + chrono::Duration::seconds(60) {
@@ -136,7 +149,7 @@ impl RenewalProvider for Strategy {
         work: &RenewalWork,
     ) -> Result<SecretString, RenewalFailure> {
         let mut p = decode(raw).map_err(|_| RenewalFailure::Malformed)?;
-        if p.generation.next().ok() != Some(next) {
+        if p.generation.next().ok() != Some(next) || p.client != self.authorization_client {
             return Err(RenewalFailure::Malformed);
         }
         let started = Utc::now();
@@ -188,8 +201,28 @@ impl RenewalProvider for Strategy {
     }
 }
 pub(crate) fn registration(server: &TokenServer) -> Registration {
+    registration_for(
+        server,
+        FixtureConfiguration {
+            client: ExternalSubject::parse("strict-client").unwrap(),
+            config: AuthConfigId::parse("workspace-strict").unwrap(),
+            app: AppId::parse("workspace-strict").unwrap(),
+            capabilities: vec![Capability::parse("resource.read").unwrap()],
+        },
+    )
+}
+pub(crate) struct FixtureConfiguration {
+    pub client: ExternalSubject,
+    pub config: AuthConfigId,
+    pub app: AppId,
+    pub capabilities: Vec<Capability>,
+}
+pub(crate) fn registration_for(
+    server: &TokenServer,
+    fixture: FixtureConfiguration,
+) -> Registration {
     let provider = ProviderId::parse("workspace-fixture").unwrap();
-    let config = AuthConfigId::parse("workspace-strict").unwrap();
+    let config = fixture.config;
     Registration {
         provider: AuthProvider {
             id: provider.clone(),
@@ -199,17 +232,21 @@ pub(crate) fn registration(server: &TokenServer) -> Registration {
         config: AuthConfig {
             id: config.clone(),
             provider: provider.clone(),
-            client_identity: ExternalSubject::parse("strict-client").unwrap(),
+            client_identity: fixture.client.clone(),
             client_secret_reference: None,
         },
         app: AppDefinition {
-            id: AppId::parse("workspace-strict").unwrap(),
+            transport:
+                crate::application::integrations::destinations::AppTransportPolicy::OwnerApproved,
+            id: fixture.app,
             provider,
             config,
             destinations: vec![],
-            capabilities: vec![Capability::parse("resource.read").unwrap()],
+            capabilities: fixture.capabilities,
         },
-        adapter: Arc::new(Adapter),
+        adapter: Arc::new(Adapter {
+            client: fixture.client.clone(),
+        }),
         authorization: None,
         renewal: RenewalStrategy::StrictRotating(Arc::new(Strategy {
             client: reqwest::Client::builder()
@@ -219,6 +256,7 @@ pub(crate) fn registration(server: &TokenServer) -> Registration {
                 .build()
                 .unwrap(),
             endpoint: server.url.clone(),
+            authorization_client: fixture.client,
         })),
     }
 }
@@ -229,7 +267,7 @@ pub(crate) fn response() -> serde_json::Value {
     json!({"workspace":"no-email-workspace","permissions":["resource.read"],"access_token":"workspace-renewed-token","refresh_token":"replacement-refresh","expires_in":3600,"token_type":"Bearer"})
 }
 
-async fn read_body(mut response: reqwest::Response) -> Result<Vec<u8>, RenewalFailure> {
+pub(super) async fn read_body(mut response: reqwest::Response) -> Result<Vec<u8>, RenewalFailure> {
     let mut body = Vec::new();
     while let Some(chunk) = response
         .chunk()

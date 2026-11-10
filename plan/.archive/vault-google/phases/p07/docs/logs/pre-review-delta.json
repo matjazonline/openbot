@@ -1,0 +1,327 @@
+[
+  {
+    "path": ".github/workflows/ci.yml",
+    "old_lines": 163,
+    "new_lines": 180
+  },
+  {
+    "path": "docs/gmail-workflows.md",
+    "old_lines": 127,
+    "new_lines": 130
+  },
+  {
+    "path": "docs/vault-integrations.md",
+    "old_lines": 0,
+    "new_lines": 231
+  },
+  {
+    "path": "scripts/check-integration-docs.py",
+    "old_lines": 0,
+    "new_lines": 51
+  },
+  {
+    "path": "scripts/integration-boundary.py",
+    "old_lines": 0,
+    "new_lines": 171
+  },
+  {
+    "path": "scripts/tests/integration-boundary.py",
+    "old_lines": 0,
+    "new_lines": 47
+  },
+  {
+    "path": "scripts/tests/vault-authoring-browser.mjs",
+    "old_lines": 87,
+    "new_lines": 152
+  },
+  {
+    "path": "src/adapters/integrations/execution/http.rs",
+    "old_lines": 92,
+    "new_lines": 124
+  },
+  {
+    "path": "src/adapters/integrations/execution/mod.rs",
+    "old_lines": 77,
+    "new_lines": 94
+  },
+  {
+    "path": "src/adapters/mcp/mod.rs",
+    "old_lines": 350,
+    "new_lines": 352
+  },
+  {
+    "path": "src/adapters/mcp/pinned_fixture.rs",
+    "old_lines": 0,
+    "new_lines": 45
+  },
+  {
+    "path": "src/adapters/mcp/preparation_test_server.rs",
+    "old_lines": 168,
+    "new_lines": 250
+  },
+  {
+    "path": "src/adapters/persistence/integrations/connect_tests/control_wire.rs",
+    "old_lines": 0,
+    "new_lines": 272
+  },
+  {
+    "path": "src/adapters/persistence/integrations/connect_tests/mod.rs",
+    "old_lines": 360,
+    "new_lines": 362
+  },
+  {
+    "path": "src/adapters/persistence/integrations/connect_tests/portability.rs",
+    "old_lines": 0,
+    "new_lines": 361
+  },
+  {
+    "path": "src/adapters/persistence/integrations/grants.rs",
+    "old_lines": 400,
+    "new_lines": 402
+  },
+  {
+    "path": "src/adapters/persistence/integrations/mod.rs",
+    "old_lines": 96,
+    "new_lines": 99
+  },
+  {
+    "path": "src/adapters/persistence/integrations/observations.rs",
+    "old_lines": 0,
+    "new_lines": 122
+  },
+  {
+    "path": "src/adapters/persistence/integrations/renewal_tests/business_peer.rs",
+    "old_lines": 0,
+    "new_lines": 295
+  },
+  {
+    "path": "src/adapters/persistence/integrations/renewal_tests/mod.rs",
+    "old_lines": 4,
+    "new_lines": 6
+  },
+  {
+    "path": "src/adapters/persistence/integrations/renewal_tests/server.rs",
+    "old_lines": 147,
+    "new_lines": 159
+  },
+  {
+    "path": "src/adapters/persistence/integrations/renewal_tests/workspace.rs",
+    "old_lines": 247,
+    "new_lines": 283
+  },
+  {
+    "path": "src/adapters/persistence/integrations/renewal_tests/workspace_authorization.rs",
+    "old_lines": 0,
+    "new_lines": 180
+  },
+  {
+    "path": "src/adapters/persistence/integrations/resolve/mod.rs",
+    "old_lines": 173,
+    "new_lines": 183
+  },
+  {
+    "path": "src/adapters/persistence/integrations/resolve/write.rs",
+    "old_lines": 158,
+    "new_lines": 169
+  },
+  {
+    "path": "src/adapters/persistence/integrations/storage_tests.rs",
+    "old_lines": 371,
+    "new_lines": 362
+  },
+  {
+    "path": "src/adapters/persistence/workflow/action_approval_http_tests.rs",
+    "old_lines": 531,
+    "new_lines": 531
+  },
+  {
+    "path": "src/adapters/persistence/workflow/agent_runtime_tests.rs",
+    "old_lines": 899,
+    "new_lines": 901
+  },
+  {
+    "path": "src/adapters/persistence/workflow/mcp_gateway_tests.rs",
+    "old_lines": 341,
+    "new_lines": 343
+  },
+  {
+    "path": "src/adapters/persistence/workflow/mcp_renewal_support.rs",
+    "old_lines": 143,
+    "new_lines": 143
+  },
+  {
+    "path": "src/adapters/persistence/workflow/mcp_test_support.rs",
+    "old_lines": 589,
+    "new_lines": 607
+  },
+  {
+    "path": "src/adapters/persistence/workflow/mcp_wire_tests.rs",
+    "old_lines": 0,
+    "new_lines": 275
+  },
+  {
+    "path": "src/adapters/persistence/workflow/vault_gmail_journey.rs",
+    "old_lines": 0,
+    "new_lines": 355
+  },
+  {
+    "path": "src/adapters/persistence/workflow/vault_tests/execution.rs",
+    "old_lines": 300,
+    "new_lines": 304
+  },
+  {
+    "path": "src/adapters/persistence/workflow/vault_tests/native_control.rs",
+    "old_lines": 0,
+    "new_lines": 155
+  },
+  {
+    "path": "src/adapters/persistence/workflow/vault_tests/native_journeys.rs",
+    "old_lines": 0,
+    "new_lines": 355
+  },
+  {
+    "path": "src/adapters/persistence/workflow/vault_tests/native_lifecycle.rs",
+    "old_lines": 0,
+    "new_lines": 367
+  },
+  {
+    "path": "src/adapters/persistence/workflow/vault_tests/native_mcp_portability.rs",
+    "old_lines": 0,
+    "new_lines": 150
+  },
+  {
+    "path": "src/adapters/persistence/workflow/vault_tests/native_portability.rs",
+    "old_lines": 0,
+    "new_lines": 339
+  },
+  {
+    "path": "src/adapters/persistence/workflow/vault_tests/native_recovery.rs",
+    "old_lines": 0,
+    "new_lines": 291
+  },
+  {
+    "path": "src/adapters/persistence/workflow/vault_tests/owner_browser.rs",
+    "old_lines": 0,
+    "new_lines": 82
+  },
+  {
+    "path": "src/adapters/persistence/workflow/vault_tests/renewal/mod.rs",
+    "old_lines": 186,
+    "new_lines": 186
+  },
+  {
+    "path": "src/adapters/persistence/workflow/vault_tests/shared_runtime.rs",
+    "old_lines": 0,
+    "new_lines": 229
+  },
+  {
+    "path": "src/adapters/persistence/workflow/vault_tests/wire.rs",
+    "old_lines": 0,
+    "new_lines": 76
+  },
+  {
+    "path": "src/adapters/persistence/workflow/vault_zero_effect_journey.rs",
+    "old_lines": 0,
+    "new_lines": 281
+  },
+  {
+    "path": "src/application/integrations/choices.rs",
+    "old_lines": 39,
+    "new_lines": 40
+  },
+  {
+    "path": "src/application/integrations/discovery.rs",
+    "old_lines": 82,
+    "new_lines": 89
+  },
+  {
+    "path": "src/application/integrations/execution.rs",
+    "old_lines": 155,
+    "new_lines": 177
+  },
+  {
+    "path": "src/application/integrations/gateway.rs",
+    "old_lines": 511,
+    "new_lines": 513
+  },
+  {
+    "path": "src/application/integrations/mod.rs",
+    "old_lines": 56,
+    "new_lines": 57
+  },
+  {
+    "path": "src/application/integrations/tests.rs",
+    "old_lines": 399,
+    "new_lines": 433
+  },
+  {
+    "path": "src/application/integrations/wire/command.rs",
+    "old_lines": 0,
+    "new_lines": 152
+  },
+  {
+    "path": "src/application/integrations/wire/control_transport.rs",
+    "old_lines": 0,
+    "new_lines": 199
+  },
+  {
+    "path": "src/application/integrations/wire/mod.rs",
+    "old_lines": 0,
+    "new_lines": 133
+  },
+  {
+    "path": "src/application/integrations/wire/reply.rs",
+    "old_lines": 0,
+    "new_lines": 88
+  },
+  {
+    "path": "src/application/integrations/wire/test_transport.rs",
+    "old_lines": 0,
+    "new_lines": 200
+  },
+  {
+    "path": "src/application/integrations/wire/tests.rs",
+    "old_lines": 0,
+    "new_lines": 404
+  },
+  {
+    "path": "src/application/integrations/wire/text.rs",
+    "old_lines": 0,
+    "new_lines": 72
+  },
+  {
+    "path": "src/domain/integrations/account.rs",
+    "old_lines": 181,
+    "new_lines": 182
+  },
+  {
+    "path": "src/infra/integration_logging_tests.rs",
+    "old_lines": 0,
+    "new_lines": 57
+  },
+  {
+    "path": "src/infra/integrations.rs",
+    "old_lines": 115,
+    "new_lines": 167
+  },
+  {
+    "path": "src/infra/setup.rs",
+    "old_lines": 173,
+    "new_lines": 181
+  },
+  {
+    "path": "src/infra/setup_tests.rs",
+    "old_lines": 75,
+    "new_lines": 78
+  },
+  {
+    "path": "src/infra/workflow.rs",
+    "old_lines": 785,
+    "new_lines": 792
+  },
+  {
+    "path": "src/main.rs",
+    "old_lines": 594,
+    "new_lines": 596
+  }
+]

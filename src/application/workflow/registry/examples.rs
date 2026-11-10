@@ -101,6 +101,9 @@ fn values(name: &str) -> Value {
             // Supply the current task only. Native history is selected independently of business JSON.
             json!({"agent":"assistant","context":{"message":"hello","task":"Answer the current request using the retained conversation context"},"output_schema":schema})
         }
+        "local_agent.run" => {
+            json!({"profile_id":"00000000-0000-0000-0000-000000000006","prompt":"Inspect the selected local project and summarize its current state."})
+        }
         "decision.rule" => json!({"data":"review","data_schema":schema}),
         "decision.human" => {
             json!({"proposal":{"summary":"review"},"reviewers":[{"kind":"user","id":"00000000-0000-0000-0000-000000000006"}],"deadline":deadline,"data_schema":schema,"feedback_required":["revise"]})
@@ -109,6 +112,7 @@ fn values(name: &str) -> Value {
             json!({"agent":"reviewer","context":{"message":"hello"},"data_schema":schema})
         }
         "data.map" | "channel.no_reply" => json!({"value":"hello","output_schema":schema}),
+        "data.url" => json!({"origin":"https://example.test","segments":["c","canvas-a"]}),
         "http.request" => {
             json!({"connection":"service","method":"POST","path":"/messages","headers":{"Accept":"application/json"},"body":{"message":"hello"}})
         }

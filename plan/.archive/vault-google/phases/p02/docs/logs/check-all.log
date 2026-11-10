@@ -1,0 +1,132 @@
+    Checking open_bots v0.1.0 (/Users/mac02/.codex/worktrees/1133/openbot)
+warning: unused import: `*`
+  --> src/adapters/persistence/integrations/tests.rs:13:9
+   |
+13 |         *,
+   |         ^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: method `write_managed` is never used
+  --> src/adapters/persistence/integrations/accounts.rs:92:25
+   |
+59 | impl PostgresVault {
+   | ------------------ method in this implementation
+...
+92 |     pub(crate) async fn write_managed(
+   |                         ^^^^^^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: struct `GooglePayload` is never constructed
+  --> src/adapters/integrations/google_credentials.rs:13:8
+   |
+13 | struct GooglePayload {
+   |        ^^^^^^^^^^^^^
+
+warning: struct `GoogleCredentialAdapter` is never constructed
+  --> src/adapters/integrations/google_credentials.rs:24:19
+   |
+24 | pub(crate) struct GoogleCredentialAdapter {
+   |                   ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: method `decode` is never used
+  --> src/adapters/integrations/google_credentials.rs:28:8
+   |
+27 | impl GoogleCredentialAdapter {
+   | ---------------------------- method in this implementation
+28 |     fn decode(&self, raw: &SecretString) -> IntegrationResult<GooglePayload> {
+   |        ^^^^^^
+
+warning: fields `owner`, `account`, `binding`, `app`, `destination`, and `host_authority` are never read
+   --> src/application/integrations/gateway.rs:209:16
+    |
+208 | pub struct OwnerConfirmation {
+    |            ----------------- fields in this struct
+209 |     pub(crate) owner: VerifiedOwner,
+    |                ^^^^^
+210 |     pub(crate) account: AccountId,
+    |                ^^^^^^^
+211 |     pub(crate) binding: HostBinding,
+    |                ^^^^^^^
+212 |     pub(crate) app: AppId,
+    |                ^^^
+213 |     pub(crate) destination: ApprovedDestination,
+    |                ^^^^^^^^^^^
+214 |     pub(crate) host_authority: HostAuthorityReference,
+    |                ^^^^^^^^^^^^^^
+    |
+    = note: `OwnerConfirmation` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+
+warning: struct `CredentialRecord` is never constructed
+ --> src/application/integrations/private.rs:7:19
+  |
+7 | pub(crate) struct CredentialRecord {
+  |                   ^^^^^^^^^^^^^^^^
+
+warning: trait `CredentialStore` is never used
+  --> src/application/integrations/private.rs:13:18
+   |
+13 | pub(crate) trait CredentialStore: Send + Sync {
+   |                  ^^^^^^^^^^^^^^^
+
+warning: struct `ProviderAuthorization` is never constructed
+  --> src/application/integrations/private.rs:21:19
+   |
+21 | pub(crate) struct ProviderAuthorization {
+   |                   ^^^^^^^^^^^^^^^^^^^^^
+
+warning: struct `ProviderConnectRequest` is never constructed
+  --> src/application/integrations/private.rs:26:19
+   |
+26 | pub(crate) struct ProviderConnectRequest {
+   |                   ^^^^^^^^^^^^^^^^^^^^^^
+
+warning: trait `ProviderLifecycle` is never used
+  --> src/application/integrations/private.rs:32:18
+   |
+32 | pub(crate) trait ProviderLifecycle: Send + Sync {
+   |                  ^^^^^^^^^^^^^^^^^
+
+warning: enum `InjectionMethod` is never used
+  --> src/application/integrations/private.rs:42:17
+   |
+42 | pub(crate) enum InjectionMethod {
+   |                 ^^^^^^^^^^^^^^^
+
+warning: struct `TypedInjection` is never constructed
+  --> src/application/integrations/private.rs:47:19
+   |
+47 | pub(crate) struct TypedInjection {
+   |                   ^^^^^^^^^^^^^^
+
+warning: method `injection` is never used
+  --> src/application/integrations/private.rs:53:8
+   |
+51 | pub(crate) trait CredentialAdapter: Send + Sync {
+   |                  ----------------- method in this trait
+52 |     fn validate(&self, payload: &SecretString) -> IntegrationResult<Option<ExternalIdentity>>;
+53 |     fn injection(&self, payload: &SecretString) -> IntegrationResult<TypedInjection>;
+   |        ^^^^^^^^^
+
+warning: field `client_secret_reference` is never read
+  --> src/application/integrations/registry.rs:17:16
+   |
+13 | pub struct AuthConfig {
+   |            ---------- field in this struct
+...
+17 |     pub(crate) client_secret_reference: Option<ClientSecretReference>,
+   |                ^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `AuthConfig` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis
+
+error[E0616]: field `persistence` of struct `persistence::integrations::PostgresVault` is private
+   --> src/adapters/http/routes/vault_management_tests.rs:191:10
+    |
+191 |         .persistence
+    |          ^^^^^^^^^^^ private field
+
+warning: `open_bots` (lib) generated 14 warnings
+For more information about this error, try `rustc --explain E0616`.
+warning: `open_bots` (lib test) generated 1 warning
+error: could not compile `open_bots` (lib test) due to 1 previous error; 1 warning emitted

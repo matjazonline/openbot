@@ -1,0 +1,11 @@
+{
+  "artifact": "c52a03aec4aaa4fbc55afcf807c77e8814aa4eedffa05f3d727b3217723d3def",
+  "all_delta_paths_and_blobs_match": true,
+  "files": [
+    "integrations/cloudroom-plugin/src/connector.ts",
+    "integrations/cloudroom-plugin/src/journal.ts",
+    "integrations/cloudroom-plugin/test/retention.test.ts"
+  ],
+  "authority_r32_equal": true,
+  "manifest_file_hashes_verified": 32
+}

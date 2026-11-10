@@ -1,0 +1,23 @@
+    Checking open_bots v0.1.0 (/Users/mac03/dev/openbot)
+error: this `if` statement can be collapsed
+   --> src/adapters/persistence/local_agents/protocol/submission_tests.rs:96:5
+    |
+ 96 | /     if let JournalObservation::Agent { observation } = &mut completed {
+ 97 | |         if let LocalEvidence::Turn { thread_id, .. } = &mut observation.evidence {
+ 98 | |             *thread_id = CloudroomThreadId::try_from("thr_queued".to_owned()).unwrap();
+ 99 | |         }
+100 | |     }
+    | |_____^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.96.0/index.html#collapsible_if
+    = note: `-D clippy::collapsible-if` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::collapsible_if)]`
+help: collapse nested if block
+    |
+ 96 ~     if let JournalObservation::Agent { observation } = &mut completed
+ 97 ~         && let LocalEvidence::Turn { thread_id, .. } = &mut observation.evidence {
+ 98 |             *thread_id = CloudroomThreadId::try_from("thr_queued".to_owned()).unwrap();
+ 99 ~         }
+    |
+
+error: could not compile `open_bots` (lib test) due to 1 previous error

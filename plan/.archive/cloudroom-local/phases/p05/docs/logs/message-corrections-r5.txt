@@ -1,0 +1,374 @@
+
+running 303 tests
+test adapters::persistence::workflow::tests::message_tests::autonomous_agent_publication_workflow_tests::autonomous_agent_publication_workflow_pin_is_exact_at_publish_and_retained_after_repin ... ok
+test adapters::persistence::workflow::tests::message_tests::authority_tests::workflow_message_publish_revocation_after_a_marker_stays_retryable ... ok
+test adapters::persistence::workflow::tests::message_tests::delivery_tests::attention_lists_a_dead_workflow_delivery_for_its_run_actor ... ok
+test adapters::persistence::workflow::tests::message_tests::agent_tests::workflow_agent_message_tool_parks_on_delivery_and_continues_with_its_receipt ... ok
+test adapters::persistence::workflow::tests::message_tests::channel_reply_terminal_message_tests::channel_reply_terminal_preserves_an_explicit_published_message ... ok
+test adapters::persistence::workflow::tests::message_tests::delivery_tests::a_dead_workflow_delivery_notifies_its_run_actor_once ... ok
+observed gated transaction pids=[16020] blocker=16026 elapsed_ms=183
+test adapters::persistence::workflow::tests::message_tests::delivery_tests::a_message_a_run_wrote_reads_back_with_its_run ... ok
+test adapters::persistence::workflow::tests::message_tests::approval_tests::workflow_action_approval_message_then_effect_wait_preserves_both_histories ... ok
+observed resolution pids=[16022] blocker=16020 elapsed_ms=1925
+test adapters::persistence::workflow::tests::message_tests::delivery_tests::run_counts_group_open_runs_by_state_and_readable_channel ... ok
+test adapters::persistence::workflow::tests::message_tests::delivery_tests::workflow_message_delivery_begin_part_refuses_a_recipient_no_longer_a_member ... ok
+test adapters::persistence::workflow::tests::message_tests::delivery_tests::workflow_message_delivery_begin_part_refuses_a_revoked_actor ... ok
+test adapters::persistence::workflow::tests::message_tests::delivery_tests::workflow_message_delivery_begin_part_refuses_a_run_past_its_deadline ... ok
+test adapters::persistence::workflow::tests::message_tests::delivery_tests::workflow_message_delivery_duplicate_callback_adds_no_event ... ok
+test adapters::persistence::workflow::tests::message_tests::delivery_tests::workflow_message_delivery_reaper_locks_parents_and_marks_started_requests_unknown ... ok
+test adapters::persistence::workflow::tests::message_tests::delivery_tests::workflow_message_race_paused_producer_then_consumer_sees_both_events ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::autonomous_entrypoints::autonomous_agent_entrypoints_manual_queues_exact_selection_and_replays_after_publication ... ok
+2026-11-08T07:04:36.634936Z  WARN open_bots::application::workflow::schedule_admission: A schedule occurrence claim was lost before its outcome was recorded company_id=55bc1fef-35ab-470e-8f9e-6a516759eb38 occurrence_id=6f9ee22c-2876-4940-a2cd-456700685369
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::autonomous_entrypoints::autonomous_agent_entrypoints_messages_select_at_materialization_and_duplicate_processing_keeps_one_run ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::autonomous_entrypoints::autonomous_agent_entrypoints_schedule_post_commit_crash_keeps_recorded_revision_and_next_occurrence_selects_new ... ok
+observed gated transaction pids=[16129] blocker=16139 elapsed_ms=121
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::knowledge_e2e::knowledge_e2e_member_upload_ceiling_prefix_new_layer_and_replacement_are_enforced ... ok
+observed resolution pids=[16131] blocker=16129 elapsed_ms=1960
+test adapters::persistence::workflow::tests::message_tests::approval_tests::workflow_action_approval_race_message_lost_ack_resolves_park ... ok
+2026-11-08T07:04:40.828701Z  WARN open_bots::adapters::persistence::workflow::knowledge_release: Workflow release refused company_id=a9ec17c2-20ff-41fb-9caa-146f63bfd6d2 run_id=dec92220-d28e-4a34-a1a5-6dd7b60ac6b8 execution_id=c6b9b8d9-8145-48bd-9903-822043b2d09b step_id=answer content_level=5 destination_level=0 code="knowledge.audience_below_content"
+observed competing knowledge replicas pids=[16186, 16138] blocker=16185 elapsed_ms=2
+observed gated transaction pids=[16181] blocker=16184 elapsed_ms=473
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::knowledge_e2e::uploads::knowledge_e2e_competing_application_replicas_replace_one_name_and_level_without_duplicates ... ok
+2026-11-08T07:04:43.619327Z  WARN open_bots::adapters::persistence::workflow::knowledge_release: Workflow release refused company_id=a55e1cdf-dda8-432d-bd5b-e804fbf0ea49 run_id=d0128336-52a2-43f1-86b1-ee9e5c3a65dd execution_id=c63d0f59-1a2c-4f67-a07a-dbf003c1aa89 step_id=reply content_level=5 destination_level=0 code="knowledge.audience_below_content"
+test adapters::persistence::workflow::tests::message_tests::authority_tests::workflow_message_publish_revoked_authority_is_terminal_rejected_before_any_marker ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::knowledge_e2e::knowledge_e2e_customer_cc_lowers_member_run_to_public_before_search ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::knowledge_e2e::knowledge_e2e_level_five_team_reply_is_stamped_and_level_zero_viewer_gets_placeholder ... ok
+observed gated transaction pids=[16227] blocker=16232 elapsed_ms=433
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::knowledge_e2e::knowledge_e2e_outside_contact_cannot_observe_private_sales_and_gets_missing_information_reply ... ok
+2026-11-08T07:04:47.827801Z  WARN open_bots::adapters::persistence::workflow::knowledge_release: Workflow release refused company_id=288eb343-ad4f-42d2-bd58-e026611c2d11 run_id=8889daa3-93ce-4ee1-9537-2e2bf147b203 execution_id=a1c1a03b-3ae6-4ab6-b7bf-b1bdf0943a52 step_id=reply content_level=5 destination_level=0 code="knowledge.audience_below_content"
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::message_ingress_end_to_end_each_message_gets_its_own_run_and_reply ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::message_ingress_member_email_reply_resumes_the_question_on_an_allowlist_channel ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::knowledge_e2e::races::knowledge_e2e_cc_and_member_demotion_mid_reply_refuse_delivery_and_show_typed_attention ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::provisioning_runtime_tests::builder_stops_a_listing_loop_once_its_result_repeats ... ok
+2026-11-08T07:04:52.460028Z  WARN open_bots::application::workflow::schedule_admission: A schedule occurrence claim was lost before its outcome was recorded company_id=57444467-e4a9-412f-90f8-2b7f6e7e435a occurrence_id=9c553ff2-fcd0-48b1-a82a-fc8af854fbb7
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::schedule_runtime_tests::schedule_end_to_end_a_due_slot_runs_its_workflow_once ... ok
+2026-11-08T07:04:53.329758Z  WARN open_bots::application::workflow::message_admission: A workflow binding did not admit an accepted message company_id=7331782c-30f9-48bd-b8ae-4bc13158f841 binding_id=da9baac5-5cde-4f04-a27a-c12f747a5c15 intent_id=6ecc9538-07e0-4283-bf21-8555cabe153b reason="unavailable"
+2026-11-08T07:04:53.355009Z  WARN open_bots::application::workflow::message_admission: A workflow binding did not admit an accepted message company_id=7331782c-30f9-48bd-b8ae-4bc13158f841 binding_id=da9baac5-5cde-4f04-a27a-c12f747a5c15 intent_id=265e1598-17d6-49c7-8dbb-f08dfc76728a reason="unavailable"
+test adapters::persistence::workflow::tests::message_tests::intent_tests::attention_groups_a_bindings_refusals_into_one_team_work_row ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::knowledge_e2e::knowledge_e2e_public_followup_in_the_same_thread_excludes_prior_private_reply_from_history ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::provisioning_runtime_tests::requester_locks::delegated_provisioning_locks_requester_before_company ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::binding_message_trigger_cap_is_enforced_on_activation_and_reconfiguration ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::binding_message_trigger_needs_a_channel_and_a_compatible_input ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::binding_run_as_follows_the_owner_and_admin_self_rule ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::provisioning_runtime_tests::builder_provisions_an_assistant_for_a_signed_in_admin ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::channel_reply_binding_company_teardown_removes_scoped_selection_and_snapshots ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::provisioning_runtime_tests::builder_refuses_members_and_emailed_requests ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::provisioning_runtime_tests::builder_sees_the_conversation_so_far ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::channel_reply_binding_competing_assignments_choose_one_current_responder ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::channel_reply_binding_freezes_head_contract_and_responder_at_ingress ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::channel_reply_binding_live_run_blocks_snapshot_and_principal_deletion ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::knowledge_e2e::mcp::knowledge_e2e_private_search_refuses_public_mcp_to_model_and_allows_level_nine_crm ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::channel_reply_binding_passive_snapshot_follows_source_retention ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::channel_reply_binding_quiet_and_unselected_ingress_get_no_snapshot ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::provisioning_runtime_tests::builder_adds_custom_steps_to_the_new_agents_workflow ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::channel_reply_binding_rejects_foreign_inactive_thread_and_stale_selection ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::channel_reply_binding_roundtrip_update_clear_and_stale_revision ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::channel_reply_binding_snapshot_and_referenced_source_facts_are_immutable ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::provisioning_runtime_tests::reviewed_assistants_park_their_answer_until_the_run_deadline ... ok
+2026-11-08T07:04:59.850186Z  WARN open_bots::application::workflow::message_admission: A workflow binding did not admit an accepted message company_id=b045e98d-63d4-4439-b07e-04eebf06fdea binding_id=1881961e-35ee-48ab-b7fd-51f8043f5004 intent_id=9712a1e1-8dec-4045-93e5-e646d5e00f5f reason="unavailable"
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::channel_reply_binding_trigger_mismatch_and_revocation_create_no_obligation ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::channel_reply_completion_approval_resumes_exact_saved_output ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::channel_reply_completion_commit_failure_and_lost_ack_preserve_atomic_decision ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::channel_reply_completion_competing_finalizers_create_one_obligation ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::reviewed_delivery_tests::workflow_cutover_reviewed_email_delivers_exact_accepted_artifact ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::channel_reply_completion_contract_edits_cannot_replace_approved_content ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::channel_reply_completion_missing_notice_configuration_cannot_commit_success ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::channel_reply_completion_policy_change_after_approval_fails_saved_step ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::channel_reply_completion_rejection_uses_failure_without_publication ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::channel_reply_completion_automatic_and_suppressed_are_atomic ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::intent_schema_tests::channel_reply_intent_schema_competing_claims_and_fenced_release ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::intent_schema_tests::channel_reply_intent_schema_cross_tenant_links_and_duplicate_decisions_are_rejected ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::intent_schema_tests::channel_reply_intent_schema_eighth_expired_claim_is_terminal ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::intent_schema_tests::channel_reply_intent_schema_expired_lease_has_one_new_owner ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::channel_reply_completion_invalid_projection_fails_or_uses_original_error_route ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::intent_schema_tests::channel_reply_intent_schema_live_obligation_and_proposal_are_protected ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::intent_schema_tests::channel_reply_intent_schema_queued_root_cannot_forge_a_suppressed_decision ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::intent_schema_tests::channel_reply_intent_schema_success_without_decision_rolls_back ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::intent_schema_tests::channel_reply_intent_schema_claim_page_serves_another_tenant_before_a_burst ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::intent_schema_tests::channel_reply_intent_schema_suppressed_is_never_claimable ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::intent_schema_tests::channel_reply_intent_schema_terminal_failure_keeps_success_and_allows_retention ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::owner_tests::channel_reply_completion_child_terminal_parks_only_the_owned_parent ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::owner_tests::channel_reply_completion_exhausted_saved_child_result_never_reconciles_original_handler ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::owner_tests::channel_reply_completion_fenced_approval_resumes_before_worker_handler ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::owner_tests::channel_reply_completion_human_choice_parks_final_approval_before_success ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::owner_tests::channel_reply_completion_timer_keeps_source_wait_and_final_approval_distinct ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::policy_runtime_tests::channel_reply_completion_approved_job_cannot_claim_a_handler_with_sql ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::policy_runtime_tests::channel_reply_completion_cancellation_and_finalization_share_one_terminal_owner ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::policy_runtime_tests::channel_reply_completion_opposite_reviewers_have_one_formal_winner ... ok
+2026-11-08T07:05:15.529680Z  WARN open_bots::adapters::persistence::workflow::knowledge_release: Workflow release refused company_id=897ac44e-45dd-4576-8402-4f135119533f run_id=d8bef5c7-9780-4b7d-ab3e-e3ae58723d66 execution_id=f640f9ff-84da-4711-b154-b768e16dd5e6 step_id=start content_level=5 destination_level=0 code="knowledge.audience_below_content"
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::policy_runtime_tests::channel_reply_completion_private_result_cannot_cross_public_reply_clearance ... ok
+2026-11-08T07:05:17.048245Z  WARN open_bots::adapters::persistence::workflow::knowledge_release: Workflow release refused company_id=6b3e047d-5c95-4dc0-ba81-2b64730919f2 run_id=a894bfe1-88ee-405a-a918-f652d87a03fa execution_id=2578e787-c70a-4174-ad19-ef7e3b553d4e step_id=start content_level=5 destination_level=0 code="knowledge.audience_below_content"
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::policy_runtime_tests::channel_reply_completion_release_revocation_and_finalization_do_not_deadlock ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::policy_runtime_tests::channel_reply_completion_review_timeout_never_publishes_unapproved_output ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::authority::channel_reply_publication_changed_plan_has_no_partial_effects ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::authority::channel_reply_publication_forged_claims_cannot_load_or_commit ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::authority::channel_reply_publication_approved_content_survives_elapsed_review_deadline_and_contract_edit ... ok
+2026-11-08T07:05:20.402363Z  WARN open_bots::application::workflow::channel_reply::publisher: Final reply refused company_id=f7f59114-d913-4c13-b640-64537746e7ee run_id=1e1c8fec-a940-40b7-8863-9e40034d29eb proposal_id=9f5c49e2-9610-4114-92cc-4753f901eafa code="policy_changed"
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::authority::channel_reply_publication_policy_change_refuses_without_redirecting ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::authority::channel_reply_publication_rechecks_current_send_authority ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::authority::channel_reply_publication_write_failure_rolls_back_then_replays_original_plan ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::policy_runtime_tests::channel_reply_completion_privileged_reviewers_still_require_payload_clearance ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::channel_reply_publication_competing_transactions_keep_one_canonical_receipt ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::policy_runtime_tests::channel_reply_completion_revoked_send_role_still_permits_suppression ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::channel_reply_publication_internal_source_never_falls_back_to_email ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::delivery::channel_reply_delivery_revocation_before_provider_entry_cancels_unsent_work ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::delivery::channel_reply_delivery_expired_started_request_recovers_unknown_without_resend ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::delivery::channel_reply_delivery_authority_lock_deadline_leaves_request_unstarted ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::delivery::channel_reply_delivery_safe_retry_keeps_same_message_and_prepared_part ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::delivery::channel_reply_delivery_unknown_is_quarantined_and_cannot_be_rewritten_or_deleted ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::delivery::channel_reply_delivery_unknown_parent_and_run_cannot_be_removed_together ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::integrity::channel_reply_delivery_multipart_cancellation_preserves_accepted_piece ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::integrity::channel_reply_delivery_resolved_owner_can_be_retained_without_losing_message ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::channel_reply_publication_email_and_in_app_commit_exact_content_and_replay ... ok
+2026-11-08T07:05:28.543691Z  WARN open_bots::application::workflow::channel_reply::publisher: Final reply refused company_id=074d6f13-97eb-4bdf-8032-5a8834026c8f run_id=686585ac-735e-4a00-b0b0-c8eb546d319e proposal_id=6901ecf6-c64e-41e7-abda-deb96ad7f091 code="authority_revoked"
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::integrity::channel_reply_publication_approved_reviewer_must_retain_payload_clearance ... ok
+2026-11-08T07:05:30.037759Z  WARN open_bots::adapters::persistence::workflow::knowledge_release: Workflow release refused company_id=5fd9e912-342c-4d61-9e55-258877ce0b27 run_id=9f84ae7a-5b4f-4111-a460-30ff4e2ab0e7 execution_id=c2c4cbbb-20c6-4bb1-b3c7-e41087224d12 step_id=start content_level=5 destination_level=0 code="knowledge.audience_below_content"
+2026-11-08T07:05:30.038549Z  WARN open_bots::application::workflow::channel_reply::publisher: Final reply refused company_id=5fd9e912-342c-4d61-9e55-258877ce0b27 run_id=9f84ae7a-5b4f-4111-a460-30ff4e2ab0e7 proposal_id=0354bb2b-1ebd-4293-a157-c0d9ee6183a9 code="release_denied"
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::integrity::channel_reply_publication_frozen_association_metadata_and_parts_cannot_change ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::lifecycle::channel_reply_recovery_shutdown_cancels_actual_composition_and_releases_claim ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::lifecycle::channel_reply_recovery_shutdown_cancels_actual_publication_transaction ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::lifecycle::channel_reply_recovery_shutdown_during_unacknowledged_claim_retains_real_lease ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::membership::channel_reply_publication_canonical_delivery_membership_rejects_extra_insert_and_update ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::membership::channel_reply_publication_competing_membership_and_commit_keeps_exact_effect_set ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::membership::channel_reply_publication_component_membership_checks_new_tenant_and_message ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::membership::channel_reply_publication_part_membership_checks_incoming_and_outgoing_owner ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::integrity::channel_reply_publication_current_binding_is_required_at_commit_and_provider_entry ... ok
+2026-11-08T07:05:34.520052Z  WARN open_bots::adapters::persistence::workflow::knowledge_release: Workflow release refused company_id=312bed23-abd7-4a4a-8b5c-44a97803822a run_id=95962bf5-b6c4-4a1d-a61b-6cf926259009 execution_id=663d7c68-b342-4dde-be0a-57d778474c85 step_id=start content_level=5 destination_level=0 code="knowledge.audience_below_content"
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::integrity::channel_reply_publication_release_rechecked_after_success_and_before_provider ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::recovery::channel_reply_recovery_reconstructed_worker_polls_without_a_wakeup ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::recovery::channel_reply_publication_and_delivery_survive_original_execution_deadline ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::recovery::channel_reply_recovery_transient_composition_backs_off_and_spares_quiet_tenant ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::recovery::channel_reply_recovery_deferred_commit_expiry_rolls_back_all_effects ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::question_final_tests::channel_reply_final_approval_question_rejection_publishes_no_final ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::question_final_tests::channel_reply_final_approval_question_uses_exact_saved_response ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::slot_tests::channel_reply_completion_full_execution_rejects_final_without_another_slot ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::slot_tests::channel_reply_completion_rejected_approval_keeps_its_slot_reservation ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::integrity::channel_reply_binding_competing_ingress_claimants_create_one_owned_run ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::slot_tests::channel_reply_completion_reserves_128th_slot_once_under_competing_finalizers ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::integrity::channel_reply_binding_context_insert_and_source_acceptance_roll_back_together ... ok
+2026-11-08T07:05:40.023420Z  WARN open_bots::application::workflow::message_admission: A workflow binding did not admit an accepted message company_id=4f412710-033b-406c-883a-e4a07192e1c1 binding_id=ec700a97-4f5f-4589-ab37-d35bc170518a intent_id=c1391c7c-f09f-4056-a7ab-dbb7cebc32df reason="unavailable"
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::integrity::channel_reply_binding_inactive_before_ingress_has_visible_refusal_until_selection_cleared ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::integrity::channel_reply_binding_manual_root_has_no_automatic_response_authority ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::integrity::channel_reply_binding_observer_run_cannot_replace_response_owner ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::integrity::channel_reply_binding_rechecks_current_run_as_private_channel_visibility ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::integrity::channel_reply_binding_thread_scoped_binding_cannot_own_channel_responses ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::policy_tests::channel_reply_completion_policy_rejects_unprivileged_reviewers_and_invalid_sql_shape ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::policy_tests::channel_reply_completion_policy_settings_freeze_duration_for_ingress ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::link_visibility_loads_only_requested_source_channels ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::message_intent_admission_replay_with_another_delivery_policy_conflicts ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::message_intent_claims_are_fair_across_tenants ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::message_intent_competing_claimants_admit_one_run_and_fence_the_stale_worker ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::message_intent_crash_after_admission_replays_its_run ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::message_intent_ignores_bindings_activated_later_or_deactivated ... ok
+2026-11-08T07:05:45.625969Z ERROR open_bots::application::workflow::message_admission: A workflow message intent failed terminally company_id=09d10ae2-5260-4cb4-9ee0-1a1f52b18723 intent_id=7cb76f6d-b6f2-47c5-b68d-463bc0745a23 cause="lease_expired"
+2026-11-08T07:05:45.641611Z  WARN open_bots::application::workflow::message_admission: A workflow binding did not admit an accepted message company_id=09d10ae2-5260-4cb4-9ee0-1a1f52b18723 binding_id=9992118b-c840-4c06-b930-a4eedcb676e3 intent_id=7cb76f6d-b6f2-47c5-b68d-463bc0745a23 reason="transient_exhausted"
+test adapters::persistence::workflow::tests::message_tests::intent_tests::message_intent_in_app_policy_reaches_the_admitted_run ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::message_intent_lease_lapsing_on_the_last_attempt_fails_it_observably ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::message_intent_poison_batch_is_not_reclaimed ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::message_intent_reconfigured_binding_is_re_read_before_admission ... ok
+2026-11-08T07:05:47.844592Z  WARN open_bots::application::workflow::message_admission: A workflow binding did not admit an accepted message company_id=8120cbfe-3db8-416d-8471-23d915e29efc binding_id=3e5835d9-385a-44ce-b496-c8758d1f77b7 intent_id=2b85206d-576c-432d-8b87-33cde2ed07f6 reason="unavailable"
+test adapters::persistence::workflow::tests::message_tests::intent_tests::message_intent_refused_run_as_is_visible_and_spares_its_sibling ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::message_intent_rows_cannot_name_another_companys_records ... ok
+2026-11-08T07:05:48.917928Z  WARN open_bots::application::workflow::message_admission: A workflow binding did not admit an accepted message company_id=a18f338e-6583-4d70-bf36-38d96e054ec6 binding_id=48a8079b-d9dd-46b4-b00e-a7a41679f7ec intent_id=884ae481-d5cd-4dce-b7d1-38eaabed9a57 reason="transient_exhausted"
+test adapters::persistence::workflow::tests::message_tests::intent_tests::message_intent_rules_admit_each_eligible_binding_independently ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::message_intent_transient_failure_retries_only_the_failed_binding ... ok
+2026-11-08T07:05:49.512167Z  WARN open_bots::application::workflow::message_admission: A workflow binding did not admit an accepted message company_id=e9432ca2-0d87-4ba9-b565-79acfe3b5e69 binding_id=7f52f3da-2da5-4223-bd9d-5151bdf2b520 intent_id=f09f6e04-736b-49bc-899e-24a4402093f9 reason="unavailable"
+test adapters::persistence::workflow::tests::message_tests::intent_tests::message_intent_worker_stops_between_and_during_processing ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::message_outcomes_lookup_and_activity_read_every_binding_of_a_message ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::channel_reply_tests::channel_reply_binding_deferred_human_reply_has_no_response_authority ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::channel_reply_tests::channel_reply_binding_matched_human_reply_retains_only_passive_snapshot ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::reconnect_batch_links_do_not_depend_on_the_newest_history_window ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::message_reply_crash_replay_matches_once ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::message_reply_before_its_wait_parks_is_deferred_until_it_does ... ok
+2026-11-08T07:05:54.254325Z  WARN open_bots::application::workflow::message_admission: Workflow reply delivery failed intent_id=a2c77040-48cb-42b7-adb1-f377c5bd52d9 attempts=5 error=Database timed out: error returned from database: canceling statement due to statement timeout
+2026-11-08T07:05:54.256811Z ERROR open_bots::application::workflow::message_admission: A workflow message intent failed terminally company_id=c3e2f90a-2d2a-4c1c-ade3-3de351474c49 intent_id=a2c77040-48cb-42b7-adb1-f377c5bd52d9 cause="transient"
+test adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::message_reply_from_the_wrong_responder_or_after_expiry_is_ordinary_ingress ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::message_reply_delivery_failing_on_the_last_attempt_fails_the_intent_observably ... ok
+2026-11-08T07:05:54.786529Z  WARN open_bots::application::workflow::message_admission: Workflow reply delivery failed intent_id=0fe2cd2d-e475-4745-87d3-837a645fc052 attempts=1 error=Database timed out: error returned from database: canceling statement due to statement timeout
+test adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::message_reply_recorded_before_the_deadline_is_consumed_after_it ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::message_reply_delivery_out_of_time_is_retried_not_settled ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::message_reply_resumes_its_wait_once_and_a_second_reply_is_ordinary ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::message_reply_that_fell_through_is_never_matched_on_a_retry ... ok
+2026-11-08T07:05:56.922172Z ERROR open_bots::application::workflow::message_admission: A workflow reply could not be delivered to its run company_id=e2b9e2ad-4a47-4d42-a2d5-5062445fbb3b intent_id=117b1bc2-23c9-47b9-b68f-4f67ebc3fa54 cause="event_id_reused"
+test adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::message_reply_racing_wait_expiry_agrees_without_deadlock ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::message_reply_the_run_can_never_take_is_ordinary_ingress ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::message_reply_to_a_channel_post_matches_only_an_in_app_answer ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::message_reply_to_a_workflow_reply_matches_only_the_customer_it_answered ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::message_reply_to_an_unawaited_send_is_ordinary_ingress ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::approval::channel_reply_hitl_prompt_approval_notice_stays_private_and_then_parks_the_original_question ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::channel_reply_hitl_prompt_cannot_be_an_agent_or_ad_hoc_tool ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::channel_reply_hitl_prompt_commits_wait_and_delivery_together ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::channel_reply_hitl_prompt_competing_publishers_create_one_occurrence ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::channel_reply_hitl_prompt_in_app_acceptance_keeps_the_human_wait_open ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::channel_reply_hitl_prompt_uuid_case_and_nanosecond_deadline_keep_the_same_witness ... ok
+observed gated transaction pids=[17403] blocker=17408 elapsed_ms=1309
+test adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::child::channel_reply_hitl_resume_child_question_returns_to_parent_without_suppression ... ok
+observed gated transaction pids=[17411] blocker=17425 elapsed_ms=133
+test adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::integrity::channel_reply_hitl_prompt_canonical_content_and_delivery_membership_are_frozen ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::integrity::channel_reply_hitl_prompt_failed_atomic_write_leaves_no_prompt_or_wait ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::integrity::channel_reply_hitl_prompt_ownership_cannot_be_edited_or_removed ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::commit::channel_reply_hitl_prompt_deferred_commit_cannot_outlive_its_real_claim ... ok
+observed resolution pids=[17412] blocker=17411 elapsed_ms=1942
+test adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::integrity::channel_reply_hitl_prompt_true_company_teardown_removes_its_owned_question_and_unknown_delivery ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::commit::channel_reply_hitl_prompt_lost_commit_ack_replays_human_wait_before_transport_receipt ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::lifecycle::channel_reply_hitl_prompt_safe_retry_keeps_message_wait_deadline_and_continuation_budget ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::lifecycle::channel_reply_hitl_prompt_unknown_send_stays_unknown_after_a_human_response ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::lifecycle::channel_reply_hitl_resume_response_racing_cancellation_cannot_reopen_the_run ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::release::channel_reply_hitl_prompt_release_authorized_entry_retains_accepted_truth_after_demotion ... ok
+2026-11-08T07:06:07.936209Z  WARN open_bots::adapters::persistence::workflow::knowledge_release: Workflow release refused company_id=92b90449-732e-4a8e-b2ce-449d2c7a599b run_id=bffbfcc6-e12d-4dcd-b47d-d86b8d93fb21 execution_id=eae8241b-556a-4b72-9575-8277525cc43b step_id=start content_level=5 destination_level=0 code="knowledge.audience_below_content"
+test adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::release::channel_reply_hitl_prompt_release_clearance_revoked_before_entry ... ok
+2026-11-08T07:06:08.389585Z  WARN open_bots::adapters::persistence::workflow::knowledge_release: Workflow release refused company_id=1696b3aa-36d3-4a51-af2a-cea49e257bda run_id=203f25be-58e1-432a-ab95-328292c4d6b1 execution_id=31d6e2a6-9b90-4064-8f64-d1a18f1a25b6 step_id=start content_level=5 destination_level=0 code="knowledge.audience_below_content"
+test adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::release::channel_reply_hitl_prompt_release_committed_demotion_wins_while_entry_is_blocked ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::lifecycle::channel_reply_hitl_prompt_provider_entry_rechecks_deadline_after_competing_parent_lock ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::release::channel_reply_hitl_prompt_release_retired_frozen_address_is_refused ... ok
+2026-11-08T07:06:10.409101Z  WARN open_bots::adapters::persistence::workflow::knowledge_release: Workflow release refused company_id=6e12d09d-fbda-4b03-a233-28c7b12b4d8a run_id=4a626f96-491e-488a-9ae6-d96804a7c36b execution_id=58c5d1c9-6a7e-43c9-a540-d8c492f160fa step_id=start content_level=5 destination_level=0 code="knowledge.audience_below_content"
+test adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::release::channel_reply_hitl_prompt_release_safe_retry_rechecks_without_changing_the_human_wait ... ok
+2026-11-08T07:06:10.742830Z  WARN open_bots::adapters::persistence::workflow::knowledge_release: Workflow release refused company_id=2837940b-d514-4706-bd34-f87af31e0b9e run_id=4e5730d8-6a1d-42c6-a844-9dc55dd2dff7 execution_id=0a6c870d-3df9-4a56-b27f-8a55cd2bff91 step_id=start content_level=5 destination_level=0 code="knowledge.audience_below_content"
+test adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::lifecycle::channel_reply_hitl_resume_late_response_races_timeout_and_stops_unsent_work_before_wake ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::release::channel_reply_hitl_prompt_release_thread_audience_change_is_refused ... ok
+2026-11-08T07:06:11.153594Z  WARN open_bots::adapters::persistence::workflow::knowledge_release: Workflow release refused company_id=663b83b9-3926-4155-9272-0fe43ae12e14 run_id=92bd366a-083b-40e1-b944-78e6a174045b execution_id=4b38717c-7ca1-48c1-8d9a-83c5f8864318 step_id=start content_level=5 destination_level=0 code="knowledge.audience_below_content"
+test adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::lifecycle::channel_reply_hitl_resume_recorded_in_time_survives_delayed_wakeup ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::release::channel_reply_hitl_prompt_release_verification_revoked_before_entry ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::resume::channel_reply_hitl_resume_before_ack_and_reconstruction_consumes_once ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::resume::channel_reply_hitl_resume_competing_humans_have_one_winner ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::resume::channel_reply_hitl_resume_ingress_consumes_before_ordinary_admission ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::resume::channel_reply_hitl_resume_repeated_questions_have_distinct_waits_and_no_reply_keeps_prompts ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::resume::channel_reply_hitl_resume_wrong_respondent_and_prompt_do_not_consume_wait ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::resume::channel_reply_hitl_resume_two_live_runs_in_one_thread_stay_independent ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::tenant_fk_tests::run_binding_fk_channel_with_runs_is_still_refused ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::tenant_fk_tests::run_binding_fk_intent_outcome_names_its_own_runs_binding ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::tenant_fk_tests::run_binding_fk_run_cannot_name_an_unknown_revision ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::thread_attribution_links_require_access_to_the_producing_run ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::workflow_run_triggers_notify_a_threads_run_on_both_channels ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::thread_runs_are_bounded_and_report_truncation ... ok
+test adapters::persistence::workflow::tests::message_tests::knowledge_delivery_views::knowledge_view_delivery_subjects_use_current_level_and_foreign_id_is_concealed ... ok
+test adapters::persistence::workflow::tests::message_tests::knowledge_delivery_views::knowledge_view_notification_email_and_in_app_projection_never_quote_classified_message ... ok
+test adapters::persistence::workflow::tests::message_tests::knowledge_message_tests::knowledge_run_level_internal_message_stamps_current_content_and_completed_replay_retains_stamp ... ok
+2026-11-08T07:06:19.476323Z  WARN open_bots::adapters::persistence::workflow::knowledge_release: Workflow release refused company_id=7874b2d7-0c4d-418a-bf38-e6fd7eb57e87 run_id=768027c7-6721-442e-8872-920893b6961c execution_id=602fb2d8-189a-4f5d-8b74-b3fc852c16e8 step_id=start content_level=5 destination_level=0 code="knowledge.audience_below_content"
+test adapters::persistence::workflow::tests::message_tests::knowledge_message_tests::knowledge_run_level_pending_public_intent_cannot_send_after_content_rises ... ok
+2026-11-08T07:06:19.842813Z  WARN open_bots::adapters::persistence::workflow::knowledge_release: Workflow release refused company_id=44abb748-9c60-48ed-aadb-20085904a5d1 run_id=50b7254b-10e2-487e-8d51-ef4043164306 execution_id=3dbb258e-a505-43fb-a6ce-cd9f8b988e61 step_id=start content_level=5 destination_level=0 code="knowledge.audience_below_content"
+test adapters::persistence::workflow::tests::message_tests::knowledge_message_tests::knowledge_run_level_race_verified_address_change_cannot_authorize_a_frozen_retired_recipient ... ok
+2026-11-08T07:06:20.168807Z  WARN open_bots::adapters::persistence::workflow::knowledge_release: Workflow release refused company_id=5dcc4af8-e95f-498d-818a-6598cff18d4a run_id=eda842b7-79cd-48ab-a64e-f9233a467c37 execution_id=f39a6b4a-eead-4e8d-9dbd-581a265323c5 step_id=start content_level=5 destination_level=0 code="knowledge.audience_below_content"
+test adapters::persistence::workflow::tests::message_tests::knowledge_message_tests::knowledge_run_level_refused_message_cannot_recover_into_success ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::tenant_fk_tests::tenant_fk_small_settled_reply_intent_survives_channel_and_company_deletion ... ok
+test adapters::persistence::workflow::tests::message_tests::knowledge_message_tests::knowledge_run_level_sql_freeze_constraint_matches_pure_release_matrix ... ok
+2026-11-08T07:06:21.324550Z  WARN open_bots::adapters::persistence::workflow::knowledge_release: Workflow release refused company_id=9198f984-44b6-44a5-9dc0-4f0bb0b08596 run_id=74dff098-3270-454d-ac1d-b50d681fe951 execution_id=c44b6668-42f0-42a4-8bd4-68826f3dc6dd step_id=start content_level=5 destination_level=0 code="knowledge.audience_below_content"
+2026-11-08T07:06:21.704620Z  WARN open_bots::adapters::persistence::workflow::knowledge_release: Workflow release refused company_id=68202af5-c1b1-4df8-92e0-50a2ab2de5ce run_id=2021dd6c-1284-4149-8d02-c166dffba288 execution_id=93a04eae-4216-460a-a0a3-25e3250e76d6 step_id=start content_level=5 destination_level=0 code="knowledge.audience_below_content"
+test adapters::persistence::workflow::tests::message_tests::knowledge_message_tests::knowledge_run_level_tool_refusal_is_typed_and_contains_no_content ... ok
+test adapters::persistence::workflow::tests::message_tests::knowledge_message_tests::knowledge_run_level_verified_member_email_uses_current_member_level ... ok
+test adapters::persistence::workflow::tests::message_tests::knowledge_views::knowledge_view_competing_readers_demotion_and_content_raise_use_final_facts ... ok
+test adapters::persistence::workflow::tests::message_tests::knowledge_views::knowledge_view_current_run_and_step_stamp_controls_payloads ... ok
+2026-11-08T07:06:23.843250Z  WARN open_bots::adapters::persistence::workflow::knowledge_release: Workflow release refused company_id=7fd5e997-301f-4610-ad08-52a458dcf549 run_id=019d6ce1-58e7-45e3-981d-8dadbb5ca0db execution_id=35820385-6f3d-4509-b1e8-b9ba59cccf7a step_id=start content_level=5 destination_level=0 code="knowledge.audience_below_content"
+test adapters::persistence::workflow::tests::message_tests::knowledge_views::knowledge_view_refusal_attention_and_native_constraints_keep_only_historical_levels ... ok
+test adapters::persistence::workflow::tests::message_tests::park_continuation_tests::message_park_continuation_limit_matches_the_sql_function ... ok
+2026-11-08T07:06:25.966785Z  WARN open_bots::adapters::persistence::workflow::knowledge_release: Workflow release refused company_id=df1fde50-7c32-4140-8ea6-6cff0b047eec run_id=0a12b515-c8e3-465d-b98a-9a35f0d78edf execution_id=60fe08e4-e094-4ca4-ad78-b6faef70f1a6 step_id=start content_level=5 destination_level=0 code="knowledge.audience_below_content"
+test adapters::persistence::workflow::tests::message_tests::knowledge_message_tests::knowledge_run_level_step_email_and_fanout_refuse_before_any_effect ... ok
+observed gated transaction pids=[17812] blocker=17817 elapsed_ms=205
+observed two settlements pids=[17772, 17825] blocker=17835 elapsed_ms=9
+observed resolution pids=[17815] blocker=17812 elapsed_ms=1904
+observed settlement and consumer pids=[17831, 17784] blocker=17840 elapsed_ms=3
+test adapters::persistence::workflow::tests::message_tests::reconcile_tests::race_tests::workflow_message_race_competing_settlements_reopen_once ... ok
+test adapters::persistence::workflow::tests::message_tests::reconcile_tests::race_tests::workflow_message_race_settle_and_consumer_compete_for_one_action ... ok
+observed settlement, consumer and begin_part pids=[17793, 17850, 17851] blocker=17859 elapsed_ms=12
+test adapters::persistence::workflow::tests::message_tests::reconcile_tests::race_tests::workflow_message_race_settle_consumer_and_begin_part_compete ... ok
+observed settlement and cancellation pids=[17801, 17858] blocker=17869 elapsed_ms=12
+test adapters::persistence::workflow::tests::message_tests::reconcile_tests::race_tests::workflow_message_race_settle_racing_workflow_cancellation_supersedes ... ok
+test adapters::persistence::workflow::tests::message_tests::reconcile_tests::veto_tests::workflow_message_reconcile_model_tool_delivery_reopen_never_reopens_the_job ... ok
+observed gated transaction pids=[17889] blocker=17895 elapsed_ms=188
+test adapters::persistence::workflow::tests::message_tests::race_tests::workflow_message_race_delayed_commit_past_fence_expiry_or_deadline_rolls_back ... ok
+observed resolution pids=[17892] blocker=17889 elapsed_ms=1907
+test adapters::persistence::workflow::tests::message_tests::reconcile_tests::veto_tests::workflow_message_reconcile_wrong_association_actor_is_refused ... ok
+test adapters::persistence::workflow::tests::message_tests::reconcile_tests::workflow_message_reconcile_applied_on_a_live_run_resumes_after_every_destination ... ok
+test adapters::persistence::workflow::tests::message_tests::park_continuation_tests::message_park_continuation_at_the_limit_is_refused_before_any_write ... ok
+test adapters::persistence::workflow::tests::message_tests::park_continuation_tests::message_park_continuation_guard_rejects_a_hand_written_park_at_the_limit ... ok
+test adapters::persistence::workflow::tests::message_tests::reconcile_tests::veto_tests::workflow_message_reconcile_sql_reopen_refuses_expired_non_final_and_foreign_evidence ... ok
+test adapters::persistence::workflow::tests::message_tests::reconcile_tests::veto_tests::workflow_message_reconcile_finality_breach_then_every_destination_final_vetoes_the_receipt ... ok
+test adapters::persistence::workflow::tests::message_tests::reconcile_tests::workflow_message_reconcile_applied_on_a_terminal_run_records_truth_only ... ok
+test adapters::persistence::workflow::tests::message_tests::park_continuation_tests::message_park_continuation_one_below_the_limit_parks_and_resumes ... ok
+test adapters::persistence::workflow::tests::message_tests::reconcile_tests::workflow_message_reconcile_conflicted_execution_reopens_nothing ... ok
+observed gated transaction pids=[18002] blocker=18026 elapsed_ms=291
+test adapters::persistence::workflow::tests::message_tests::reconcile_tests::workflow_message_reconcile_expired_proof_before_begin_part_returns_to_unknown ... ok
+test adapters::persistence::workflow::tests::message_tests::reconcile_tests::workflow_message_reconcile_expired_proof_is_refused_without_a_grant ... ok
+test adapters::persistence::workflow::tests::message_tests::reconcile_tests::workflow_message_reconcile_finality_breach_vetoes_resume_and_reopen ... ok
+2026-11-08T07:06:41.541562Z  WARN open_bots::adapters::persistence::workflow::persistence_bound: Workflow persistence bound op="message.publish" outcome="unknown" cause="unresolved" acquire_ms=Some(0) body_ms=Some(134) commit_ms=Some(1868) resolution_ms=Some(998) total_ms=3001 attempt_bound_ms=2000
+test adapters::persistence::workflow::tests::message_tests::reconcile_tests::workflow_message_reconcile_not_applied_reopens_only_the_subject ... ok
+test adapters::persistence::workflow::tests::message_tests::race_tests::workflow_message_race_ambiguous_publication_commit_resolves_three_ways ... ok
+test adapters::persistence::workflow::tests::message_tests::reconcile_tests::workflow_message_reconcile_stale_snapshot_is_refused_without_a_grant ... ok
+test adapters::persistence::workflow::tests::message_tests::reconcile_tests::workflow_message_reconcile_unknown_and_refusals_change_nothing ... ok
+test adapters::persistence::workflow::tests::message_tests::reconcile_tests::workflow_message_sql_evidence_attribution_shape_rejects_forgeries ... ok
+test adapters::persistence::workflow::tests::message_tests::reconcile_tests::workflow_message_unknown_note_through_the_production_composition ... ok
+test adapters::persistence::workflow::tests::message_tests::recovery_tests::workflow_message_model_tool_failed_delivery_continues_the_agent_job ... ok
+test adapters::persistence::workflow::tests::message_tests::recovery_tests::workflow_message_publish_competing_dispatchers_publish_once ... ok
+test adapters::persistence::workflow::tests::message_tests::recovery_tests::workflow_message_recovery_control_retry_replays_the_failed_receipt ... ok
+test adapters::persistence::workflow::tests::message_tests::sql_tests::workflow_message_publish_admission_admits_128_and_refuses_129 ... ok
+test adapters::persistence::workflow::tests::message_tests::sql_tests::workflow_message_publish_step_at_the_limit_is_a_terminal_action_limit ... ok
+test adapters::persistence::workflow::tests::message_tests::sql_tests::workflow_message_sql_admission_backstop_serializes_competing_writers ... ok
+test adapters::persistence::workflow::tests::message_tests::sql_tests::workflow_message_sql_destination_links_reject_foreign_rows ... ok
+test adapters::persistence::workflow::tests::message_tests::sql_tests::workflow_message_sql_effect_wait_must_match_its_run_and_action ... ok
+test adapters::persistence::workflow::tests::message_tests::sql_tests::workflow_message_sql_fence_capture_and_close_identity_reject_forgeries ... ok
+test adapters::persistence::workflow::tests::message_tests::reconcile_tests::workflow_message_reconcile_not_applied_exhausted_or_ended_never_resends ... ok
+test adapters::persistence::workflow::tests::message_tests::sql_tests::workflow_message_sql_park_requires_the_effect_parked_close_cause ... ok
+test adapters::persistence::workflow::tests::message_tests::sql_tests::workflow_message_sql_delivery_provenance_rejects_unproven_exits ... ok
+test adapters::persistence::workflow::tests::message_tests::sql_tests::workflow_message_sql_step_execution_keeps_one_effect_wait ... ok
+test adapters::persistence::workflow::tests::message_tests::storage_message_tests::run_retention_pending_message_consumption_keeps_terminal_tree ... ok
+test adapters::persistence::workflow::tests::message_tests::thread_tests::correlation_tests::workflow_message_stores_anchored_rendered_headers_without_rederiving_them ... ok
+2026-11-08T07:06:59.668570Z  WARN open_bots::adapters::persistence::workflow::knowledge_release: Workflow release refused company_id=6e7e0783-9a94-43f3-8db3-0d29c74d1e97 run_id=46f6a222-526e-4fae-8a98-fe6cd914166d execution_id=e456ee66-efb6-4201-81dd-3bbba662aa8a step_id=start content_level=5 destination_level=0 code="knowledge.audience_below_content"
+test adapters::persistence::workflow::tests::message_tests::thread_tests::knowledge_reply_tests::knowledge_run_level_race_cc_commit_after_destination_snapshot_is_ordered_after_that_freeze ... ok
+test adapters::persistence::workflow::tests::message_tests::recovery_tests::workflow_message_recovery_existing_marker_is_never_republished ... ok
+2026-11-08T07:07:00.697957Z  WARN open_bots::adapters::persistence::workflow::knowledge_release: Workflow release refused company_id=4f269fa0-4ff2-4ce2-9c96-3ec7f3afc545 run_id=f0130ae1-90f9-4801-a518-0ff4f7b3a057 execution_id=b173e51b-bf8e-4e1d-8da4-c5ebf82d2803 step_id=start content_level=5 destination_level=0 code="knowledge.audience_below_content"
+test adapters::persistence::workflow::tests::message_tests::thread_tests::knowledge_reply_tests::knowledge_run_level_reply_cc_added_after_intent_refuses_publication_without_partial_effect ... ok
+2026-11-08T07:07:02.258998Z  WARN open_bots::adapters::persistence::workflow::knowledge_release: Workflow release refused company_id=0198f25a-15d6-47a9-8412-7b0acd517b14 run_id=35a127eb-14da-4a2b-8d2a-4bf7d027e237 execution_id=4cd9de7b-06b5-4bea-80c9-d44f9fab3342 step_id=start content_level=5 destination_level=0 code="knowledge.audience_below_content"
+test adapters::persistence::workflow::tests::message_tests::sql_tests::workflow_message_sql_receipt_and_state_guards_reject_forgeries ... ok
+test adapters::persistence::workflow::tests::message_tests::thread_tests::knowledge_reply_tests::knowledge_run_level_reply_unverified_historical_address_stays_public ... ok
+test adapters::persistence::workflow::tests::message_tests::thread_tests::message_thread_fk_company_deletion_removes_a_reply_destination ... ok
+test adapters::persistence::workflow::tests::message_tests::thread_tests::message_thread_fk_company_deletion_removes_channel_and_user_destinations ... ok
+test adapters::persistence::workflow::tests::message_tests::thread_tests::message_thread_fk_destination_names_a_message_of_its_own_thread ... ok
+test adapters::persistence::workflow::tests::message_tests::thread_tests::workflow_message_thread_external_reply_answers_its_own_source ... ok
+test adapters::persistence::workflow::tests::message_tests::recovery_tests::workflow_message_recovery_rolled_back_publication_retries_and_publishes_once ... ok
+test adapters::persistence::workflow::tests::message_tests::thread_tests::workflow_message_thread_in_app_reply_stays_in_the_source_thread ... ok
+test adapters::persistence::workflow::tests::message_tests::thread_tests::workflow_message_thread_inbound_reply_resolves_each_recipients_copy ... ok
+test adapters::persistence::workflow::tests::message_tests::thread_tests::workflow_message_thread_internal_reply_note_leaves_guards_unchanged ... ok
+test adapters::persistence::workflow::tests::message_tests::thread_tests::workflow_message_thread_send_never_joins_the_customer_thread ... ok
+test adapters::persistence::workflow::tests::message_tests::thread_tests::workflow_message_thread_external_reply_continues_the_source_relay_trace ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_message_publish_in_app_channel_commits_receipt_atomically ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_message_model_tool_deliveries_park_and_continue_sequentially ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_message_receipt_failed_delivery_takes_final_error_and_never_resends ... ok
+2026-11-08T07:07:12.981543Z  WARN open_bots::adapters::persistence::workflow::message::receipts: Workflow message receipt consumption failed company_id=83dd2da4-3b5f-44b3-866c-f7f5f9f8e301 invocation_id=abfe8be7-3bd4-422e-bcd9-010cdd0b92a0 error=Database error: error returned from database: injected consumer defect
+2026-11-08T07:07:12.993751Z  WARN open_bots::adapters::persistence::workflow::message::receipts: Workflow message receipt consumption failed company_id=83dd2da4-3b5f-44b3-866c-f7f5f9f8e301 invocation_id=abfe8be7-3bd4-422e-bcd9-010cdd0b92a0 error=Database error: error returned from database: injected consumer defect
+2026-11-08T07:07:13.000997Z  WARN open_bots::adapters::persistence::workflow::message::receipts: Workflow message receipt consumption failed company_id=83dd2da4-3b5f-44b3-866c-f7f5f9f8e301 invocation_id=abfe8be7-3bd4-422e-bcd9-010cdd0b92a0 error=Database error: error returned from database: injected consumer defect
+2026-11-08T07:07:13.004208Z  WARN open_bots::adapters::persistence::workflow::message::receipts: Workflow message receipt consumption failed company_id=83dd2da4-3b5f-44b3-866c-f7f5f9f8e301 invocation_id=abfe8be7-3bd4-422e-bcd9-010cdd0b92a0 error=Database error: error returned from database: injected consumer defect
+2026-11-08T07:07:13.011015Z  WARN open_bots::adapters::persistence::workflow::message::receipts: Workflow message receipt consumption failed company_id=83dd2da4-3b5f-44b3-866c-f7f5f9f8e301 invocation_id=abfe8be7-3bd4-422e-bcd9-010cdd0b92a0 error=Database error: error returned from database: injected consumer defect
+test adapters::persistence::workflow::tests::message_tests::workflow_message_receipt_poison_backs_off_and_stalls_at_five ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_message_receipt_unknown_is_uncertain_until_the_deadline ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_message_wait_cancel_supersedes_unsent_and_records_late_truth ... ok
+test adapters::persistence::workflow::tests::message_tests::thread_tests::correlation_tests::workflow_message_invalid_frozen_correlation_creates_no_message_or_delivery ... ok
+test adapters::persistence::workflow::tests::message_tests::thread_tests::workflow_message_thread_user_send_opens_a_thread_the_member_takes_part_in ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_message_wait_deadline_supersedes_unsent_deliveries ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_message_wait_user_email_parks_then_resumes_on_accepted_receipt ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_race_tests::workflow_tool_cancel_and_continuation_settle_the_call_once ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_race_tests::workflow_tool_cancel_and_dispatch_never_leave_a_live_child_under_a_cancelled_run ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_race_tests::workflow_tool_reopened_attempt_lost_before_saving_replays_the_same_result ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_race_tests::workflow_tool_dispatch_after_or_during_lease_expiry_starts_nothing ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_registration_tests::closure::autonomous_agent_admission_checks_resources_of_agent_owned_child_workflows ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_registration_tests::references::autonomous_agent_admission_rejects_a_newly_published_self_workflow_binding ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_race_tests::workflow_tool_schema_guards_refuse_parks_reopens_and_lineage_written_by_hand ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_registration_tests::references::autonomous_agent_workflow_reference_keeps_the_child_contract_in_the_agent_revision ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_registration_tests::references::autonomous_agent_workflow_reference_step_http_alias_cannot_redirect_agent_child ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_registration_tests::workflow_tool_pins_and_grants_stay_within_the_agents_company ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_registration_tests::workflow_tool_registration_commands_keep_revisions_authority_and_bounds ... ok
+test adapters::persistence::workflow::tests::message_tests::thread_tests::workflow_message_thread_reply_refuses_sources_it_cannot_answer ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_revocation_tests::current_authority::autonomous_agent_authority_workflow_repoint_requires_new_binding_publication ... ok
+2026-11-08T07:07:26.867466Z  WARN open_bots::adapters::persistence::agent_publication::commands: Agent preview failed failure="invalid_definition"
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_revocation_tests::current_authority::workflow_tool_revocation_refuses_new_runs_and_calls_while_parked_calls_deliver ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_revocation_tests::workflow_tool_repin_and_archive_leave_published_workflows_on_their_frozen_version ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_revocation_tests::workflow_tool_stored_children_keep_their_frozen_pin_until_the_tool_is_revoked ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_tests::knowledge_run_level_workflow_tool_child_and_saved_result_replay_taint_parent_atomically ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_tests::workflow_tool_child_output_outside_the_pinned_schema_fails_the_parent_wait ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_tests::workflow_tool_dispatch_starts_one_child_per_call_and_one_resumer_continues ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_tests::workflow_tool_parent_cancel_cascades_and_a_restarted_worker_resumes_the_call ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_tests::workflow_tool_resumes_the_pending_call_after_a_child_human_decision ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_tests::workflow_tool_typed_errors_reach_the_model_without_fabricated_success ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_tests::workflow_tool_child_failure_limit_and_result_bound_are_typed_errors ... ok
+
+test result: ok. 303 passed; 0 failed; 0 ignored; 0 measured; 3004 filtered out; finished in 189.27s
+

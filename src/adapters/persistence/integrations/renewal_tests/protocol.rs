@@ -15,7 +15,8 @@ pub(crate) async fn reserve(
 ) -> ResolutionResult<Claim> {
     vault.final_dispatch_guard(i, c).await?;
     let work = work(i, c);
-    let s = locked::lock(vault, i, &work).await?;
+    let request = CredentialUse::business(i, c);
+    let s = locked::lock(vault, &request, &work).await?;
     if s.pending.is_some()
         || !matches!(
             vault.registry.get(&s.grant.app)?.renewal,
@@ -37,7 +38,8 @@ pub(crate) async fn complete(
     c: &ExecutionContext,
 ) -> ResolutionResult<ResolvedCredential> {
     let work = work(i, c);
-    let resolved = rotating::execute(vault, &claim.0, i, c, &work).await?;
+    let resolved =
+        rotating::execute(vault, &claim.0, &CredentialUse::business(i, c), &work).await?;
     vault.final_dispatch_guard(i, c).await?;
     Ok(resolved)
 }
@@ -77,4 +79,26 @@ pub(crate) async fn resolver_settings(vault: &PostgresVault) -> Settings {
         .fetch_one(&mut *tx).await.unwrap();
     tx.rollback().await.unwrap();
     value
+}
+
+/// Simulates a separate successful refresher through the real locked cache validator/write.
+pub(crate) async fn cache_refresh(
+    vault: &PostgresVault,
+    i: &AuthorizedInvocation,
+    c: &ExecutionContext,
+    payload: SecretString,
+) -> ResolutionResult<ResolvedCredential> {
+    vault.final_dispatch_guard(i, c).await?;
+    let work = work(i, c);
+    let request = CredentialUse::business(i, c);
+    let locked = locked::lock(vault, &request, &work).await?;
+    write::cache(
+        vault,
+        locked,
+        payload,
+        write::CacheWrite::Renewed,
+        &request,
+        &work,
+    )
+    .await
 }

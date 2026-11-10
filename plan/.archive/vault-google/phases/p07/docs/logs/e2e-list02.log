@@ -1,0 +1,6 @@
+   Compiling open_bots v0.1.0 (/Users/mac02/.codex/worktrees/1133/openbot)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 54.38s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-048b7abd3ed0c794)
+adapters::persistence::workflow::tests::http_tests::vault_tests::execution::native_portability::vault_google_e2e_owner_consent_reuses_one_private_secret_in_two_native_workflows: test
+
+1 test, 0 benchmarks

@@ -1,0 +1,6 @@
+{
+  "fixture": "task-owned isolated origin target cache",
+  "error": "baseline linker failed errno28 disk capacity; no baseline MCP test executed",
+  "action": "removed only /tmp/obpub-origin-jw2vio46/target to release its cloned/generated cache",
+  "source_changed": false
+}

@@ -1,0 +1,2 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+running the test suite with a 2048 KiB thread stack

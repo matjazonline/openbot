@@ -217,13 +217,20 @@ async fn credential(
 async fn refresh(
     State(s): State<std::sync::Arc<crate::use_cases::mcp::McpUseCases>>,
     user: AuthenticatedUser,
+    State(sessions): State<std::sync::Arc<crate::adapters::http::session::SessionAuthority>>,
+    headers: axum::http::HeaderMap,
     Path((company, id)): Path<(Uuid, Uuid)>,
     Form(body): Form<Revision>,
 ) -> AppResult<Html<String>> {
     let current = s.get(user.id, company, id).await?;
+    let owner = if matches!(current.auth, McpAuth::Integration(_)) {
+        super::ui_vault_connect::browser(&sessions, &headers).await?
+    } else {
+        crate::adapters::integrations::owner::verified_owner(&user)
+    };
     let result = async {
         revision(&current, body.expected_revision)?;
-        s.refresh(user.id, &current).await
+        s.refresh(user.id, &current, owner).await
     }
     .await;
     let message = result

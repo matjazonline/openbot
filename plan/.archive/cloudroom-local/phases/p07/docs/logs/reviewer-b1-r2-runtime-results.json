@@ -1,0 +1,47 @@
+[
+  {
+    "name": "plugin-tests",
+    "command": [
+      "node",
+      "test/run.mjs"
+    ],
+    "status": "PASS",
+    "exit": 0,
+    "seconds": 16.48,
+    "file": "reviewer-b1-r2-plugin-tests.txt"
+  },
+  {
+    "name": "e2e-inventory",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "--offline",
+      "--lib",
+      "cloudroom_e2e_",
+      "--",
+      "--list"
+    ],
+    "status": "PASS",
+    "exit": 0,
+    "seconds": 0.83,
+    "file": "reviewer-b1-r2-e2e-inventory.txt"
+  },
+  {
+    "name": "e2e-tests",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "--offline",
+      "--lib",
+      "cloudroom_e2e_",
+      "--",
+      "--nocapture"
+    ],
+    "status": "PASS",
+    "exit": 0,
+    "seconds": 35.39,
+    "file": "reviewer-b1-r2-e2e-tests.txt"
+  }
+]

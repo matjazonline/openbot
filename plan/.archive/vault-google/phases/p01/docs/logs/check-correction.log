@@ -1,0 +1,175 @@
+    Checking open_bots v0.1.0 (/Users/mac02/.codex/worktrees/1133/openbot)
+warning: struct `GooglePayload` is never constructed
+  --> src/adapters/integrations/google_credentials.rs:13:8
+   |
+13 | struct GooglePayload {
+   |        ^^^^^^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: struct `GoogleCredentialAdapter` is never constructed
+  --> src/adapters/integrations/google_credentials.rs:24:19
+   |
+24 | pub(crate) struct GoogleCredentialAdapter {
+   |                   ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: method `decode` is never used
+  --> src/adapters/integrations/google_credentials.rs:28:8
+   |
+27 | impl GoogleCredentialAdapter {
+   | ---------------------------- method in this implementation
+28 |     fn decode(&self, raw: &SecretString) -> IntegrationResult<GooglePayload> {
+   |        ^^^^^^
+
+warning: associated function `from_verified_client` is never used
+  --> src/application/integrations/gateway.rs:18:19
+   |
+17 | impl VerifiedOwner {
+   | ------------------ associated function in this implementation
+18 |     pub(crate) fn from_verified_client(owner: AccountOwner) -> Self {
+   |                   ^^^^^^^^^^^^^^^^^^^^
+
+warning: fields `owner`, `account`, `binding`, `app`, `destination`, and `host_authority` are never read
+   --> src/application/integrations/gateway.rs:209:16
+    |
+208 | pub struct OwnerConfirmation {
+    |            ----------------- fields in this struct
+209 |     pub(crate) owner: VerifiedOwner,
+    |                ^^^^^
+210 |     pub(crate) account: AccountId,
+    |                ^^^^^^^
+211 |     pub(crate) binding: HostBinding,
+    |                ^^^^^^^
+212 |     pub(crate) app: AppId,
+    |                ^^^
+213 |     pub(crate) destination: ApprovedDestination,
+    |                ^^^^^^^^^^^
+214 |     pub(crate) host_authority: HostAuthorityReference,
+    |                ^^^^^^^^^^^^^^
+    |
+    = note: `OwnerConfirmation` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+
+warning: struct `CredentialRecord` is never constructed
+ --> src/application/integrations/private.rs:7:19
+  |
+7 | pub(crate) struct CredentialRecord {
+  |                   ^^^^^^^^^^^^^^^^
+
+warning: trait `CredentialStore` is never used
+  --> src/application/integrations/private.rs:13:18
+   |
+13 | pub(crate) trait CredentialStore: Send + Sync {
+   |                  ^^^^^^^^^^^^^^^
+
+warning: struct `ProviderAuthorization` is never constructed
+  --> src/application/integrations/private.rs:21:19
+   |
+21 | pub(crate) struct ProviderAuthorization {
+   |                   ^^^^^^^^^^^^^^^^^^^^^
+
+warning: struct `ProviderConnectRequest` is never constructed
+  --> src/application/integrations/private.rs:26:19
+   |
+26 | pub(crate) struct ProviderConnectRequest {
+   |                   ^^^^^^^^^^^^^^^^^^^^^^
+
+warning: trait `ProviderLifecycle` is never used
+  --> src/application/integrations/private.rs:32:18
+   |
+32 | pub(crate) trait ProviderLifecycle: Send + Sync {
+   |                  ^^^^^^^^^^^^^^^^^
+
+warning: enum `InjectionMethod` is never used
+  --> src/application/integrations/private.rs:42:17
+   |
+42 | pub(crate) enum InjectionMethod {
+   |                 ^^^^^^^^^^^^^^^
+
+warning: struct `TypedInjection` is never constructed
+  --> src/application/integrations/private.rs:47:19
+   |
+47 | pub(crate) struct TypedInjection {
+   |                   ^^^^^^^^^^^^^^
+
+warning: trait `CredentialAdapter` is never used
+  --> src/application/integrations/private.rs:51:18
+   |
+51 | pub(crate) trait CredentialAdapter: Send + Sync {
+   |                  ^^^^^^^^^^^^^^^^^
+
+warning: field `client_secret_reference` is never read
+  --> src/application/integrations/registry.rs:17:16
+   |
+13 | pub struct AuthConfig {
+   |            ---------- field in this struct
+...
+17 |     pub(crate) client_secret_reference: Option<ClientSecretReference>,
+   |                ^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `AuthConfig` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis
+
+warning: struct `Registration` is never constructed
+  --> src/application/integrations/registry.rs:27:19
+   |
+27 | pub(crate) struct Registration {
+   |                   ^^^^^^^^^^^^
+
+warning: struct `CodeOwnedRegistry` is never constructed
+  --> src/application/integrations/registry.rs:34:19
+   |
+34 | pub(crate) struct CodeOwnedRegistry {
+   |                   ^^^^^^^^^^^^^^^^^
+
+warning: methods `register`, `get`, and `validate` are never used
+  --> src/application/integrations/registry.rs:38:12
+   |
+37 | impl CodeOwnedRegistry {
+   | ---------------------- methods in this implementation
+38 |     pub fn register(&mut self, entry: Registration) -> IntegrationResult<()> {
+   |            ^^^^^^^^
+...
+51 |     pub fn get(&self, app: &AppId) -> IntegrationResult<&Registration> {
+   |            ^^^
+...
+54 |     pub fn validate(
+   |            ^^^^^^^^
+
+warning: struct `StaticCredentialAdapter` is never constructed
+  --> src/application/integrations/registry.rs:73:19
+   |
+73 | pub(crate) struct StaticCredentialAdapter {
+   |                   ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: associated items `bearer`, `api_key_header`, and `secret` are never used
+  --> src/application/integrations/registry.rs:77:12
+   |
+76 | impl StaticCredentialAdapter {
+   | ---------------------------- associated items in this implementation
+77 |     pub fn bearer() -> Self {
+   |            ^^^^^^
+...
+80 |     pub fn api_key_header(header: &str) -> IntegrationResult<Self> {
+   |            ^^^^^^^^^^^^^^
+...
+98 |     fn secret(&self, payload: &SecretString) -> IntegrationResult<SecretString> {
+   |        ^^^^^^
+
+warning: function `static_registry` is never used
+   --> src/application/integrations/registry.rs:150:15
+    |
+150 | pub(crate) fn static_registry() -> CodeOwnedRegistry {
+    |               ^^^^^^^^^^^^^^^
+
+warning: `open_bots` (lib) generated 20 warnings
+warning: associated function `from_verified_client` is never used
+  --> src/application/integrations/gateway.rs:18:19
+   |
+17 | impl VerifiedOwner {
+   | ------------------ associated function in this implementation
+18 |     pub(crate) fn from_verified_client(owner: AccountOwner) -> Self {
+   |                   ^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `open_bots` (lib test) generated 8 warnings (7 duplicates)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 16.02s

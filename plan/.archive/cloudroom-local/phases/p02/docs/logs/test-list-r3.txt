@@ -1,0 +1,38 @@
+   Compiling open_bots v0.1.0 (/Users/mac03/dev/openbot)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1m 58s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-3384251af61cfdaf)
+adapters::http::routes::local_machines::tests::cloudroom_company_http_foreign_mutations_preserve_pairing_projects_and_machine: test
+adapters::http::routes::local_machines::tests::cloudroom_company_http_session_csrf_and_foreign_object_guards: test
+adapters::http::routes::local_machines::tests::cloudroom_pairing_http_bounds_and_closed_payloads_reject_before_enrollment: test
+adapters::http::routes::local_machines::tests::cloudroom_pairing_http_response_loss_and_dedicated_header_recovery: test
+adapters::persistence::local_agents::machine_tests::cloudroom_company_operation_deadline_round_trip_preserves_digest: test
+adapters::persistence::local_agents::machine_tests::cloudroom_company_profiles_sessions_operations_are_scoped_and_frozen: test
+adapters::persistence::local_agents::machine_tests::cloudroom_revocation_fences_competing_connections_and_preserves_uncertainty: test
+adapters::persistence::local_agents::machine_tests::cloudroom_revocation_repair_is_new_and_installation_reservation_survives_company_deletion: test
+adapters::persistence::local_agents::machine_tests::constraint_tests::cloudroom_company_machine_reference_constraints_reject_foreign_rows: test
+adapters::persistence::local_agents::machine_tests::constraint_tests::cloudroom_company_session_operation_constraints_reject_foreign_rows: test
+adapters::persistence::local_agents::machine_tests::constraint_tests::cloudroom_company_workflow_session_constraint_rejects_existing_foreign_run: test
+adapters::persistence::local_agents::pairing_tests::cloudroom_company_live_issuer_revocation_and_management_scope: test
+adapters::persistence::local_agents::pairing_tests::cloudroom_pairing_budget_cardinality_is_bounded_under_competing_new_keys: test
+adapters::persistence::local_agents::pairing_tests::cloudroom_pairing_cancel_and_consume_are_linearized: test
+adapters::persistence::local_agents::pairing_tests::cloudroom_pairing_code_limit_cancel_and_competing_attempt_budget: test
+adapters::persistence::local_agents::pairing_tests::cloudroom_pairing_competing_claimants_and_lost_response_recover_only_winner: test
+adapters::persistence::local_agents::pairing_tests::cloudroom_pairing_expiry_uses_database_time_after_waiting_for_locks: test
+adapters::persistence::local_agents::pairing_tests::cloudroom_pairing_reused_claim_or_credential_never_reserves_another_installation: test
+adapters::persistence::local_agents::pairing_tests::cloudroom_pairing_secret_encodings_entropy_and_debug_redaction: test
+application::local_agents::contract_tests::cloudroom_bounds_admission_preserves_control_capacity: test
+application::local_agents::contract_tests::cloudroom_bounds_deadline_rejects_elapsed_and_above_maximum: test
+application::local_agents::contract_tests::cloudroom_bounds_output_and_catalog_decode_at_their_limits: test
+application::local_agents::contract_tests::cloudroom_bounds_prompt_counts_utf8_bytes_and_redacts_debug: test
+application::local_agents::contract_tests::cloudroom_contract_aligned_leap_seconds_are_not_representable_operation_deadlines: test
+application::local_agents::contract_tests::cloudroom_contract_catalog_refuses_unsupported_model_reasoning: test
+application::local_agents::contract_tests::cloudroom_contract_catalog_success_requires_catalog_evidence: test
+application::local_agents::contract_tests::cloudroom_contract_commands_are_closed_and_controls_are_explicit: test
+application::local_agents::contract_tests::cloudroom_contract_deadline_precision_is_frozen_before_hashing: test
+application::local_agents::contract_tests::cloudroom_contract_effect_success_requires_its_thread_and_a_turn: test
+application::local_agents::contract_tests::cloudroom_contract_identities_validate_on_decode: test
+application::local_agents::contract_tests::cloudroom_contract_machine_capabilities_reference_an_installation_scoped_snapshot: test
+application::local_agents::contract_tests::cloudroom_contract_operations_freeze_digest_and_separate_dispatch_outcomes: test
+application::local_agents::contract_tests::cloudroom_contract_reasoning_is_frozen_into_the_create_digest: test
+
+33 tests, 0 benchmarks

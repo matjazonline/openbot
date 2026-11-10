@@ -1,0 +1,36 @@
+{
+  "stage": "pair",
+  "commands": [
+    {
+      "id": "2fe3c137-ebe0-437b-a1ca-bf4bcca76e56",
+      "kind": "refresh_catalog",
+      "stage": "terminal",
+      "sdkCalls": 0,
+      "thread": null,
+      "request": null,
+      "turn": null,
+      "queue": null,
+      "cursor": 0,
+      "correlationConflict": 0,
+      "nativeState": null,
+      "sequence": 2,
+      "evidence": null
+    },
+    {
+      "id": "725bb8c3-4b05-4e75-b86b-76a73577aa62",
+      "kind": "create",
+      "stage": "uncertain",
+      "sdkCalls": 1,
+      "thread": "thr_tfiubsjg9h",
+      "request": "creq_rrs8wbfunr",
+      "turn": "da41b30c19-t1",
+      "queue": null,
+      "cursor": 19,
+      "correlationConflict": 1,
+      "nativeState": "running",
+      "sequence": 7,
+      "evidence": "uncertain"
+    }
+  ],
+  "events": []
+}

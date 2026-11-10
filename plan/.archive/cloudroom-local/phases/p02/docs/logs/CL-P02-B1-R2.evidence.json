@@ -1,0 +1,174 @@
+{
+  "version": 1,
+  "round": "CL-P02-B1-R2",
+  "artifact": "ee02338b474bb7b234a8a8978669f952df0b36aabf125d191ae1bb2fc547aad7",
+  "checks": [
+    {
+      "criteria": [
+        "AC4"
+      ],
+      "command": "SQLX_OFFLINE=true cargo test --locked --offline --lib adapters::http::auth_admission -- --list; SQLX_OFFLINE=true cargo test --locked --offline --lib adapters::http::auth_admission",
+      "fixture": "existing auth-admission focused tests, 9 nonzero",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/auth-admission-list-r1.txt",
+          "sha256": "08c6593cad4c222b67bf4682698856fe095c5d7a769687d4f1bc2dd2865dc577"
+        },
+        {
+          "path": "logs/auth-admission-tests-r1.txt",
+          "sha256": "f31940f4e4a0cfef792e65133cd52cc46554e75f74765fe5ed63631375d921a4"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC6"
+      ],
+      "command": "cargo sqlx migrate run; cargo sqlx prepare -- --all-targets; SQLX_OFFLINE=true cargo check --locked --offline --all-targets",
+      "fixture": "owned fresh openbot_cloudroom_build on loopback 56388, final init schema",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/migrate-r3.txt",
+          "sha256": "ee603945516f77c0ca672bbb546a1de16b70884098ebee707dd23c6eb045e3da"
+        },
+        {
+          "path": "logs/sqlx-prepare-r2.txt",
+          "sha256": "b83047d7fd9c9ed54143080c6ad9332e8216a025551789b7613f3498eeff908c"
+        },
+        {
+          "path": "logs/check-r4.txt",
+          "sha256": "73596b79c23573c30ea3176cec2df235cf5a72cea804331b01f4aa027afa4a13"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "CL-I005"
+      ],
+      "command": "native headless Linux smoke acceptance",
+      "fixture": "macOS host",
+      "status": "NOT EXERCISED",
+      "reason": "User explicitly chose Leave Linux acceptance unverified; platform implementation remains in scope."
+    },
+    {
+      "criteria": [
+        "AC1",
+        "AC2",
+        "AC3",
+        "AC4",
+        "AC5",
+        "CL-P02-B1-F1",
+        "CL-P02-B1-F2"
+      ],
+      "command": "SQLX_OFFLINE=true cargo test --locked --offline --lib cloudroom_ -- --list; SQLX_OFFLINE=true cargo test --locked --offline --lib cloudroom_",
+      "fixture": "owned Postgres18 at loopback 56388, per-test owned DB including real accepted_http workflow fixture; 33 nonzero tests",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/test-list-r4.txt",
+          "sha256": "1ff1f5278eb2a230b3abac0873ee72b12f349d33bddf99b1af36c01801eaf15b"
+        },
+        {
+          "path": "logs/tests-r4.txt",
+          "sha256": "07ce4ec8df6813ea5dd7af59cef28a38b9d1a3b88508a05576e10d9dff917ccd"
+        },
+        {
+          "path": "logs/test-inventory-correction-r1.json",
+          "sha256": "a23e1d6c72b483e7e06efb538af8b38ef9184664f2aefa02609531b5c5e23f2e"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC1",
+        "CL-P02-B1-F2",
+        "AC6"
+      ],
+      "command": "DATABASE_URL=<owned build database> cargo sqlx prepare -- --all-targets",
+      "fixture": "owned build DB on loopback56388; new raw test SQL; no metadata delta",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/sqlx-prepare-r3.txt",
+          "sha256": "ff1b2af3a880a908bee0d7a1297379a16ad145b31a727322e76e83dafc22e6b7"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC6"
+      ],
+      "command": "SQLX_OFFLINE=true cargo clippy --locked --offline --all-targets -- -D warnings",
+      "fixture": "current correction artifact",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/clippy-r3.txt",
+          "sha256": "03ddec9cf65f9b85aa276fef190ddeed7913ca4a823e44f976cb615f1e7a5b8b"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC6"
+      ],
+      "command": "cargo fmt --all -- --check; git diff --check",
+      "fixture": "current correction artifact",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/format-final-r2.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": "logs/whitespace-final-r2.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC1"
+      ],
+      "command": "SQLX_OFFLINE=true cargo test --locked --offline --lib cloudroom_company_operation_deadline_round_trip_preserves_digest",
+      "fixture": "historical pre-fix defect; passing correction retained in tests-r4",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/deadline-roundtrip-before.txt",
+          "sha256": "bfe954ad12155b0f17a123d2949142d4f26f002679b2b9370e53f30001a490a8"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "CL-P02-B1-F1"
+      ],
+      "command": "SQLX_OFFLINE=true cargo test --locked --offline --lib cloudroom_",
+      "fixture": "first new HTTP regression helper incorrectly parsed plain-text 404 as JSON; helper corrected, tests-r4 passes all33",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/tests-r3.txt",
+          "sha256": "8ed4dd4d7fb46a0bf7a54430304ce567becde1812da8d69bbca936d0c4517436"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC6"
+      ],
+      "command": "reviewer supplemental SQLX_OFFLINE=true cargo test --locked --offline --lib cloudroom_",
+      "fixture": "historical ENOSPC before tests; root recovered only current-crate incremental files and tests-r4 ran successfully",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/reviewer-b1-r1-cloudroom-tests.txt",
+          "sha256": "6e2216d7bf9e285311ffda0473e92bbe72791b28ae7fd2178d1245102ef6df81"
+        }
+      ]
+    }
+  ]
+}

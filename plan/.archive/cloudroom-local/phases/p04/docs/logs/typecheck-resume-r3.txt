@@ -1,0 +1,5 @@
+
+> bb-plugin-openbot-local@0.1.0 typecheck
+> tsc --noEmit
+
+test/native-fixture.ts(44,51): error TS2550: Property 'toReversed' does not exist on type 'ThreadEventRow[]'. Do you need to change your target library? Try changing the 'lib' compiler option to 'es2023' or later.

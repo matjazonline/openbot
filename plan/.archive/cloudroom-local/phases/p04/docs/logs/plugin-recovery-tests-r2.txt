@@ -1,0 +1,53 @@
+
+> bb-plugin-openbot-local@0.1.0 test
+> node scripts/build.mjs --test && node test/run.mjs
+
+built 5 test entries
+✔ real trusted WSS reconnect rewraps immutable outbox and native tracking continues offline without duplicate SDK calls (1010.739625ms)
+✔ authorization rejection stops reconnect attempts and never enters the SDK (6.3205ms)
+✔ shutdown during a stalled TLS handshake joins network and dispatcher within the host drain (15.282958ms)
+✔ configuration refuses non-origin URL http:// (0.502375ms)
+✔ configuration refuses non-origin URL https:// (0.054167ms)
+✔ configuration refuses non-origin URL https://path (0.041708ms)
+✔ configuration refuses non-origin URL https:// (0.039791ms)
+✔ configuration refuses non-origin URL https:// (0.043583ms)
+✔ configuration canonicalizes HTTPS and refuses arbitrary project paths/duplicates/bounds (0.881416ms)
+✔ user UTF8 prompt bound remains32KiB with fixed native operation header (3.738167ms)
+✔ actual peer command decoder canonicalizes field order and rejects hash/date/field changes (0.338042ms)
+✔ chunk transport roundtrips the exact2MiB limit and rejects overflow before send (19.984625ms)
+✔ chunks reject interleaving, invalid UTF8/base64, unsafe integers and time expiry (2.036708ms)
+✔ real SQLite survives receipt/intent reopen and replay keeps immutable payloads (13.49625ms)
+✔ competing stale intent claimants have exactly one durable SDK entry marker (3.236084ms)
+✔ missing command under reconcile enters durable recovery without a fresh SDK claim (3.398958ms)
+✔ acknowledgment cannot forget an unknown future or restore an already-pruned cursor (4.134416ms)
+✔ preflight refusal is durable but cannot follow the SDK intent cut (4.241458ms)
+✔ fixed4096 history bound fails controlled admission and never allocates a dangling sequence (1503.474792ms)
+✔ real process interruption at enrollment before-pending recovers the same durable claim (107.186958ms)
+✔ real process interruption at enrollment pending recovers the same durable claim (73.653875ms)
+✔ real process interruption at enrollment server-commit recovers the same durable claim (94.994959ms)
+✔ real process interruption at enrollment receipt recovers the same durable claim (185.038791ms)
+✔ real process interruption at enrollment journal recovers the same durable claim (122.520667ms)
+✔ real process interruption at enrollment paired recovers the same durable claim (83.852625ms)
+✔ real process interruption at enrollment cleaned recovers the same durable claim (85.107917ms)
+✔ changed origin never receives a saved pending credential or pairing claim (2.648458ms)
+✔ real competing connector processes exclude each other and OS releases graceful and killed owners (443.411959ms)
+✔ create freezes explicit local checkout/provider/model and duplicate concurrent delivery submits once (18.398041ms)
+✔ lost send response reopens intent and recovers exact turn without sending again (9.262333ms)
+✔ spawn gap recovers positive plugin metadata, while absent threads never recreate (4.918083ms)
+✔ human turn, idle thread and unrelated permission prompts cannot complete or take ownership (6.014208ms)
+✔ preflight model refusal is durable before any SDK mutation (4.119791ms)
+✔ preflight provider refusal is durable before any SDK mutation (3.873875ms)
+✔ preflight project refusal is durable before any SDK mutation (4.875125ms)
+✔ preflight expired refusal is durable before any SDK mutation (2.83975ms)
+✔ preflight gate refusal is durable before any SDK mutation (3.213875ms)
+✔ preflight foreign refusal is durable before any SDK mutation (6.472375ms)
+✔ unknown work consumes eight effect slots but explicit mapped-thread stop retains headroom (20.845625ms)
+✔ service abort cancels actual SDK wait and retains ambiguous intent without broad stop (8.852791ms)
+ℹ tests 40
+ℹ suites 0
+ℹ pass 40
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1653.751292

@@ -1,0 +1,57 @@
+{
+  "operations": [
+    {
+      "tool": "get_guide",
+      "effect": "read",
+      "approval_required": false
+    },
+    {
+      "tool": "get_profile",
+      "effect": "read",
+      "approval_required": false
+    },
+    {
+      "tool": "list_canvases",
+      "effect": "read",
+      "approval_required": false
+    },
+    {
+      "tool": "get_canvas",
+      "effect": "read",
+      "approval_required": false
+    },
+    {
+      "tool": "get_frame",
+      "effect": "read",
+      "approval_required": false
+    },
+    {
+      "tool": "get_frame_screenshot",
+      "effect": "read",
+      "approval_required": false
+    },
+    {
+      "tool": "create_canvas",
+      "effect": "write",
+      "approval_required": true
+    },
+    {
+      "tool": "create_frame",
+      "effect": "write",
+      "approval_required": true
+    },
+    {
+      "tool": "edit_frame_html",
+      "effect": "write",
+      "approval_required": true
+    }
+  ],
+  "editing_agent": [
+    "get_guide",
+    "get_canvas",
+    "get_frame",
+    "create_frame",
+    "edit_frame_html",
+    "get_frame_screenshot"
+  ]
+}

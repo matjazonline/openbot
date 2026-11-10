@@ -1,0 +1,632 @@
+{
+  "stage": "deny",
+  "commands": [
+    {
+      "id": "75dfad99-3509-455b-bdee-6e2f1b6a95b6",
+      "kind": "refresh_catalog",
+      "stage": "terminal",
+      "sdkCalls": 0,
+      "thread": null,
+      "request": null,
+      "turn": null,
+      "queue": null,
+      "cursor": 0,
+      "correlationConflict": 0,
+      "nativeState": null,
+      "sequence": 2,
+      "evidence": null
+    },
+    {
+      "id": "5b59dbce-4726-47ec-a721-3b5ed920e006",
+      "kind": "create",
+      "stage": "terminal",
+      "sdkCalls": 1,
+      "thread": "thr_cvmdgs2vij",
+      "request": "creq_irtuudx6cr",
+      "turn": "dae9778e15-t1",
+      "queue": null,
+      "cursor": 36,
+      "correlationConflict": 0,
+      "nativeState": "completed",
+      "sequence": 7,
+      "evidence": "turn"
+    },
+    {
+      "id": "2821f9a0-5899-4b03-8876-963871df3302",
+      "kind": "refresh_catalog",
+      "stage": "terminal",
+      "sdkCalls": 0,
+      "thread": null,
+      "request": null,
+      "turn": null,
+      "queue": null,
+      "cursor": 0,
+      "correlationConflict": 0,
+      "nativeState": null,
+      "sequence": 9,
+      "evidence": null
+    },
+    {
+      "id": "01a1bb1b-5d9c-75e9-a603-720bf2fc0fc9",
+      "kind": "send",
+      "stage": "terminal",
+      "sdkCalls": 1,
+      "thread": "thr_cvmdgs2vij",
+      "request": "creq_9qy52qdkgq",
+      "turn": "da6be03856-t1",
+      "queue": null,
+      "cursor": 54,
+      "correlationConflict": 0,
+      "nativeState": "completed",
+      "sequence": 14,
+      "evidence": "turn"
+    },
+    {
+      "id": "01a1bb1b-9208-715a-8b3d-1eec87987b7d",
+      "kind": "send",
+      "stage": "observing",
+      "sdkCalls": 1,
+      "thread": "thr_cvmdgs2vij",
+      "request": "creq_s3i96p5d2c",
+      "turn": "dad1b15d8b-t2",
+      "queue": null,
+      "cursor": 78,
+      "correlationConflict": 0,
+      "nativeState": "waiting_for_input",
+      "sequence": 19,
+      "evidence": "turn"
+    },
+    {
+      "id": "7a1a076c-9479-4c30-ac3e-208d3d46b382",
+      "kind": "refresh_catalog",
+      "stage": "terminal",
+      "sdkCalls": 0,
+      "thread": null,
+      "request": null,
+      "turn": null,
+      "queue": null,
+      "cursor": 0,
+      "correlationConflict": 0,
+      "nativeState": null,
+      "sequence": 21,
+      "evidence": null
+    }
+  ],
+  "events": [
+    {
+      "seq": 1,
+      "type": "client/turn/requested",
+      "scope": {
+        "kind": "thread"
+      },
+      "request": "creq_irtuudx6cr",
+      "source": "spawn",
+      "operation": "5b59dbce-4726-47ec-a721-3b5ed920e006"
+    },
+    {
+      "seq": 2,
+      "type": "client/thread/start",
+      "scope": {
+        "kind": "thread"
+      },
+      "source": "spawn"
+    },
+    {
+      "seq": 3,
+      "type": "system/thread-provisioning",
+      "scope": {
+        "kind": "thread"
+      },
+      "status": "active"
+    },
+    {
+      "seq": 4,
+      "type": "system/thread-provisioning",
+      "scope": {
+        "kind": "thread"
+      },
+      "status": "active"
+    },
+    {
+      "seq": 5,
+      "type": "system/thread-provisioning",
+      "scope": {
+        "kind": "thread"
+      },
+      "status": "active"
+    },
+    {
+      "seq": 6,
+      "type": "system/thread-provisioning",
+      "scope": {
+        "kind": "thread"
+      },
+      "status": "active"
+    },
+    {
+      "seq": 7,
+      "type": "system/thread-provisioning",
+      "scope": {
+        "kind": "thread"
+      },
+      "status": "active"
+    },
+    {
+      "seq": 8,
+      "type": "system/thread-provisioning",
+      "scope": {
+        "kind": "thread"
+      },
+      "status": "completed"
+    },
+    {
+      "seq": 9,
+      "type": "thread/identity",
+      "scope": {
+        "kind": "thread"
+      }
+    },
+    {
+      "seq": 10,
+      "type": "thread/started",
+      "scope": {
+        "kind": "thread"
+      }
+    },
+    {
+      "seq": 11,
+      "type": "thread/identity",
+      "scope": {
+        "kind": "thread"
+      }
+    },
+    {
+      "seq": 12,
+      "type": "provider.env-resolved",
+      "scope": {
+        "kind": "thread"
+      }
+    },
+    {
+      "seq": 13,
+      "type": "turn/started",
+      "scope": {
+        "kind": "turn",
+        "turnId": "dae9778e15-t1"
+      }
+    },
+    {
+      "seq": 14,
+      "type": "turn/input/accepted",
+      "scope": {
+        "kind": "turn",
+        "turnId": "dae9778e15-t1"
+      },
+      "clientRequest": "creq_irtuudx6cr"
+    },
+    {
+      "seq": 15,
+      "type": "item/started",
+      "scope": {
+        "kind": "turn",
+        "turnId": "dae9778e15-t1"
+      },
+      "itemType": "agentMessage"
+    },
+    {
+      "seq": 16,
+      "type": "item/agentMessage/delta",
+      "scope": {
+        "kind": "turn",
+        "turnId": "dae9778e15-t1"
+      }
+    },
+    {
+      "seq": 19,
+      "type": "item/completed",
+      "scope": {
+        "kind": "turn",
+        "turnId": "dae9778e15-t1"
+      },
+      "itemType": "agentMessage"
+    },
+    {
+      "seq": 20,
+      "type": "item/started",
+      "scope": {
+        "kind": "turn",
+        "turnId": "dae9778e15-t1"
+      },
+      "itemType": "commandExecution"
+    },
+    {
+      "seq": 21,
+      "type": "item/completed",
+      "scope": {
+        "kind": "turn",
+        "turnId": "dae9778e15-t1"
+      },
+      "itemType": "commandExecution"
+    },
+    {
+      "seq": 22,
+      "type": "thread/tokenUsage/updated",
+      "scope": {
+        "kind": "turn",
+        "turnId": "dae9778e15-t1"
+      }
+    },
+    {
+      "seq": 23,
+      "type": "thread/contextWindowUsage/updated",
+      "scope": {
+        "kind": "turn",
+        "turnId": "dae9778e15-t1"
+      }
+    },
+    {
+      "seq": 24,
+      "type": "provider/rateLimits/updated",
+      "scope": {
+        "kind": "thread"
+      }
+    },
+    {
+      "seq": 25,
+      "type": "item/started",
+      "scope": {
+        "kind": "turn",
+        "turnId": "dae9778e15-t1"
+      },
+      "itemType": "agentMessage"
+    },
+    {
+      "seq": 26,
+      "type": "item/agentMessage/delta",
+      "scope": {
+        "kind": "turn",
+        "turnId": "dae9778e15-t1"
+      }
+    },
+    {
+      "seq": 31,
+      "type": "item/completed",
+      "scope": {
+        "kind": "turn",
+        "turnId": "dae9778e15-t1"
+      },
+      "itemType": "agentMessage"
+    },
+    {
+      "seq": 32,
+      "type": "thread/tokenUsage/updated",
+      "scope": {
+        "kind": "turn",
+        "turnId": "dae9778e15-t1"
+      }
+    },
+    {
+      "seq": 33,
+      "type": "thread/contextWindowUsage/updated",
+      "scope": {
+        "kind": "turn",
+        "turnId": "dae9778e15-t1"
+      }
+    },
+    {
+      "seq": 34,
+      "type": "provider/rateLimits/updated",
+      "scope": {
+        "kind": "thread"
+      }
+    },
+    {
+      "seq": 35,
+      "type": "provider/unhandled",
+      "scope": {
+        "kind": "thread"
+      }
+    },
+    {
+      "seq": 36,
+      "type": "turn/completed",
+      "scope": {
+        "kind": "turn",
+        "turnId": "dae9778e15-t1"
+      },
+      "status": "completed"
+    },
+    {
+      "seq": 37,
+      "type": "client/turn/requested",
+      "scope": {
+        "kind": "thread"
+      },
+      "request": "creq_9qy52qdkgq",
+      "source": "tell",
+      "operation": "01a1bb1b-5d9c-75e9-a603-720bf2fc0fc9"
+    },
+    {
+      "seq": 38,
+      "type": "thread/identity",
+      "scope": {
+        "kind": "thread"
+      }
+    },
+    {
+      "seq": 39,
+      "type": "provider.env-resolved",
+      "scope": {
+        "kind": "thread"
+      }
+    },
+    {
+      "seq": 40,
+      "type": "thread/contextWindowUsage/updated",
+      "scope": {
+        "kind": "thread"
+      }
+    },
+    {
+      "seq": 41,
+      "type": "thread/extensionState/updated",
+      "scope": {
+        "kind": "thread"
+      }
+    },
+    {
+      "seq": 42,
+      "type": "turn/started",
+      "scope": {
+        "kind": "turn",
+        "turnId": "da6be03856-t1"
+      }
+    },
+    {
+      "seq": 43,
+      "type": "turn/input/accepted",
+      "scope": {
+        "kind": "turn",
+        "turnId": "da6be03856-t1"
+      },
+      "clientRequest": "creq_9qy52qdkgq"
+    },
+    {
+      "seq": 44,
+      "type": "item/started",
+      "scope": {
+        "kind": "turn",
+        "turnId": "da6be03856-t1"
+      },
+      "itemType": "agentMessage"
+    },
+    {
+      "seq": 45,
+      "type": "item/agentMessage/delta",
+      "scope": {
+        "kind": "turn",
+        "turnId": "da6be03856-t1"
+      }
+    },
+    {
+      "seq": 49,
+      "type": "item/completed",
+      "scope": {
+        "kind": "turn",
+        "turnId": "da6be03856-t1"
+      },
+      "itemType": "agentMessage"
+    },
+    {
+      "seq": 50,
+      "type": "thread/tokenUsage/updated",
+      "scope": {
+        "kind": "turn",
+        "turnId": "da6be03856-t1"
+      }
+    },
+    {
+      "seq": 51,
+      "type": "thread/contextWindowUsage/updated",
+      "scope": {
+        "kind": "turn",
+        "turnId": "da6be03856-t1"
+      }
+    },
+    {
+      "seq": 52,
+      "type": "provider/rateLimits/updated",
+      "scope": {
+        "kind": "thread"
+      }
+    },
+    {
+      "seq": 53,
+      "type": "provider/unhandled",
+      "scope": {
+        "kind": "thread"
+      }
+    },
+    {
+      "seq": 54,
+      "type": "turn/completed",
+      "scope": {
+        "kind": "turn",
+        "turnId": "da6be03856-t1"
+      },
+      "status": "completed"
+    },
+    {
+      "seq": 55,
+      "type": "client/turn/requested",
+      "scope": {
+        "kind": "thread"
+      },
+      "request": "creq_m3axaxkxca",
+      "source": "tell"
+    },
+    {
+      "seq": 56,
+      "type": "thread/identity",
+      "scope": {
+        "kind": "thread"
+      }
+    },
+    {
+      "seq": 57,
+      "type": "provider.env-resolved",
+      "scope": {
+        "kind": "thread"
+      }
+    },
+    {
+      "seq": 58,
+      "type": "thread/contextWindowUsage/updated",
+      "scope": {
+        "kind": "thread"
+      }
+    },
+    {
+      "seq": 59,
+      "type": "thread/extensionState/updated",
+      "scope": {
+        "kind": "thread"
+      }
+    },
+    {
+      "seq": 60,
+      "type": "turn/started",
+      "scope": {
+        "kind": "turn",
+        "turnId": "dad1b15d8b-t1"
+      }
+    },
+    {
+      "seq": 61,
+      "type": "turn/input/accepted",
+      "scope": {
+        "kind": "turn",
+        "turnId": "dad1b15d8b-t1"
+      },
+      "clientRequest": "creq_m3axaxkxca"
+    },
+    {
+      "seq": 62,
+      "type": "item/started",
+      "scope": {
+        "kind": "turn",
+        "turnId": "dad1b15d8b-t1"
+      },
+      "itemType": "agentMessage"
+    },
+    {
+      "seq": 63,
+      "type": "item/agentMessage/delta",
+      "scope": {
+        "kind": "turn",
+        "turnId": "dad1b15d8b-t1"
+      }
+    },
+    {
+      "seq": 67,
+      "type": "item/completed",
+      "scope": {
+        "kind": "turn",
+        "turnId": "dad1b15d8b-t1"
+      },
+      "itemType": "agentMessage"
+    },
+    {
+      "seq": 68,
+      "type": "thread/tokenUsage/updated",
+      "scope": {
+        "kind": "turn",
+        "turnId": "dad1b15d8b-t1"
+      }
+    },
+    {
+      "seq": 69,
+      "type": "thread/contextWindowUsage/updated",
+      "scope": {
+        "kind": "turn",
+        "turnId": "dad1b15d8b-t1"
+      }
+    },
+    {
+      "seq": 70,
+      "type": "provider/rateLimits/updated",
+      "scope": {
+        "kind": "thread"
+      }
+    },
+    {
+      "seq": 71,
+      "type": "provider/unhandled",
+      "scope": {
+        "kind": "thread"
+      }
+    },
+    {
+      "seq": 72,
+      "type": "turn/completed",
+      "scope": {
+        "kind": "turn",
+        "turnId": "dad1b15d8b-t1"
+      },
+      "status": "completed"
+    },
+    {
+      "seq": 73,
+      "type": "client/turn/requested",
+      "scope": {
+        "kind": "thread"
+      },
+      "request": "creq_s3i96p5d2c",
+      "source": "tell",
+      "operation": "01a1bb1b-9208-715a-8b3d-1eec87987b7d"
+    },
+    {
+      "seq": 74,
+      "type": "turn/started",
+      "scope": {
+        "kind": "turn",
+        "turnId": "dad1b15d8b-t2"
+      }
+    },
+    {
+      "seq": 75,
+      "type": "turn/input/accepted",
+      "scope": {
+        "kind": "turn",
+        "turnId": "dad1b15d8b-t2"
+      },
+      "clientRequest": "creq_s3i96p5d2c"
+    },
+    {
+      "seq": 76,
+      "type": "item/started",
+      "scope": {
+        "kind": "turn",
+        "turnId": "dad1b15d8b-t2"
+      },
+      "itemType": "commandExecution"
+    },
+    {
+      "seq": 77,
+      "type": "system/interaction/lifecycle",
+      "scope": {
+        "kind": "turn",
+        "turnId": "dad1b15d8b-t2"
+      }
+    },
+    {
+      "seq": 78,
+      "type": "item/started",
+      "scope": {
+        "kind": "turn",
+        "turnId": "dad1b15d8b-t2"
+      },
+      "itemType": "commandExecution"
+    }
+  ]
+}

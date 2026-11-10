@@ -1,0 +1,37 @@
+{
+  "status": "PASS",
+  "actions": [
+    {
+      "resource": "owned PostgreSQL cluster",
+      "path": "/tmp/openbot-cloudroom-publication-utf8-pg",
+      "status": "stopped and removed"
+    },
+    {
+      "resource": "owned PostgreSQL cluster",
+      "path": "/tmp/openbot-cloudroom-publication-pg",
+      "status": "stopped and removed"
+    },
+    {
+      "resource": "obpub-browser-",
+      "path": "/tmp/obpub-browser-gatlypbc",
+      "status": "removed after retaining proof"
+    },
+    {
+      "resource": "obpub-runtime-",
+      "path": "/tmp/obpub-runtime-nigzqzl3",
+      "status": "removed after retaining proof"
+    },
+    {
+      "resource": "obpub-origin-",
+      "path": "/tmp/obpub-origin-jw2vio46",
+      "status": "removed after retaining proof"
+    }
+  ],
+  "image": "owned VM/home already removed after verified current build; image-cleanup.json",
+  "preserved": [
+    "all uncommitted publication records/worktree",
+    "original prepared Cloudroom source and prior native package",
+    "/tmp/openbot-cloudroom-publication-artifacts",
+    "ordinary provider accounts, PostgreSQL clusters and Lima homes"
+  ]
+}

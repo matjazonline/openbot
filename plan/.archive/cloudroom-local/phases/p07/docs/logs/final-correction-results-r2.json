@@ -1,0 +1,29 @@
+[
+  {
+    "name": "stock-stream-proof-r1",
+    "command": [
+      "scripts/test-network-isolation.sh",
+      "scripts/stack-budget.sh",
+      "--offline",
+      "workflow_action_dispatch_resolution_stalled_local_effect_once"
+    ],
+    "status": "PASS",
+    "exit": 0,
+    "seconds": 7.25,
+    "file": "logs/stock-stream-proof-r1.txt",
+    "progress": "logs/stock-stream-proof-r1-progress.txt"
+  },
+  {
+    "name": "stack",
+    "command": [
+      "scripts/test-network-isolation.sh",
+      "scripts/stack-budget.sh",
+      "--offline"
+    ],
+    "status": "PASS",
+    "exit": 0,
+    "seconds": 1069.42,
+    "file": "logs/stock-correction-full-r2.txt",
+    "progress": "logs/stock-correction-full-r2-progress.txt"
+  }
+]

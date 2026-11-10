@@ -1,0 +1,82 @@
+$ cargo test --locked --offline --lib vault_contract_ -- --list
+warning: associated function `from_verified_client` is never used
+  --> src/application/integrations/gateway.rs:18:19
+   |
+17 | impl VerifiedOwner {
+   | ------------------ associated function in this implementation
+18 |     pub(crate) fn from_verified_client(owner: AccountOwner) -> Self {
+   |                   ^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: fields `owner`, `account`, `binding`, `app`, `destination`, and `host_authority` are never read
+   --> src/application/integrations/gateway.rs:209:16
+    |
+208 | pub struct OwnerConfirmation {
+    |            ----------------- fields in this struct
+209 |     pub(crate) owner: VerifiedOwner,
+    |                ^^^^^
+210 |     pub(crate) account: AccountId,
+    |                ^^^^^^^
+211 |     pub(crate) binding: HostBinding,
+    |                ^^^^^^^
+212 |     pub(crate) app: AppId,
+    |                ^^^
+213 |     pub(crate) destination: ApprovedDestination,
+    |                ^^^^^^^^^^^
+214 |     pub(crate) host_authority: HostAuthorityReference,
+    |                ^^^^^^^^^^^^^^
+    |
+    = note: `OwnerConfirmation` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+
+warning: struct `CredentialRecord` is never constructed
+ --> src/application/integrations/private.rs:7:19
+  |
+7 | pub(crate) struct CredentialRecord {
+  |                   ^^^^^^^^^^^^^^^^
+
+warning: trait `CredentialStore` is never used
+  --> src/application/integrations/private.rs:13:18
+   |
+13 | pub(crate) trait CredentialStore: Send + Sync {
+   |                  ^^^^^^^^^^^^^^^
+
+warning: struct `ProviderAuthorization` is never constructed
+  --> src/application/integrations/private.rs:21:19
+   |
+21 | pub(crate) struct ProviderAuthorization {
+   |                   ^^^^^^^^^^^^^^^^^^^^^
+
+warning: struct `ProviderConnectRequest` is never constructed
+  --> src/application/integrations/private.rs:26:19
+   |
+26 | pub(crate) struct ProviderConnectRequest {
+   |                   ^^^^^^^^^^^^^^^^^^^^^^
+
+warning: trait `ProviderLifecycle` is never used
+  --> src/application/integrations/private.rs:32:18
+   |
+32 | pub(crate) trait ProviderLifecycle: Send + Sync {
+   |                  ^^^^^^^^^^^^^^^^^
+
+warning: field `client_secret_reference` is never read
+  --> src/application/integrations/registry.rs:17:16
+   |
+13 | pub struct AuthConfig {
+   |            ---------- field in this struct
+...
+17 |     pub(crate) client_secret_reference: Option<ClientSecretReference>,
+   |                ^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `AuthConfig` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis
+
+warning: `open_bots` (lib test) generated 8 warnings
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.38s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-048b7abd3ed0c794)
+application::integrations::tests::vault_contract_identifier_and_page_bounds_survive_deserialization: test
+application::integrations::tests::vault_contract_managed_scope_and_aggregate_bounds: test
+application::integrations::tests::vault_contract_metadata_is_bounded_and_has_no_credential_fields: test
+application::integrations::tests::vault_contract_revision_table_separates_refresh_rewrap_and_authorization: test
+application::integrations::tests::vault_contract_static_credential_bound_is_aggregate_and_inclusive: test
+
+5 tests, 0 benchmarks

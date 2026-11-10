@@ -1,0 +1,11 @@
+{
+  "original_files": 1636,
+  "byte_identical": 1633,
+  "permitted_live_changes": [
+    "07-integration-and-verification.md",
+    "COORDINATION.md",
+    "README.md"
+  ],
+  "explicit_historical_relocations": 4,
+  "unexpected": []
+}

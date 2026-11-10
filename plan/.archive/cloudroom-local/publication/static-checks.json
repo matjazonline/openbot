@@ -1,0 +1,137 @@
+[
+  {
+    "name": "deploy-tests",
+    "command": [
+      "scripts/tests/deploy.sh"
+    ],
+    "status": "PASS",
+    "exit": 0,
+    "seconds": 1.57,
+    "log": "logs/deploy-tests.log"
+  },
+  {
+    "name": "rotation-tests",
+    "command": [
+      "scripts/tests/credential-key-rotation.sh"
+    ],
+    "status": "PASS",
+    "exit": 0,
+    "seconds": 1.42,
+    "log": "logs/rotation-tests.log"
+  },
+  {
+    "name": "model-prepare-tests",
+    "command": [
+      "python3",
+      "scripts/tests/knowledge-model-prepare.py"
+    ],
+    "status": "PASS",
+    "exit": 0,
+    "seconds": 0.18,
+    "log": "logs/model-prepare-tests.log"
+  },
+  {
+    "name": "transport-tests",
+    "command": [
+      "scripts/tests/transport-boundary.sh"
+    ],
+    "status": "PASS",
+    "exit": 0,
+    "seconds": 4.1,
+    "log": "logs/transport-tests.log"
+  },
+  {
+    "name": "transport-boundary",
+    "command": [
+      "scripts/transport-boundary-check.sh"
+    ],
+    "status": "FAIL",
+    "exit": 1,
+    "seconds": 12.78,
+    "log": "logs/transport-boundary.log"
+  },
+  {
+    "name": "sample-boundary-tests",
+    "command": [
+      "python3",
+      "scripts/tests/workflow-sample-boundary.py"
+    ],
+    "status": "PASS",
+    "exit": 0,
+    "seconds": 0.18,
+    "log": "logs/sample-boundary-tests.log"
+  },
+  {
+    "name": "sample-boundary",
+    "command": [
+      "python3",
+      "scripts/workflow-sample-boundary.py"
+    ],
+    "status": "PASS",
+    "exit": 0,
+    "seconds": 0.07,
+    "log": "logs/sample-boundary.log"
+  },
+  {
+    "name": "integration-boundary-tests",
+    "command": [
+      "python3",
+      "scripts/tests/integration-boundary.py"
+    ],
+    "status": "PASS",
+    "exit": 0,
+    "seconds": 0.17,
+    "log": "logs/integration-boundary-tests.log"
+  },
+  {
+    "name": "integration-boundary",
+    "command": [
+      "python3",
+      "scripts/integration-boundary.py"
+    ],
+    "status": "PASS",
+    "exit": 0,
+    "seconds": 1.96,
+    "log": "logs/integration-boundary.log"
+  },
+  {
+    "name": "integration-docs",
+    "command": [
+      "python3",
+      "scripts/check-integration-docs.py"
+    ],
+    "status": "PASS",
+    "exit": 0,
+    "seconds": 0.22,
+    "log": "logs/integration-docs.log"
+  },
+  {
+    "name": "browser-protocols",
+    "command": [
+      "node",
+      "--test",
+      "scripts/tests/sse-navigation.mjs",
+      "scripts/tests/agent-runtime.mjs",
+      "scripts/tests/channel-response-authoring.mjs",
+      "scripts/tests/workflow-runs.mjs",
+      "scripts/tests/workflow-conversations.mjs",
+      "scripts/tests/workflow-samples.mjs"
+    ],
+    "status": "PASS",
+    "exit": 0,
+    "seconds": 49.35,
+    "log": "logs/browser-protocols.log"
+  },
+  {
+    "name": "run-counts",
+    "command": [
+      "npm",
+      "run",
+      "test:run-counts"
+    ],
+    "status": "PASS",
+    "exit": 0,
+    "seconds": 3.11,
+    "log": "logs/run-counts.log"
+  }
+]

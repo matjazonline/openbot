@@ -91,6 +91,7 @@ impl From<OperationArguments> for Value {
 pub struct AuthorizedInvocation {
     pub authorization: AuthorizationSnapshot,
     pub operation: OperationId,
+    pub target: super::OperationTarget,
     pub arguments: OperationArguments,
     pub request_digest: [u8; 32],
     pub correlation: CorrelationId,
@@ -103,25 +104,39 @@ pub struct AuthorizedInvocation {
 #[derive(Clone)]
 pub struct ExecutionContext {
     pub(crate) authority: std::sync::Arc<dyn DispatchAuthority>,
+    pub(crate) dispatch: std::sync::Arc<dyn super::BusinessDispatch>,
     pub cancellation: CancellationToken,
 }
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum DispatchEffect {
-    PreDispatch,
-    Committed,
+#[derive(Debug, Clone, Serialize)]
+#[serde(tag = "effect", rename_all = "snake_case", deny_unknown_fields)]
+pub enum ExecutionOutcome {
+    PreDispatch { failure: super::PreDispatchFailure },
+    Committed { data: ProviderData },
     Uncertain,
 }
-#[derive(Debug, Clone, Serialize)]
-pub struct ExecutionOutcome {
-    pub effect: DispatchEffect,
-    /// A transport must bound/redact provider data before constructing this result.
-    pub data: ProviderData,
+impl<'de> Deserialize<'de> for ExecutionOutcome {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        #[derive(Deserialize)]
+        #[serde(tag = "effect", rename_all = "snake_case", deny_unknown_fields)]
+        enum Fields {
+            PreDispatch { failure: super::PreDispatchFailure },
+            Committed { data: ProviderData },
+            Uncertain {},
+        }
+        Ok(match Fields::deserialize(deserializer)? {
+            Fields::PreDispatch { failure } => Self::PreDispatch { failure },
+            Fields::Committed { data } => Self::Committed { data },
+            Fields::Uncertain {} => Self::Uncertain,
+        })
+    }
 }
 #[derive(Debug, Clone, Serialize)]
 #[serde(transparent)]
 pub struct ProviderData(Value);
 impl ProviderData {
+    pub fn value(&self) -> &Value {
+        &self.0
+    }
     pub fn from_redacted(value: Value) -> IntegrationResult<Self> {
         if serde_json::to_vec(&value)
             .map_err(|_| IntegrationError::Invalid)?
@@ -155,13 +170,8 @@ pub trait CredentialDispatchGate: Send + Sync {
     ) -> IntegrationResult<()>;
 }
 
-/// Separate owner-authorized configuration purpose. It has no business action,
-/// dispatch reference or permission to manufacture one. Phase06 owns its adapter.
-#[derive(Clone)]
-#[expect(dead_code, reason = "Owner MCP discovery is wired in phase06")]
-pub(crate) struct OwnerDiscoveryContext {
-    pub owner: super::VerifiedOwner,
-    pub authorization: AuthorizationSnapshot,
-    pub deadline: DateTime<Utc>,
-    pub cancellation: CancellationToken,
+impl<'de> Deserialize<'de> for ProviderData {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        Self::from_redacted(Value::deserialize(deserializer)?).map_err(serde::de::Error::custom)
+    }
 }

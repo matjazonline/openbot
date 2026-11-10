@@ -1,0 +1,14 @@
+[
+  {
+    "provider": "claude",
+    "status": "PASS",
+    "seconds": 81.0,
+    "file": "logs/native-claude-r12.txt"
+  },
+  {
+    "provider": "opencode",
+    "status": "FAIL",
+    "seconds": 49.04,
+    "file": "logs/native-opencode-r12.txt"
+  }
+]

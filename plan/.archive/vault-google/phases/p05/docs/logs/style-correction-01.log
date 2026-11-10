@@ -1,0 +1,22 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.23s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-048b7abd3ed0c794)
+
+running 1 test
+test adapters::http::pages::tests::rendered_markup_carries_no_inline_javascript ... FAILED
+
+failures:
+
+---- adapters::http::pages::tests::rendered_markup_carries_no_inline_javascript stdout ----
+
+thread 'adapters::http::pages::tests::rendered_markup_carries_no_inline_javascript' (35637954) panicked at src/adapters/http/pages/tests.rs:4615:45:
+readable source directory: Os { code: 2, kind: NotFound, message: "No such file or directory" }
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    adapters::http::pages::tests::rendered_markup_carries_no_inline_javascript
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 3193 filtered out; finished in 0.03s
+
+error: test failed, to rerun pass `--lib`

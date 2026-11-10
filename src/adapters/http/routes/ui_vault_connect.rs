@@ -40,7 +40,10 @@ struct StartForm {
     account: Option<Uuid>,
     authorization: Option<i64>,
 }
-async fn browser(sessions: &SessionAuthority, headers: &HeaderMap) -> AppResult<VerifiedOwner> {
+pub(super) async fn browser(
+    sessions: &SessionAuthority,
+    headers: &HeaderMap,
+) -> AppResult<VerifiedOwner> {
     use sha2::{Digest, Sha256};
     let session = sessions
         .user_from_headers(headers)

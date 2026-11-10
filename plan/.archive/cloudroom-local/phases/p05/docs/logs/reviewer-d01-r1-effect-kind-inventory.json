@@ -1,0 +1,685 @@
+{
+  "pattern": "effect_kind",
+  "filesSearched": 504,
+  "totalHits": 44,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_native_bounds_tests.rs#sql",
+        "name": "sql",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_native_bounds_tests.rs",
+        "span": "L221-L239"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_native_bounds_tests.rs",
+      "inDegree": 4,
+      "hits": [
+        {
+          "line": 226,
+          "text": "effect_kind,remote_entry_id,result) \\"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_receipt_sql_tests.rs#receipt",
+        "name": "receipt",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_receipt_sql_tests.rs",
+        "span": "L114-L134"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_receipt_sql_tests.rs",
+      "inDegree": 4,
+      "hits": [
+        {
+          "line": 120,
+          "text": "\"INSERT INTO workflow_action_receipts(company_id,run_id,execution_id,invocation_id,argument_digest,dispatch_id,effect_kind,remote_entry_id,reconciliation_eviden"
+        },
+        {
+          "line": 124,
+          "text": "COALESCE($2->>'effect_kind',effect_kind),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_dispatch.rs#insert_subject",
+        "name": "insert_subject",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_dispatch.rs",
+        "span": "L191-L207"
+      },
+      "path": "src/adapters/persistence/workflow/action_dispatch.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 199,
+          "text": "sqlx::query(\"INSERT INTO workflow_action_dispatches (company_id,run_id,execution_id,invocation_id,argument_digest,id,job_id,attempt_number,execution_generation,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_uncertainty_acceptance_tests.rs#observation",
+        "name": "observation",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_uncertainty_acceptance_tests.rs",
+        "span": "L4-L14"
+      },
+      "path": "src/adapters/persistence/workflow/action_uncertainty_acceptance_tests.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 9,
+          "text": "sqlx::query(\"INSERT INTO workflow_action_reconciliations(company_id,run_id,execution_id,invocation_id,argument_digest,dispatch_id,effect_kind,failure_code) VALU"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_dispatch_sql_tests.rs#receipt",
+        "name": "receipt",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_dispatch_sql_tests.rs",
+        "span": "L19-L29"
+      },
+      "path": "src/adapters/persistence/workflow/action_dispatch_sql_tests.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 25,
+          "text": "sqlx::query(\"INSERT INTO workflow_action_receipts (company_id,run_id,execution_id,invocation_id,argument_digest,dispatch_id,effect_kind,result) VALUES ($1,$2,$3"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_receipts.rs#verify_entry_on",
+        "name": "verify_entry_on",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_receipts.rs",
+        "span": "L138-L166"
+      },
+      "path": "src/adapters/persistence/workflow/action_receipts.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 153,
+          "text": "AND marker.effect_kind='remote' AND (marker.current_policy->'provider_replay'=$12 OR EXISTS(SELECT 1 FROM workflow_action_evidence_consumptions AS consumption W"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_uncertainty_acceptance_tests.rs#terminal_audit",
+        "name": "terminal_audit",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_uncertainty_acceptance_tests.rs",
+        "span": "L244-L302"
+      },
+      "path": "src/adapters/persistence/workflow/action_uncertainty_acceptance_tests.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 272,
+          "text": "let linked: i64 = sqlx::query_scalar(\"SELECT count(*) FROM workflow_action_reconciliations AS observation JOIN workflow_action_dispatches AS marker ON marker.co"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/message_sql_tests.rs#sql_marker_for",
+        "name": "sql_marker_for",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/message_sql_tests.rs",
+        "span": "L30-L42"
+      },
+      "path": "src/adapters/persistence/workflow/message_sql_tests.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 37,
+          "text": "\"INSERT INTO workflow_action_dispatches (company_id,run_id,execution_id,invocation_id,argument_digest,id,job_id,attempt_number,execution_generation,worker_id,ef"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/message_sql_tests.rs#sql_publication_for",
+        "name": "sql_publication_for",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/message_sql_tests.rs",
+        "span": "L54-L97"
+      },
+      "path": "src/adapters/persistence/workflow/message_sql_tests.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 87,
+          "text": "\"INSERT INTO workflow_action_receipts (company_id,run_id,execution_id,invocation_id,argument_digest,dispatch_id,effect_kind,result) \\"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_receipts.rs#insert_receipt_on",
+        "name": "insert_receipt_on",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_receipts.rs",
+        "span": "L256-L279"
+      },
+      "path": "src/adapters/persistence/workflow/action_receipts.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 272,
+          "text": "(company_id,run_id,execution_id,invocation_id,argument_digest,dispatch_id,effect_kind,remote_entry_id,result) \\"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_attribution_tests.rs#marker_only",
+        "name": "marker_only",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_attribution_tests.rs",
+        "span": "L91-L141"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_attribution_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 119,
+          "text": "assert_eq!(added[0][\"effect_kind\"], \"remote\");"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_native_coverage_assertions.rs#assert_pair",
+        "name": "assert_pair",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_native_coverage_assertions.rs",
+        "span": "L205-L270"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_native_coverage_assertions.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 258,
+          "text": "(\"effect_kind\", json!(\"remote\")),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_retained_truth_assertions.rs#receipt_and_conflict",
+        "name": "receipt_and_conflict",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_retained_truth_assertions.rs",
+        "span": "L113-L146"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_retained_truth_assertions.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 127,
+          "text": "assert_eq!(receipt[\"effect_kind\"], \"remote\");"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_runtime_mixed_truth_assertions.rs#parked_facts",
+        "name": "parked_facts",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_runtime_mixed_truth_assertions.rs",
+        "span": "L217-L277"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_runtime_mixed_truth_assertions.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 258,
+          "text": "assert_eq!(observation[\"effect_kind\"], \"remote\");"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_runtime_mixed_truth_evidence_assertions.rs#actual_receipt",
+        "name": "actual_receipt",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_runtime_mixed_truth_evidence_assertions.rs",
+        "span": "L4-L40"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_runtime_mixed_truth_evidence_assertions.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 34,
+          "text": "assert_eq!(receipt[\"effect_kind\"], \"remote\");"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation/mod.rs#marker_on",
+        "name": "marker_on",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation/mod.rs",
+        "span": "L242-L252"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation/mod.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 247,
+          "text": "sqlx::query_scalar(\"SELECT created_at FROM workflow_action_dispatches WHERE company_id=$1 AND run_id=$2 AND execution_id=$3 AND invocation_id=$4 AND argument_di"
+        },
+        {
+          "line": 250,
+          "text": ".bind(command.target.effect_kind())"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/message_park_continuation_tests.rs#sql_effect_park",
+        "name": "sql_effect_park",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/message_park_continuation_tests.rs",
+        "span": "L149-L254"
+      },
+      "path": "src/adapters/persistence/workflow/message_park_continuation_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 173,
+          "text": "\"INSERT INTO workflow_action_dispatches (company_id,run_id,execution_id,invocation_id,argument_digest,id,job_id,attempt_number,execution_generation,worker_id,ef"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/message_publish.rs#accept_in_app_on",
+        "name": "accept_in_app_on",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/message_publish.rs",
+        "span": "L197-L211"
+      },
+      "path": "src/adapters/persistence/workflow/message_publish.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 204,
+          "text": "sqlx::query(\"INSERT INTO workflow_action_receipts (company_id,run_id,execution_id,invocation_id,argument_digest,dispatch_id,effect_kind,result) VALUES ($1,$2,$3"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/message_receipts.rs#consume_on",
+        "name": "consume_on",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/message_receipts.rs",
+        "span": "L143-L185"
+      },
+      "path": "src/adapters/persistence/workflow/message_receipts.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 164,
+          "text": "sqlx::query(\"INSERT INTO workflow_action_receipts (company_id,run_id,execution_id,invocation_id,argument_digest,dispatch_id,effect_kind,result) VALUES ($1,$2,$3"
+        },
+        {
+          "line": 180,
+          "text": "sqlx::query(\"INSERT INTO workflow_action_reconciliations (company_id,run_id,execution_id,invocation_id,argument_digest,dispatch_id,effect_kind,failure_code) VAL"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/reads.rs#actions",
+        "name": "actions",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/reads.rs",
+        "span": "L643-L742"
+      },
+      "path": "src/adapters/persistence/workflow/reads.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 650,
+          "text": "dispatch.argument_digest, dispatch.effect_kind, dispatch.attempt_number, \\"
+        },
+        {
+          "line": 657,
+          "text": "AND dispatch.effect_kind IN ('remote', 'message') \\"
+        },
+        {
+          "line": 732,
+          "text": "effect_kind: kind,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_dispatch_tests.rs#workflow_action_dispatch_sql_commit_expiry_and_append_only_facts",
+        "name": "workflow_action_dispatch_sql_commit_expiry_and_append_only_facts",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_dispatch_tests.rs",
+        "span": "L443-L491"
+      },
+      "path": "src/adapters/persistence/workflow/action_dispatch_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 464,
+          "text": "sqlx::query(\"INSERT INTO workflow_action_receipts (company_id,run_id,execution_id,invocation_id,argument_digest,dispatch_id,effect_kind,result) VALUES ($1,$2,$3"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_dispatch.rs#local",
+        "name": "local",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_dispatch.rs",
+        "span": "L212-L283"
+      },
+      "path": "src/adapters/persistence/workflow/action_dispatch.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 240,
+          "text": "sqlx::query(\"INSERT INTO workflow_action_receipts (company_id,run_id,execution_id,invocation_id,argument_digest,dispatch_id,effect_kind,result) VALUES ($1,$2,$3"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_history_tests.rs#workflow_action_history_remote_entry_append_only_and_receipt_requires_entry",
+        "name": "workflow_action_history_remote_entry_append_only_and_receipt_requires_entry",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_history_tests.rs",
+        "span": "L475-L519"
+      },
+      "path": "src/adapters/persistence/workflow/action_history_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 504,
+          "text": "let error=sqlx::query(\"INSERT INTO workflow_action_receipts(company_id,run_id,execution_id,invocation_id,argument_digest,dispatch_id,effect_kind,remote_entry_id"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_receipts.rs#marker_on",
+        "name": "marker_on",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_receipts.rs",
+        "span": "L61-L105"
+      },
+      "path": "src/adapters/persistence/workflow/action_receipts.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 74,
+          "text": "AND effect_kind='remote' AND replay_subject=$4\","
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_receipt_tests.rs#workflow_action_reconciliation_sql_actual_receipt_conflict_and_audit_guards",
+        "name": "workflow_action_reconciliation_sql_actual_receipt_conflict_and_audit_guards",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_receipt_tests.rs",
+        "span": "L606-L659"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_receipt_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 632,
+          "text": "sqlx::query(\"INSERT INTO workflow_action_receipts(company_id,run_id,execution_id,invocation_id,argument_digest,dispatch_id,effect_kind,remote_entry_id,result) V"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation/facts.rs#truth_on",
+        "name": "truth_on",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation/facts.rs",
+        "span": "L84-L142"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation/facts.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 120,
+          "text": "sqlx::query(\"INSERT INTO workflow_action_receipts(company_id,run_id,execution_id,invocation_id,argument_digest,dispatch_id,effect_kind,reconciliation_evidence_i"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_uncertainty_acceptance_tests.rs#workflow_action_uncertainty_sql_remote_receipt_guard_and_append_only",
+        "name": "workflow_action_uncertainty_sql_remote_receipt_guard_and_append_only",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_uncertainty_acceptance_tests.rs",
+        "span": "L107-L169"
+      },
+      "path": "src/adapters/persistence/workflow/action_uncertainty_acceptance_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 119,
+          "text": "sqlx::query_scalar(\"SELECT id FROM workflow_action_dispatches WHERE effect_kind='remote'\")"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_uncertainty.rs#record",
+        "name": "record",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_uncertainty.rs",
+        "span": "L6-L19"
+      },
+      "path": "src/adapters/persistence/workflow/action_uncertainty.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 16,
+          "text": "sqlx::query(\"INSERT INTO workflow_action_reconciliations (company_id,run_id,execution_id,invocation_id,argument_digest,dispatch_id,effect_kind,failure_code) SEL"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/message_reconcile_tests.rs#workflow_message_unknown_note_through_the_production_composition",
+        "name": "workflow_message_unknown_note_through_the_production_composition",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/message_reconcile_tests.rs",
+        "span": "L908-L970"
+      },
+      "path": "src/adapters/persistence/workflow/message_reconcile_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 923,
+          "text": "assert_eq!(action.effect_kind, \"message\");"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/message_sql_tests.rs#workflow_message_sql_receipt_and_state_guards_reject_forgeries",
+        "name": "workflow_message_sql_receipt_and_state_guards_reject_forgeries",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/message_sql_tests.rs",
+        "span": "L297-L366"
+      },
+      "path": "src/adapters/persistence/workflow/message_sql_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 304,
+          "text": "\"INSERT INTO workflow_action_receipts (company_id,run_id,execution_id,invocation_id,argument_digest,dispatch_id,effect_kind,result) \\"
+        },
+        {
+          "line": 360,
+          "text": "\"INSERT INTO workflow_action_receipts (company_id,run_id,execution_id,invocation_id,argument_digest,dispatch_id,effect_kind,result) \\"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/message_tests.rs#workflow_message_receipt_unknown_is_uncertain_until_the_deadline",
+        "name": "workflow_message_receipt_unknown_is_uncertain_until_the_deadline",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/message_tests.rs",
+        "span": "L292-L339"
+      },
+      "path": "src/adapters/persistence/workflow/message_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 311,
+          "text": "\"SELECT failure_code FROM workflow_action_reconciliations WHERE invocation_id=$1 AND effect_kind='message'\","
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/provisioning_dispatch_tests.rs#provisioning_lists_agents_and_models",
+        "name": "provisioning_lists_agents_and_models",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/provisioning_dispatch_tests.rs",
+        "span": "L539-L587"
+      },
+      "path": "src/adapters/persistence/workflow/provisioning_dispatch_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 571,
+          "text": "\"SELECT effect_kind FROM workflow_action_dispatches WHERE company_id = $1 AND run_id = $2\","
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/run_views.rs#ReconciliationRow",
+        "name": "ReconciliationRow",
+        "kind": "struct",
+        "path": "src/adapters/persistence/workflow/run_views.rs",
+        "span": "L105-L112"
+      },
+      "path": "src/adapters/persistence/workflow/run_views.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 109,
+          "text": "effect_kind: String,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/run_views.rs#from~3",
+        "name": "from~3",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/run_views.rs",
+        "span": "L115-L124"
+      },
+      "path": "src/adapters/persistence/workflow/run_views.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 120,
+          "text": "effect_kind: row.effect_kind,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/run_views.rs#ReceiptRow",
+        "name": "ReceiptRow",
+        "kind": "struct",
+        "path": "src/adapters/persistence/workflow/run_views.rs",
+        "span": "L193-L199"
+      },
+      "path": "src/adapters/persistence/workflow/run_views.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 196,
+          "text": "effect_kind: String,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/run_views.rs#from~6",
+        "name": "from~6",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/run_views.rs",
+        "span": "L202-L210"
+      },
+      "path": "src/adapters/persistence/workflow/run_views.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 206,
+          "text": "effect_kind: row.effect_kind,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/run_views.rs#RECONCILIATIONS_SQL",
+        "name": "RECONCILIATIONS_SQL",
+        "kind": "constant",
+        "path": "src/adapters/persistence/workflow/run_views.rs",
+        "span": "L262-L270"
+      },
+      "path": "src/adapters/persistence/workflow/run_views.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 263,
+          "text": "reconciliation.invocation_id, reconciliation.dispatch_id, reconciliation.effect_kind, \\"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/run_views.rs#RECEIPTS_SQL",
+        "name": "RECEIPTS_SQL",
+        "kind": "constant",
+        "path": "src/adapters/persistence/workflow/run_views.rs",
+        "span": "L282-L288"
+      },
+      "path": "src/adapters/persistence/workflow/run_views.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 283,
+          "text": "receipt.effect_kind, receipt.result, receipt.created_at \\"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 26,
+    "baselineChars": 484012
+  }
+}

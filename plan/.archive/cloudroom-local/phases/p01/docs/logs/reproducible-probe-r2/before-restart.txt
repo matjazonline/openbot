@@ -1,0 +1,1 @@
+{"lifecycle":{"loads":3,"aborts":1},"secretPersisted":true,"secretSameAcrossReload":true,"hosts":[{"id":"host_szbqmt9ach","name":"openbot-p01-disposable","status":"connected"}],"providers":["codex","claude-code","pi","acp-cursor","acp-opencode"],"projects":["proj_7a6y6br5fw"]}

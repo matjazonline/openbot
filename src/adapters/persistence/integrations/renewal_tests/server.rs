@@ -25,6 +25,9 @@ pub(crate) struct Observation {
     pub grant: String,
     pub client_valid: bool,
     pub refresh_digest: [u8; 32],
+    pub client_identity: Option<crate::domain::integrations::ExternalSubject>,
+    pub code_digest: Option<[u8; 32]>,
+    pub verifier_digest: Option<[u8; 32]>,
 }
 pub(crate) struct StateData {
     pub calls: AtomicUsize,
@@ -105,6 +108,15 @@ async fn token(
     Form(form): Form<BTreeMap<String, String>>,
 ) -> Response {
     *state.observation.lock().unwrap() = Some(Observation {
+        client_identity: form
+            .get("client_id")
+            .and_then(|value| crate::domain::integrations::ExternalSubject::parse(value).ok()),
+        code_digest: form
+            .get("code")
+            .map(|value| Sha256::digest(value.as_bytes()).into()),
+        verifier_digest: form
+            .get("code_verifier")
+            .map(|value| Sha256::digest(value.as_bytes()).into()),
         grant: form.get("grant_type").cloned().unwrap_or_default(),
         client_valid: form
             .get("client_id")

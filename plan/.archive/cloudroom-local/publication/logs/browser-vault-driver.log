@@ -1,0 +1,12 @@
+✔ vault dark: native picker progress, escaped private metadata and recoverable consent (2476.862792ms)
+✔ vault light: native picker progress, escaped private metadata and recoverable consent (573.335583ms)
+✔ vault dark: owner secrets start blank and reconnect failures remain recoverable (554.126917ms)
+✔ vault light: owner secrets start blank and reconnect failures remain recoverable (457.476917ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 4707.618125

@@ -1,0 +1,22 @@
+{
+  "priorArtifact": "5e3cb39493d6068a837125789a1cb5f6165c45b77af547ecf90ae3e0ed91c505",
+  "priorTree": "/var/folders/n2/5y7x75r92zl0ll90154hxdzr0000gn/T/openbot-cloudroom-p05-r1-recheck-rxfuqs56",
+  "patch": "p05-r2-corrections.patch",
+  "sha256": "43e989eed2d8049de542c64aa32efd89bfa692463bbf38ce2fb425619fb26fa6",
+  "changed": [
+    "migrations/20260817000000_init_schema.sql",
+    "scripts/tests/local-agents-browser.mjs",
+    "src/adapters/http/pages/local_agents/mod.rs",
+    "src/adapters/http/pages/local_agents/profiles.rs",
+    "src/adapters/http/pages/local_agents/sessions.rs",
+    "src/adapters/http/routes/ui_local_agents_tests.rs",
+    "src/adapters/persistence/local_agents/management/tests.rs",
+    "src/adapters/persistence/local_agents/protocol/mod.rs",
+    "src/adapters/persistence/workflow/local_agent_continuation_tests.rs",
+    "src/adapters/persistence/workflow/local_agent_correction_tests.rs",
+    "src/adapters/persistence/workflow/local_agent_tests.rs",
+    "src/adapters/persistence/workflow/local_agents/continuation.rs",
+    "src/adapters/persistence/workflow/local_agents/mod.rs",
+    "src/adapters/persistence/workflow/polling.rs"
+  ]
+}

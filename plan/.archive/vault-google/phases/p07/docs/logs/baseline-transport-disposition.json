@@ -1,0 +1,9 @@
+{
+  "path": "src/adapters/persistence/workflow/channel_reply_continuation_views_support.rs",
+  "baseline": "ace526fd8259ec53c5199ffa7555a1a99dcba58e",
+  "baseline_sha256": "c7681f4cad6a6e4a9a2378ab76ad4163868613274ca1e4002340fee6bd5e1250",
+  "current_sha256": "c7681f4cad6a6e4a9a2378ab76ad4163868613274ca1e4002340fee6bd5e1250",
+  "byte_identical": true,
+  "scanner_receipt": "final-transport.json",
+  "disposition": "Confirmed unrelated existing RFC Message-ID test fixture literal; leave unchanged per VG-I03/r3. No full-suite claim."
+}

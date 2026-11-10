@@ -1,0 +1,129 @@
+{
+  "activeNativeStopMatchedInterruptedTurn": true,
+  "actualUi": true,
+  "actualWorkflowWorkers": 2,
+  "afterRestart": {
+    "event": "snapshot",
+    "requests": 1,
+    "terminals": [
+      {
+        "status": "completed",
+        "turn": "da84d834cc-t1"
+      }
+    ],
+    "thread": "thr_zuapv3rm7u",
+    "turns": [
+      "da84d834cc-t1"
+    ]
+  },
+  "beforeRestart": {
+    "event": "snapshot",
+    "requests": 1,
+    "terminals": [
+      {
+        "status": "completed",
+        "turn": "da84d834cc-t1"
+      }
+    ],
+    "thread": "thr_zuapv3rm7u",
+    "turns": [
+      "da84d834cc-t1"
+    ]
+  },
+  "explicitThreadStopAndArchiveAccepted": true,
+  "fileAccess": true,
+  "final": {
+    "event": "snapshot",
+    "requests": 6,
+    "terminals": [
+      {
+        "status": "completed",
+        "turn": "da84d834cc-t1"
+      },
+      {
+        "status": "completed",
+        "turn": "da852fdfe1-t1"
+      },
+      {
+        "status": "completed",
+        "turn": "da852fdfe1-t2"
+      },
+      {
+        "status": "completed",
+        "turn": "da852fdfe1-t3"
+      },
+      {
+        "status": "completed",
+        "turn": "da852fdfe1-t4"
+      },
+      {
+        "status": "interrupted",
+        "turn": "da852fdfe1-t5"
+      }
+    ],
+    "thread": "thr_zuapv3rm7u",
+    "turns": [
+      "da84d834cc-t1",
+      "da852fdfe1-t1",
+      "da852fdfe1-t2",
+      "da852fdfe1-t3",
+      "da852fdfe1-t4",
+      "da852fdfe1-t5"
+    ]
+  },
+  "isolatedLoggedOutProvider": {
+    "isolation": {
+      "credentialEnvironmentRemoved": [
+        "OPENAI_API_KEY",
+        "CODEX_API_KEY",
+        "OPENAI_ACCESS_TOKEN",
+        "ANTHROPIC_API_KEY",
+        "ANTHROPIC_AUTH_TOKEN",
+        "CLAUDE_CODE_OAUTH_TOKEN",
+        "OPENCODE_AUTH_JSON",
+        "OPENCODE_CONFIG_CONTENT"
+      ],
+      "event": "logged_out",
+      "isolatedProviderConfiguration": true,
+      "nativeLoginStatus": 1,
+      "parentLoginUntouched": true,
+      "provider": "codex"
+    },
+    "nativeOperation": "de361981-8d89-4447-98b7-90a24b95a13c",
+    "originalWorkflowUnchanged": true,
+    "sdkCalls": 1,
+    "status": "PASS",
+    "successfulReceipts": 0,
+    "workflow": "failed"
+  },
+  "linux": "NOT EXERCISED on this host",
+  "nativeHumanPermission": {
+    "actualUiPermissionDenied": true,
+    "independentHumanTurn": "da852fdfe1-t4",
+    "openbotWaitingForMatchingInput": true,
+    "outcome": "succeeded",
+    "ownTurn": "da852fdfe1-t3",
+    "sdkCalls": 1,
+    "status": "PASS"
+  },
+  "nativeStopIsNotAnAtomicTargetedTurnGuarantee": true,
+  "outputRecoveredAfterNativeOutputBeforeServerReceipt": true,
+  "platform": "macos",
+  "productionPlugin": true,
+  "provider": "codex",
+  "realPairingHttp": true,
+  "selection": {
+    "machine_id": "9e041c83-a160-4b8b-82d3-569539b205b1",
+    "model": "gpt-6-luna",
+    "policy": {
+      "permissions": "provider_default",
+      "reasoning": "low",
+      "workspace": "project_directory"
+    },
+    "project_id": "proj_pm6pcqm47s",
+    "provider": "codex"
+  },
+  "session": "895d00f5-48b6-48ea-a28c-bdca2c221c1a",
+  "status": "PASS",
+  "thread": "thr_zuapv3rm7u"
+}

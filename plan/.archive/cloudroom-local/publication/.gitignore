@@ -1,0 +1,3 @@
+# Publication evidence must remain eligible for Git retention.
+!logs/
+!logs/**

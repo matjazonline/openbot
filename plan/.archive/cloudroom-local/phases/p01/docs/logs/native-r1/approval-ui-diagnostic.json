@@ -1,0 +1,326 @@
+{
+  "requests": [
+    {
+      "url": "http://127.0.0.1:46985/api/v1/system/config",
+      "hasCallerProof": true
+    },
+    {
+      "url": "http://127.0.0.1:46985/api/v1/preferences/ui",
+      "hasCallerProof": true
+    },
+    {
+      "url": "http://127.0.0.1:46985/api/v1/sidebar-bootstrap",
+      "hasCallerProof": true
+    },
+    {
+      "url": "http://127.0.0.1:46985/api/v1/cloudroom/account",
+      "hasCallerProof": true
+    },
+    {
+      "url": "http://127.0.0.1:46985/api/v1/system/providers?",
+      "hasCallerProof": true
+    },
+    {
+      "url": "http://127.0.0.1:46985/api/v1/plugins",
+      "hasCallerProof": true
+    },
+    {
+      "url": "http://127.0.0.1:46985/api/v1/system/version?",
+      "hasCallerProof": true
+    },
+    {
+      "url": "http://127.0.0.1:46985/api/v1/hosts?includeCreating=false",
+      "hasCallerProof": true
+    },
+    {
+      "url": "http://127.0.0.1:46985/api/v1/cloudroom/desktop-update",
+      "hasCallerProof": true
+    },
+    {
+      "url": "http://127.0.0.1:46985/api/v1/system/worktree-storage",
+      "hasCallerProof": true
+    },
+    {
+      "url": "http://127.0.0.1:46985/api/v1/threads/thr_3f7ej72rxx/timeline?",
+      "hasCallerProof": true
+    },
+    {
+      "url": "http://127.0.0.1:46985/api/v1/threads/thr_3f7ej72rxx?include=environment%2Chost",
+      "hasCallerProof": true
+    },
+    {
+      "url": "http://127.0.0.1:46985/api/v1/threads/thr_3f7ej72rxx/interactions",
+      "hasCallerProof": true
+    },
+    {
+      "url": "http://127.0.0.1:46985/api/v1/cloudroom/popups",
+      "hasCallerProof": true
+    },
+    {
+      "url": "http://127.0.0.1:46985/api/v1/threads?parentThreadId=thr_3f7ej72rxx&archived=false&includeHidden=true",
+      "hasCallerProof": true
+    },
+    {
+      "url": "http://127.0.0.1:46985/api/v1/hosts/host_x39f5jia3f/paths/exist",
+      "hasCallerProof": true
+    },
+    {
+      "url": "http://127.0.0.1:46985/api/v1/hosts/host_x39f5jia3f/provider-clis/status",
+      "hasCallerProof": true
+    },
+    {
+      "url": "http://127.0.0.1:46985/api/v1/threads?parentThreadId=thr_rvbjg3dc7k&archived=false&includeHidden=true",
+      "hasCallerProof": true
+    },
+    {
+      "url": "http://127.0.0.1:46985/api/v1/plugins/drafts/assets/app.js?h=9bd7c035db4a0934",
+      "hasCallerProof": true
+    },
+    {
+      "url": "http://127.0.0.1:46985/api/v1/plugins/environment-git-worktree/assets/app.js?h=0c8abbbae27dedf5",
+      "hasCallerProof": true
+    },
+    {
+      "url": "http://127.0.0.1:46985/api/v1/plugins/time-in-cloudroom/assets/app.js?h=a1dc4fe8cda6983e",
+      "hasCallerProof": true
+    },
+    {
+      "url": "http://127.0.0.1:46985/api/v1/plugins/environment-git-worktree/assets/app.css?h=0c8abbbae27dedf5",
+      "hasCallerProof": true
+    },
+    {
+      "url": "http://127.0.0.1:46985/api/v1/plugins/pdf-preview/assets/app.js?h=713575fce032a283",
+      "hasCallerProof": true
+    },
+    {
+      "url": "http://127.0.0.1:46985/api/v1/plugins/time-in-cloudroom/assets/app.css?h=a1dc4fe8cda6983e",
+      "hasCallerProof": true
+    },
+    {
+      "url": "http://127.0.0.1:46985/api/v1/plugins/provider-retry/assets/app.js?h=58f928e90a8c3c40",
+      "hasCallerProof": true
+    },
+    {
+      "url": "http://127.0.0.1:46985/api/v1/plugins/drafts/assets/app.css?h=9bd7c035db4a0934",
+      "hasCallerProof": true
+    },
+    {
+      "url": "http://127.0.0.1:46985/api/v1/plugins/side-chat/assets/app.js?h=f1afe3d4bda0991f",
+      "hasCallerProof": true
+    },
+    {
+      "url": "http://127.0.0.1:46985/api/v1/plugins/pdf-preview/assets/app.css?h=713575fce032a283",
+      "hasCallerProof": true
+    },
+    {
+      "url": "http://127.0.0.1:46985/api/v1/plugins/inline-vis/assets/app.js?h=6b4ee0b8d9d1d425",
+      "hasCallerProof": true
+    },
+    {
+      "url": "http://127.0.0.1:46985/api/v1/plugins/provider-retry/assets/app.css?h=58f928e90a8c3c40",
+      "hasCallerProof": true
+    },
+    {
+      "url": "http://127.0.0.1:46985/api/v1/plugins/connect/assets/app.js?h=4ea841b6a65554cc",
+      "hasCallerProof": true
+    },
+    {
+      "url": "http://127.0.0.1:46985/api/v1/plugins/side-chat/assets/app.css?h=f1afe3d4bda0991f",
+      "hasCallerProof": true
+    },
+    {
+      "url": "http://127.0.0.1:46985/api/v1/plugins/monaco-editor/assets/app.js?h=848696f014c83eba",
+      "hasCallerProof": true
+    },
+    {
+      "url": "http://127.0.0.1:46985/api/v1/plugins/inline-vis/assets/app.css?h=6b4ee0b8d9d1d425",
+      "hasCallerProof": true
+    },
+    {
+      "url": "http://127.0.0.1:46985/api/v1/plugins/environment-project-checkout/assets/app.js?h=6f9cc4159793fb43",
+      "hasCallerProof": true
+    },
+    {
+      "url": "http://127.0.0.1:46985/api/v1/plugins/connect/assets/app.css?h=4ea841b6a65554cc",
+      "hasCallerProof": true
+    },
+    {
+      "url": "http://127.0.0.1:46985/api/v1/plugins/keep-awake/assets/app.js?h=dc82b87e90987b85",
+      "hasCallerProof": true
+    },
+    {
+      "url": "http://127.0.0.1:46985/api/v1/plugins/monaco-editor/assets/app.css?h=848696f014c83eba",
+      "hasCallerProof": true
+    },
+    {
+      "url": "http://127.0.0.1:46985/api/v1/plugins/scheduled-send/assets/app.js?h=d9be85c9a5634ee5",
+      "hasCallerProof": true
+    },
+    {
+      "url": "http://127.0.0.1:46985/api/v1/plugins/environment-project-checkout/assets/app.css?h=6f9cc4159793fb43",
+      "hasCallerProof": true
+    },
+    {
+      "url": "http://127.0.0.1:46985/api/v1/plugins/automations/assets/app.js?h=3738b1a563bc4a9d",
+      "hasCallerProof": true
+    },
+    {
+      "url": "http://127.0.0.1:46985/api/v1/plugins/keep-awake/assets/app.css?h=dc82b87e90987b85",
+      "hasCallerProof": true
+    },
+    {
+      "url": "http://127.0.0.1:46985/api/v1/plugins/push-notifications/assets/app.js?h=176675cce9cd1d03",
+      "hasCallerProof": true
+    },
+    {
+      "url": "http://127.0.0.1:46985/api/v1/plugins/scheduled-send/assets/app.css?h=d9be85c9a5634ee5",
+      "hasCallerProof": true
+    },
+    {
+      "url": "http://127.0.0.1:46985/api/v1/plugins/gpu/assets/app.js?h=9ba1e40bf8eafd52",
+      "hasCallerProof": true
+    },
+    {
+      "url": "http://127.0.0.1:46985/api/v1/plugins/automations/assets/app.css?h=3738b1a563bc4a9d",
+      "hasCallerProof": true
+    },
+    {
+      "url": "http://127.0.0.1:46985/api/v1/plugins/provider-pi/assets/app.js?h=9386cf6046067566",
+      "hasCallerProof": true
+    },
+    {
+      "url": "http://127.0.0.1:46985/api/v1/plugins/push-notifications/assets/app.css?h=176675cce9cd1d03",
+      "hasCallerProof": true
+    },
+    {
+      "url": "http://127.0.0.1:46985/api/v1/plugins/computer-use/assets/app.js?h=e10c25fa4b48ee05",
+      "hasCallerProof": true
+    },
+    {
+      "url": "http://127.0.0.1:46985/api/v1/plugins/gpu/assets/app.css?h=9ba1e40bf8eafd52",
+      "hasCallerProof": true
+    },
+    {
+      "url": "http://127.0.0.1:46985/api/v1/plugins/secrets/assets/app.js?h=6cb78acec678ecde",
+      "hasCallerProof": true
+    },
+    {
+      "url": "http://127.0.0.1:46985/api/v1/plugins/provider-pi/assets/app.css?h=9386cf6046067566",
+      "hasCallerProof": true
+    },
+    {
+      "url": "http://127.0.0.1:46985/api/v1/plugins/provider-usage/assets/app.js?h=cecc7c94b3f1b472",
+      "hasCallerProof": true
+    },
+    {
+      "url": "http://127.0.0.1:46985/api/v1/plugins/computer-use/assets/app.css?h=e10c25fa4b48ee05",
+      "hasCallerProof": true
+    },
+    {
+      "url": "http://127.0.0.1:46985/api/v1/plugins/accounts/assets/app.js?h=c56cad9133ba36c3",
+      "hasCallerProof": true
+    },
+    {
+      "url": "http://127.0.0.1:46985/api/v1/plugins/secrets/assets/app.css?h=6cb78acec678ecde",
+      "hasCallerProof": true
+    },
+    {
+      "url": "http://127.0.0.1:46985/api/v1/plugins/provider-usage/assets/app.css?h=cecc7c94b3f1b472",
+      "hasCallerProof": true
+    },
+    {
+      "url": "http://127.0.0.1:46985/api/v1/plugins/provider-usage/rpc/getUsage",
+      "hasCallerProof": true
+    },
+    {
+      "url": "http://127.0.0.1:46985/api/v1/plugins/accounts/assets/app.css?h=c56cad9133ba36c3",
+      "hasCallerProof": true
+    },
+    {
+      "url": "http://127.0.0.1:46985/api/v1/plugins/automations/rpc/paused_loops",
+      "hasCallerProof": true
+    },
+    {
+      "url": "http://127.0.0.1:46985/api/v1/plugins/push-notifications/settings",
+      "hasCallerProof": true
+    },
+    {
+      "url": "http://127.0.0.1:46985/api/v1/cloudroom/threads/thr_3f7ej72rxx/share",
+      "hasCallerProof": true
+    },
+    {
+      "url": "http://127.0.0.1:46985/api/v1/cloudroom",
+      "hasCallerProof": true
+    },
+    {
+      "url": "http://127.0.0.1:46985/api/v1/threads/thr_3f7ej72rxx/default-execution-options",
+      "hasCallerProof": true
+    },
+    {
+      "url": "http://127.0.0.1:46985/api/v1/threads/thr_3f7ej72rxx/queued-messages",
+      "hasCallerProof": true
+    },
+    {
+      "url": "http://127.0.0.1:46985/api/v1/threads/thr_3f7ej72rxx/prompt-history?",
+      "hasCallerProof": true
+    },
+    {
+      "url": "http://127.0.0.1:46985/api/v1/system/execution-options?hostId=host_x39f5jia3f&providerId=codex",
+      "hasCallerProof": true
+    },
+    {
+      "url": "http://127.0.0.1:46985/api/v1/plugins/contributions",
+      "hasCallerProof": true
+    },
+    {
+      "url": "http://127.0.0.1:46985/api/v1/threads?projectId=proj_65t4tfudn5&sourceThreadId=thr_3f7ej72rxx&originKind=fork&archived=false",
+      "hasCallerProof": true
+    },
+    {
+      "url": "http://127.0.0.1:46985/api/v1/system/environment-providers?",
+      "hasCallerProof": true
+    },
+    {
+      "url": "http://127.0.0.1:46985/api/v1/system/machine-providers",
+      "hasCallerProof": true
+    },
+    {
+      "url": "http://127.0.0.1:46985/api/v1/threads/thr_3f7ej72rxx/tabs",
+      "hasCallerProof": true
+    },
+    {
+      "url": "http://127.0.0.1:46985/api/v1/threads/thr_3f7ej72rxx/timeline?afterSequence=64",
+      "hasCallerProof": true
+    },
+    {
+      "url": "http://127.0.0.1:46985/api/v1/system/providers?environmentId=env_hsyye3pyx2",
+      "hasCallerProof": true
+    },
+    {
+      "url": "http://127.0.0.1:46985/api/v1/threads/thr_3f7ej72rxx/tabs",
+      "hasCallerProof": true
+    },
+    {
+      "url": "http://127.0.0.1:46985/api/v1/perf",
+      "hasCallerProof": true
+    },
+    {
+      "url": "http://127.0.0.1:46985/api/v1/threads/thr_3f7ej72rxx/conversation-outline",
+      "hasCallerProof": true
+    },
+    {
+      "url": "http://127.0.0.1:46985/api/v1/plugins/provider-usage/rpc/getUsage",
+      "hasCallerProof": true
+    },
+    {
+      "url": "http://127.0.0.1:46985/api/v1/cloudroom/setup-step",
+      "hasCallerProof": true
+    },
+    {
+      "url": "http://127.0.0.1:46985/api/v1/system/providers/codex/logo?h=688b78b75ffe1a5c",
+      "hasCallerProof": true
+    }
+  ],
+  "failures": [],
+  "body": "New thread\nPlugins\nSkills\nLoops\nMore\nOpenbot public SDK proof\n\nNo threads\n\nOpenbot codex smoke\nOpenbot codex smoke\nOpenbot claude-code smoke\nOpenbot claude-code smoke\nSettings\nCloudroom Connect\nProvider usage\nYour disk is almost full: 5.4 GB free. Archive finished threads to free space.\n\nOpenbot codex smoke\n\nReport a bug\nShare\n\nThis is an authorized disposable integration smoke test. Reply with exactly OPENBOT_SMOKE_fd1dbad52d4390a5398841d3. Do not use tools, change files, or start subagents.\n\n8:39 PM\nProvisioned thread\n\nOPENBOT_SMOKE_fd1dbad52d4390a5398841d3\n\n8:40 PM\n\nThis is an authorized disposable integration smoke test. Reply with exactly OPENBOT_SMOKE_683ab977f88dd0987a76a8a9. Do not use tools, change files, or start subagents.\n\n8:40 PM\n\nOPENBOT_SMOKE_683ab977f88dd0987a76a8a9\n\n8:40 PM\n\nThis is an authorized disposable integration smoke test. Reply with exactly OPENBOT_SMOKE_6f8dbb85360f857c005569a0. Do not use tools, change files, or start subagents.\n\n8:44 PM\n\nOPENBOT_SMOKE_6f8dbb85360f857c005569a0\n\n8:44 PM\n\nDisposable permission test: use your shell tool to write the single word smoke to exactly /var/folders/n2/5y7x75r92zl0ll90154hxdzr0000gn/T/openbot-permission-smoke-JsBlwJ/smoke.txt. This target is a fresh directory owned by this test, outside the project to exercise permission handling. If permission is required, ask; do not work around the boundary or use another path. Then reply exactly OPENBOT_SMOKE_ac1b670a9acc1db0088859b4. Do not access any other files, network, or subagents.\n\n8:51 PM\nWaiting for approval\nto run\nmkdir -p /var/folders/n2/5y7x75r92zl0ll90154hxdzr0000gn/T/openbot-permission-smoke-JsBlwJ && printf smoke > /var/folders/n2/5y7x75r92zl0ll90154hxdzr0000gn/T/openbot-permission-smoke-JsBlwJ/smoke.txt\nWorking...\nApproval needed\nInfo\nParent\nNone\nEnvironment\nLocal\nDirectory\n/var/folders/n2/5y7x75r92zl0ll90154hxdzr0000gn/T/openbot-native-smoke-TQMA3V\nToggle Sidebar\ncloudroom\n\nSETUP\n\n01\nSign in\nIn progress\n02\nConnect an agent\nClaude Code or Codex\n03\nConnect GitHub\nFor private repos\n04\nImport your work\nLast step\n\nReopen setup anytime from the account button in the sidebar.\n\nStep 1 of 4\n\nSign in to Cloudroom\n\nUse the account you made on cloudroom.dev.\n\nSign in with browser\n\nAlready signed in there? You come right back."
+}

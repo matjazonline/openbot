@@ -1,0 +1,5 @@
+{
+  "r1": "missing compile-time sample inputs; output retained",
+  "r2": "queued shared-target build terminated; orphan rustc89236 confirmed origin cwd/PPID1 and terminated",
+  "r3": "active isolated cloned target; no contention with suite/stock build lock"
+}

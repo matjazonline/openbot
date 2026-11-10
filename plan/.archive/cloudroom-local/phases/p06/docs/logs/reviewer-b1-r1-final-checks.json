@@ -1,0 +1,16 @@
+{
+  "artifact": "2fdbad30cd3ba21436662b82dfd114ad519e75f52736b322a7b5d51db4d393fb",
+  "head": "97e5d60dc538e26c7cb976a8d63772eed80baff2",
+  "authority_r31_byte_equal": true,
+  "decision_r3_hash_equal": true,
+  "retained_manifest_files_verified": 25,
+  "source_changed_during_review": false,
+  "independent_checks": {
+    "cloudroom": "124 PASS, 1 ignored fixture generator",
+    "plugin": "83 PASS",
+    "plugin_typecheck": "PASS",
+    "workflow_retention": "21 PASS",
+    "mapping_pagination_reproduction": "REPRODUCED: 3996 absent mappings never queried after ten pages; create admission remains paused",
+    "whitespace": "PASS"
+  }
+}

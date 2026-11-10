@@ -1,0 +1,1616 @@
+{
+  "plugins": [
+    {
+      "id": "accounts",
+      "source": "builtin:accounts",
+      "rootDir": "/private/tmp/openbot-cloudroom-d8b3cc3/gui/plugins/accounts",
+      "version": "0.1.0",
+      "provenance": "builtin",
+      "isOrphanedBuiltin": false,
+      "publisherLabel": "Cloudroom Official",
+      "sourceDisplay": "builtin · accounts",
+      "updateState": {},
+      "enabled": true,
+      "description": "Several Claude Code, Codex, and Cursor subscriptions for Local and Cloud threads. Pick the one in use.",
+      "name": "Accounts",
+      "screenshots": [],
+      "collections": [],
+      "icon": "Layers",
+      "iconUrl": null,
+      "status": "running",
+      "statusDetail": null,
+      "handlerStats": {
+        "count": 0,
+        "totalMs": 0,
+        "maxMs": 0,
+        "errorCount": 0
+      },
+      "services": [],
+      "schedules": [],
+      "cliCommand": null,
+      "capabilities": [],
+      "hasSettings": false,
+      "app": {
+        "hasApp": true,
+        "bundle": {
+          "jsUrl": "/api/v1/plugins/accounts/assets/app.js?h=c56cad9133ba36c3",
+          "cssUrl": "/api/v1/plugins/accounts/assets/app.css?h=c56cad9133ba36c3",
+          "jsBytes": 351264,
+          "hash": "c56cad9133ba36c3",
+          "sdkMajor": 0,
+          "sdkVersion": "0.6.50",
+          "compatible": true
+        }
+      },
+      "logoUrl": null,
+      "logoDarkUrl": null,
+      "providerIds": [],
+      "icons": {}
+    },
+    {
+      "id": "ask-user-question",
+      "source": "builtin:ask-user-question",
+      "rootDir": "/private/tmp/openbot-cloudroom-d8b3cc3/gui/plugins/ask-user-question",
+      "version": "0.1.0",
+      "provenance": "builtin",
+      "isOrphanedBuiltin": false,
+      "publisherLabel": "Cloudroom Official",
+      "sourceDisplay": "builtin · ask-user-question",
+      "updateState": {},
+      "enabled": false,
+      "description": "Let any provider ask the user a multiple-choice question, the way Claude Code's AskUserQuestion does natively.",
+      "name": "Ask User Question",
+      "screenshots": [],
+      "collections": [],
+      "icon": "MessageQuestion",
+      "iconUrl": null,
+      "status": "disabled",
+      "statusDetail": null,
+      "handlerStats": {
+        "count": 0,
+        "totalMs": 0,
+        "maxMs": 0,
+        "errorCount": 0
+      },
+      "services": [],
+      "schedules": [],
+      "cliCommand": null,
+      "capabilities": [],
+      "hasSettings": false,
+      "app": {
+        "hasApp": false,
+        "bundle": null
+      },
+      "logoUrl": null,
+      "logoDarkUrl": null,
+      "providerIds": [],
+      "icons": {}
+    },
+    {
+      "id": "automations",
+      "source": "builtin:automations",
+      "rootDir": "/private/tmp/openbot-cloudroom-d8b3cc3/gui/plugins/automations",
+      "version": "0.1.0",
+      "provenance": "builtin",
+      "isOrphanedBuiltin": false,
+      "publisherLabel": "Cloudroom Official",
+      "sourceDisplay": "builtin · automations",
+      "updateState": {},
+      "enabled": true,
+      "description": "Run agents and scripts on a schedule, locally or in the cloud, and review what they did.",
+      "name": "Loops",
+      "screenshots": [],
+      "collections": [],
+      "icon": "Repeat",
+      "iconUrl": null,
+      "status": "running",
+      "statusDetail": null,
+      "handlerStats": {
+        "count": 0,
+        "totalMs": 0,
+        "maxMs": 0,
+        "errorCount": 0
+      },
+      "services": [
+        {
+          "name": "automation-sweep",
+          "state": "running"
+        },
+        {
+          "name": "automation-webhooks",
+          "state": "running"
+        }
+      ],
+      "schedules": [],
+      "cliCommand": {
+        "name": "loop",
+        "summary": "Create and manage loops: scheduled agent and script runs, Local and Cloud (`room-cli automation` works too)"
+      },
+      "capabilities": [
+        {
+          "kind": "skill",
+          "id": "automations",
+          "label": "automations",
+          "detail": "Skill this plugin adds to your agents"
+        },
+        {
+          "kind": "skill",
+          "id": "workflow-scan",
+          "label": "workflow-scan",
+          "detail": "Skill this plugin adds to your agents"
+        }
+      ],
+      "hasSettings": false,
+      "app": {
+        "hasApp": true,
+        "bundle": {
+          "jsUrl": "/api/v1/plugins/automations/assets/app.js?h=3738b1a563bc4a9d",
+          "cssUrl": "/api/v1/plugins/automations/assets/app.css?h=3738b1a563bc4a9d",
+          "jsBytes": 206403,
+          "hash": "3738b1a563bc4a9d",
+          "sdkMajor": 0,
+          "sdkVersion": "0.6.50",
+          "compatible": true
+        }
+      },
+      "logoUrl": null,
+      "logoDarkUrl": null,
+      "providerIds": [],
+      "icons": {}
+    },
+    {
+      "id": "bb-guide",
+      "source": "builtin:bb-guide",
+      "rootDir": "/private/tmp/openbot-cloudroom-d8b3cc3/gui/plugins/bb-guide",
+      "version": "0.1.0",
+      "provenance": "builtin",
+      "isOrphanedBuiltin": false,
+      "publisherLabel": "Cloudroom Official",
+      "sourceDisplay": "builtin · bb-guide",
+      "updateState": {},
+      "enabled": true,
+      "description": "Control the bundled Cloudroom agent skills.",
+      "name": "Cloudroom guide",
+      "screenshots": [],
+      "collections": [],
+      "icon": "Explore",
+      "iconUrl": null,
+      "status": "running",
+      "statusDetail": null,
+      "handlerStats": {
+        "count": 0,
+        "totalMs": 0,
+        "maxMs": 0,
+        "errorCount": 0
+      },
+      "services": [],
+      "schedules": [],
+      "cliCommand": null,
+      "capabilities": [
+        {
+          "kind": "skill",
+          "id": "plugin-authoring",
+          "label": "plugin-authoring",
+          "detail": "Skill this plugin adds to your agents"
+        },
+        {
+          "kind": "skill",
+          "id": "room-cli",
+          "label": "room-cli",
+          "detail": "Skill this plugin adds to your agents"
+        },
+        {
+          "kind": "skill",
+          "id": "skill-creator",
+          "label": "skill-creator",
+          "detail": "Skill this plugin adds to your agents"
+        }
+      ],
+      "hasSettings": true,
+      "app": {
+        "hasApp": false,
+        "bundle": null
+      },
+      "logoUrl": null,
+      "logoDarkUrl": null,
+      "providerIds": [],
+      "icons": {}
+    },
+    {
+      "id": "computer-use",
+      "source": "builtin:computer-use",
+      "rootDir": "/private/tmp/openbot-cloudroom-d8b3cc3/gui/plugins/computer-use",
+      "version": "0.1.0",
+      "provenance": "builtin",
+      "isOrphanedBuiltin": false,
+      "publisherLabel": "Cloudroom Official",
+      "sourceDisplay": "builtin · computer-use",
+      "updateState": {},
+      "enabled": true,
+      "description": "Agents see and control desktop apps. Cloudroom asks before each new app.",
+      "name": "Computer Use",
+      "screenshots": [],
+      "collections": [],
+      "icon": "Cursor",
+      "iconUrl": null,
+      "status": "running",
+      "statusDetail": null,
+      "handlerStats": {
+        "count": 0,
+        "totalMs": 0,
+        "maxMs": 0,
+        "errorCount": 0
+      },
+      "services": [],
+      "schedules": [],
+      "cliCommand": {
+        "name": "computer-use",
+        "summary": "See and control desktop apps, with a per-app approval from the user"
+      },
+      "capabilities": [
+        {
+          "kind": "skill",
+          "id": "computer-use",
+          "label": "computer-use",
+          "detail": "Skill this plugin adds to your agents"
+        }
+      ],
+      "hasSettings": false,
+      "app": {
+        "hasApp": true,
+        "bundle": {
+          "jsUrl": "/api/v1/plugins/computer-use/assets/app.js?h=e10c25fa4b48ee05",
+          "cssUrl": "/api/v1/plugins/computer-use/assets/app.css?h=e10c25fa4b48ee05",
+          "jsBytes": 325185,
+          "hash": "e10c25fa4b48ee05",
+          "sdkMajor": 0,
+          "sdkVersion": "0.6.50",
+          "compatible": true
+        }
+      },
+      "logoUrl": null,
+      "logoDarkUrl": null,
+      "providerIds": [],
+      "icons": {}
+    },
+    {
+      "id": "connect",
+      "source": "builtin:connect",
+      "rootDir": "/private/tmp/openbot-cloudroom-d8b3cc3/gui/plugins/connect",
+      "version": "0.1.0",
+      "provenance": "builtin",
+      "isOrphanedBuiltin": false,
+      "publisherLabel": "Cloudroom Official",
+      "sourceDisplay": "builtin · connect",
+      "updateState": {},
+      "enabled": true,
+      "description": "Use Cloudroom from your phone.",
+      "name": "Cloudroom Connect",
+      "screenshots": [],
+      "collections": [],
+      "icon": "Smartphone",
+      "iconUrl": null,
+      "status": "running",
+      "statusDetail": null,
+      "handlerStats": {
+        "count": 0,
+        "totalMs": 0,
+        "maxMs": 0,
+        "errorCount": 0
+      },
+      "services": [
+        {
+          "name": "tunnel",
+          "state": "running"
+        }
+      ],
+      "schedules": [],
+      "cliCommand": {
+        "name": "connect",
+        "summary": "Open this Cloudroom from your phone at cloudroom.run and share ports"
+      },
+      "capabilities": [
+        {
+          "kind": "skill",
+          "id": "share-server-links",
+          "label": "share-server-links",
+          "detail": "Skill this plugin adds to your agents"
+        }
+      ],
+      "hasSettings": true,
+      "app": {
+        "hasApp": true,
+        "bundle": {
+          "jsUrl": "/api/v1/plugins/connect/assets/app.js?h=4ea841b6a65554cc",
+          "cssUrl": "/api/v1/plugins/connect/assets/app.css?h=4ea841b6a65554cc",
+          "jsBytes": 25270,
+          "hash": "4ea841b6a65554cc",
+          "sdkMajor": 0,
+          "sdkVersion": "0.6.50",
+          "compatible": true
+        }
+      },
+      "logoUrl": null,
+      "logoDarkUrl": null,
+      "providerIds": [],
+      "icons": {}
+    },
+    {
+      "id": "custom-instructions",
+      "source": "builtin:custom-instructions",
+      "rootDir": "/private/tmp/openbot-cloudroom-d8b3cc3/gui/plugins/custom-instructions",
+      "version": "0.1.0",
+      "provenance": "builtin",
+      "isOrphanedBuiltin": false,
+      "publisherLabel": "Cloudroom Official",
+      "sourceDisplay": "builtin · custom-instructions",
+      "updateState": {},
+      "enabled": true,
+      "description": "Add persistent custom instructions to agent tasks on this Cloudroom host.",
+      "name": "Custom instructions",
+      "screenshots": [],
+      "collections": [],
+      "icon": "EditFile",
+      "iconUrl": null,
+      "status": "running",
+      "statusDetail": null,
+      "handlerStats": {
+        "count": 0,
+        "totalMs": 0,
+        "maxMs": 0,
+        "errorCount": 0
+      },
+      "services": [],
+      "schedules": [],
+      "cliCommand": {
+        "name": "instructions",
+        "summary": "Read and update the custom instructions injected into agents"
+      },
+      "capabilities": [],
+      "hasSettings": true,
+      "app": {
+        "hasApp": false,
+        "bundle": null
+      },
+      "logoUrl": null,
+      "logoDarkUrl": null,
+      "providerIds": [],
+      "icons": {}
+    },
+    {
+      "id": "drafts",
+      "source": "builtin:drafts",
+      "rootDir": "/private/tmp/openbot-cloudroom-d8b3cc3/gui/plugins/drafts",
+      "version": "0.1.0",
+      "provenance": "builtin",
+      "isOrphanedBuiltin": false,
+      "publisherLabel": "Cloudroom Official",
+      "sourceDisplay": "builtin · drafts",
+      "updateState": {},
+      "enabled": true,
+      "description": "Save a composer draft as a manually sent queued message.",
+      "name": "Drafts",
+      "screenshots": [],
+      "collections": [],
+      "icon": "EditFile",
+      "iconUrl": null,
+      "status": "running",
+      "statusDetail": null,
+      "handlerStats": {
+        "count": 0,
+        "totalMs": 0,
+        "maxMs": 0,
+        "errorCount": 0
+      },
+      "services": [],
+      "schedules": [],
+      "cliCommand": null,
+      "capabilities": [],
+      "hasSettings": false,
+      "app": {
+        "hasApp": true,
+        "bundle": {
+          "jsUrl": "/api/v1/plugins/drafts/assets/app.js?h=9bd7c035db4a0934",
+          "cssUrl": "/api/v1/plugins/drafts/assets/app.css?h=9bd7c035db4a0934",
+          "jsBytes": 2542,
+          "hash": "9bd7c035db4a0934",
+          "sdkMajor": 0,
+          "sdkVersion": "0.6.50",
+          "compatible": true
+        }
+      },
+      "logoUrl": null,
+      "logoDarkUrl": null,
+      "providerIds": [],
+      "icons": {}
+    },
+    {
+      "id": "environment-git-worktree",
+      "source": "builtin:environment-git-worktree",
+      "rootDir": "/private/tmp/openbot-cloudroom-d8b3cc3/gui/plugins/environment-git-worktree",
+      "version": "0.1.0",
+      "provenance": "builtin",
+      "isOrphanedBuiltin": false,
+      "publisherLabel": "Cloudroom Official",
+      "sourceDisplay": "builtin · environment-git-worktree",
+      "updateState": {},
+      "enabled": true,
+      "description": "Run a thread in a fresh git worktree on an enrolled machine",
+      "name": "Worktree",
+      "screenshots": [],
+      "collections": [],
+      "icon": "FolderGit",
+      "iconUrl": null,
+      "status": "running",
+      "statusDetail": null,
+      "handlerStats": {
+        "count": 0,
+        "totalMs": 0,
+        "maxMs": 0,
+        "errorCount": 0
+      },
+      "services": [],
+      "schedules": [],
+      "cliCommand": null,
+      "capabilities": [],
+      "hasSettings": false,
+      "app": {
+        "hasApp": true,
+        "bundle": {
+          "jsUrl": "/api/v1/plugins/environment-git-worktree/assets/app.js?h=0c8abbbae27dedf5",
+          "cssUrl": "/api/v1/plugins/environment-git-worktree/assets/app.css?h=0c8abbbae27dedf5",
+          "jsBytes": 3616,
+          "hash": "0c8abbbae27dedf5",
+          "sdkMajor": 0,
+          "sdkVersion": "0.6.50",
+          "compatible": true
+        }
+      },
+      "logoUrl": null,
+      "logoDarkUrl": null,
+      "providerIds": [],
+      "icons": {}
+    },
+    {
+      "id": "environment-personal-workspace",
+      "source": "builtin:environment-personal-workspace",
+      "rootDir": "/private/tmp/openbot-cloudroom-d8b3cc3/gui/plugins/environment-personal-workspace",
+      "version": "0.1.0",
+      "provenance": "builtin",
+      "isOrphanedBuiltin": false,
+      "publisherLabel": "Cloudroom Official",
+      "sourceDisplay": "builtin · environment-personal-workspace",
+      "updateState": {},
+      "enabled": true,
+      "description": "Give every thread without a project its own personal workspace on the machine",
+      "name": "Personal workspace",
+      "screenshots": [],
+      "collections": [],
+      "icon": "Folder",
+      "iconUrl": null,
+      "status": "running",
+      "statusDetail": null,
+      "handlerStats": {
+        "count": 0,
+        "totalMs": 0,
+        "maxMs": 0,
+        "errorCount": 0
+      },
+      "services": [],
+      "schedules": [],
+      "cliCommand": null,
+      "capabilities": [],
+      "hasSettings": false,
+      "app": {
+        "hasApp": false,
+        "bundle": null
+      },
+      "logoUrl": null,
+      "logoDarkUrl": null,
+      "providerIds": [],
+      "icons": {}
+    },
+    {
+      "id": "environment-project-checkout",
+      "source": "builtin:environment-project-checkout",
+      "rootDir": "/private/tmp/openbot-cloudroom-d8b3cc3/gui/plugins/environment-project-checkout",
+      "version": "0.1.0",
+      "provenance": "builtin",
+      "isOrphanedBuiltin": false,
+      "publisherLabel": "Cloudroom Official",
+      "sourceDisplay": "builtin · environment-project-checkout",
+      "updateState": {},
+      "enabled": true,
+      "description": "Run a thread in the project's own checkout on an enrolled machine, on the branch you choose",
+      "name": "Project checkout",
+      "screenshots": [],
+      "collections": [],
+      "icon": "Laptop",
+      "iconUrl": null,
+      "status": "running",
+      "statusDetail": null,
+      "handlerStats": {
+        "count": 0,
+        "totalMs": 0,
+        "maxMs": 0,
+        "errorCount": 0
+      },
+      "services": [],
+      "schedules": [],
+      "cliCommand": null,
+      "capabilities": [],
+      "hasSettings": false,
+      "app": {
+        "hasApp": true,
+        "bundle": {
+          "jsUrl": "/api/v1/plugins/environment-project-checkout/assets/app.js?h=6f9cc4159793fb43",
+          "cssUrl": "/api/v1/plugins/environment-project-checkout/assets/app.css?h=6f9cc4159793fb43",
+          "jsBytes": 32506,
+          "hash": "6f9cc4159793fb43",
+          "sdkMajor": 0,
+          "sdkVersion": "0.6.50",
+          "compatible": true
+        }
+      },
+      "logoUrl": null,
+      "logoDarkUrl": null,
+      "providerIds": [],
+      "icons": {}
+    },
+    {
+      "id": "gpu",
+      "source": "builtin:gpu",
+      "rootDir": "/private/tmp/openbot-cloudroom-d8b3cc3/gui/plugins/gpu",
+      "version": "0.1.0",
+      "provenance": "builtin",
+      "isOrphanedBuiltin": false,
+      "publisherLabel": "Cloudroom Official",
+      "sourceDisplay": "builtin · gpu",
+      "updateState": {},
+      "enabled": true,
+      "description": "Agents can rent a GPU for heavy GPU work. Cloudroom asks you first and shows the Cloud Credits it will use.",
+      "name": "GPUs",
+      "screenshots": [],
+      "collections": [],
+      "icon": "Zap",
+      "iconUrl": null,
+      "status": "running",
+      "statusDetail": null,
+      "handlerStats": {
+        "count": 0,
+        "totalMs": 0,
+        "maxMs": 0,
+        "errorCount": 0
+      },
+      "services": [],
+      "schedules": [],
+      "cliCommand": {
+        "name": "gpu",
+        "summary": "Rent a GPU box for heavy GPU work, after the user approves its Cloud Credits (beta)"
+      },
+      "capabilities": [
+        {
+          "kind": "skill",
+          "id": "gpu",
+          "label": "gpu",
+          "detail": "Skill this plugin adds to your agents"
+        }
+      ],
+      "hasSettings": false,
+      "app": {
+        "hasApp": true,
+        "bundle": {
+          "jsUrl": "/api/v1/plugins/gpu/assets/app.js?h=9ba1e40bf8eafd52",
+          "cssUrl": "/api/v1/plugins/gpu/assets/app.css?h=9ba1e40bf8eafd52",
+          "jsBytes": 321343,
+          "hash": "9ba1e40bf8eafd52",
+          "sdkMajor": 0,
+          "sdkVersion": "0.6.50",
+          "compatible": true
+        }
+      },
+      "logoUrl": null,
+      "logoDarkUrl": null,
+      "providerIds": [],
+      "icons": {}
+    },
+    {
+      "id": "inline-vis",
+      "source": "builtin:inline-vis",
+      "rootDir": "/private/tmp/openbot-cloudroom-d8b3cc3/gui/plugins/inline-vis",
+      "version": "0.1.0",
+      "provenance": "builtin",
+      "isOrphanedBuiltin": false,
+      "publisherLabel": "Cloudroom Official",
+      "sourceDisplay": "builtin · inline-vis",
+      "updateState": {},
+      "enabled": true,
+      "description": "Render workspace or thread-storage HTML visualizations and Markdown documents inline in assistant messages.",
+      "name": "Inline visualizations",
+      "screenshots": [],
+      "collections": [],
+      "icon": "AppWindow",
+      "iconUrl": null,
+      "status": "running",
+      "statusDetail": null,
+      "handlerStats": {
+        "count": 0,
+        "totalMs": 0,
+        "maxMs": 0,
+        "errorCount": 0
+      },
+      "services": [],
+      "schedules": [],
+      "cliCommand": null,
+      "capabilities": [
+        {
+          "kind": "skill",
+          "id": "inline-vis",
+          "label": "inline-vis",
+          "detail": "Skill this plugin adds to your agents"
+        }
+      ],
+      "hasSettings": false,
+      "app": {
+        "hasApp": true,
+        "bundle": {
+          "jsUrl": "/api/v1/plugins/inline-vis/assets/app.js?h=6b4ee0b8d9d1d425",
+          "cssUrl": "/api/v1/plugins/inline-vis/assets/app.css?h=6b4ee0b8d9d1d425",
+          "jsBytes": 12334,
+          "hash": "6b4ee0b8d9d1d425",
+          "sdkMajor": 0,
+          "sdkVersion": "0.6.50",
+          "compatible": true
+        }
+      },
+      "logoUrl": null,
+      "logoDarkUrl": null,
+      "providerIds": [],
+      "icons": {}
+    },
+    {
+      "id": "keep-awake",
+      "source": "builtin:keep-awake",
+      "rootDir": "/private/tmp/openbot-cloudroom-d8b3cc3/gui/plugins/keep-awake",
+      "version": "0.1.0",
+      "provenance": "builtin",
+      "isOrphanedBuiltin": false,
+      "publisherLabel": "Cloudroom Official",
+      "sourceDisplay": "builtin · keep-awake",
+      "updateState": {},
+      "enabled": true,
+      "description": "Keeps selected macOS, Linux and Windows hosts awake while Cloudroom is running.",
+      "name": "Keep Awake",
+      "screenshots": [],
+      "collections": [],
+      "icon": "Coffee",
+      "iconUrl": null,
+      "status": "running",
+      "statusDetail": null,
+      "handlerStats": {
+        "count": 0,
+        "totalMs": 0,
+        "maxMs": 0,
+        "errorCount": 0
+      },
+      "services": [
+        {
+          "name": "desired-state-reconciler",
+          "state": "running"
+        }
+      ],
+      "schedules": [],
+      "cliCommand": {
+        "name": "keep-awake",
+        "summary": "Configure sleep prevention"
+      },
+      "capabilities": [],
+      "hasSettings": false,
+      "app": {
+        "hasApp": true,
+        "bundle": {
+          "jsUrl": "/api/v1/plugins/keep-awake/assets/app.js?h=dc82b87e90987b85",
+          "cssUrl": "/api/v1/plugins/keep-awake/assets/app.css?h=dc82b87e90987b85",
+          "jsBytes": 33878,
+          "hash": "dc82b87e90987b85",
+          "sdkMajor": 0,
+          "sdkVersion": "0.6.50",
+          "compatible": true
+        }
+      },
+      "logoUrl": null,
+      "logoDarkUrl": null,
+      "providerIds": [],
+      "icons": {}
+    },
+    {
+      "id": "machine-ssh",
+      "source": "builtin:machine-ssh",
+      "rootDir": "/private/tmp/openbot-cloudroom-d8b3cc3/gui/plugins/machine-ssh",
+      "version": "0.1.0",
+      "provenance": "builtin",
+      "isOrphanedBuiltin": false,
+      "publisherLabel": "Cloudroom Official",
+      "sourceDisplay": "builtin · machine-ssh",
+      "updateState": {},
+      "enabled": true,
+      "description": "Add machines you can reach with SSH. Cloudroom installs itself using your SSH keys.",
+      "name": "SSH Machines",
+      "screenshots": [],
+      "collections": [],
+      "icon": "Terminal",
+      "iconUrl": null,
+      "status": "running",
+      "statusDetail": null,
+      "handlerStats": {
+        "count": 0,
+        "totalMs": 0,
+        "maxMs": 0,
+        "errorCount": 0
+      },
+      "services": [],
+      "schedules": [],
+      "cliCommand": null,
+      "capabilities": [],
+      "hasSettings": false,
+      "app": {
+        "hasApp": false,
+        "bundle": null
+      },
+      "logoUrl": null,
+      "logoDarkUrl": null,
+      "providerIds": [],
+      "icons": {}
+    },
+    {
+      "id": "monaco-editor",
+      "source": "builtin:monaco-editor",
+      "rootDir": "/private/tmp/openbot-cloudroom-d8b3cc3/gui/plugins/monaco-editor",
+      "version": "0.1.0",
+      "provenance": "builtin",
+      "isOrphanedBuiltin": false,
+      "publisherLabel": "Cloudroom Official",
+      "sourceDisplay": "builtin · monaco-editor",
+      "updateState": {},
+      "enabled": true,
+      "description": "Edit files in Cloudroom with the Monaco editor instead of the read-only preview.",
+      "name": "File Editor",
+      "screenshots": [],
+      "collections": [],
+      "icon": "Code",
+      "iconUrl": null,
+      "status": "running",
+      "statusDetail": null,
+      "handlerStats": {
+        "count": 0,
+        "totalMs": 0,
+        "maxMs": 0,
+        "errorCount": 0
+      },
+      "services": [],
+      "schedules": [],
+      "cliCommand": null,
+      "capabilities": [],
+      "hasSettings": false,
+      "app": {
+        "hasApp": true,
+        "bundle": {
+          "jsUrl": "/api/v1/plugins/monaco-editor/assets/app.js?h=848696f014c83eba",
+          "cssUrl": "/api/v1/plugins/monaco-editor/assets/app.css?h=848696f014c83eba",
+          "jsBytes": 30046,
+          "hash": "848696f014c83eba",
+          "sdkMajor": 0,
+          "sdkVersion": "0.6.50",
+          "compatible": true
+        }
+      },
+      "logoUrl": null,
+      "logoDarkUrl": null,
+      "providerIds": [],
+      "icons": {}
+    },
+    {
+      "id": "organization",
+      "source": "builtin:organization",
+      "rootDir": "/private/tmp/openbot-cloudroom-d8b3cc3/gui/plugins/organization",
+      "version": "0.1.0",
+      "provenance": "builtin",
+      "isOrphanedBuiltin": false,
+      "publisherLabel": "Cloudroom Official",
+      "sourceDisplay": "builtin · organization",
+      "updateState": {},
+      "enabled": false,
+      "description": "Work as a team: shared agent instructions, and teammates' Cloud threads you can read and take over.",
+      "name": "Organization",
+      "screenshots": [],
+      "collections": [],
+      "icon": "UserRound",
+      "iconUrl": null,
+      "status": "disabled",
+      "statusDetail": null,
+      "handlerStats": {
+        "count": 0,
+        "totalMs": 0,
+        "maxMs": 0,
+        "errorCount": 0
+      },
+      "services": [],
+      "schedules": [],
+      "cliCommand": null,
+      "capabilities": [],
+      "hasSettings": false,
+      "app": {
+        "hasApp": false,
+        "bundle": null
+      },
+      "logoUrl": null,
+      "logoDarkUrl": null,
+      "providerIds": [],
+      "icons": {}
+    },
+    {
+      "id": "pdf-preview",
+      "source": "builtin:pdf-preview",
+      "rootDir": "/private/tmp/openbot-cloudroom-d8b3cc3/gui/plugins/pdf-preview",
+      "version": "0.1.0",
+      "provenance": "builtin",
+      "isOrphanedBuiltin": false,
+      "publisherLabel": "Cloudroom Official",
+      "sourceDisplay": "builtin · pdf-preview",
+      "updateState": {},
+      "enabled": true,
+      "description": "Preview PDF files with the browser's built-in viewer.",
+      "name": "PDF preview",
+      "screenshots": [],
+      "collections": [],
+      "icon": "FileText",
+      "iconUrl": null,
+      "status": "running",
+      "statusDetail": null,
+      "handlerStats": {
+        "count": 0,
+        "totalMs": 0,
+        "maxMs": 0,
+        "errorCount": 0
+      },
+      "services": [],
+      "schedules": [],
+      "cliCommand": null,
+      "capabilities": [],
+      "hasSettings": false,
+      "app": {
+        "hasApp": true,
+        "bundle": {
+          "jsUrl": "/api/v1/plugins/pdf-preview/assets/app.js?h=713575fce032a283",
+          "cssUrl": "/api/v1/plugins/pdf-preview/assets/app.css?h=713575fce032a283",
+          "jsBytes": 7139,
+          "hash": "713575fce032a283",
+          "sdkMajor": 0,
+          "sdkVersion": "0.6.50",
+          "compatible": true
+        }
+      },
+      "logoUrl": null,
+      "logoDarkUrl": null,
+      "providerIds": [],
+      "icons": {}
+    },
+    {
+      "id": "plugin-api-docs",
+      "source": "builtin:plugin-api-docs",
+      "rootDir": "/private/tmp/openbot-cloudroom-d8b3cc3/gui/plugins/plugin-api-docs",
+      "version": "0.1.0",
+      "provenance": "builtin",
+      "isOrphanedBuiltin": false,
+      "publisherLabel": "Cloudroom Official",
+      "sourceDisplay": "builtin · plugin-api-docs",
+      "updateState": {},
+      "enabled": false,
+      "description": "Browse the Cloudroom plugin API as an annotated map of the product.",
+      "name": "Plugin Guide",
+      "screenshots": [],
+      "collections": [],
+      "icon": "./icons/ai-generative.svg",
+      "iconUrl": "/api/v1/plugins/plugin-api-docs/assets/icon?h=4e87ef6283a4c264",
+      "status": "disabled",
+      "statusDetail": null,
+      "handlerStats": {
+        "count": 0,
+        "totalMs": 0,
+        "maxMs": 0,
+        "errorCount": 0
+      },
+      "services": [],
+      "schedules": [],
+      "cliCommand": null,
+      "capabilities": [],
+      "hasSettings": false,
+      "app": {
+        "hasApp": false,
+        "bundle": null
+      },
+      "logoUrl": null,
+      "logoDarkUrl": null,
+      "providerIds": [],
+      "icons": {}
+    },
+    {
+      "id": "plugin-api-tester",
+      "source": "builtin:plugin-api-tester",
+      "rootDir": "/private/tmp/openbot-cloudroom-d8b3cc3/gui/plugins/plugin-api-tester",
+      "version": "0.1.0",
+      "provenance": "builtin",
+      "isOrphanedBuiltin": false,
+      "publisherLabel": "Cloudroom Official",
+      "sourceDisplay": "builtin · plugin-api-tester",
+      "updateState": {},
+      "enabled": false,
+      "description": "Exercise and inspect Cloudroom plugin API surfaces during development.",
+      "name": "Plugin API Tester",
+      "screenshots": [],
+      "collections": [],
+      "icon": "Beaker",
+      "iconUrl": null,
+      "status": "disabled",
+      "statusDetail": null,
+      "handlerStats": {
+        "count": 0,
+        "totalMs": 0,
+        "maxMs": 0,
+        "errorCount": 0
+      },
+      "services": [],
+      "schedules": [],
+      "cliCommand": null,
+      "capabilities": [],
+      "hasSettings": false,
+      "app": {
+        "hasApp": false,
+        "bundle": null
+      },
+      "logoUrl": null,
+      "logoDarkUrl": null,
+      "providerIds": [],
+      "icons": {}
+    },
+    {
+      "id": "provider-acp",
+      "source": "builtin:provider-acp",
+      "rootDir": "/private/tmp/openbot-cloudroom-d8b3cc3/gui/plugins/provider-acp",
+      "version": "0.1.0",
+      "provenance": "builtin",
+      "isOrphanedBuiltin": false,
+      "publisherLabel": "Cloudroom Official",
+      "sourceDisplay": "builtin · provider-acp",
+      "updateState": {},
+      "enabled": true,
+      "description": "Run Cloudroom threads with ACP agents (supports Cursor, opencode, omp and more).",
+      "name": "ACP providers",
+      "screenshots": [],
+      "collections": [],
+      "icon": "./icons/acp.svg",
+      "iconUrl": "/api/v1/plugins/provider-acp/assets/icon?h=8e6031f899b688db",
+      "status": "running",
+      "statusDetail": null,
+      "handlerStats": {
+        "count": 0,
+        "totalMs": 0,
+        "maxMs": 0,
+        "errorCount": 0
+      },
+      "services": [
+        {
+          "name": "acp-capability-probe",
+          "state": "running"
+        }
+      ],
+      "schedules": [],
+      "cliCommand": null,
+      "capabilities": [
+        {
+          "kind": "skill",
+          "id": "acp-provider",
+          "label": "acp-provider",
+          "detail": "Skill this plugin adds to your agents"
+        }
+      ],
+      "hasSettings": true,
+      "app": {
+        "hasApp": false,
+        "bundle": null
+      },
+      "logoUrl": null,
+      "logoDarkUrl": null,
+      "providerIds": [
+        "acp-cursor",
+        "acp-opencode",
+        "acp-omp",
+        "acp-grok",
+        "acp-fx",
+        "acp-hermes-agent",
+        "acp-openclaw",
+        "acp-devin",
+        "acp-droid",
+        "acp-kilo",
+        "acp-cline"
+      ],
+      "icons": {
+        "cursor": "/api/v1/plugins/provider-acp/assets/icons/cursor.svg?h=54518fbba151af1d",
+        "opencode": "/api/v1/plugins/provider-acp/assets/icons/opencode.svg?h=7e411ab06762c1eb",
+        "omp": "/api/v1/plugins/provider-acp/assets/icons/omp.svg?h=f90290c0c2e2858a",
+        "grok": "/api/v1/plugins/provider-acp/assets/icons/grok.svg?h=3ac2309e881f3a6f",
+        "fx": "/api/v1/plugins/provider-acp/assets/icons/fx.svg?h=004a0fe486fba5f0",
+        "hermes-agent": "/api/v1/plugins/provider-acp/assets/icons/hermes-agent.svg?h=067571f33ff25ee2",
+        "openclaw": "/api/v1/plugins/provider-acp/assets/icons/openclaw.svg?h=c8dd79003581807c",
+        "devin": "/api/v1/plugins/provider-acp/assets/icons/devin.svg?h=f28b8e179145eb91",
+        "droid": "/api/v1/plugins/provider-acp/assets/icons/droid.svg?h=8c4b11d0024c7642",
+        "kilo": "/api/v1/plugins/provider-acp/assets/icons/kilo.svg?h=f69645d002f2719f",
+        "cline": "/api/v1/plugins/provider-acp/assets/icons/cline.svg?h=8610cec30217e8bd"
+      }
+    },
+    {
+      "id": "provider-claude-code",
+      "source": "builtin:provider-claude-code",
+      "rootDir": "/private/tmp/openbot-cloudroom-d8b3cc3/gui/plugins/provider-claude-code",
+      "version": "0.1.0",
+      "provenance": "builtin",
+      "isOrphanedBuiltin": false,
+      "publisherLabel": "Cloudroom Official",
+      "sourceDisplay": "builtin · provider-claude-code",
+      "updateState": {},
+      "enabled": true,
+      "description": "Run Cloudroom threads with Claude Code.",
+      "name": "Claude Code provider",
+      "screenshots": [],
+      "collections": [],
+      "icon": "./icons/claude-code.svg",
+      "iconUrl": "/api/v1/plugins/provider-claude-code/assets/icon?h=138a999a87258575",
+      "status": "running",
+      "statusDetail": null,
+      "handlerStats": {
+        "count": 0,
+        "totalMs": 0,
+        "maxMs": 0,
+        "errorCount": 0
+      },
+      "services": [],
+      "schedules": [],
+      "cliCommand": null,
+      "capabilities": [
+        {
+          "kind": "skill",
+          "id": "claude-code-provider",
+          "label": "claude-code-provider",
+          "detail": "Skill this plugin adds to your agents"
+        }
+      ],
+      "hasSettings": true,
+      "app": {
+        "hasApp": false,
+        "bundle": null
+      },
+      "logoUrl": null,
+      "logoDarkUrl": null,
+      "providerIds": [
+        "claude-code"
+      ],
+      "icons": {}
+    },
+    {
+      "id": "provider-codex",
+      "source": "builtin:provider-codex",
+      "rootDir": "/private/tmp/openbot-cloudroom-d8b3cc3/gui/plugins/provider-codex",
+      "version": "0.1.0",
+      "provenance": "builtin",
+      "isOrphanedBuiltin": false,
+      "publisherLabel": "Cloudroom Official",
+      "sourceDisplay": "builtin · provider-codex",
+      "updateState": {},
+      "enabled": true,
+      "description": "Run Cloudroom threads with Codex.",
+      "name": "Codex provider",
+      "screenshots": [],
+      "collections": [],
+      "icon": "./icons/codex.svg",
+      "iconUrl": "/api/v1/plugins/provider-codex/assets/icon?h=688b78b75ffe1a5c",
+      "status": "running",
+      "statusDetail": null,
+      "handlerStats": {
+        "count": 0,
+        "totalMs": 0,
+        "maxMs": 0,
+        "errorCount": 0
+      },
+      "services": [],
+      "schedules": [],
+      "cliCommand": null,
+      "capabilities": [
+        {
+          "kind": "skill",
+          "id": "codex-provider",
+          "label": "codex-provider",
+          "detail": "Skill this plugin adds to your agents"
+        }
+      ],
+      "hasSettings": true,
+      "app": {
+        "hasApp": false,
+        "bundle": null
+      },
+      "logoUrl": null,
+      "logoDarkUrl": null,
+      "providerIds": [
+        "codex"
+      ],
+      "icons": {}
+    },
+    {
+      "id": "provider-pi",
+      "source": "builtin:provider-pi",
+      "rootDir": "/private/tmp/openbot-cloudroom-d8b3cc3/gui/plugins/provider-pi",
+      "version": "0.1.0",
+      "provenance": "builtin",
+      "isOrphanedBuiltin": false,
+      "publisherLabel": "Cloudroom Official",
+      "sourceDisplay": "builtin · provider-pi",
+      "updateState": {},
+      "enabled": true,
+      "description": "Run Cloudroom threads with Pi.",
+      "name": "Pi provider",
+      "screenshots": [],
+      "collections": [],
+      "icon": "./icons/pi.svg",
+      "iconUrl": "/api/v1/plugins/provider-pi/assets/icon?h=16cd38b27b481945",
+      "status": "running",
+      "statusDetail": null,
+      "handlerStats": {
+        "count": 0,
+        "totalMs": 0,
+        "maxMs": 0,
+        "errorCount": 0
+      },
+      "services": [],
+      "schedules": [],
+      "cliCommand": null,
+      "capabilities": [
+        {
+          "kind": "skill",
+          "id": "pi-provider",
+          "label": "pi-provider",
+          "detail": "Skill this plugin adds to your agents"
+        }
+      ],
+      "hasSettings": false,
+      "app": {
+        "hasApp": true,
+        "bundle": {
+          "jsUrl": "/api/v1/plugins/provider-pi/assets/app.js?h=9386cf6046067566",
+          "cssUrl": "/api/v1/plugins/provider-pi/assets/app.css?h=9386cf6046067566",
+          "jsBytes": 322148,
+          "hash": "9386cf6046067566",
+          "sdkMajor": 0,
+          "sdkVersion": "0.6.50",
+          "compatible": true
+        }
+      },
+      "logoUrl": null,
+      "logoDarkUrl": null,
+      "providerIds": [
+        "pi"
+      ],
+      "icons": {}
+    },
+    {
+      "id": "provider-retry",
+      "source": "builtin:provider-retry",
+      "rootDir": "/private/tmp/openbot-cloudroom-d8b3cc3/gui/plugins/provider-retry",
+      "version": "0.1.0",
+      "provenance": "builtin",
+      "isOrphanedBuiltin": false,
+      "publisherLabel": "Cloudroom Official",
+      "sourceDisplay": "builtin · provider-retry",
+      "updateState": {},
+      "enabled": true,
+      "description": "Retry turns after transient provider overloads and subscription limits reset.",
+      "name": "Provider retry",
+      "screenshots": [],
+      "collections": [],
+      "icon": "ArrowReloadHorizontal",
+      "iconUrl": null,
+      "status": "running",
+      "statusDetail": null,
+      "handlerStats": {
+        "count": 0,
+        "totalMs": 0,
+        "maxMs": 0,
+        "errorCount": 0
+      },
+      "services": [],
+      "schedules": [],
+      "cliCommand": {
+        "name": "provider-retry",
+        "summary": "Manage pending automatic provider retries"
+      },
+      "capabilities": [
+        {
+          "kind": "skill",
+          "id": "provider-retry",
+          "label": "provider-retry",
+          "detail": "Skill this plugin adds to your agents"
+        }
+      ],
+      "hasSettings": true,
+      "app": {
+        "hasApp": true,
+        "bundle": {
+          "jsUrl": "/api/v1/plugins/provider-retry/assets/app.js?h=58f928e90a8c3c40",
+          "cssUrl": "/api/v1/plugins/provider-retry/assets/app.css?h=58f928e90a8c3c40",
+          "jsBytes": 7432,
+          "hash": "58f928e90a8c3c40",
+          "sdkMajor": 0,
+          "sdkVersion": "0.6.50",
+          "compatible": true
+        }
+      },
+      "logoUrl": null,
+      "logoDarkUrl": null,
+      "providerIds": [],
+      "icons": {}
+    },
+    {
+      "id": "provider-usage",
+      "source": "builtin:provider-usage",
+      "rootDir": "/private/tmp/openbot-cloudroom-d8b3cc3/gui/plugins/provider-usage",
+      "version": "0.1.0",
+      "provenance": "builtin",
+      "isOrphanedBuiltin": false,
+      "publisherLabel": "Cloudroom Official",
+      "sourceDisplay": "builtin · provider-usage",
+      "updateState": {},
+      "enabled": true,
+      "description": "View provider usage in plugin settings and an optional sidebar footer card.",
+      "name": "Provider usage",
+      "screenshots": [],
+      "collections": [],
+      "icon": "ChartColumn",
+      "iconUrl": null,
+      "status": "running",
+      "statusDetail": null,
+      "handlerStats": {
+        "count": 0,
+        "totalMs": 0,
+        "maxMs": 0,
+        "errorCount": 0
+      },
+      "services": [],
+      "schedules": [],
+      "cliCommand": null,
+      "capabilities": [],
+      "hasSettings": false,
+      "app": {
+        "hasApp": true,
+        "bundle": {
+          "jsUrl": "/api/v1/plugins/provider-usage/assets/app.js?h=cecc7c94b3f1b472",
+          "cssUrl": "/api/v1/plugins/provider-usage/assets/app.css?h=cecc7c94b3f1b472",
+          "jsBytes": 346261,
+          "hash": "cecc7c94b3f1b472",
+          "sdkMajor": 0,
+          "sdkVersion": "0.6.50",
+          "compatible": true
+        }
+      },
+      "logoUrl": null,
+      "logoDarkUrl": null,
+      "providerIds": [],
+      "icons": {}
+    },
+    {
+      "id": "push-notifications",
+      "source": "builtin:push-notifications",
+      "rootDir": "/private/tmp/openbot-cloudroom-d8b3cc3/gui/plugins/push-notifications",
+      "version": "0.1.0",
+      "provenance": "builtin",
+      "isOrphanedBuiltin": false,
+      "publisherLabel": "Cloudroom Official",
+      "sourceDisplay": "builtin · push-notifications",
+      "updateState": {},
+      "enabled": true,
+      "description": "Desktop and web notifications when a thread needs you",
+      "name": "Push notifications",
+      "screenshots": [],
+      "collections": [],
+      "icon": "BellDot",
+      "iconUrl": null,
+      "status": "running",
+      "statusDetail": null,
+      "handlerStats": {
+        "count": 0,
+        "totalMs": 0,
+        "maxMs": 0,
+        "errorCount": 0
+      },
+      "services": [
+        {
+          "name": "notifier",
+          "state": "running"
+        }
+      ],
+      "schedules": [],
+      "cliCommand": {
+        "name": "push-notifications",
+        "summary": "Web and desktop notifications"
+      },
+      "capabilities": [],
+      "hasSettings": true,
+      "app": {
+        "hasApp": true,
+        "bundle": {
+          "jsUrl": "/api/v1/plugins/push-notifications/assets/app.js?h=176675cce9cd1d03",
+          "cssUrl": "/api/v1/plugins/push-notifications/assets/app.css?h=176675cce9cd1d03",
+          "jsBytes": 317281,
+          "hash": "176675cce9cd1d03",
+          "sdkMajor": 0,
+          "sdkVersion": "0.6.50",
+          "compatible": true
+        }
+      },
+      "logoUrl": null,
+      "logoDarkUrl": null,
+      "providerIds": [],
+      "icons": {}
+    },
+    {
+      "id": "scheduled-send",
+      "source": "builtin:scheduled-send",
+      "rootDir": "/private/tmp/openbot-cloudroom-d8b3cc3/gui/plugins/scheduled-send",
+      "version": "0.1.0",
+      "provenance": "builtin",
+      "isOrphanedBuiltin": false,
+      "publisherLabel": "Cloudroom Official",
+      "sourceDisplay": "builtin · scheduled-send",
+      "updateState": {},
+      "enabled": true,
+      "description": "Schedule the current composer draft to send at a later time.",
+      "name": "Send later",
+      "screenshots": [],
+      "collections": [],
+      "icon": "Calendar",
+      "iconUrl": null,
+      "status": "running",
+      "statusDetail": null,
+      "handlerStats": {
+        "count": 0,
+        "totalMs": 0,
+        "maxMs": 0,
+        "errorCount": 0
+      },
+      "services": [],
+      "schedules": [],
+      "cliCommand": null,
+      "capabilities": [],
+      "hasSettings": false,
+      "app": {
+        "hasApp": true,
+        "bundle": {
+          "jsUrl": "/api/v1/plugins/scheduled-send/assets/app.js?h=d9be85c9a5634ee5",
+          "cssUrl": "/api/v1/plugins/scheduled-send/assets/app.css?h=d9be85c9a5634ee5",
+          "jsBytes": 35530,
+          "hash": "d9be85c9a5634ee5",
+          "sdkMajor": 0,
+          "sdkVersion": "0.6.50",
+          "compatible": true
+        }
+      },
+      "logoUrl": null,
+      "logoDarkUrl": null,
+      "providerIds": [],
+      "icons": {}
+    },
+    {
+      "id": "secrets",
+      "source": "builtin:secrets",
+      "rootDir": "/private/tmp/openbot-cloudroom-d8b3cc3/gui/plugins/secrets",
+      "version": "0.1.0",
+      "provenance": "builtin",
+      "isOrphanedBuiltin": false,
+      "publisherLabel": "Cloudroom Official",
+      "sourceDisplay": "builtin · secrets",
+      "updateState": {},
+      "enabled": true,
+      "description": "Securely request credentials from a user and reconcile them into dotenv files.",
+      "name": "Secrets",
+      "screenshots": [],
+      "collections": [],
+      "icon": "Lock",
+      "iconUrl": null,
+      "status": "running",
+      "statusDetail": null,
+      "handlerStats": {
+        "count": 0,
+        "totalMs": 0,
+        "maxMs": 0,
+        "errorCount": 0
+      },
+      "services": [],
+      "schedules": [],
+      "cliCommand": {
+        "name": "secret",
+        "summary": "Securely request credentials and write them to a dotenv file."
+      },
+      "capabilities": [
+        {
+          "kind": "skill",
+          "id": "secrets",
+          "label": "secrets",
+          "detail": "Skill this plugin adds to your agents"
+        }
+      ],
+      "hasSettings": false,
+      "app": {
+        "hasApp": true,
+        "bundle": {
+          "jsUrl": "/api/v1/plugins/secrets/assets/app.js?h=6cb78acec678ecde",
+          "cssUrl": "/api/v1/plugins/secrets/assets/app.css?h=6cb78acec678ecde",
+          "jsBytes": 329984,
+          "hash": "6cb78acec678ecde",
+          "sdkMajor": 0,
+          "sdkVersion": "0.6.50",
+          "compatible": true
+        }
+      },
+      "logoUrl": null,
+      "logoDarkUrl": null,
+      "providerIds": [],
+      "icons": {}
+    },
+    {
+      "id": "side-chat",
+      "source": "builtin:side-chat",
+      "rootDir": "/private/tmp/openbot-cloudroom-d8b3cc3/gui/plugins/side-chat",
+      "version": "0.1.0",
+      "provenance": "builtin",
+      "isOrphanedBuiltin": false,
+      "publisherLabel": "Cloudroom Official",
+      "sourceDisplay": "builtin · side-chat",
+      "updateState": {},
+      "enabled": true,
+      "description": "Reply to messages in hidden side-chat forks rendered in a thread panel.",
+      "name": "Side chat",
+      "screenshots": [],
+      "collections": [],
+      "icon": "SideChat",
+      "iconUrl": null,
+      "status": "running",
+      "statusDetail": null,
+      "handlerStats": {
+        "count": 0,
+        "totalMs": 0,
+        "maxMs": 0,
+        "errorCount": 0
+      },
+      "services": [],
+      "schedules": [
+        {
+          "name": "empty-fork-cleanup",
+          "cron": "13 * * * *",
+          "nextRunAt": 1794049980000,
+          "lastRunAt": null,
+          "lastStatus": null,
+          "lastError": null
+        }
+      ],
+      "cliCommand": null,
+      "capabilities": [],
+      "hasSettings": false,
+      "app": {
+        "hasApp": true,
+        "bundle": {
+          "jsUrl": "/api/v1/plugins/side-chat/assets/app.js?h=f1afe3d4bda0991f",
+          "cssUrl": "/api/v1/plugins/side-chat/assets/app.css?h=f1afe3d4bda0991f",
+          "jsBytes": 7461,
+          "hash": "f1afe3d4bda0991f",
+          "sdkMajor": 0,
+          "sdkVersion": "0.6.50",
+          "compatible": true
+        }
+      },
+      "logoUrl": null,
+      "logoDarkUrl": null,
+      "providerIds": [],
+      "icons": {}
+    },
+    {
+      "id": "time-in-cloudroom",
+      "source": "builtin:time-in-cloudroom",
+      "rootDir": "/private/tmp/openbot-cloudroom-d8b3cc3/gui/plugins/time-in-cloudroom",
+      "version": "0.1.0",
+      "provenance": "builtin",
+      "isOrphanedBuiltin": false,
+      "publisherLabel": "Cloudroom Official",
+      "sourceDisplay": "builtin · time-in-cloudroom",
+      "updateState": {},
+      "enabled": true,
+      "description": "See how much time you spend in Cloudroom, as a year of days like GitHub's contribution graph.",
+      "name": "Time in Cloudroom",
+      "screenshots": [],
+      "collections": [],
+      "icon": "Clock",
+      "iconUrl": null,
+      "status": "running",
+      "statusDetail": null,
+      "handlerStats": {
+        "count": 0,
+        "totalMs": 0,
+        "maxMs": 0,
+        "errorCount": 0
+      },
+      "services": [],
+      "schedules": [],
+      "cliCommand": null,
+      "capabilities": [],
+      "hasSettings": false,
+      "app": {
+        "hasApp": true,
+        "bundle": {
+          "jsUrl": "/api/v1/plugins/time-in-cloudroom/assets/app.js?h=a1dc4fe8cda6983e",
+          "cssUrl": "/api/v1/plugins/time-in-cloudroom/assets/app.css?h=a1dc4fe8cda6983e",
+          "jsBytes": 6077,
+          "hash": "a1dc4fe8cda6983e",
+          "sdkMajor": 0,
+          "sdkVersion": "0.6.50",
+          "compatible": true
+        }
+      },
+      "logoUrl": null,
+      "logoDarkUrl": null,
+      "providerIds": [],
+      "icons": {}
+    },
+    {
+      "id": "workflows",
+      "source": "builtin:workflows",
+      "rootDir": "/private/tmp/openbot-cloudroom-d8b3cc3/gui/plugins/workflows",
+      "version": "0.1.0",
+      "provenance": "builtin",
+      "isOrphanedBuiltin": false,
+      "publisherLabel": "Cloudroom Official",
+      "sourceDisplay": "builtin · workflows",
+      "updateState": {},
+      "enabled": false,
+      "description": "Run durable, provider-independent agent workflows.",
+      "name": "Workflows",
+      "screenshots": [],
+      "collections": [],
+      "icon": "Workflow",
+      "iconUrl": null,
+      "status": "disabled",
+      "statusDetail": null,
+      "handlerStats": {
+        "count": 0,
+        "totalMs": 0,
+        "maxMs": 0,
+        "errorCount": 0
+      },
+      "services": [],
+      "schedules": [],
+      "cliCommand": null,
+      "capabilities": [
+        {
+          "kind": "skill",
+          "id": "workflows",
+          "label": "workflows",
+          "detail": "Skill this plugin adds to your agents"
+        }
+      ],
+      "hasSettings": false,
+      "app": {
+        "hasApp": false,
+        "bundle": null
+      },
+      "logoUrl": null,
+      "logoDarkUrl": null,
+      "providerIds": [],
+      "icons": {}
+    }
+  ]
+}

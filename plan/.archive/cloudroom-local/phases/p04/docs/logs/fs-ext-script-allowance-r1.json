@@ -1,0 +1,13 @@
+{
+  "allowScripts": [
+    {
+      "name": "fs-ext",
+      "changes": [
+        {
+          "key": "fs-ext@2.1.1",
+          "change": "added"
+        }
+      ]
+    }
+  ]
+}

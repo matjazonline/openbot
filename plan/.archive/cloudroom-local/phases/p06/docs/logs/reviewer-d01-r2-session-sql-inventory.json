@@ -1,0 +1,100 @@
+{
+  "pattern": "INSERT INTO local_agent_sessions",
+  "filesSearched": 1626,
+  "totalHits": 5,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/local_agents/test_support.rs#prepare_session",
+        "name": "prepare_session",
+        "kind": "function",
+        "path": "src/adapters/persistence/local_agents/test_support.rs",
+        "span": "L191-L220"
+      },
+      "path": "src/adapters/persistence/local_agents/test_support.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 211,
+          "text": "sqlx::query(\"INSERT INTO local_agent_sessions (company_id,id,machine_id,installation_id,profile_id,selection,conversation_id,thread_id) VALUES ($1,$2,$3,$4,$5,$"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/local_agents/protocol/test_support.rs#unmapped_session",
+        "name": "unmapped_session",
+        "kind": "function",
+        "path": "src/adapters/persistence/local_agents/protocol/test_support.rs",
+        "span": "L129-L134"
+      },
+      "path": "src/adapters/persistence/local_agents/protocol/test_support.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 131,
+          "text": "sqlx::query(\"INSERT INTO local_agent_sessions(company_id,id,machine_id,installation_id,profile_id,selection,conversation_id) SELECT company_id,$3,machine_id,ins"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/local_agents/shared.rs#insert_session_on",
+        "name": "insert_session_on",
+        "kind": "function",
+        "path": "src/adapters/persistence/local_agents/shared.rs",
+        "span": "L114-L133"
+      },
+      "path": "src/adapters/persistence/local_agents/shared.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 126,
+          "text": "sqlx::query(\"INSERT INTO local_agent_sessions(company_id,id,machine_id,installation_id,profile_id,selection,conversation_id,workflow_run_id) VALUES($1,$2,$3,$4,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/local_agents/constraint_tests.rs#foreign_session",
+        "name": "foreign_session",
+        "kind": "function",
+        "path": "src/adapters/persistence/local_agents/constraint_tests.rs",
+        "span": "L188-L201"
+      },
+      "path": "src/adapters/persistence/local_agents/constraint_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 196,
+          "text": "sqlx::query(\"INSERT INTO local_agent_sessions(company_id,id,machine_id,installation_id,profile_id,selection,conversation_id) VALUES($1,$2,$3,$4,$5,$6,$7)\")"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/local_agents/machine_tests.rs#assert_foreign_profile_constraints",
+        "name": "assert_foreign_profile_constraints",
+        "kind": "function",
+        "path": "src/adapters/persistence/local_agents/machine_tests.rs",
+        "span": "L98-L117"
+      },
+      "path": "src/adapters/persistence/local_agents/machine_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 114,
+          "text": "sql_state(sqlx::query(\"INSERT INTO local_agent_sessions (company_id,id,machine_id,installation_id,profile_id,selection,conversation_id) VALUES ($1,$2,$3,$4,$5,$"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 5,
+    "baselineChars": 52499
+  }
+}

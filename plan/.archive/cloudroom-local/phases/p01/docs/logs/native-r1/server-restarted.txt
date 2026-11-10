@@ -1,0 +1,41 @@
+[20:42:51] INFO: [server] Server listening {"bindHost":"127.0.0.1","port":46986,"dataDir":"/tmp/openbot-cloudroom-p01-profile"}
+[20:42:51] INFO: [server] plugin custom-instructions@0.1.0 loaded
+[20:42:51] INFO: [server] plugin machine-ssh@0.1.0 loaded
+[20:42:51] INFO: [server] plugin bb-guide@0.1.0 loaded
+[20:42:51] INFO: [server] plugin openbot-compatibility-probe@0.1.0 loaded
+[20:42:52] INFO: [server] plugin time-in-cloudroom@0.1.0 loaded
+[20:42:52] INFO: [server] plugin drafts@0.1.0 loaded
+[20:42:52] INFO: [server] plugin side-chat@0.1.0 loaded
+[20:42:52] INFO: [server] plugin pdf-preview@0.1.0 loaded
+[20:42:52] INFO: [server] plugin scheduled-send@0.1.0 loaded
+[20:42:52] INFO: [server] plugin push-notifications@0.1.0 loaded
+[20:42:52] INFO: [server] plugin accounts@0.1.0 loaded
+[20:42:52] INFO: [server] plugin provider-usage@0.1.0 loaded
+[20:42:52] INFO: [server] plugin inline-vis@0.1.0 loaded
+[20:42:52] INFO: [server] plugin gpu@0.1.0 loaded
+[20:42:52] INFO: [server] plugin secrets@0.1.0 loaded
+[20:42:52] INFO: [server] plugin provider-retry@0.1.0 loaded
+[20:42:52] INFO: [server] plugin connect@0.1.0 loaded
+[20:42:52] INFO: [server] plugin monaco-editor@0.1.0 loaded
+[20:42:52] INFO: [server] plugin automations@0.1.0 loaded
+[20:42:52] INFO: [server] Session opened {"sessionId":"hses_mptmmxrqfd","hostId":"host_x39f5jia3f","replacedSessionId":"hses_2cgpt2qkzt"}
+[20:42:52] INFO: [server] Daemon WebSocket opened {"sessionId":"hses_mptmmxrqfd","hostId":"host_x39f5jia3f"}
+[20:42:54] INFO: [server] plugin environment-personal-workspace@0.1.0 loaded
+[20:42:54] INFO: [server] plugin computer-use@0.1.0 loaded
+[20:42:54] INFO: [server] plugin environment-project-checkout@0.1.0 loaded
+[20:42:55] INFO: [server] plugin environment-git-worktree@0.1.0 loaded
+[20:42:55] INFO: [server] plugin keep-awake@0.1.0 loaded
+[20:42:55] INFO: [server] plugin provider-codex@0.1.0 loaded
+[20:42:55] INFO: [server] plugin provider-pi@0.1.0 loaded
+[20:42:55] INFO: [server] plugin provider-acp@0.1.0 loaded
+[20:42:55] INFO: [server] plugin provider-claude-code@0.1.0 loaded
+[20:42:56] INFO: [server] Event loop stalled {"intervalMs":5000,"maxDelayMs":602.9,"meanDelayMs":25.9,"p99DelayMs":101.8,"resolutionMs":20,"thresholdMs":500,"currentWork":null,"lastWork":"ws:daemon host-rpc.response","lastWorkMs":0.4,"slowestWork":"ws:daemon host-rpc.response","slowestWorkMs":0.8,"cpuMs":2442.5,"gcMs":78.5,"maxGcMs":8,"heapUsedMb":419,"rssMb":706}
+[20:42:57] INFO: [server] Provider model catalog refresh settled {"hostId":"host_x39f5jia3f","providerId":"claude-code","scope":"host","durationMs":769,"outcome":"success","modelCount":20,"changed":false}
+[20:42:57] WARN: [server] Provider model catalog refresh settled {"hostId":"host_x39f5jia3f","providerId":"pi","scope":"host","durationMs":134,"outcome":"failed","errorCode":"command_failed","errorMessage":"Could not find the pi CLI on this host. Install @earendil-works/pi-coding-agent and retry.","errorStatus":502,"errorRetryable":false,"changed":true}
+[20:42:57] WARN: [server] Provider model catalog refresh settled {"hostId":"host_x39f5jia3f","providerId":"acp-cursor","scope":"host","durationMs":180,"outcome":"missing_executable","errorCode":"missing_executable","errorMessage":"spawn cursor-agent ENOENT","errorStatus":502,"errorRetryable":false,"changed":true}
+[20:42:58] INFO: [server] Provider model catalog refresh settled {"hostId":"host_x39f5jia3f","providerId":"codex","scope":"host","durationMs":2014,"outcome":"success","modelCount":8,"changed":false}
+[20:43:27] WARN: [server] Provider model catalog refresh settled {"hostId":"host_x39f5jia3f","providerId":"acp-opencode","scope":"host","durationMs":30002,"outcome":"timeout","errorCode":"command_timeout","errorMessage":"Timed out waiting for command result","errorStatus":504,"changed":true}
+[20:43:27] INFO: [server] Provider model catalog prewarm pass finished {"hostId":"host_x39f5jia3f","providerCount":5,"durationMs":34590}
+[20:43:27] INFO: [server] Provider model catalog prewarm pass finished {"hostId":"host_x39f5jia3f","providerCount":5,"durationMs":4}
+[20:43:47] WARN: [server] [plugin:openbot-compatibility-probe] cli openbot-proof failed: provider catalog failed: timeout
+[20:46:34] INFO: [server] Daemon WebSocket closed {"sessionId":"hses_mptmmxrqfd"}

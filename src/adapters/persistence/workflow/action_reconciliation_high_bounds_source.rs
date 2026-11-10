@@ -60,6 +60,9 @@ fn observation(observed: &AppResult<RemoteDispatchObservation>) -> String {
         Ok(RemoteDispatchObservation::PossibleDispatchExists) => {
             "Ok(PossibleDispatchExists)".into()
         }
+        Ok(RemoteDispatchObservation::PreparationFailed(reason)) => {
+            format!("PreparationFailed({reason:?})")
+        }
         Ok(RemoteDispatchObservation::Committed(receipt)) => {
             format!("Ok(Committed(result={}))", receipt.result)
         }

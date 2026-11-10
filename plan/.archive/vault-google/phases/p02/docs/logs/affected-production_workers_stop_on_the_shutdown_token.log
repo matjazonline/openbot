@@ -1,0 +1,24 @@
+$ cargo test --locked --offline --lib production_workers_stop_on_the_shutdown_token
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.19s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-048b7abd3ed0c794)
+
+running 1 test
+test infra::workflow::tests::production_workers_stop_on_the_shutdown_token ... FAILED
+
+failures:
+
+---- infra::workflow::tests::production_workers_stop_on_the_shutdown_token stdout ----
+
+thread 'infra::workflow::tests::production_workers_stop_on_the_shutdown_token' (34299491) panicked at src/infra/workflow.rs:730:9:
+assertion `left == right` failed: one slot, metrics, intent, schedule and storage workers
+  left: 6
+ right: 5
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    infra::workflow::tests::production_workers_stop_on_the_shutdown_token
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 3060 filtered out; finished in 1.02s
+
+error: test failed, to rerun pass `--lib`

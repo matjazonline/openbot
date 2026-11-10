@@ -1,0 +1,1105 @@
+{
+  "stage": "journal",
+  "commands": [
+    {
+      "id": "58b84f63-9923-4194-9937-8782a0e26a1f",
+      "kind": "refresh_catalog",
+      "stage": "terminal",
+      "sdkCalls": 0,
+      "thread": null,
+      "request": null,
+      "turn": null,
+      "queue": null,
+      "cursor": 0,
+      "correlationConflict": 0,
+      "nativeState": null,
+      "sequence": 2,
+      "evidence": null
+    },
+    {
+      "id": "5f765142-4707-4f9e-88b7-29e8f3b1a14c",
+      "kind": "create",
+      "stage": "terminal",
+      "sdkCalls": 1,
+      "thread": "thr_93w7s4bidf",
+      "request": "creq_w4uzxwnmx8",
+      "turn": "da1742d68f-t1",
+      "queue": null,
+      "cursor": 30,
+      "correlationConflict": 0,
+      "nativeState": "completed",
+      "sequence": 7,
+      "evidence": "turn"
+    },
+    {
+      "id": "7b3776aa-bda0-4e97-ad21-71e162b8f607",
+      "kind": "refresh_catalog",
+      "stage": "terminal",
+      "sdkCalls": 0,
+      "thread": null,
+      "request": null,
+      "turn": null,
+      "queue": null,
+      "cursor": 0,
+      "correlationConflict": 0,
+      "nativeState": null,
+      "sequence": 9,
+      "evidence": null
+    },
+    {
+      "id": "01a1bb7a-ae96-77a2-9abe-da8bd6ef7ada",
+      "kind": "send",
+      "stage": "terminal",
+      "sdkCalls": 1,
+      "thread": "thr_93w7s4bidf",
+      "request": "creq_8vvje8mnah",
+      "turn": "da74589eff-t1",
+      "queue": null,
+      "cursor": 48,
+      "correlationConflict": 0,
+      "nativeState": "completed",
+      "sequence": 14,
+      "evidence": "turn"
+    },
+    {
+      "id": "01a1bb7a-da7b-7407-a500-c56c7c0db1ec",
+      "kind": "send",
+      "stage": "terminal",
+      "sdkCalls": 1,
+      "thread": "thr_93w7s4bidf",
+      "request": "creq_xrv72nxus3",
+      "turn": "daaf281545-t2",
+      "queue": null,
+      "cursor": 94,
+      "correlationConflict": 0,
+      "nativeState": "completed",
+      "sequence": 21,
+      "evidence": "turn"
+    },
+    {
+      "id": "01a1bb7b-02ab-71ce-84de-7e6237ad02c4",
+      "kind": "send",
+      "stage": "terminal",
+      "sdkCalls": 1,
+      "thread": "thr_93w7s4bidf",
+      "request": "creq_48g9k7mzca",
+      "turn": "daaf281545-t4",
+      "queue": null,
+      "cursor": 124,
+      "correlationConflict": 0,
+      "nativeState": "stopped",
+      "sequence": 31,
+      "evidence": "turn"
+    },
+    {
+      "id": "339862c1-8f53-4c14-a6c0-778152cf58e0",
+      "kind": "refresh_catalog",
+      "stage": "terminal",
+      "sdkCalls": 0,
+      "thread": null,
+      "request": null,
+      "turn": null,
+      "queue": null,
+      "cursor": 0,
+      "correlationConflict": 0,
+      "nativeState": null,
+      "sequence": 27,
+      "evidence": null
+    },
+    {
+      "id": "01a1bb7b-1027-70fe-a276-18ea0616c211",
+      "kind": "stop_thread",
+      "stage": "terminal",
+      "sdkCalls": 1,
+      "thread": "thr_93w7s4bidf",
+      "request": null,
+      "turn": null,
+      "queue": null,
+      "cursor": 119,
+      "correlationConflict": 0,
+      "nativeState": null,
+      "sequence": 30,
+      "evidence": null
+    },
+    {
+      "id": "01a1bb7b-129f-73ef-b54e-aa89d8316904",
+      "kind": "archive_thread",
+      "stage": "terminal",
+      "sdkCalls": 1,
+      "thread": "thr_93w7s4bidf",
+      "request": null,
+      "turn": null,
+      "queue": null,
+      "cursor": 124,
+      "correlationConflict": 0,
+      "nativeState": null,
+      "sequence": 34,
+      "evidence": null
+    },
+    {
+      "id": "69cb68a9-68e4-4fe4-a7ce-531fa14a29fb",
+      "kind": "refresh_catalog",
+      "stage": "terminal",
+      "sdkCalls": 0,
+      "thread": null,
+      "request": null,
+      "turn": null,
+      "queue": null,
+      "cursor": 0,
+      "correlationConflict": 0,
+      "nativeState": null,
+      "sequence": 36,
+      "evidence": null
+    },
+    {
+      "id": "062c59cb-e3fd-4a13-91cb-4a5adf9a62d4",
+      "kind": "create",
+      "stage": "terminal",
+      "sdkCalls": 1,
+      "thread": "thr_e8tu6n4pqu",
+      "request": "creq_d2hbfe7qpi",
+      "turn": "da6dc2120f-t1",
+      "queue": null,
+      "cursor": 26,
+      "correlationConflict": 0,
+      "nativeState": "failed",
+      "sequence": 41,
+      "evidence": "turn"
+    }
+  ],
+  "nativeThreads": [
+    {
+      "id": "thr_e8tu6n4pqu",
+      "status": "error",
+      "events": [
+        {
+          "type": "client/turn/requested"
+        },
+        {
+          "type": "client/thread/start"
+        },
+        {
+          "type": "system/thread-provisioning",
+          "status": "active"
+        },
+        {
+          "type": "system/thread-provisioning",
+          "status": "active"
+        },
+        {
+          "type": "system/thread-provisioning",
+          "status": "active"
+        },
+        {
+          "type": "system/thread-provisioning",
+          "status": "active"
+        },
+        {
+          "type": "system/thread-provisioning",
+          "status": "completed"
+        },
+        {
+          "type": "thread/identity"
+        },
+        {
+          "type": "thread/started"
+        },
+        {
+          "type": "thread/identity"
+        },
+        {
+          "type": "provider.env-resolved"
+        },
+        {
+          "type": "turn/started"
+        },
+        {
+          "type": "turn/input/accepted"
+        },
+        {
+          "type": "provider/error"
+        },
+        {
+          "type": "provider/error"
+        },
+        {
+          "type": "provider/error"
+        },
+        {
+          "type": "provider/error"
+        },
+        {
+          "type": "provider/warning"
+        },
+        {
+          "type": "provider/error"
+        },
+        {
+          "type": "provider/error"
+        },
+        {
+          "type": "provider/error"
+        },
+        {
+          "type": "provider/error"
+        },
+        {
+          "type": "provider/error"
+        },
+        {
+          "type": "provider/error"
+        },
+        {
+          "type": "provider/unhandled"
+        },
+        {
+          "type": "turn/completed",
+          "status": "failed"
+        }
+      ]
+    }
+  ],
+  "permissionTargetCreated": null,
+  "events": [
+    {
+      "seq": 1,
+      "type": "client/turn/requested",
+      "scope": {
+        "kind": "thread"
+      },
+      "request": "creq_w4uzxwnmx8",
+      "source": "spawn",
+      "operation": "5f765142-4707-4f9e-88b7-29e8f3b1a14c"
+    },
+    {
+      "seq": 2,
+      "type": "client/thread/start",
+      "scope": {
+        "kind": "thread"
+      },
+      "source": "spawn"
+    },
+    {
+      "seq": 3,
+      "type": "system/thread-provisioning",
+      "scope": {
+        "kind": "thread"
+      },
+      "status": "active"
+    },
+    {
+      "seq": 4,
+      "type": "system/thread-provisioning",
+      "scope": {
+        "kind": "thread"
+      },
+      "status": "active"
+    },
+    {
+      "seq": 5,
+      "type": "system/thread-provisioning",
+      "scope": {
+        "kind": "thread"
+      },
+      "status": "active"
+    },
+    {
+      "seq": 6,
+      "type": "system/thread-provisioning",
+      "scope": {
+        "kind": "thread"
+      },
+      "status": "active"
+    },
+    {
+      "seq": 7,
+      "type": "system/thread-provisioning",
+      "scope": {
+        "kind": "thread"
+      },
+      "status": "active"
+    },
+    {
+      "seq": 8,
+      "type": "system/thread-provisioning",
+      "scope": {
+        "kind": "thread"
+      },
+      "status": "completed"
+    },
+    {
+      "seq": 9,
+      "type": "thread/identity",
+      "scope": {
+        "kind": "thread"
+      }
+    },
+    {
+      "seq": 10,
+      "type": "thread/started",
+      "scope": {
+        "kind": "thread"
+      }
+    },
+    {
+      "seq": 11,
+      "type": "thread/identity",
+      "scope": {
+        "kind": "thread"
+      }
+    },
+    {
+      "seq": 12,
+      "type": "provider.env-resolved",
+      "scope": {
+        "kind": "thread"
+      }
+    },
+    {
+      "seq": 13,
+      "type": "turn/started",
+      "scope": {
+        "kind": "turn",
+        "turnId": "da1742d68f-t1"
+      }
+    },
+    {
+      "seq": 14,
+      "type": "turn/input/accepted",
+      "scope": {
+        "kind": "turn",
+        "turnId": "da1742d68f-t1"
+      },
+      "clientRequest": "creq_w4uzxwnmx8"
+    },
+    {
+      "seq": 15,
+      "type": "item/started",
+      "scope": {
+        "kind": "turn",
+        "turnId": "da1742d68f-t1"
+      },
+      "itemType": "commandExecution"
+    },
+    {
+      "seq": 16,
+      "type": "item/completed",
+      "scope": {
+        "kind": "turn",
+        "turnId": "da1742d68f-t1"
+      },
+      "itemType": "commandExecution"
+    },
+    {
+      "seq": 17,
+      "type": "thread/tokenUsage/updated",
+      "scope": {
+        "kind": "turn",
+        "turnId": "da1742d68f-t1"
+      }
+    },
+    {
+      "seq": 18,
+      "type": "thread/contextWindowUsage/updated",
+      "scope": {
+        "kind": "turn",
+        "turnId": "da1742d68f-t1"
+      }
+    },
+    {
+      "seq": 19,
+      "type": "provider/rateLimits/updated",
+      "scope": {
+        "kind": "thread"
+      }
+    },
+    {
+      "seq": 20,
+      "type": "item/started",
+      "scope": {
+        "kind": "turn",
+        "turnId": "da1742d68f-t1"
+      },
+      "itemType": "agentMessage"
+    },
+    {
+      "seq": 21,
+      "type": "item/agentMessage/delta",
+      "scope": {
+        "kind": "turn",
+        "turnId": "da1742d68f-t1"
+      }
+    },
+    {
+      "seq": 25,
+      "type": "item/completed",
+      "scope": {
+        "kind": "turn",
+        "turnId": "da1742d68f-t1"
+      },
+      "itemType": "agentMessage"
+    },
+    {
+      "seq": 26,
+      "type": "thread/tokenUsage/updated",
+      "scope": {
+        "kind": "turn",
+        "turnId": "da1742d68f-t1"
+      }
+    },
+    {
+      "seq": 27,
+      "type": "thread/contextWindowUsage/updated",
+      "scope": {
+        "kind": "turn",
+        "turnId": "da1742d68f-t1"
+      }
+    },
+    {
+      "seq": 28,
+      "type": "provider/rateLimits/updated",
+      "scope": {
+        "kind": "thread"
+      }
+    },
+    {
+      "seq": 29,
+      "type": "provider/unhandled",
+      "scope": {
+        "kind": "thread"
+      }
+    },
+    {
+      "seq": 30,
+      "type": "turn/completed",
+      "scope": {
+        "kind": "turn",
+        "turnId": "da1742d68f-t1"
+      },
+      "status": "completed"
+    },
+    {
+      "seq": 31,
+      "type": "client/turn/requested",
+      "scope": {
+        "kind": "thread"
+      },
+      "request": "creq_8vvje8mnah",
+      "source": "tell",
+      "operation": "01a1bb7a-ae96-77a2-9abe-da8bd6ef7ada"
+    },
+    {
+      "seq": 32,
+      "type": "thread/identity",
+      "scope": {
+        "kind": "thread"
+      }
+    },
+    {
+      "seq": 33,
+      "type": "provider.env-resolved",
+      "scope": {
+        "kind": "thread"
+      }
+    },
+    {
+      "seq": 34,
+      "type": "thread/contextWindowUsage/updated",
+      "scope": {
+        "kind": "thread"
+      }
+    },
+    {
+      "seq": 35,
+      "type": "thread/extensionState/updated",
+      "scope": {
+        "kind": "thread"
+      }
+    },
+    {
+      "seq": 36,
+      "type": "turn/started",
+      "scope": {
+        "kind": "turn",
+        "turnId": "da74589eff-t1"
+      }
+    },
+    {
+      "seq": 37,
+      "type": "turn/input/accepted",
+      "scope": {
+        "kind": "turn",
+        "turnId": "da74589eff-t1"
+      },
+      "clientRequest": "creq_8vvje8mnah"
+    },
+    {
+      "seq": 38,
+      "type": "item/started",
+      "scope": {
+        "kind": "turn",
+        "turnId": "da74589eff-t1"
+      },
+      "itemType": "agentMessage"
+    },
+    {
+      "seq": 39,
+      "type": "item/agentMessage/delta",
+      "scope": {
+        "kind": "turn",
+        "turnId": "da74589eff-t1"
+      }
+    },
+    {
+      "seq": 43,
+      "type": "item/completed",
+      "scope": {
+        "kind": "turn",
+        "turnId": "da74589eff-t1"
+      },
+      "itemType": "agentMessage"
+    },
+    {
+      "seq": 44,
+      "type": "thread/tokenUsage/updated",
+      "scope": {
+        "kind": "turn",
+        "turnId": "da74589eff-t1"
+      }
+    },
+    {
+      "seq": 45,
+      "type": "thread/contextWindowUsage/updated",
+      "scope": {
+        "kind": "turn",
+        "turnId": "da74589eff-t1"
+      }
+    },
+    {
+      "seq": 46,
+      "type": "provider/rateLimits/updated",
+      "scope": {
+        "kind": "thread"
+      }
+    },
+    {
+      "seq": 47,
+      "type": "provider/unhandled",
+      "scope": {
+        "kind": "thread"
+      }
+    },
+    {
+      "seq": 48,
+      "type": "turn/completed",
+      "scope": {
+        "kind": "turn",
+        "turnId": "da74589eff-t1"
+      },
+      "status": "completed"
+    },
+    {
+      "seq": 49,
+      "type": "client/turn/requested",
+      "scope": {
+        "kind": "thread"
+      },
+      "request": "creq_twmnadspi6",
+      "source": "tell"
+    },
+    {
+      "seq": 50,
+      "type": "thread/identity",
+      "scope": {
+        "kind": "thread"
+      }
+    },
+    {
+      "seq": 51,
+      "type": "provider.env-resolved",
+      "scope": {
+        "kind": "thread"
+      }
+    },
+    {
+      "seq": 52,
+      "type": "thread/contextWindowUsage/updated",
+      "scope": {
+        "kind": "thread"
+      }
+    },
+    {
+      "seq": 53,
+      "type": "thread/extensionState/updated",
+      "scope": {
+        "kind": "thread"
+      }
+    },
+    {
+      "seq": 54,
+      "type": "turn/started",
+      "scope": {
+        "kind": "turn",
+        "turnId": "daaf281545-t1"
+      }
+    },
+    {
+      "seq": 55,
+      "type": "turn/input/accepted",
+      "scope": {
+        "kind": "turn",
+        "turnId": "daaf281545-t1"
+      },
+      "clientRequest": "creq_twmnadspi6"
+    },
+    {
+      "seq": 56,
+      "type": "item/started",
+      "scope": {
+        "kind": "turn",
+        "turnId": "daaf281545-t1"
+      },
+      "itemType": "agentMessage"
+    },
+    {
+      "seq": 57,
+      "type": "item/agentMessage/delta",
+      "scope": {
+        "kind": "turn",
+        "turnId": "daaf281545-t1"
+      }
+    },
+    {
+      "seq": 61,
+      "type": "item/completed",
+      "scope": {
+        "kind": "turn",
+        "turnId": "daaf281545-t1"
+      },
+      "itemType": "agentMessage"
+    },
+    {
+      "seq": 62,
+      "type": "thread/tokenUsage/updated",
+      "scope": {
+        "kind": "turn",
+        "turnId": "daaf281545-t1"
+      }
+    },
+    {
+      "seq": 63,
+      "type": "thread/contextWindowUsage/updated",
+      "scope": {
+        "kind": "turn",
+        "turnId": "daaf281545-t1"
+      }
+    },
+    {
+      "seq": 64,
+      "type": "provider/rateLimits/updated",
+      "scope": {
+        "kind": "thread"
+      }
+    },
+    {
+      "seq": 65,
+      "type": "provider/unhandled",
+      "scope": {
+        "kind": "thread"
+      }
+    },
+    {
+      "seq": 66,
+      "type": "turn/completed",
+      "scope": {
+        "kind": "turn",
+        "turnId": "daaf281545-t1"
+      },
+      "status": "completed"
+    },
+    {
+      "seq": 67,
+      "type": "client/turn/requested",
+      "scope": {
+        "kind": "thread"
+      },
+      "request": "creq_xrv72nxus3",
+      "source": "tell",
+      "operation": "01a1bb7a-da7b-7407-a500-c56c7c0db1ec"
+    },
+    {
+      "seq": 68,
+      "type": "turn/started",
+      "scope": {
+        "kind": "turn",
+        "turnId": "daaf281545-t2"
+      }
+    },
+    {
+      "seq": 69,
+      "type": "turn/input/accepted",
+      "scope": {
+        "kind": "turn",
+        "turnId": "daaf281545-t2"
+      },
+      "clientRequest": "creq_xrv72nxus3"
+    },
+    {
+      "seq": 70,
+      "type": "item/started",
+      "scope": {
+        "kind": "turn",
+        "turnId": "daaf281545-t2"
+      },
+      "itemType": "agentMessage"
+    },
+    {
+      "seq": 71,
+      "type": "item/agentMessage/delta",
+      "scope": {
+        "kind": "turn",
+        "turnId": "daaf281545-t2"
+      }
+    },
+    {
+      "seq": 74,
+      "type": "item/completed",
+      "scope": {
+        "kind": "turn",
+        "turnId": "daaf281545-t2"
+      },
+      "itemType": "agentMessage"
+    },
+    {
+      "seq": 75,
+      "type": "item/started",
+      "scope": {
+        "kind": "turn",
+        "turnId": "daaf281545-t2"
+      },
+      "itemType": "commandExecution"
+    },
+    {
+      "seq": 76,
+      "type": "system/interaction/lifecycle",
+      "scope": {
+        "kind": "turn",
+        "turnId": "daaf281545-t2"
+      }
+    },
+    {
+      "seq": 77,
+      "type": "item/started",
+      "scope": {
+        "kind": "turn",
+        "turnId": "daaf281545-t2"
+      },
+      "itemType": "commandExecution"
+    },
+    {
+      "seq": 78,
+      "type": "system/interaction/lifecycle",
+      "scope": {
+        "kind": "turn",
+        "turnId": "daaf281545-t2"
+      }
+    },
+    {
+      "seq": 79,
+      "type": "system/interaction/lifecycle",
+      "scope": {
+        "kind": "turn",
+        "turnId": "daaf281545-t2"
+      }
+    },
+    {
+      "seq": 80,
+      "type": "item/completed",
+      "scope": {
+        "kind": "turn",
+        "turnId": "daaf281545-t2"
+      },
+      "itemType": "commandExecution"
+    },
+    {
+      "seq": 81,
+      "type": "thread/tokenUsage/updated",
+      "scope": {
+        "kind": "turn",
+        "turnId": "daaf281545-t2"
+      }
+    },
+    {
+      "seq": 82,
+      "type": "thread/contextWindowUsage/updated",
+      "scope": {
+        "kind": "turn",
+        "turnId": "daaf281545-t2"
+      }
+    },
+    {
+      "seq": 83,
+      "type": "provider/rateLimits/updated",
+      "scope": {
+        "kind": "thread"
+      }
+    },
+    {
+      "seq": 84,
+      "type": "item/started",
+      "scope": {
+        "kind": "turn",
+        "turnId": "daaf281545-t2"
+      },
+      "itemType": "agentMessage"
+    },
+    {
+      "seq": 85,
+      "type": "item/agentMessage/delta",
+      "scope": {
+        "kind": "turn",
+        "turnId": "daaf281545-t2"
+      }
+    },
+    {
+      "seq": 89,
+      "type": "item/completed",
+      "scope": {
+        "kind": "turn",
+        "turnId": "daaf281545-t2"
+      },
+      "itemType": "agentMessage"
+    },
+    {
+      "seq": 90,
+      "type": "thread/tokenUsage/updated",
+      "scope": {
+        "kind": "turn",
+        "turnId": "daaf281545-t2"
+      }
+    },
+    {
+      "seq": 91,
+      "type": "thread/contextWindowUsage/updated",
+      "scope": {
+        "kind": "turn",
+        "turnId": "daaf281545-t2"
+      }
+    },
+    {
+      "seq": 92,
+      "type": "provider/rateLimits/updated",
+      "scope": {
+        "kind": "thread"
+      }
+    },
+    {
+      "seq": 93,
+      "type": "provider/unhandled",
+      "scope": {
+        "kind": "thread"
+      }
+    },
+    {
+      "seq": 94,
+      "type": "turn/completed",
+      "scope": {
+        "kind": "turn",
+        "turnId": "daaf281545-t2"
+      },
+      "status": "completed"
+    },
+    {
+      "seq": 95,
+      "type": "client/turn/requested",
+      "scope": {
+        "kind": "thread"
+      },
+      "request": "creq_s9zj4qhxf7",
+      "source": "tell"
+    },
+    {
+      "seq": 96,
+      "type": "turn/started",
+      "scope": {
+        "kind": "turn",
+        "turnId": "daaf281545-t3"
+      }
+    },
+    {
+      "seq": 97,
+      "type": "turn/input/accepted",
+      "scope": {
+        "kind": "turn",
+        "turnId": "daaf281545-t3"
+      },
+      "clientRequest": "creq_s9zj4qhxf7"
+    },
+    {
+      "seq": 98,
+      "type": "item/started",
+      "scope": {
+        "kind": "turn",
+        "turnId": "daaf281545-t3"
+      },
+      "itemType": "agentMessage"
+    },
+    {
+      "seq": 99,
+      "type": "item/agentMessage/delta",
+      "scope": {
+        "kind": "turn",
+        "turnId": "daaf281545-t3"
+      }
+    },
+    {
+      "seq": 104,
+      "type": "item/completed",
+      "scope": {
+        "kind": "turn",
+        "turnId": "daaf281545-t3"
+      },
+      "itemType": "agentMessage"
+    },
+    {
+      "seq": 105,
+      "type": "thread/tokenUsage/updated",
+      "scope": {
+        "kind": "turn",
+        "turnId": "daaf281545-t3"
+      }
+    },
+    {
+      "seq": 106,
+      "type": "thread/contextWindowUsage/updated",
+      "scope": {
+        "kind": "turn",
+        "turnId": "daaf281545-t3"
+      }
+    },
+    {
+      "seq": 107,
+      "type": "provider/rateLimits/updated",
+      "scope": {
+        "kind": "thread"
+      }
+    },
+    {
+      "seq": 108,
+      "type": "provider/unhandled",
+      "scope": {
+        "kind": "thread"
+      }
+    },
+    {
+      "seq": 109,
+      "type": "turn/completed",
+      "scope": {
+        "kind": "turn",
+        "turnId": "daaf281545-t3"
+      },
+      "status": "completed"
+    },
+    {
+      "seq": 110,
+      "type": "client/turn/requested",
+      "scope": {
+        "kind": "thread"
+      },
+      "request": "creq_48g9k7mzca",
+      "source": "tell",
+      "operation": "01a1bb7b-02ab-71ce-84de-7e6237ad02c4"
+    },
+    {
+      "seq": 111,
+      "type": "turn/started",
+      "scope": {
+        "kind": "turn",
+        "turnId": "daaf281545-t4"
+      }
+    },
+    {
+      "seq": 112,
+      "type": "turn/input/accepted",
+      "scope": {
+        "kind": "turn",
+        "turnId": "daaf281545-t4"
+      },
+      "clientRequest": "creq_48g9k7mzca"
+    },
+    {
+      "seq": 113,
+      "type": "item/started",
+      "scope": {
+        "kind": "turn",
+        "turnId": "daaf281545-t4"
+      },
+      "itemType": "agentMessage"
+    },
+    {
+      "seq": 114,
+      "type": "item/agentMessage/delta",
+      "scope": {
+        "kind": "turn",
+        "turnId": "daaf281545-t4"
+      }
+    },
+    {
+      "seq": 118,
+      "type": "item/completed",
+      "scope": {
+        "kind": "turn",
+        "turnId": "daaf281545-t4"
+      },
+      "itemType": "agentMessage"
+    },
+    {
+      "seq": 119,
+      "type": "item/started",
+      "scope": {
+        "kind": "turn",
+        "turnId": "daaf281545-t4"
+      },
+      "itemType": "commandExecution"
+    },
+    {
+      "seq": 120,
+      "type": "system/thread/interrupted",
+      "scope": {
+        "kind": "thread"
+      }
+    },
+    {
+      "seq": 121,
+      "type": "thread/tokenUsage/updated",
+      "scope": {
+        "kind": "turn",
+        "turnId": "daaf281545-t4"
+      }
+    },
+    {
+      "seq": 122,
+      "type": "thread/contextWindowUsage/updated",
+      "scope": {
+        "kind": "turn",
+        "turnId": "daaf281545-t4"
+      }
+    },
+    {
+      "seq": 123,
+      "type": "provider/rateLimits/updated",
+      "scope": {
+        "kind": "thread"
+      }
+    },
+    {
+      "seq": 124,
+      "type": "turn/completed",
+      "scope": {
+        "kind": "turn",
+        "turnId": "daaf281545-t4"
+      },
+      "status": "interrupted"
+    }
+  ]
+}

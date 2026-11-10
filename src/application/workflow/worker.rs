@@ -211,7 +211,7 @@ where
         }
         let kind = self.port.step_kind(scope).await?;
         match kind.0.as_str() {
-            "data.map" | "decision.rule" | "channel.no_reply" => {
+            kind if super::batch::is_pure_kind(kind) => {
                 self.port
                     .advance_pure(scope, BatchBudget::new(16, Duration::from_millis(100))?)
                     .await?;

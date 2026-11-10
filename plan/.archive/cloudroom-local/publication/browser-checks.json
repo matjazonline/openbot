@@ -1,0 +1,271 @@
+[
+  {
+    "name": "vault-fixture-1",
+    "command": [
+      "scripts/test-network-isolation.sh",
+      "/Users/mac03/dev/openbot/target/debug/deps/open_bots-b3fb49a4c0332dfc",
+      "vault_authoring_picker_is_owner_scoped_and_only_exposes_approved_metadata",
+      "--test-threads=1"
+    ],
+    "fixture": "/tmp/obpub-browser-gatlypbc/vault/app.js",
+    "status": "PASS",
+    "exit": 0,
+    "exercised": true,
+    "seconds": 1.42,
+    "log": "logs/browser-vault-fixture-1.log"
+  },
+  {
+    "name": "vault-fixture-2",
+    "command": [
+      "scripts/test-network-isolation.sh",
+      "/Users/mac03/dev/openbot/target/debug/deps/open_bots-b3fb49a4c0332dfc",
+      "vault_authoring_owner_forms_and_reconnect_states_emit_real_browser_markup",
+      "--test-threads=1"
+    ],
+    "fixture": "/tmp/obpub-browser-gatlypbc/vault/app.js",
+    "status": "PASS",
+    "exit": 0,
+    "exercised": true,
+    "seconds": 2.28,
+    "log": "logs/browser-vault-fixture-2.log"
+  },
+  {
+    "name": "vault-driver",
+    "command": [
+      "node",
+      "--test",
+      "scripts/tests/vault-authoring-browser.mjs"
+    ],
+    "fixture": "/tmp/obpub-browser-gatlypbc/vault/app.js",
+    "status": "PASS",
+    "exit": 0,
+    "exercised": true,
+    "seconds": 4.78,
+    "log": "logs/browser-vault-driver.log"
+  },
+  {
+    "name": "html-fixture-1",
+    "command": [
+      "scripts/test-network-isolation.sh",
+      "/Users/mac03/dev/openbot/target/debug/deps/open_bots-b3fb49a4c0332dfc",
+      "dump_html_injection_browser_fixtures",
+      "--test-threads=1",
+      "--ignored"
+    ],
+    "fixture": "/tmp/obpub-browser-gatlypbc/html/app.js",
+    "status": "PASS",
+    "exit": 0,
+    "exercised": true,
+    "seconds": 0.1,
+    "log": "logs/browser-html-fixture-1.log"
+  },
+  {
+    "name": "html-driver",
+    "command": [
+      "node",
+      "--test",
+      "scripts/tests/team-autocomplete-browser.mjs",
+      "scripts/tests/html-injection-browser.mjs"
+    ],
+    "fixture": "/tmp/obpub-browser-gatlypbc/html/app.js",
+    "status": "PASS",
+    "exit": 0,
+    "exercised": true,
+    "seconds": 1.26,
+    "log": "logs/browser-html-driver.log"
+  },
+  {
+    "name": "knowledge-fixture-1",
+    "command": [
+      "scripts/test-network-isolation.sh",
+      "/Users/mac03/dev/openbot/target/debug/deps/open_bots-b3fb49a4c0332dfc",
+      "dump_knowledge_browser_fixtures",
+      "--test-threads=1",
+      "--ignored"
+    ],
+    "fixture": "/tmp/obpub-browser-gatlypbc/knowledge/app.js",
+    "status": "PASS",
+    "exit": 0,
+    "exercised": true,
+    "seconds": 0.09,
+    "log": "logs/browser-knowledge-fixture-1.log"
+  },
+  {
+    "name": "knowledge-driver",
+    "command": [
+      "node",
+      "--test",
+      "scripts/tests/knowledge-browser.mjs"
+    ],
+    "fixture": "/tmp/obpub-browser-gatlypbc/knowledge/app.js",
+    "status": "PASS",
+    "exit": 0,
+    "exercised": true,
+    "seconds": 1.15,
+    "log": "logs/browser-knowledge-driver.log"
+  },
+  {
+    "name": "agent-fixture-1",
+    "command": [
+      "scripts/test-network-isolation.sh",
+      "/Users/mac03/dev/openbot/target/debug/deps/open_bots-b3fb49a4c0332dfc",
+      "dump_autonomous_agent_authoring_browser_fixtures",
+      "--test-threads=1",
+      "--ignored"
+    ],
+    "fixture": "/tmp/obpub-browser-gatlypbc/agent/app.js",
+    "status": "PASS",
+    "exit": 0,
+    "exercised": true,
+    "seconds": 1.38,
+    "log": "logs/browser-agent-fixture-1.log"
+  },
+  {
+    "name": "agent-driver",
+    "command": [
+      "node",
+      "--test",
+      "scripts/tests/agent-authoring-browser.mjs"
+    ],
+    "fixture": "/tmp/obpub-browser-gatlypbc/agent/app.js",
+    "status": "PASS",
+    "exit": 0,
+    "exercised": true,
+    "seconds": 2.53,
+    "log": "logs/browser-agent-driver.log"
+  },
+  {
+    "name": "local-fixture-1",
+    "command": [
+      "scripts/test-network-isolation.sh",
+      "/Users/mac03/dev/openbot/target/debug/deps/open_bots-b3fb49a4c0332dfc",
+      "dump_cloudroom_management_browser_fixtures",
+      "--test-threads=1",
+      "--ignored"
+    ],
+    "fixture": "/tmp/obpub-browser-gatlypbc/local/app.js",
+    "status": "PASS",
+    "exit": 0,
+    "exercised": true,
+    "seconds": 1.59,
+    "log": "logs/browser-local-fixture-1.log"
+  },
+  {
+    "name": "local-driver",
+    "command": [
+      "node",
+      "--test",
+      "scripts/tests/local-agents-browser.mjs"
+    ],
+    "fixture": "/tmp/obpub-browser-gatlypbc/local/app.js",
+    "status": "PASS",
+    "exit": 0,
+    "exercised": true,
+    "seconds": 1.3,
+    "log": "logs/browser-local-driver.log"
+  },
+  {
+    "name": "picker-fixture-1",
+    "command": [
+      "scripts/test-network-isolation.sh",
+      "/Users/mac03/dev/openbot/target/debug/deps/open_bots-b3fb49a4c0332dfc",
+      "dump_autonomous_workflow_agent_picker_browser_fixtures",
+      "--test-threads=1",
+      "--ignored"
+    ],
+    "fixture": "/tmp/obpub-browser-gatlypbc/picker/app.js",
+    "status": "PASS",
+    "exit": 0,
+    "exercised": true,
+    "seconds": 1.68,
+    "log": "logs/browser-picker-fixture-1.log"
+  },
+  {
+    "name": "picker-driver",
+    "command": [
+      "node",
+      "--test",
+      "scripts/tests/workflow-agent-picker-browser.mjs"
+    ],
+    "fixture": "/tmp/obpub-browser-gatlypbc/picker/app.js",
+    "status": "PASS",
+    "exit": 0,
+    "exercised": true,
+    "seconds": 1.17,
+    "log": "logs/browser-picker-driver.log"
+  },
+  {
+    "name": "session-fixture-1",
+    "command": [
+      "scripts/test-network-isolation.sh",
+      "/Users/mac03/dev/openbot/target/debug/deps/open_bots-b3fb49a4c0332dfc",
+      "dump_session_revocation_browser_fixtures",
+      "--test-threads=1",
+      "--ignored"
+    ],
+    "fixture": "/tmp/obpub-browser-gatlypbc/session/app.js",
+    "status": "PASS",
+    "exit": 0,
+    "exercised": true,
+    "seconds": 1.65,
+    "log": "logs/browser-session-fixture-1.log"
+  },
+  {
+    "name": "session-driver",
+    "command": [
+      "node",
+      "--test",
+      "scripts/tests/session-revocation-browser.mjs"
+    ],
+    "fixture": "/tmp/obpub-browser-gatlypbc/session/app.js",
+    "status": "PASS",
+    "exit": 0,
+    "exercised": true,
+    "seconds": 0.87,
+    "log": "logs/browser-session-driver.log"
+  },
+  {
+    "name": "decision-fixture-1",
+    "command": [
+      "scripts/test-network-isolation.sh",
+      "/Users/mac03/dev/openbot/target/debug/deps/open_bots-b3fb49a4c0332dfc",
+      "decision_browser_markup_and_closed_draft_recovery",
+      "--test-threads=1"
+    ],
+    "fixture": "/tmp/obpub-browser-gatlypbc/decision/app.js",
+    "status": "PASS",
+    "exit": 0,
+    "exercised": true,
+    "seconds": 0.07,
+    "log": "logs/browser-decision-fixture-1.log"
+  },
+  {
+    "name": "decision-fixture-2",
+    "command": [
+      "scripts/test-network-isolation.sh",
+      "/Users/mac03/dev/openbot/target/debug/deps/open_bots-b3fb49a4c0332dfc",
+      "source_message_outside_window_is_exact_and_authorized",
+      "--test-threads=1"
+    ],
+    "fixture": "/tmp/obpub-browser-gatlypbc/decision/app.js",
+    "status": "PASS",
+    "exit": 0,
+    "exercised": true,
+    "seconds": 0.51,
+    "log": "logs/browser-decision-fixture-2.log"
+  },
+  {
+    "name": "decision-driver",
+    "command": [
+      "node",
+      "--test",
+      "scripts/tests/workflow-decisions.mjs"
+    ],
+    "fixture": "/tmp/obpub-browser-gatlypbc/decision/app.js",
+    "status": "PASS",
+    "exit": 0,
+    "exercised": true,
+    "seconds": 1.89,
+    "log": "logs/browser-decision-driver.log"
+  }
+]

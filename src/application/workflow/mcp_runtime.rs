@@ -163,7 +163,7 @@ where
             client: self.client.clone(),
             opened: Mutex::new(None),
         };
-        if state == ActionEffectState::Prepared {
+        if state == ActionEffectState::Prepared && request.context.integration.is_none() {
             tokio::select! {
                 biased;
                 _ = cancel.cancelled() => return Ok(RemoteDispatchObservation::Interrupted),
@@ -217,13 +217,21 @@ where
     ) -> WorkflowHandlerOutcome {
         use ActionStepOutcome as Outcome;
         let result = match self.step(kind, claim).await {
+            Ok(RemoteDispatchObservation::PreparationFailed(failure)) => {
+                Err(integration_pre_dispatch_failure(ActionFamily::Mcp, failure))
+            }
             Ok(RemoteDispatchObservation::Committed(receipt)) => {
                 if mcp_result_is_error(&receipt.result) {
                     // The receipt keeps the bounded error result; a tool error never proves
                     // that the effect was not applied, so no new call is ever made for it.
                     fail(Outcome::ToolError)
                 } else {
-                    Ok(receipt.result)
+                    // Keep the original receipt for reconciliation. Workflow field
+                    // bindings must never extract typed binary bytes into model text.
+                    crate::services::mcp_client::observation::omit_binary_content(receipt.result)
+                        .map_err(|_| {
+                            action_step_failure(ActionFamily::Mcp, Outcome::ContractChanged)
+                        })
                 }
             }
             Ok(RemoteDispatchObservation::ApprovalParked(wait)) => {
@@ -295,7 +303,7 @@ async fn connect_checked(
                 .map_err(Failure::Preparation)?,
         )
         .await
-        .map_err(|_| Failure::Unavailable)?;
+        .map_err(connection_failure)?;
     match session.discover().await {
         Ok(tools) if discovery_matches(&request.contract, &tools) => Ok(Opened {
             session,
@@ -305,10 +313,17 @@ async fn connect_checked(
             close(session).await;
             Err(Failure::ContractChanged)
         }
-        Err(_) => {
+        Err(error) => {
             close(session).await;
-            Err(Failure::Unavailable)
+            Err(connection_failure(error))
         }
+    }
+}
+
+fn connection_failure(error: AppError) -> Failure {
+    match error {
+        AppError::McpAuthentication => Failure::Preparation(error),
+        _ => Failure::Unavailable,
     }
 }
 

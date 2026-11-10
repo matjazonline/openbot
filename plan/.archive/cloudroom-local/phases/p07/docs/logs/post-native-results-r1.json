@@ -1,0 +1,87 @@
+[
+  {
+    "name": "format",
+    "command": [
+      "cargo",
+      "fmt",
+      "--all",
+      "--",
+      "--check"
+    ],
+    "status": "PASS",
+    "exit": 0,
+    "seconds": 2.24,
+    "file": "logs/post-native-format-r1.txt"
+  },
+  {
+    "name": "whitespace",
+    "command": [
+      "git",
+      "diff",
+      "--check"
+    ],
+    "status": "PASS",
+    "exit": 0,
+    "seconds": 0.07,
+    "file": "logs/post-native-whitespace-r1.txt"
+  },
+  {
+    "name": "clippy",
+    "command": [
+      "cargo",
+      "clippy",
+      "--locked",
+      "--offline",
+      "--all-targets",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "status": "PASS",
+    "exit": 0,
+    "seconds": 71.79,
+    "file": "logs/post-native-clippy-r1.txt"
+  },
+  {
+    "name": "sqlx",
+    "command": [
+      "cargo",
+      "sqlx",
+      "prepare",
+      "--check",
+      "--",
+      "--all-targets"
+    ],
+    "status": "PASS",
+    "exit": 0,
+    "seconds": 69.46,
+    "file": "logs/post-native-sqlx-r1.txt"
+  },
+  {
+    "name": "inventory",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "--offline",
+      "--all-targets",
+      "--",
+      "--list"
+    ],
+    "status": "PASS",
+    "exit": 0,
+    "seconds": 185.89,
+    "file": "logs/post-native-inventory-r1.txt"
+  },
+  {
+    "name": "graft",
+    "command": [
+      "graft",
+      "build"
+    ],
+    "status": "PASS",
+    "exit": 0,
+    "seconds": 3.67,
+    "file": "logs/post-native-graft-r1.txt"
+  }
+]

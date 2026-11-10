@@ -1,0 +1,13 @@
+{
+  "image": "openbot-cloudroom-p07-knowledge:r3",
+  "image_id": "sha256:7b813a4a8fdf6e57be321e0d0439a1f500244099271ba6926c4a06d462f1fc41",
+  "user": "mailagents",
+  "network": "none",
+  "read_only": true,
+  "container_memory_mib": 2048,
+  "peak_rss_budget_mib": 1536,
+  "missing_and_tampered_model_check_and_serve": "PASS",
+  "artifact": "bd92212d24d49b9d937eac2c52723eae45085cdb81abc36d12c262dcdf33cbe9",
+  "peak_rss_bytes": 1522925568,
+  "inputAudit": "lima-image-context-source-audit-r1.json"
+}

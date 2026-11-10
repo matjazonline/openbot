@@ -2,6 +2,7 @@
 //! publish → bind → admit → claim path for `mcp.call`.
 use super::*;
 use crate::application::agent::{ActionEffect, ActionRecovery, ApprovedActionPolicy};
+use crate::entities::mcp::McpToolName;
 use axum::{
     Json, Router,
     body::Bytes,
@@ -50,8 +51,15 @@ pub(super) struct ServerState {
     arguments: Mutex<Vec<Value>>,
     names: Mutex<Vec<String>>,
     tools: Mutex<Value>,
+    result: Mutex<Option<Value>>,
+    tool_results: Mutex<std::collections::HashMap<McpToolName, Value>>,
+    tool_scripts: Mutex<std::collections::HashMap<McpToolName, std::collections::VecDeque<Value>>>,
+    tool_modes: Mutex<std::collections::HashMap<McpToolName, Call>>,
+    tool_mode_scripts:
+        Mutex<std::collections::HashMap<McpToolName, std::collections::VecDeque<Call>>>,
     call: Mutex<Call>,
     fail_initialize: AtomicBool,
+    refusals: Mutex<std::collections::BTreeMap<&'static str, StatusCode>>,
     hang_list: AtomicBool,
     pub(super) arrived: Notify,
     pub(super) release: Notify,
@@ -91,8 +99,36 @@ impl McpServer {
     pub(super) fn set_tools(&self, tools: Value) {
         *self.state.tools.lock().unwrap() = tools;
     }
+    pub(in crate::adapters::persistence::workflow) fn set_result(&self, result: Value) {
+        *self.state.result.lock().unwrap() = Some(result);
+    }
+    pub(super) fn set_tool_result(&self, tool: McpToolName, result: Value) {
+        self.state.tool_results.lock().unwrap().insert(tool, result);
+    }
+    pub(super) fn script_tool(&self, tool: McpToolName, results: Vec<Value>) {
+        assert!(results.len() <= 16, "bounded fixture responses");
+        self.state
+            .tool_scripts
+            .lock()
+            .unwrap()
+            .insert(tool, results.into());
+    }
+    pub(super) fn tool_mode(&self, tool: McpToolName, mode: Call) {
+        self.state.tool_modes.lock().unwrap().insert(tool, mode);
+    }
+    pub(super) fn script_modes(&self, tool: McpToolName, modes: Vec<Call>) {
+        assert!(modes.len() <= 16, "bounded fixture modes");
+        self.state
+            .tool_mode_scripts
+            .lock()
+            .unwrap()
+            .insert(tool, modes.into());
+    }
     pub(super) fn fail_initialize(&self, fail: bool) {
         self.state.fail_initialize.store(fail, Ordering::SeqCst);
+    }
+    pub(super) fn refuse(&self, method: &'static str, status: StatusCode) {
+        self.state.refusals.lock().unwrap().insert(method, status);
     }
     pub(super) fn hang_list(&self, hang: bool) {
         self.state.hang_list.store(hang, Ordering::SeqCst);
@@ -117,8 +153,14 @@ pub(in crate::adapters::persistence::workflow) async fn mcp_server(call: Call) -
         arguments: Mutex::default(),
         names: Mutex::default(),
         tools: Mutex::new(listed_tools()),
+        result: Mutex::default(),
+        tool_results: Mutex::default(),
+        tool_scripts: Mutex::default(),
+        tool_modes: Mutex::default(),
+        tool_mode_scripts: Mutex::default(),
         call: Mutex::new(call),
         fail_initialize: AtomicBool::new(false),
+        refusals: Mutex::default(),
         hang_list: AtomicBool::new(false),
         arrived: Notify::new(),
         release: Notify::new(),
@@ -161,6 +203,9 @@ async fn rpc(State(state): State<Arc<ServerState>>, headers: HeaderMap, body: By
     let Some(id) = message.get("id").cloned() else {
         return StatusCode::ACCEPTED.into_response();
     };
+    if let Some(status) = state.refusals.lock().unwrap().get(method.as_str()).copied() {
+        return (status, "fixture-mcp-secret remote-private-diagnostic").into_response();
+    }
     let result = match method.as_str() {
         "initialize" => {
             if state.fail_initialize.load(Ordering::SeqCst) {
@@ -187,6 +232,12 @@ async fn rpc(State(state): State<Arc<ServerState>>, headers: HeaderMap, body: By
 }
 
 async fn call(state: &ServerState, id: Value, message: &Value) -> Response {
+    let name: McpToolName = message["params"]["name"]
+        .as_str()
+        .unwrap()
+        .to_owned()
+        .try_into()
+        .unwrap();
     state
         .names
         .lock()
@@ -198,7 +249,14 @@ async fn call(state: &ServerState, id: Value, message: &Value) -> Response {
         .unwrap()
         .push(message["params"]["arguments"].clone());
     let structured = json!({"name":"Ada","tier":3});
-    let mode = *state.call.lock().unwrap();
+    let mode = state
+        .tool_mode_scripts
+        .lock()
+        .unwrap()
+        .get_mut(&name)
+        .and_then(std::collections::VecDeque::pop_front)
+        .or_else(|| state.tool_modes.lock().unwrap().get(&name).copied())
+        .unwrap_or_else(|| *state.call.lock().unwrap());
     let result = match mode {
         Call::Json | Call::Sse => {
             json!({"content":[{"type":"text","text":"Ada"}],"structuredContent":structured,"isError":false,"_meta":{"trace":"remote"}})
@@ -226,6 +284,16 @@ async fn call(state: &ServerState, id: Value, message: &Value) -> Response {
         Call::Fail => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
         Call::Expired => return StatusCode::NOT_FOUND.into_response(),
     };
+    let scripted = state
+        .tool_scripts
+        .lock()
+        .unwrap()
+        .get_mut(&name)
+        .and_then(std::collections::VecDeque::pop_front);
+    let result = scripted
+        .or_else(|| state.tool_results.lock().unwrap().get(&name).cloned())
+        .or_else(|| state.result.lock().unwrap().clone())
+        .unwrap_or(result);
     let body = json!({"jsonrpc":"2.0","id":id,"result":result});
     if mode == Call::Sse {
         return (
@@ -280,8 +348,8 @@ pub(super) fn connection_write(endpoint: &str) -> McpConnectionWrite {
     }
 }
 
-pub(super) struct McpSetup {
-    pub(super) fixture: Fixture,
+pub(in crate::adapters::persistence::workflow::tests) struct McpSetup {
+    pub(in crate::adapters::persistence::workflow::tests) fixture: Fixture,
     pub(super) server: McpServer,
     pub(super) connection: CompanyMcpConnection,
     pub(super) operation: Uuid,
@@ -303,7 +371,9 @@ impl McpSetup {
     pub(super) fn actor(&self) -> WorkflowActor {
         self.fixture.target.actor
     }
-    pub(super) async fn current(&self) -> CompanyMcpConnection {
+    pub(in crate::adapters::persistence::workflow::tests) async fn current(
+        &self,
+    ) -> CompanyMcpConnection {
         connection_on(
             &self.fixture.persistence,
             self.company().as_uuid(),
@@ -537,6 +607,22 @@ pub(super) async fn claim(p: &PostgresPersistence, scope: ActivationRequest) -> 
 pub(super) async fn claimed(setup: &McpSetup) -> ClaimedWorkflow {
     let scope = admitted(setup, "mcp-run").await;
     claim(&setup.fixture.persistence, scope).await
+}
+pub(in crate::adapters::persistence::workflow::tests) async fn integration_claim(
+    setup: &McpSetup,
+) -> ClaimedWorkflow {
+    let scope = Box::pin(admitted(setup, "mcp-run")).await;
+    let p = &setup.fixture.persistence;
+    let claim = p
+        .claim_io(scope, WorkflowWorkerId(Uuid::new_v4()), lease())
+        .await
+        .unwrap();
+    if let Some(claim) = claim {
+        return claim;
+    }
+    let state:Value=sqlx::query_scalar("SELECT jsonb_build_object('run',run.state,'job',job.status,'failures',job.retry_count,'ordinal',job.attempt_ordinal,'error',COALESCE(to_jsonb(job)->'last_error',to_jsonb(job)->'error',to_jsonb(job)->'last_error_message'),'activated',execution.activated_at,'events',(SELECT jsonb_agg(event_kind) FROM workflow_run_events WHERE run_id=run.id)) FROM workflow_runs AS run JOIN workflow_executions AS execution ON execution.run_id=run.id JOIN background_tasks AS job ON job.workflow_execution_id=execution.id WHERE run.id=$1")
+        .bind(scope.run.as_uuid()).fetch_one(p.pool()).await.unwrap();
+    panic!("integration claim missing: {state}");
 }
 /// Makes a retried job due now (the test does not wait out the backoff) and claims it.
 pub(super) async fn reclaim(p: &PostgresPersistence, scope: ActivationRequest) -> ClaimedWorkflow {

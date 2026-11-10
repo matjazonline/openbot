@@ -1,0 +1,14 @@
+{
+  "command": [
+    "cargo",
+    "check",
+    "--locked",
+    "--offline",
+    "--all-targets"
+  ],
+  "cwd": "/Users/mac02/.codex/worktrees/1133/openbot",
+  "database": "vault_google_p06_1133_baa6bd7114",
+  "exit": 101,
+  "seconds": 76.88,
+  "log": "/Users/mac02/.codex/worktrees/1133/openbot/plan/vault-google/phases/p06/docs/logs/build-contracts01.log"
+}

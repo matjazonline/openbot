@@ -1,0 +1,96 @@
+{
+  "artifact": "1e4f5b2148970677a7f1c388fa5a38cc52b1e7685061a4fac15857ea6b1325d9",
+  "coordination_r11_matches": true,
+  "manifest_files_verified": [
+    {
+      "path": "logs/tests-r2.txt",
+      "sha256": "27eda1472b68e7babd696873aef13f47339c22484c2d98535e17d8700feb882e"
+    },
+    {
+      "path": "logs/test-list-binary-r1.txt",
+      "sha256": "a312eeee3a20998e91aafab60296963575149a9fc8c2310bb0d3a67ac02b2014"
+    },
+    {
+      "path": "logs/test-inventory-b1-r2.json",
+      "sha256": "66e2992e5c01cc52625b52a9f19f85d359426fbed7734ebfe8f8fa11afe7ad8d"
+    },
+    {
+      "path": "logs/auth-list-r1.txt",
+      "sha256": "586bc3dc7dfd60566899a4724d1d94cd8aa8ea5eb36e362d0258a317086139da"
+    },
+    {
+      "path": "logs/auth-tests-r1.txt",
+      "sha256": "9e3f71a53cc44fda2982f756ebd78b945767377c8f57597eea8f11648e7ee365"
+    },
+    {
+      "path": "logs/association-list-r1.txt",
+      "sha256": "6442223fcccf27b702deb6a3687084765ef08b90bbf67c59f64de9a25246b4b9"
+    },
+    {
+      "path": "logs/association-tests-r1.txt",
+      "sha256": "221baad7ce1afa4314c6af305de8202d515766dc9a2a8336a8d4afb8bfeb20a3"
+    },
+    {
+      "path": "logs/migrate-r2.txt",
+      "sha256": "43490a16b6fa42d1d4ea1ec59f9105775153ac3cf93f65fd6fb9cd36d993e73e"
+    },
+    {
+      "path": "logs/sqlx-prepare-r4.txt",
+      "sha256": "89f82af50bedc768a14334cd25bdff0dc3ca42234c9b98319634e95a4b45ac1c"
+    },
+    {
+      "path": "logs/clippy-r4.txt",
+      "sha256": "a91b37d8e5f91c92e383030d7b873449039d20ced34e3444d6ae1627654dc681"
+    },
+    {
+      "path": "logs/format-final-r3.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "logs/whitespace-final-r3.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "logs/tests-preliminary-r1.txt",
+      "sha256": "a948a7923251160cb91ac98ca8096875015517944573bfe208fb4fb35319cb43"
+    },
+    {
+      "path": "logs/tests-preliminary-r2.txt",
+      "sha256": "976f7f71d3e69531f2a62f401e9a4b845be00efee85737f3f562140000db6caf"
+    },
+    {
+      "path": "logs/clippy-r1.txt",
+      "sha256": "9403a5b991996efc03f36a97ab98de263b7d6d563354055c36af406c69e88ee7"
+    },
+    {
+      "path": "logs/rust-node-wire-r1.txt",
+      "sha256": "3a8ca68cecdb4788cf301d9b4127d7ace543c38935a2b3bd1ab242401d5997a9"
+    },
+    {
+      "path": "logs/test-list-r6.txt",
+      "sha256": "a405113952d48a9f7797017f39f428b286b3934bad1f075788aa8cb3008d8e1a"
+    }
+  ],
+  "source_export_hashes_verified": true,
+  "inventory": {
+    "before": 69,
+    "after": 77,
+    "removed": [],
+    "added": [
+      "adapters::http::routes::local_machine_connection::tests::recovery::cloudroom_connection_uncertain_reconnect_withholds_new_effect_until_reconciled",
+      "adapters::persistence::local_agents::protocol::recovery_tests::cloudroom_commands_expired_uncertain_work_reconciles_before_new_effects",
+      "adapters::persistence::local_agents::protocol::recovery_tests::cloudroom_commands_explicit_uncertainty_reconciles_before_new_effects",
+      "adapters::persistence::local_agents::protocol::recovery_tests::cloudroom_observations_every_preflight_refusal_preserves_expired_uncertainty",
+      "adapters::persistence::local_agents::protocol::recovery_tests::cloudroom_observations_every_preflight_refusal_preserves_explicit_uncertainty",
+      "adapters::persistence::local_agents::protocol::recovery_tests::cloudroom_observations_every_preflight_refusal_rejects_after_possible_submission",
+      "adapters::persistence::local_agents::protocol::recovery_tests::cloudroom_observations_preflight_refusals_before_intent_are_definitive",
+      "application::local_agents::wire_tests::cloudroom_protocol_rust_node_command_hash_preserves_exact_deadline_and_text"
+    ]
+  },
+  "reviewer_checks": {
+    "reviewer-b1-r2-recovery-tests.txt": "\nrunning 6 tests\ntest adapters::persistence::local_agents::protocol::recovery_tests::cloudroom_observations_every_preflight_refusal_rejects_after_possible_submission ... ok\ntest adapters::persistence::local_agents::protocol::recovery_tests::cloudroom_commands_explicit_uncertainty_reconciles_before_new_effects ... ok\ntest adapters::persistence::local_agents::protocol::recovery_tests::cloudroom_observations_every_preflight_refusal_preserves_explicit_uncertainty ... ok\ntest adapters::persistence::local_agents::protocol::recovery_tests::cloudroom_observations_preflight_refusals_before_intent_are_definitive ... ok\ntest adapters::persistence::local_agents::protocol::recovery_tests::cloudroom_commands_expired_uncertain_work_reconciles_before_new_effects ... ok\ntest adapters::persistence::local_agents::protocol::recovery_tests::cloudroom_observations_every_preflight_refusal_preserves_expired_uncertainty ... ok\n\ntest result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 3265 filtered out; finished in 4.78s\n\n",
+    "reviewer-b1-r2-ws-test.txt": "\nrunning 1 test\ntest adapters::http::routes::local_machine_connection::tests::recovery::cloudroom_connection_uncertain_reconnect_withholds_new_effect_until_reconciled ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3270 filtered out; finished in 1.74s\n\n",
+    "reviewer-b1-r2-matrix-test.txt": "\nrunning 1 test\ntest adapters::persistence::local_agents::protocol::capacity_tests::cloudroom_commands_capacity_sql_matches_command_kind_and_terminal_evidence_matrix ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3270 filtered out; finished in 0.61s\n\n",
+    "reviewer-b1-r2-wire-test.txt": "\nrunning 1 test\nPASS Rust\u2192Node command hashes: all 6 kinds, exact microseconds, escaping/Unicode, tampering and lossy Date negatives\ntest application::local_agents::wire_tests::cloudroom_protocol_rust_node_command_hash_preserves_exact_deadline_and_text ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3270 filtered out; finished in 0.03s\n\n"
+  }
+}

@@ -1,0 +1,1227 @@
+{
+  "version": 1,
+  "round": "CL-P07-B1-R2-final-v2",
+  "artifact": "bd92212d24d49b9d937eac2c52723eae45085cdb81abc36d12c262dcdf33cbe9",
+  "checks": [
+    {
+      "criteria": [
+        "AC5"
+      ],
+      "command": "bash -c 'rustc --version; cargo --version; node --version; npm --version; cargo sqlx --version; /opt/homebrew/opt/postgresql@18/bin/psql --version'",
+      "fixture": "Fresh owned PostgreSQL 18.6 loopback56388; final-databases-r2.json; exact CI-equivalent checks. Full-suite controller walltime includes its deliberate resource hold.",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/final-versions-r2.txt",
+          "sha256": "4f63740b1500c83cdf0a8b596663796357d8846651aaf8ae414715c2f433501c"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC3",
+        "AC5"
+      ],
+      "command": "npm --prefix integrations/cloudroom-plugin ci",
+      "fixture": "Fresh owned PostgreSQL 18.6 loopback56388; final-databases-r2.json; exact CI-equivalent checks. Full-suite controller walltime includes its deliberate resource hold.",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/final-plugin-install-r2.txt",
+          "sha256": "d57393bdcbd07597b52deef7f8c864692dbb2d22d8854ded09a76c6cf9fce632"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC3",
+        "AC5"
+      ],
+      "command": "npm --prefix integrations/cloudroom-plugin run typecheck",
+      "fixture": "Fresh owned PostgreSQL 18.6 loopback56388; final-databases-r2.json; exact CI-equivalent checks. Full-suite controller walltime includes its deliberate resource hold.",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/final-plugin-typecheck-r2.txt",
+          "sha256": "2a76b0b41aed0a0cb5fa95cac7cc06b64b1ae4106faf0279b855bd394e7dadab"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC3",
+        "AC5"
+      ],
+      "command": "npm --prefix integrations/cloudroom-plugin run build",
+      "fixture": "Fresh owned PostgreSQL 18.6 loopback56388; final-databases-r2.json; exact CI-equivalent checks. Full-suite controller walltime includes its deliberate resource hold.",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/final-plugin-build-r2.txt",
+          "sha256": "54ba34766bbe8fa61156b478619557814d7a37b0eb4cce1032e9f7d4a51012a7"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC3",
+        "AC5"
+      ],
+      "command": "npm --prefix integrations/cloudroom-plugin test",
+      "fixture": "Fresh owned PostgreSQL 18.6 loopback56388; final-databases-r2.json; exact CI-equivalent checks. Full-suite controller walltime includes its deliberate resource hold.",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/final-plugin-tests-r2.txt",
+          "sha256": "2cec0703aaa3382c5e92d0ba80aa63dceb3672df1c550a400fd77fb8cfab48a4"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC3",
+        "AC5"
+      ],
+      "command": "npm --prefix integrations/cloudroom-plugin run test:guards",
+      "fixture": "Fresh owned PostgreSQL 18.6 loopback56388; final-databases-r2.json; exact CI-equivalent checks. Full-suite controller walltime includes its deliberate resource hold.",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/final-plugin-guards-r2.txt",
+          "sha256": "0e08c68e9f83dc98a9abe96ec56d45b9187f29da4c42ee976c3135d20b32e1d9"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC3",
+        "AC5"
+      ],
+      "command": "npm --prefix integrations/cloudroom-plugin run package -- /tmp/openbot-cloudroom-p07-artifacts-r4",
+      "fixture": "Fresh owned PostgreSQL 18.6 loopback56388; final-databases-r2.json; exact CI-equivalent checks. Full-suite controller walltime includes its deliberate resource hold.",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/final-plugin-package-r2.txt",
+          "sha256": "31a299d386c40613bebff84408f1afb02263923d6311bfba328421c040e5ad03"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC3",
+        "AC5"
+      ],
+      "command": "tar -xzf /tmp/openbot-cloudroom-p07-artifacts-r4/bb-plugin-openbot-local-0.2.0.tgz -C /private/var/folders/n2/5y7x75r92zl0ll90154hxdzr0000gn/T/openbot-cloudroom-p07-final-package-xz3q09gs --strip-components=1",
+      "fixture": "Fresh owned PostgreSQL 18.6 loopback56388; final-databases-r2.json; exact CI-equivalent checks. Full-suite controller walltime includes its deliberate resource hold.",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/final-plugin-extract-r2.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC3",
+        "AC5"
+      ],
+      "command": "npm --prefix /private/var/folders/n2/5y7x75r92zl0ll90154hxdzr0000gn/T/openbot-cloudroom-p07-final-package-xz3q09gs ci --omit=dev",
+      "fixture": "Fresh owned PostgreSQL 18.6 loopback56388; final-databases-r2.json; exact CI-equivalent checks. Full-suite controller walltime includes its deliberate resource hold.",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/final-r2-plugin-runtime-install.txt",
+          "sha256": "c05e89134e4d2358fb87c91dc1d880e4ac3f2609a3d0b6d05cfdccb61318be92"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC5"
+      ],
+      "command": "cargo fmt --all -- --check",
+      "fixture": "Fresh owned PostgreSQL 18.6 loopback56388; final-databases-r2.json; exact CI-equivalent checks. Full-suite controller walltime includes its deliberate resource hold.",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/final-format-r2.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC5"
+      ],
+      "command": "git diff --check",
+      "fixture": "Fresh owned PostgreSQL 18.6 loopback56388; final-databases-r2.json; exact CI-equivalent checks. Full-suite controller walltime includes its deliberate resource hold.",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/final-whitespace-r2.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC5"
+      ],
+      "command": "cargo check --locked --offline --all-targets",
+      "fixture": "Fresh owned PostgreSQL 18.6 loopback56388; final-databases-r2.json; exact CI-equivalent checks. Full-suite controller walltime includes its deliberate resource hold.",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/final-offline-check-r2.txt",
+          "sha256": "f3705343d75188eb3daa66b701ac3354781f6494ea395322b262a65fd5ee4276"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC5"
+      ],
+      "command": "cargo clippy --locked --offline --all-targets -- -D warnings",
+      "fixture": "Fresh owned PostgreSQL 18.6 loopback56388; final-databases-r2.json; exact CI-equivalent checks. Full-suite controller walltime includes its deliberate resource hold.",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/final-clippy-r2.txt",
+          "sha256": "372f110bdafd02206599a898fd677ec9ee2bf8874547843404d03f5f2adde2ce"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC5"
+      ],
+      "command": "cargo sqlx migrate run",
+      "fixture": "Fresh owned PostgreSQL 18.6 loopback56388; final-databases-r2.json; exact CI-equivalent checks. Full-suite controller walltime includes its deliberate resource hold.",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/final-migrations-r2.txt",
+          "sha256": "0493af0a0aeb3d7bfb4ecb60f65a452593bb5fe5bbf759fdd9808e464cea8884"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC5"
+      ],
+      "command": "/opt/homebrew/opt/postgresql@18/bin/psql postgres://mac03@127.0.0.1:56388/openbot_cl_final_build_8a72675493 -X -v ON_ERROR_STOP=1 -c 'SELECT 1 AS ci_pg_stat_statements_probe'",
+      "fixture": "Fresh owned PostgreSQL 18.6 loopback56388; final-databases-r2.json; exact CI-equivalent checks. Full-suite controller walltime includes its deliberate resource hold.",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/final-query-statistics-probe-r2.txt",
+          "sha256": "8295d8193dec8f4f417ffb2af36ab678eb277f766567f8df22c304354859c669"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC5"
+      ],
+      "command": "/opt/homebrew/opt/postgresql@18/bin/psql postgres://mac03@127.0.0.1:56388/openbot_cl_final_build_8a72675493 -X -v ON_ERROR_STOP=1 -c 'DO $$ BEGIN ASSERT current_setting('\"'\"'pg_stat_statements.track'\"'\"')='\"'\"'top'\"'\"'; ASSERT current_setting('\"'\"'pg_stat_statements.track_utility'\"'\"')='\"'\"'off'\"'\"'; ASSERT current_setting('\"'\"'log_parameter_max_length'\"'\"')='\"'\"'0'\"'\"'; ASSERT current_setting('\"'\"'log_parameter_max_length_on_error'\"'\"')='\"'\"'0'\"'\"'; ASSERT EXISTS (SELECT 1 FROM pg_stat_statements WHERE dbid=(SELECT oid FROM pg_database WHERE datname=current_database()) AND query LIKE '\"'\"'%ci_pg_stat_statements_probe%'\"'\"'); END $$'",
+      "fixture": "Fresh owned PostgreSQL 18.6 loopback56388; final-databases-r2.json; exact CI-equivalent checks. Full-suite controller walltime includes its deliberate resource hold.",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/final-query-statistics-r2.txt",
+          "sha256": "c14aee5b62ffd744902b84a24398e930998597dda300e71334862f0ef148e50a"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC5"
+      ],
+      "command": "cargo sqlx prepare --check -- --all-targets",
+      "fixture": "Fresh owned PostgreSQL 18.6 loopback56388; final-databases-r2.json; exact CI-equivalent checks. Full-suite controller walltime includes its deliberate resource hold.",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/final-sqlx-r2.txt",
+          "sha256": "aaaf62a9b18d62fda6db328bb1d4b43c3db279570ca8a99a22e9515a7140020e"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC5"
+      ],
+      "command": "cargo test --locked --offline --all-targets --no-run",
+      "fixture": "Fresh owned PostgreSQL 18.6 loopback56388; final-databases-r2.json; exact CI-equivalent checks. Full-suite controller walltime includes its deliberate resource hold.",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/final-compile-tests-r2.txt",
+          "sha256": "3949954748b0256d9fe89f0546abcc8a804f6c8531b8b7d3f7b0efe09ba18da2"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC5"
+      ],
+      "command": "cargo test --locked --offline --all-targets -- --list",
+      "fixture": "Fresh owned PostgreSQL 18.6 loopback56388; final-databases-r2.json; exact CI-equivalent checks. Full-suite controller walltime includes its deliberate resource hold.",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/final-inventory-r2.txt",
+          "sha256": "1011cb079b12aed30b6a8d6bdbc4056c47254b2af6055ba0d96c0a372a6357e2"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC1",
+        "AC2",
+        "AC5"
+      ],
+      "command": "scripts/test-network-isolation.sh cargo test --locked --offline --all-targets",
+      "fixture": "Fresh owned PostgreSQL 18.6 loopback56388; final-databases-r2.json; exact CI-equivalent checks. Full-suite controller walltime includes its deliberate resource hold.",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/final-suite-r2.txt",
+          "sha256": "aa58071baa1659dfa1877e3d311d39ec9e4e62db5aad053188a50dc93f06d4d6"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC1",
+        "AC2",
+        "AC5"
+      ],
+      "command": "scripts/test-network-isolation.sh scripts/stack-budget.sh --offline",
+      "fixture": "Fresh owned PostgreSQL 18.6 loopback56388; final-databases-r2.json; exact CI-equivalent checks. Full-suite controller walltime includes its deliberate resource hold.",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/stock-correction-full-r2.txt",
+          "sha256": "4086e820e38c983d521f9bdca995863296128ce6ccc6a8f1485a98dddd269640"
+        },
+        {
+          "path": "logs/final-stack-r2.txt",
+          "sha256": "ac2833e4a3810406d15010bba87108c6e2e3a87270420128016ece1423897874"
+        },
+        {
+          "path": "logs/stock-local-resolution-after-fix-results.json",
+          "sha256": "554265f8930da6fb65999c77a460fa8628c7c7fa365fa6ebb6790ce4a57444c2"
+        },
+        {
+          "path": "logs/source-delta-audit-r6.json",
+          "sha256": "9777dacb934e560f7e4149b9d3c74f18b0003316627a55f6ece873ef11149f15"
+        },
+        {
+          "path": "logs/stock-correction-full-r2-progress.txt",
+          "sha256": "e9086f38e204202f2e81459ac2a9300b3de50f302b672e0968f681ac04c9fd82"
+        },
+        {
+          "path": "logs/stock-correction-timeout-r1.json",
+          "sha256": "0f48da9349b505a0b786da7c4239e382aa87a2c4b5485f3e932076d9037783fe"
+        },
+        {
+          "path": "logs/stock-timeout-process-audit-r1.json",
+          "sha256": "51152db82013e8cc676741f485353228ffbbacd22ebc67709484661a73030d28"
+        },
+        {
+          "path": "logs/stock-timeout-pre-run-observations-r1.md",
+          "sha256": "3d08f480acb34fc30588043c1b9e8e20de2a3a9c177378988af7391477ba456d"
+        },
+        {
+          "path": "logs/cargo-stream-wrapper-r1.sh",
+          "sha256": "bcbf93b897d244865a36d1a2388235cd7fc87a9877ba449e23ca9a6a1066c78c"
+        },
+        {
+          "path": "logs/stock-stream-proof-r1.txt",
+          "sha256": "f5cd9b30f2d4012a0443be69e9c7259dbdd3e69fd0b2adbaa3fd61a2dadc5b23"
+        }
+      ],
+      "reason": "Full corrected stock-stack run supersedes the earlier one-test fixture failure and a later outer-supervisor timeout. Exact2MiB/network scripts, production/per-test bounds and all assertions are unchanged. Fresh database, real Cargo with pipefail/tee output duplication,3600second outer watchdog; failed/timed-out observations retained."
+    },
+    {
+      "criteria": [
+        "AC5"
+      ],
+      "command": "scripts/test-network-isolation.sh scripts/lease-budget.sh --offline",
+      "fixture": "Fresh owned PostgreSQL 18.6 loopback56388; final-databases-r2.json; exact CI-equivalent checks. Full-suite controller walltime includes its deliberate resource hold.",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/final-lease-r2.txt",
+          "sha256": "ce7344c383060ec1155c3b42b36f813609244e5a2340b1224be0ff440ebffbf6"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC5"
+      ],
+      "command": "npm run check:css",
+      "fixture": "Fresh owned PostgreSQL 18.6 loopback56388; final-databases-r2.json; exact CI-equivalent checks. Full-suite controller walltime includes its deliberate resource hold.",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/final-css-r2.txt",
+          "sha256": "3a72780c5ec5091d65aa80919b873f5af06d51e6a6d583eead10d39e603f52cb"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC5"
+      ],
+      "command": "npm run test:run-counts",
+      "fixture": "Fresh owned PostgreSQL 18.6 loopback56388; final-databases-r2.json; exact CI-equivalent checks. Full-suite controller walltime includes its deliberate resource hold.",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/final-run-counts-r2.txt",
+          "sha256": "e84ad665689ed52d9a4537dbded2d4d176fc7d7a709ec4c5db242f9222bb12e9"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC5"
+      ],
+      "command": "node --test scripts/tests/sse-navigation.mjs scripts/tests/agent-runtime.mjs scripts/tests/workflow-runs.mjs scripts/tests/workflow-conversations.mjs scripts/tests/workflow-samples.mjs",
+      "fixture": "Fresh owned PostgreSQL 18.6 loopback56388; final-databases-r2.json; exact CI-equivalent checks. Full-suite controller walltime includes its deliberate resource hold.",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/final-js-protocols-r2.txt",
+          "sha256": "09aa9106149aa966d30f9e062353a9955cb6660c4c404bc53dcaae5047a03adb"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC5"
+      ],
+      "command": "scripts/tests/deploy.sh",
+      "fixture": "Fresh owned PostgreSQL 18.6 loopback56388; final-databases-r2.json; exact CI-equivalent checks. Full-suite controller walltime includes its deliberate resource hold.",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/final-deploy-r2.txt",
+          "sha256": "e970eb58edddc8dae62051093aa49f389c70fb68e98591d8676518e92dd09da7"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC5"
+      ],
+      "command": "scripts/tests/credential-key-rotation.sh",
+      "fixture": "Fresh owned PostgreSQL 18.6 loopback56388; final-databases-r2.json; exact CI-equivalent checks. Full-suite controller walltime includes its deliberate resource hold.",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/final-key-rotation-r2.txt",
+          "sha256": "3ddbc0e774ee727d438513c3ad4a5c7fc6203e847efa6ffab28dd0f0da6e55a4"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC5"
+      ],
+      "command": "scripts/tests/transport-boundary.sh",
+      "fixture": "Fresh owned PostgreSQL 18.6 loopback56388; final-databases-r2.json; exact CI-equivalent checks. Full-suite controller walltime includes its deliberate resource hold.",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/final-transport-tests-r2.txt",
+          "sha256": "480891f26caa8bd468e29fde86837c36980ab880981422add136e69cc813b7e0"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC5"
+      ],
+      "command": "scripts/transport-boundary-check.sh",
+      "fixture": "Fresh owned PostgreSQL 18.6 loopback56388; final-databases-r2.json; exact CI-equivalent checks. Full-suite controller walltime includes its deliberate resource hold.",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/final-transport-r2.txt",
+          "sha256": "c923ead8c556a6ed82fc4c192c87b3e0b8e00568630d34a849de155536ef1789"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC5"
+      ],
+      "command": "python3 scripts/tests/workflow-sample-boundary.py",
+      "fixture": "Fresh owned PostgreSQL 18.6 loopback56388; final-databases-r2.json; exact CI-equivalent checks. Full-suite controller walltime includes its deliberate resource hold.",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/final-sample-tests-r2.txt",
+          "sha256": "5610bb341ae4df72930d9f88afd8d925eec567770a8ccf6387603ee214544c29"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC5"
+      ],
+      "command": "python3 scripts/workflow-sample-boundary.py",
+      "fixture": "Fresh owned PostgreSQL 18.6 loopback56388; final-databases-r2.json; exact CI-equivalent checks. Full-suite controller walltime includes its deliberate resource hold.",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/final-sample-r2.txt",
+          "sha256": "228c0f0f23407594379b257a3e3684550f2f3eb1741d27acbc9be312e22e6d2d"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC5"
+      ],
+      "command": "python3 scripts/tests/knowledge-model-prepare.py",
+      "fixture": "Fresh owned PostgreSQL 18.6 loopback56388; final-databases-r2.json; exact CI-equivalent checks. Full-suite controller walltime includes its deliberate resource hold.",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/final-knowledge-prepare-r2.txt",
+          "sha256": "455a234a903f02c7d36882c9b036acc1ee7cca1176404082cfe9897ae40211f7"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC5"
+      ],
+      "command": "cargo test --locked --offline --lib dump_html_injection_browser_fixtures -- --ignored",
+      "fixture": "Fresh owned PostgreSQL 18.6 loopback56388; final-databases-r2.json; exact CI-equivalent checks. Full-suite controller walltime includes its deliberate resource hold.",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/final-html-fixtures-r2.txt",
+          "sha256": "c6774f097e9845eeb233f197e04f988064ac2dbbf1ac296fe5aae534ccf942ad"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC5"
+      ],
+      "command": "node --test scripts/tests/team-autocomplete-browser.mjs scripts/tests/html-injection-browser.mjs",
+      "fixture": "Fresh owned PostgreSQL 18.6 loopback56388; final-databases-r2.json; exact CI-equivalent checks. Full-suite controller walltime includes its deliberate resource hold.",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/final-html-browser-r2.txt",
+          "sha256": "183736124987a49c84223d3a11658cf16fc6a1308164e6d288b64c67a1cc2cff"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC5"
+      ],
+      "command": "cargo test --locked --offline --lib dump_knowledge_browser_fixtures -- --ignored",
+      "fixture": "Fresh owned PostgreSQL 18.6 loopback56388; final-databases-r2.json; exact CI-equivalent checks. Full-suite controller walltime includes its deliberate resource hold.",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/final-knowledge-fixtures-r2.txt",
+          "sha256": "b9d9deb333a9acfb5cf82c17cec068a75b08ba64e9675640621fe057ef611409"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC5"
+      ],
+      "command": "node --test scripts/tests/knowledge-browser.mjs",
+      "fixture": "Fresh owned PostgreSQL 18.6 loopback56388; final-databases-r2.json; exact CI-equivalent checks. Full-suite controller walltime includes its deliberate resource hold.",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/final-knowledge-browser-r2.txt",
+          "sha256": "e60e2749207cf75bf7802a487d34bfd13b76d9cb1ffb521cac911f9f8961bdaa"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC5"
+      ],
+      "command": "cargo test --locked --offline --lib dump_autonomous_agent_authoring_browser_fixtures -- --ignored",
+      "fixture": "Fresh owned PostgreSQL 18.6 loopback56388; final-databases-r2.json; exact CI-equivalent checks. Full-suite controller walltime includes its deliberate resource hold.",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/final-agent-authoring-fixtures-r2.txt",
+          "sha256": "3b88278cdc9006cac13745a5047f5a9c020010373a15a82f17dee7f2f03c9a90"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC5"
+      ],
+      "command": "node --test scripts/tests/agent-authoring-browser.mjs",
+      "fixture": "Fresh owned PostgreSQL 18.6 loopback56388; final-databases-r2.json; exact CI-equivalent checks. Full-suite controller walltime includes its deliberate resource hold.",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/final-agent-authoring-browser-r2.txt",
+          "sha256": "67814b39821d00e8f4727dd54d075367fd527e56a80d2fbb2ce20f5d632002b8"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC5"
+      ],
+      "command": "cargo test --locked --offline --lib dump_cloudroom_management_browser_fixtures -- --ignored",
+      "fixture": "Fresh owned PostgreSQL 18.6 loopback56388; final-databases-r2.json; exact CI-equivalent checks. Full-suite controller walltime includes its deliberate resource hold.",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/final-local-agents-fixtures-r2.txt",
+          "sha256": "9405a105ce6dc12be067c2a7edbeb165e225a161ae8786f7389a95768b7aa548"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC5"
+      ],
+      "command": "node --test scripts/tests/local-agents-browser.mjs",
+      "fixture": "Fresh owned PostgreSQL 18.6 loopback56388; final-databases-r2.json; exact CI-equivalent checks. Full-suite controller walltime includes its deliberate resource hold.",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/final-local-agents-browser-r2.txt",
+          "sha256": "15a4cda8fbcd686cdf017dead94bf086cfda67e1f4b67439924803c34f1a54ff"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC5"
+      ],
+      "command": "cargo test --locked --offline --lib dump_autonomous_workflow_agent_picker_browser_fixtures -- --ignored",
+      "fixture": "Fresh owned PostgreSQL 18.6 loopback56388; final-databases-r2.json; exact CI-equivalent checks. Full-suite controller walltime includes its deliberate resource hold.",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/final-workflow-agent-fixtures-r2.txt",
+          "sha256": "808c371ff8965b320d105e094dd0d0e71b941a22763e2f38b7c710cd07a17063"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC5"
+      ],
+      "command": "node --test scripts/tests/workflow-agent-picker-browser.mjs",
+      "fixture": "Fresh owned PostgreSQL 18.6 loopback56388; final-databases-r2.json; exact CI-equivalent checks. Full-suite controller walltime includes its deliberate resource hold.",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/final-workflow-agent-browser-r2.txt",
+          "sha256": "a4303ee349c712d1fb635c34d2f00fb64daaa750a193d60990c9eabb18b47254"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC5"
+      ],
+      "command": "cargo test --locked --offline --lib dump_session_revocation_browser_fixtures -- --ignored",
+      "fixture": "Fresh owned PostgreSQL 18.6 loopback56388; final-databases-r2.json; exact CI-equivalent checks. Full-suite controller walltime includes its deliberate resource hold.",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/final-session-fixtures-r2.txt",
+          "sha256": "ff5c277a9822953eb3a8e1904e01a2d2def4b3f69570798b4cd668d20f8addf0"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC5"
+      ],
+      "command": "node --test scripts/tests/session-revocation-browser.mjs",
+      "fixture": "Fresh owned PostgreSQL 18.6 loopback56388; final-databases-r2.json; exact CI-equivalent checks. Full-suite controller walltime includes its deliberate resource hold.",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/final-session-browser-r2.txt",
+          "sha256": "dfc536b414d0cfc3432f5be6a2076746c65481150ff6ed61c47a190b97d3ad0b"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC5"
+      ],
+      "command": "cargo test --locked --offline --lib decision_browser_markup_and_closed_draft_recovery",
+      "fixture": "Fresh owned PostgreSQL 18.6 loopback56388; final-databases-r2.json; exact CI-equivalent checks. Full-suite controller walltime includes its deliberate resource hold.",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/final-decision_browser_markup_and_closed_draft_recovery-r2.txt",
+          "sha256": "8a082f1006b7b03f74d905788d6e0a9a3fe8d8c75306e5312c8c24cfcef5769d"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC5"
+      ],
+      "command": "cargo test --locked --offline --lib source_message_outside_window_is_exact_and_authorized",
+      "fixture": "Fresh owned PostgreSQL 18.6 loopback56388; final-databases-r2.json; exact CI-equivalent checks. Full-suite controller walltime includes its deliberate resource hold.",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/final-source_message_outside_window_is_exact_and_authorized-r2.txt",
+          "sha256": "01984401e06d5dda579bce70d6fd3fda21216700a80f0002913b70baaabe54e1"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC5"
+      ],
+      "command": "node --test scripts/tests/workflow-decisions.mjs",
+      "fixture": "Fresh owned PostgreSQL 18.6 loopback56388; final-databases-r2.json; exact CI-equivalent checks. Full-suite controller walltime includes its deliberate resource hold.",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/final-decision-browser-r2.txt",
+          "sha256": "f7c749b1add7a8208ba4fc087cfe860433ba0bb0907ddba7eff13b3aca7458d5"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC5"
+      ],
+      "command": "limactl shell img -- python3 /tmp/openbot-p07-image/scripts/check-knowledge-image.py --image openbot-cloudroom-p07-knowledge:r3",
+      "fixture": "Fresh owned PostgreSQL 18.6 loopback56388; final-databases-r2.json; exact CI-equivalent checks. Full-suite controller walltime includes its deliberate resource hold.",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/lima-image-check-r3.txt",
+          "sha256": "6d5e4fabb74768e7065e73bd161834bc89f000045d7e463d031c2db35590ed0f"
+        },
+        {
+          "path": "logs/lima-image-build-r3.txt",
+          "sha256": "b8e53935cba2c7c951a7ff3221c11a16e71ad2e15185309a460d82a5f7f662c5"
+        },
+        {
+          "path": "logs/lima-image-resource-r3.json",
+          "sha256": "60aeef70da90225484c48692d528c667bf3d846044bf1b0821c497035af09675"
+        },
+        {
+          "path": "logs/lima-image-context-r1.json",
+          "sha256": "bb6ff3338bdb57c8d3bff9e46a6393a6c709ec6b1afb0f61b6238bf0e87749ef"
+        },
+        {
+          "path": "logs/lima-image-context-source-audit-r1.json",
+          "sha256": "3cfb749032942cefc04528d4db92de742d25f4bca32665e6c6dd6a0e4c57f634"
+        },
+        {
+          "path": "logs/reviewer-b1-r2-image-input-audit.json",
+          "sha256": "a69ef5b9b737d69b7d7656913b69c954ba55a8ccda2fbb74a39689ae719ead81"
+        },
+        {
+          "path": "logs/lima-image-runtime-info-r1.json",
+          "sha256": "a05016e5896212e80c603ae24ba666e250b6895cbe9e6caa7ade65e52818ca5b"
+        },
+        {
+          "path": "logs/lima-image-final-identity-r1.json",
+          "sha256": "093b24649af7024e76a80339f1cc2d23b1a15ac189c54744f48e8aee33508331"
+        },
+        {
+          "path": "logs/reviewer-b1-r2-image-check.txt",
+          "sha256": "05fffb98dc87003ac2140f11edcc3aac2ced456a2ba84d645ccc2909b0b5214c"
+        },
+        {
+          "path": "logs/reviewer-b1-r2-image-results.json",
+          "sha256": "345ca4b8522a5ab8d4964ece5363bc2b65b65c3f4086d9e9618020e000ee682f"
+        }
+      ],
+      "reason": "Host Docker was unavailable; the exact required image/check script ran in a task-owned native ARM64 Linux VM. All context inputs match the frozen source."
+    },
+    {
+      "criteria": [
+        "AC4"
+      ],
+      "command": "headless-linux-native",
+      "fixture": "Fresh owned PostgreSQL 18.6 loopback56388; final-databases-r2.json; exact CI-equivalent checks. Full-suite controller walltime includes its deliberate resource hold.",
+      "status": "NOT EXERCISED",
+      "reason": "User explicitly left Linux acceptance unverified; no Linux host/systemd here"
+    },
+    {
+      "criteria": [
+        "AC5"
+      ],
+      "command": "limactl shell img -- docker build --progress=plain --tag openbot-cloudroom-p07-knowledge:r3 /tmp/openbot-p07-image",
+      "fixture": "Pinned production Dockerfile in task-owned native ARM64 Lima VM; readonly host source, isolated Docker cache",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/lima-image-build-r3.txt",
+          "sha256": "b8e53935cba2c7c951a7ff3221c11a16e71ad2e15185309a460d82a5f7f662c5"
+        },
+        {
+          "path": "logs/lima-image-context-r1.json",
+          "sha256": "bb6ff3338bdb57c8d3bff9e46a6393a6c709ec6b1afb0f61b6238bf0e87749ef"
+        },
+        {
+          "path": "logs/lima-image-build-r1.txt",
+          "sha256": "2f33f69f9edf829c03f7ceb9e78eade21d6c0f70f4bec76a04c2359d072a446e"
+        },
+        {
+          "path": "logs/lima-image-build-oom-r1.txt",
+          "sha256": "1adb573efce2933b9c5e19aadd9067298b737b8503025a439d5aa4651299f7c2"
+        },
+        {
+          "path": "logs/lima-image-build-r2.txt",
+          "sha256": "4c3ad7d6d3608c9eb88c795a436001b9cdc60d0af1050c0993385cd41ebefddf"
+        },
+        {
+          "path": "logs/lima-image-resize-r1.txt",
+          "sha256": "d8561bbcd76e1382989e5d9bf5efeb01b5651aee7f8b3d54f18d3945b33e6eaa"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC5",
+        "AC6"
+      ],
+      "command": "cargo fmt --all -- --check",
+      "fixture": "Retained checks before the final test-only lease-fixture correction; current affected checks follow",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/post-native-format-r1.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC5",
+        "AC6"
+      ],
+      "command": "git diff --check",
+      "fixture": "Retained checks before the final test-only lease-fixture correction; current affected checks follow",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/post-native-whitespace-r1.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC5",
+        "AC6"
+      ],
+      "command": "cargo clippy --locked --offline --all-targets -- -D warnings",
+      "fixture": "Retained checks before the final test-only lease-fixture correction; current affected checks follow",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/post-native-clippy-r1.txt",
+          "sha256": "ad244dfeeb829048eed946b762cb17a0ccb002a1389ae8eb5ae36277b4175710"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC5",
+        "AC6"
+      ],
+      "command": "cargo sqlx prepare --check -- --all-targets",
+      "fixture": "Retained checks before the final test-only lease-fixture correction; current affected checks follow",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/post-native-sqlx-r1.txt",
+          "sha256": "bfa111b89abc10820ccdbf8e23df6f2c5024869142617e293e6c4c8d37c2d77f"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC5",
+        "AC6"
+      ],
+      "command": "cargo test --locked --offline --all-targets -- --list",
+      "fixture": "Retained checks before the final test-only lease-fixture correction; current affected checks follow",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/post-native-inventory-r1.txt",
+          "sha256": "00799588d01c2ba8ca117784c7a116c531c52600c5ba1cbd7e93cace7679c4ec"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC5",
+        "AC6"
+      ],
+      "command": "graft build",
+      "fixture": "Retained checks before the final test-only lease-fixture correction; current affected checks follow",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/post-native-graft-r1.txt",
+          "sha256": "e5ccf0ce389df1ae490ee02e72e32d63d7fce10398e9601c83781415739aa76c"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC5",
+        "AC6"
+      ],
+      "command": "cargo fmt --all -- --check",
+      "fixture": "Current clean frozen source after the one-line gate-fixture correction",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/final-fixture-format-r1.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC5",
+        "AC6"
+      ],
+      "command": "git diff --check",
+      "fixture": "Current clean frozen source after the one-line gate-fixture correction",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/final-fixture-whitespace-r1.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC5",
+        "AC6"
+      ],
+      "command": "cargo clippy --locked --offline --all-targets -- -D warnings",
+      "fixture": "Current clean frozen source after the one-line gate-fixture correction",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/final-fixture-clippy-r1.txt",
+          "sha256": "ad244dfeeb829048eed946b762cb17a0ccb002a1389ae8eb5ae36277b4175710"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC5",
+        "AC6"
+      ],
+      "command": "cargo test --locked --offline --all-targets -- --list",
+      "fixture": "Current clean frozen source after the one-line gate-fixture correction",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/final-fixture-inventory-r1.txt",
+          "sha256": "df3a176b1cfe8fa32117d109806a2f07cadee7d6f2a4c23a696a9cab877cfa9d"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC5",
+        "AC6"
+      ],
+      "command": "graft build",
+      "fixture": "Current clean frozen source after the one-line gate-fixture correction",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/final-fixture-graft-r1.txt",
+          "sha256": "699d37f47dd5d64e1602d59a6fd0fca78695dd0c28e4ed7f6c546b037d73b729"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC5"
+      ],
+      "command": "cargo check --locked --offline --all-targets; cargo test --locked --offline --lib --no-run",
+      "fixture": "Current frozen native acceptance helpers, explicit owned databases, no missing-database skip",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/offline-native-assertion-r1.txt",
+          "sha256": "6e38663c5a9d45ca8d14f5ecec1c40010d62b6a01f2aeb036bb96fc6f76bcd99"
+        },
+        {
+          "path": "logs/compile-native-final-r1.txt",
+          "sha256": "8514418a2f08ce5d0bd1c76952c4ba99400523894eeeae1aa2673e28028e7b8e"
+        },
+        {
+          "path": "logs/plugin-corrections-typecheck-r12.txt",
+          "sha256": "2a76b0b41aed0a0cb5fa95cac7cc06b64b1ae4106faf0279b855bd394e7dadab"
+        },
+        {
+          "path": "logs/build-peers-native-final-r1.txt",
+          "sha256": "b5baba07c6b0a92b656031424d5ccddfefd358cb3cf6a82561ee39ebd6fbcbf4"
+        },
+        {
+          "path": "logs/compile-local-resolution-r1.txt",
+          "sha256": "abf7d323429bfea18a95e72ea6316e8d2fb1f615cd8ca0c3c973d0a5e4203d3e"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC1",
+        "AC4"
+      ],
+      "command": "Explicitly authorized native runner run-native-r21.py: codex",
+      "fixture": "macOS; packaged production plugin SHA561d6b3b3e3d0fa038130cd20e1fcdb95e1e1cb07316d2cf0e285089dcfe8bde; actual HTTP/WSS, two workflow workers, provider login, UI denial/human turn, unconsumed-output restart, one SDK entry/control, exact interruption and public archivedAt. Actual uncertain ACK remains uncertain.",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/native-codex-r21.txt",
+          "sha256": "d7c21d77daa3318237cccdd456dbc718c2aaa9ebb55f8c8e8cde672d2cc222c4"
+        },
+        {
+          "path": "logs/native-r21/codex/deny-after.png",
+          "sha256": "360f8cf8864129dbe7c2b8a6da85cfbde1e59750c1a04fe850e35784e32f118d"
+        },
+        {
+          "path": "logs/native-r21/codex/deny-before.png",
+          "sha256": "7d6132de30f75769001d01062e6cbb1bf57d708f8e58dbed9c968bb70fa80399"
+        },
+        {
+          "path": "logs/native-r21/codex/deny-ui.json",
+          "sha256": "d2db7759b784451bb03374b59dfa53f33fd194bebb2c12fc1d678be8cd2f6657"
+        },
+        {
+          "path": "logs/native-r21/codex/diagnostics.json",
+          "sha256": "968d732004f07c50bbcd15aa21278fd4522251462e84e994380b63edb758eb87"
+        },
+        {
+          "path": "logs/native-r21/codex/result.json",
+          "sha256": "2b9b5cb7cdb5d47c9e15b3124bff9ffda8ff08eea0d8968fe0204884c5194db4"
+        },
+        {
+          "path": "logs/native-r21/codex/ui-1794146740185/ui-thread.json",
+          "sha256": "bfd1945dbff7e0cf2a9dea8359da9200d02fedad09327c24e972a6020d705257"
+        },
+        {
+          "path": "logs/native-r21/codex/ui-1794146740185/ui-thread.png",
+          "sha256": "cc1a5d065dfeaaa31d6f55ebc1be1b29793e382bb370ba7daac4774f3ada8f19"
+        },
+        {
+          "path": "logs/native-r21/codex/ui-1794146747125/ui-thread.json",
+          "sha256": "bfd1945dbff7e0cf2a9dea8359da9200d02fedad09327c24e972a6020d705257"
+        },
+        {
+          "path": "logs/native-r21/codex/ui-1794146747125/ui-thread.png",
+          "sha256": "1ba244267cc0726c709175d71680e82a8b3e4ddc788d468dc2639cf99a19f7d7"
+        },
+        {
+          "path": "logs/native-final-versions-r1.json",
+          "sha256": "e4438c9a850fde95ebc935c4bb62c6ed85778186c600ad16b7992c3cad210ee0"
+        },
+        {
+          "path": "logs/native-package-r3.integrity.json",
+          "sha256": "d3c35f7abc8fea20d2b8ad8629160f74bf126528e7111283aa0d9590144d47d5"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC1",
+        "AC4"
+      ],
+      "command": "Explicitly authorized native runner run-native-r21.py: claude",
+      "fixture": "macOS; packaged production plugin SHA561d6b3b3e3d0fa038130cd20e1fcdb95e1e1cb07316d2cf0e285089dcfe8bde; actual HTTP/WSS, two workflow workers, provider login, UI denial/human turn, unconsumed-output restart, one SDK entry/control, exact interruption and public archivedAt. Actual uncertain ACK remains uncertain.",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/native-claude-r21.txt",
+          "sha256": "be27101762f1d345ab4adf6ceedca42293699dd1c12d78f62b04885cb244c3bd"
+        },
+        {
+          "path": "logs/native-r21/claude-code/deny-after.png",
+          "sha256": "b31e9a52f1645f266590eba19dffeb42c7627cdc42bc3af510537a22640871c9"
+        },
+        {
+          "path": "logs/native-r21/claude-code/deny-before.png",
+          "sha256": "35a90ba4a25e39c052665614b586961e7da952e123a558fd062a4da1e0474395"
+        },
+        {
+          "path": "logs/native-r21/claude-code/deny-ui.json",
+          "sha256": "52824878d637ff94975a8f87233b2780f51ba3db94e58bf8c75c428142ea8ecf"
+        },
+        {
+          "path": "logs/native-r21/claude-code/diagnostics.json",
+          "sha256": "04715c8b6f64a267a3573ad9441cf9e2fd79b244d4e84e6d9a33a14f8989aa87"
+        },
+        {
+          "path": "logs/native-r21/claude-code/result.json",
+          "sha256": "00b99be2ffa46825a91add42081fdb73e4ceefdff6e0e6d46914be5d74793faf"
+        },
+        {
+          "path": "logs/native-r21/claude-code/ui-1794146825020/ui-thread.json",
+          "sha256": "9ff7508d080cd619683c51c9459a6144fbbcae06fd467200b601cea09a337052"
+        },
+        {
+          "path": "logs/native-r21/claude-code/ui-1794146825020/ui-thread.png",
+          "sha256": "022e779cc77d69bbd9928825b38f2cb515dd6b902b85428f16c472f7e2e23b52"
+        },
+        {
+          "path": "logs/native-r21/claude-code/ui-1794146830533/ui-thread.json",
+          "sha256": "9ff7508d080cd619683c51c9459a6144fbbcae06fd467200b601cea09a337052"
+        },
+        {
+          "path": "logs/native-r21/claude-code/ui-1794146830533/ui-thread.png",
+          "sha256": "09f054d84e078504836e3882fb1d11c52baf849e84828758ee0d6ddae086db06"
+        },
+        {
+          "path": "logs/native-final-versions-r1.json",
+          "sha256": "e4438c9a850fde95ebc935c4bb62c6ed85778186c600ad16b7992c3cad210ee0"
+        },
+        {
+          "path": "logs/native-package-r3.integrity.json",
+          "sha256": "d3c35f7abc8fea20d2b8ad8629160f74bf126528e7111283aa0d9590144d47d5"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC1",
+        "AC4"
+      ],
+      "command": "Explicitly authorized native runner run-native-r21.py: opencode",
+      "fixture": "macOS; packaged production plugin SHA561d6b3b3e3d0fa038130cd20e1fcdb95e1e1cb07316d2cf0e285089dcfe8bde; actual HTTP/WSS, two workflow workers, provider login, UI denial/human turn, unconsumed-output restart, one SDK entry/control, exact interruption and public archivedAt. Actual uncertain ACK remains uncertain.",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/native-opencode-r21.txt",
+          "sha256": "da12d785fe7dbc05da4f875a813c37706ce376b318ce109c5b09c4973b50be70"
+        },
+        {
+          "path": "logs/native-r21/acp-opencode/deny-after.png",
+          "sha256": "6142fd97bdc7fac2cbfe007731e8dcb99938766697ce08db145c2d637d96084c"
+        },
+        {
+          "path": "logs/native-r21/acp-opencode/deny-before.png",
+          "sha256": "b9e65619068b0ab53ca3a53df375c9e3f6249d34785df98ca3504d77473a71d2"
+        },
+        {
+          "path": "logs/native-r21/acp-opencode/deny-ui.json",
+          "sha256": "49bf87c0aa895af5e733b38691e20a809a6780a3d98652c54a0a92bb44075908"
+        },
+        {
+          "path": "logs/native-r21/acp-opencode/diagnostics.json",
+          "sha256": "34030261659d7d99e5a90c0df90f49649dd7b72ae41ed39129a616fc13e92db9"
+        },
+        {
+          "path": "logs/native-r21/acp-opencode/result.json",
+          "sha256": "201431795bcb2d9b2958d394060defb403a8cd5926949fa7510161c5c46df41e"
+        },
+        {
+          "path": "logs/native-r21/acp-opencode/ui-1794146905491/ui-thread.json",
+          "sha256": "238f53781b9dddc3deffbc476d174d6a62a7759e416c1b528398673837768062"
+        },
+        {
+          "path": "logs/native-r21/acp-opencode/ui-1794146905491/ui-thread.png",
+          "sha256": "a908b79b67581c6eabaf7346093cc9783f17d531e81eaa7138cf49dd1135b6c1"
+        },
+        {
+          "path": "logs/native-r21/acp-opencode/ui-1794146913431/ui-thread.json",
+          "sha256": "238f53781b9dddc3deffbc476d174d6a62a7759e416c1b528398673837768062"
+        },
+        {
+          "path": "logs/native-r21/acp-opencode/ui-1794146913431/ui-thread.png",
+          "sha256": "9190b7ec5f9af7f79a75f3223cccf1498d1512300fba2c168c71b36e05cf61d1"
+        },
+        {
+          "path": "logs/native-final-versions-r1.json",
+          "sha256": "e4438c9a850fde95ebc935c4bb62c6ed85778186c600ad16b7992c3cad210ee0"
+        },
+        {
+          "path": "logs/native-package-r3.integrity.json",
+          "sha256": "d3c35f7abc8fea20d2b8ad8629160f74bf126528e7111283aa0d9590144d47d5"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC1",
+        "AC2",
+        "AC3"
+      ],
+      "command": "Independent B: node test/run.mjs; current focused Cargo e2e inventory and five composed tests",
+      "fixture": "Serialized reviewer slot; 90 plugin tests; 5 real PostgreSQL/WSS tests; 3 explicit native ignores separately exercised by root",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/reviewer-b1-r2-plugin-tests.txt",
+          "sha256": "64f60cd1cffe1ec69ec6d2b074992b0008159815bb5b0d6a73cd2da9dbdf7a03"
+        },
+        {
+          "path": "logs/reviewer-b1-r2-e2e-inventory.txt",
+          "sha256": "4dcfc0f283ccda05577d127161c0ea4791abb671eb0334a52a229fc93b223700"
+        },
+        {
+          "path": "logs/reviewer-b1-r2-e2e-tests.txt",
+          "sha256": "7cf2e6a98ce660c49a94c0c0db76abd6b45f72b7851f7e9899c1aa7d03c76d0e"
+        },
+        {
+          "path": "logs/reviewer-b1-r2-runtime-results.json",
+          "sha256": "b6b266fef41480035afc6aef50a4ab8846b0e8a50fbda7ca9de94b28aa7f58f4"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC6"
+      ],
+      "command": "Historical R1 installation-output retention audit",
+      "fixture": "Rejected historical preliminary round",
+      "status": "NOT EXERCISED",
+      "files": [
+        {
+          "path": "logs/runtime-install-retention-loss-r1.json",
+          "sha256": "35487758a7d5f1f091db8eb3fa0d25cd82c3a933a07528f47c0c90fa2bc82a0d"
+        },
+        {
+          "path": "logs/reviewer-b1-r2-retained-evidence-audit.json",
+          "sha256": "151c62740432f9622a90cc9447aa6dc8975b651327e42ef01f3e0f5fe4683281"
+        }
+      ],
+      "reason": "An earlier stdout file was overwritten by an author filename collision; original bytes could not be recovered and were not regenerated. Historical R1 manifest remains unchanged and invalid at that entry. Current installation was independently exercised and retained under a unique path above; no aggregate historical-validation PASS."
+    }
+  ]
+}

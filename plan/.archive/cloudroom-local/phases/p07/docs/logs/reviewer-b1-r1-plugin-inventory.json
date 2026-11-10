@@ -1,0 +1,13 @@
+{
+  "before": 86,
+  "after": 89,
+  "removed": [
+    "native event history gaps retain durable correlation uncertainty across restart"
+  ],
+  "added": [
+    "compacted sparse native replay survives restart and uses completed snapshots",
+    "sparse native replay never invents missing request correlation",
+    "sparse native replay never invents missing acceptance correlation",
+    "prunable partial or started text cannot become final output without a completed snapshot"
+  ]
+}

@@ -1,0 +1,7 @@
+{
+  "server": "29.9.3",
+  "cpus": 2,
+  "memory": 6188535808,
+  "cgroup": "2",
+  "kernel": "Linux aarch64"
+}

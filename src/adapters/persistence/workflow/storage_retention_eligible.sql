@@ -26,9 +26,16 @@ SELECT
     AND NOT EXISTS(SELECT 1 FROM workflow_runs AS run JOIN tree ON tree.run_id=run.rerun_of_run_id
         WHERE run.company_id=$1 AND NOT EXISTS(SELECT 1 FROM tree AS member WHERE member.run_id=run.id))
     AND NOT EXISTS(SELECT 1 FROM workflow_action_evidence_conflicts AS conflict JOIN tree ON tree.run_id=conflict.run_id WHERE conflict.company_id=$1)
+    AND NOT EXISTS(SELECT 1 FROM local_agent_sessions AS session JOIN tree ON tree.run_id=session.workflow_run_id WHERE session.company_id=$1)
+    AND NOT EXISTS(SELECT 1 FROM workflow_local_agent_calls AS call JOIN tree ON tree.run_id=call.run_id WHERE call.company_id=$1)
     AND NOT EXISTS(SELECT 1 FROM workflow_action_dispatches AS marker JOIN tree ON tree.run_id=marker.run_id WHERE marker.company_id=$1
         AND NOT EXISTS(SELECT 1 FROM workflow_action_receipts WHERE company_id=marker.company_id AND invocation_id=marker.invocation_id)
         AND NOT EXISTS(SELECT 1 FROM workflow_action_evidence WHERE company_id=marker.company_id AND invocation_id=marker.invocation_id AND disposition='applied')
+        AND NOT (marker.effect_kind='local_agent' AND EXISTS(
+            SELECT 1 FROM workflow_local_agent_retention_proofs AS proof WHERE proof.company_id=marker.company_id
+                AND proof.run_id=marker.run_id AND proof.execution_id=marker.execution_id
+                AND proof.invocation_id=marker.invocation_id AND proof.argument_digest=marker.argument_digest
+                AND proof.dispatch_id=marker.id))
         AND NOT (marker.effect_kind='remote' AND EXISTS(
             SELECT 1 FROM workflow_action_evidence AS proof WHERE proof.company_id=marker.company_id AND proof.invocation_id=marker.invocation_id
                 AND proof.disposition='final_not_applied' AND proof.grant_eligible

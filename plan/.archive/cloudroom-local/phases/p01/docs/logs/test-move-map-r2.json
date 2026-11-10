@@ -1,0 +1,26 @@
+{
+  "before_inventory": "rust-test-list-retry.txt",
+  "after_inventory": "rust-test-list-r2-final.txt",
+  "before": [
+    "application::local_agents::commands::tests::cloudroom_bounds_deadline_rejects_elapsed_and_above_maximum",
+    "application::local_agents::commands::tests::cloudroom_bounds_prompt_counts_utf8_bytes_and_redacts_debug",
+    "application::local_agents::commands::tests::cloudroom_contract_commands_are_closed_and_controls_are_explicit",
+    "application::local_agents::commands::tests::cloudroom_contract_identities_validate_on_decode"
+  ],
+  "after": [
+    "application::local_agents::contract_tests::cloudroom_bounds_admission_preserves_control_capacity",
+    "application::local_agents::contract_tests::cloudroom_bounds_deadline_rejects_elapsed_and_above_maximum",
+    "application::local_agents::contract_tests::cloudroom_bounds_output_and_catalog_decode_at_their_limits",
+    "application::local_agents::contract_tests::cloudroom_bounds_prompt_counts_utf8_bytes_and_redacts_debug",
+    "application::local_agents::contract_tests::cloudroom_contract_commands_are_closed_and_controls_are_explicit",
+    "application::local_agents::contract_tests::cloudroom_contract_identities_validate_on_decode",
+    "application::local_agents::contract_tests::cloudroom_contract_machine_capabilities_reference_an_installation_scoped_snapshot",
+    "application::local_agents::contract_tests::cloudroom_contract_operations_freeze_digest_and_separate_dispatch_outcomes"
+  ],
+  "replacements": {
+    "application::local_agents::commands::tests::cloudroom_bounds_deadline_rejects_elapsed_and_above_maximum": "application::local_agents::contract_tests::cloudroom_bounds_deadline_rejects_elapsed_and_above_maximum",
+    "application::local_agents::commands::tests::cloudroom_bounds_prompt_counts_utf8_bytes_and_redacts_debug": "application::local_agents::contract_tests::cloudroom_bounds_prompt_counts_utf8_bytes_and_redacts_debug",
+    "application::local_agents::commands::tests::cloudroom_contract_commands_are_closed_and_controls_are_explicit": "application::local_agents::contract_tests::cloudroom_contract_commands_are_closed_and_controls_are_explicit",
+    "application::local_agents::commands::tests::cloudroom_contract_identities_validate_on_decode": "application::local_agents::contract_tests::cloudroom_contract_identities_validate_on_decode"
+  }
+}

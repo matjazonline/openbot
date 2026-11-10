@@ -1,0 +1,344 @@
+    Checking open_bots v0.1.0 (/Users/mac02/.codex/worktrees/1133/openbot)
+warning: this lint expectation is unfulfilled
+ --> src/adapters/persistence/integrations/mod.rs:6:12
+  |
+6 |     expect(dead_code, reason = "Final business dispatch is wired in phase06")
+  |            ^^^^^^^^^
+  |
+  = note: Final business dispatch is wired in phase06
+  = note: `#[warn(unfulfilled_lint_expectations)]` on by default
+
+warning: this lint expectation is unfulfilled
+  --> src/adapters/persistence/integrations/mod.rs:14:9
+   |
+14 |         dead_code,
+   |         ^^^^^^^^^
+   |
+   = note: Private credential resolution is consumed by authenticated business transports in phase06
+
+warning: this lint expectation is unfulfilled
+  --> src/adapters/integrations/mod.rs:12:9
+   |
+12 |         dead_code,
+   |         ^^^^^^^^^
+   |
+   = note: Private credential resolution is consumed by authenticated business transports in phase06
+
+warning: this lint expectation is unfulfilled
+  --> src/application/integrations/registry.rs:36:13
+   |
+36 |             dead_code,
+   |             ^^^^^^^^^
+   |
+   = note: Private credential resolution is consumed by authenticated business transports in phase06
+
+warning: `open_bots` (lib) generated 4 warnings
+warning: type alias `Tx` is never used
+  --> src/adapters/persistence/integrations/resolve/mod.rs:19:6
+   |
+19 | type Tx = Transaction<'static, Postgres>;
+   |      ^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: function `db_error` is never used
+  --> src/adapters/persistence/integrations/resolve/mod.rs:20:4
+   |
+20 | fn db_error(error: sqlx::Error) -> ResolutionError {
+   |    ^^^^^^^^
+
+warning: function `provider` is never used
+  --> src/adapters/persistence/integrations/resolve/mod.rs:26:4
+   |
+26 | fn provider(
+   |    ^^^^^^^^
+
+warning: function `resolved` is never used
+  --> src/adapters/persistence/integrations/resolve/mod.rs:35:4
+   |
+35 | fn resolved(
+   |    ^^^^^^^^
+
+warning: function `under_lock` is never used
+  --> src/adapters/persistence/integrations/resolve/mod.rs:67:10
+   |
+67 | async fn under_lock(
+   |          ^^^^^^^^^^
+
+warning: struct `Observation` is never constructed
+ --> src/adapters/persistence/integrations/resolve/commit.rs:3:19
+  |
+3 | pub(super) struct Observation {
+  |                   ^^^^^^^^^^^
+
+warning: associated function `current` is never used
+  --> src/adapters/persistence/integrations/resolve/commit.rs:14:12
+   |
+13 | impl Observation {
+   | ---------------- associated function in this implementation
+14 |     pub fn current(s: &Locked) -> Self {
+   |            ^^^^^^^
+
+warning: function `commit` is never used
+  --> src/adapters/persistence/integrations/resolve/commit.rs:27:21
+   |
+27 | pub(super) async fn commit(
+   |                     ^^^^^^
+
+warning: struct `PendingRenewal` is never constructed
+ --> src/adapters/persistence/integrations/resolve/locked.rs:5:19
+  |
+5 | pub(super) struct PendingRenewal {
+  |                   ^^^^^^^^^^^^^^
+
+warning: struct `PrivateRow` is never constructed
+  --> src/adapters/persistence/integrations/resolve/locked.rs:12:8
+   |
+12 | struct PrivateRow {
+   |        ^^^^^^^^^^
+
+warning: method `pending` is never used
+  --> src/adapters/persistence/integrations/resolve/locked.rs:20:8
+   |
+19 | impl PrivateRow {
+   | --------------- method in this implementation
+20 |     fn pending(&self) -> ResolutionResult<Option<PendingRenewal>> {
+   |        ^^^^^^^
+
+warning: struct `Locked` is never constructed
+  --> src/adapters/persistence/integrations/resolve/locked.rs:40:19
+   |
+40 | pub(super) struct Locked {
+   |                   ^^^^^^
+
+warning: function `begin` is never used
+  --> src/adapters/persistence/integrations/resolve/locked.rs:49:21
+   |
+49 | pub(super) async fn begin(vault: &PostgresVault, work: &RenewalWork) -> ResolutionResult<Tx> {
+   |                     ^^^^^
+
+warning: function `private_row` is never used
+  --> src/adapters/persistence/integrations/resolve/locked.rs:58:10
+   |
+58 | async fn private_row(tx: &mut Tx, id: AccountId) -> ResolutionResult<PrivateRow> {
+   |          ^^^^^^^^^^^
+
+warning: function `lock` is never used
+  --> src/adapters/persistence/integrations/resolve/locked.rs:62:21
+   |
+62 | pub(super) async fn lock(
+   |                     ^^^^
+
+warning: function `live` is never used
+   --> src/adapters/persistence/integrations/resolve/locked.rs:118:21
+    |
+118 | pub(super) async fn live(
+    |                     ^^^^
+
+warning: function `observe` is never used
+   --> src/adapters/persistence/integrations/resolve/locked.rs:135:21
+    |
+135 | pub(super) async fn observe(
+    |                     ^^^^^^^
+
+warning: function `lock_owner` is never used
+   --> src/adapters/persistence/integrations/resolve/locked.rs:161:10
+    |
+161 | async fn lock_owner(tx: &mut Tx, owner: &AccountOwner) -> ResolutionResult<()> {
+    |          ^^^^^^^^^^
+
+warning: function `load_account` is never used
+   --> src/adapters/persistence/integrations/resolve/locked.rs:169:10
+    |
+169 | async fn load_account(
+    |          ^^^^^^^^^^^^
+
+warning: struct `Reserved` is never constructed
+ --> src/adapters/persistence/integrations/resolve/rotating.rs:3:8
+  |
+3 | struct Reserved {
+  |        ^^^^^^^^
+
+warning: function `reserve` is never used
+ --> src/adapters/persistence/integrations/resolve/rotating.rs:9:21
+  |
+9 | pub(super) async fn reserve(
+  |                     ^^^^^^^
+
+warning: function `execute` is never used
+  --> src/adapters/persistence/integrations/resolve/rotating.rs:27:21
+   |
+27 | pub(super) async fn execute(
+   |                     ^^^^^^^
+
+warning: enum `CacheWrite` is never used
+ --> src/adapters/persistence/integrations/resolve/write.rs:5:17
+  |
+5 | pub(super) enum CacheWrite {
+  |                 ^^^^^^^^^^
+
+warning: function `cache` is never used
+ --> src/adapters/persistence/integrations/resolve/write.rs:9:21
+  |
+9 | pub(super) async fn cache(
+  |                     ^^^^^
+
+warning: function `reconnect` is never used
+  --> src/adapters/persistence/integrations/resolve/write.rs:78:21
+   |
+78 | pub(super) async fn reconnect(
+   |                     ^^^^^^^^^
+
+warning: function `request` is never used
+   --> src/adapters/persistence/integrations/resolve/write.rs:107:21
+    |
+107 | pub(super) async fn request(
+    |                     ^^^^^^^
+
+warning: fields `credentials`, `client_secret`, and `http` are never read
+  --> src/adapters/integrations/google_renewal.rs:21:9
+   |
+20 | pub(crate) struct GoogleRenewal {
+   |                   ------------- fields in this struct
+21 |     pub credentials: Arc<GoogleCredentialAdapter>,
+   |         ^^^^^^^^^^^
+22 |     pub client_secret: SecretString,
+   |         ^^^^^^^^^^^^^
+23 |     pub http: Arc<GoogleHttp>,
+   |         ^^^^
+
+warning: struct `Token` is never constructed
+  --> src/adapters/integrations/google_renewal.rs:26:8
+   |
+26 | struct Token {
+   |        ^^^^^
+
+warning: function `http_error` is never used
+   --> src/adapters/integrations/google_renewal.rs:144:4
+    |
+144 | fn http_error(error: GoogleHttpError) -> RenewalFailure {
+    |    ^^^^^^^^^^
+
+warning: function `provider_error` is never used
+   --> src/adapters/integrations/google_renewal.rs:151:4
+    |
+151 | fn provider_error(status: u16, raw: &SecretString) -> RenewalFailure {
+    |    ^^^^^^^^^^^^^^
+
+warning: enum `RetryReason` is never used
+  --> src/application/integrations/renewal.rs:11:17
+   |
+11 | pub(crate) enum RetryReason {
+   |                 ^^^^^^^^^^^
+
+warning: enum `ResolutionError` is never used
+  --> src/application/integrations/renewal.rs:20:17
+   |
+20 | pub(crate) enum ResolutionError {
+   |                 ^^^^^^^^^^^^^^^
+
+warning: type alias `ResolutionResult` is never used
+  --> src/application/integrations/renewal.rs:40:17
+   |
+40 | pub(crate) type ResolutionResult<T> = Result<T, ResolutionError>;
+   |                 ^^^^^^^^^^^^^^^^
+
+warning: enum `SessionPolicy` is never used
+  --> src/application/integrations/renewal.rs:42:17
+   |
+42 | pub(crate) enum SessionPolicy {
+   |                 ^^^^^^^^^^^^^
+
+warning: enum `RevocationScope` is never used
+  --> src/application/integrations/renewal.rs:47:17
+   |
+47 | pub(crate) enum RevocationScope {
+   |                 ^^^^^^^^^^^^^^^
+
+warning: field `0` is never read
+  --> src/application/integrations/renewal.rs:55:21
+   |
+55 |     ReusableRefresh(Arc<dyn RenewalProvider>),
+   |     --------------- ^^^^^^^^^^^^^^^^^^^^^^^^
+   |     |
+   |     field in this variant
+   |
+   = note: `RenewalStrategy` has a derived impl for the trait `Clone`, but this is intentionally ignored during dead code analysis
+help: consider changing the field to be of unit type to suppress this warning while preserving the field numbering, or remove the field
+   |
+55 -     ReusableRefresh(Arc<dyn RenewalProvider>),
+55 +     ReusableRefresh(()),
+   |
+
+warning: variant `StrictRotating` is never constructed
+  --> src/application/integrations/renewal.rs:56:5
+   |
+53 | pub(crate) enum RenewalStrategy {
+   |                 --------------- variant in this enum
+...
+56 |     StrictRotating(Arc<dyn RenewalProvider>),
+   |     ^^^^^^^^^^^^^^
+   |
+   = note: `RenewalStrategy` has a derived impl for the trait `Clone`, but this is intentionally ignored during dead code analysis
+
+warning: enum `RenewalDecision` is never used
+  --> src/application/integrations/renewal.rs:58:17
+   |
+58 | pub(crate) enum RenewalDecision {
+   |                 ^^^^^^^^^^^^^^^
+
+warning: enum `RenewalFailure` is never used
+  --> src/application/integrations/renewal.rs:64:17
+   |
+64 | pub(crate) enum RenewalFailure {
+   |                 ^^^^^^^^^^^^^^
+
+warning: struct `RenewalWork` is never constructed
+  --> src/application/integrations/renewal.rs:71:19
+   |
+71 | pub(crate) struct RenewalWork {
+   |                   ^^^^^^^^^^^
+
+warning: methods `session_policy`, `revocation_scope`, `assess`, `cooldown`, and `renew` are never used
+  --> src/application/integrations/renewal.rs:77:8
+   |
+76 | pub(crate) trait RenewalProvider: Send + Sync {
+   |                  --------------- methods in this trait
+77 |     fn session_policy(&self) -> SessionPolicy;
+   |        ^^^^^^^^^^^^^^
+78 |     fn revocation_scope(&self) -> RevocationScope;
+   |        ^^^^^^^^^^^^^^^^
+79 |     fn assess(
+   |        ^^^^^^
+...
+85 |     fn cooldown(
+   |        ^^^^^^^^
+...
+90 |     async fn renew(
+   |              ^^^^^
+
+warning: struct `ResolvedCredential` is never constructed
+  --> src/application/integrations/renewal.rs:98:19
+   |
+98 | pub(crate) struct ResolvedCredential {
+   |                   ^^^^^^^^^^^^^^^^^^
+
+warning: trait `CredentialResolver` is never used
+   --> src/application/integrations/renewal.rs:106:18
+    |
+106 | pub(crate) trait CredentialResolver: Send + Sync {
+    |                  ^^^^^^^^^^^^^^^^^^
+
+warning: methods `session_policy` and `revocation_scope` are never used
+   --> src/application/integrations/renewal.rs:115:12
+    |
+114 | impl RenewalStrategy {
+    | -------------------- methods in this implementation
+115 |     pub fn session_policy(&self) -> SessionPolicy {
+    |            ^^^^^^^^^^^^^^
+...
+121 |     pub fn revocation_scope(&self) -> RevocationScope {
+    |            ^^^^^^^^^^^^^^^^
+
+warning: `open_bots` (lib test) generated 44 warnings
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1m 10s

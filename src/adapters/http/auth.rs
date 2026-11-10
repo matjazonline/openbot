@@ -114,20 +114,22 @@ impl<S: Send + Sync> FromRequestParts<S> for AuthenticatedUser {
 ///
 /// An extractor rather than a lookup inside each handler, so a read guard cannot be reached with
 /// somebody else's address: the address comes from the session's own account, every time.
-impl FromRequestParts<AppState> for Viewer {
+impl<S> FromRequestParts<S> for Viewer
+where
+    S: Send + Sync,
+    Arc<crate::use_cases::user::UserUseCases>: axum::extract::FromRef<S>,
+{
     type Rejection = AuthError;
 
-    async fn from_request_parts(
-        parts: &mut Parts,
-        state: &AppState,
-    ) -> Result<Self, Self::Rejection> {
+    async fn from_request_parts(parts: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
         let user = AuthenticatedUser::from_request_parts(parts, state).await?;
 
         // A signed cookie whose account no longer exists is a signed-out browser, not an API
         // client: send it back through the login page rather than answering a page request with
         // bare 401 text.
-        let account = state
-            .user_use_cases
+        let users: Arc<crate::use_cases::user::UserUseCases> =
+            axum::extract::FromRef::from_ref(state);
+        let account = users
             .get_user_by_id(user.id)
             .await
             .map_err(|_| AuthError::ServiceUnavailable)?

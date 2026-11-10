@@ -1,0 +1,10 @@
+No rustc active; reviewer using the already built test binary. Removed only generated current-crate incremental directories after final Clippy, retaining all binaries/dependencies/source/evidence. Future task commands use CARGO_INCREMENTAL=0 to prevent the same temporary cache pressure.
+/Users/mac03/dev/openbot/target/debug/incremental/open_bots-2pz6km9wjzna5
+/Users/mac03/dev/openbot/target/debug/incremental/open_bots-0ewmzpn6qrlnl
+/Users/mac03/dev/openbot/target/debug/incremental/open_bots-3gr604certtou
+/Users/mac03/dev/openbot/target/debug/incremental/open_bots-2jrvmthkfwlee
+/Users/mac03/dev/openbot/target/debug/incremental/open_bots-0z4q911n28aoq
+/Users/mac03/dev/openbot/target/debug/incremental/open_bots-3drb81yxz4un7
+/Users/mac03/dev/openbot/target/debug/incremental/open_bots-00jeuvkjw3ji6
+/Users/mac03/dev/openbot/target/debug/incremental/open_bots-0pc8e8tgxalzr
+/Users/mac03/dev/openbot/target/debug/incremental/open_bots-0zu0vx4yqjrhd

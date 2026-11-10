@@ -1,0 +1,39 @@
+<p>Agent reference applied to the editor. Save and validate the workflow when ready.</p><span hidden data-workflow-agent-source="{
+  &quot;entry&quot;: &quot;start&quot;,
+  &quot;format_version&quot;: 1,
+  &quot;input_schema&quot;: true,
+  &quot;limits&quot;: {
+    &quot;max_context_bytes&quot;: 65536,
+    &quot;max_steps&quot;: 100
+  },
+  &quot;output_schema&quot;: true,
+  &quot;parameter_schema&quot;: true,
+  &quot;resources&quot;: [],
+  &quot;steps&quot;: {
+    &quot;start&quot;: {
+      &quot;routes&quot;: {
+        &quot;success&quot;: &quot;$end&quot;
+      },
+      &quot;type&quot;: &quot;agent.run&quot;,
+      &quot;with&quot;: {
+        &quot;agent&quot;: {
+          &quot;literal&quot;: &quot;picked&quot;
+        },
+        &quot;context&quot;: {
+          &quot;literal&quot;: {
+            &quot;message&quot;: &quot;hello&quot;
+          }
+        },
+        &quot;output_schema&quot;: {
+          &quot;literal&quot;: {
+            &quot;maxLength&quot;: 128,
+            &quot;type&quot;: &quot;string&quot;
+          }
+        }
+      }
+    }
+  },
+  &quot;workflow_id&quot;: &quot;bf270ccb-60b9-4ee6-9cac-66d58391d2dd&quot;
+}
+# browser unsaved comment
+"></span>

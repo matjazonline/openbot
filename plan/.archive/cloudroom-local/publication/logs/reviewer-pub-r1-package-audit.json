@@ -1,0 +1,10 @@
+{
+  "newSha256": "0c96eb901ec5f51b2edde3caef4470468488b9d3aa38f329848923d439647576",
+  "oldSha256": "561d6b3b3e3d0fa038130cd20e1fcdb95e1e1cb07316d2cf0e285089dcfe8bde",
+  "removed": [],
+  "added": [
+    "package/compatibility/patches/.gitattributes"
+  ],
+  "changed": [],
+  "unchanged": 23
+}

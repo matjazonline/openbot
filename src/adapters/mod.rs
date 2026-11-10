@@ -24,3 +24,5 @@ pub mod workflow_source;
 
 pub(crate) mod integrations;
 pub mod workflow_jev;
+
+pub(crate) mod guarded_http;

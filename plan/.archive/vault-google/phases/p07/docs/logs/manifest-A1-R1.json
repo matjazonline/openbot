@@ -1,0 +1,11 @@
+{
+  "decision_sha256": "241766fb8efd2af70cbdc5c8d8a5e7dcb23dcd4db63e7db3c1e52b4937049484",
+  "source_digest": "d9d84e7e35bc0a1d603f6f57bf2ac6ba5a9c95a133611bba00b432fe31533b71",
+  "head": "ace526fd8259ec53c5199ffa7555a1a99dcba58e",
+  "coordination_revision": 22,
+  "exclusions": [
+    "plan/vault-google/COORDINATION.md",
+    "plan/vault-google/phases/p06/docs",
+    "plan/vault-google/phases/p07/docs"
+  ]
+}

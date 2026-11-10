@@ -2311,6 +2311,7 @@ pub fn message_pane(pane: &MessagePane<'_>) -> String {
                         hx-get="/ui/messages?company_id={company_id}&channel_id={channel_id}&thread_id={thread_id}"
                         hx-target="#detail-pane" hx-swap="outerHTML" hx-sync="#detail-pane:replace">{reload}</button>
                     {simulator}
+                    {local_agent}
                 </div>
             </div>
             {pane_error}
@@ -2329,6 +2330,14 @@ pub fn message_pane(pane: &MessagePane<'_>) -> String {
         pencil = icon(Icon::Pencil, BUTTON_ICON),
         reload = icon(Icon::Sync, BUTTON_ICON),
         simulator = simulator_link(pane),
+        local_agent = if pane.viewer_membership.manages_company_operations() {
+            format!(
+                r#"<a class="btn btn-ghost btn-sm" href="/ui/companies/{}/local-agents?channel={}&amp;conversation={}">Run locally</a>"#,
+                pane.company_id, pane.channel.id, pane.thread.id
+            )
+        } else {
+            String::new()
+        },
         subject = escape_html_text(&pane.thread.subject),
         participants = participants,
         thread_id = pane.thread.id,

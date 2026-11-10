@@ -1,0 +1,62 @@
+    Checking open_bots v0.1.0 (/Users/mac02/.codex/worktrees/1133/openbot)
+error: this function can be simplified using the `async fn` syntax
+  --> src/adapters/persistence/workflow/vault_tests/owner_browser.rs:7:1
+   |
+ 7 | fn owner_page(f: &Journey) -> impl Future<Output = String> + '_ {
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#manual_async_fn
+   = note: `-D clippy::manual-async-fn` implied by `-D warnings`
+   = help: to override `-D warnings` add `#[allow(clippy::manual_async_fn)]`
+help: make the function `async` and return the output of the future directly
+   |
+ 7 ~ async fn owner_page(f: &Journey) -> String {
+ 8 +     let accounts = f
+ 9 +         .vault
+10 +         .list(&f.account.owner, PageRequest::new(None, 50).unwrap())
+11 +         .await
+12 +         .unwrap();
+13 +     let entry = f.vault.registry.get(&Case::Google.app()).unwrap();
+14 +     let apps = vec![ConnectApp {
+15 +         provider: entry.provider.id.clone(),
+16 +         id: entry.app.id.clone(),
+17 +         config: entry.config.id.clone(),
+18 +         capabilities: entry.app.capabilities.clone(),
+19 +     }];
+20 +     let content = pages::vault::vault_content(&accounts, None, &apps);
+21 +     let email = EmailAddress::from("workflow@example.test");
+22 +     let user = pages::MailboxUser {
+23 +         id: f.setup.fixture.target.actor.user_id(),
+24 +         username: "workflow_owner",
+25 +         email: &email,
+26 +         avatar_url: None,
+27 +         is_operator: false,
+28 +         company_membership: CompanyMembership::None,
+29 +     };
+30 +     pages::profile_page(&pages::ProfilePage {
+31 +         user: &user,
+32 +         company: None,
+33 +         pane_html: &content,
+34 +     })
+35 + }
+   |
+
+error: this expression creates a reference which is immediately dereferenced by the compiler
+   --> src/adapters/persistence/workflow/vault_tests/native_recovery.rs:178:42
+    |
+178 |     let after = Box::pin(dispatch.remote(&request, &NoLegacy, &retry_cancel));
+    |                                          ^^^^^^^^ help: change this to: `request`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#needless_borrow
+    = note: `-D clippy::needless-borrow` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::needless_borrow)]`
+
+error: this expression creates a reference which is immediately dereferenced by the compiler
+   --> src/adapters/persistence/workflow/vault_tests/native_recovery.rs:213:25
+    |
+213 |                 .remote(&request, &NoLegacy, &CancellationToken::new())
+    |                         ^^^^^^^^ help: change this to: `request`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#needless_borrow
+
+error: could not compile `open_bots` (lib test) due to 3 previous errors

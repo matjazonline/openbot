@@ -1,2 +1,7 @@
 # Preserve the exact upstream license bytes verified by the model artifact manifest.
 assets/knowledge/MODEL-LICENSE.txt -text whitespace=cr-at-eol
+# Unified-diff blank context lines are syntax in this byte-pinned artifact.
+integrations/doop/managed.patch whitespace=-blank-at-eol
+# Preserve section-boundary newlines when reconstructing the complete upstream guide.
+integrations/doop/document-guide-1.md whitespace=-blank-at-eof
+integrations/doop/document-guide-2.md whitespace=-blank-at-eof

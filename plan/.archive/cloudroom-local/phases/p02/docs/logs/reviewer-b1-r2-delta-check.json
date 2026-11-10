@@ -1,0 +1,10 @@
+{
+  "current": "ee02338b474bb7b234a8a8978669f952df0b36aabf125d191ae1bb2fc547aad7",
+  "reconstructed_before_test_additions": "21ef73d573a4e3ed67a7e809290aded3d9f0551b696752cd33fba541d816099a",
+  "expected_prior": "21ef73d573a4e3ed67a7e809290aded3d9f0551b696752cd33fba541d816099a",
+  "only_changed_source": [
+    "src/adapters/http/routes/local_machines_tests.rs",
+    "src/adapters/persistence/local_agents/machine_tests.rs",
+    "src/adapters/persistence/local_agents/constraint_tests.rs"
+  ]
+}

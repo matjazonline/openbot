@@ -1,0 +1,27 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.20s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-048b7abd3ed0c794)
+
+running 6 tests
+test adapters::persistence::integrations::connect_tests::portability::integration_portability_installation_and_client_identity_encoding_has_no_separator_collision ... ok
+test adapters::persistence::integrations::connect_tests::portability::integration_portability_scope_upgrade_requires_consent_and_retires_older_app_grants ... ok
+test adapters::persistence::integrations::connect_tests::portability::integration_portability_workspace_accounts_and_oauth_clients_keep_separate_authorizations ... ok
+test adapters::persistence::integrations::connect_tests::portability::integration_portability_missing_custom_scope_never_creates_an_account_or_replays_exchange ... ok
+test adapters::persistence::integrations::connect_tests::portability::integration_portability_custom_oauth_scope_pkce_and_installation_identity_need_no_email ... ok
+test adapters::persistence::workflow::tests::http_tests::vault_tests::execution::native_portability::integration_portability_all_auth_methods_use_native_http_headers_and_unchanged_workflow_contract ... FAILED
+
+failures:
+
+---- adapters::persistence::workflow::tests::http_tests::vault_tests::execution::native_portability::integration_portability_all_auth_methods_use_native_http_headers_and_unchanged_workflow_contract stdout ----
+
+thread 'adapters::persistence::workflow::tests::http_tests::vault_tests::execution::native_portability::integration_portability_all_auth_methods_use_native_http_headers_and_unchanged_workflow_contract' (36773844) panicked at src/adapters/persistence/workflow/vault_tests/native_portability.rs:151:64:
+called `Result::unwrap()` on an `Err` value: Unavailable
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    adapters::persistence::workflow::tests::http_tests::vault_tests::execution::native_portability::integration_portability_all_auth_methods_use_native_http_headers_and_unchanged_workflow_contract
+
+test result: FAILED. 5 passed; 1 failed; 0 ignored; 0 measured; 3600 filtered out; finished in 2.66s
+
+error: test failed, to rerun pass `--lib`

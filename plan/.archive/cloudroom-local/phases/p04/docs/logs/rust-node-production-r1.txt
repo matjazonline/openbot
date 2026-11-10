@@ -1,0 +1,9 @@
+
+running 2 tests
+PASS Rust→Node submission evidence: accepted/queued/missing, no turn fabrication or terminal variant
+test application::local_agents::wire_tests::cloudroom_submission_rust_node_evidence_has_thread_without_turn_or_terminal_authority ... ok
+PASS Rust→Node command hashes: all 6 kinds, exact microseconds, escaping/Unicode, tampering and lossy Date negatives
+test application::local_agents::wire_tests::cloudroom_protocol_rust_node_command_hash_preserves_exact_deadline_and_text ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 3274 filtered out; finished in 0.09s
+

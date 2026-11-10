@@ -23,7 +23,7 @@ impl ActionAuthorities for PostgresPersistence {
         let mut tx = self.pool().begin().await?;
         sqlx::query("SELECT set_config('lock_timeout','5s',true), set_config('statement_timeout','5s',true)").execute(&mut *tx).await?;
         let actor = prelock_on(&mut tx, scope).await?;
-        let authority = load_on(&mut tx, scope, subject, actor).await?;
+        let authority = load_on(&mut tx, scope, subject, actor, RunPhase::Claimed).await?;
         tx.commit().await?;
         Ok(authority)
     }
@@ -92,20 +92,31 @@ pub(super) async fn prelock_accounts_on(
     }
 }
 
+pub(super) enum RunPhase {
+    Claimed,
+    LocalAgentWait,
+}
+
 pub(super) async fn load_on(
     tx: &mut Transaction<'_, Postgres>,
     scope: ActionScope,
     subject: &ApprovalSubject,
     actor: Option<WorkflowActor>,
+    phase: RunPhase,
 ) -> AppResult<ActionRunAuthority> {
     let actor = actor.ok_or_else(missing)?;
+    let states: &[&str] = match phase {
+        RunPhase::Claimed => &["queued", "running"],
+        RunPhase::LocalAgentWait => &["waiting"],
+    };
     let run = sqlx::query_as::<_, RunAuthorityRow>(
         "SELECT actor_id,version_id,workflow_id,stored.bundle AS bundle,resources FROM workflow_runs AS run LEFT JOIN workflow_bundles AS stored ON stored.company_id=run.company_id AND stored.digest=run.bundle_digest \
-             WHERE run.company_id=$1 AND id=$2 AND state IN ('queued','running') \
+             WHERE run.company_id=$1 AND id=$2 AND state=ANY($3) \
              AND deadline > clock_timestamp() FOR UPDATE OF run",
     )
     .bind(scope.company.as_uuid())
     .bind(scope.run.as_uuid())
+    .bind(states)
     .fetch_optional(&mut **tx)
     .await?
     .ok_or_else(missing)?;
@@ -142,11 +153,12 @@ pub(super) async fn load_on(
         return Err(invalid());
     }
     let active: bool = sqlx::query_scalar(
-        "SELECT state IN ('queued','running') AND deadline > clock_timestamp() \
+        "SELECT state=ANY($3) AND deadline > clock_timestamp() \
              FROM workflow_runs WHERE company_id=$1 AND id=$2",
     )
     .bind(scope.company.as_uuid())
     .bind(scope.run.as_uuid())
+    .bind(states)
     .fetch_one(&mut **tx)
     .await?;
     if !active {

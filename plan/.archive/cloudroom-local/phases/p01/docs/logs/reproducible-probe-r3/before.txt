@@ -1,0 +1,1 @@
+{"lifecycle":{"loads":1,"aborts":0},"secretPersisted":true,"secretSameAcrossReload":false,"hosts":[],"providers":["codex","claude-code","pi","acp-cursor"],"projects":[]}

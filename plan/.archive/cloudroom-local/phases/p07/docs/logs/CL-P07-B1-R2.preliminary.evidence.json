@@ -1,0 +1,105 @@
+{
+  "version": 1,
+  "round": "CL-P07-B1-R2-preliminary",
+  "artifact": "1b45290aa64d13e0a82057a37aeadeb99105ad8382e596aae1e30124088098be",
+  "checks": [
+    {
+      "criteria": [
+        "AC1",
+        "AC2",
+        "AC3"
+      ],
+      "command": "npm --prefix integrations/cloudroom-plugin test; typecheck; test:guards",
+      "fixture": "Node24.21.0/npm11.19.0;90tests/4sourceguards; current production plugin",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/final-plugin-tests-r2.txt",
+          "sha256": "2cec0703aaa3382c5e92d0ba80aa63dceb3672df1c550a400fd77fb8cfab48a4"
+        },
+        {
+          "path": "logs/final-plugin-typecheck-r2.txt",
+          "sha256": "2a76b0b41aed0a0cb5fa95cac7cc06b64b1ae4106faf0279b855bd394e7dadab"
+        },
+        {
+          "path": "logs/final-plugin-guards-r2.txt",
+          "sha256": "0e08c68e9f83dc98a9abe96ec56d45b9187f29da4c42ee976c3135d20b32e1d9"
+        },
+        {
+          "path": "logs/plugin-corrections-typecheck-r12.txt",
+          "sha256": "2a76b0b41aed0a0cb5fa95cac7cc06b64b1ae4106faf0279b855bd394e7dadab"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC1",
+        "AC2"
+      ],
+      "command": "focused cloudroom_e2e_ and final-failure-corrections selected tests",
+      "fixture": "owned PG18.6 loopback56388, real WSS, competing workflow workers and counted SDK; focused5+3pass; final full suite underway",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/e2e-corrections-r1.txt",
+          "sha256": "90937a14ddb61535d53e974c49da06a74adbd716dafce0f3b10348a838c1038a"
+        },
+        {
+          "path": "logs/final-failure-corrections-r1.txt",
+          "sha256": "819231b8c9972616d7b5253208e24df2665d406a750d451578035ddead67d300"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC3",
+        "AC6"
+      ],
+      "command": "npm run package; extracted package npm ci --omit=dev; compare native/final integrity",
+      "fixture": "native artifacts-r3 and final artifacts-r4 identical SHA561d6b3b3e3d0fa038130cd20e1fcdb95e1e1cb07316d2cf0e285089dcfe8bde",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/final-plugin-package-r2.txt",
+          "sha256": "31a299d386c40613bebff84408f1afb02263923d6311bfba328421c040e5ad03"
+        },
+        {
+          "path": "logs/final-plugin-runtime-install-r2.txt",
+          "sha256": "c05e89134e4d2358fb87c91dc1d880e4ac3f2609a3d0b6d05cfdccb61318be92"
+        },
+        {
+          "path": "logs/native-package-r3.integrity.json",
+          "sha256": "d3c35f7abc8fea20d2b8ad8629160f74bf126528e7111283aa0d9590144d47d5"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC4"
+      ],
+      "command": "final ignored native three-provider matrix with current helpers",
+      "fixture": "same production archive; Codex r19/OpenCode r18 passed; final helper strengthens actual archive and records honest uncertain acknowledgment",
+      "status": "NOT EXERCISED",
+      "reason": "Final helper matrix awaits in-flight full database suite resource release; earlier successes/failures retained in TASK."
+    },
+    {
+      "criteria": [
+        "AC5"
+      ],
+      "command": "final-verify-r2.py",
+      "fixture": "fresh final-databases-r2; controller held after in-flight full suite; current affected native-helper check",
+      "status": "NOT EXERCISED",
+      "reason": "Full all-target suite still running; stock-stack, lease and browser gates pending. No final pass claimed."
+    },
+    {
+      "criteria": [
+        "AC4",
+        "AC5"
+      ],
+      "command": "headless Linux native; Docker production image/knowledge memory",
+      "fixture": "macOS workspace",
+      "status": "NOT EXERCISED",
+      "reason": "Linux native explicitly left unverified by user; Docker unavailable separately."
+    }
+  ]
+}

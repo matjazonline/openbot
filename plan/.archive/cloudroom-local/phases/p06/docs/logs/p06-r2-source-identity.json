@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "reviewBaseCommit": "97e5d60dc538e26c7cb976a8d63772eed80baff2",
+  "prerequisite": "c7dfb6034c5f3f5001e107ac94a008da7fc55b88054af8208cfa1b79a6685664",
+  "prerequisitePatchSha256": "260b5e6290b2638587d2ab575b14414cb145585d2a7de69ff7a6cf506deb2fd2",
+  "prerequisiteTree": "/var/folders/n2/5y7x75r92zl0ll90154hxdzr0000gn/T/openbot-cloudroom-p05-review-base-laj31acx",
+  "exclusions": [
+    "plan/cloudroom-local/COORDINATION.md",
+    "plan/cloudroom-local/phases/p01/docs",
+    "plan/cloudroom-local/phases/p02/docs",
+    "plan/cloudroom-local/phases/p03/docs",
+    "plan/cloudroom-local/phases/p04/docs",
+    "plan/cloudroom-local/phases/p05/docs",
+    "plan/cloudroom-local/phases/p06/docs",
+    "plan/cloudroom-local/phases/p07/docs"
+  ],
+  "fullPatch": "p06-r2-source.patch",
+  "fullPatchSha256": "fe44bc53f6e4a3d5e3a13a3af14f39c374351f9b99cbf51fe72f165bff2fcd7f",
+  "deltaPatch": "p06-r2-delta.patch",
+  "deltaPatchSha256": "b4b9412617f2fccc4294f01d6d1adb2ebfb8c1081a1eca7f6035ac416f967e35",
+  "artifact": "2fdbad30cd3ba21436662b82dfd114ad519e75f52736b322a7b5d51db4d393fb",
+  "phaseStartCommit": "97e5d60dc538e26c7cb976a8d63772eed80baff2",
+  "preservedPreexistingChanges": "nine skill deletions and accepted p01-p05 prerequisite"
+}

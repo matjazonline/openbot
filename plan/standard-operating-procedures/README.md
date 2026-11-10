@@ -4,6 +4,12 @@
 > when needed. Do not add data backfills, dual reads/writes, legacy decoders, compatibility shims,
 > or staged rollouts for existing data.
 
+> **Organization plans, 2026-11-09.** Role keys are `DepartmentRole` from
+> [01-departments](../01-departments/README.md) and resolve per department as specified in
+> [02-workflow-roles](../02-workflow-roles/README.md); do not define a second role vocabulary.
+> The owner/coordinator policy names the department `lead`. Flow measures and capacity in 05 group
+> by department using the run scope snapshot from [05-scopes](../05-scopes/README.md).
+
 ## Outcome and status
 
 Make a company procedure understandable, executable, observable, and improvable by humans and

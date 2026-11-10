@@ -131,6 +131,11 @@ pub(super) async fn supported_publication(
         let definition = current.compiled().graph().definition();
         for tool in &snapshots.tools {
             match tool.kind() {
+                ToolKind::LocalAgent => {
+                    if !crate::application::local_agents::workflow::is_trusted_snapshot(tool)? {
+                        return Err(missing());
+                    }
+                }
                 ToolKind::Message => {
                     builtin_message_tool(tool)?;
                 }

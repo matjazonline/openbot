@@ -1,0 +1,40 @@
+[
+  {
+    "name": "production-image-build",
+    "command": [
+      "limactl",
+      "shell",
+      "img",
+      "--",
+      "docker",
+      "build",
+      "--progress=plain",
+      "--tag",
+      "openbot-cloudroom-p07-knowledge:r3",
+      "/tmp/openbot-p07-image"
+    ],
+    "status": "PASS",
+    "exit": 0,
+    "seconds": 499.39,
+    "file": "logs/lima-image-build-r3.txt",
+    "image": "openbot-cloudroom-p07-knowledge:r3"
+  },
+  {
+    "name": "production-image-knowledge-memory",
+    "command": [
+      "limactl",
+      "shell",
+      "img",
+      "--",
+      "python3",
+      "/tmp/openbot-p07-image/scripts/check-knowledge-image.py",
+      "--image",
+      "openbot-cloudroom-p07-knowledge:r3"
+    ],
+    "status": "PASS",
+    "exit": 0,
+    "seconds": 12.51,
+    "file": "logs/lima-image-check-r3.txt",
+    "image": "openbot-cloudroom-p07-knowledge:r3"
+  }
+]

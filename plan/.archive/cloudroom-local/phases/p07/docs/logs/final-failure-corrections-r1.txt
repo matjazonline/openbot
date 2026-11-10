@@ -1,0 +1,8 @@
+
+running 3 tests
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::acceptance_tests::revision_tests::workflow_control_revision_overflow_refuses_without_partial_writes ... ok
+test infra::workflow::tests::production_workers_stop_on_the_shutdown_token ... ok
+test adapters::persistence::workflow::tests::local_agent_tests::retention::cloudroom_retention_two_terminal_roots_with_reciprocal_native_sessions_eventually_retire ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 3324 filtered out; finished in 3.28s
+

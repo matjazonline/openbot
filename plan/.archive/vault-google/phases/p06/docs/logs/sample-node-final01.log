@@ -1,0 +1,42 @@
+✖ sample progress, failed request recovery and late navigation response use the requesting form (10.157458ms)
+✖ actual sample textarea template preserves leading newlines for every raw JSON field (1.385458ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 0
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 157504.344375
+
+✖ failing tests:
+
+test at scripts/tests/workflow-samples.mjs:9:1
+✖ sample progress, failed request recovery and late navigation response use the requesting form (10.157458ms)
+  browserType.launch: Executable doesn't exist at /Users/mac02/Library/Caches/ms-playwright/chromium_headless_shell-1193/chrome-mac/headless_shell
+  ╔═════════════════════════════════════════════════════════════════════════╗
+  ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+  ║ Please run the following command to download new browsers:              ║
+  ║                                                                         ║
+  ║     npx playwright install                                              ║
+  ║                                                                         ║
+  ║ <3 Playwright Team                                                      ║
+  ╚═════════════════════════════════════════════════════════════════════════╝
+      at TestContext.<anonymous> (/Users/mac02/.codex/worktrees/1133/openbot/scripts/tests/workflow-samples.mjs:19:34) {
+    name: 'Error'
+  }
+
+test at scripts/tests/workflow-samples.mjs:42:1
+✖ actual sample textarea template preserves leading newlines for every raw JSON field (1.385458ms)
+  browserType.launch: Executable doesn't exist at /Users/mac02/Library/Caches/ms-playwright/chromium_headless_shell-1193/chrome-mac/headless_shell
+  ╔═════════════════════════════════════════════════════════════════════════╗
+  ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+  ║ Please run the following command to download new browsers:              ║
+  ║                                                                         ║
+  ║     npx playwright install                                              ║
+  ║                                                                         ║
+  ║ <3 Playwright Team                                                      ║
+  ╚═════════════════════════════════════════════════════════════════════════╝
+      at TestContext.<anonymous> (/Users/mac02/.codex/worktrees/1133/openbot/scripts/tests/workflow-samples.mjs:46:34) {
+    name: 'Error'
+  }

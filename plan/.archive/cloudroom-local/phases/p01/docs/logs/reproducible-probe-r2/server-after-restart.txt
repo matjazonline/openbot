@@ -1,0 +1,35 @@
+[12:04:07] INFO: [server] Server listening {"bindHost":"127.0.0.1","port":61274,"dataDir":"/var/folders/n2/5y7x75r92zl0ll90154hxdzr0000gn/T/openbot-cloudroom-proof-D0aLMz/profile"}
+[12:04:07] INFO: [server] plugin custom-instructions@0.1.0 loaded
+[12:04:07] INFO: [server] plugin machine-ssh@0.1.0 loaded
+[12:04:07] INFO: [server] plugin openbot-compatibility-probe@0.1.0 loaded
+[12:04:07] INFO: [server] plugin bb-guide@0.1.0 loaded
+[12:04:07] INFO: [server] plugin time-in-cloudroom@0.1.0 loaded
+[12:04:07] INFO: [server] plugin side-chat@0.1.0 loaded
+[12:04:07] INFO: [server] plugin drafts@0.1.0 loaded
+[12:04:07] INFO: [server] plugin pdf-preview@0.1.0 loaded
+[12:04:07] INFO: [server] plugin scheduled-send@0.1.0 loaded
+[12:04:07] INFO: [server] plugin push-notifications@0.1.0 loaded
+[12:04:07] INFO: [server] plugin provider-usage@0.1.0 loaded
+[12:04:07] INFO: [server] plugin accounts@0.1.0 loaded
+[12:04:07] INFO: [server] plugin gpu@0.1.0 loaded
+[12:04:07] INFO: [server] plugin inline-vis@0.1.0 loaded
+[12:04:07] INFO: [server] plugin secrets@0.1.0 loaded
+[12:04:07] INFO: [server] plugin provider-retry@0.1.0 loaded
+[12:04:07] INFO: [server] plugin connect@0.1.0 loaded
+[12:04:07] INFO: [server] plugin monaco-editor@0.1.0 loaded
+[12:04:08] INFO: [server] plugin automations@0.1.0 loaded
+[12:04:08] INFO: [server] Session opened {"sessionId":"hses_6v4h4m8mjp","hostId":"host_szbqmt9ach","replacedSessionId":"hses_wenhiautkx"}
+[12:04:09] INFO: [server] Daemon WebSocket opened {"sessionId":"hses_6v4h4m8mjp","hostId":"host_szbqmt9ach"}
+[12:04:10] INFO: [server] plugin environment-personal-workspace@0.1.0 loaded
+[12:04:10] INFO: [server] plugin keep-awake@0.1.0 loaded
+[12:04:10] INFO: [server] plugin environment-project-checkout@0.1.0 loaded
+[12:04:10] INFO: [server] plugin computer-use@0.1.0 loaded
+[12:04:10] INFO: [server] plugin environment-git-worktree@0.1.0 loaded
+[12:04:10] INFO: [server] plugin provider-pi@0.1.0 loaded
+[12:04:10] INFO: [server] plugin provider-codex@0.1.0 loaded
+[12:04:10] INFO: [server] plugin provider-acp@0.1.0 loaded
+[12:04:10] INFO: [server] plugin provider-claude-code@0.1.0 loaded
+[12:04:10] INFO: [server] Slow API request {"durationMs":2717.3,"method":"GET","path":"/api/v1/system/providers","status":200}
+[12:04:10] INFO: [server] Slow API request {"durationMs":2729.7,"method":"POST","path":"/api/v1/plugins/openbot-compatibility-probe/cli","status":200}
+[12:04:10] INFO: [server] Provider model catalog refresh settled {"hostId":"host_szbqmt9ach","providerId":"claude-code","scope":"host","durationMs":20,"outcome":"success","modelCount":20,"changed":false}
+[12:04:10] INFO: [server] Daemon WebSocket closed {"sessionId":"hses_6v4h4m8mjp"}

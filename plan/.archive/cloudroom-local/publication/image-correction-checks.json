@@ -1,0 +1,36 @@
+[
+  {
+    "name": "image-check-copy",
+    "command": [
+      "limactl",
+      "shell",
+      "img",
+      "--",
+      "cp",
+      "-a",
+      "/private/tmp/obpub-m8sfhp0f/context",
+      "/tmp/cloudroom-publication-image-check"
+    ],
+    "status": "PASS",
+    "exit": 0,
+    "seconds": 2.92,
+    "log": "logs/image-check-copy.log"
+  },
+  {
+    "name": "image-check-r2",
+    "command": [
+      "limactl",
+      "shell",
+      "img",
+      "--",
+      "python3",
+      "/tmp/cloudroom-publication-image-check/scripts/check-knowledge-image.py",
+      "--image",
+      "openbot-cloudroom-publication:verified"
+    ],
+    "status": "PASS",
+    "exit": 0,
+    "seconds": 7.05,
+    "log": "logs/image-check-r2.log"
+  }
+]

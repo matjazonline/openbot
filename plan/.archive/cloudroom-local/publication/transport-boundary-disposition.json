@@ -1,0 +1,11 @@
+{
+  "baseline": "b8c46300",
+  "baseline_exit": 1,
+  "same_failure_output": true,
+  "unchanged_from_origin": [
+    "src/adapters/persistence/workflow/channel_reply_continuation_views_support.rs",
+    "scripts/transport-boundary-check.sh"
+  ],
+  "baseline_directory": "/tmp/obpub-origin-jw2vio46",
+  "disposition": "Confirmed pre-existing upstream test-fixture scanner failure. No production transport violation and no Cloudroom cause; leave unrelated source/check unchanged per selected workflow."
+}

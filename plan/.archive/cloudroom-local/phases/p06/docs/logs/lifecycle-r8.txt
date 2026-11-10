@@ -1,0 +1,21 @@
+   Compiling open_bots v0.1.0 (/Users/mac03/dev/openbot)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1m 54s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-50aeda0c9f5dbc3a)
+
+running 3 tests
+test application::local_agents::lifecycle::tests::cloudroom_lifecycle_retention_shutdown_cancels_the_actual_pending_port_future ... ok
+test adapters::persistence::local_agents::retention_tests::cloudroom_lifecycle_mapping_retirement_is_bounded_read_only_and_current_installation_fenced ... ok
+
+thread 'adapters::persistence::workflow::tests::local_agent_tests::retention::peer::cloudroom_lifecycle_real_server_plugin_retention_preserves_prepared_and_unseen_queued_work_once' (18073665) panicked at src/adapters/persistence/workflow/local_agent_retention_tests.rs:51:10:
+called `Result::unwrap()` on an `Err` value: WorkflowFailure { failure: StepFailure { knowledge_refusal: None, class: Terminal, code: FailureCode("local_agent.failed"), diagnostic: None }, safety: SafeToRetry }
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test adapters::persistence::workflow::tests::local_agent_tests::retention::peer::cloudroom_lifecycle_real_server_plugin_retention_preserves_prepared_and_unseen_queued_work_once ... FAILED
+
+failures:
+
+failures:
+    adapters::persistence::workflow::tests::local_agent_tests::retention::peer::cloudroom_lifecycle_real_server_plugin_retention_preserves_prepared_and_unseen_queued_work_once
+
+test result: FAILED. 2 passed; 1 failed; 0 ignored; 0 measured; 3314 filtered out; finished in 3.91s
+
+error: test failed, to rerun pass `--lib`

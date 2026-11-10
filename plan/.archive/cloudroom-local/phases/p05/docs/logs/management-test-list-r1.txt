@@ -1,0 +1,11 @@
+   Compiling open_bots v0.1.0 (/Users/mac03/dev/openbot)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2m 02s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-27a3d10d41cba73d)
+adapters::persistence::local_agents::management::tests::cloudroom_management_competing_starts_freeze_one_session_and_replay_before_profile_edits: test
+adapters::persistence::local_agents::management::tests::cloudroom_management_connection_diagnostics_are_fenced_and_do_not_claim_provider_execution: test
+adapters::persistence::local_agents::management::tests::cloudroom_management_controls_keep_disabled_headroom_and_stable_request_actor: test
+adapters::persistence::local_agents::management::tests::cloudroom_management_private_and_foreign_session_reads_and_every_control_fail_closed: test
+adapters::persistence::local_agents::management::tests::cloudroom_management_profile_pages_are_complete_without_cross_company_rows: test
+adapters::persistence::local_agents::management::tests::cloudroom_management_recent_output_is_bounded_and_usage_remains_unavailable: test
+
+6 tests, 0 benchmarks

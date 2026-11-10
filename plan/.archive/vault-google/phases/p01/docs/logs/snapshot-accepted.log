@@ -1,0 +1,20 @@
+base:   769a23aa6ef423e964f8221a8ee6b0743325c6ba
+digest: 48c978f0dbbcaf84db7b4901eac45b6aad1efd33a66f54ed65aef0c83f64de81
+files:
+  src/adapters/integrations/google_credentials.rs
+  src/adapters/integrations/mod.rs
+  src/adapters/mod.rs
+  src/application/integrations/authority_tests.rs
+  src/application/integrations/execution.rs
+  src/application/integrations/gateway.rs
+  src/application/integrations/mod.rs
+  src/application/integrations/private.rs
+  src/application/integrations/registry.rs
+  src/application/integrations/tests.rs
+  src/application/mod.rs
+  src/domain/integrations/account.rs
+  src/domain/integrations/authority.rs
+  src/domain/integrations/ids.rs
+  src/domain/integrations/mod.rs
+  src/domain/mod.rs
+  src/lib.rs

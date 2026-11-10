@@ -26,6 +26,7 @@ pub mod inbound_event;
 pub mod integration;
 pub(crate) mod integrations;
 pub mod knowledge;
+pub mod local_agents;
 pub mod memory;
 pub(crate) mod model_usage;
 pub mod notification;
@@ -589,6 +590,10 @@ mod agent_config_tests;
 #[cfg(test)]
 mod legacy_runtime_schema_tests;
 
+#[cfg(test)]
+mod doop_live_input;
+#[cfg(test)]
+mod doop_live_setup_tests;
 pub mod mcp;
 #[cfg(test)]
 mod mcp_tests;
@@ -605,3 +610,5 @@ mod user_lifecycle;
 pub(crate) mod integration_bindings;
 
 pub(crate) mod integration_connect_authority;
+
+pub(crate) use mcp::discovery::PostgresMcpDiscovery;

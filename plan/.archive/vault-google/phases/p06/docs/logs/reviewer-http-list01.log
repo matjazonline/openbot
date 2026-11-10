@@ -1,0 +1,9 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.20s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-048b7abd3ed0c794)
+adapters::persistence::workflow::tests::http_tests::vault_tests::execution::vault_workflow_http_competing_claimants_have_one_business_entry: test
+adapters::persistence::workflow::tests::http_tests::vault_tests::execution::vault_workflow_http_ownership_lost_during_preparation_sends_nothing: test
+adapters::persistence::workflow::tests::http_tests::vault_tests::execution::vault_workflow_http_preparation_failure_leaves_intent_without_remote_effect: test
+adapters::persistence::workflow::tests::http_tests::vault_tests::execution::vault_workflow_http_uncertain_send_is_not_dispatched_twice: test
+adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::gateway::vault_workflow_http_google_refresh_waits_for_approval_then_keeps_native_receipt: test
+
+5 tests, 0 benchmarks

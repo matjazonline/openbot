@@ -1,0 +1,190 @@
+{
+  "base": "97e5d60dc538e26c7cb976a8d63772eed80baff2",
+  "changed": [
+    {
+      "path": "integrations/cloudroom-plugin/.gitignore",
+      "lines": 3
+    },
+    {
+      "path": "integrations/cloudroom-plugin/README.md",
+      "lines": 62
+    },
+    {
+      "path": "integrations/cloudroom-plugin/compatibility/README.md",
+      "lines": 78
+    },
+    {
+      "path": "integrations/cloudroom-plugin/compatibility/check-source.mjs",
+      "lines": 70
+    },
+    {
+      "path": "integrations/cloudroom-plugin/compatibility/check-source.test.mjs",
+      "lines": 113
+    },
+    {
+      "path": "integrations/cloudroom-plugin/compatibility/manifest.json",
+      "lines": 143
+    },
+    {
+      "path": "integrations/cloudroom-plugin/compatibility/patches/sdk-mutation-abort.patch",
+      "lines": 87
+    },
+    {
+      "path": "integrations/cloudroom-plugin/compatibility/prove-sdk-abort.mjs",
+      "lines": 46
+    },
+    {
+      "path": "integrations/cloudroom-plugin/compatibility/run-probe.mjs",
+      "lines": 174
+    },
+    {
+      "path": "integrations/cloudroom-plugin/compatibility/verify-command-wire.mjs",
+      "lines": 34
+    },
+    {
+      "path": "integrations/cloudroom-plugin/compatibility/verify-observation-wire.mjs",
+      "lines": 16
+    },
+    {
+      "path": "integrations/cloudroom-plugin/package-lock.json",
+      "lines": 1158
+    },
+    {
+      "path": "integrations/cloudroom-plugin/package.json",
+      "lines": 54
+    },
+    {
+      "path": "integrations/cloudroom-plugin/scripts/build.mjs",
+      "lines": 12
+    },
+    {
+      "path": "integrations/cloudroom-plugin/src/connector.ts",
+      "lines": 167
+    },
+    {
+      "path": "integrations/cloudroom-plugin/src/dispatcher.ts",
+      "lines": 87
+    },
+    {
+      "path": "integrations/cloudroom-plugin/src/enrollment.ts",
+      "lines": 139
+    },
+    {
+      "path": "integrations/cloudroom-plugin/src/journal.ts",
+      "lines": 231
+    },
+    {
+      "path": "integrations/cloudroom-plugin/src/lock.ts",
+      "lines": 11
+    },
+    {
+      "path": "integrations/cloudroom-plugin/src/protocol.ts",
+      "lines": 167
+    },
+    {
+      "path": "integrations/cloudroom-plugin/src/sdk.ts",
+      "lines": 224
+    },
+    {
+      "path": "integrations/cloudroom-plugin/src/server.ts",
+      "lines": 58
+    },
+    {
+      "path": "integrations/cloudroom-plugin/src/turns.ts",
+      "lines": 79
+    },
+    {
+      "path": "integrations/cloudroom-plugin/test/connector.test.ts",
+      "lines": 180
+    },
+    {
+      "path": "integrations/cloudroom-plugin/test/core.test.ts",
+      "lines": 128
+    },
+    {
+      "path": "integrations/cloudroom-plugin/test/enrollment.test.ts",
+      "lines": 103
+    },
+    {
+      "path": "integrations/cloudroom-plugin/test/lock.test.ts",
+      "lines": 33
+    },
+    {
+      "path": "integrations/cloudroom-plugin/test/native-fixture.ts",
+      "lines": 48
+    },
+    {
+      "path": "integrations/cloudroom-plugin/test/run.mjs",
+      "lines": 12
+    },
+    {
+      "path": "integrations/cloudroom-plugin/test/sdk.test.ts",
+      "lines": 177
+    },
+    {
+      "path": "integrations/cloudroom-plugin/test/support.ts",
+      "lines": 30
+    },
+    {
+      "path": "integrations/cloudroom-plugin/tsconfig.json",
+      "lines": 23
+    },
+    {
+      "path": "integrations/cloudroom-plugin/types/UPSTREAM-LICENSE",
+      "lines": 201
+    },
+    {
+      "path": "integrations/cloudroom-plugin/types/UPSTREAM-NOTICE",
+      "lines": 24
+    },
+    {
+      "path": "integrations/cloudroom-plugin/types/bb-plugin-sdk.d.ts",
+      "lines": 23975
+    },
+    {
+      "path": "integrations/cloudroom-plugin/types/manifest.json",
+      "lines": 19
+    },
+    {
+      "path": "src/adapters/http/routes/local_machine_connection/connection_submission_tests.rs",
+      "lines": 60
+    },
+    {
+      "path": "src/adapters/http/routes/local_machine_connection/connection_tests.rs",
+      "lines": 425
+    },
+    {
+      "path": "src/adapters/persistence/local_agents/protocol/admission_failure_tests.rs",
+      "lines": 192
+    },
+    {
+      "path": "src/adapters/persistence/local_agents/protocol/mod.rs",
+      "lines": 264
+    },
+    {
+      "path": "src/adapters/persistence/local_agents/protocol/observations.rs",
+      "lines": 390
+    },
+    {
+      "path": "src/adapters/persistence/local_agents/protocol/recovery_tests.rs",
+      "lines": 314
+    },
+    {
+      "path": "src/adapters/persistence/local_agents/protocol/submission_tests.rs",
+      "lines": 263
+    },
+    {
+      "path": "src/adapters/persistence/local_agents/protocol/test_support.rs",
+      "lines": 194
+    },
+    {
+      "path": "src/application/local_agents/wire_tests.rs",
+      "lines": 121
+    },
+    {
+      "path": "src/domain/local_agents/observations.rs",
+      "lines": 96
+    }
+  ],
+  "current_bytes_match": true
+}

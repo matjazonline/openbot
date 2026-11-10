@@ -1,0 +1,43 @@
+{
+  "running_3761": true,
+  "stack_2048_kib": true,
+  "counts": {
+    "ok": 3746,
+    "ignored": 14,
+    "FAILED": 1
+  },
+  "cloudroom_counts": {
+    "ok": 129,
+    "ignored": 4
+  },
+  "cloudroom_unexecuted": {
+    "adapters::persistence::local_agents::management::tests::dump_cloudroom_management_browser_fixtures": "ignored",
+    "adapters::persistence::workflow::tests::local_agent_tests::e2e::native::cloudroom_e2e_native_claude_packaged_plugin_pairing_workflow_ui_restart_followup_stop": "ignored",
+    "adapters::persistence::workflow::tests::local_agent_tests::e2e::native::cloudroom_e2e_native_codex_packaged_plugin_pairing_workflow_ui_restart_followup_stop": "ignored",
+    "adapters::persistence::workflow::tests::local_agent_tests::e2e::native::cloudroom_e2e_native_opencode_packaged_plugin_pairing_workflow_ui_restart_followup_stop": "ignored"
+  },
+  "failures": [
+    "adapters::http::pages::tests::rendered_markup_carries_no_inline_javascript"
+  ],
+  "affected_seams": {
+    "adapters::mcp::tests::mcp_dropped_call_sends_protocol_cancellation_and_joins_cleanup": "ok",
+    "adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_graph::descendants::history_continuation::agent_history_retention_actual_human_submission_owner_competes_with_cleanup_and_replays_expired_selected_source": "ok",
+    "adapters::persistence::workflow::tests::local_agent_tests::corrections::cloudroom_workflow_actual_fair_poll_worker_discovers_native_result_and_completes_once": "ok",
+    "adapters::persistence::workflow::tests::message_tests::ingress_tests::channel_reply_e2e::history::retention::agent_history_retention_real_pending_channel_delivery_pins_the_produced_payload_even_after_age": "ok",
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::agent_history_recovery_final_commit_releases_before_workflow_finish_and_poll_recovers_lost_wake": "ok",
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::owner_races::agent_history_retention_actual_expiry_owner_precedes_blocked_fresh_selection_without_mixed_seed": "ok",
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::metadata_capacity::agent_history_retention_conversation_metadata_actual_limit_blocks_competitors_with_expired_payload_prefix": "ok",
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::owner_races::agent_history_retention_actual_preparation_owner_skips_competing_cleanup_and_replays_exact_copy": "ok",
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::retention::agent_history_retention_competing_collectors_expire_json_null_once_and_keep_checkpoint_proof": "ok",
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::retention::agent_history_retention_direct_expiry_refuses_reverse_source_lock_without_deadlock_or_partial_boundary": "ok",
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::retention::agent_history_retention_holes_and_source_cascade_keep_truthful_monotone_boundary": "ok",
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::retention::agent_history_retention_lifecycle_events_are_structured_and_never_contain_the_native_payload_or_credential": "ok",
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::retention::agent_history_retention_rollback_and_deferred_abort_preserve_payload_digests_and_boundary": "ok",
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::metadata_capacity::agent_history_retention_company_payload_actual_limit_and_pressure_expire_sparse_streams_to_soft_ceiling": "ok",
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::metadata_capacity::agent_history_retention_company_metadata_actual_limit_is_independent_of_payload_and_conversation_limits": "ok",
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::retry_retention::agent_history_retention_completed_output_failed_job_pressure_competes_with_native_retry_without_model_reentry": "ok",
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::retention_capacity::agent_history_retention_actual_last_payload_slot_has_one_competing_producer_and_replay_survives_capacity": "ok",
+    "infra::workflow::tests::production_workers_stop_on_the_shutdown_token": "ok"
+  },
+  "total_test_results": 3761
+}

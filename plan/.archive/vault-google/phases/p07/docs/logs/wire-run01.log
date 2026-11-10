@@ -1,0 +1,27 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.59s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-048b7abd3ed0c794)
+
+running 5 tests
+test application::integrations::tests::service_contract::integration_service_contract_execution_identity_is_bound_to_the_local_context_reference ... ok
+test application::integrations::tests::service_contract::integration_service_contract_unknown_protocol_fields_depth_and_bounds_fail_closed ... ok
+test application::integrations::tests::service_contract::integration_service_contract_metadata_and_sensitive_submission_commands_round_trip ... ok
+test application::integrations::tests::service_contract::integration_service_contract_large_local_catalog_has_explicit_transport_overflow ... ok
+test application::integrations::tests::service_contract::integration_service_contract_outcomes_are_exclusive_bounded_and_identity_checked ... FAILED
+
+failures:
+
+---- application::integrations::tests::service_contract::integration_service_contract_outcomes_are_exclusive_bounded_and_identity_checked stdout ----
+
+thread 'application::integrations::tests::service_contract::integration_service_contract_outcomes_are_exclusive_bounded_and_identity_checked' (36720323) panicked at src/application/integrations/wire/tests.rs:253:9:
+assertion failed: Response::decode(&serde_json::to_vec(&changed).unwrap(),
+        serde_json::from_value(changed["identity"].clone()).unwrap()).is_err()
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    application::integrations::tests::service_contract::integration_service_contract_outcomes_are_exclusive_bounded_and_identity_checked
+
+test result: FAILED. 4 passed; 1 failed; 0 ignored; 0 measured; 3584 filtered out; finished in 0.07s
+
+error: test failed, to rerun pass `--lib`

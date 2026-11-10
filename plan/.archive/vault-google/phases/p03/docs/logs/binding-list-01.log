@@ -1,0 +1,35 @@
+   Compiling open_bots v0.1.0 (/Users/mac02/.codex/worktrees/1133/openbot)
+error[E0716]: temporary value dropped while borrowed
+   --> src/adapters/persistence/workflow/integration_authority_tests.rs:322:33
+    |
+321 |       let (a, b) = tokio::join!(
+    |  __________________-
+322 | |         vault.create_confirmed(&consent(&account, 127), confirmed()),
+    | |                                 ^^^^^^^^^^^^^^^^^^^^^^ creates a temporary value which is freed while still in use
+323 | |         vault.create_confirmed(&consent(&account, 128), confirmed())
+324 | |     );
+    | |     -
+    | |     |
+    | |_____temporary value is freed at the end of this statement
+    |       borrow later used here
+    |
+    = note: consider using a `let` binding to create a longer lived value
+
+error[E0716]: temporary value dropped while borrowed
+   --> src/adapters/persistence/workflow/integration_authority_tests.rs:323:33
+    |
+321 |       let (a, b) = tokio::join!(
+    |  __________________-
+322 | |         vault.create_confirmed(&consent(&account, 127), confirmed()),
+323 | |         vault.create_confirmed(&consent(&account, 128), confirmed())
+    | |                                 ^^^^^^^^^^^^^^^^^^^^^^ creates a temporary value which is freed while still in use
+324 | |     );
+    | |     -
+    | |     |
+    | |_____temporary value is freed at the end of this statement
+    |       borrow later used here
+    |
+    = note: consider using a `let` binding to create a longer lived value
+
+For more information about this error, try `rustc --explain E0716`.
+error: could not compile `open_bots` (lib test) due to 2 previous errors

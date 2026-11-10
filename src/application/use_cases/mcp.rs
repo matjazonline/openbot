@@ -8,6 +8,12 @@ use secrecy::SecretString;
 use serde::Deserialize;
 use uuid::Uuid;
 
+/// Display identity for the schema an operator is currently reviewing.
+pub(crate) fn schema_fingerprint(schema: &serde_json::Value) -> String {
+    use sha2::{Digest, Sha256};
+    format!("{:x}", Sha256::digest(schema.to_string().as_bytes()))
+}
+
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct McpConnectionWrite {
@@ -125,10 +131,38 @@ pub trait McpPersistence: Send + Sync {
 /// Authorization belongs to the application boundary; storage adapters never infer an actor.
 #[derive(Clone)]
 pub struct McpUseCases {
+    discovery: std::sync::Arc<dyn McpIntegrationDiscovery>,
     companies: std::sync::Arc<dyn super::company::CompanyPersistence>,
     catalog: std::sync::Arc<dyn McpPersistence>,
     credentials: std::sync::Arc<dyn McpCredentialPersistence>,
     client: std::sync::Arc<dyn crate::services::mcp_client::McpClient>,
+}
+
+/// Host-owned configuration discovery and catalog commit, separate from business actions.
+#[async_trait]
+pub trait McpIntegrationDiscovery: Send + Sync {
+    async fn refresh(
+        &self,
+        user: Uuid,
+        owner: crate::application::integrations::VerifiedOwner,
+        current: &CompanyMcpConnection,
+    ) -> AppResult<CompanyMcpConnection>;
+}
+#[cfg(test)]
+pub(crate) struct UnavailableMcpDiscovery;
+#[cfg(test)]
+#[async_trait]
+impl McpIntegrationDiscovery for UnavailableMcpDiscovery {
+    async fn refresh(
+        &self,
+        _: Uuid,
+        _: crate::application::integrations::VerifiedOwner,
+        _: &CompanyMcpConnection,
+    ) -> AppResult<CompanyMcpConnection> {
+        Err(AppError::ServiceUnavailable(
+            "Integration discovery is unavailable".into(),
+        ))
+    }
 }
 impl McpUseCases {
     pub fn new(
@@ -136,8 +170,10 @@ impl McpUseCases {
         catalog: std::sync::Arc<dyn McpPersistence>,
         credentials: std::sync::Arc<dyn McpCredentialPersistence>,
         client: std::sync::Arc<dyn crate::services::mcp_client::McpClient>,
+        discovery: std::sync::Arc<dyn McpIntegrationDiscovery>,
     ) -> Self {
         Self {
+            discovery,
             companies,
             catalog,
             credentials,
@@ -241,12 +277,11 @@ impl McpUseCases {
         &self,
         user: Uuid,
         current: &CompanyMcpConnection,
+        owner: crate::application::integrations::VerifiedOwner,
     ) -> AppResult<CompanyMcpConnection> {
         super::company::managed_company(self.companies.as_ref(), user, current.company_id).await?;
         if matches!(current.auth, McpAuth::Integration(_)) {
-            return Err(crate::app_error::AppError::ServiceUnavailable(
-                "Integration discovery is not available yet".into(),
-            ));
+            return self.discovery.refresh(user, owner, current).await;
         }
         let token = self
             .credentials

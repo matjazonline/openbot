@@ -48,20 +48,28 @@ impl ActionIntents for PostgresPersistence {
         if existing.is_none() && !active {
             return Err(conflict());
         }
-        if existing.is_none() {
-            super::agent_origin::freeze_on(&mut tx, action.request(), model_call).await?;
-        }
-        let row = match existing {
-            Some(row) => row,
-            None => insert(&mut tx, action).await?,
+        let intent = match existing {
+            Some(row) => restore(action, row, replayed)?,
+            None => insert_on(&mut tx, action, model_call).await?,
         };
-        let intent = restore(action, row, replayed)?;
         if let Some(call) = model_call {
             map_call(&mut tx, action, call, &intent).await?;
         }
         tx.commit().await?;
         Ok(intent)
     }
+}
+
+/// Insert a new frozen intent inside its owner's transaction. The caller holds current
+/// authority, run and execution locks and has established that this logical call is new.
+pub(super) async fn insert_on(
+    db: &mut PgConnection,
+    action: &FrozenAction,
+    model_call: Option<&ModelToolCallId>,
+) -> AppResult<ActionIntent> {
+    super::agent_origin::freeze_on(db, action.request(), model_call).await?;
+    let row = insert(db, action).await?;
+    restore(action, row, false)
 }
 
 async fn read(db: &mut PgConnection, action: &FrozenAction) -> AppResult<Option<IntentRow>> {

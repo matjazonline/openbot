@@ -271,6 +271,14 @@ pub(crate) fn registration(
             provider,
             config,
             destinations: vec![ApprovedDestination::parse("https://gmail.googleapis.com")?],
+            transport:
+                crate::application::integrations::destinations::AppTransportPolicy::HttpPaths {
+                    prefixes: vec![
+                        crate::application::integrations::destinations::ApiPathPrefix::parse(
+                            "/gmail/v1/",
+                        )?,
+                    ],
+                },
             capabilities: vec![
                 Capability::parse("gmail.read")?,
                 Capability::parse("gmail.send")?,

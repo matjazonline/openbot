@@ -1,0 +1,11 @@
+{
+  "decision": "CL-P01-D01/r1",
+  "decisionSha256": "d4b50a4974e7b0490533de5ed86243b78b63e361c5d88e15e0f846259dd16b44",
+  "patchSha256": "c201acedcbe1003a3867507e7fb4138c4171d7f5fa0c2971c4e182800cd58ca4",
+  "beforeSha256": "26edcb0d980159dbf88fd28979d7d87dcd1935c8e429546e90228dbe5c22e489",
+  "afterSha256": "d2aebaadf687bc3863f645acd2dff5add1fb943219afe0dec4f5a9ac2836496d",
+  "isolatedPatchHashCheck": "PASS",
+  "upstreamTrackedSources": "clean, patch NOT applied",
+  "coordination": "r2 identical to pinned input; CL-C001/r1 proposed",
+  "runtimeOperations": "NONE"
+}

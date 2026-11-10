@@ -20,6 +20,9 @@ async fn counts(f: &Fixture) -> BTreeMap<&'static str, i64> {
         "messages",
         "thread_messages",
         "message_deliveries",
+        "local_agent_sessions",
+        "local_agent_operations",
+        "workflow_local_agent_calls",
     ] {
         let count = sqlx::query_scalar(&format!("SELECT count(*) AS count FROM {table}"))
             .fetch_one(f.persistence.pool())
@@ -28,6 +31,35 @@ async fn counts(f: &Fixture) -> BTreeMap<&'static str, i64> {
         counts.insert(table, count);
     }
     counts
+}
+
+#[tokio::test]
+async fn cloudroom_samples_local_run_uses_scripted_output_without_machine_or_production_effects() {
+    let f = Fixture::new().await.unwrap();
+    let workflow = Uuid::new_v4();
+    f.draft(
+        workflow,
+        "Local sample",
+        &source_of("local_agent.run", workflow),
+    )
+    .await;
+    let before = counts(&f).await;
+    let result = json!({"status":"succeeded","text":"Sample <img src=x onerror=alert(1)>","operation_id":Uuid::new_v4(),"session_id":Uuid::new_v4(),"thread_id":null,"usage":null,"truncated":false});
+    let scripts = json!([{"workflow_id":workflow,"step":"start","responses":[{"output":result}]}])
+        .to_string();
+    let html = sample(
+        f.ui(f.owner),
+        Path(workflow),
+        f.query(),
+        sample_form("1", &scripts),
+    )
+    .await
+    .unwrap()
+    .0;
+    assert!(html.contains("Sample completed"), "{html}");
+    assert!(html.contains("local_agent.run") && html.contains("intercepted_write"));
+    assert!(!html.contains("<img src=x"));
+    assert_eq!(before, counts(&f).await);
 }
 #[tokio::test]
 async fn samples_authorize_tenant_revision_and_preserve_invalid_hostile_text() {

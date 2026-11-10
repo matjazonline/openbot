@@ -1,0 +1,1 @@
+bb openbot-proof failed: HTTP 502: Host is not connected

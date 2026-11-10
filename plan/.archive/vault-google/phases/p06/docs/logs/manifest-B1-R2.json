@@ -1,0 +1,23 @@
+{
+  "phase": "p06",
+  "start": "ace526fd8259ec53c5199ffa7555a1a99dcba58e",
+  "review_base": "ace526fd8259ec53c5199ffa7555a1a99dcba58e",
+  "head": "ace526fd8259ec53c5199ffa7555a1a99dcba58e",
+  "digest": "d9d84e7e35bc0a1d603f6f57bf2ac6ba5a9c95a133611bba00b432fe31533b71",
+  "previous_code_digest": "a781a861b6d39b7abccfdc0706619a7cfcc5573a440f5026ae0dbb492218c658",
+  "exclusions": [
+    "plan/vault-google/COORDINATION.md",
+    "plan/vault-google/phases/p06/docs"
+  ],
+  "coordination_revision": 21,
+  "coordination_sha256": "d7e01662d64ae71b5c866b06ce459f2fc799bd2119789f60f5ce98966a705b1d",
+  "decision": "VG-P06-D1/r3",
+  "decision_sha256": "58e5a9056c77498d967a61ef2c931076aba1dc62ec70dbdfea358254af3af13e",
+  "review_note": "VG-P06-B1-R2",
+  "findings": [
+    "VG-P06-B1-F1",
+    "VG-P06-B1-F2",
+    "VG-P06-B1-F3"
+  ],
+  "checks": "correction-results-B1-R2.json: final correction67 affected tests PASS, stock2MiB/networkguard; Clippy/fmt/diff/offline alltargets/SQLx PASS. Native lifecycle4 PASS (also in seven gateway tests). Prior unaffected253 Rust and4 Chrome proof retained; known inherited scanner failures not fixed. No full suite."
+}

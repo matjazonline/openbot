@@ -1,0 +1,79 @@
+{
+  "activeNativeStopMatchedInterruptedTurn": true,
+  "actualUi": true,
+  "actualWorkflowWorkers": 2,
+  "afterRestart": {
+    "event": "snapshot",
+    "requests": 1,
+    "terminals": [
+      {
+        "status": "completed",
+        "turn": "dad78d0b7d-t1"
+      }
+    ],
+    "thread": "thr_zkrea5giau",
+    "turns": [
+      "dad78d0b7d-t1"
+    ]
+  },
+  "beforeRestart": {
+    "event": "snapshot",
+    "requests": 1,
+    "terminals": [
+      {
+        "status": "completed",
+        "turn": "dad78d0b7d-t1"
+      }
+    ],
+    "thread": "thr_zkrea5giau",
+    "turns": [
+      "dad78d0b7d-t1"
+    ]
+  },
+  "explicitThreadStopAndArchiveAccepted": true,
+  "fileAccess": true,
+  "final": {
+    "event": "snapshot",
+    "requests": 3,
+    "terminals": [
+      {
+        "status": "completed",
+        "turn": "dad78d0b7d-t1"
+      },
+      {
+        "status": "completed",
+        "turn": "da588887f5-t1"
+      },
+      {
+        "status": "interrupted",
+        "turn": "da588887f5-t2"
+      }
+    ],
+    "thread": "thr_zkrea5giau",
+    "turns": [
+      "dad78d0b7d-t1",
+      "da588887f5-t1",
+      "da588887f5-t2"
+    ]
+  },
+  "linux": "NOT EXERCISED on this host",
+  "nativeStopIsNotAnAtomicTargetedTurnGuarantee": true,
+  "platform": "macos",
+  "productionPlugin": true,
+  "provider": "acp-opencode",
+  "realPairingHttp": true,
+  "selection": {
+    "machine_id": "07dc4084-779b-4f64-8309-9f36b401007c",
+    "model": "openai/gpt-6-luna",
+    "policy": {
+      "permissions": "provider_default",
+      "reasoning": "low",
+      "workspace": "project_directory"
+    },
+    "project_id": "proj_cu63h85r5w",
+    "provider": "acp-opencode"
+  },
+  "session": "de388a89-9f8a-467a-8168-f4e5b6615793",
+  "status": "PASS",
+  "thread": "thr_zkrea5giau"
+}

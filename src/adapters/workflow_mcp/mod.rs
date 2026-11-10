@@ -26,7 +26,13 @@ use std::sync::Arc;
 use tokio_util::sync::CancellationToken;
 
 pub struct McpRuntime {
-    inner: McpActions<PostgresPersistence, PostgresActionDispatch<McpActionAuthority, NoLocal>>,
+    inner: McpActions<
+        PostgresPersistence,
+        crate::adapters::integrations::workflow_dispatch::IntegrationActionDispatch<
+            McpActionAuthority,
+            NoLocal,
+        >,
+    >,
 }
 impl McpRuntime {
     /// `client` is the process's shared guarded MCP client (also used by legacy agent
@@ -45,11 +51,32 @@ impl McpRuntime {
         lease: LeasePolicy,
         notices: Option<crate::application::workflow::decisions::DecisionNotices>,
     ) -> Self {
+        Self::with_integrations(
+            persistence,
+            client,
+            lease,
+            notices,
+            Arc::new(crate::application::integrations::unavailable::UnavailableIntegrations),
+        )
+    }
+    pub fn with_integrations(
+        persistence: PostgresPersistence,
+        client: Arc<dyn McpClient>,
+        lease: LeasePolicy,
+        notices: Option<crate::application::workflow::decisions::DecisionNotices>,
+        gateway: Arc<dyn crate::application::integrations::ExecutionGateway>,
+    ) -> Self {
         let mut dispatch =
             PostgresActionDispatch::new(persistence.clone(), McpActionAuthority, NoLocal);
         if let Some(notices) = notices {
             dispatch = dispatch.with_decision_notices(notices);
         }
+        let dispatch =
+            crate::adapters::integrations::workflow_dispatch::IntegrationActionDispatch::new(
+                persistence.clone(),
+                dispatch,
+                gateway,
+            );
         Self {
             inner: McpActions::new(persistence, dispatch, client, lease),
         }

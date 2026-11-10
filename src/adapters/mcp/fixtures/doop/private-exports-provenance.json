@@ -1,0 +1,136 @@
+{
+  "scope": "Actual corrected production image/native PostgreSQL/private Garage/local TLS/normal MCP keys and human browser cookies; same-image disk controls; synthetic, not production or model visual review",
+  "round": "DC-P06-current-private-R1",
+  "source_base": "01584b34f6cadcf21767127280cc6e320a6d748a",
+  "source_files": {
+    "scripts/private-storage-fixture.py": "5997bc49a828b5ca9f477111c3c8562d337999f03755588e513d54b8455abfac",
+    "server/access.ts": "1db60580d1d7ffc5426d82e2debe90f05dcd8f78bb0b64f58c121ffe1db39988",
+    "server/db/persist.ts": "13a6c28722960ab4efb68c07e3616a6723395157f27bb2492863133a38f19083",
+    "server/fontFile.ts": "655230bab8bc61af593bd7cd4cfb4bd9eeed1dbd79c1bf9ed04c123b765ac462",
+    "server/index.ts": "a564587ef045137e95b8bbab2c862306485d8376780b37e6d32c42045feee090",
+    "server/mcp.ts": "40111b14aafb27e4d9bb71fb7c18898688c9dbb7e5c037149b88e206fe5e1e08",
+    "server/mcpMedia.ts": "8f6dbb341f24bc270197a68b06dab4dd8225d7e35a0a3335178b77faf655ff73",
+    "server/privateMediaDecoder.ts": "a3f83c2ac344b14a6002ee64b2907606499ef25ec46d26a428dbdf503fec1895",
+    "server/privateMediaFiles.ts": "4dba81e6f2d7e0014af30f36ac5304a6c3558dbb8401661d01a79ceeed538822",
+    "server/privateMediaPreview.ts": "432202181d1f1ce550d45e6febf9401f90e7935fed149bb4d98a47c4daa27a59",
+    "server/privateMediaValidation.ts": "7ce2c453650f2754ec4793ecbdee91bc6298e454813951c9b5ab70a6609a6a33",
+    "server/userEvents.ts": "7860b55ef3a9ef2ca3bf09abdcc38de090ce59879a62757bd71f4ded5605c9b9",
+    "server/workspaces.ts": "a60f1c2e89f1a6ff8da4b9f9b6e39234af10879d8875049a6ca6467a9fdced17",
+    "shared/privateMedia.ts": "9fb63a1c3271ea8e078069e5938cb4fc74f3faddddd97c57461e08a9a3e68437",
+    "tests/canvasRevisionPersistence.test.ts": "11110a149bf1c94fb4010679f0280e74d23b7033635715f2da7c7a5e665865de",
+    "tests/privateExport.test.ts": "4e67e9e9ef6d505c5e25e2740ac7c751208ba15a6b58e5fd5131ab861de5e3bf",
+    "tests/privateIdleRevocation.test.ts": "e90d3b21ce81bc215ead68df97e992a6509298256618681cd74f1d18bf08110c",
+    "tests/userEventsObservers.test.ts": "94e05db865fcde2ecdff2454be119a36a0da1b17cff057f23df0273ce2c7be2c"
+  },
+  "files": {
+    "private-screenshot.json": "6361eaed1a173e5528146762f437b5dccd0819a2644a6226fce25c06f4072242",
+    "private-png.json": "87901ec6e5d7610d6d6a7c69b772e4db5ce456a0f2ba5628f643b9821fee97bd",
+    "private-jpg.json": "8d7aaee7dbccc6ea17fdde88facf8a352c0c02d7cec7be437374ec5575fe5db9",
+    "private-pdf.json": "d913f6538691296abbd80d71aec8ee472974c6986664617078bbeb231907690b",
+    "private-pdf-small.json": "bef89f45bf84bf21be93241837668be69dcb2198bb4516b7101ab85be7eeffae",
+    "private-exports-tools.json": "14c45c267a2180a9e78d4ac8b37e728a6fd672684fa4d8b779d1a9e0a2dca413",
+    "private-acceptance-report.json": "c266c42738a9c6437c58eba20eb9b60b04613ed40f41fa9f6446642eac8c6d4d"
+  },
+  "calls": {
+    "screenshot": {
+      "tool": "get_frame_screenshot",
+      "arguments": {
+        "frame_id": "sJZG25ZJU7"
+      }
+    },
+    "png": {
+      "tool": "export_frame",
+      "arguments": {
+        "frame_id": "sJZG25ZJU7",
+        "format": "png"
+      }
+    },
+    "jpg": {
+      "tool": "export_frame",
+      "arguments": {
+        "frame_id": "sJZG25ZJU7",
+        "format": "jpg"
+      }
+    },
+    "pdf-small": {
+      "tool": "export_frame",
+      "arguments": {
+        "frame_id": "Pvj1bRqw0a",
+        "format": "pdf"
+      }
+    },
+    "pdf": {
+      "tool": "export_frame",
+      "arguments": {
+        "frame_id": "sJZG25ZJU7",
+        "format": "pdf",
+        "frame_ids": [
+          "6yJ6_8O5Qx"
+        ]
+      }
+    }
+  },
+  "catalog": "exact two-tool subset of actual captured tools/list; complete original capture retained in phase03 logs",
+  "identities": "disposable local identities and URLs retained unchanged, no credentials; URLs must remain inert in the consumer",
+  "proof": "Complete four-run acceptance: full all-profile disk42/bucket43 and actual document e2e disk9/bucket10 groups, zero failures or omitted required groups. Same current source, immutable image and Openbot helper throughout; positive cleanup between all runs. Full normal setup/key lifecycle/restore/private media and confidentiality retained. Actual two-company shipped document workflows and five-turn normal-provider HTTP fixtures, two competing worker groups and quiescent restart, third accepted create with a deliberately lost receipt remaining unknown/no replay, independent healthy progress and exact current-audience notifications. Fresh current-key get_frame HTML readbacks prove both targeted edits before any human enrichment. Both normal human browser opens/reloads show exact private image pixels and loaded font; both ordinary UI PDFs contain targeted text and the embedded private font. Foreign/signed-out known-ID, socket, media/cache and private-bucket denials pass.",
+  "limits": "Existing 65536-byte helper stdin/16384-byte combined output, 80s helper/60s model fixture/180s probe,16384-byte field/65536-byte receipt,16 TLS sockets and160/96 direct-request bounds unchanged. Current bounded inline image export is at most12288 bytes and may be a truthful JPEG thumbnail; full private files/PDFs require a current human session. All-profile restore retains private storage. No public certificates, production deployment, paid inference, model visual verification or full object-store restoration claim.",
+  "capture": "plan/doop-canvas/phases/p06/docs/logs/current-image-capture-R1",
+  "source_identity": {
+    "revision": "01584b34f6cadcf21767127280cc6e320a6d748a",
+    "fingerprint": "e0c063c43c5bc70018eb8e09d0add0d32ef35159fff843bc9646da7ebe4c4464",
+    "kind": "packaged managed source"
+  },
+  "image": {
+    "image_id": "sha256:425a2d2e718285f11fd9b18bf110dd173c689d0f0378a94f5ebe4f9872e52d43",
+    "manifest_digest": "sha256:425a2d2e718285f11fd9b18bf110dd173c689d0f0378a94f5ebe4f9872e52d43",
+    "archive_sha256": "7e85e67b892e8b0c523f089cbe2b8a4612861634e9ed5b7c5a64efba721e046d",
+    "user": "node"
+  },
+  "lock_sha256": "9fc8b3c110b390a9c46975da45c3a297090096703f9d9721dcea19f84dad28e3",
+  "producer_files": {
+    "scripts/doop-test.py": "87db0bfb43eabcf50b6b5320b5ed75223492a2fb516c7777e8de0d89a10dc457",
+    "scripts/doop-test/acceptance.py": "692be1a4260e9adf283edcf15ef6ab96cc8def1159737ea66ae5c01914eaec0d",
+    "scripts/doop-test/browser-export.mjs": "c3d1bb00cfcbbd583c4686f9dfa7eec2370f4db8c8012f62c20ced9382685245",
+    "scripts/doop-test/browser-owner.mjs": "5e5c42b217ac3532f7689ae830c54c0544dc0aa9bbe29a6a0fe654cd4ffe7784",
+    "scripts/doop-test/e2e-probe.mjs": "0e1d923c801307a2192baf848baf27047a9303e5f70f4c3d6bbba86d9c6a1332",
+    "scripts/doop-test/image_service.py": "88bcf05c5656f3c49cbd8df02038c7488db813c80a30271fd404a859ee43842c",
+    "scripts/doop-test/ingress.py": "ccceab5c951d72aff706d4e7b8dd934f359718c833037eb197426c78c98cfdf4",
+    "scripts/doop-test/lifecycle-probe.mjs": "c6fbacfe2c088927998ee588c67df66ade493f137c32f21d412482d908174107",
+    "scripts/doop-test/openbot-helper.mjs": "0a1c60d74ed85f27f3a7e05b53bfa922ed16652102aeb42b37c57c9fce47372d",
+    "scripts/doop-test/ownership.py": "3ab17b7826ca0ac60fa273af767da746b2d7f4bf8c1188cd1d411266fb8ee7f7",
+    "scripts/doop-test/private-browser.mjs": "1c1b8c280eb553bd9ee58502125894f72e05aff8135b48d6318873bd15988090",
+    "scripts/doop-test/private-probe.mjs": "88f53ce466613c4a23d52e2b18c99287c5a7861fe15039335d46bfb71ce3399b",
+    "scripts/doop-test/private_deployment.py": "94d2c5644540fa46d5019c259ee2953af1495b57ceae7bfea5ece6daa8b02478",
+    "scripts/doop-test/probe.mjs": "e4ef8e00d26cd6674b5fa7b88274f5560ae0eb9e3c5207995472d4ffcd9fe45b",
+    "scripts/doop-test/restore.py": "6152c421745ddccdfa03e53f93867749c0b3bc01e3936f9fe41c042eedfe4ca1",
+    "src/adapters/mcp/policy.rs": "68accaf87edb33b94e72f175062dd5cb9d6a600382c2609f928b60904361aafe",
+    "src/adapters/persistence/doop_live_input.rs": "86adbf3910d476b61ffd3809b7a855af8d18fa942381faa489d01cf7a3393bfc",
+    "src/adapters/persistence/doop_live_lifecycle_tests.rs": "6aff4d81f07b589f312a65aba1a49928848ba48ff5859c587ddf9643fc73aed8",
+    "src/adapters/persistence/doop_live_observation.rs": "4e00b7080cda2bec82e5a0696c01f313e1ac4b57394589cebc1b68b1d45a3c7d",
+    "src/adapters/persistence/doop_live_setup_tests.rs": "8b5a3f253a0053609c0b5a82af45e16c86b509643e751aad9a40a4288559c163",
+    "src/adapters/persistence/doop_live_workflow.rs": "fa7c368e65b511d0ae12199e55658e74021d63e2a1dbec64cb18c6b28133ba19",
+    "src/adapters/persistence/workflow/doop_document_agent_tests.rs": "8a95f9c27a326c18b62569e947f89caa3fbdd41816a8a3e56fb6096ae5ed7a90",
+    "src/adapters/persistence/workflow/doop_document_create_tests.rs": "920a9f833951ff3f36aa1f3ae165ae71b57d409741750832eddf371ed19375ff",
+    "src/adapters/persistence/workflow/doop_document_delivery_support.rs": "75e14f2ca8ecdf345f8422403000563b61429ef832d8b7daf7aa520389790a5f",
+    "src/adapters/persistence/workflow/doop_document_failure_tests.rs": "cde2a3a75b6c1ae3bdb5912829034bae801ee1a51bcadbf8c6ebdac208a85f92",
+    "src/adapters/persistence/workflow/doop_document_guide_tests.rs": "8fb3497efdb375c908011915108b2414a18ffbc950948e389961183eb79559e5",
+    "src/adapters/persistence/workflow/doop_document_lifecycle_tests.rs": "e6eb483f1d781e4c0736c80e22e84e01af6345d7772f221806904d09c5c40a08",
+    "src/adapters/persistence/workflow/doop_document_live_client.rs": "ebe654cc020c04a5fa8b169d693afaa58b63905919756a040be1c45c4af93266",
+    "src/adapters/persistence/workflow/doop_document_live_driver.rs": "94d72a3e54f3dac7616b12620819d9a94fac7611804c0494f400f5bdbb3be12d",
+    "src/adapters/persistence/workflow/doop_document_live_model.rs": "24cf3200340eaf982e9e8a1d0fcb061975995cc5289c2b05c22a0c3760eb3354",
+    "src/adapters/persistence/workflow/doop_document_live_setup.rs": "69ddc499f70da2febf6d492cf8d9c3bcd1b18f4d5bbaa0a7eb60a0b2fd3e494d",
+    "src/adapters/persistence/workflow/doop_document_live_tests.rs": "fbaf856bc78d3c86a48e1aae4b7cd563de5403850fee29da060252ee05b013da",
+    "src/adapters/persistence/workflow/doop_document_live_verification.rs": "4fa24cfdf2f2c529bd4176a4f0b622a27357e4b237eaa0077994c0f6276156bf",
+    "src/adapters/persistence/workflow/doop_document_policy_tests.rs": "517a8ad59549519a9445e5c39ab9d7fd7cf454ac9d312d74edae7097a29d9241",
+    "src/adapters/persistence/workflow/doop_document_recovery_tests.rs": "a2ff51e8b44932532c1072c19cb7fd90f01c970ff7d7b9338b0e184579d26f6c",
+    "src/adapters/persistence/workflow/doop_document_result_tests.rs": "a31d90553475390af0c1d2d8efd2a816b409a2d57ed429e1f493276af4aaf958",
+    "src/adapters/persistence/workflow/doop_document_runtime_support.rs": "206a63bd1803ae42b61997f869b267e666d2661ba16422105e2e29e765c021f1",
+    "src/adapters/persistence/workflow/doop_document_sample_tests.rs": "1d3160c41bff65d8a985ea6252e89a76f7371144305b3f05ffe0bd0c53f0950e",
+    "src/adapters/persistence/workflow/doop_document_tests.rs": "257673d4374b8ae3acd8e05216ea25081b642c1693e17c48fb55798354dcf6cd",
+    "src/adapters/persistence/workflow/mcp_snapshot_tests.rs": "e63052c0cd3e9a1461096f13aa613d4d9af4d6c0d603c064da51d96bc3c1d449",
+    "src/adapters/persistence/workflow/mcp_tests.rs": "86135cb01ca4463e78d46bb84354d63e61be864b155ba45d470268573ff402c0",
+    "src/application/services/test_support/scenario.rs": "13aff67fd6bf1014472f3152902899af989fcb4953fcfecc903befa915fe41b1",
+    "src/application/services/test_support/scenario_tests.rs": "c7d1b1ab1ebb1d5d163634bc36f20ab2091f48715e0f067c14c72552b350df26"
+  },
+  "openbot_helper_sha256": "0e55a4d3b1631a859c48b7ce23cca5ef1783ff77b3096f08658ccc58ffdb71d3"
+}

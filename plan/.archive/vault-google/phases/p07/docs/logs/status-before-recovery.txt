@@ -1,0 +1,143 @@
+ M .github/workflows/ci.yml
+ M plan/vault-google/COORDINATION.md
+ M src/adapters/http/pages/connection_levels.rs
+ M src/adapters/http/pages/mcp.rs
+ M src/adapters/http/routes/connection_level_tests.rs
+ M src/adapters/http/routes/connection_levels.rs
+ M src/adapters/http/routes/mcp.rs
+ M src/adapters/http/routes/mcp_api_tests.rs
+ M src/adapters/http/routes/ui_mcp.rs
+ M src/adapters/http/routes/ui_vault/tests.rs
+ M src/adapters/http/routes/ui_vault_bindings.rs
+ M src/adapters/http/routes/ui_vault_connect.rs
+ M src/adapters/http/routes/vault_binding_route_tests.rs
+ M src/adapters/integrations/google_authorization.rs
+ M src/adapters/integrations/mod.rs
+ M src/adapters/mcp/http.rs
+ M src/adapters/mcp/mod.rs
+ M src/adapters/mod.rs
+ M src/adapters/persistence/integration_bindings.rs
+ M src/adapters/persistence/integration_connect_authority.rs
+ M src/adapters/persistence/integrations/connect_tests/mod.rs
+ M src/adapters/persistence/integrations/grants.rs
+ M src/adapters/persistence/integrations/mod.rs
+ M src/adapters/persistence/integrations/renewal_tests/mod.rs
+ M src/adapters/persistence/integrations/renewal_tests/protocol.rs
+ M src/adapters/persistence/integrations/renewal_tests/server.rs
+ M src/adapters/persistence/integrations/renewal_tests/workspace.rs
+ M src/adapters/persistence/integrations/resolve/locked.rs
+ M src/adapters/persistence/integrations/resolve/mod.rs
+ M src/adapters/persistence/integrations/resolve/rotating.rs
+ M src/adapters/persistence/integrations/resolve/write.rs
+ M src/adapters/persistence/integrations/tests.rs
+ M src/adapters/persistence/mcp.rs
+ M src/adapters/persistence/mod.rs
+ M src/adapters/persistence/workflow/action_approval_http_tests.rs
+ M src/adapters/persistence/workflow/action_cancellation_receipt_tests.rs
+ M src/adapters/persistence/workflow/action_dispatch.rs
+ M src/adapters/persistence/workflow/action_dispatch_remote_tests.rs
+ M src/adapters/persistence/workflow/action_dispatch_resolution_tests.rs
+ M src/adapters/persistence/workflow/action_receipts.rs
+ M src/adapters/persistence/workflow/action_reconciliation_high_bounds_source.rs
+ M src/adapters/persistence/workflow/action_reconciliation_sibling_boundary_tests.rs
+ M src/adapters/persistence/workflow/action_reconciliation_validation_tests.rs
+ M src/adapters/persistence/workflow/agent_runtime_tests.rs
+ M src/adapters/persistence/workflow/http_test_support.rs
+ M src/adapters/persistence/workflow/integration_authority.rs
+ M src/adapters/persistence/workflow/knowledge_e2e_mcp_tests.rs
+ M src/adapters/persistence/workflow/mcp_renewal_support.rs
+ M src/adapters/persistence/workflow/mcp_test_support.rs
+ M src/adapters/persistence/workflow/message_ingress_composition.rs
+ M src/adapters/persistence/workflow/mod.rs
+ M src/adapters/persistence/workflow/tests.rs
+ M src/adapters/persistence/workflow/vault_tests/mod.rs
+ M src/adapters/persistence/workflow/vault_tests/renewal/mod.rs
+ M src/adapters/workflow_agent/mod.rs
+ M src/adapters/workflow_http/mod.rs
+ M src/adapters/workflow_http/tests.rs
+ M src/adapters/workflow_mcp/mod.rs
+ M src/application/integrations/authority_tests.rs
+ M src/application/integrations/execution.rs
+ M src/application/integrations/gateway.rs
+ M src/application/integrations/management.rs
+ M src/application/integrations/mod.rs
+ M src/application/integrations/private.rs
+ M src/application/integrations/registry.rs
+ M src/application/integrations/renewal.rs
+ M src/application/integrations/tests.rs
+ M src/application/integrations/unavailable.rs
+ M src/application/services/mcp_client.rs
+ M src/application/use_cases/integration_binding.rs
+ M src/application/use_cases/mcp.rs
+ M src/application/workflow/actions/dispatch.rs
+ M src/application/workflow/actions/failure.rs
+ M src/application/workflow/http_runtime.rs
+ M src/application/workflow/mcp_runtime.rs
+ M src/application/workflow/sample/tests.rs
+ M src/domain/integrations/account.rs
+ M src/domain/integrations/authority.rs
+ M src/infra/integrations.rs
+ M src/infra/setup.rs
+ M src/infra/setup/clients.rs
+ M src/infra/setup/mail.rs
+ M src/infra/setup_tests.rs
+ M src/infra/workflow.rs
+ M src/main.rs
+?? docs/gmail-workflows.md
+?? docs/vault-integrations.md
+?? plan/vault-google/phases/p06/
+?? plan/vault-google/phases/p07/
+?? samples/gmail-read-prepare.json
+?? samples/gmail-reviewed-send.json
+?? scripts/check-integration-docs.py
+?? scripts/integration-boundary.py
+?? scripts/tests/integration-boundary.py
+?? scripts/tests/vault-authoring-browser.mjs
+?? src/adapters/guarded_http.rs
+?? src/adapters/http/routes/connection_levels/
+?? src/adapters/http/routes/http_authoring_tests.rs
+?? src/adapters/http/routes/ui_vault_bindings/
+?? src/adapters/http/routes/vault_authoring_route_tests.rs
+?? src/adapters/integrations/execution/
+?? src/adapters/integrations/workflow_dispatch.rs
+?? src/adapters/mcp/body_lifetime_tests.rs
+?? src/adapters/mcp/connection.rs
+?? src/adapters/mcp/pinned_fixture.rs
+?? src/adapters/mcp/preparation.rs
+?? src/adapters/mcp/preparation_test_server.rs
+?? src/adapters/mcp/preparation_tests.rs
+?? src/adapters/persistence/integration_bindings/
+?? src/adapters/persistence/integrations/connect_tests/control_wire.rs
+?? src/adapters/persistence/integrations/connect_tests/portability.rs
+?? src/adapters/persistence/integrations/grants/
+?? src/adapters/persistence/integrations/observations.rs
+?? src/adapters/persistence/integrations/renewal_tests/business_peer.rs
+?? src/adapters/persistence/integrations/renewal_tests/workspace_authorization.rs
+?? src/adapters/persistence/integrations/resolve/subject.rs
+?? src/adapters/persistence/integrations/status.rs
+?? src/adapters/persistence/mcp/
+?? src/adapters/persistence/workflow/mcp_gateway_support.rs
+?? src/adapters/persistence/workflow/mcp_gateway_tests.rs
+?? src/adapters/persistence/workflow/mcp_preparation_authority_tests.rs
+?? src/adapters/persistence/workflow/mcp_projection_tests.rs
+?? src/adapters/persistence/workflow/mcp_wire_tests.rs
+?? src/adapters/persistence/workflow/projection_test_support.rs
+?? src/adapters/persistence/workflow/vault_gmail_journey.rs
+?? src/adapters/persistence/workflow/vault_tests/execution.rs
+?? src/adapters/persistence/workflow/vault_tests/native_journeys.rs
+?? src/adapters/persistence/workflow/vault_tests/native_portability.rs
+?? src/adapters/persistence/workflow/vault_tests/projection.rs
+?? src/adapters/persistence/workflow/vault_tests/renewal/gateway.rs
+?? src/adapters/persistence/workflow/vault_tests/shared_runtime.rs
+?? src/adapters/persistence/workflow/vault_tests/wire.rs
+?? src/application/integrations/choices.rs
+?? src/application/integrations/destinations.rs
+?? src/application/integrations/discovery.rs
+?? src/application/integrations/dispatch.rs
+?? src/application/integrations/execute.rs
+?? src/application/integrations/operation.rs
+?? src/application/integrations/preparation.rs
+?? src/application/integrations/wire/
+?? src/application/services/mcp_preparation.rs
+?? src/application/workflow/sample/gmail_tests.rs
+?? src/infra/integration_logging_tests.rs

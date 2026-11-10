@@ -64,6 +64,7 @@ impl Session {
             | "message.reply" | "message.ask" | "http.request" | "mcp.call" | "tool.call" => {
                 self.external_step(bundle, activation, path, kind, response)
             }
+            "local_agent.run" => self.external_step(bundle, activation, path, kind, response),
             _ => Err(refused(format!(
                 "Unsupported sample step {kind}; no production fallback exists"
             ))),

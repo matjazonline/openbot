@@ -1,0 +1,275 @@
+[
+  {
+    "name": "versions",
+    "command": [
+      "bash",
+      "-c",
+      "rustc --version; cargo --version; node --version; npm --version; cargo sqlx --version; /opt/homebrew/opt/postgresql@18/bin/psql --version"
+    ],
+    "status": "PASS",
+    "exit": 0,
+    "seconds": 0.34,
+    "file": "logs/final-versions-r1.txt"
+  },
+  {
+    "name": "plugin-install",
+    "command": [
+      "npm",
+      "--prefix",
+      "integrations/cloudroom-plugin",
+      "ci"
+    ],
+    "status": "PASS",
+    "exit": 0,
+    "seconds": 2.09,
+    "file": "logs/final-plugin-install-r1.txt"
+  },
+  {
+    "name": "plugin-typecheck",
+    "command": [
+      "npm",
+      "--prefix",
+      "integrations/cloudroom-plugin",
+      "run",
+      "typecheck"
+    ],
+    "status": "PASS",
+    "exit": 0,
+    "seconds": 1.05,
+    "file": "logs/final-plugin-typecheck-r1.txt"
+  },
+  {
+    "name": "plugin-build",
+    "command": [
+      "npm",
+      "--prefix",
+      "integrations/cloudroom-plugin",
+      "run",
+      "build"
+    ],
+    "status": "PASS",
+    "exit": 0,
+    "seconds": 0.13,
+    "file": "logs/final-plugin-build-r1.txt"
+  },
+  {
+    "name": "plugin-tests",
+    "command": [
+      "npm",
+      "--prefix",
+      "integrations/cloudroom-plugin",
+      "test"
+    ],
+    "status": "PASS",
+    "exit": 0,
+    "seconds": 17.06,
+    "file": "logs/final-plugin-tests-r1.txt"
+  },
+  {
+    "name": "plugin-guards",
+    "command": [
+      "npm",
+      "--prefix",
+      "integrations/cloudroom-plugin",
+      "run",
+      "test:guards"
+    ],
+    "status": "PASS",
+    "exit": 0,
+    "seconds": 1.17,
+    "file": "logs/final-plugin-guards-r1.txt"
+  },
+  {
+    "name": "plugin-package",
+    "command": [
+      "npm",
+      "--prefix",
+      "integrations/cloudroom-plugin",
+      "run",
+      "package",
+      "--",
+      "/tmp/openbot-cloudroom-p07-artifacts-r1"
+    ],
+    "status": "PASS",
+    "exit": 0,
+    "seconds": 0.66,
+    "file": "logs/final-plugin-package-r1.txt"
+  },
+  {
+    "name": "plugin-extract",
+    "command": [
+      "tar",
+      "-xzf",
+      "/tmp/openbot-cloudroom-p07-artifacts-r1/bb-plugin-openbot-local-0.2.0.tgz",
+      "-C",
+      "/var/folders/n2/5y7x75r92zl0ll90154hxdzr0000gn/T/openbot-cloudroom-p07-final-package-uuw4ohc8",
+      "--strip-components=1"
+    ],
+    "status": "PASS",
+    "exit": 0,
+    "seconds": 0.01,
+    "file": "logs/final-plugin-extract-r1.txt"
+  },
+  {
+    "name": "plugin-runtime-install",
+    "command": [
+      "npm",
+      "--prefix",
+      "/var/folders/n2/5y7x75r92zl0ll90154hxdzr0000gn/T/openbot-cloudroom-p07-final-package-uuw4ohc8",
+      "ci",
+      "--omit=dev"
+    ],
+    "status": "FAIL",
+    "exit": 1,
+    "seconds": 0.18,
+    "file": "logs/final-plugin-runtime-install-r1.txt"
+  },
+  {
+    "name": "format",
+    "command": [
+      "cargo",
+      "fmt",
+      "--all",
+      "--",
+      "--check"
+    ],
+    "status": "PASS",
+    "exit": 0,
+    "seconds": 1.87,
+    "file": "logs/final-format-r1.txt"
+  },
+  {
+    "name": "whitespace",
+    "command": [
+      "git",
+      "diff",
+      "--check"
+    ],
+    "status": "PASS",
+    "exit": 0,
+    "seconds": 0.08,
+    "file": "logs/final-whitespace-r1.txt"
+  },
+  {
+    "name": "offline-check",
+    "command": [
+      "cargo",
+      "check",
+      "--locked",
+      "--offline",
+      "--all-targets"
+    ],
+    "status": "PASS",
+    "exit": 0,
+    "seconds": 62.89,
+    "file": "logs/final-offline-check-r1.txt"
+  },
+  {
+    "name": "clippy",
+    "command": [
+      "cargo",
+      "clippy",
+      "--locked",
+      "--offline",
+      "--all-targets",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "status": "PASS",
+    "exit": 0,
+    "seconds": 70.28,
+    "file": "logs/final-clippy-r1.txt"
+  },
+  {
+    "name": "migrations",
+    "command": [
+      "cargo",
+      "sqlx",
+      "migrate",
+      "run"
+    ],
+    "status": "PASS",
+    "exit": 0,
+    "seconds": 0.56,
+    "file": "logs/final-migrations-r1.txt"
+  },
+  {
+    "name": "query-statistics-probe",
+    "command": [
+      "/opt/homebrew/opt/postgresql@18/bin/psql",
+      "postgres://mac03@127.0.0.1:56388/openbot_cl_final_build_c95025232e",
+      "-X",
+      "-v",
+      "ON_ERROR_STOP=1",
+      "-c",
+      "SELECT 1 AS ci_pg_stat_statements_probe"
+    ],
+    "status": "PASS",
+    "exit": 0,
+    "seconds": 0.04,
+    "file": "logs/final-query-statistics-probe-r1.txt"
+  },
+  {
+    "name": "query-statistics",
+    "command": [
+      "/opt/homebrew/opt/postgresql@18/bin/psql",
+      "postgres://mac03@127.0.0.1:56388/openbot_cl_final_build_c95025232e",
+      "-X",
+      "-v",
+      "ON_ERROR_STOP=1",
+      "-c",
+      "DO $$ BEGIN ASSERT current_setting('pg_stat_statements.track')='top'; ASSERT current_setting('pg_stat_statements.track_utility')='off'; ASSERT current_setting('log_parameter_max_length')='0'; ASSERT current_setting('log_parameter_max_length_on_error')='0'; ASSERT EXISTS (SELECT 1 FROM pg_stat_statements WHERE dbid=(SELECT oid FROM pg_database WHERE datname=current_database()) AND query LIKE '%ci_pg_stat_statements_probe%'); END $$"
+    ],
+    "status": "PASS",
+    "exit": 0,
+    "seconds": 0.02,
+    "file": "logs/final-query-statistics-r1.txt"
+  },
+  {
+    "name": "sqlx",
+    "command": [
+      "cargo",
+      "sqlx",
+      "prepare",
+      "--check",
+      "--",
+      "--all-targets"
+    ],
+    "status": "PASS",
+    "exit": 0,
+    "seconds": 59.85,
+    "file": "logs/final-sqlx-r1.txt"
+  },
+  {
+    "name": "compile-tests",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "--offline",
+      "--all-targets",
+      "--no-run"
+    ],
+    "status": "PASS",
+    "exit": 0,
+    "seconds": 146.33,
+    "file": "logs/final-compile-tests-r1.txt"
+  },
+  {
+    "name": "inventory",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "--offline",
+      "--all-targets",
+      "--",
+      "--list"
+    ],
+    "status": "PASS",
+    "exit": 0,
+    "seconds": 3.98,
+    "file": "logs/final-inventory-r1.txt"
+  }
+]

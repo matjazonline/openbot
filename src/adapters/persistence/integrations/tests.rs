@@ -182,6 +182,7 @@ fn managed_registry() -> Arc<CodeOwnedRegistry> {
                     client_secret_reference: None,
                 },
                 app: AppDefinition {
+                    transport: crate::application::integrations::destinations::AppTransportPolicy::OwnerApproved,
                     id: AppId::parse(name).unwrap(),
                     provider,
                     config,
@@ -244,6 +245,7 @@ fn google_registry() -> Arc<CodeOwnedRegistry> {
                 client_secret_reference: None,
             },
             app: AppDefinition {
+                    transport: crate::application::integrations::destinations::AppTransportPolicy::OwnerApproved,
                 id: AppId::parse("google-fixture").unwrap(),
                 provider,
                 config,
@@ -279,6 +281,8 @@ pub(super) fn workspace_connect_entry() -> Registration {
             client_secret_reference: None,
         },
         app: AppDefinition {
+            transport:
+                crate::application::integrations::destinations::AppTransportPolicy::OwnerApproved,
             id: AppId::parse("workspace-a").unwrap(),
             provider,
             config,

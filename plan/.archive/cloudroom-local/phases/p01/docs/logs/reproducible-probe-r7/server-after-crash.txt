@@ -1,0 +1,43 @@
+[21:23:36] WARN: [server] Unsupported inference provider {"provider":"codex"}
+[21:23:36] INFO: [server] Thread metadata inference failed; using fallback model {"attempt":1,"errorCode":"ai_service_invalid_response","fallbackModel":"claude-code/claude-haiku-5-5","maxAttempts":3,"model":"codex/gpt-5.6-luna","reason":"failure","threadId":"thr_m6xawxdbwq"}
+[21:23:36] INFO: [server] Server listening {"bindHost":"127.0.0.1","port":54164,"dataDir":"/var/folders/n2/5y7x75r92zl0ll90154hxdzr0000gn/T/openbot-cloudroom-proof-93Fg24/profile"}
+[21:23:37] INFO: [server] plugin custom-instructions@0.1.0 loaded
+[21:23:37] INFO: [server] plugin machine-ssh@0.1.0 loaded
+[21:23:37] INFO: [server] plugin openbot-compatibility-probe@0.1.0 loaded
+[21:23:37] INFO: [server] plugin bb-guide@0.1.0 loaded
+[21:23:37] INFO: [server] plugin time-in-cloudroom@0.1.0 loaded
+[21:23:37] INFO: [server] plugin drafts@0.1.0 loaded
+[21:23:37] INFO: [server] plugin pdf-preview@0.1.0 loaded
+[21:23:37] INFO: [server] plugin side-chat@0.1.0 loaded
+[21:23:37] INFO: [server] plugin scheduled-send@0.1.0 loaded
+[21:23:37] INFO: [server] plugin push-notifications@0.1.0 loaded
+[21:23:37] INFO: [server] plugin accounts@0.1.0 loaded
+[21:23:37] INFO: [server] plugin provider-usage@0.1.0 loaded
+[21:23:37] INFO: [server] plugin gpu@0.1.0 loaded
+[21:23:37] INFO: [server] plugin inline-vis@0.1.0 loaded
+[21:23:37] INFO: [server] plugin provider-retry@0.1.0 loaded
+[21:23:37] INFO: [server] plugin secrets@0.1.0 loaded
+[21:23:37] INFO: [server] plugin connect@0.1.0 loaded
+[21:23:37] WARN: [server] Unsupported inference provider {"provider":"claude-code"}
+[21:23:37] INFO: [server] Thread metadata inference failed; using fallback model {"attempt":2,"errorCode":"ai_service_invalid_response","fallbackModel":"claude-code/claude-haiku-5-5","maxAttempts":3,"model":"claude-code/claude-haiku-5-5","reason":"failure","threadId":"thr_m6xawxdbwq"}
+[21:23:37] INFO: [server] plugin monaco-editor@0.1.0 loaded
+[21:23:37] WARN: [server] Unsupported inference provider {"provider":"codex"}
+[21:23:37] INFO: [server] Thread metadata inference completed with fallback model {"attempts":3,"durationMs":973,"maxAttempts":3,"model":"codex/gpt-5.6-luna","reason":"transient-failure","timeoutMs":30000,"threadId":"thr_m6xawxdbwq"}
+[21:23:37] WARN: [server] Thread metadata inference returned no result {"attempts":3,"durationMs":973,"reason":"no-result","threadId":"thr_m6xawxdbwq"}
+[21:23:37] INFO: [server] Thread title retry scheduled {"threadId":"thr_m6xawxdbwq","attempts":1,"nextAttemptAt":1794083027925}
+[21:23:37] INFO: [server] plugin automations@0.1.0 loaded
+[21:23:37] WARN: [server] marketplace bb-community refresh dropped 1 catalog entry whose id matches a bundled plugin: provider-usage
+[21:23:38] INFO: [server] Session opened {"sessionId":"hses_bqzqjiu4r7","hostId":"host_bbnqfzy6y7","replacedSessionId":"hses_zs8pfsmyer"}
+[21:23:38] INFO: [server] Daemon WebSocket opened {"sessionId":"hses_bqzqjiu4r7","hostId":"host_bbnqfzy6y7"}
+[21:23:39] INFO: [server] plugin keep-awake@0.1.0 loaded
+[21:23:39] INFO: [server] plugin environment-personal-workspace@0.1.0 loaded
+[21:23:40] INFO: [server] plugin environment-project-checkout@0.1.0 loaded
+[21:23:40] INFO: [server] plugin environment-git-worktree@0.1.0 loaded
+[21:23:40] INFO: [server] plugin computer-use@0.1.0 loaded
+[21:23:40] INFO: [server] plugin provider-pi@0.1.0 loaded
+[21:23:40] INFO: [server] plugin provider-codex@0.1.0 loaded
+[21:23:40] INFO: [server] plugin provider-acp@0.1.0 loaded
+[21:23:40] INFO: [server] plugin provider-claude-code@0.1.0 loaded
+[21:23:41] INFO: [server] Slow API request {"durationMs":2399.8,"method":"GET","path":"/api/v1/system/providers","status":200}
+[21:23:41] INFO: [server] Slow API request {"durationMs":2413.6,"method":"POST","path":"/api/v1/plugins/openbot-compatibility-probe/cli","status":200}
+[21:23:41] INFO: [server] Daemon WebSocket closed {"sessionId":"hses_bqzqjiu4r7"}

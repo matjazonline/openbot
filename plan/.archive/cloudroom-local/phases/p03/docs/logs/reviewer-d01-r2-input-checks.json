@@ -1,0 +1,14 @@
+{
+  "review": "CL-P03-D01-R2",
+  "decision": "CL-P03-D01/r2",
+  "decision_sha256": "6674b2420de4589f1311c7b556ee26b0407e0feb62198f1aa9074452f74e9367",
+  "source_digest": "ee02338b474bb7b234a8a8978669f952df0b36aabf125d191ae1bb2fc547aad7",
+  "coordination_revision": 9,
+  "coordination_sha256": "cad6e47c8350b6b067e2f1e82fe035161acca6fdb97586c9873e9619c447befa",
+  "coordination_matches_pin": true,
+  "runtime_checks_executed": false,
+  "outcome": "PASS",
+  "resolved_at_gate": [
+    "CL-P03-D01-F1"
+  ]
+}

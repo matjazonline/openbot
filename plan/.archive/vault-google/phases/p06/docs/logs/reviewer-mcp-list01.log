@@ -1,0 +1,14 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.20s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-048b7abd3ed0c794)
+adapters::persistence::workflow::tests::mcp_tests::support::renewal::gateway_tests::vault_workflow_mcp_another_administrator_cannot_discover_the_owners_account: test
+adapters::persistence::workflow::tests::mcp_tests::support::renewal::gateway_tests::vault_workflow_mcp_browser_expiring_during_catalog_prevents_configuration_save: test
+adapters::persistence::workflow::tests::mcp_tests::support::renewal::gateway_tests::vault_workflow_mcp_cancellation_drops_actual_call_then_awaits_session_close: test
+adapters::persistence::workflow::tests::mcp_tests::support::renewal::gateway_tests::vault_workflow_mcp_competing_catalog_refreshes_commit_one_current_revision: test
+adapters::persistence::workflow::tests::mcp_tests::support::renewal::gateway_tests::vault_workflow_mcp_credential_in_catalog_is_rejected_before_any_business_marker: test
+adapters::persistence::workflow::tests::mcp_tests::support::renewal::gateway_tests::vault_workflow_mcp_generation_change_during_catalog_closes_and_rebuilds_before_entry: test
+adapters::persistence::workflow::tests::mcp_tests::support::renewal::gateway_tests::vault_workflow_mcp_owner_configuration_discovers_without_a_business_invocation: test
+adapters::persistence::workflow::tests::mcp_tests::support::renewal::gateway_tests::vault_workflow_mcp_owner_disconnect_during_catalog_prevents_configuration_save: test
+adapters::persistence::workflow::tests::mcp_tests::support::renewal::gateway_tests::vault_workflow_mcp_private_session_uses_native_receipt_and_redacts_active_credential: test
+adapters::persistence::workflow::tests::mcp_tests::support::renewal::gateway_tests::vault_workflow_mcp_uncertain_tool_call_never_reopens_or_replays: test
+
+10 tests, 0 benchmarks

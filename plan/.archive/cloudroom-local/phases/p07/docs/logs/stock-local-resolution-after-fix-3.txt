@@ -1,0 +1,12 @@
+
+running 1 test
+observed gated transaction pids=[25965] blocker=25969 elapsed_ms=14
+observed resolution pids=[25967] blocker=25965 elapsed_ms=1993
+observed dispatch resolution and competing dispatch pids=[25967, 25963] blocker=25965 elapsed_ms=6
+observed gated transaction pids=[25992] blocker=25997 elapsed_ms=20
+observed resolution pids=[25994] blocker=25992 elapsed_ms=1985
+observed dispatch resolution and competing dispatch pids=[25994, 25984] blocker=25992 elapsed_ms=7
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::resolution_tests::workflow_action_dispatch_resolution_stalled_local_effect_once ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3326 filtered out; finished in 5.35s
+

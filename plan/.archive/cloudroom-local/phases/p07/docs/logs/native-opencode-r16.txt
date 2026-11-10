@@ -1,0 +1,17 @@
+
+running 1 test
+observed gated transaction pids=[5269] blocker=6223 elapsed_ms=2
+test adapters::persistence::workflow::tests::local_agent_tests::e2e::native::cloudroom_e2e_native_opencode_packaged_plugin_pairing_workflow_ui_restart_followup_stop has been running for over 60 seconds
+
+thread 'adapters::persistence::workflow::tests::local_agent_tests::e2e::native::cloudroom_e2e_native_opencode_packaged_plugin_pairing_workflow_ui_restart_followup_stop' (18928415) panicked at src/adapters/persistence/workflow/local_agent_early_e2e_tests.rs:31:6:
+called `Result::unwrap()` on an `Err` value: Elapsed(())
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test adapters::persistence::workflow::tests::local_agent_tests::e2e::native::cloudroom_e2e_native_opencode_packaged_plugin_pairing_workflow_ui_restart_followup_stop ... FAILED
+
+failures:
+
+failures:
+    adapters::persistence::workflow::tests::local_agent_tests::e2e::native::cloudroom_e2e_native_opencode_packaged_plugin_pairing_workflow_ui_restart_followup_stop
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 3326 filtered out; finished in 118.03s
+

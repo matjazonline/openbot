@@ -1,0 +1,29 @@
+
+> bb-plugin-openbot-local@0.1.0 test
+> node scripts/build.mjs --test && node --test build-tests/*.test.js
+
+built 1 test entries
+✔ configuration refuses non-origin URL http:// (0.422292ms)
+✔ configuration refuses non-origin URL https:// (0.043875ms)
+✔ configuration refuses non-origin URL https://path (0.0365ms)
+✔ configuration refuses non-origin URL https:// (0.034375ms)
+✔ configuration refuses non-origin URL https:// (0.036166ms)
+✔ configuration canonicalizes HTTPS and refuses arbitrary project paths/duplicates/bounds (0.624167ms)
+✔ user UTF8 prompt bound remains32KiB with fixed native operation header (2.382042ms)
+✔ actual peer command decoder canonicalizes field order and rejects hash/date/field changes (0.268458ms)
+✔ chunk transport roundtrips the exact2MiB limit and rejects overflow before send (13.459ms)
+✔ chunks reject interleaving, invalid UTF8/base64, unsafe integers and time expiry (1.145042ms)
+✔ real SQLite survives receipt/intent reopen and replay keeps immutable payloads (19.405167ms)
+✔ competing stale intent claimants have exactly one durable SDK entry marker (2.344125ms)
+✔ missing command under reconcile enters durable recovery without a fresh SDK claim (2.609ms)
+✔ acknowledgment cannot forget an unknown future or restore an already-pruned cursor (1.676583ms)
+✔ preflight refusal is durable but cannot follow the SDK intent cut (2.7185ms)
+✔ fixed4096 history bound fails controlled admission and never allocates a dangling sequence (1240.807458ms)
+ℹ tests 16
+ℹ suites 0
+ℹ pass 16
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1350.338583

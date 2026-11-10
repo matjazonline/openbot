@@ -66,7 +66,10 @@ fn notes(name: &str) -> &'static str {
             "The selected agent's model and instructions classify the context into a finite label set; no tools or skills. Invalid labels get bounded repair, then fail terminally."
         }
         "agent.run" => {
-            "Runs the selected agent with exactly its saved tools and skills, frozen at publication; current revocation still applies. Context is untrusted data; output follows output_schema with bounded repair. Automatic history stores the exact supplied context and accepted logical output per actual agent and thread/private session. The prompt uses a bounded, level-filtered recent suffix, frozen once for retries and human continuation. Child calls have private branch history. Inspect Agent history in the run step for exact context, omissions and expiry. Produced output and message delivery have separate states; history inspection never reruns the model."
+            "Runs the selected agent with exactly its saved tools and skills, frozen at publication; current revocation still applies. Context is untrusted data; output follows output_schema with bounded repair. Optional literal mcp_error_policy is observe (default) or fail_step: fail_step stops on a saved MCP isError or an ungranted tool, before another model turn or final output, including checkpoint replay. It does not interpret other tools' business fields. Automatic history stores the exact supplied context and accepted logical output per actual agent and thread/private session. The prompt uses a bounded, level-filtered recent suffix, frozen once for retries and human continuation. Child calls have private branch history. Inspect Agent history in the run step for exact context, omissions and expiry. Produced output and message delivery have separate states; history inspection never reruns the model."
+        }
+        "local_agent.run" => {
+            "Runs an authorized company local profile through Cloudroom. Input is a bounded prompt and optional explicit session; exact project/provider/model and deadline freeze before approval. The workflow parks without holding a worker lease. Native permissions are answered in Cloudroom; output cannot grant approval or publish a message. Unknown native outcomes require recovery and never silently retry or fail over."
         }
         "decision.rule" => {
             "Ordered pure rule with required default; all choices must be explicit routes. Data follows data_schema."
@@ -79,6 +82,9 @@ fn notes(name: &str) -> &'static str {
         }
         "data.map" => {
             "Pure typed construction, no scripts; output is value itself and follows output_schema."
+        }
+        "data.url" => {
+            "Pure HTTPS URL construction; no request, preview or permission grant. origin is at most 2048 bytes and has no credentials, non-root path, query or fragment. Normalizes through the existing HTTP-origin validator. Appends 0–16 ASCII URI-unreserved path segments, each 1–128 bytes; dot and dot-dot are refused. Output is one URL string bounded to 8192 bytes. A trusted origin and authenticated resource identity remain the caller's responsibility."
         }
         "channel.no_reply" => {
             "Finish this run successfully without an automatic channel reply. Return the explicit value unchanged, validated against output_schema and the workflow output schema. Success must route to $end. Earlier explicit messages remain published; children cannot suppress their parent's reply."

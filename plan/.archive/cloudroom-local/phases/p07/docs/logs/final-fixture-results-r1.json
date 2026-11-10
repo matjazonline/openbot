@@ -1,0 +1,72 @@
+[
+  {
+    "name": "format",
+    "command": [
+      "cargo",
+      "fmt",
+      "--all",
+      "--",
+      "--check"
+    ],
+    "status": "PASS",
+    "exit": 0,
+    "seconds": 2.24,
+    "file": "logs/final-fixture-format-r1.txt"
+  },
+  {
+    "name": "whitespace",
+    "command": [
+      "git",
+      "diff",
+      "--check"
+    ],
+    "status": "PASS",
+    "exit": 0,
+    "seconds": 0.09,
+    "file": "logs/final-fixture-whitespace-r1.txt"
+  },
+  {
+    "name": "clippy",
+    "command": [
+      "cargo",
+      "clippy",
+      "--locked",
+      "--offline",
+      "--all-targets",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "status": "PASS",
+    "exit": 0,
+    "seconds": 71.2,
+    "file": "logs/final-fixture-clippy-r1.txt"
+  },
+  {
+    "name": "inventory",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "--offline",
+      "--all-targets",
+      "--",
+      "--list"
+    ],
+    "status": "PASS",
+    "exit": 0,
+    "seconds": 0.96,
+    "file": "logs/final-fixture-inventory-r1.txt"
+  },
+  {
+    "name": "graft",
+    "command": [
+      "graft",
+      "build"
+    ],
+    "status": "PASS",
+    "exit": 0,
+    "seconds": 3.07,
+    "file": "logs/final-fixture-graft-r1.txt"
+  }
+]

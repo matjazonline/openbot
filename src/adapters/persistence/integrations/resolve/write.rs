@@ -11,7 +11,7 @@ pub(super) async fn cache(
     mut s: Locked,
     payload: SecretString,
     change: CacheWrite,
-    i: &AuthorizedInvocation,
+    i: &CredentialUse<'_>,
     work: &RenewalWork,
 ) -> ResolutionResult<ResolvedCredential> {
     let entry = vault.registry.get(&s.grant.app)?;
@@ -73,6 +73,11 @@ pub(super) async fn cache(
         CacheWrite::Cooldown => None,
     };
     commit::commit(vault, s.tx, &expected, work).await?;
+    match change {
+        CacheWrite::Renewed => super::super::observations::Event::RefreshCommitted,
+        CacheWrite::Cooldown => super::super::observations::Event::CooldownCommitted,
+    }
+    .emit();
     result.ok_or(ResolutionError::Retry(RetryReason::Cooldown, None))
 }
 pub(super) async fn reconnect(
@@ -102,12 +107,13 @@ pub(super) async fn reconnect(
         pending: None,
     };
     commit::commit(vault, s.tx, &expected, work).await?;
+    super::super::observations::Event::ReconnectRequired.emit();
     Err(ResolutionError::ReconnectRequired)
 }
 pub(super) async fn request(
     vault: &PostgresVault,
     mut s: Locked,
-    i: &AuthorizedInvocation,
+    i: &CredentialUse<'_>,
     work: &RenewalWork,
 ) -> ResolutionResult<ResolvedCredential> {
     locked::live(&mut s.tx, i, work).await?;
@@ -135,11 +141,16 @@ pub(super) async fn request(
     let remaining = (deadline - Utc::now())
         .to_std()
         .map_err(|_| IntegrationError::Denied)?;
+    super::super::observations::Event::RefreshAttempt.emit();
     let response = tokio::select! { biased;
         _=work.cancellation.cancelled()=>Err(RenewalFailure::Cancelled),
         _=tokio::time::sleep(remaining)=>Err(RenewalFailure::Temporary),
         result=provider.renew(&s.payload,next,&request)=>result,
     };
+    super::super::observations::Event::RefreshResponse(
+        response.as_ref().map(|_| ()).map_err(|e| *e),
+    )
+    .emit();
     match response {
         Ok(payload) => cache(vault, s, payload, CacheWrite::Renewed, i, work).await,
         Err(RenewalFailure::Reconnect) => reconnect(vault, s, work).await,

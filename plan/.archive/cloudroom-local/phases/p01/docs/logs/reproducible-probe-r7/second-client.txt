@@ -1,0 +1,37 @@
+{
+  "threadId": "thr_ijdz3x4mdu",
+  "ok": true,
+  "delivery": "queued",
+  "queuedMessage": {
+    "id": "qmsg_etgau89fje",
+    "initiator": "user",
+    "senderThreadId": null,
+    "threadId": "thr_ijdz3x4mdu",
+    "content": [
+      {
+        "type": "text",
+        "text": "Independent CLI message",
+        "mentions": []
+      }
+    ],
+    "model": "gpt-5.1-codex",
+    "reasoningLevel": "medium",
+    "permissionMode": "full",
+    "serviceTier": "default",
+    "hardQueue": false,
+    "sendAt": null,
+    "waitingOn": {
+      "kind": "plugin",
+      "pluginId": "openbot-compatibility-probe",
+      "reason": "Disposable compatibility probe never runs inference"
+    },
+    "failureReason": null,
+    "payload": {
+      "kind": "inline"
+    },
+    "editable": true,
+    "createdAt": 1794083014823,
+    "updatedAt": 1794083014823
+  },
+  "mode": "auto"
+}

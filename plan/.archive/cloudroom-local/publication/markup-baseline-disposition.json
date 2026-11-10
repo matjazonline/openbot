@@ -1,0 +1,9 @@
+{
+  "origin": "b8c46300",
+  "test_and_helper_byte_equal_current": true,
+  "baseline_source": "/tmp/obpub-origin-jw2vio46",
+  "exit": 101,
+  "tests_exercised": 1,
+  "method": "Compile exact unchanged #[test] function and inline_event_attribute helper against origin source snapshot with its original CARGO_MANIFEST_DIR.",
+  "disposition": "Confirmed pre-existing origin scanner flags a cfg(test) hostile string in sample.rs; leave unrelated code/test unchanged. Initial omitted-attribute zero-test probe retained and not proof."
+}

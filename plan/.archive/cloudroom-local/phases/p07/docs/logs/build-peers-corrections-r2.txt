@@ -1,0 +1,14 @@
+node:internal/fs/promises:1661
+  const result = await PromisePrototypeThen(
+                 ^
+
+Error: ENOENT: no such file or directory, scandir 'test'
+    at async readdir (node:internal/fs/promises:1661:18)
+    at async file:///Users/mac03/dev/openbot/integrations/cloudroom-plugin/scripts/build.mjs:5:6 {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'scandir',
+  path: 'test'
+}
+
+Node.js v24.21.0

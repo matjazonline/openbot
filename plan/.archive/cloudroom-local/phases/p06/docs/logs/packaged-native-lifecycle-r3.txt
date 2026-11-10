@@ -1,0 +1,1 @@
+PASS: packaged server/host/UI boot; native Codex task reads only disposable project file and matches its accepted turn; bounded packaged wrapper shutdown while native shell work is active; restart preserves thread/turn history with zero new native submissions; explicit broad stop/archive and plugin removal preserve workspace

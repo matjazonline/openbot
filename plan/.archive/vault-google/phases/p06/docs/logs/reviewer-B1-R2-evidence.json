@@ -1,0 +1,126 @@
+{
+  "round": "VG-P06-B1-R2",
+  "utc": "2026-11-08T08:27:51.492350+00:00",
+  "digest": "d9d84e7e35bc0a1d603f6f57bf2ac6ba5a9c95a133611bba00b432fe31533b71",
+  "head": "ace526fd8259ec53c5199ffa7555a1a99dcba58e",
+  "exclusions": [
+    "plan/vault-google/COORDINATION.md",
+    "plan/vault-google/phases/p06/docs"
+  ],
+  "coordination_revision": 21,
+  "coordination_sha256": "d7e01662d64ae71b5c866b06ce459f2fc799bd2119789f60f5ce98966a705b1d",
+  "decision_sha256": "58e5a9056c77498d967a61ef2c931076aba1dc62ec70dbdfea358254af3af13e",
+  "delta_files": {
+    "src/adapters/http/routes/connection_level_tests.rs": "01850636da56af1f155daa4f8bf334e9b0ab4e68afd7c217aee1581d88755733",
+    "src/adapters/integrations/execution/mcp.rs": "4fa3323cf19cf1fe33e07a87d330261a8658625bcb0d4bf38b3b6fa9575216ce",
+    "src/adapters/integrations/execution/mod.rs": "ede45bc88bf072d8ad747e2ad60f9dd0757ace3403ce1febdbf913e202dccd0b",
+    "src/adapters/integrations/workflow_dispatch.rs": "f3bd293fea8744adb296cedb9454f76c52b81d5d7a40316673c45ef1e53d6c0e",
+    "src/adapters/mcp/body_lifetime_tests.rs": "2200b1fc7ffd43b2ac821342decd30e090489c9975229f566c439625a78f51a3",
+    "src/adapters/mcp/connection.rs": "ea306117beaf8eede17c6ac7f83254fc8de3632022e29e99c7bb1db7595e06a9",
+    "src/adapters/mcp/http.rs": "1add782556d4bec15e1b4e470f44c11388d8a0a0d8d8097648b8f694b7c6672a",
+    "src/adapters/mcp/mod.rs": "82fcbbdae2a9f5b3626354ad4a78db522b4ea3c77106ceaf5493c31edc09b668",
+    "src/adapters/mcp/preparation.rs": "51a1a8581cb27179dbf135ad6131a45bfc544500500064a4fa712192f4736cde",
+    "src/adapters/mcp/preparation_test_server.rs": "a424ada469d9d6a3d35363ab06fc37ee7544f6269f4df40ae1a6b6138d789df3",
+    "src/adapters/mcp/preparation_tests.rs": "3b10f3bf67a6f08edbdeefbf2c46485f3dd1f7ae5bbfbae2c6bfbd04aa811f2d",
+    "src/adapters/persistence/workflow/http_test_support.rs": "faa96dbbed513d8b9a3d081b33d9ee02a93756e65843655a76825bdc17e4b843",
+    "src/adapters/persistence/workflow/mcp_gateway_support.rs": "a728be274e4ebd77326772c6b161dd637b3a4ac1f349345f5d9ae0b21ddc2652",
+    "src/adapters/persistence/workflow/mcp_gateway_tests.rs": "e0dc7f5fb4879423994190894907cb34bb70fdb55cf3d3c2921f672ed3f9e0e3",
+    "src/adapters/persistence/workflow/mcp_preparation_authority_tests.rs": "e1f8b92995ef837ef65f08d5530e50194acaed02395be2636bfba0baa16160db",
+    "src/adapters/persistence/workflow/mcp_projection_tests.rs": "8f63b330e55dbd3f45bb9288b50c0a2ba56584da7a14bf00f5467477e364934c",
+    "src/adapters/persistence/workflow/projection_test_support.rs": "593ead53fa657c00a4449be89dc776060c144bd61edee6313b235587f8dc8f6c",
+    "src/adapters/persistence/workflow/tests.rs": "4332414e43e55f02e47a85bb1e29165f5dcdd29bbb1ec9114e0a073d15577e37",
+    "src/adapters/persistence/workflow/vault_tests/execution.rs": "69f5c0869ae231bc55db6cdf91896df3b9f0777013f517ab099ee6d768cc18fe",
+    "src/adapters/persistence/workflow/vault_tests/projection.rs": "d6002a768396c62ac0cc895595b499fad3bf4a4541642e496d91db0ec24c68de",
+    "src/application/integrations/execute.rs": "b6d0e2becc9278ab284c8225a2a28f051db9845d4c8a620b5c6f6481c6a58827",
+    "src/application/integrations/mod.rs": "f6410b61c593a6488d9f47c343d56aa77a0b9ace1d9dd434a35f564f4a197f93",
+    "src/application/integrations/preparation.rs": "ffed8f32494ed02869c0efbf246096e056def641e1188499638e6be28755fcb2",
+    "src/application/services/mcp_client.rs": "699e3248de7701aab22a3e794f5d9277ffb5e3cbab75a1cd93f248eb5af40c48",
+    "src/application/services/mcp_preparation.rs": "e56b92d744b9dd2c26d38dd8b0a1f0018ca66119d72808319d09c5beac16a611"
+  },
+  "checks": [
+    {
+      "receipt": "reviewer-B1-R2-gateway-list.json",
+      "log_sha256": "2930517442dddffc8b38d9101e514afa73c70f4fb1ed22b6145aa117b5b7d53f",
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "integration_gateway_",
+        "--",
+        "--list"
+      ],
+      "cwd": "/Users/mac02/.codex/worktrees/1133/openbot",
+      "database": "vault_google_p06_1133_baa6bd7114",
+      "exit": 0,
+      "seconds": 19.9,
+      "log": "/Users/mac02/.codex/worktrees/1133/openbot/plan/vault-google/phases/p06/docs/logs/reviewer-B1-R2-gateway-list.log"
+    },
+    {
+      "receipt": "reviewer-B1-R2-gateway-run.json",
+      "log_sha256": "302ba033b1d21c80c528ed99ef5d9b1d107f500e0fffffdfca3eedf84985062f",
+      "command": [
+        "env",
+        "RUST_MIN_STACK=2097152",
+        "RUST_TEST_THREADS=2",
+        "bash",
+        "scripts/test-network-isolation.sh",
+        "cargo",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "integration_gateway_"
+      ],
+      "cwd": "/Users/mac02/.codex/worktrees/1133/openbot",
+      "database": "vault_google_p06_1133_baa6bd7114",
+      "exit": 0,
+      "seconds": 2.56,
+      "log": "/Users/mac02/.codex/worktrees/1133/openbot/plan/vault-google/phases/p06/docs/logs/reviewer-B1-R2-gateway-run.log"
+    },
+    {
+      "receipt": "reviewer-B1-R2-workflow-list.json",
+      "log_sha256": "14ece87d03a500d46c99ccf94d8d13eb8d24d51080c2582469ed9ddc3d313f9c",
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "vault_workflow_",
+        "--",
+        "--list"
+      ],
+      "cwd": "/Users/mac02/.codex/worktrees/1133/openbot",
+      "database": "vault_google_p06_1133_baa6bd7114",
+      "exit": 0,
+      "seconds": 0.24,
+      "log": "/Users/mac02/.codex/worktrees/1133/openbot/plan/vault-google/phases/p06/docs/logs/reviewer-B1-R2-workflow-list.log"
+    },
+    {
+      "receipt": "reviewer-B1-R2-workflow-run.json",
+      "log_sha256": "4e56e2775ed51ed2ec103aa36c087e7b72b1efd468da25d4cdbc96a16e2b88f2",
+      "command": [
+        "env",
+        "RUST_MIN_STACK=2097152",
+        "RUST_TEST_THREADS=2",
+        "bash",
+        "scripts/test-network-isolation.sh",
+        "cargo",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "vault_workflow_"
+      ],
+      "cwd": "/Users/mac02/.codex/worktrees/1133/openbot",
+      "database": "vault_google_p06_1133_baa6bd7114",
+      "exit": 0,
+      "seconds": 21.88,
+      "log": "/Users/mac02/.codex/worktrees/1133/openbot/plan/vault-google/phases/p06/docs/logs/reviewer-B1-R2-workflow-run.log"
+    }
+  ],
+  "distinct_independent_tests": 25,
+  "verdict": "PASS"
+}

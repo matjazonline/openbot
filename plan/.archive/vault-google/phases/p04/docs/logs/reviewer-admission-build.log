@@ -1,0 +1,12 @@
+warning: variants `PUT` and `DELETE` are never constructed
+ --> plan/vault-google/phases/p04/docs/logs/reviewer-admission-repro.rs:1:56
+  |
+1 | #[derive(PartialEq,Eq)] enum Method { GET, HEAD, POST, PUT, DELETE }
+  |                              ------                    ^^^  ^^^^^^
+  |                              |
+  |                              variants in this enum
+  |
+  = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: 1 warning emitted
+

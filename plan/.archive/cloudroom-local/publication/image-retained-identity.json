@@ -1,0 +1,8 @@
+{
+  "image": "openbot-cloudroom-publication:verified",
+  "writing_image_ids": [],
+  "build": "logs/image-build.log",
+  "runtime_check": "logs/image-check-r2.log",
+  "inputs": "image-inputs.json",
+  "disposition": "Build/runtime verification passed; disposed owned VM after retaining immutable output and complete source hashes."
+}

@@ -44,6 +44,7 @@ pub fn marker_owned_effect_kind(kind: &str) -> bool {
             // Phase 05 E4: its only effect path is the delivery intent, committed in the same
             // transaction that parks the step, so an attempt without one sent nothing.
             | "memory.save"
+            | "local_agent.run"
     )
 }
 
@@ -51,20 +52,18 @@ pub fn marker_owned_effect_kind(kind: &str) -> bool {
 /// reads, and the tool-free model steps, whose provider calls are ledger-charged
 /// reservations (an unresolved one stays charged across a retry), not effects.
 pub fn effect_free_kind(kind: &str) -> bool {
-    matches!(
-        kind,
-        "data.map"
-            | "channel.no_reply"
-            | "decision.rule"
-            | "decision.human"
-            | "decision.agent"
-            | "context.history"
-            | "memory.load"
-            | "ai.classify"
-            | "jev.evaluate"
-            | "wait.event"
-            | "wait.timer"
-    )
+    super::super::batch::is_pure_kind(kind)
+        || matches!(
+            kind,
+            "decision.human"
+                | "decision.agent"
+                | "context.history"
+                | "memory.load"
+                | "ai.classify"
+                | "jev.evaluate"
+                | "wait.event"
+                | "wait.timer"
+        )
 }
 
 /// The one predicate for Rust lease retirement and pending recovery: without a
@@ -110,6 +109,31 @@ pub enum ActionStepOutcome<'a> {
     ActionLimit,
 }
 
+pub fn integration_pre_dispatch_failure(
+    family: ActionFamily,
+    failure: crate::application::integrations::PreDispatchFailure,
+) -> WorkflowFailure {
+    use crate::application::integrations::PreDispatchFailure as P;
+    let (class, suffix) = match failure {
+        P::Denied => (FailureClass::Terminal, "integration_denied"),
+        P::Invalid => (FailureClass::Terminal, "integration_invalid"),
+        P::ReconnectRequired => (FailureClass::Terminal, "integration_reconnect"),
+        P::Configuration => (FailureClass::Terminal, "integration_configuration"),
+        P::Retry => (FailureClass::Retryable, "integration_retry"),
+        P::Cancelled => (FailureClass::Retryable, "interrupted"),
+    };
+    WorkflowFailure {
+        failure: StepFailure::new(
+            class,
+            FailureCode::parse(format!("{}.{suffix}", family.prefix()))
+                .expect("bounded static failure code"),
+            None,
+        )
+        .expect("bounded static failure"),
+        safety: RetrySafety::SafeToRetry,
+    }
+}
+
 pub fn action_step_failure(
     family: ActionFamily,
     outcome: ActionStepOutcome<'_>,
@@ -141,6 +165,9 @@ pub fn action_step_failure(
         };
     }
     let (class, suffix) = match outcome {
+        Preparation(AppError::McpAuthentication) if matches!(family, ActionFamily::Mcp) => {
+            (Terminal, "authentication_rejected")
+        }
         Preparation(
             AppError::NotFound(_) | AppError::BadRequest(_) | AppError::InvalidCredentials,
         ) => (Terminal, "rejected"),
@@ -311,6 +338,7 @@ mod tests {
             "message.ask",
             "agent.run",
             "memory.save",
+            "local_agent.run",
         ] {
             assert!(marker_owned_effect_kind(kind));
         }

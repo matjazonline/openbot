@@ -1,0 +1,1 @@
+ERROR: failed to build: unable to prepare context: path "/tmp/openbot-p07-image" not found

@@ -6,8 +6,14 @@
 
 ## Outcome and status
 
-Status: proposed implementation, 2026-11-06. Publishing this plan does not implement the integration
-or establish that our deployed Doop instance passes the requirements below.
+All six implementation groups and the four file-access prerequisite groups are implemented.
+Operator instructions and repeatable checks are in the linked guides below; retained implementation
+review records are separate from the published source package.
+The [reusable local test runner](../../docs/doop-testing.md) reconstructs the
+[pinned managed-company source](../../integrations/doop/README.md) and exercises
+synthetic native/container compatibility, isolation, real PNG/PDF rendering and existing
+Openbot company connections. Later groups require accepted predecessor evidence.
+Confidential-use acceptance requires the separate file-access fix.
 
 An Openbot agent creates and updates a document on our self-hosted Doop instance. A human opens the
 private canvas, collaborates in Doop, and can export a PDF there. Each company uses its own Doop
@@ -77,7 +83,7 @@ Recheck the actual deployed revision before implementation:
 - [Workflow MCP authority](../../src/adapters/persistence/workflow/mcp.rs):26–37, 152–186 and
   [operation contracts](../../src/application/workflow/mcp.rs):68–98 own live scoped dispatch.
 
-The proposed [vault/integrations plan](../vault-google/README.md) is not a prerequisite. Use the
+The proposed [vault/integrations plan](../.archive/vault-google/README.md) is not a prerequisite. Use the
 credential owner actually present when implementing; if that plan has landed, reuse its approved
 credential reference rather than introducing a second secret store.
 

@@ -1,0 +1,12 @@
+[
+  {
+    "manifest": "CL-P07-B1-R1.preliminary.evidence.json",
+    "mismatches": [
+      {
+        "file": "logs/final-plugin-runtime-install-r2.txt",
+        "expected": "651e8978cb393ebe279f02f92dc542e91a103861de605b442f0453dde070bfe4",
+        "actual": "c05e89134e4d2358fb87c91dc1d880e4ac3f2609a3d0b6d05cfdccb61318be92"
+      }
+    ]
+  }
+]

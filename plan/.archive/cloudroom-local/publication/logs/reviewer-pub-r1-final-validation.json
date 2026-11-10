@@ -1,0 +1,43 @@
+{
+  "validators": [
+    {
+      "command": [
+        "python3",
+        "-B",
+        "/Users/mac03/.codex/skills/implement-astra-reviewed-2-2/scripts/check-evidence.py",
+        "--require-tracked",
+        "--expect-artifact",
+        "fbc00a75eb16d9c9cc00f4441976aaa9e176503a54d7dfad8a896d96d1143110",
+        "/private/tmp/openbot-cloudroom-publication/plan/.archive/cloudroom-local/publication/logs/CL-PUB-R1.final.evidence.json"
+      ],
+      "exit": 0,
+      "output": "/private/tmp/openbot-cloudroom-publication/plan/.archive/cloudroom-local/publication/logs/CL-PUB-R1.final.evidence.json: retained evidence valid {\"FAIL\": 6, \"NOT EXERCISED\": 1, \"PASS\": 55}\n1 evidence manifest(s) validated; declared results are not acceptance\n"
+    },
+    {
+      "command": [
+        "python3",
+        "-B",
+        "scripts/check-workflow-evidence.py",
+        "--require-tracked",
+        "--expect-artifact",
+        "fbc00a75eb16d9c9cc00f4441976aaa9e176503a54d7dfad8a896d96d1143110",
+        "/private/tmp/openbot-cloudroom-publication/plan/.archive/cloudroom-local/publication/logs/CL-PUB-R1.final.evidence.json"
+      ],
+      "exit": 0,
+      "output": "/private/tmp/openbot-cloudroom-publication/plan/.archive/cloudroom-local/publication/logs/CL-PUB-R1.final.evidence.json: retained evidence valid {\"FAIL\": 6, \"NOT EXERCISED\": 1, \"PASS\": 55}\n1 evidence manifest(s) validated; declared results are not acceptance\n"
+    }
+  ],
+  "manifest_sha256": "bfe8b566631dfa99f76d68289c69991129d5d25e1b6a8e184b90209894827d58",
+  "exclusions": [
+    "plan/.archive/cloudroom-local/COORDINATION.md",
+    "plan/.archive/cloudroom-local/phases/p01/docs",
+    "plan/.archive/cloudroom-local/phases/p02/docs",
+    "plan/.archive/cloudroom-local/phases/p03/docs",
+    "plan/.archive/cloudroom-local/phases/p04/docs",
+    "plan/.archive/cloudroom-local/phases/p05/docs",
+    "plan/.archive/cloudroom-local/phases/p06/docs",
+    "plan/.archive/cloudroom-local/phases/p07/docs",
+    "plan/.archive/cloudroom-local/publication"
+  ],
+  "snapshot": "base:   f63f08e00bc5c94dbcd83a33ff58fbcf142f97e4\ndigest: fbc00a75eb16d9c9cc00f4441976aaa9e176503a54d7dfad8a896d96d1143110\nfiles:\n"
+}

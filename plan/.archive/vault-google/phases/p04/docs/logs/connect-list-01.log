@@ -1,0 +1,33 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+   Compiling open_bots v0.1.0 (/Users/mac02/.codex/worktrees/1133/openbot)
+warning: field `cookie` is never read
+   --> src/adapters/persistence/integrations/connect_tests/mod.rs:104:9
+    |
+ 98 | pub(crate) struct Fixture {
+    |                   ------- field in this struct
+...
+104 |     pub cookie: String,
+    |         ^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: this lint expectation is unfulfilled
+ --> src/application/integrations/mod.rs:5:5
+  |
+5 |     dead_code,
+  |     ^^^^^^^^^
+  |
+  = note: Private provider lifecycle and injection contracts are wired in phases04–06
+  = note: `#[warn(unfulfilled_lint_expectations)]` on by default
+
+warning: `open_bots` (lib test) generated 2 warnings
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2m 32s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-048b7abd3ed0c794)
+adapters::persistence::integrations::connect_tests::bounds::integration_connect_cap_has_real_competing_creators: test
+adapters::persistence::integrations::connect_tests::bounds::integration_connect_ciphertext_context_substitution_fails_and_consumes_material: test
+adapters::persistence::integrations::connect_tests::bounds::integration_connect_expiry_erases_verifier_and_cannot_complete: test
+adapters::persistence::integrations::connect_tests::bounds::integration_connect_retains_only_bounded_terminal_outcomes: test
+adapters::persistence::integrations::connect_tests::bounds::integration_connect_wrong_browser_provider_purpose_signature_and_apps_deny: test
+adapters::persistence::integrations::connect_tests::workspace::integration_connect_workspace_identity_needs_neither_email_nor_refresh_token: test
+
+6 tests, 0 benchmarks

@@ -112,6 +112,7 @@ fn publication_failure(error: &AppError) -> &'static str {
         AppError::Forbidden(_) | AppError::InvalidCredentials => "forbidden",
         AppError::NotFound(_) => "missing",
         AppError::ServiceUnavailable(_) => "unavailable",
+        AppError::McpAuthentication => "mcp_authentication_rejected",
         AppError::Database(_) | AppError::DatabaseTimeout(_) => "database",
         AppError::Timeout(_) => "timeout",
         AppError::Execution(_)

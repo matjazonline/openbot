@@ -28,6 +28,7 @@ pub(super) fn workflow(
     let engine = crate::infra::workflow::WorkflowEngine::new(
         (*f.persistence).clone(),
         crate::infra::workflow::WorkflowEngineSetup {
+            integrations: clients.integrations.clone(),
             config: &f.config,
             composer: mail.composer.clone(),
             mcp_client: clients.mcp.clone(),

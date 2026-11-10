@@ -1,0 +1,16 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.61s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-ed6f58dd3efb6ea2)
+
+running 9 tests
+test application::local_agents::contract_tests::cloudroom_bounds_deadline_rejects_elapsed_and_above_maximum ... ok
+test application::local_agents::contract_tests::cloudroom_bounds_prompt_counts_utf8_bytes_and_redacts_debug ... ok
+test application::local_agents::contract_tests::cloudroom_contract_identities_validate_on_decode ... ok
+test application::local_agents::contract_tests::cloudroom_bounds_admission_preserves_control_capacity ... ok
+test application::local_agents::contract_tests::cloudroom_contract_commands_are_closed_and_controls_are_explicit ... ok
+test application::local_agents::contract_tests::cloudroom_contract_machine_capabilities_reference_an_installation_scoped_snapshot ... ok
+test application::local_agents::contract_tests::cloudroom_contract_operations_freeze_digest_and_separate_dispatch_outcomes ... ok
+test application::local_agents::contract_tests::cloudroom_contract_effect_success_requires_its_thread_and_a_turn ... ok
+test application::local_agents::contract_tests::cloudroom_bounds_output_and_catalog_decode_at_their_limits ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 3194 filtered out; finished in 0.01s
+

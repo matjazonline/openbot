@@ -1,0 +1,17 @@
+
+running 1 test
+
+thread 'adapters::persistence::workflow::tests::local_agent_tests::e2e::native::cloudroom_e2e_native_claude_packaged_plugin_pairing_workflow_ui_restart_followup_stop' (18380742) panicked at src/adapters/persistence/workflow/local_agent_e2e_tests.rs:300:17:
+assertion `left == right` failed
+  left: "uncertain"
+ right: "succeeded"
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test adapters::persistence::workflow::tests::local_agent_tests::e2e::native::cloudroom_e2e_native_claude_packaged_plugin_pairing_workflow_ui_restart_followup_stop ... FAILED
+
+failures:
+
+failures:
+    adapters::persistence::workflow::tests::local_agent_tests::e2e::native::cloudroom_e2e_native_claude_packaged_plugin_pairing_workflow_ui_restart_followup_stop
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 3323 filtered out; finished in 39.49s
+

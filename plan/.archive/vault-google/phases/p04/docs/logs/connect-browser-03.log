@@ -1,0 +1,10 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.20s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-048b7abd3ed0c794)
+
+running 2 tests
+test adapters::http::routes::ui_vault_connect::tests::integration_connect_browser_auth_csrf_form_limits_and_switched_session_deny ... ok
+test adapters::http::routes::ui_vault_connect::tests::integration_connect_browser_start_callback_status_and_replay_are_sanitized ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 3295 filtered out; finished in 0.97s
+

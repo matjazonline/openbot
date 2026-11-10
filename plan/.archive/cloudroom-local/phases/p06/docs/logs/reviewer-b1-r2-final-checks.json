@@ -1,0 +1,15 @@
+{
+  "artifact": "c52a03aec4aaa4fbc55afcf807c77e8814aa4eedffa05f3d727b3217723d3def",
+  "head": "97e5d60dc538e26c7cb976a8d63772eed80baff2",
+  "entry_final_equal": true,
+  "authority_r32_equal": true,
+  "D01_r3_equal": true,
+  "manifest_file_hashes_verified": 32,
+  "checks": {
+    "plugin": "86 passed",
+    "typecheck": "PASS",
+    "combined_PG_WSS_Node_lifecycle": "1 passed",
+    "whitespace": "PASS",
+    "current_package_inputs": "PASS"
+  }
+}

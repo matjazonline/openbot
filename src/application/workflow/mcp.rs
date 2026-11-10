@@ -7,7 +7,7 @@ use super::{
     compiler::{Schema, SourceSpan},
     publication::ToolSnapshot,
 };
-use crate::application::agent::ActionRecovery;
+use crate::application::agent::{ActionEffect, ActionRecovery, ApprovedActionPolicy};
 use crate::{
     app_error::{AppError, AppResult},
     domain::workflow::{CompanyId, TypeName},
@@ -22,6 +22,7 @@ pub use runtime::*;
 
 pub const MAX_MCP_OPERATION_BYTES: usize = 65_536;
 pub const MAX_MCP_OPERATIONS: usize = 256;
+pub const MCP_REVIEW_PAGE_SIZE: usize = 8;
 
 /// The frozen output contract of a tool that declares no `outputSchema`: MCP structured
 /// content is always a JSON object.
@@ -57,12 +58,44 @@ pub fn mcp_result_is_error(result: &Value) -> bool {
 
 /// Trusted workflow policy for one granted MCP tool, installed by a company administrator.
 /// MCP annotations, discovery metadata and session ids never supply any part of it.
-#[derive(Clone)]
+#[derive(Clone, serde::Serialize)]
 pub struct McpOperation {
     pub tool: ToolSnapshot,
     pub approval_required: bool,
 }
 impl McpOperation {
+    /// Freeze server-loaded discovery under an explicit administrator policy.
+    pub fn review(
+        company: CompanyId,
+        discovered: &McpDiscoveredTool,
+        effect: ActionEffect,
+        approval_required: bool,
+        policy_revision: u64,
+    ) -> AppResult<Self> {
+        let operation = Self {
+            tool: ToolSnapshot {
+                workflow: None,
+                company_id: company,
+                contract: super::registry::ToolContract {
+                    name: TypeName::parse(discovered.name.as_str()).map_err(|_| invalid())?,
+                    connection: None,
+                    input_schema: discovered.input_schema.clone(),
+                    output_schema: offered(discovered).1,
+                },
+                policy: ApprovedActionPolicy {
+                    capability: TypeName::parse(format!("mcp.{}", discovered.name.as_str()))
+                        .map_err(|_| invalid())?,
+                    policy_revision,
+                    effect,
+                    recovery: ActionRecovery::Reconcile,
+                },
+            },
+            approval_required,
+        };
+        operation.validate_snapshot(company)?;
+        Ok(operation)
+    }
+
     /// Validates the policy against the connection's current reviewed catalog entry.
     /// Stored snapshots are re-validated with this at every use.
     pub fn validate(
@@ -71,6 +104,17 @@ impl McpOperation {
         reviewed: Option<&McpDiscoveredTool>,
         granted: bool,
     ) -> AppResult<()> {
+        self.validate_snapshot(company)?;
+        if !granted
+            || !reviewed
+                .is_some_and(|entry| discovery_matches(&self.tool, std::slice::from_ref(entry)))
+        {
+            return Err(invalid());
+        }
+        Ok(())
+    }
+
+    pub fn validate_snapshot(&self, company: CompanyId) -> AppResult<()> {
         let tool = &self.tool;
         let name = tool.contract.name.as_str();
         if tool.company_id != company
@@ -79,9 +123,6 @@ impl McpOperation {
             || tool.policy.policy_revision == 0
             || McpToolName::try_from(name.to_owned()).is_err()
             || serde_json::to_vec(tool).map_err(|_| invalid())?.len() > MAX_MCP_OPERATION_BYTES
-            || !granted
-            || !reviewed
-                .is_some_and(|reviewed| discovery_matches(tool, std::slice::from_ref(reviewed)))
         {
             return Err(invalid());
         }
@@ -96,6 +137,31 @@ impl McpOperation {
         }
         Ok(())
     }
+}
+
+pub enum McpOperationSelection {
+    Page { after: Option<TypeName> },
+    Exact(TypeName),
+}
+
+pub struct McpOperationRead {
+    pub connection: Uuid,
+    pub catalog_revision: i64,
+    pub selection: McpOperationSelection,
+}
+
+#[derive(serde::Serialize)]
+pub struct McpOperationReview {
+    pub version: Uuid,
+    pub operation: McpOperation,
+    pub schema_current: bool,
+    pub granted: bool,
+}
+
+#[derive(serde::Serialize)]
+pub struct McpOperationPage {
+    pub operations: Vec<McpOperationReview>,
+    pub next: Option<TypeName>,
 }
 
 /// `expected_version`: None registers a new approval only; Some(v) replaces exactly the
@@ -117,6 +183,12 @@ pub struct McpOperationRevoke {
 
 #[async_trait]
 pub trait McpOperations: Send + Sync {
+    async fn reviewed_mcp_operations(
+        &self,
+        company: CompanyId,
+        actor: WorkflowActor,
+        read: McpOperationRead,
+    ) -> AppResult<McpOperationPage>;
     /// Returns the new approval version.
     async fn register_mcp_operation(
         &self,

@@ -4,6 +4,11 @@
 > when needed. Do not add data backfills, dual reads/writes, legacy decoders, compatibility shims,
 > or staged rollouts for existing data.
 
+> **Organization plans, 2026-11-09.** An evaluation run executes under a department context: the
+> desk it is bound to decides the run scopes from [05-scopes](../05-scopes/README.md), the role
+> holders from [02-workflow-roles](../02-workflow-roles/README.md) and the intake schema from the
+> `channel.call` plan. Datasets record that context so scoped behavior is tested, not bypassed.
+
 ## Outcome and status
 
 Status: proposed implementation, 2026-11-06. This plan does not implement evals or claim that any

@@ -1,0 +1,6 @@
+
+running 1 test
+test adapters::persistence::local_agents::protocol::capacity_tests::cloudroom_commands_uncertain_native_work_keeps_capacity_until_known_terminal_evidence ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3262 filtered out; finished in 0.56s
+

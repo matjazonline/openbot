@@ -1,0 +1,9 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.20s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-048b7abd3ed0c794)
+
+running 1 test
+test adapters::persistence::workflow::tests::http_tests::vault_tests::execution::native_portability::native_journeys::vault_google_e2e_reviewed_supplied_mime_resumes_after_expiry_with_same_approval ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3626 filtered out; finished in 2.79s
+

@@ -1,0 +1,76 @@
+[
+  {
+    "id": "bb-plugin-openbot-local@0.1.0",
+    "name": "bb-plugin-openbot-local",
+    "version": "0.1.0",
+    "size": 214501,
+    "unpackedSize": 1246858,
+    "shasum": "9857b8f3865781213e958ad3df2db0b4d552b11b",
+    "integrity": "sha512-1N7fdPld9siu6ByMo5reSMPkbKf6252WhrCiAcmS0U677cjCc5FqFTQEwMDlygYRSh5s/IMUzPvYeCMu2385Jg==",
+    "filename": "bb-plugin-openbot-local-0.1.0.tgz",
+    "files": [
+      {
+        "path": "README.md",
+        "size": 3685,
+        "mode": 420
+      },
+      {
+        "path": "compatibility/manifest.json",
+        "size": 6942,
+        "mode": 420
+      },
+      {
+        "path": "compatibility/patches/local-onboarding.patch",
+        "size": 3137,
+        "mode": 420
+      },
+      {
+        "path": "compatibility/patches/sdk-mutation-abort.patch",
+        "size": 2604,
+        "mode": 420
+      },
+      {
+        "path": "compatibility/README.md",
+        "size": 5855,
+        "mode": 420
+      },
+      {
+        "path": "dist/server.js",
+        "size": 68484,
+        "mode": 420
+      },
+      {
+        "path": "dist/server.js.map",
+        "size": 124379,
+        "mode": 420
+      },
+      {
+        "path": "package.json",
+        "size": 1324,
+        "mode": 420
+      },
+      {
+        "path": "types/bb-plugin-sdk.d.ts",
+        "size": 1017020,
+        "mode": 420
+      },
+      {
+        "path": "types/manifest.json",
+        "size": 849,
+        "mode": 420
+      },
+      {
+        "path": "types/UPSTREAM-LICENSE",
+        "size": 11357,
+        "mode": 420
+      },
+      {
+        "path": "types/UPSTREAM-NOTICE",
+        "size": 1222,
+        "mode": 420
+      }
+    ],
+    "entryCount": 12,
+    "bundled": []
+  }
+]

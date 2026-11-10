@@ -1,0 +1,44 @@
+[
+  {
+    "command": [
+      "rustc",
+      "--version"
+    ],
+    "output": "rustc 1.96.0 (ac68faa20 2026-05-25)"
+  },
+  {
+    "command": [
+      "cargo",
+      "--version"
+    ],
+    "output": "cargo 1.96.0 (30a34c682 2026-05-25)"
+  },
+  {
+    "command": [
+      "node",
+      "--version"
+    ],
+    "output": "v24.21.0"
+  },
+  {
+    "command": [
+      "npm",
+      "--version"
+    ],
+    "output": "11.19.0"
+  },
+  {
+    "command": [
+      "/opt/homebrew/opt/postgresql@18/bin/psql",
+      "--version"
+    ],
+    "output": "psql (PostgreSQL) 18.6 (Homebrew)"
+  },
+  {
+    "command": [
+      "uname",
+      "-srm"
+    ],
+    "output": "Darwin 25.5.0 arm64"
+  }
+]

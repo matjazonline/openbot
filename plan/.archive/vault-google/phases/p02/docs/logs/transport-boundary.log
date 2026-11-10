@@ -1,0 +1,2 @@
+$ bash scripts/transport-boundary-check.sh
+transport boundary check passed

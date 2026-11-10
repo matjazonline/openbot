@@ -1,0 +1,253 @@
+{
+  "version": 1,
+  "round": "CL-P06-B1-R1",
+  "artifact": "2fdbad30cd3ba21436662b82dfd114ad519e75f52736b322a7b5d51db4d393fb",
+  "checks": [
+    {
+      "criteria": [
+        "AC3",
+        "AC4",
+        "AC5"
+      ],
+      "command": "explicit owned DATABASE_URL/TEST_DATABASE_URL target/debug/deps/open_bots-50aeda0c9f5dbc3a cloudroom_; current extra cloudroom_management_durable_status test",
+      "fixture": "owned PG18.6 loopback56388; build/test disposable databases; no missing-DB skip",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/cloudroom-r15.txt",
+          "sha256": "d7a0f968c78c4857b31e7d41f843940aa20c48b641b3f84eb478065652632691"
+        },
+        {
+          "path": "logs/status-metadata-r1.txt",
+          "sha256": "727f0693418f8f9f815bbc9f1a5fd4d49b95e79ec31d24ada8fffd942d0bfe98"
+        },
+        {
+          "path": "logs/cloudroom-list-r16.txt",
+          "sha256": "833c6cc1db80d6dcc40abc56231f3b8c6d42c016429fb5cefe247017c810f5f9"
+        },
+        {
+          "path": "logs/test-inventory-r2.json",
+          "sha256": "0da080f718d2f7461559d3b9cf30cec673b625921ee25fa1c0b0dbf199de0beb"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC4",
+        "AC5"
+      ],
+      "command": "target/debug/deps/open_bots-50aeda0c9f5dbc3a cloudroom_lifecycle_",
+      "fixture": "owned PG18.6 loopback56388; build/test disposable databases; no missing-DB skip",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/lifecycle-r14.txt",
+          "sha256": "621bc4603fee4ad84da4e4eb49bb6b636bae0aece8eeea5a48b4d5c039c8c49b"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC3",
+        "AC5"
+      ],
+      "command": "target/debug/deps/open_bots-50aeda0c9f5dbc3a cloudroom_commands_",
+      "fixture": "owned PG18.6 loopback56388; build/test disposable databases; no missing-DB skip",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/command-regressions-r1.txt",
+          "sha256": "bb26209811881f4c0fd69a735e6a7dafd7c7137828192b6663337af23ae2ad79"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC4"
+      ],
+      "command": "target/debug/deps/open_bots-50aeda0c9f5dbc3a run_retention_",
+      "fixture": "owned PG18.6 loopback56388; build/test disposable databases; no missing-DB skip",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/workflow-storage-list-r2.txt",
+          "sha256": "235835fa739c555f9b9e712136a75c9e2c828e848e99983b725343c9f1e3429b"
+        },
+        {
+          "path": "logs/workflow-storage-r2.txt",
+          "sha256": "0052a3f49846850b8b625261a13ac201e264d877e32aae6d996a4f04e838f9b6"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC1",
+        "AC2",
+        "AC5"
+      ],
+      "command": "npm --prefix integrations/cloudroom-plugin test; npm --prefix integrations/cloudroom-plugin run typecheck",
+      "fixture": "real SQLite/WSS fixtures, counted public SDK and real supervised child processes; Node24.21.0/npm11.19.0",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/plugin-regressions-r7.txt",
+          "sha256": "f1c3b6d3d083543ecbcd9ecb46139148010a127779c3d2463fdb8064c0a8c240"
+        },
+        {
+          "path": "logs/plugin-typecheck-final-r1.txt",
+          "sha256": "2a76b0b41aed0a0cb5fa95cac7cc06b64b1ae4106faf0279b855bd394e7dadab"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC1",
+        "AC2",
+        "AC6"
+      ],
+      "command": "node scripts/prepare-runtime.mjs /tmp/openbot-cloudroom-d8b3cc3; npm run package -- /tmp/openbot-cloudroom-p06-artifacts-final-r2",
+      "fixture": "pinned Cloudroom source plus both reviewed patches; SDK0.6.50, pnpm10.34.9",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/prepare-runtime-r1.txt",
+          "sha256": "350078eb84d6984f49e1aaaefe6d7d6afd834504505211cd79f77ceeb84cd607"
+        },
+        {
+          "path": "logs/package-final-r2.txt",
+          "sha256": "8039a3e934fa8dfa7e6034eaea59b521edaf4ce4c5a1e93277d131fb497fd170"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC1",
+        "AC2",
+        "AC6"
+      ],
+      "command": "node plan/cloudroom-local/phases/p06/docs/logs/packaged-smoke-r4.mjs",
+      "fixture": "disposable macOS unprivileged packaged wrapper/profile; runtime-identical package before README-only edit",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/packaged-smoke-r4.txt",
+          "sha256": "5599aa9c976eb75689bf1c5b827be8a51a62bf11df12f6ff0c6e3a5f1156a752"
+        },
+        {
+          "path": "logs/packaged-smoke-r4.json",
+          "sha256": "57ca6013ecc3ee26d2916174d86e24e2467152c3c0bf89e6dda2cb8a51fe1fdc"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC2",
+        "AC6"
+      ],
+      "command": "node plan/cloudroom-local/phases/p06/docs/logs/packaged-native-lifecycle-r3.mjs",
+      "fixture": "final archive SHA3df1730528eaae9087be9b51a07e249b3ea537e68fd3c4d9490362af4b4970fc; disposable native Codex project under existing authorized login; paired production-plugin acceptance not exercised",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/packaged-native-lifecycle-r3.txt",
+          "sha256": "6a9d3237be9f64b72434df1112590fc30548ad9629c1d7fc6531e83920ac515c"
+        },
+        {
+          "path": "logs/packaged-native-lifecycle-r3.json",
+          "sha256": "e094651476e040dde6a3e01bc0f3871e1885a7f250b05235cce4c752e3873c26"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC3",
+        "AC6"
+      ],
+      "command": "CLOUDROOM_MANAGEMENT_BROWSER_FIXTURES=/tmp/openbot-cloudroom-p06-browser binary dump_cloudroom_management_browser_fixtures --ignored; node --test scripts/tests/local-agents-browser.mjs",
+      "fixture": "actual production markup/assets from owned real-PG generator; installed Chromium",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/browser-fixtures-r1.txt",
+          "sha256": "6f50db2b9b4b9de1445f9299d3c4b46d9f1f7db3ad641e5f7399d05c374d3959"
+        },
+        {
+          "path": "logs/browser-r1.txt",
+          "sha256": "f931ee21f5706d4e570188044d6b20d6549caf913af655827295cfb8eb3e70fc"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC1",
+        "AC3",
+        "AC4",
+        "AC6"
+      ],
+      "command": "SQLX_OFFLINE=false cargo sqlx prepare -- --all-targets; SQLX_OFFLINE=true CARGO_INCREMENTAL=0 cargo clippy --locked --offline --all-targets -- -D warnings",
+      "fixture": "owned PG18.6 loopback56388; build/test disposable databases; no missing-DB skip",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/sqlx-r1.txt",
+          "sha256": "98d5553d249988e1c4c3c092e95297e5b8b69f01d00fe172194b2c3f719a8b0e"
+        },
+        {
+          "path": "logs/clippy-r2.txt",
+          "sha256": "bfa111b89abc10820ccdbf8e23df6f2c5024869142617e293e6c4c8d37c2d77f"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC6"
+      ],
+      "command": "cargo fmt --all -- --check; git diff --check; npm run check:css; graft build",
+      "fixture": "repository static/build/source checks",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/format-r1.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": "logs/whitespace-r1.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": "logs/css-r1.txt",
+          "sha256": "b5a657dc78d28b8f0ecdf219559c6c07d444a3e778eca4c4735f2408d7243afb"
+        },
+        {
+          "path": "logs/graft-r1.txt",
+          "sha256": "bca7dee970461a816fc1e1ced37fce9338ea0a75236c3adf0c9dbc2445fceb83"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC2",
+        "AC6"
+      ],
+      "command": "native headless Linux packaged installation/systemd boot/provider smoke",
+      "fixture": "macOS host; no disposable Linux target supplied",
+      "status": "NOT EXERCISED",
+      "reason": "User explicitly chose Leave Linux acceptance unverified (I005/r1); implementation/template supplied; no Linux runtime claim."
+    },
+    {
+      "criteria": [
+        "AC6"
+      ],
+      "command": "cargo test --locked --offline --test source_modules",
+      "fixture": "actual repository Cargo targets",
+      "status": "NOT EXERCISED",
+      "reason": "No source_modules test target exists. Failed invocation retained; all-target compile/current test discovery used instead.",
+      "files": [
+        {
+          "path": "logs/source-modules-r1.txt",
+          "sha256": "9572f07da4b1ba698720c7f22b9599e18b2d374442ec0ae20c0d12e07eab7a5b"
+        }
+      ]
+    }
+  ]
+}

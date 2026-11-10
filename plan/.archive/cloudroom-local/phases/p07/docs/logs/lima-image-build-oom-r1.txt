@@ -1,0 +1,3 @@
+containerd invoked oom-killer: gfp_mask=0x140cca(GFP_HIGHUSER_MOVABLE|__GFP_COMP), order=0, oom_score_adj=200
+oom-kill:constraint=CONSTRAINT_NONE,nodemask=(null),cpuset=docker.service,mems_allowed=0,global_oom,task_memcg=/user.slice/user-501.slice/user@501.service/app.slice/p177stupjewk92jvzgigfdgqe,task=rustc,pid=45456,uid=501
+Out of memory: Killed process 45456 (rustc) total-vm:4833324kB, anon-rss:3022700kB, file-rss:1036kB, shmem-rss:0kB, UID:501 pgtables:7944kB oom_score_adj:200

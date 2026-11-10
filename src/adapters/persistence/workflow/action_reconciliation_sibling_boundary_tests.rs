@@ -185,6 +185,7 @@ impl SiblingDispatchDiagnostic {
             RemoteDispatchObservation::ApprovalParked(_) => "ApprovalParked",
             RemoteDispatchObservation::ApprovalRequired => "ApprovalRequired",
             RemoteDispatchObservation::PossibleDispatchExists => "PossibleDispatchExists",
+            RemoteDispatchObservation::PreparationFailed(_) => "PreparationFailed",
             RemoteDispatchObservation::Committed(_) => "Committed",
             RemoteDispatchObservation::Interrupted => "Interrupted",
         };

@@ -1,0 +1,11 @@
+{
+  "oldTests": 9,
+  "newTests": 12,
+  "removed": [],
+  "added": [
+    "application::local_agents::contract_tests::cloudroom_contract_catalog_refuses_unsupported_model_reasoning",
+    "application::local_agents::contract_tests::cloudroom_contract_catalog_success_requires_catalog_evidence",
+    "application::local_agents::contract_tests::cloudroom_contract_reasoning_is_frozen_into_the_create_digest"
+  ],
+  "coordination": "r4 exact match; CL-I005/r1 acknowledged, CL-C001/r1 unchanged"
+}

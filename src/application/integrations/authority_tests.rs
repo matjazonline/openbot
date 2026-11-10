@@ -174,6 +174,7 @@ async fn vault_authority_host_port_denial_propagates() {
     let invocation = AuthorizedInvocation {
         authorization: snapshot(&grant),
         operation: OperationId::parse("messages.read").unwrap(),
+        target: OperationTarget::Http,
         arguments: OperationArguments::new(json!({})).unwrap(),
         request_digest: [0; 32],
         correlation: CorrelationId::parse("correlation").unwrap(),

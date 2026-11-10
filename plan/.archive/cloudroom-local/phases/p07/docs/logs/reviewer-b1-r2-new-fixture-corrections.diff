@@ -1,0 +1,467 @@
+--- R1/integrations/cloudroom-plugin/test/e2e-peer.ts
++++ R2/integrations/cloudroom-plugin/test/e2e-peer.ts
+@@ -31,6 +31,11 @@
+ }
+ const persistProvider = () => writeFileSync(providerFile, JSON.stringify({ state: native.state, calls: native.calls.map(call => call.kind) }), { mode: 0o600 });
+ persistProvider();
++if (config.cut === 'after_admission' && !existsSync(cutFile)) {
++  // The Rust owner has committed admission; this peer has not opened a socket.
++  writeFileSync(cutFile, JSON.stringify({ stage: config.cut }), { mode: 0o600 });
++  process.kill(process.pid, 'SIGKILL');
++}
+ function cut(stage: string, record: CommandRecord) {
+   if (config.cut !== stage || existsSync(cutFile) || !['create', 'send'].includes(record.operation.command.kind)) return;
+   writeFileSync(cutFile, JSON.stringify({ stage, operation: record.operation.id }), { mode: 0o600 });
+--- R1/integrations/cloudroom-plugin/test/native-peer.ts
++++ R2/integrations/cloudroom-plugin/test/native-peer.ts
+@@ -2,7 +2,8 @@
+ // Pairing/auth material remains in a private config file and request bodies.
+ import assert from 'node:assert/strict';
+ import { spawn, execFileSync, type ChildProcess } from 'node:child_process';
+-import { readFileSync, statSync, mkdirSync, writeFileSync } from 'node:fs';
++import { readFileSync, statSync, mkdirSync, writeFileSync, mkdtempSync, existsSync, rmSync } from 'node:fs';
++import { homedir } from 'node:os';
+ import Database from 'better-sqlite3';
+ import { resolve, join } from 'node:path';
+ import { createServer } from 'node:net';
+@@ -10,6 +11,7 @@
+ import { createHash } from 'node:crypto';
+ import { createInterface } from 'node:readline';
+ import { readBoundedJson } from '../src/enrollment.js';
++import { loggedOutProviderEnvironment } from './native-provider-environment.js';
+ 
+ assert.equal(process.env.OPENBOT_CLOUDROOM_NATIVE_SMOKE, '1', 'native acceptance requires explicit opt-in');
+ const inputFile = process.argv[2]!; assert(statSync(inputFile).size < 16 * 1024);
+@@ -28,9 +30,13 @@
+   const value = (listener.address() as { port: number }).port; await new Promise<void>(done => listener.close(() => done())); return value; };
+ const ports = [await port(), await port(), await port()]; const origin = `http://127.0.0.1:${ports[0]}`;
+ const uiOrigin = `http://127.0.0.1:${ports[2]}`;
+-const env = { ...process.env, NODE_ENV: 'production', BB_DATA_DIR: profile, ROOM_SERVER_URL: origin,
++let env: NodeJS.ProcessEnv = { ...process.env, NODE_ENV: 'production', BB_DATA_DIR: profile, ROOM_SERVER_URL: origin,
+   ROOM_HOST_DAEMON_PORT: String(ports[1]), PATH: cfg.opencodeBin ? `${cfg.opencodeBin}:${process.env.PATH}` : process.env.PATH };
+-if (cfg.provider === 'acp-opencode') assert.match(execFileSync('opencode', ['--version'], { env, encoding: 'utf8', timeout: 5000 }), /1\.19\.5/);
++if (cfg.provider === 'acp-opencode') {
++  assert.match(execFileSync('opencode', ['--version'], { env, encoding: 'utf8', timeout: 5000 }), /1\.19\.5/);
++  assert(!env.OPENCODE_CONFIG_CONTENT, 'native acceptance must not replace an existing inline provider configuration');
++  env.OPENCODE_CONFIG_CONTENT = JSON.stringify({ permission: { edit: 'ask' } });
++}
+ const cli = (args: string[]) => execFileSync(process.execPath, [resolve(cfg.source, 'gui/apps/cli/dist/index.js'), ...args], {
+   cwd: resolve(cfg.source, 'gui'), env, encoding: 'utf8', timeout: 60_000, maxBuffer: 2 * 1024 * 1024,
+ });
+@@ -58,32 +64,96 @@
+ const { localCallerHeaders } = await import(new URL('local-caller.mjs', compatibility).href);
+ const { proveUi } = await import(new URL('prove-ui.mjs', compatibility).href);
+ let headers: Record<string, string>; let thread: string | undefined; let ownedProject: string | undefined;
++let permissionDirectory: string | undefined; let permissionTarget: string | undefined;
+ async function settings(values: Record<string, unknown>) {
+   const response = await fetch(`${origin}/api/v1/plugins/openbot-local/settings`, { method: 'PUT', redirect: 'error',
+     headers: { ...headers, 'content-type': 'application/json' }, body: JSON.stringify({ values }), signal: AbortSignal.timeout(10_000) });
+   assert(response.ok, 'public plugin settings refused'); await readBoundedJson(response, 256 * 1024);
+ }
+-async function connected() {
++async function waitStatus(ready: (status: any) => boolean) {
+   const deadline = performance.now() + 60_000;
+   while (performance.now() < deadline) {
+     const status = jsonCli(['plugin', 'run', 'openbot-local', 'status']);
+-    if (status.paired && status.connection === 'connected' && status.providers.some((item: {provider:string;status:string}) => item.provider === cfg.provider && item.status === 'available')) return status;
++    if (status.paired && status.connection === 'connected' && ready(status)) return status;
+     await new Promise(done => setTimeout(done, 250));
+   }
+   throw new Error('paired production connector did not become ready');
+ }
++const connected = () => waitStatus(status => status.providers.some((item: {provider:string;status:string}) => item.provider === cfg.provider && item.status === 'available'));
+ const lines = createInterface({ input: process.stdin });
+ const deadline = setTimeout(() => lines.close(), 5 * 60_000);
++function readEvents(id: string): any[] {
++  const events: any[] = []; let after = 0;
++  for (let page = 0; page < 4; page++) {
++    const batch = jsonCli(['thread', 'log', id, '--json', '--limit', '100', '--after-seq', String(after)]);
++    assert(Array.isArray(batch) && batch.length <= 100);
++    for (const event of batch) { assert(Number.isSafeInteger(event.seq) && event.seq > after); after = event.seq; events.push(event); }
++    if (batch.length < 100) return events;
++  }
++  throw new Error('native acceptance history exceeded four bounded pages');
++}
++async function humanTerminal(marker: string) {
++  assert(thread); const deadline = performance.now() + 120_000;
++  // A native permission denial may interrupt the turn and pause its queue.
++  // The human explicitly sends the existing queued message; never resubmit it.
++  const queued = jsonCli(['thread', 'queue', 'list', thread, '--json']);
++  assert(Array.isArray(queued) && queued.length <= 32);
++  const own = queued.filter(item => JSON.stringify(item.content).includes(marker));
++  assert(own.length <= 1);
++  if (own.length === 1) {
++    assert(typeof own[0].id === 'string');
++    const lastTurn = readEvents(thread).filter(event => event.type === 'turn/completed').at(-1);
++    // ACP can retain an active thread after the denied turn is interrupted.
++    // The human explicitly stops that thread before resuming its existing queue.
++    if (lastTurn?.data.status === 'interrupted') cli(['thread', 'stop', thread]);
++    jsonCli(['thread', 'queue', 'send', thread, own[0].id, '--json']);
++  }
++  while (performance.now() < deadline) {
++    const events = readEvents(thread);
++    const requests = events.filter(event => event.type === 'client/turn/requested' && JSON.stringify(event.data.input).includes(marker));
++    assert(requests.length <= 1, 'independent human input must not be resubmitted');
++    const request = requests[0];
++    const accepted = request && events.find(event => event.type === 'turn/input/accepted' && event.data.clientRequestId === request.data.requestId);
++    if (accepted && events.some(event => event.type === 'turn/completed' && event.scope.turnId === accepted.scope.turnId)) {
++      assert(events.some(event => event.type === 'item/completed' && event.scope.turnId === accepted.scope.turnId
++        && event.data.item.type === 'agentMessage' && event.data.item.text.includes(marker)));
++      return accepted.scope.turnId;
++    }
++    await new Promise(done => setTimeout(done, 100));
++  }
++  throw new Error('independent human turn did not finish');
++}
++function transcript(operation: string) {
++  assert(thread && /^[0-9a-f-]{36}$/.test(operation));
++  const events = readEvents(thread);
++  assert(Array.isArray(events) && events.length <= 400);
++  const request = events.find((event: any) => event.type === 'client/turn/requested'
++    && JSON.stringify(event.data.input).includes(`Openbot operation ${operation}`));
++  const accepted = request && events.find((event: any) => event.type === 'turn/input/accepted' && event.data.clientRequestId === request.data.requestId);
++  return { events, turn: accepted?.scope.turnId };
++}
++async function terminal(operation: string, marker: string) {
++  const deadline = performance.now() + 120_000;
++  while (performance.now() < deadline) {
++    const { events, turn } = transcript(operation);
++    const complete = turn && events.find((event: any) => event.type === 'turn/completed' && event.scope.turnId === turn);
++    if (complete) {
++      assert.equal(complete.data.status, 'completed');
++      assert(events.some((event: any) => event.type === 'item/completed' && event.scope.turnId === turn
++        && event.data.item.type === 'agentMessage' && event.data.item.text.includes(marker)));
++      return turn;
++    }
++    await new Promise(done => setTimeout(done, 100));
++  }
++  throw new Error('native output did not become durable');
++}
+ async function executing(operation: string) {
+   assert(thread && /^[0-9a-f-]{36}$/.test(operation));
+   const deadline = performance.now() + 30_000;
+   while (performance.now() < deadline) {
+-    const events = jsonCli(['thread', 'log', thread, '--json', '--limit', '100']);
+-    const request = events.find((event: any) => event.type === 'client/turn/requested'
+-      && JSON.stringify(event.data.input).includes(`Openbot operation ${operation}`));
+-    const accepted = events.find((event: any) => event.type === 'turn/input/accepted' && event.data.clientRequestId === request?.data.requestId);
+-    if (accepted && events.some((event: any) => event.type === 'item/started' && event.data.item.type === 'commandExecution'
+-        && event.scope.kind === 'turn' && event.scope.turnId === accepted.scope.turnId)) return accepted.scope.turnId;
++    const { events, turn } = transcript(operation);
++    if (turn && events.some((event: any) => event.type === 'item/started' && event.data.item.type === 'commandExecution'
++        && event.scope.kind === 'turn' && event.scope.turnId === turn)) return turn;
+     await new Promise(done => setTimeout(done, 100));
+   }
+   throw new Error('native stop task did not execute its bounded shell command');
+@@ -101,10 +171,16 @@
+       COALESCE(json_extract(state,'$.lastObservation.observation.sequence'),json_extract(state,'$.lastObservation.sequence')) AS sequence,
+       json_extract(state,'$.lastObservation.observation.evidence.kind') AS evidence
+       FROM commands ORDER BY rowid LIMIT 16`).all();
+-    const events = thread ? jsonCli(['thread', 'log', thread, '--json', '--limit', '100']) : [];
+-    writeFileSync(join(cfg.evidence, 'diagnostics.json'), JSON.stringify({ stage, commands, events: events.map((event: any) => ({
++    const events = thread ? readEvents(thread) : [];
++    const threads = jsonCli(['thread', 'list', '--json']);
++    assert(Array.isArray(threads) && threads.length <= 8);
++    const nativeThreads = threads.map(item => ({ id: item.id, status: item.status,
++      events: readEvents(item.id).map(event => ({ type: event.type, status: event.data.status })) }));
++    writeFileSync(join(cfg.evidence, 'diagnostics.json'), JSON.stringify({ stage, commands, nativeThreads, permissionTargetCreated: permissionTarget ? existsSync(permissionTarget) : null, events: events.map((event: any) => ({
+       seq: event.seq, type: event.type, scope: event.scope, request: event.data.requestId, clientRequest: event.data.clientRequestId,
+       source: event.data.source, status: event.data.status, itemType: event.data.item?.type,
++      ...(cfg.provider === 'acp-opencode' && stage === 'permission_prompt' && event.data.item?.type === 'agentMessage'
++        ? { fixtureAgentText: String(event.data.item.text).slice(0, 1000) } : {}),
+       operation: JSON.stringify(event.data.input ?? '').match(/Openbot operation ([0-9a-f-]{36})/)?.[1],
+     })) }, null, 2));
+   } finally { db.close(); }
+@@ -122,15 +198,21 @@
+   for (const provider of ['codex', 'claude-code', 'acp-opencode']) {
+     try { jsonCli(['provider', 'models', provider, '--machine', host, '--json']); } catch { /* actual selected-provider proof remains mandatory */ }
+   }
+-  stage = 'pair';
++  stage = 'pair_settings';
+   await settings({ openbotOrigin: cfg.origin, machineName: `Disposable ${cfg.provider} acceptance`, selectedProjects: project.id, pairingCode: cfg.pairingCode });
+-  cli(['plugin', 'reload', 'openbot-local']); await connected();
++  stage = 'pair_reload'; cli(['plugin', 'reload', 'openbot-local']); stage = 'pair_connected'; await connected();
+   emit({ event: 'ready', project: project.id, profile, ports });
+   for await (const line of lines) {
+-    assert(Buffer.byteLength(line) <= 4096); const input = JSON.parse(line) as { command: string; thread?: string; text?: string; operation?: string };
++    assert(Buffer.byteLength(line) <= 4096); const input = JSON.parse(line) as { command: string; thread?: string; text?: string; operation?: string; permissionMode?: string };
+     if (input.thread !== undefined) { assert(/^thr_[a-z0-9]+$/.test(input.thread)); thread = input.thread; }
+     if (input.command === 'restart') {
+       stage = 'restart'; await stop(); await boot(); headers = await localCallerHeaders(origin, profile); await connected(); emit({ event: 'restarted' });
++    } else if (input.command === 'shutdown') {
++      stage = 'shutdown'; await stop(); emit({ event: 'shutdown' });
++    } else if (input.command === 'boot') {
++      stage = 'boot'; await boot(); headers = await localCallerHeaders(origin, profile); await connected(); emit({ event: 'booted' });
++    } else if (input.command === 'terminal') {
++      stage = 'terminal'; assert(input.operation && input.text); emit({ event: 'terminal', turn: await terminal(input.operation, input.text) });
+     } else if (input.command === 'ui') {
+       stage = 'ui'; assert(thread && input.text && input.text.length <= 256);
+       const evidence = join(cfg.evidence, `ui-${Date.now()}`); mkdirSync(evidence, { recursive: true });
+@@ -138,16 +220,69 @@
+       emit({ event: 'ui', thread, project: project.id, evidence });
+     } else if (input.command === 'executing') {
+       stage = 'executing'; assert(input.operation); emit({ event: 'executing', turn: await executing(input.operation) });
++    } else if (input.command === 'human') {
++      stage = 'human'; assert(thread && input.text && input.text.length <= 256);
++      assert(input.permissionMode === undefined || input.permissionMode === 'accept-edits');
++      const receipt = jsonCli(['thread', 'tell', thread, `Reply exactly ${input.text}. Do not use tools, change files, access network, or start subagents.`, '--mode', 'queue', '--json',
++        ...(input.permissionMode ? ['--permission-mode', input.permissionMode] : [])]);
++      emit({ event: 'human', independentlyOriginated: true, queued: receipt.delivery === 'queued' });
++    } else if (input.command === 'human_terminal') {
++      stage = 'human_terminal'; assert(input.text); emit({ event: 'human_terminal', turn: await humanTerminal(input.text) });
++    } else if (input.command === 'permission_prompt') {
++      stage = 'permission_prompt'; assert(input.text && input.text.length <= 256);
++      if (cfg.provider === 'codex') {
++        emit({ event: 'permission_prompt', prompt: `Disposable permission test: call exec_command exactly once with sandbox_permissions set to require_escalated and a justification asking the human to allow this disposable local request. Do not attempt the command without requesting elevated permission first. The command is exactly curl --max-time 5 --silent ${origin}/api/v1/system/version. If denied, do not retry or work around it. Finally reply exactly ${input.text}. Do not read/change files, use other URLs, or start subagents.` });
++      } else {
++        assert(!permissionTarget);
++        if (cfg.provider === 'claude-code') {
++          permissionDirectory = mkdtempSync(join(homedir(), '.openbot-p07-permission-'));
++          permissionTarget = join(permissionDirectory, 'smoke.txt');
++        } else permissionTarget = join(cfg.workspace, 'smoke-permission.txt');
++        assert(!existsSync(permissionTarget));
++        const tool = cfg.provider === 'claude-code' ? 'Write' : 'available file-creation (write or apply_patch)';
++        const policy = cfg.provider === 'claude-code' ? 'The fresh test-owned target is outside the project.' : 'The fresh test-owned target is in the project, whose native edit policy explicitly requires human approval.';
++        emit({ event: 'permission_prompt', prompt: `Authorized disposable permission test: invoke your ${tool} tool exactly once to write the single word smoke to exactly ${permissionTarget}. ${policy} Invoke the tool directly; let its native permission callback ask the human. Do not ask in chat instead. If denied, do not retry or work around the boundary. Finally reply exactly ${input.text}. Do not access any other paths, use network, or start subagents.` });
++      }
++    } else if (input.command === 'deny') {
++      stage = 'deny'; assert(thread);
++      try {
++        execFileSync(process.execPath, [resolve(new URL('prove-native-ui.mjs', compatibility).pathname), uiOrigin, origin, profile, project.id, thread, 'deny', cfg.evidence],
++          { env, stdio: 'pipe', timeout: 75_000, maxBuffer: 1024 * 1024 });
++      } catch (error) {
++        // This controlled UI probe reports locator/assertion errors, never request headers.
++        const detail = (error as { stderr?: Buffer }).stderr?.toString('utf8') ?? 'UI probe timeout';
++        writeFileSync(join(cfg.evidence, 'deny-probe-failure.txt'), detail.slice(0, 4096), { mode: 0o600 });
++        throw error;
++      }
++      assert(!permissionTarget || !existsSync(permissionTarget), 'denied permission must not create the test-owned file');
++      emit({ event: 'deny', actualUi: true, deniedFileAbsent: true });
++    } else if (input.command === 'logged_out') {
++      stage = 'logged_out'; await stop(); const isolated = loggedOutProviderEnvironment(cfg.provider, env, cfg.directory); env = isolated.env;
++      await boot(); headers = await localCallerHeaders(origin, profile); const status = await waitStatus(() => true);
++      emit({ event: 'logged_out', ...isolated.proof, health: status.providers.find((item: any) => item.provider === cfg.provider)?.status });
++    } else if (input.command === 'journal') {
++      stage = 'journal'; assert(input.operation && /^[0-9a-f-]{36}$/.test(input.operation));
++      const db = new Database(join(profile, 'plugins/openbot-local/data.db'), { readonly: true, fileMustExist: true });
++      try {
++        const row = db.prepare('SELECT state FROM commands WHERE id=?').get(input.operation) as {state:string} | undefined;
++        assert(!row || Buffer.byteLength(row.state) <= 2 * 1024 * 1024); const record = row && JSON.parse(row.state);
++        emit({ event: 'journal', present: Boolean(record), sdkCalls: record?.sdkCalls ?? 0, stage: record?.stage, thread: record?.threadId, turn: record?.turnId });
++      } finally { db.close(); }
+     } else if (input.command === 'snapshot') {
+       stage = 'snapshot'; assert(thread);
+-      const events = jsonCli(['thread', 'log', thread, '--json', '--limit', '100']); assert(Array.isArray(events) && events.length <= 100);
+-      emit({ event: 'snapshot', thread, requests: events.filter(event => event.type === 'client/turn/requested').length,
++      const events = readEvents(thread); assert(Array.isArray(events) && events.length <= 400);
++      const native = jsonCli(['thread', 'show', thread, '--json']).thread;
++      assert(native.id === thread && Object.hasOwn(native, 'archivedAt'));
++      emit({ event: 'snapshot', thread, archived: native.archivedAt !== null, requests: events.filter(event => event.type === 'client/turn/requested').length,
+         turns: [...new Set(events.filter(event => event.scope?.kind === 'turn').map(event => event.scope.turnId))],
+         terminals: events.filter(event => event.type === 'turn/completed').map(event => ({ turn: event.scope.turnId, status: event.data.status })) });
+     } else if (input.command === 'close') break;
+     else throw new Error('unknown native acceptance command');
+   }
+-} catch {
++} catch (error) {
++  const failure = error as { name?: string; code?: string; status?: number; signal?: string };
++  writeFileSync(join(cfg.evidence, 'failure-stage.json'), JSON.stringify({ stage, name: failure.name,
++    code: failure.code, exitStatus: failure.status, signal: failure.signal }), { mode: 0o600 });
+   emit({ event: 'failure', stage }); process.exitCode = 1;
+ } finally {
+   clearTimeout(deadline); lines.close();
+@@ -163,4 +298,5 @@
+     try { cli(['plugin', 'remove', 'openbot-local']); } catch {}
+   }
+   await stop();
+-}
++  if (permissionDirectory) rmSync(permissionDirectory, { recursive: true, force: true });
++}
+--- R1/src/adapters/persistence/workflow/local_agent_e2e_tests.rs
++++ R2/src/adapters/persistence/workflow/local_agent_e2e_tests.rs
+@@ -62,6 +62,14 @@
+                 .await
+                 .unwrap()
+                 .unwrap();
++        }
++    }
++    async fn crash(mut self) {
++        for task in &self.tasks {
++            task.abort();
++        }
++        for task in self.tasks.drain(..) {
++            assert!(task.await.unwrap_err().is_cancelled());
+         }
+     }
+ }
+@@ -473,3 +481,6 @@
+ 
+ #[path = "local_agent_native_e2e_tests.rs"]
+ mod native;
++
++#[path = "local_agent_early_e2e_tests.rs"]
++mod early;
+--- R1/src/adapters/persistence/workflow/local_agent_native_e2e_tests.rs
++++ R2/src/adapters/persistence/workflow/local_agent_native_e2e_tests.rs
+@@ -2,6 +2,11 @@
+ use super::*;
+ use crate::application::local_agents::LocalMachineUseCases;
+ use futures::FutureExt;
++#[path = "local_agent_native_recovery_tests.rs"]
++mod recovery;
++use recovery::initial_native;
++#[path = "local_agent_native_interaction_tests.rs"]
++mod interactions;
+ 
+ struct NativeRig {
+     s: Setup,
+@@ -185,65 +190,6 @@
+         .await
+         .unwrap();
+ }
+-async fn initial_native(rig: &mut NativeRig) -> NativeInitial {
+-    let s = &rig.s;
+-    let p = &s.fixture.persistence;
+-    let workers = Workers::start(p);
+-    state_timeout(s, "succeeded", 120).await;
+-    workers.close().await;
+-    let session: Uuid = sqlx::query_scalar(
+-        "SELECT session_id FROM workflow_local_agent_calls WHERE company_id=$1 AND run_id=$2",
+-    )
+-    .bind(s.scope.company.as_uuid())
+-    .bind(s.scope.run.as_uuid())
+-    .fetch_one(p.pool())
+-    .await
+-    .unwrap();
+-    let session = SessionId::new(session).unwrap();
+-    let details = p
+-        .read_session(
+-            s.fixture.target.actor.user_id(),
+-            s.scope.company.as_uuid(),
+-            session,
+-        )
+-        .await
+-        .unwrap();
+-    let thread = details.session.thread_id.clone().unwrap();
+-    assert!(details.recent.entries.iter().any(|operation| {
+-        operation
+-            .output
+-            .as_ref()
+-            .is_some_and(|output| output.as_str().contains(&rig.marker))
+-    }));
+-    rig.peer
+-        .command(json!({"command":"ui","thread":thread,"text":rig.marker}))
+-        .await;
+-    assert_eq!(
+-        rig.peer.event_timeout("ui", 120).await["thread"]
+-            .as_str()
+-            .unwrap(),
+-        thread.as_str()
+-    );
+-    rig.peer
+-        .command(json!({"command":"snapshot","thread":thread}))
+-        .await;
+-    let before = rig.peer.event("snapshot").await;
+-    assert_eq!(before["requests"], 1);
+-    rig.peer.command(json!({"command":"restart"})).await;
+-    rig.peer.event_timeout("restarted", 120).await;
+-    rig.peer
+-        .command(json!({"command":"snapshot","thread":thread}))
+-        .await;
+-    let after = rig.peer.event("snapshot").await;
+-    assert_eq!(after["requests"], 1);
+-    assert_eq!(after["turns"], before["turns"]);
+-    NativeInitial {
+-        session,
+-        thread,
+-        before,
+-        after,
+-    }
+-}
+ async fn follow_native(rig: &mut NativeRig, initial: &NativeInitial) {
+     let s = &rig.s;
+     let p = &s.fixture.persistence;
+@@ -262,7 +208,11 @@
+         .await;
+     rig.peer.event_timeout("ui", 120).await;
+ }
+-async fn stop_native(rig: &mut NativeRig, initial: &NativeInitial) -> Value {
++async fn stop_native(
++    rig: &mut NativeRig,
++    initial: &NativeInitial,
++    expected_requests: usize,
++) -> Value {
+     let s = &rig.s;
+     let p = &s.fixture.persistence;
+     let active = ControlSession {
+@@ -278,6 +228,7 @@
+         )
+         .await;
+     let executing = rig.peer.event_timeout("executing", 45).await;
++    let mut controls = Vec::new();
+     for command in [SessionCommand::Stop, SessionCommand::Archive] {
+         let control = ControlSession {
+             actor: active.actor,
+@@ -287,7 +238,17 @@
+             command,
+         };
+         p.control_session(&control).await.unwrap();
+-        native_outcome(s, control.request_id, OperationOutcome::Succeeded).await;
++        let view = interactions::settled(rig, control.request_id).await;
++        let outcome = view.operation.outcome().unwrap();
++        assert!(matches!(
++            outcome,
++            OperationOutcome::Succeeded | OperationOutcome::Uncertain
++        ));
++        rig.peer
++            .command(json!({"command":"journal","operation":control.request_id}))
++            .await;
++        assert_eq!(rig.peer.event("journal").await["sdkCalls"], 1);
++        controls.push(json!({"command":control.command,"outcome":outcome,"sdkCalls":1}));
+         if matches!(control.command, SessionCommand::Stop) {
+             native_outcome(s, active.request_id, OperationOutcome::Cancelled).await;
+         }
+@@ -295,10 +256,21 @@
+     rig.peer
+         .command(json!({"command":"snapshot","thread":initial.thread}))
+         .await;
+-    let final_state = rig.peer.event("snapshot").await;
+-    assert_eq!(final_state["requests"], 3);
+-    assert_eq!(final_state["turns"].as_array().unwrap().len(), 3);
+-    assert_eq!(final_state["terminals"].as_array().unwrap().len(), 3);
++    let mut final_state = rig.peer.event("snapshot").await;
++    assert_eq!(
++        final_state["archived"], true,
++        "actual native archive must be witnessed even if the SDK reply was uncertain"
++    );
++    final_state["controls"] = json!(controls);
++    assert_eq!(final_state["requests"], expected_requests);
++    assert_eq!(
++        final_state["turns"].as_array().unwrap().len(),
++        expected_requests
++    );
++    assert_eq!(
++        final_state["terminals"].as_array().unwrap().len(),
++        expected_requests
++    );
+     assert!(
+         final_state["terminals"]
+             .as_array()
+@@ -312,11 +284,15 @@
+     configure_native(rig).await;
+     let initial = initial_native(rig).await;
+     follow_native(rig, &initial).await;
+-    let final_state = stop_native(rig, &initial).await;
++    let pending_permission = interactions::begin_permission(rig, &initial).await;
++    let interaction = interactions::finish_permission(rig, &initial, pending_permission).await;
++    let final_state = stop_native(rig, &initial, 6).await;
++    let logged_out = interactions::logged_out(rig).await;
+     json!({"status":"PASS","platform":std::env::consts::OS,"provider":rig.provider,"selection":rig.s.profile.selection,
+         "session":initial.session,"thread":initial.thread,"beforeRestart":initial.before,"afterRestart":initial.after,"final":final_state,
++        "nativeHumanPermission":interaction,"isolatedLoggedOutProvider":logged_out,
+         "realPairingHttp":true,"productionPlugin":true,"actualWorkflowWorkers":2,"actualUi":true,"fileAccess":true,
+-        "explicitThreadStopAndArchiveAccepted":true,"activeNativeStopMatchedInterruptedTurn":true,"nativeStopIsNotAnAtomicTargetedTurnGuarantee":true,"linux":"NOT EXERCISED on this host"})
++        "outputRecoveredAfterNativeOutputBeforeServerReceipt":true,"explicitThreadControlsAdmitted":true,"nativeThreadArchived":true,"activeNativeStopMatchedInterruptedTurn":true,"nativeStopIsNotAnAtomicTargetedTurnGuarantee":true,"linux":"NOT EXERCISED on this host"})
+ }
+ async fn close_native(mut rig: NativeRig) -> std::process::ExitStatus {
+     if rig.peer.child.try_wait().unwrap().is_none() {

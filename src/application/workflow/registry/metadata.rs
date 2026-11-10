@@ -53,14 +53,14 @@ pub(super) fn constraints(name: &str) -> ExecutionConstraints {
     use CapabilityRequirement::*;
     use EffectClass::*;
     let (effect, capabilities) = match name {
-        "data.map" | "decision.rule" | "channel.no_reply" => (Pure, vec![]),
+        kind if super::super::batch::is_pure_kind(kind) => (Pure, vec![]),
         "context.history" => (BoundedRead, vec![ContextRead]),
         "memory.load" => (BoundedRead, vec![MemoryRead]),
         "memory.save" => (DurableWrite, vec![MemoryWrite]),
         "ai.classify" | "decision.agent" => (ModelInvocation, vec![ModelInvoke]),
         "jev.evaluate" => (ModelInvocation, vec![ModelInvoke, ResourceUse]),
         "agent.run" => (AgentActions, vec![AgentInvoke]),
-        "http.request" | "mcp.call" => (
+        "http.request" | "mcp.call" | "local_agent.run" => (
             EffectClass::SharedAction,
             vec![ResourceUse, CapabilityRequirement::SharedAction],
         ),

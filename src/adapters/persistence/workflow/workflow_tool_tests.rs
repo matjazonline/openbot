@@ -605,3 +605,9 @@ async fn memory_access_level_workflow_tool_child_exactness_reaches_the_calling_r
 
 #[path = "agent_history_cascade_tests.rs"]
 mod history_cascade;
+
+#[path = "doop_binary_child_tests.rs"]
+mod doop_binary;
+
+#[path = "doop_binary_mcp_child_tests.rs"]
+mod doop_binary_mcp;
