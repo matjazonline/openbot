@@ -381,3 +381,153 @@
 - Diffing against the source copy kept from the previous round's CSS check gave an exact
   correction delta without a commit. Candidate (reviewer, recheck rounds): keep a copy of the
   reviewed tree at each round's digest so the next recheck can diff against it.
+
+## 01DEP-P04-B3-R1 — batch review B3 (04C.5 + 04D documentation, with B2-F6)
+
+### Identity
+
+- Date 2026-11-10. Workflow `implement-opus-reviewed-2_2`. Batch B3; stage: batch review
+  (documentation plus one doc-comment move). Phase `p04`.
+- Reviewer B: Opus 5.5 (`claude-opus-5-5`), agent `ad409b2d3d149c2c6`.
+- Phase start `b1026003`. Review base and HEAD are `5c64e7d1` (B2, accepted and committed). B3 is
+  uncommitted: 11 docs and `src/adapters/http/routes/mod.rs`. Artifact digest
+  `9204f954f94190de01874d963cd7cceb2ea31f14f332e6c60ea44514e73f15d1`, recomputed at the start and
+  before returning (exclusions `plan/01-departments/phases/p04/docs`,
+  `plan/01-departments/COORDINATION.md`).
+- Evidence: `logs/01DEP-P04-B3-R1.evidence.json` validates with `--expect-artifact` (PASS 2).
+- Coordination r7: `COORDINATION.md` sha256 = `logs/coordination-r7.md` = `3b556f5a…5414`
+  (I001 r1, I002 r2, I003 r2; C001–C004 r1 with plan 04/05 documentation targets).
+- Requirements: plan 04 items 04C.5 and 04D.1–4 and its documentation-only checks; README
+  decision 2; C001–C004. Author record: TASK.md "B3 implementation".
+
+### Coverage and evidence
+
+- **Factual check of `docs/departments.md`:** I read it line by line against the code. These
+  claims hold:
+  - the Departments tab URL and the read-only view for members;
+  - the field rules: address rules, a slug edit does not move the desk, 4096-byte charter,
+    8 levels, cycle refusal;
+  - membership; the members-only rules (must have a department, the C002 grants, Participant
+    Emails kept, no `@public`); trusted relays (C001);
+  - agents' own desks: every creation path goes through `create_company_agent_on`, the keyed
+    model is required, and the desk belongs to no department;
+  - the department desk at creation;
+  - lead changes: run-as and all five refusals, word for word against
+    `provisioning_department.rs`;
+  - the Leads run context (`agent_department.rs`: after the agent's prompt, roster only off
+    public desks, at most 20 children and 50 agents, agents only, frozen);
+  - `list_company_agents`; dispatch deferred (C004);
+  - every "Where departments show up" surface (B1/B2, including `view=waiting` and its 100 cap);
+  - delete rules; the JSON paths and payloads.
+
+  Wrong: who sees and reaches what (B3-F1), and the lead cardinality, the 404/400 split and two
+  lead-change cases (B3-F2).
+- **`inter_channel_agent_communication.md` "Department dispatch and escalation":** matches
+  C001–C004 and the run-context code. No finding.
+- **04C.5:** `agent-builder-context.md` and `custom_tools.md` describe the directory's department,
+  role and filter fields and the placement arguments, and say there is no intake schema yet.
+  `agent-authoring.md` has the directory's department fields (`:67`, `:105-116`, from B1/p03).
+  `system_addresses.md` matches the B2 `_help` formatter. `workflow-operations.md` matches the
+  runs routes; the JSON listing and board pass `department: None`.
+- **04D.2, the full `git diff -- docs`:** I read it hunk by hunk with `--word-diff`.
+  - Nothing that is a code identifier was converted outside backticks: table names,
+    `ChannelSelector`, `X-MailAgents-Channel-*` and URLs are all intact.
+  - Six headings were renamed; no link in the repository targets their old anchors.
+  - No "Slack desk" or other conversion of a provider's own "channel".
+  - The four kept lines are deliberate and acceptable.
+- **My own scan** (`logs/B3-R1-review-prose-scan.py`, output `logs/B3-R1-review-prose-scan.txt`):
+  case-insensitive, substring, outside fenced blocks, code spans, link targets and URLs.
+  - Top-level `docs/*.md`: 126 hits at HEAD, 4 now (the author's four).
+  - Subdirectory evidence records: 13 lines unchanged (B3-F4).
+  - The plan's "173" did not reproduce; it was presumably a raw count including code.
+- **Links:** my checker (`logs/B3-R1-review-links.py`) found 63 relative links in `docs/*.md`,
+  all resolving, with anchors. The cross-repository anchors into the changed docs still exist.
+  `scripts/check-integration-docs.py` (CI) passes.
+- **`file:line` anchors:** no new doc line quotes one. `src/main.rs:221-226` holds the six plan
+  paths (04D.4).
+- **B2-F6:** resolved, comment-only.
+- **Executed:**
+  - doc readers `memory::lifecycle_tests::restore:: response_schema desk_wording`: 16 passed,
+    including the 4 `deploy.md` restore tests the author's filter missed (B3-F3)
+    (`logs/B3-R1-review-doc-readers.txt`);
+  - `cargo fmt --check` clean; clippy `-D warnings` clean (`logs/B3-R1-review-clippy.txt`);
+  - `check-integration-docs.py` PASS.
+- **Not run:** the full gate (phase 05). No other Rust suites, since this is documentation only
+  (AGENTS.md).
+- **Coordination:** the C001–C004 plan 04 documentation targets are now met in `departments.md`
+  and `inter_channel_agent_communication.md`, once B3-F1/F2 are fixed. Root still has to record
+  the p04 responses in COORDINATION.md.
+
+### Outcome
+
+**Changes required** for digest `9204f954…15d1`. There is no PASS.
+
+- Actionable: B3-F1 (Low), B3-F2 (Low), B3-F3 (Low).
+- Optional: B3-F4.
+- B2-F6 is resolved.
+- No item needs the user.
+
+### Process and instruction feedback
+
+- A word-bounded mechanical rename was safe here because the conversion skipped backticks and
+  the docs keep identifiers in code spans; the hunk-by-hunk read found no meaning change.
+- The defects are in the new hand-written page, at the points where earlier rounds changed a rule
+  (B2-F1 visibility) or where a general rule applies (owner exemption). Candidate (author,
+  documentation batches): check each access sentence against the use case that enforces it.
+- Candidate (author, evidence): a `cargo test` filter should be confirmed by the test names it
+  printed; a filter that matches nothing reports success.
+
+## 01DEP-P04-B3-R2 — correction recheck of 01DEP-P04-B3-F1..F4
+
+### Identity
+
+- Date 2026-11-10. Workflow `implement-opus-reviewed-2_2`. Batch B3; stage: correction recheck.
+  Phase `p04`.
+- Reviewer B: Opus 5.5 (`claude-opus-5-5`), agent `ad409b2d3d149c2c6`.
+- Base and HEAD are `5c64e7d1`; the work is uncommitted (the same 12 files as R1). Artifact digest
+  `30567a293792a0799ba5a8077dbeb361664a85e0071123743c482c0206a7c675`, recomputed at the start and
+  before returning (same exclusions).
+- Evidence: `logs/01DEP-P04-B3-R2.evidence.json` validates with `--expect-artifact` (PASS 2).
+- Coordination r8: `COORDINATION.md` sha256 = `logs/coordination-r8.md` = `a6b2911c…a9a4`. The
+  diff against r7 is the revision number plus the four p04 response lines on C001–C004; no
+  instruction changed.
+- Correction description: TASK.md "B3 corrections (R2, for B3-R1 findings)".
+
+### Coverage and evidence
+
+- **Delta:**
+  - Only `docs/departments.md` is newer than my R1 logs (`find -newer`). I read the whole file
+    again.
+  - `routes/mod.rs` and the other docs are as reviewed in R1. So the R1 evidence (the hunk-by-hunk
+    diff read, fmt, clippy, doc readers) still holds for them; no test reads `departments.md`.
+- **F1:** the four access statements now match the code. The new paragraph on filters and
+  headings holds for every member-facing surface: the work queue and `_help`. Desk lists and the
+  other filters are manager-only.
+- **F2:** lead cardinality, the 404/400 split, and the two lead-change cases are corrected.
+  `provision_on_desk_on` runs the same `guard_on`, so the refusal sentence also covers the new
+  plain-desk case.
+- **F3:** TASK and the manifest are corrected; the author's rerun matches mine (16 passed, 4 of
+  them `restore`).
+- **F4:** the address form is fixed and the scope note is in TASK.
+- **Coordination responses checked against the docs:**
+  - C001: "Members-only desks", the relay paragraph.
+  - C002: the grant list and "one step of the hierarchy each way".
+  - C003: "Leads" says the directory stays an owner's or admin's tool, and `agent-authoring.md`
+    has the context and its 20/50 bounds.
+  - C004: "Dispatch and escalation", the inter-desk section, and `custom_tools.md` on the intake
+    schema.
+  - "Plan 05 open" appears exactly on the notices that target plan 05 (C001, C004).
+- **Executed:**
+  - my prose scan over `docs/*.md`: 4 hits, the same deliberate keeps;
+  - links: 63 relative links, 0 problems (`logs/B3-R2-review-prose-scan.txt`);
+  - `scripts/check-integration-docs.py`: PASS.
+- **Not run:** the full gate (phase 05). No Rust suites, since the change is documentation only.
+
+### Outcome
+
+**PASS** for digest `30567a293792a0799ba5a8077dbeb361664a85e0071123743c482c0206a7c675`.
+01DEP-P04-B3-F1..F4 are resolved, and there are no new findings. No item needs the user.
+
+### Process and instruction feedback
+
+- None new.

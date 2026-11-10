@@ -8,7 +8,7 @@ publishing them. A stale save keeps submitted fields for reconciliation with the
 Assign capabilities on the agent:
 
 - Built-ins provide message send/reply and knowledge search. Message authority still comes from
-  the workflow's actual channel and source message. Ordinary edits cannot add Builder provisioning
+  the workflow's actual desk and source message. Ordinary edits cannot add Builder provisioning
   privileges; a trusted Builder copy may retain or drop its existing provisioning bindings.
 - HTTP choices identify a company connection and approved operation.
 - MCP choices identify a company connection, operation, reviewed version and remote tool name.

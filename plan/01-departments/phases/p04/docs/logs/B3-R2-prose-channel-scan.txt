@@ -1,0 +1,4 @@
+docs/departments.md:5: are what the code calls channels: an address where work arrives, with workflow bindings deciding
+docs/transport_architecture.md:8: > **Terminology.** "Desk" is the product word for a channel: the UI and these documents say desk,
+docs/transport_architecture.md:22: | `TransportKind` | The supported interface family, initially `email` or `slack`. It replaces `ChannelType`; “channel” is reserved for the business object, the product’s desk. |
+docs/workflow-verification.md:143: - Existing history continuation/retry/channel/source-retention tests retain their discovered names.

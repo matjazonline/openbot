@@ -300,6 +300,56 @@ empty-department case, not with an item on an owned desk; browser behaviour of t
 - Checks: `department_views_` 15 passed; clippy/fmt clean; CSS rebuilt (`B2-css-check.txt` R2 line);
   affected rerun `logs/B2-R2-affected.txt`.
 
+## B3 implementation (04C.5 + 04D + B2-F6), on top of 5c64e7d1
+
+- **04D.1** new `docs/departments.md`: what a department is (fields, members, the `lead` role),
+  desks and ownership, members-only desks (one step up and down — C002; Participant Emails; no
+  `@public`; relays trusted — C001), agents' own desks, the department desk and lead changes
+  (refusals as `provisioning_department.rs` words them), leads' run context (C003), dispatch and
+  escalation deferred to `channel.call` (C004), where departments show up (every p04 surface),
+  delete rules, and the JSON API with its refusal codes (checked against `department.rs`).
+- **04D.2** "channel" → "desk" in prose across `docs/*.md` (`logs/B3-to-desk.py`: case- and
+  plural-preserving, skipping code spans, fenced blocks and link targets), then read hunk by hunk;
+  kept as identifiers: `channel` destination kind in `workflow-language-v1.md` (now in code
+  spans), the test-category word in `workflow-verification.md:143`, and "“channel” is reserved for
+  the business object" in `transport_architecture.md`. Terminology note at the top of
+  `transport_architecture.md`. Scan `logs/B3-prose-channel-scan.py` → `logs/B3-prose-channel-scan.txt`:
+  4 lines left, all deliberate (two explain the term, two are identifiers).
+- **04D.3** `inter_channel_agent_communication.md`: new section "Department dispatch and
+  escalation" (C001–C004 as they hold now); `agent-authoring.md` directory fields were done in B1.
+- **04C.5** `agent-builder-context.md` and `custom_tools.md` already described the directory's
+  department/role fields, the filter and the placement arguments (p03); added that entries carry
+  no intake schema yet (it arrives with `channel.call`) and links to `departments.md`.
+  `system_addresses.md` says `_help` lists desks under department headings; `workflow-operations.md`
+  documents the run board's department filter and "Waiting on a person" (UI only; the JSON listing
+  and board take no department).
+- **04D.4** plan paths in `NO_BACKWARD_COMPATIBILITY_NOTES` (`src/main.rs:221-226`): present.
+- **B2-F6**: `known_department` moved below the deserializer's doc comment (`routes/mod.rs`).
+- Checks (R1): `cargo fmt --check`, clippy clean; relative links in `docs/*.md` resolve (2
+  regex-pattern false positives in `system_addresses.md` code, pre-existing). The R1 doc-reader run
+  used the filter `restore_tests`, which matches no test: its 12 passes (`logs/B3-doc-readers.txt`)
+  did not include the `docs/deploy.md` readers (B3-F3). Documentation-only otherwise: no further
+  Rust suites (AGENTS.md).
+
+### B3 corrections (R2, for B3-R1 findings)
+
+- **B3-F1** `docs/departments.md`: who sees departments in filters/headings (owners/admins all; a
+  member their own plus the department of each desk they can read, as `desk_departments`); the
+  JSON API's reads are open to members for their own departments, writes to owners/admins; a
+  members-only desk also admits the company owner; ownership leaves the desk's own access (team,
+  Participant Emails, `@public`) unchanged.
+- **B3-F2**: lead "at most one holder" (assign replaces, DELETE clears); refusals add `404` for a
+  principal or parent outside the company and narrow `400` to the company's non-person/non-agent
+  principals; a lead change gives a plain desk with a new agent lead the autonomous workflow, and
+  leaves a responder someone chose on the desk alone (`provisioning_department.rs:262-300`).
+- **B3-F3**: doc readers rerun with the filter `memory::lifecycle_tests::restore response_schema
+  desk_wording`: 16 passed, 4 of them `restore` (`logs/B3-R2-doc-readers.txt`; matches the
+  reviewer's `logs/B3-R1-review-doc-readers.txt`).
+- **B3-F4** (optional, taken): the address is written `slug@{company}.{application-domain}`.
+  Scope note: 04D.2 converts `docs/*.md`. `docs/performance/run-list.md` and
+  `docs/query-evidence/2026-09-01-thread-index-and-task-attempts.md` are dated evidence records
+  and keep their wording.
+
 ## Status
 
 - **B2 accepted in phase**: B2-R1 changes required (F1–F5), corrected; B2-R2 **PASS** for digest
@@ -310,4 +360,11 @@ empty-department case, not with an item on an owned desk; browser behaviour of t
 - **B1 accepted in phase**: B1-R1 changes required (F1–F5), corrected; B1-R2 **PASS** for digest
   `9cad3b579f1e5121427ee277b620bebd9a8dffa3786d299f748844354bb63848` (root recomputed; coordination
   r7 unchanged; manifest valid). Committed after b1026003.
-- B3: next (04C.5 + 04D docs, plus B2-F6).
+- **B3 accepted in phase**: B3-R1 changes required (F1–F3; F4 optional, taken), corrected; B3-R2
+  **PASS** for digest `30567a293792a0799ba5a8077dbeb361664a85e0071123743c482c0206a7c675` (base 5c64e7d1,
+  exclusions `plan/01-departments/phases/p04/docs`, `plan/01-departments/COORDINATION.md`;
+  manifest `logs/01DEP-P04-B3-R2.evidence.json` valid; root recomputed). Coordination r8 (sha256
+  a6b2911c…fa9a4, pinned `logs/coordination-r8.md`) adds p04's responses to C001–C004; no
+  instruction changed from r7. Committed after 5c64e7d1.
+- **p04 accepted in phase** (B1, B2, B3). Not yet integrated: the full gate runs in p05 (I003 r2).
+  Test DB `openbot_dept_p04_test` dropped at phase close.

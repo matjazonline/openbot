@@ -1,0 +1,43 @@
+{
+  "version": 1,
+  "round": "01DEP-P04-B3-R2",
+  "artifact": "30567a293792a0799ba5a8077dbeb361664a85e0071123743c482c0206a7c675",
+  "checks": [
+    {
+      "criteria": [
+        "04D.2"
+      ],
+      "command": "python3 logs/B3-prose-channel-scan.py docs/*.md",
+      "fixture": "working tree",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B3-R2-prose-channel-scan.txt",
+          "sha256": "7e385e4006b21cba29c310977882749b43dcc11408d5a2f3ef85b6d675965949"
+        },
+        {
+          "path": "logs/B3-prose-channel-scan.py",
+          "sha256": "5fd35535664c113909eebcdec3c22b00ccbce85ee1f1cff77023c859fadb2e7a"
+        }
+      ],
+      "note": "same 4 deliberate keeps as R1 (TASK B3)"
+    },
+    {
+      "criteria": [
+        "04D",
+        "doc-readers",
+        "B3-F3"
+      ],
+      "command": "cargo test --locked --offline --lib -- memory::lifecycle_tests::restore response_schema desk_wording --test-threads=4; cargo fmt --check",
+      "fixture": "TEST_DATABASE_URL db openbot_dept_p04_test; SQLX_OFFLINE=true",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B3-R2-doc-readers.txt",
+          "sha256": "977fdaf00c6059560556dcfd45e31b51ed5b1f67a3e8db36bcafce0b86a11880"
+        }
+      ],
+      "note": "16 passed incl. 4 restore"
+    }
+  ]
+}

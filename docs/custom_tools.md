@@ -35,7 +35,8 @@ granted two workflow tools:
 
 - `list_company_agents`: the company's agents, so it does not duplicate one, with each agent's
   departments and roles and its own desk's address; `department` (a slug) lists only that
-  department's members and role holders;
+  department's members and role holders. An entry carries no intake schema yet: that arrives with
+  `channel.call` (agent-workflow-call);
 - `create_agent_channel`: provisions the new agent with its own autonomous desk at its slug and,
   when `channel_slug` names another address, a second team (never public) desk bound to the
   reply-mode workflow the conversation chose (p08 D2). `department` and `role` place the agent in

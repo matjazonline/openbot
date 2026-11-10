@@ -1,0 +1,9 @@
+# reviewer scan, working tree (digest 30567a29…c675): docs/*.md
+TOTAL 4
+docs/departments.md:5: [1] are what the code calls channels: an address where work arrives, with workflow bindings deciding
+docs/transport_architecture.md:8: [1] > **Terminology.** "Desk" is the product word for a channel: the UI and these documents say desk,
+docs/transport_architecture.md:22: [1] | `TransportKind` | The supported interface family, initially `email` or `slack`. It replaces `ChannelType`; “channel” is reserved for the business object, the product’s desk. |
+docs/workflow-verification.md:143: [1] - Existing history continuation/retry/channel/source-retention tests retain their discovered names.
+
+# links
+checked 63 relative links, 0 problems

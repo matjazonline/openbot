@@ -33,9 +33,9 @@ The broader nine-operation catalog and six-operation general editor selection re
 
 Save and publish `integrations/doop/create-document.workflow.json`. Select `get_profile`,
 `create_canvas` and `get_canvas` for its `service` MCP resource. Associate the binding with an
-explicit company channel that supports email delivery. This is the sender channel for the normal
+explicit company desk that supports email delivery. This is the sender desk for the normal
 `message.send` operation; Openbot does not choose a first or default sender. The manual run uses
-that same channel association.
+that same desk association.
 
 Configure and activate the binding with these trusted parameters:
 

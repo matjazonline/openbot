@@ -61,7 +61,6 @@ use axum::{
 
 use crate::adapters::http::{app_state::AppState, auth, pages, session::SessionAuthority};
 
-/// A query or form field where an empty string means "not given" rather than a value to parse.
 /// A department filter names one of the departments the viewer may see, or it is not found
 /// (01-departments 04B.4, 04C.1); `None` is no filter.
 pub(super) fn known_department(
@@ -76,6 +75,7 @@ pub(super) fn known_department(
     }
 }
 
+/// A query or form field where an empty string means "not given" rather than a value to parse.
 pub(super) fn deserialize_empty_string_as_none<'de, D, T>(
     deserializer: D,
 ) -> Result<Option<T>, D::Error>

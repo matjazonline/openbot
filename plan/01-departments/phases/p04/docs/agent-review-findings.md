@@ -301,3 +301,131 @@ Common context for the B2 findings below:
   Behaviour is unaffected.
 - **Suggestion:** move line 64 back above `deserialize_empty_string_as_none`.
 - **Resolution history:** 2026-11-10 open (optional, B2-R2).
+  2026-11-10 resolved (B3-R1, digest `9204f954…15d1`): the doc comment is back above `deserialize_empty_string_as_none` (`routes/mod.rs:78`), and `known_department` keeps only its own two lines. Comment-only change; fmt and clippy are clean.
+
+---
+
+# Batch B3 review — round `01DEP-P04-B3-R1`
+
+Common context for the B3 findings below:
+
+- Date 2026-11-10. Batch B3: 04C.5 and 04D.1–4 (documentation), plus B2-F6 (a doc-comment
+  move). Stage: batch review. Round `01DEP-P04-B3-R1`.
+- Reviewer B: Opus 5.5 (`claude-opus-5-5`), agent `ad409b2d3d149c2c6`.
+- Phase start `b1026003`. Review base and HEAD are `5c64e7d1` (B2, accepted and committed); B3 is
+  uncommitted.
+- Artifact digest `9204f954f94190de01874d963cd7cceb2ea31f14f332e6c60ea44514e73f15d1` (same
+  exclusions).
+- Coordination r7, sha256 `3b556f5a…5414`: I001 r1, I002 r2, I003 r2; C001–C004 r1.
+
+---
+
+## 01DEP-P04-B3-F1 — `docs/departments.md` misstates who can see and reach what
+
+- **Classification:** actionable defect · **Low** · documentation accuracy. Plan 04D.1 says "Name
+  only behavior the code has"; AGENTS.md says documentation must name behaviour the code has.
+- **Evidence:**
+  - **Line 117:** "Department names are visible to everyone in the company". That is the rule
+    B2-F1 removed. A plain member sees the departments they belong to or lead, plus the owner of
+    each desk they can read:
+    - `DepartmentUseCases::desk_departments`, `use_cases/department.rs:348-392`;
+    - `visible_departments`, `:292-303`;
+    - the Departments tab and the JSON list.
+  - **Line 128:** "All under `/api/companies/{company_id}`, for owners and admins; anyone else
+    gets `404`." The two GET routes serve a plain member the departments they belong to or lead:
+    - `list_departments_json`, `routes/department.rs:98-105` (via `visible_departments`);
+    - `get_department_json`, `:145-156` (via `visible_department`);
+    - the module doc, `:1-3`.
+
+    Only the writes answer 404. This also contradicts the doc's own line 10.
+  - **Lines 46-48:** "Everyone else in the company, and anyone outside it, is refused." The
+    company owner is admitted to an allowlist desk, for reading and for writing
+    (`Channel::participant_access`, `domain/entities/channel.rs:151`; `viewer_access`, `:184`).
+    README decision 7 itself says a company-wide view "still needs the owner exemption".
+  - **Lines 31-32 (minor):** "a desk a department owns is reachable by the whole company, as any
+    team desk is". Ownership keeps the desk's own access. A desk that is not members-only but has
+    a Participant Emails list stays restricted to that list.
+- **Required:** state the rules the code has:
+  - a plain member sees their own departments and the department of each desk they can read;
+  - plain members can read their departments through the JSON GET routes, and only writes are
+    404 for them;
+  - the company owner is admitted to members-only desks;
+  - ownership leaves the desk's own access settings as they are.
+- **Resolution history:** 2026-11-10 open (B3-R1).
+  2026-11-10 resolved (B3-R2, digest `30567a29…c675`). `departments.md` now says:
+  - Line 32-34: ownership leaves the desk's own access (team, Participant Emails, `@public`).
+  - Line 49-50: the company owner keeps access to a members-only desk (`channel.rs:151`, `:184`).
+  - Line 122-125: owners and admins see every department in filters and headings; a plain member sees their own departments and the department of each desk they can read, and any other department is not found as a filter (`desk_departments`, `known_department`).
+  - Line 135-137 and 141: writes are for owners and admins; reads are open to a member for their own departments; anything else is 404 (`routes/department.rs:103`, `:151`; `visible_department`, `use_cases/department.rs:307-330`).
+
+  The only member-facing headings are the work queue's and `_help`'s; desk lists and the other filters are manager-only (`load_managed_company`, `list_departments`), so the sentence holds.
+
+---
+
+## 01DEP-P04-B3-F2 — Other factual errors and an omission in `docs/departments.md`
+
+- **Classification:** actionable defect · **Low** · documentation accuracy.
+- **Evidence:**
+  - **Line 26:** "The only role is `lead`, with exactly one holder." It is at most one.
+    - `department_roles_one_lead` is a partial unique index
+      (`migrations/20260817000000_init_schema.sql:15453`).
+    - Assigning a lead replaces the current holder (`assign_department_role_on`,
+      `persistence/department.rs:528`, the single-holder delete at `:649`).
+    - DELETE clears it.
+    - The doc's own line 69 says "with a person lead, or none".
+  - **Lines 140-142:** "`400 Bad Request` for … a principal that is not one of the company's
+    people or agents". An id that is not a principal of this company answers 404 "Principal not
+    found in this company." (`persistence/department.rs:265`). Only the company's own external or
+    system principals get 400 (`:271`). A parent from another company is also 404 (`:211`). The
+    list names 404 nowhere except as the answer for non-managers.
+  - **Lines 71-72:** "Changing the lead re-points the department-owned binding … or pauses it".
+    `follow_department_lead_on` (`workflow/provisioning_department.rs:229-300`) also does two
+    things the doc leaves out:
+    - on a plain desk, which has no owned binding (the desk of a department created with a person
+      lead or none), an agent lead gets the autonomous workflow provisioned (`:279`), so the desk
+      starts answering;
+    - a responder a user chose is left alone (`:276`).
+
+    A reader of the doc would expect nothing to happen in the first case.
+- **Required:** fix these three statements.
+- **Resolution history:** 2026-11-10 open (B3-R1).
+  2026-11-10 resolved (B3-R2). `departments.md` now says:
+  - Line 26-28: "at most one holder", assigning replaces, clearing leaves none.
+  - Line 149-152: 400 only for the company's principals that are neither person nor agent, and 404 for a principal or parent that is not the company's (`persistence/department.rs:211`, `:265`, `:271`).
+  - Line 76-77: a plain desk that gets an agent lead is given the autonomous workflow (`provision_on_desk_on`, which runs the same `guard_on`, so the refusal sentence covers it), and a responder someone chose is left as set (`provisioning_department.rs:276`; the person-lead branch unselects only the owned binding).
+
+---
+
+## 01DEP-P04-B3-F3 — The doc-reader evidence names `restore_tests`, which matches no test
+
+- **Classification:** actionable defect · **Low** · verification record.
+- **Evidence:**
+  - TASK "B3 implementation" (Checks) and `logs/01DEP-P04-B3-R1.evidence.json` (criteria
+    "doc-readers") record `cargo test … -- restore_tests response_schema desk_wording`.
+  - The `docs/deploy.md` reader is `src/adapters/persistence/memory/restore_tests.rs`. It is
+    mounted as `mod restore` (`memory/lifecycle_tests.rs:1352-1353`), so its tests are
+    `…::lifecycle_tests::restore::memory_operations_*`. The filter matches none of them.
+  - `logs/B3-doc-readers.txt` lists 12 tests and no restore test. Yet `docs/deploy.md` is one of
+    the files this batch changed.
+  - The behaviour holds. The conversion skipped fenced blocks, so the marked restore SQL is
+    unchanged. With `memory::lifecycle_tests::restore::` I ran 16 tests, including the 4 restore
+    tests: all passed (`logs/B3-R1-review-doc-readers.txt`).
+- **Required:** correct the filter in TASK and the manifest. Either rerun with it or cite
+  `logs/B3-R1-review-doc-readers.txt`.
+- **Resolution history:** 2026-11-10 open (B3-R1).
+  2026-11-10 resolved (B3-R2): TASK "Checks (R1)" now says the R1 filter matched no restore test. The R2 manifest runs `memory::lifecycle_tests::restore response_schema desk_wording`: 16 passed, including 4 `restore` tests (`logs/B3-R2-doc-readers.txt`), the same as my R1 run.
+
+---
+
+## 01DEP-P04-B3-F4 — Small wording points
+
+- **Classification:** optional suggestion · Low.
+- **Evidence and suggestions:**
+  - `departments.md:18` writes the department desk's address as `slug@company.domain`. Elsewhere
+    the address is `slug@{company}.{application-domain}` (`system_addresses.md`); use that form.
+  - Plan 04D.2 scopes the conversion to `docs/*.md`. `docs/performance/run-list.md` (13 lines)
+    and `docs/query-evidence/2026-09-01-thread-index-and-task-attempts.md:25` still say
+    "channel" in prose. They are dated evidence records, so leaving them is defensible. Say so in
+    TASK, so the scope is explicit.
+- **Resolution history:** 2026-11-10 open (optional).
+  2026-11-10 resolved (B3-R2, optional): `departments.md:18` writes `slug@{company}.{application-domain}`. TASK "B3 corrections (R2)" records that the 04D.2 scope is `docs/*.md` and that the two subdirectory evidence records keep their wording.

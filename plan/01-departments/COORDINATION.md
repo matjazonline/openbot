@@ -3,7 +3,7 @@
 - Authority: /Users/mac02/.codex/worktrees/2050/openbot/plan/01-departments/COORDINATION.md
 - Writer: root session 68933786-cbe7-4b6b-9387-b5dcb29689a4, worktree
   /Users/mac02/.codex/worktrees/2050/openbot (branch codex/departments-addressing-plans)
-- Revision: 7
+- Revision: 9
 
 ## Plan-wide instructions
 
@@ -24,7 +24,8 @@
 | p01 | root 68933786 (A), B per TASK | /Users/mac02/.codex/worktrees/2050/openbot | plan/01-departments/phases/p01/docs/{TASK,HANDOFF}.md — accepted in phase, commit 57adfa7a |
 | p02 | root 68933786 (A), B per TASK | /Users/mac02/.codex/worktrees/2050/openbot | plan/01-departments/phases/p02/docs/{TASK,HANDOFF}.md — accepted in phase (B2 0c5df403, B1 next commit) |
 | p03 | root 68933786 (A), B per TASK | /Users/mac02/.codex/worktrees/2050/openbot | plan/01-departments/phases/p03/docs/{TASK,HANDOFF}.md — accepted in phase (B1 523732b7, B2 01608b1f, B3 30654e3c) |
-| p04 | root 68933786 (A), B per TASK | /Users/mac02/.codex/worktrees/2050/openbot | plan/01-departments/phases/p04/docs/{TASK,HANDOFF}.md — in progress (start b1026003) |
+| p04 | root 68933786 (A), B per TASK | /Users/mac02/.codex/worktrees/2050/openbot | plan/01-departments/phases/p04/docs/{TASK,HANDOFF}.md — accepted in phase (B1 399efe2c, B2 5c64e7d1, B3 next commit) |
+| p05 | root 68933786 (A), B per TASK | /Users/mac02/.codex/worktrees/2050/openbot | plan/01-departments/phases/p05/docs/{TASK,HANDOFF}.md — next |
 
 ## Cross-phase notices
 
@@ -49,7 +50,9 @@
 - Verification: p02 `department_desk_relay_` tests; p03 round-trip tests.
 - Responses: p02 -> satisfied (r1; `department_desk_relay_into_a_members_only_desk_stays_trusted`,
   docs/inter_channel_agent_communication.md paragraph; p02 TASK B1 mapping); p03 -> disposed by
-  C004 (no p03 round-trip test; the trusted-relay rule stands as p02 verified and documented).
+  C004 (no p03 round-trip test; the trusted-relay rule stands as p02 verified and documented);
+  p04 -> satisfied (r1; `docs/departments.md` "Members-only desks": relays from other desks stay
+  admitted under the hop budget and loop refusal; B3 artifact 30567a29…c675). Plan 05 open.
 
 ### 01DEP-C002 / r1
 - State: active (2026-11-10)
@@ -71,7 +74,9 @@
   p02 TASK B1 mapping); p03 -> satisfied for grants (B1
   `agent_default_desk_places_the_agent_and_its_lead_role_with_grants`: a lead placed at creation
   gets derived grants on its own, parent's and child's members-only desks); the escalation
-  message test is disposed by C004.
+  message test is disposed by C004; p04 -> satisfied (r1; `docs/departments.md` "Members-only
+  desks" lists members, role holders, parent lead, direct children's leads, "one step of the
+  hierarchy each way"; B3 artifact 30567a29…c675).
 
 ### 01DEP-C003 / r1
 - State: active (2026-11-10)
@@ -93,7 +98,9 @@
 - Responses: p03 -> satisfied (r1; B3 artifact 0db98506…dbf1, B3-R2 PASS:
   `department_context_*` (content, lead flag, public desk without roster, bound, frozen retry,
   e2e request text) and `department_directory_*` (fields, filter, picker entries); the
-  round-trip test is disposed by C004).
+  round-trip test is disposed by C004); p04 -> satisfied (r1; `docs/departments.md` "Leads" and
+  `docs/agent-authoring.md`: the context and its bounds, the directory staying an owner's or
+  admin's tool; B3 artifact 30567a29…c675).
 
 ### 01DEP-C004 / r1
 - State: active (2026-11-10)
@@ -118,4 +125,7 @@
 - Verification: p03 records the two checks as not built, with these code facts; docs say so.
 - Responses: p03 -> satisfied (r1; no `department_lead_round_trip_` / `department_lead_loop_`
   tests; docs/inter_channel_agent_communication.md and the plan 03 "Status after p03" note under
-  03C item 4; `department-lead.yaml` header). Plan 04/05 documentation targets remain open.
+  03C item 4; `department-lead.yaml` header); p04 -> satisfied (r1; `docs/departments.md`
+  "Dispatch and escalation", `docs/inter_channel_agent_communication.md` "Department dispatch and
+  escalation", `docs/custom_tools.md`: no intake schema until `channel.call`; B3 artifact
+  30567a29…c675). Plan 05 open.

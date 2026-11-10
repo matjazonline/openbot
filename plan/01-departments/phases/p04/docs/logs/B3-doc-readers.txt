@@ -1,0 +1,20 @@
+   Compiling open_bots v0.1.0 (/Users/mac02/.codex/worktrees/2050/openbot)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 37.89s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-c4f538027eed5c31)
+
+running 12 tests
+test adapters::http::pages::tests::desk_wording::desk_wording_company_workspace_count ... ok
+test adapters::http::pages::tests::desk_wording::desk_wording_flash_messages_say_desk ... ok
+test adapters::http::pages::tests::desk_wording::desk_wording_desks_page_heading ... ok
+test adapters::http::pages::tests::desk_wording::desk_wording_nav_names_the_desks_link ... ok
+test adapters::http::pages::tests::desk_wording::desk_wording_settings_breadcrumb ... ok
+test adapters::response_schema::tests::contract_envelope_and_fingerprint_are_stable ... ok
+test adapters::http::pages::tests::desk_wording::desk_wording_scan_reads_text_nodes_in_every_literal_form ... ok
+test adapters::response_schema::tests::final_payload_requires_exact_json_and_validates_after_sanitization ... ok
+test adapters::response_schema::tests::documented_rig_configuration_and_response_contracts_pass_application_parsers ... ok
+test adapters::response_schema::tests::schemas_are_validated_without_external_or_recursive_resolution ... ok
+test application::use_cases::builtin_agent_library::tests::desk_wording_agent_builder_prompt_says_desk ... ok
+test adapters::http::pages::tests::desk_wording::desk_wording_page_sources_keep_channel_out_of_text_nodes ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 4156 filtered out; finished in 0.22s
+

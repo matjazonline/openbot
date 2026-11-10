@@ -1,15 +1,15 @@
 # System Addresses
 
-Some local parts are answered by the server itself instead of being routed to a channel. They are
+Some local parts are answered by the server itself instead of being routed to a desk. They are
 prefixed with an underscore:
 
 ```text
 _help@{company}.{application-domain}
 ```
 
-System addresses are email-adapter routes, not business channels, principals, or channel
+System addresses are email-adapter routes, not business desks, principals, or desk
 identities. Likewise, an ordinary platform email address is adapter syntax that resolves to a
-transport-neutral channel selector and then to a canonical channel and email binding. See the
+transport-neutral desk selector and then to a canonical desk and email binding. See the
 [Transport Architecture Contract](transport_architecture.md).
 
 ## Why the underscore
@@ -23,20 +23,22 @@ slug::text ~ '^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$'
 slug::text ~ '^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$'
 ```
 
-A leading underscore is therefore not a legal channel slug, alias, or company slug. Reserved names
+A leading underscore is therefore not a legal desk slug, alias, or company slug. Reserved names
 cannot be shadowed by anything a customer creates, and the guarantee is a CHECK constraint rather
 than an application-level blocklist that can drift out of sync.
 
-Reserving a bare name like `help` would need a blocklist, and would collide with channels that
+Reserving a bare name like `help` would need a blocklist, and would collide with desks that
 already hold that slug.
 
 ## `_help`
 
-Replies with the channels the sender may write to, each with its description, followed by the
+Replies with the desks the sender may write to, each with its description — under their
+department's heading, root departments first and desks no department owns last, once any desk
+belongs to a department ([departments](departments.md)) — followed by the
 addressing syntax. It is answered only for a member of that company's team; anyone else is ignored.
 
-The channel list comes from `ThreadUseCases::writable_channel_directory`, the same helper the
-undeliverable-address bounce uses, so "which channels may this person write to" is decided once. It
+The desk list comes from `ThreadUseCases::writable_channel_directory`, the same helper the
+undeliverable-address bounce uses, so "which desks may this person write to" is decided once. It
 filters on `Channel::enabled` and `Channel::participant_access(sender, membership).authorized` — the
 predicate the delivery path itself applies — so the list can never name an address that would then
 bounce.
@@ -46,9 +48,9 @@ bounce.
 | Rule | Why |
 |---|---|
 | Matched against the **raw** local part | Context-suffix stripping turns a bare reserved suffix into an empty slug, so a future `_msg` would be eaten before `SystemAddress::parse` ever saw it |
-| Never answered on the internal channel path | Agents can address sibling channels; keeping reserved addresses off that path keeps them out of the trace and the trust model |
+| Never answered on the internal desk path | Agents can address sibling desks; keeping reserved addresses off that path keeps them out of the trace and the trust model |
 | Answered only for the company's team | A reply would otherwise confirm that a company exists to anyone who guessed the domain |
-| Skipped by channel routing, never bounced | Lets `_help` be CC'd on a real message without bouncing it; and a bounce's fuzzy suggestions could offer a stranger a real channel named `help` |
+| Skipped by desk routing, never bounced | Lets `_help` be CC'd on a real message without bouncing it; and a bounce's fuzzy suggestions could offer a stranger a real desk named `help` |
 | The reply carries `Auto-Submitted: auto-replied` | `guard_ingress` refuses inbound auto-replies, so an auto-responder on the other end cannot ping-pong |
 
 ## Adding one

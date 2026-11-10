@@ -51,8 +51,15 @@ finished first: `day`, `week` (the default) or `month` (30 days). Each run carri
 `cut` says it showed only the first 50. It takes `binding_id` and `agent_id` as the listing does,
 and names the `window` and `cutoff` it read.
 
+In the app, `/ui/workflow-runs` also filters list and board by `department_id`: the runs on the
+desks that department owns now (another company's department is not found). Its third view,
+**Waiting on a person** (`view=waiting`), lists the team's open decisions and the run problems
+escalated to a person, grouped by the department of their desk, at most 100; the work queue
+(`/ui/work`) has the rest. The JSON listing and board above take no department. See
+[departments](departments.md).
+
 Decision links use `/ui/workflow-decisions/{decision_id}`. Visibility is checked
-against current company/channel membership. Keep identifiers in restricted incident records and
+against current company/desk membership. Keep identifiers in restricted incident records and
 links, not metric labels. Retain receipts and audit events; never repair status with SQL updates.
 
 ## Safe operator actions
@@ -94,7 +101,7 @@ capacity, and retain the lease and stock-stack CI budget alarms.
    migration; verify readiness. Retain the non-root image and proxy port mapping. Configure actual
    keys from [deployment settings](deploy.md), including database, encryption, domain and transport.
    Startup validates local configuration, not remote credentials, provider readiness or pilot results.
-4. Recreate company membership, channels, model connections, agents, approved HTTP/MCP resources
+4. Recreate company membership, desks, model connections, agents, approved HTTP/MCP resources
    and credentials. Install validated workflow templates, publish and configure bindings while
    keeping them **inactive**. Keep schedules and external ingress closed. No legacy runtime flag
    or alternate dispatcher is needed. Memory and classifier-selected capability profiles are out
@@ -117,7 +124,7 @@ capacity, and retain the lease and stock-stack CI budget alarms.
 Current ownership: ingress creates durable message intents; bindings admit immutable runs;
 `WorkflowEngine` owns polling and maintenance; executions own outputs/routes; action invocations
 own remote uncertainty; human decisions own review; the shared delivery worker owns transport
-attempts. Obsolete channel-owned agent dispatch and the alternative runtime were removed in phase08.
+attempts. Obsolete desk-owned agent dispatch and the alternative runtime were removed in phase08.
 The old [replacement inventory](https://github.com/matjazonline/openbot/blob/19bab48c28c76a929f20a19f46e44bfb75c24cae/plan/workflow-foundation/REPLACEMENT-MAP.md) records that baseline,
 not supported APIs. [Release evidence](workflow-verification.md) maps the acceptance scenarios.
 
@@ -165,11 +172,11 @@ Images require Jev 1.13/1.14 and Box 1.14. A missing storage configuration or re
 changed or oversized attachment produces an explicit failure, never an external URL
 fetch. See the exact [image contract](workflow-language-v1.md#experimental-jev-images-and-box).
 
-## Channel responses and human questions
+## Desk responses and human questions
 
-The channel's **Automatic response** card chooses one active message binding and a version1
+The desk's **Automatic response** card chooses one active message binding and a version1
 subject/body projection from its final business result. Other bindings observe. Selection requires
-current company administration, channel visibility, run-as visibility and resource readiness.
+current company administration, desk visibility, run-as visibility and resource readiness.
 `GET` and `PUT /api/companies/{company_id}/channels/{channel_id}/response` use the same checks.
 PUT carries `expected_revision` (null for the first save), `responder` (null to clear), and optional
 `approval_policy`. A responder contains `binding_id`, `expected_binding_state_revision`, and
@@ -181,10 +188,10 @@ PUT carries `expected_revision` (null for the first save), `responder` (null to 
 
 References select required string fields of the declared final output. The optional final approval
 policy is `{"reviewers":[{"kind":"user","id":"CURRENT_ADMIN_UUID"}],"review_timeout_seconds":300}`.
-Reviewers must currently be company admins who can see the channel. Re-read after a revision
+Reviewers must currently be company admins who can see the desk. Re-read after a revision
 conflict; a stale form keeps its typed values and offers an explicit reload. Clearing selection
 persists a new revision. Replaying a native create command never restores a cleared responder.
-Fresh native assistant channels select only their new active binding in the provisioning transaction.
+Fresh native assistant desks select only their new active binding in the provisioning transaction.
 Native templates return typed `{body}` output, with no explicit final send. Editable business review
 publishes the approved/edited body; rejection closes review and finishes without reply. This differs
 from rejecting protected final publication, which refuses that final effect.
@@ -259,11 +266,11 @@ output limit and an expiry, and a reason that is recorded with who changed it. A
 exchange is then sent to the memory service to be summarized into memory: only its input and the
 agent's accepted answer, never tool arguments or results, recalled memory or internal notes.
 Private-session capture covers a person's own manual runs in a private session that is not
-attached to a channel or thread and lands in that person's private memory; scheduled,
+attached to a desk or thread and lands in that person's private memory; scheduled,
 message-triggered and child runs never reach private memory. Thread capture covers every
-completed exchange of the agent in a channel thread, whatever started the run (customer messages
+completed exchange of the agent in a desk thread, whatever started the run (customer messages
 included), and lands in the agent's memory, labelled at the thread's lowest-reader level, so any
-reader cleared to that level in any channel the agent serves can recall it, and a thread with a
+reader cleared to that level in any desk the agent serves can recall it, and a thread with a
 public or external reader is captured at level 0. Child branches, failed or cancelled runs and
 samples are never captured. Capture stays idle while the operator's generation cap for
 the company is 0 and while the deployment has no memory service configured; the first exchange after turning it on can be missed while the target memory
@@ -271,7 +278,7 @@ is still being created. Captures are delivered in the background with the same r
 retry until their expiry; switching capture off stops new windows, not ones already queued.
 
 Private memory is reachable only from a person's own manual start in a private session (not in a
-channel or thread), and from children of that run run as the same person. Scheduled and
+desk or thread), and from children of that run run as the same person. Scheduled and
 message-triggered runs never reach it. The author of the workflow, its binding or its agent is not
 checked: an owner or admin who manually runs a colleague's workflow lets that workflow's agent read
 their private memory, and the workflow can send what it read wherever its author chose. Run only
@@ -304,7 +311,7 @@ The authenticated API is
 The run/execution anchor must be genuine. A sample ID, another stream's cursor or an unrelated
 source handle grants no access. Reads neither dispatch work nor call a model.
 
-**Produced** means the agent accepted a logical output, including JSON `null`. Workflow, channel
+**Produced** means the agent accepted a logical output, including JSON `null`. Workflow, desk
 response and delivery status appear separately. A later workflow failure, cancellation or permanent
 delivery failure does not erase Produced. Queued, waiting for an agent turn, active, waiting for
 human input, and failed/cancelled before output are distinct states.
