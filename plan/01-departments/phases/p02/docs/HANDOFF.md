@@ -10,12 +10,12 @@
 
 ## State
 
-- Gate: r1 changes required (G1-R1: F1 High grant key, F2/F3 Medium, F4/F5 Low, F6–F8 optional);
-  r2 written (`logs/gate-decisions-r2.md` sha256 0bee3eb0…bd6), sent to B for G1-R2.
-- B2 (desk wording) being implemented by author helper agent a77724bc09910bbe6 (DB
-  openbot_dept_p02c_test); its report pending.
-- Drafts: scratchpad `draft/p02_grants.rs` (eligible-principal SQL).
+- **Accepted in phase** 2026-11-10: B2 (desk wording) commit 0c5df403; B1 (ownership +
+  members-only) B1-R2 PASS digest cbca0a00…438f, committed after 0c5df403.
+- Coordination rev 3: C001/C002 satisfied for p02, pending for p03.
+- Follow-ups: B2-F1..F3 (phase 04 copy).
+- Resources: openbot_dept_p02_test, openbot_dept_p02_dev, openbot_dept_p02c_test (drop at task end).
 
 ## Next action
 
-On B2 report: freeze, B2 batch review, commit B2. On G1-R2 PASS: implement B1.
+p03.

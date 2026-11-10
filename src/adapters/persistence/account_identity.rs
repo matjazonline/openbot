@@ -230,14 +230,15 @@ async fn adopt_outsider_places(
     if still_reachable {
         return Ok(());
     }
-    // A grant the person already holds for the same channel and capability keeps the person's row.
+    // A grant the person already holds for the same channel, capability and provenance keeps the
+    // person's row.
     sqlx::query(
         r#"INSERT INTO channel_principal_grants
                (company_id, channel_id, principal_id, capability, provenance, created_at)
            SELECT company_id, channel_id, $3, capability, provenance, created_at
            FROM channel_principal_grants
            WHERE company_id = $1 AND principal_id = $2
-           ON CONFLICT (company_id, channel_id, principal_id, capability) DO NOTHING"#,
+           ON CONFLICT (company_id, channel_id, principal_id, capability, provenance) DO NOTHING"#,
     )
     .bind(company_id)
     .bind(outsider)

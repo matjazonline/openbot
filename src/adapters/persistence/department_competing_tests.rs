@@ -3,7 +3,7 @@
 use super::*;
 
 /// Hold the company write lock so competitors line up behind it, then release them together.
-async fn hold_company(f: &Departments) -> sqlx::Transaction<'_, sqlx::Postgres> {
+pub(super) async fn hold_company(f: &Departments) -> sqlx::Transaction<'_, sqlx::Postgres> {
     let mut blocker = f.pool().begin().await.unwrap();
     sqlx::query("SELECT id FROM companies WHERE id = $1 FOR NO KEY UPDATE")
         .bind(f.company)

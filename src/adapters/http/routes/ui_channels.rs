@@ -490,6 +490,8 @@ impl SubmittedChannel {
             enabled: self.form.enabled(),
             add_3rd_party: self.form.add_3rd_party(),
             created_by: None,
+            // The form has no department fields yet (phase 04): saving it keeps the ownership.
+            ownership: None,
         }
     }
 }

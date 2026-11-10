@@ -5,6 +5,9 @@ use std::{collections::HashSet, str::FromStr};
 use uuid::Uuid;
 
 use crate::adapters::persistence::PostgresPersistence;
+use crate::adapters::persistence::department_desks::{
+    DeskOwnership, desk_ownership_on, prelock_ownership_on, sync_desk_grants_on,
+};
 use crate::adapters::persistence::integration::email_binding::{
     CanonicalEmailBinding, write_canonical_email_binding,
 };
@@ -19,10 +22,12 @@ use crate::application::ports::channel::ChannelPersistence;
 use crate::application::ports::channel::ChannelUpdate;
 use crate::application::ports::channel::ChannelWrite;
 use crate::application::ports::participant::IdentityObservation;
+use crate::domain::workflow::CompanyId;
 use crate::entities::agent::Agent;
 use crate::entities::channel::Channel;
 use crate::entities::channel::ChannelAccessMode;
 use crate::entities::creation::CreationProvenance;
+use crate::entities::department::DepartmentId;
 use crate::entities::participant::IdentityClaimMetadata;
 use crate::entities::participant::IdentityProvenance;
 use crate::entities::participant::PrincipalCapability;
@@ -50,6 +55,8 @@ pub struct ChannelDb {
     pub settings_revision: i64,
     pub created_by: serde_json::Value,
     pub created_at: DateTime<Utc>,
+    pub department_id: Option<Uuid>,
+    pub members_only: bool,
 }
 
 impl TryFrom<ChannelDb> for Channel {
@@ -81,6 +88,8 @@ impl TryFrom<ChannelDb> for Channel {
                 AppError::Internal(format!("Invalid channels.created_by provenance: {err}"))
             })?,
             created_at: db.created_at,
+            department_id: db.department_id.map(DepartmentId::new),
+            members_only: db.members_only,
         })
     }
 }
@@ -130,7 +139,8 @@ const CHANNEL_SELECT: &str = r#"
                 FROM channel_principal_grants AS channel_grant
                 WHERE channel_grant.company_id = ch.company_id AND channel_grant.channel_id = ch.id),
                '[]'::jsonb) AS principal_grants,
-           ch.enabled, ch.add_3rd_party, ch.settings_revision, ch.created_by, ch.created_at
+           ch.enabled, ch.add_3rd_party, ch.settings_revision, ch.created_by, ch.created_at,
+           ch.department_id, ch.members_only
     FROM channels ch
 "#;
 
@@ -242,14 +252,15 @@ pub(crate) async fn insert_email_allowlist_grants(
         )
         .await?;
 
-        // A grant this principal already holds from another provenance stays that provenance's:
-        // relabelling it would let the next allowlist edit delete access the allowlist never gave.
+        // Each provenance owns its own row, so this allowlist entry and a grant the principal holds
+        // from elsewhere (a department, a manager) never delete or relabel one another.
         for capability in [PrincipalCapability::Participate, PrincipalCapability::View] {
             sqlx::query(
                 r#"INSERT INTO channel_principal_grants
                        (company_id, channel_id, principal_id, capability, provenance)
                    VALUES ($1, $2, $3, $4, 'configured_allowlist')
-                   ON CONFLICT (company_id, channel_id, principal_id, capability) DO NOTHING"#,
+                   ON CONFLICT (company_id, channel_id, principal_id, capability, provenance)
+                   DO NOTHING"#,
             )
             .bind(company_id)
             .bind(channel_id)
@@ -302,6 +313,10 @@ pub(crate) async fn insert_channel_row_on(
     write: &ChannelWrite,
 ) -> AppResult<Vec<String>> {
     let (access_mode, participants) = channel_access(write.participant_emails.clone());
+    let ownership = write.ownership.map_or(DeskOwnership::UNOWNED, |edit| {
+        DeskOwnership::UNOWNED.merged(&edit)
+    });
+    let access_mode = ownership.stored_mode(access_mode)?;
     let created_by = serde_json::to_value(
         write
             .created_by
@@ -312,8 +327,8 @@ pub(crate) async fn insert_channel_row_on(
     sqlx::query(
         r#"INSERT INTO channels (
                 id, company_id, name, description, access_mode, enabled, add_3rd_party,
-                created_by)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)"#,
+                created_by, department_id, members_only)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)"#,
     )
     .bind(channel_id)
     .bind(company_id)
@@ -323,6 +338,8 @@ pub(crate) async fn insert_channel_row_on(
     .bind(write.enabled)
     .bind(write.add_3rd_party)
     .bind(created_by)
+    .bind(ownership.department_id.map(DepartmentId::as_uuid))
+    .bind(ownership.members_only)
     .execute(&mut **tx)
     .await
     .map_err(AppError::from)?;
@@ -334,6 +351,11 @@ impl ChannelPersistence for PostgresPersistence {
     async fn create(&self, company_id: Uuid, write: ChannelWrite) -> AppResult<Channel> {
         let uuid = Uuid::new_v4();
         let mut tx = self.pool.begin().await.map_err(AppError::from)?;
+        // An owned desk is created under the company write lock, so the department's membership
+        // its grants derive from cannot change before this commits (DEP-P02-D3).
+        if let Some(edit) = write.ownership {
+            prelock_ownership_on(&mut tx, CompanyId::new(company_id), None, &edit).await?;
+        }
         let participants = insert_channel_row_on(&mut tx, company_id, uuid, &write).await?;
 
         insert_channel_slugs(&mut tx, company_id, uuid, &write.slug, &write.alias_slugs).await?;
@@ -341,6 +363,10 @@ impl ChannelPersistence for PostgresPersistence {
         write_channel_email_binding(&mut tx, company_id, uuid, &write).await?;
 
         insert_email_allowlist_grants(&mut tx, company_id, uuid, participants).await?;
+
+        if write.ownership.is_some() {
+            sync_desk_grants_on(&mut tx, CompanyId::new(company_id), uuid).await?;
+        }
 
         tx.commit().await.map_err(AppError::from)?;
         load_channel(self, uuid)
@@ -454,10 +480,20 @@ pub(super) async fn write_channel_settings_on(
     write: &ChannelWrite,
 ) -> AppResult<()> {
     let (access_mode, participants) = channel_access(write.participant_emails.clone());
-    let result = sqlx::query(
+    // Every save applies the members-only rule to the ownership the desk will have, including a
+    // save from a form that does not know about departments (DEP-P02-D2).
+    let current = desk_ownership_on(tx, CompanyId::new(company_id), id)
+        .await?
+        .ok_or_else(|| AppError::Internal("Channel not found".into()))?;
+    let ownership = write
+        .ownership
+        .map_or(current, |edit| current.merged(&edit));
+    let access_mode = ownership.stored_mode(access_mode)?;
+    sqlx::query(
         r#"UPDATE channels
                SET name = $1, description = $2, access_mode = $3, enabled = $4,
-                   add_3rd_party = $5, settings_revision = settings_revision + 1
+                   add_3rd_party = $5, settings_revision = settings_revision + 1,
+                   department_id = $8, members_only = $9
                WHERE id = $6 AND company_id = $7"#,
     )
     .bind(&write.name)
@@ -467,13 +503,11 @@ pub(super) async fn write_channel_settings_on(
     .bind(write.add_3rd_party)
     .bind(id)
     .bind(company_id)
+    .bind(ownership.department_id.map(DepartmentId::as_uuid))
+    .bind(ownership.members_only)
     .execute(&mut **tx)
     .await
     .map_err(AppError::from)?;
-
-    if result.rows_affected() == 0 {
-        return Err(AppError::Internal("Channel not found".into()));
-    }
 
     // Only the grants this form owns: a grant written by another provenance is not the email
     // allowlist's to replace.
@@ -692,6 +726,7 @@ mod tests {
                 // cannot pass this test.
                 add_3rd_party: false,
                 created_by: None,
+                ownership: None,
             },
         )
         .await

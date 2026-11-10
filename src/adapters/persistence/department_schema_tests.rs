@@ -254,14 +254,14 @@ async fn department_schema_grant_provenance_check_accepts_every_variant() {
     .execute(f.pool())
     .await
     .unwrap();
+    // One row per provenance: the key includes it, so a principal may hold one capability from
+    // several provenances at once (DEP-P02-D1).
     let mut tx = f.pool().begin().await.unwrap();
     for provenance in GrantProvenance::ALL {
         sqlx::query(
             "INSERT INTO channel_principal_grants \
                  (company_id, channel_id, principal_id, capability, provenance) \
-             VALUES ($1, $2, $3, 'view', $4) \
-             ON CONFLICT (company_id, channel_id, principal_id, capability) \
-             DO UPDATE SET provenance = EXCLUDED.provenance",
+             VALUES ($1, $2, $3, 'view', $4)",
         )
         .bind(f.company)
         .bind(channel)
@@ -271,10 +271,21 @@ async fn department_schema_grant_provenance_check_accepts_every_variant() {
         .await
         .unwrap_or_else(|error| panic!("{provenance:?} is accepted: {error}"));
     }
+    let rows: i64 =
+        sqlx::query_scalar("SELECT count(*) FROM channel_principal_grants WHERE channel_id = $1")
+            .bind(channel)
+            .fetch_one(&mut *tx)
+            .await
+            .unwrap();
+    assert_eq!(rows, GrantProvenance::ALL.len() as i64);
     let unknown = sqlx::query(
-        "UPDATE channel_principal_grants SET provenance = 'department' WHERE channel_id = $1",
+        "INSERT INTO channel_principal_grants \
+             (company_id, channel_id, principal_id, capability, provenance) \
+         VALUES ($1, $2, $3, 'participate', 'department')",
     )
+    .bind(f.company)
     .bind(channel)
+    .bind(f.member_principal.as_uuid())
     .execute(&mut *tx)
     .await;
     assert_eq!(

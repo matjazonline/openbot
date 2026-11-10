@@ -1,0 +1,113 @@
+{
+  "version": 1,
+  "round": "01DEP-P02-B1-R1",
+  "artifact": "a3b1ed11e9a8ecbce73549e00d0afebef9dc1f6971e124d6d16e24a435faada8",
+  "checks": [
+    {
+      "criteria": [
+        "AC1",
+        "AC2",
+        "AC3",
+        "D1",
+        "D2",
+        "D3",
+        "D4",
+        "D5",
+        "D6",
+        "p01-regression"
+      ],
+      "command": "cargo test --locked --offline --lib department -- --test-threads=4",
+      "fixture": "TEST_DATABASE_URL db openbot_dept_p02_test (phase-owned) + own_database for competing tests; SQLX_OFFLINE=true; test-threads=4",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R1-department-tests.txt",
+          "sha256": "7a85d59d437d691ee03dcf68159ec8d0e2f14be54b860eb341f86edd93514426"
+        },
+        {
+          "path": "logs/B1-test-inventory.txt",
+          "sha256": "0128d650375b85b95bbfc4b087790f71de2fde915037dba87f62cfa025f2416f"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "contract-impact"
+      ],
+      "command": "cargo test --locked --offline --lib -- --test-threads=4 channel account_identity notification participant agent_retire company_invite provisioning assistant_channel onboarding library legacy_runtime_schema test_support::tests adapters::persistence::tests use_cases::thread:: workflow_routes_mount member_removal removed_membership user_deletion revision_overflow state_witness",
+      "fixture": "TEST_DATABASE_URL db openbot_dept_p02_test (phase-owned) + own_database for competing tests; SQLX_OFFLINE=true; test-threads=4",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B1-R1-affected-tests.txt",
+          "sha256": "4d04cb792e01bb20863f07090af3d401c8334bc037b5e34ffbc8b284aab140de"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "contract-impact"
+      ],
+      "command": "cargo test --locked --offline --lib leaves_a_manager_grant_alone (after updating it for per-provenance rows)",
+      "fixture": "TEST_DATABASE_URL db openbot_dept_p02_test (phase-owned) + own_database for competing tests; SQLX_OFFLINE=true; test-threads=4",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R1-allowlist-rerun.txt",
+          "sha256": "8887518675c4562c3757beee3d82db031a888fcce6013c4e25e5f3d090ff5a8b"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "lint"
+      ],
+      "command": "cargo clippy --locked --offline --lib --tests -- -D warnings",
+      "fixture": "none",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R1-clippy.txt",
+          "sha256": "b62dd012b82fe2109fae83a0d6ad2f53477904f2f0a2621816bf878a62f9ea2d"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "module-tree"
+      ],
+      "command": "cargo test --locked --offline --test source_modules",
+      "fixture": "none",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R1-source-modules.txt",
+          "sha256": "d7c2a9bbc8a706beda482ae04becc0c8d536bd79cb73d38b1578f761687e644a"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "schema"
+      ],
+      "command": "sqlx migrate run (fresh openbot_dept_p02_dev) && SQLX_OFFLINE=false cargo sqlx prepare --check -- --all-targets",
+      "fixture": "fresh disposable DB openbot_dept_p02_dev",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R1-sqlx-prepare.txt",
+          "sha256": "823b76ebcf4a4299d473de700cf7624c6d5f2e722e5803bbb9ce4866feb6d2db"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "full-gate"
+      ],
+      "command": "scripts/check.sh",
+      "fixture": "none",
+      "status": "NOT EXERCISED",
+      "reason": "User decision 2026-11-09 (01DEP-I003): focused checks only"
+    }
+  ]
+}

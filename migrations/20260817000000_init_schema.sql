@@ -906,9 +906,15 @@ CREATE TABLE public.channels (
     created_by jsonb NOT NULL,
     description text,
     settings_revision bigint DEFAULT 0 NOT NULL,
+    department_id uuid,
+    members_only boolean DEFAULT false NOT NULL,
     CONSTRAINT channels_access_mode_check CHECK ((access_mode = ANY (ARRAY['team'::text, 'allowlist'::text, 'public'::text]))),
     CONSTRAINT channels_created_by_shape_check CHECK (public.valid_creation_provenance(created_by)),
-    CONSTRAINT channels_name_not_blank CHECK ((btrim(name) <> ''::text))
+    CONSTRAINT channels_name_not_blank CHECK ((btrim(name) <> ''::text)),
+    -- A members-only desk belongs to a department and is an allowlist desk, so channel policy
+    -- needs no rule of its own: its department's grants are its allowlist (01-departments p02).
+    CONSTRAINT channels_members_only_owned CHECK (((NOT members_only) OR (department_id IS NOT NULL))),
+    CONSTRAINT channels_members_only_allowlist CHECK (((NOT members_only) OR (access_mode = 'allowlist'::text)))
 );
 
 
@@ -6046,7 +6052,7 @@ ALTER TABLE ONLY public.channel_bindings
 --
 
 ALTER TABLE ONLY public.channel_principal_grants
-    ADD CONSTRAINT channel_principal_grants_pkey PRIMARY KEY (company_id, channel_id, principal_id, capability);
+    ADD CONSTRAINT channel_principal_grants_pkey PRIMARY KEY (company_id, channel_id, principal_id, capability, provenance);
 
 
 --
@@ -15409,6 +15415,14 @@ CREATE UNIQUE INDEX department_roles_one_lead ON public.department_roles USING b
     WHERE (role = 'lead'::text);
 CREATE INDEX department_roles_principal_idx ON public.department_roles USING btree (company_id, principal_id);
 
+-- A desk may belong to a department (p02). Deleting a department that still owns a desk is
+-- refused; detach or delete the desk first. Deleting the desk is never blocked by its owner.
+ALTER TABLE ONLY public.channels
+    ADD CONSTRAINT channels_department_fk FOREIGN KEY (company_id, department_id)
+        REFERENCES public.departments(company_id, id) ON DELETE RESTRICT;
+CREATE INDEX channels_department_idx ON public.channels USING btree (company_id, department_id)
+    WHERE (department_id IS NOT NULL);
+
 -- Why `checked_department` may not sit under `proposed_parent`, or NULL when it may: 'cycle' when
 -- the parent is the department itself or one of its descendants; 'depth' when the department's
 -- subtree would then reach below level 8 (a root department is level 1). Both walks stop at level
@@ -15487,6 +15501,17 @@ BEGIN
      WHERE member.company_id = NEW.company_id AND member.principal_id = NEW.id;
     DELETE FROM public.department_roles AS holder
      WHERE holder.company_id = NEW.company_id AND holder.principal_id = NEW.id;
+    -- The members-only access those rows gave goes too, or an address that still resolves to the
+    -- demoted principal would keep it; the provenance is scoped deliberately, so an allowlist
+    -- entry stays. The desks' settings move on as any grant re-derivation's do.
+    WITH removed AS (
+        DELETE FROM public.channel_principal_grants AS derived
+         WHERE derived.company_id = NEW.company_id AND derived.principal_id = NEW.id
+           AND derived.provenance = 'department_membership'
+        RETURNING derived.channel_id
+    )
+    UPDATE public.channels AS channel SET settings_revision = channel.settings_revision + 1
+     WHERE channel.company_id = NEW.company_id AND channel.id IN (SELECT channel_id FROM removed);
     RETURN NEW;
 END $$;
 CREATE TRIGGER department_principal_demoted AFTER UPDATE OF kind ON public.principals

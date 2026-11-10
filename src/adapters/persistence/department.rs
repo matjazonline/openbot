@@ -24,6 +24,7 @@ use uuid::Uuid;
 
 use crate::adapters::persistence::PostgresPersistence;
 use crate::adapters::persistence::agent_publication::{begin_bounded, lock_company_on};
+use crate::adapters::persistence::department_desks::sync_department_grants_on;
 use crate::app_error::{AppError, AppResult};
 use crate::application::agent::AgentCompanyScope;
 use crate::application::ports::department::{
@@ -240,6 +241,30 @@ async fn check_principal_on(
     }
 }
 
+/// Lock principals whose department rows this write is about to delete, `FOR KEY SHARE` and in
+/// id order, before deleting them. A demotion holds its principal `FOR UPDATE` and then deletes
+/// the same rows through `department_principal_demoted`; taking the principal first keeps the
+/// two in one order (01DEP-P02-B1-F1).
+async fn lock_principals_on(
+    tx: &mut Transaction<'_, Postgres>,
+    company: CompanyId,
+    principals: &[Uuid],
+) -> AppResult<()> {
+    if principals.is_empty() {
+        return Ok(());
+    }
+    sqlx::query(
+        "SELECT principal.id FROM principals AS principal \
+          WHERE principal.company_id = $1 AND principal.id = ANY($2) \
+          ORDER BY principal.id FOR KEY SHARE",
+    )
+    .bind(company.as_uuid())
+    .bind(principals)
+    .execute(&mut **tx)
+    .await?;
+    Ok(())
+}
+
 /// Create a department, with its lead when one is named. The caller holds the company write lock.
 pub(crate) async fn create_department_on(
     tx: &mut Transaction<'_, Postgres>,
@@ -326,7 +351,16 @@ pub(crate) async fn update_department_on(
     .fetch_one(&mut **tx)
     .await
     .map_err(|error| slug_conflict(error, &slug))?;
-    Department::try_from(updated)
+    let updated = Department::try_from(updated)?;
+    // The moved department's desks gain a new parent lead; the old and the new parent's desks
+    // lose and gain it as a child lead (01DEP-C002).
+    if updated.parent_id != current.parent_id {
+        let mut reach = vec![department];
+        reach.extend(current.parent_id);
+        reach.extend(updated.parent_id);
+        sync_department_grants_on(tx, company, &reach).await?;
+    }
+    Ok(updated)
 }
 
 /// Delete a department that has no child departments; its members and roles go with it. The
@@ -351,6 +385,34 @@ pub(crate) async fn delete_department_on(
             current.name
         )));
     }
+    let owns_desks: bool = sqlx::query_scalar(
+        "SELECT EXISTS (SELECT 1 FROM channels AS desk \
+                         WHERE desk.company_id = $1 AND desk.department_id = $2)",
+    )
+    .bind(company.as_uuid())
+    .bind(department.as_uuid())
+    .fetch_one(&mut **tx)
+    .await?;
+    if owns_desks {
+        return Err(AppError::Conflict(format!(
+            "Department '{}' still owns desks. Move them to another department or delete them first.",
+            current.name
+        )));
+    }
+    // Its member and role rows cascade with it: lock their principals first, as row deletes do.
+    let placed: Vec<Uuid> = sqlx::query_scalar(
+        "SELECT member.principal_id FROM department_members AS member \
+          WHERE member.company_id = $1 AND member.department_id = $2 \
+         UNION \
+         SELECT holder.principal_id FROM department_roles AS holder \
+          WHERE holder.company_id = $1 AND holder.department_id = $2 \
+         ORDER BY 1",
+    )
+    .bind(company.as_uuid())
+    .bind(department.as_uuid())
+    .fetch_all(&mut **tx)
+    .await?;
+    lock_principals_on(tx, company, &placed).await?;
     sqlx::query("DELETE FROM departments WHERE company_id = $1 AND id = $2")
         .bind(company.as_uuid())
         .bind(department.as_uuid())
@@ -369,6 +431,10 @@ pub(crate) async fn delete_department_on(
                 AppError::from(error)
             }
         })?;
+    // Its lead was a child lead of the parent's desks.
+    if let Some(parent) = current.parent_id {
+        sync_department_grants_on(tx, company, &[parent]).await?;
+    }
     Ok(())
 }
 
@@ -383,6 +449,24 @@ pub(crate) async fn assign_department_role_on(
     principal: PrincipalId,
 ) -> AppResult<()> {
     lock_department_on(tx, company, department).await?;
+    // The holder this assignment replaces loses a row: lock them with the new holder, first.
+    let mut involved: Vec<Uuid> = if role.is_single_holder() {
+        sqlx::query_scalar(
+            "SELECT holder.principal_id FROM department_roles AS holder \
+              WHERE holder.company_id = $1 AND holder.department_id = $2 AND holder.role = $3",
+        )
+        .bind(company.as_uuid())
+        .bind(department.as_uuid())
+        .bind(role.as_str())
+        .fetch_all(&mut **tx)
+        .await?
+    } else {
+        Vec::new()
+    };
+    involved.push(principal.as_uuid());
+    involved.sort_unstable();
+    involved.dedup();
+    lock_principals_on(tx, company, &involved).await?;
     check_principal_on(tx, company, principal).await?;
     if role.is_single_holder() {
         sqlx::query(
@@ -407,7 +491,8 @@ pub(crate) async fn assign_department_role_on(
     .bind(principal.as_uuid())
     .execute(&mut **tx)
     .await?;
-    Ok(())
+    let reach = role_reach_on(tx, company, department).await?;
+    sync_department_grants_on(tx, company, &reach).await
 }
 
 /// Take the role from `principal`. The caller holds the company write lock.
@@ -419,6 +504,7 @@ pub(crate) async fn clear_department_role_on(
     principal: PrincipalId,
 ) -> AppResult<()> {
     lock_department_on(tx, company, department).await?;
+    lock_principals_on(tx, company, &[principal.as_uuid()]).await?;
     let cleared = sqlx::query(
         "DELETE FROM department_roles \
           WHERE company_id = $1 AND department_id = $2 AND role = $3 AND principal_id = $4",
@@ -435,7 +521,8 @@ pub(crate) async fn clear_department_role_on(
             "That principal does not hold the {role} role in this department."
         )));
     }
-    Ok(())
+    let reach = role_reach_on(tx, company, department).await?;
+    sync_department_grants_on(tx, company, &reach).await
 }
 
 /// Add `principal` to the department; adding a member again changes nothing. The caller holds
@@ -457,7 +544,7 @@ pub(crate) async fn add_department_member_on(
     .bind(principal.as_uuid())
     .execute(&mut **tx)
     .await?;
-    Ok(())
+    sync_department_grants_on(tx, company, &[department]).await
 }
 
 /// Remove `principal` from the department. The caller holds the company write lock.
@@ -468,6 +555,7 @@ pub(crate) async fn remove_department_member_on(
     principal: PrincipalId,
 ) -> AppResult<()> {
     lock_department_on(tx, company, department).await?;
+    lock_principals_on(tx, company, &[principal.as_uuid()]).await?;
     let removed = sqlx::query(
         "DELETE FROM department_members \
           WHERE company_id = $1 AND department_id = $2 AND principal_id = $3",
@@ -483,7 +571,31 @@ pub(crate) async fn remove_department_member_on(
             "That principal is not a member of this department.".into(),
         ));
     }
-    Ok(())
+    sync_department_grants_on(tx, company, &[department]).await
+}
+
+/// The departments whose desks a role holder of `department` reaches: its own, its parent's
+/// (as a child lead) and its children's (as their parent's lead), one step both ways
+/// (01DEP-C002).
+async fn role_reach_on(
+    tx: &mut Transaction<'_, Postgres>,
+    company: CompanyId,
+    department: DepartmentId,
+) -> AppResult<Vec<DepartmentId>> {
+    let neighbours: Vec<Uuid> = sqlx::query_scalar(
+        "SELECT department.parent_id FROM departments AS department \
+          WHERE department.company_id = $1 AND department.id = $2 AND department.parent_id IS NOT NULL \
+         UNION \
+         SELECT child.id FROM departments AS child \
+          WHERE child.company_id = $1 AND child.parent_id = $2",
+    )
+    .bind(company.as_uuid())
+    .bind(department.as_uuid())
+    .fetch_all(&mut **tx)
+    .await?;
+    Ok(std::iter::once(department)
+        .chain(neighbours.into_iter().map(DepartmentId::new))
+        .collect())
 }
 
 #[async_trait]

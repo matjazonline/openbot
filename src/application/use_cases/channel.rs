@@ -640,6 +640,8 @@ mod tests {
             created_by: write.created_by.unwrap_or_else(CreationProvenance::system),
             created_at: Utc::now(),
             settings_revision: 0,
+            department_id: None,
+            members_only: false,
         }
     }
 
@@ -1205,6 +1207,8 @@ mod tests {
                 created_by: crate::entities::creation::CreationProvenance::system(),
                 created_at: chrono::Utc::now(),
                 settings_revision: 0,
+                department_id: None,
+                members_only: false,
             },
             Channel {
                 enabled: false,
@@ -1221,6 +1225,8 @@ mod tests {
                 created_by: crate::entities::creation::CreationProvenance::system(),
                 created_at: chrono::Utc::now(),
                 settings_revision: 0,
+                department_id: None,
+                members_only: false,
             },
         ];
 

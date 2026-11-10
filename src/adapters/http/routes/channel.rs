@@ -26,9 +26,10 @@ use crate::adapters::protocols::email::parser::RawInboundPayload;
 use crate::app_error::AppError;
 use crate::app_error::AppResult;
 use crate::application::message_outcomes::MessageOutcomeReader;
-use crate::application::ports::channel::ChannelWrite;
+use crate::application::ports::channel::{ChannelOwnershipWrite, ChannelWrite};
 use crate::entities::channel::Channel;
 use crate::entities::cursor::ThreadCursor;
+use crate::entities::department::DepartmentId;
 use crate::entities::thread::Thread;
 use crate::entities::user::Viewer;
 use crate::entities::value_objects::EmailAddress;
@@ -189,6 +190,35 @@ pub struct ChannelJsonPayload {
     pub enabled: Option<bool>,
     /// Omitted means on, for the same reason as `enabled`.
     pub add_3rd_party: Option<bool>,
+    /// Unlike every field above, ownership is kept when absent: `null` detaches the desk from its
+    /// department, an id assigns it, and leaving the key out changes nothing.
+    #[serde(default, deserialize_with = "present")]
+    pub department_id: Option<Option<Uuid>>,
+    /// Kept when absent, like `department_id`.
+    pub members_only: Option<bool>,
+}
+
+/// A field that is present, even as `null`, is `Some`; an absent one stays `None` via `default`.
+fn present<'de, D, T>(deserializer: D) -> Result<Option<Option<T>>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+    T: Deserialize<'de>,
+{
+    Option::<T>::deserialize(deserializer).map(Some)
+}
+
+impl ChannelJsonPayload {
+    /// The ownership change this payload asks for, if it names either field.
+    fn ownership(&self) -> Option<ChannelOwnershipWrite> {
+        (self.department_id.is_some() || self.members_only.is_some()).then(|| {
+            ChannelOwnershipWrite {
+                department_id: self
+                    .department_id
+                    .map(|department| department.map(DepartmentId::new)),
+                members_only: self.members_only,
+            }
+        })
+    }
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -361,6 +391,7 @@ async fn create_channel_handler(
         alias_slugs: parse_list_form(form.alias_slugs),
         participant_emails: parse_emails_form(form.participant_emails),
         created_by: None,
+        ownership: None,
     };
     if let Err(err) = channel_use_cases
         .create_channel(user.id, company_id, write, confirm_spam_disabled)
@@ -517,6 +548,7 @@ async fn update_channel_handler(
         enabled,
         add_3rd_party,
         created_by: None,
+        ownership: None,
     };
 
     let updated = match channel_use_cases
@@ -710,6 +742,7 @@ async fn create_channel_json(
         .map(String::from)
         .unwrap_or_else(|| slugify(&payload.name));
 
+    let ownership = payload.ownership();
     let write = ChannelWrite {
         name: payload.name,
         description: parse_text_form(payload.description),
@@ -719,6 +752,7 @@ async fn create_channel_json(
         enabled: payload.enabled.unwrap_or(true),
         add_3rd_party: payload.add_3rd_party.unwrap_or(true),
         created_by: None,
+        ownership,
     };
 
     let channel = channel_use_cases
@@ -764,6 +798,7 @@ pub(super) async fn update_channel_json(
         .map(String::from)
         .unwrap_or_else(|| slugify(&payload.name));
 
+    let ownership = payload.ownership();
     let write = ChannelWrite {
         name: payload.name,
         description: parse_text_form(payload.description),
@@ -773,6 +808,7 @@ pub(super) async fn update_channel_json(
         enabled: payload.enabled.unwrap_or(true),
         add_3rd_party: payload.add_3rd_party.unwrap_or(true),
         created_by: None,
+        ownership,
     };
 
     let channel = channel_use_cases
@@ -862,6 +898,8 @@ mod tests {
             created_by: crate::entities::creation::CreationProvenance::system(),
             created_at: Utc::now(),
             settings_revision: 0,
+            department_id: None,
+            members_only: false,
         };
 
         let channels = [channel.clone()];
@@ -1212,3 +1250,7 @@ mod tests {
 #[cfg(test)]
 #[path = "channel_authorization_tests.rs"]
 mod authorization_tests;
+
+#[cfg(test)]
+#[path = "channel_department_tests.rs"]
+mod department_tests;

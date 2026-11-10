@@ -1,0 +1,22 @@
+   Compiling open_bots v0.1.0 (/Users/mac02/.codex/worktrees/2050/openbot)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 58.39s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-c4f538027eed5c31)
+
+running 1 test
+test adapters::persistence::department::tests::desks::department_desk_competing_removal_and_demotion_of_one_principal_both_commit ... FAILED
+
+failures:
+
+---- adapters::persistence::department::tests::desks::department_desk_competing_removal_and_demotion_of_one_principal_both_commit stdout ----
+
+thread 'adapters::persistence::department::tests::desks::department_desk_competing_removal_and_demotion_of_one_principal_both_commit' (39845932) panicked at src/adapters/persistence/department_desks_tests.rs:798:28:
+the removal commits: DatabaseTimeout("error returned from database: canceling statement due to lock timeout")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    adapters::persistence::department::tests::desks::department_desk_competing_removal_and_demotion_of_one_principal_both_commit
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 3823 filtered out; finished in 2.05s
+
+error: test failed, to rerun pass `--lib`

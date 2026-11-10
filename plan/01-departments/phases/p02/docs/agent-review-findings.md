@@ -339,3 +339,86 @@ Common context for the G1 findings below:
   read better. Everything else I read is grammatical and consistent: singular, plural and
   capitalisation follow the original wording.
 - **Resolution history:** 2026-11-10 open (optional; B2-R1).
+
+---
+
+## 01DEP-P02-B1-F1 — A department write can deadlock with an agent or account deletion of the same principal
+
+- **ID and context:** 2026-11-10 · `implement-opus-reviewed-2_2` · batch B1 (02A + 02B) · batch
+  review · round `01DEP-P02-B1-R1` · B = Opus 5.5, agent `ad409b2d3d149c2c6` · worktree
+  `/Users/mac02/.codex/worktrees/2050/openbot`, base/HEAD `0c5df403` + working tree · digest
+  `a3b1ed11e9a8ecbce73549e00d0afebef9dc1f6971e124d6d16e24a435faada8`.
+- **Classification:** actionable defect · **Low** · concurrency. The cause is in the implementation
+  order. It also shows that the gated D3 r2 "Residual deadlocks … complete" item 3 is incomplete.
+- **Evidence:**
+  - `remove_department_member_on`, `clear_department_role_on`, and the lead-replacing `DELETE` in
+    `assign_department_role_on` delete a principal's `department_members`/`department_roles` row.
+    That leaves a row lock on it.
+  - They then call `sync_department_grants_on`. `rederive_on` → `lock_principals_on` locks every
+    eligible principal `FOR KEY SHARE` (`department_desks.rs`). That includes the principal just
+    removed, if it is still eligible another way: a member removed who is still lead, a lead
+    replaced who is still a member, or the lead of a neighbouring department.
+  - A demotion of that principal through agent delete or account deletion, neither of which takes
+    the company lock, holds the principal `FOR UPDATE`. Its trigger then deletes the same join row
+    (`department_principal_demoted`).
+  - The two orders are join row → principal and principal → join row, so they form a cycle.
+  - D3 r2 item 3 says sync takes principals "before gates and rows". That covers channel rows, but
+    not the join rows the `_on` function wrote first.
+  - Reproduced: `logs/01DEP-P02-B1-R1-sql-deadlock-probe.txt` (scratch DB, working-tree schema)
+    shows T1 delete member row → KEY SHARE vs T2 demotion, and PostgreSQL reports `deadlock
+    detected`, aborting the demotion. It needs a members-only desk in the affected set and a
+    concurrent demotion of that very principal: rare, detected, nothing partial.
+- **Required:** in each `_on` function that deletes a principal's join rows, take that principal
+  `FOR KEY SHARE` (sorted, with any others) before deleting. That gives principal → join row
+  everywhere, as `check_principal_on` already does for inserts, and the sync's later lock is then
+  already held. The alternative is to add the case to D3's residual list. Preferably add a competing
+  test with a held demotion against a remove/replace that keeps the principal eligible.
+- **Instruction lesson:** (observation) a new lock taken late in an existing write inherits that
+  write's earlier row locks. Candidate: when a gate places a new lock step "before gates and rows",
+  also list the rows the caller already wrote.
+- **Resolution history:** 2026-11-10 open (B1-R1).
+  - 2026-11-10 **fixed** (recheck `01DEP-P02-B1-R2`, digest `cbca0a00bf06f97d453c5191aac2f98984cf9062aae79101246ba6bd8aa5438f`):
+    - `department.rs` `lock_principals_on` locks, `FOR KEY SHARE` and sorted, every principal whose department rows a write deletes, before deleting them. That covers the member in `remove_department_member_on`, the holder in `clear_department_role_on`, the replaced and new holders in `assign_department_role_on` (one statement, before `check_principal_on`), and every member and holder before `delete_department_on`'s cascade. So the order is principal → join row everywhere, and the sync's later locks on those principals are already held.
+    - The remaining eligible principals have no rows written by this transaction, and in-company demotions lock one principal each, so lock order among `KEY SHARE` holders cannot form a cycle.
+    - TASK records the correction to gate r2 D3 item 3.
+    - Test `desks::department_desk_competing_removal_and_demotion_of_one_principal_both_commit` pauses the real removal after its row delete, blocks a demotion behind it, then asserts both commit and the final grants are empty. The author's mutation run without the lock fails the test with a lock timeout (`logs/B1-R2-mutation-without-fix.txt`), so it discriminates. It passes in B's run (`logs/01DEP-P02-B1-R2-reviewer-department-tests.txt`).
+
+---
+
+## 01DEP-P02-B1-F2 — No test checks that a derived grant's email stays out of the form's allowlist
+
+- **ID and context:** as B1-F1.
+- **Classification:** actionable defect · **Low** · verification (plan 02B.3).
+- **Evidence:** 02B.3 asks the form round-trip test to show that derived grants are "neither shown
+  as emails nor deleted by a form save". The author kept the original test unchanged and records
+  that two new tests cover this. `department_desk_members_only_keeps_an_allowlist_entry_and_a_membership_apart`
+  proves the **not deleted** half: after a save with an empty list, the member's derived grants
+  remain. No test asserts the **not shown** half. In the first part, `first` has an email identity
+  and derived grants, yet `unlisted.participant_emails` is never checked. The `Departments` fixture
+  principals have no identities, so other tests cannot exercise it. The SQL filter (`provenance =
+  'configured_allowlist'`) makes it true today, but nothing would catch a regression.
+- **Required:** assert that `participant_emails` holds no derived holder's address. For example,
+  in that test assert `unlisted.participant_emails == Some(vec![])` while `first` holds derived
+  grants. Or extend the round-trip test as the plan says.
+- **Resolution history:** 2026-11-10 open (B1-R1).
+  - 2026-11-10 **fixed** (recheck `01DEP-P02-B1-R2`, digest `cbca0a00bf06f97d453c5191aac2f98984cf9062aae79101246ba6bd8aa5438f`): the allowlist/membership test now asserts `participant_emails == Some(vec![])` while the derived holder `first` (who has an email identity) holds grants.
+
+---
+
+## 01DEP-P02-B1-F3 — The JSON channel payload's ownership fields are untested
+
+- **ID and context:** as B1-F1.
+- **Classification:** actionable defect · **Low** · verification (D2 r2, F7 follow-up).
+- **Evidence:** D2 r2 says the keep-when-absent exception is "Documented on the payload type and in
+  the route test". `routes/channel.rs` adds `department_id` (with the `present` deserializer:
+  `null` → `Some(None)` detaches) and `members_only`, plus `ChannelJsonPayload::ownership()`.
+  No test in `routes/channel.rs` or elsewhere touches them; a search for `ownership()`,
+  `"department_id"` and `members_only` in the route tests finds nothing. The persistence merge is
+  tested with `ChannelOwnershipWrite` built directly (`an_ownership_edit_keeps_what_it_does_not_name`,
+  desk tests). An error in the deserializer or the mapping would silently detach desks, or fail to
+  detach them, through the JSON API.
+- **Required:** a route-level test, deserializing JSON as `department_routes_round_trip_…` does in
+  p01, for three cases: absent fields keep ownership, `"department_id": null` detaches, and an id plus
+  `"members_only": true` assigns. Also cover `"members_only"` alone.
+- **Resolution history:** 2026-11-10 open (B1-R1).
+  - 2026-11-10 **fixed** (recheck `01DEP-P02-B1-R2`, digest `cbca0a00bf06f97d453c5191aac2f98984cf9062aae79101246ba6bd8aa5438f`): `routes/channel_department_tests.rs` `department_desk_ownership_json_fields_are_kept_when_absent` deserializes real JSON into `ChannelJsonPayload` and drives `update_channel_json`. It covers an id plus `members_only: true` → allowlist; absent → kept; `members_only: false` alone → department kept, mode team; `department_id: null` → detached. It passes in B's run.

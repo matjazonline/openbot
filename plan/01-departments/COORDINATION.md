@@ -3,7 +3,7 @@
 - Authority: /Users/mac02/.codex/worktrees/2050/openbot/plan/01-departments/COORDINATION.md
 - Writer: root session 68933786-cbe7-4b6b-9387-b5dcb29689a4, worktree
   /Users/mac02/.codex/worktrees/2050/openbot (branch codex/departments-addressing-plans)
-- Revision: 2
+- Revision: 3
 
 ## Plan-wide instructions
 
@@ -21,7 +21,7 @@
 | Phase | Owner/session | Worktree | Authoritative TASK/HANDOFF paths |
 | --- | --- | --- | --- |
 | p01 | root 68933786 (A), B per TASK | /Users/mac02/.codex/worktrees/2050/openbot | plan/01-departments/phases/p01/docs/{TASK,HANDOFF}.md — accepted in phase, commit 57adfa7a |
-| p02 | root 68933786 (A), B per TASK | /Users/mac02/.codex/worktrees/2050/openbot | plan/01-departments/phases/p02/docs/{TASK,HANDOFF}.md |
+| p02 | root 68933786 (A), B per TASK | /Users/mac02/.codex/worktrees/2050/openbot | plan/01-departments/phases/p02/docs/{TASK,HANDOFF}.md — accepted in phase (B2 0c5df403, B1 next commit) |
 | p03 | root 68933786 (A), B per TASK | /Users/mac02/.codex/worktrees/2050/openbot | plan/01-departments/phases/p03/docs/{TASK,HANDOFF}.md (pending) |
 
 ## Cross-phase notices
@@ -45,7 +45,8 @@
 - Dependencies/order: effective now; p02 gate decisions build on it.
 - Evidence/review: user answer in session 68933786 (AskUserQuestion, 2026-11-10).
 - Verification: p02 `department_desk_relay_` tests; p03 round-trip tests.
-- Responses: p02 -> acknowledged (r1); p03 -> pending.
+- Responses: p02 -> satisfied (r1; `department_desk_relay_into_a_members_only_desk_stays_trusted`,
+  docs/inter_channel_agent_communication.md paragraph; p02 TASK B1 mapping); p03 -> pending.
 
 ### 01DEP-C002 / r1
 - State: active (2026-11-10)
@@ -63,4 +64,5 @@
 - Evidence/review: user answer in session 68933786 (AskUserQuestion, 2026-11-10).
 - Verification: p02 `department_desk_members_only_` tests (child lead admitted, grandchild lead
   refused, parent lead admitted, grandparent lead refused); p03 escalation test.
-- Responses: p02 -> acknowledged (r1); p03 -> pending.
+- Responses: p02 -> satisfied (r1; `department_desk_members_only_reaches_one_step_up_and_down`;
+  p02 TASK B1 mapping); p03 -> pending.

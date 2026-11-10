@@ -4,6 +4,7 @@ use crate::{
     entities::{
         channel::Channel,
         creation::CreationProvenance,
+        department::DepartmentId,
         value_objects::{ChannelSlug, CompanySlug},
     },
 };
@@ -27,6 +28,18 @@ pub struct ChannelWrite {
     /// Whether a trusted sender may pull CC'd outsiders onto this channel's threads.
     pub add_3rd_party: bool,
     pub created_by: Option<CreationProvenance>,
+    /// Which department owns the desk and whether it is members-only. `None` leaves both as they
+    /// are on an edit and creates an unowned desk: every form that predates departments builds
+    /// this write wholesale, and must not detach a desk by saving it.
+    pub ownership: Option<ChannelOwnershipWrite>,
+}
+
+/// A change to a desk's ownership; an absent field keeps its current value.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct ChannelOwnershipWrite {
+    /// `Some(None)` detaches the desk from its department.
+    pub department_id: Option<Option<DepartmentId>>,
+    pub members_only: Option<bool>,
 }
 
 /// One authorized channel edit, as persistence receives it.

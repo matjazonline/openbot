@@ -1,0 +1,9 @@
+   Compiling open_bots v0.1.0 (/Users/mac02/.codex/worktrees/2050/openbot)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2m 33s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-d844332ade227b6a)
+
+running 1 test
+test adapters::persistence::channel::allowlist_tests::channel_allowlist_leaves_a_manager_grant_alone ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3821 filtered out; finished in 0.37s
+

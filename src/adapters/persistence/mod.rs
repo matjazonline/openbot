@@ -23,6 +23,7 @@ pub mod dashboard;
 pub mod database_query_health;
 pub mod delivery;
 pub mod department;
+pub(crate) mod department_desks;
 pub mod inbound_event;
 pub mod integration;
 pub(crate) mod integrations;

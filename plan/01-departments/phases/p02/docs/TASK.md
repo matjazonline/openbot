@@ -306,3 +306,100 @@ another channel", "Channel not found", the `SlugKind` nouns) and `routes/workflo
 bindings.rs:160`, plus the simulation "participant_emails" banner — phase 04 copy follow-up;
 B2-F3 onboarding "Continue to desk" → "Continue to your first desk". Unrelated pre-existing
 failure `rendered_markup_carries_no_inline_javascript` (sample.rs:153) confirmed by B; unchanged.
+
+## B1 implementation (02A + 02B, 2026-11-10)
+
+Review base 0c5df403 (B2 commit). Files: init schema (channels `department_id`, `members_only`, two
+checks; grant PK gains provenance; `channels_department_fk` RESTRICT + `channels_department_idx`
+in the Departments block; `department_principal_demoted` deletes derived grants and bumps the
+desks' revision); `domain/entities/channel.rs` (`Channel` fields); `ports/channel.rs`
+(`ChannelWrite.ownership`, `ChannelOwnershipWrite { department_id: Option<Option<_>>,
+members_only: Option<bool> }` — tri-state fields so the JSON keep-when-absent merge happens under
+the locks, per D2); new `persistence/department_desks.rs` (`DeskOwnership` merge + members-only
+mode rule, `prelock_ownership_on`, eligibility SQL, `lock_principals_on`, `rederive_on`,
+`sync_department_grants_on`, `sync_desk_grants_on`, `set_desk_ownership_on` for p03, 3 unit
+tests); `persistence/channel.rs` (select/row/insert/create/settings write, allowlist conflict
+target); `persistence/channel_edit.rs` (ownership prelock before the gate, re-derive after);
+`persistence/department.rs` (sync calls per D4 sets via `role_reach_on`; delete refuses owned
+desks); `persistence/account_identity.rs` (merge conflict target); `routes/channel.rs` (JSON
+`department_id` present-null / `members_only`, `ownership()`; HTML forms `ownership: None`);
+`routes/ui_channels.rs` (`ownership: None`); 44 `Channel` literals in tests;
+`docs/inter_channel_agent_communication.md` (relay paragraph, D6).
+Deviations recorded: create D without a lead needs no sync (its desks don't exist yet and the
+parent's desks change only through a child lead, which `assign_department_role_on` re-derives);
+the plan's form round-trip test (`a_channel_form_round_trips_…`) is unchanged — the derived-grant
+form behaviour is covered by `department_desk_members_only_keeps_an_allowlist_entry_and_a_membership_apart`
+and `…_form_saves_keep_allowlist_and_refuse_public`; `channel_allowlist_leaves_a_manager_grant_alone`
+updated for per-provenance rows (gated D1/F1 consequence; intent kept: the manager grant is never
+relabelled or deleted).
+
+### Verification mapping (actual, B1)
+
+| Criterion | Test | Decisive assertion | Status |
+| --- | --- | --- | --- |
+| AC1 cross-company dept | `desks::department_desk_ownership_refuses_another_companys_department` | NotFound on edit and create; unchanged | PASS |
+| AC1 delete/revision/keep | `desks::department_desk_ownership_blocks_deleting_its_department_until_detached` | revision moves; `ownership: None` keeps; delete Conflict then Ok after detach | PASS |
+| D1 FK + teardown | `desks::department_desk_ownership_company_teardown_takes_owned_desks_with_it` | raw dept delete → `channels_department_fk`; company delete succeeds | PASS |
+| D4 invariant (F3) | `desks::department_desk_ownership_moving_or_opening_a_desk_rederives_its_grants` | D1→D2 replaces; off → none, mode team; later membership no-op | PASS |
+| AC2 member/teammate/owner + agent grants | `desks::department_desk_members_only_admits_members_and_the_owner_only` | `participant_access`, `viewer_access`, `notification_principal_can_view` triples | PASS |
+| AC2 removal + notifications | `desks::department_desk_members_only_removal_revokes_access_and_notifications_in_one_commit` | grants gone, revision moved, notification `withdrawn` | PASS |
+| C002 hierarchy, lead change, re-parent, clear | `desks::department_desk_members_only_reaches_one_step_up_and_down` | exact derived sets; grand*/ out | PASS |
+| F1 both orders | `desks::department_desk_members_only_keeps_an_allowlist_entry_and_a_membership_apart` | access kept; email shown | PASS |
+| D2 (F2) | `desks::department_desk_members_only_form_saves_keep_allowlist_and_refuse_public` | allowlist kept; @public and unowned members-only BadRequest | PASS |
+| D5 | `desks::department_desk_members_only_removing_a_teammate_drops_only_derived_grants` | derived gone, revision moved, configured kept | PASS |
+| p03 contract | `desks::department_desk_members_only_set_desk_ownership_on_takes_the_desk_edit_path` | allowlist mode + derived grants | PASS |
+| D3 competing | `desks::department_desk_competing_membership_and_ownership_edit_agree`, `desks::department_desk_competing_rederivation_behind_a_demotion_leaves_it_out` | final grants = final membership; demoted left out | PASS |
+| AC3/C001 relays | `thread::tests::department_desk_relay::department_desk_relay_into_a_members_only_desk_stays_trusted` | member and non-member desks `Relayed`; trace → loop refusal | PASS |
+| D6/F8 thread parties | `…::department_desk_members_only_thread_party_keeps_replying_after_removal` | reply accepted; new message "Sender unauthorized" | PASS |
+| D2 pure rule | `department_desks::tests::*` (3) | mode table; merge keeps absent | PASS |
+| p01 regressions | `department` filter (p01 34 tests) | all pass with syncing | PASS |
+
+Stand-ins: channel policy is exercised through `Channel::participant_access`/`viewer_access` on
+the stored grants and the SQL `notification_principal_can_view`, not through a full inbound email
+to a members-only desk; the relay and thread-party tests run the real routing on in-memory ports.
+
+### Check results (B1-R1)
+
+| Command | Result | Log |
+| --- | --- | --- |
+| `cargo test --locked --offline --lib department -- --test-threads=4` | 52 passed | `logs/B1-R1-department-tests.txt` |
+| affected filters (channel, account_identity, notification, participant, agent_retire, company_invite, provisioning, assistant_channel, onboarding, library, legacy_runtime_schema, test_support::tests, persistence::tests, use_cases::thread::, router mount, member_removal, removed_membership, user_deletion, revision_overflow, state_witness) | 592 passed, **1 failed** (`channel_allowlist_leaves_a_manager_grant_alone`, expected D1/F1 consequence) | `logs/B1-R1-affected-tests.txt` |
+| that test after updating its assertion | 1 passed | `logs/B1-R1-allowlist-rerun.txt` |
+| clippy `-D warnings`; fmt; `git diff --check`; `source_modules` | clean; clean; clean; 8 passed | `logs/B1-R1-clippy.txt`, `logs/B1-R1-source-modules.txt` |
+| fresh `openbot_dept_p02_dev` + `sqlx prepare --check` | pass | `logs/B1-R1-sqlx-prepare.txt` |
+
+Environment note: the machine disk filled during the affected run (`No space left on device`
+compiling the rerun); root removed this worktree's own `target/debug/incremental` (16 GB, rebuildable)
+and continued; the user then freed more space. No test result depended on it.
+Frozen: base 0c5df403, digest a3b1ed11e9a8ecbce73549e00d0afebef9dc1f6971e124d6d16e24a435faada8,
+manifest `logs/01DEP-P02-B1-R1.evidence.json` (5 PASS, 1 FAIL retained, 1 NOT EXERCISED).
+
+## B1 correction (B1-R2, 2026-11-10) — answers 01DEP-P02-B1-F1..F3
+
+- F1: `lock_principals_on` (department.rs) locks, `FOR KEY SHARE` in id order, every principal
+  whose department rows a write deletes, before deleting them: the member in
+  `remove_department_member_on`, the holder in `clear_department_role_on`, the replaced and the new
+  holder in `assign_department_role_on`, and all members/holders before `delete_department_on`'s
+  cascade. **Correction to gate r2 D3 item 3**: its no-cycle argument covered channel rows but not
+  department rows a writer had already deleted; with this change the writer holds the principal
+  before any of its rows, so the demotion trigger waits instead. Test
+  `desks::department_desk_competing_removal_and_demotion_of_one_principal_both_commit` (pause
+  trigger after the member-row delete, demotion started meanwhile, both commit); mutation check
+  without the lock: the removal fails with a lock timeout (`logs/B1-R2-mutation-without-fix.txt`).
+- F2: the allowlist/membership test asserts `participant_emails == Some(vec![])` for a derived
+  holder (not shown as an email).
+- F3: `routes/channel_department_tests.rs` `department_desk_ownership_json_fields_are_kept_when_absent`
+  drives `update_channel_json` with id + `members_only: true`, absent (kept), `members_only: false`
+  alone (department kept, mode team) and `department_id: null` (detached).
+- Checks: department filter 54 passed; clippy, fmt, `git diff --check` clean. Frozen digest in
+  `logs/B1-R2-snapshot.txt`, manifest `logs/01DEP-P02-B1-R2.evidence.json`.
+
+### B1 acceptance (2026-11-10)
+
+B1-R2 **PASS** for digest cbca0a00bf06f97d453c5191aac2f98984cf9062aae79101246ba6bd8aa5438f; root
+recomputed the digest; coordination checked (rev 2 → root published rev 3 marking C001/C002
+satisfied for p02; no new notices). **p02 accepted in phase** (B2 commit 0c5df403 + B1 commit).
+Open optional suggestions carried as follow-ups: B2-F1..F3 (phase 04 copy). Full repository gate
+not run (I003). Pre-existing unrelated failure `rendered_markup_carries_no_inline_javascript`.
+p03 contracts: `set_desk_ownership_on`, `sync_department_grants_on`, D3 lock order with
+`lock_principals_on` before row deletes.

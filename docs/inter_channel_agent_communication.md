@@ -35,6 +35,13 @@ A relayed message goes through the same ingress as mail:
 - one inbound commit, under the channel gate and its settings-revision check;
 - one admission intent per association.
 
+The access-policy step does not apply the receiving channel's participant list to a relay: once
+`authorize_relay` has matched the sender address to its source channel, ingress trusts
+`IngressOrigin::InternalChannel`. A members-only channel, whose allowlist is derived from its
+department's members, role holders and adjacent leads, therefore restricts people and outside
+senders only; any channel of the same company may relay into it, still bound by the hop budget
+and the loop rule below.
+
 From there the receiving channel's workflow bindings decide, by their message triggers, whether
 it starts a run. The relay itself starts no work. An intent that answers a message a run is
 waiting on is offered to that run before ordinary admission (reply correlation,

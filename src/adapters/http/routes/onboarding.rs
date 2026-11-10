@@ -444,6 +444,8 @@ mod tests {
             created_by: crate::entities::creation::CreationProvenance::system(),
             created_at: Utc::now(),
             settings_revision: 0,
+            department_id: None,
+            members_only: false,
         };
 
         let company_page = pages::onboarding_company_page(&user, "example.com", None);

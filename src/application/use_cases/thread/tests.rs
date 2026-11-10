@@ -211,6 +211,8 @@ async fn test_inter_channel_hop_limit_rejection() {
                 created_by: crate::entities::creation::CreationProvenance::system(),
                 created_at: Utc::now(),
                 settings_revision: 0,
+                department_id: None,
+                members_only: false,
             },
             Channel {
                 enabled: true,
@@ -227,6 +229,8 @@ async fn test_inter_channel_hop_limit_rejection() {
                 created_by: crate::entities::creation::CreationProvenance::system(),
                 created_at: Utc::now(),
                 settings_revision: 0,
+                department_id: None,
+                members_only: false,
             },
         ]),
     });
@@ -301,6 +305,8 @@ async fn test_spf_authentication_failure_rejection() {
             created_by: crate::entities::creation::CreationProvenance::system(),
             created_at: Utc::now(),
             settings_revision: 0,
+            department_id: None,
+            members_only: false,
         }]),
     });
 
@@ -369,6 +375,8 @@ async fn test_high_spam_score_rejection() {
             created_by: crate::entities::creation::CreationProvenance::system(),
             created_at: Utc::now(),
             settings_revision: 0,
+            department_id: None,
+            members_only: false,
         }]),
     });
 
@@ -435,6 +443,8 @@ async fn access_level_dmarc_failure_rejects_a_known_member_address() {
             created_by: crate::entities::creation::CreationProvenance::system(),
             created_at: Utc::now(),
             settings_revision: 0,
+            department_id: None,
+            members_only: false,
         }]),
     });
 
@@ -512,6 +522,8 @@ async fn test_unauthorized_sender_blocked_before_spam_checks() {
             created_by: crate::entities::creation::CreationProvenance::system(),
             created_at: Utc::now(),
             settings_revision: 0,
+            department_id: None,
+            members_only: false,
         }]),
     });
 
@@ -579,6 +591,8 @@ async fn test_participant_sender_bypasses_spam_checks() {
             created_by: crate::entities::creation::CreationProvenance::system(),
             created_at: Utc::now(),
             settings_revision: 0,
+            department_id: None,
+            members_only: false,
         }]),
     });
 
@@ -647,6 +661,8 @@ async fn test_channel_in_cc_resolves_properly() {
             created_by: crate::entities::creation::CreationProvenance::system(),
             created_at: Utc::now(),
             settings_revision: 0,
+            department_id: None,
+            members_only: false,
         }]),
     });
 
@@ -720,6 +736,8 @@ async fn test_multi_channel_to_and_cc_execution() {
                 created_by: crate::entities::creation::CreationProvenance::system(),
                 created_at: Utc::now(),
                 settings_revision: 0,
+                department_id: None,
+                members_only: false,
             },
             Channel {
                 enabled: true,
@@ -736,6 +754,8 @@ async fn test_multi_channel_to_and_cc_execution() {
                 created_by: crate::entities::creation::CreationProvenance::system(),
                 created_at: Utc::now(),
                 settings_revision: 0,
+                department_id: None,
+                members_only: false,
             },
         ]),
     });
@@ -837,6 +857,8 @@ async fn test_pipeline_address_chaining_execution() {
                 created_by: crate::entities::creation::CreationProvenance::system(),
                 created_at: Utc::now(),
                 settings_revision: 0,
+                department_id: None,
+                members_only: false,
             },
             Channel {
                 enabled: true,
@@ -853,6 +875,8 @@ async fn test_pipeline_address_chaining_execution() {
                 created_by: crate::entities::creation::CreationProvenance::system(),
                 created_at: Utc::now(),
                 settings_revision: 0,
+                department_id: None,
+                members_only: false,
             },
             Channel {
                 enabled: true,
@@ -869,6 +893,8 @@ async fn test_pipeline_address_chaining_execution() {
                 created_by: crate::entities::creation::CreationProvenance::system(),
                 created_at: Utc::now(),
                 settings_revision: 0,
+                department_id: None,
+                members_only: false,
             },
         ]),
     });
@@ -947,6 +973,8 @@ async fn test_misspelled_channel_bounce_and_strict_pipeline_validation() {
                 created_by: crate::entities::creation::CreationProvenance::system(),
                 created_at: Utc::now(),
                 settings_revision: 0,
+                department_id: None,
+                members_only: false,
             },
             Channel {
                 enabled: true,
@@ -963,6 +991,8 @@ async fn test_misspelled_channel_bounce_and_strict_pipeline_validation() {
                 created_by: crate::entities::creation::CreationProvenance::system(),
                 created_at: Utc::now(),
                 settings_revision: 0,
+                department_id: None,
+                members_only: false,
             },
         ]),
     });
@@ -1084,6 +1114,8 @@ async fn test_quote_stripping_rules_for_first_in_thread_and_forwarded_emails() {
             created_by: crate::entities::creation::CreationProvenance::system(),
             created_at: Utc::now(),
             settings_revision: 0,
+            department_id: None,
+            members_only: false,
         }]),
     });
 
@@ -1205,6 +1237,8 @@ async fn test_participant_modes_company_team_public_and_explicit() {
                 created_by: crate::entities::creation::CreationProvenance::system(),
                 created_at: Utc::now(),
                 settings_revision: 0,
+                department_id: None,
+                members_only: false,
             },
             Channel {
                 enabled: true,
@@ -1221,6 +1255,8 @@ async fn test_participant_modes_company_team_public_and_explicit() {
                 created_by: crate::entities::creation::CreationProvenance::system(),
                 created_at: Utc::now(),
                 settings_revision: 0,
+                department_id: None,
+                members_only: false,
             },
             Channel {
                 enabled: true,
@@ -1237,6 +1273,8 @@ async fn test_participant_modes_company_team_public_and_explicit() {
                 created_by: crate::entities::creation::CreationProvenance::system(),
                 created_at: Utc::now(),
                 settings_revision: 0,
+                department_id: None,
+                members_only: false,
             },
         ]),
     });
@@ -1354,6 +1392,8 @@ async fn test_sender_verification_refuses_strangers_replying_into_a_thread() {
             created_by: crate::entities::creation::CreationProvenance::system(),
             created_at: Utc::now(),
             settings_revision: 0,
+            department_id: None,
+            members_only: false,
         }]),
     });
 
@@ -1460,6 +1500,8 @@ async fn uncorrelated_inter_channel_cycle_is_rejected() {
                 created_by: crate::entities::creation::CreationProvenance::system(),
                 created_at: Utc::now(),
                 settings_revision: 0,
+                department_id: None,
+                members_only: false,
             },
             Channel {
                 enabled: true,
@@ -1476,6 +1518,8 @@ async fn uncorrelated_inter_channel_cycle_is_rejected() {
                 created_by: crate::entities::creation::CreationProvenance::system(),
                 created_at: Utc::now(),
                 settings_revision: 0,
+                department_id: None,
+                members_only: false,
             },
         ]),
     });
@@ -1546,6 +1590,8 @@ async fn a_hop_to_a_plain_channel_is_relayed() {
                 created_by: crate::entities::creation::CreationProvenance::system(),
                 created_at: Utc::now(),
                 settings_revision: 0,
+                department_id: None,
+                members_only: false,
             },
             Channel {
                 enabled: true,
@@ -1562,6 +1608,8 @@ async fn a_hop_to_a_plain_channel_is_relayed() {
                 created_by: crate::entities::creation::CreationProvenance::system(),
                 created_at: Utc::now(),
                 settings_revision: 0,
+                department_id: None,
+                members_only: false,
             },
         ]),
     });
@@ -1623,6 +1671,8 @@ async fn inter_channel_max_hops_exceeded_is_rejected() {
                 created_by: crate::entities::creation::CreationProvenance::system(),
                 created_at: Utc::now(),
                 settings_revision: 0,
+                department_id: None,
+                members_only: false,
             },
             Channel {
                 enabled: true,
@@ -1639,6 +1689,8 @@ async fn inter_channel_max_hops_exceeded_is_rejected() {
                 created_by: crate::entities::creation::CreationProvenance::system(),
                 created_at: Utc::now(),
                 settings_revision: 0,
+                department_id: None,
+                members_only: false,
             },
         ]),
     });
@@ -1707,6 +1759,8 @@ async fn test_third_party_thread_participants_addition_and_authorization() {
             created_by: crate::entities::creation::CreationProvenance::system(),
             created_at: Utc::now(),
             settings_revision: 0,
+            department_id: None,
+            members_only: false,
         }]),
     });
 
@@ -1886,6 +1940,8 @@ async fn test_context_only_quiet_mode_ingestion() {
             created_by: crate::entities::creation::CreationProvenance::system(),
             created_at: Utc::now(),
             settings_revision: 0,
+            department_id: None,
+            members_only: false,
         }]),
     });
 
@@ -2058,6 +2114,8 @@ fn channel_fixture_with_settings(spec: TestChannel, config: Arc<ThreadSettings>)
             created_by: crate::entities::creation::CreationProvenance::system(),
             created_at: Utc::now(),
             settings_revision: 0,
+            department_id: None,
+            members_only: false,
         }]),
     });
 
@@ -2344,6 +2402,9 @@ fn participants_of(result: &InboundIngestResult) -> Vec<String> {
 
 #[path = "address_grouping_tests.rs"]
 mod address_grouping;
+
+#[path = "department_desk_relay_tests.rs"]
+mod department_desk_relay;
 
 fn cc_message(message_id: &str, body: &str, cc: &str) -> RawInboundPayload {
     RawInboundPayload {
@@ -2824,6 +2885,8 @@ fn use_cases_with_directory(specs: Vec<DirectoryChannel>) -> ThreadUseCases {
                 created_by: crate::entities::creation::CreationProvenance::system(),
                 created_at: Utc::now(),
                 settings_revision: 0,
+                department_id: None,
+                members_only: false,
             }
         })
         .collect();
@@ -3261,6 +3324,8 @@ async fn send_reply_in_thread_with_prior_agent_turn_stays_in_same_thread() {
             created_by: crate::entities::creation::CreationProvenance::system(),
             created_at: Utc::now(),
             settings_revision: 0,
+            department_id: None,
+            members_only: false,
         }]),
     });
 
@@ -3359,6 +3424,8 @@ async fn external_email_cannot_use_mailagents_thread_id_header_to_inject() {
             created_by: crate::entities::creation::CreationProvenance::system(),
             created_at: Utc::now(),
             settings_revision: 0,
+            department_id: None,
+            members_only: false,
         }]),
     });
 
@@ -3437,6 +3504,8 @@ async fn ingest_canonical_threads_correctly_with_target_thread_and_reply_to() {
             created_by: crate::entities::creation::CreationProvenance::system(),
             created_at: Utc::now(),
             settings_revision: 0,
+            department_id: None,
+            members_only: false,
         }]),
     });
 

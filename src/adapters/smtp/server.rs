@@ -1179,6 +1179,8 @@ mod tests {
                 created_by: crate::entities::creation::CreationProvenance::system(),
                 created_at: Utc::now(),
                 settings_revision: 0,
+                department_id: None,
+                members_only: false,
             }]),
         });
 
@@ -1401,6 +1403,8 @@ regis";
                 created_by: crate::entities::creation::CreationProvenance::system(),
                 created_at: Utc::now(),
                 settings_revision: 0,
+                department_id: None,
+                members_only: false,
             }]),
         });
 

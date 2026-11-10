@@ -1,0 +1,90 @@
+{
+  "version": 1,
+  "round": "01DEP-P02-B1-R2",
+  "artifact": "cbca0a00bf06f97d453c5191aac2f98984cf9062aae79101246ba6bd8aa5438f",
+  "checks": [
+    {
+      "criteria": [
+        "B1-F1",
+        "B1-F2",
+        "B1-F3",
+        "AC1",
+        "AC2",
+        "D1-D6",
+        "p01-regression"
+      ],
+      "command": "cargo test --locked --offline --lib department -- --test-threads=4",
+      "fixture": "TEST_DATABASE_URL db openbot_dept_p02_test + own_database; SQLX_OFFLINE=true; test-threads=4",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R2-department-tests.txt",
+          "sha256": "8e00ec305675fc9a78cce12e895e9bcbdb122bb00cc6a4619dfeb1cc27169fbb"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "B1-F1"
+      ],
+      "command": "mutation: lock_principals_on removed from remove_department_member_on, then cargo test --lib removal_and_demotion_of_one_principal (restored afterwards)",
+      "fixture": "TEST_DATABASE_URL db openbot_dept_p02_test + own_database; SQLX_OFFLINE=true; test-threads=4",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B1-R2-mutation-without-fix.txt",
+          "sha256": "ddd7d749084dec90ace29df73993ef2a1cebef09cea048798f8f1d105850ce66"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "lint"
+      ],
+      "command": "cargo clippy --locked --offline --lib --tests -- -D warnings",
+      "fixture": "none",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R2-clippy.txt",
+          "sha256": "226939feb35699ef4ebb2057e42a016dae5bf4d6ba294b33d6e5606c0f6d0ef7"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "contract-impact"
+      ],
+      "command": "B1-R1 affected runs reused (changes since: department.rs principal locks before row deletes; tests)",
+      "fixture": "TEST_DATABASE_URL db openbot_dept_p02_test + own_database; SQLX_OFFLINE=true; test-threads=4",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R1-affected-tests.txt",
+          "sha256": "4d04cb792e01bb20863f07090af3d401c8334bc037b5e34ffbc8b284aab140de"
+        },
+        {
+          "path": "logs/B1-R1-allowlist-rerun.txt",
+          "sha256": "8887518675c4562c3757beee3d82db031a888fcce6013c4e25e5f3d090ff5a8b"
+        },
+        {
+          "path": "logs/B1-R1-source-modules.txt",
+          "sha256": "d7c2a9bbc8a706beda482ae04becc0c8d536bd79cb73d38b1578f761687e644a"
+        },
+        {
+          "path": "logs/B1-R1-sqlx-prepare.txt",
+          "sha256": "823b76ebcf4a4299d473de700cf7624c6d5f2e722e5803bbb9ce4866feb6d2db"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "full-gate"
+      ],
+      "command": "scripts/check.sh",
+      "fixture": "none",
+      "status": "NOT EXERCISED",
+      "reason": "User decision 2026-11-09 (01DEP-I003): focused checks only"
+    }
+  ]
+}

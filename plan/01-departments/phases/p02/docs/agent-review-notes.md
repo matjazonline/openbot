@@ -271,3 +271,158 @@
     batch, so the reviewer can confirm that nothing but prose changed.
 - `Path::ends_with` compares path components, not string suffixes. Test-file exclusion rules built
   on it should be read with that in mind (observation; no change needed here).
+
+---
+
+## 01DEP-P02-B1-R1 — batch review of B1 (02A ownership, 02B members-only, D5, relay/thread-party)
+
+### Identity
+
+- Date 2026-11-10. Workflow `implement-opus-reviewed-2_2`. Records: `TASK.md` "B1 implementation
+  (02A + 02B)", `REVIEW.md`, `agent-review-findings.md`.
+- Batch B1; stage: batch review. Phase `p02`.
+- Reviewer B: Opus 5.5 (`claude-opus-5-5`), effort per TASK (xhigh), agent `ad409b2d3d149c2c6`.
+- Worktree `/Users/mac02/.codex/worktrees/2050/openbot`. Review base and HEAD are both `0c5df403`
+  (the B2 commit), plus the working tree: 25 files, with new `department_desks.rs`,
+  `department_desks_tests.rs` and `department_desk_relay_tests.rs`.
+- Digest `a3b1ed11e9a8ecbce73549e00d0afebef9dc1f6971e124d6d16e24a435faada8`, with exclusions
+  `plan/01-departments/phases/p02/docs` and `plan/01-departments/COORDINATION.md`. I recomputed it
+  at the start and before returning; it matches `logs/B1-R1-snapshot.txt`.
+- Gated decisions DEP-P02-D1..D7 r2 (`0bee3eb0…1bd6`). Coordination revision 2 (`d33f363c…d02f`)
+  unchanged; C001/C002 apply.
+
+### Coverage and evidence
+
+- **Whole diff read**, plus the three new files:
+  - schema: channels columns and CHECKs, grants PK with provenance, FK RESTRICT and index, D5
+    trigger;
+  - `department_desks.rs`: merge, mode rule, prelock, eligibility SQL (= C002), principal locks,
+    `rederive_on`, `set_desk_ownership_on`;
+  - `channel.rs`: select, insert and create with prelock and sync, settings write applying the rule
+    to post-write ownership, allowlist conflict target;
+  - `channel_edit.rs`: prelock only for ownership `Some`, then sync;
+  - p01 `department.rs`: sync per D4 set via `role_reach_on`; delete refuses owned desks, then
+    syncs the parent;
+  - `account_identity.rs`: conflict target;
+  - JSON payload;
+  - the remaining `Channel` literal sites;
+  - the docs paragraph.
+- **Gated decisions against the code:**
+  - D1, D2 (the rule on every save) and D4 (unconditional delete, then insert only for members-only
+    desks; affected sets match D4; create without a lead needs no sync, which I re-derived and
+    agree with) hold;
+  - D3 order holds for channel rows (principals → gates → rows) but not for join rows (→ F1);
+  - D5 trigger matches;
+  - D6/C001: there is no routing change, and the doc paragraph is present.
+- **Deviations accepted:**
+  - tri-state `ChannelOwnershipWrite`, merged under the locks. This is safer than merging in the
+    route and matches D2/D3's intent;
+  - create-without-lead needs no sync;
+  - `channel_allowlist_leaves_a_manager_grant_alone` is updated consistently and still asserts the
+    manager rows survive the email being removed;
+  - the plan's form round-trip test is unchanged; the coverage gap is F2.
+- **Verification mapping checked** against fixtures and production paths (use cases on Postgres).
+  - Competing tests hold the company row and wait for blocked backends. The membership-vs-ownership
+    test would fail if the ownership path skipped the company lock, so it discriminates.
+  - The relay and thread-party tests run real routing on in-memory ports; that stand-in is declared.
+  - `list_readable_channels` is not exercised (row stand-in); its policy is `viewer_access`, which is
+    tested.
+- **Executed by B** (DB `openbot_dept_p02_test` plus `own_database`, `SQLX_OFFLINE=true`, 4
+  threads):
+  - `department` → 52 passed (`logs/01DEP-P02-B1-R1-reviewer-department-tests.txt`);
+  - affected callers and contracts → 548 passed. Filters: `channel account_identity notification
+    participant use_cases::thread:: remove_member agent_retire user_lifecycle account_deletion
+    onboarding provisioning assistant_channel library legacy_runtime_schema test_support::tests::
+    workflow_routes_mount_in_the_app_router revision_overflow state_witness`
+    (`…-reviewer-affected-tests.txt`);
+  - `company_invite pages:: smtp:: authorization_cases` → 251 passed, 1 failed. The failure is the
+    known unrelated `rendered_markup_carries_no_inline_javascript` (`sample.rs:153`), as in B2-R1
+    (`…-reviewer-pages-invite-smtp-tests.txt`);
+  - `source_modules` → 8 passed;
+  - `cargo fmt --check` clean;
+  - `git diff --check` clean.
+- **SQL probe** (scratch DB, created and dropped): the join-row / principal deadlock
+  (`logs/01DEP-P02-B1-R1-sql-deadlock-probe.txt`) (→ F1).
+- **Evidence manifest:** `logs/01DEP-P02-B1-R1.evidence.json` validated against the digest: 5
+  PASS, 1 FAIL retained (the pre-update allowlist test), 1 NOT EXERCISED.
+- **Inspected, not rerun:** the author's clippy and `sqlx prepare` logs.
+
+### Outcome
+
+**Changes required** for digest `a3b1ed11…aada8`. There is no PASS. All findings are Low:
+
+- 01DEP-P02-B1-F1: a department write deleting a principal's join row and then syncing can
+  deadlock with an agent or account deletion of the same principal. Reproduced.
+- 01DEP-P02-B1-F2: plan 02B.3's "derived grants not shown as emails" has no decisive assertion.
+- 01DEP-P02-B1-F3: the JSON ownership fields (`null` detaches, absent keeps) are untested at the
+  route level, though D2 promised a route test.
+
+The recheck can be narrow if the corrections are a lock-order fix plus tests: rerun `department`
+and the new tests, and review the delta.
+
+### Process and instruction feedback
+
+- Batch size was reviewable. The new module's top-of-file lock-order comment and the TASK's
+  deviation list were accurate and useful.
+- F1 shows a gate's lock-order argument can miss rows that the caller of a new step has already
+  locked.
+  - Candidate (scope: gated lock orders): enumerate the locks held on entry to each new lock
+    step, including rows the caller wrote.
+
+---
+
+## 01DEP-P02-B1-R2 — correction recheck of B1
+
+### Identity
+
+- Date 2026-11-10. Workflow `implement-opus-reviewed-2_2`. Records: `TASK.md` "B1 correction
+  (B1-R2)", `REVIEW.md`, `agent-review-findings.md`.
+- Batch B1; stage: correction recheck. Phase `p02`.
+- Reviewer B: Opus 5.5 (`claude-opus-5-5`), effort per TASK (xhigh), agent `ad409b2d3d149c2c6`.
+- Worktree `/Users/mac02/.codex/worktrees/2050/openbot`. Base and HEAD are both `0c5df403`, plus
+  the working tree.
+- Digest `cbca0a00bf06f97d453c5191aac2f98984cf9062aae79101246ba6bd8aa5438f` (same exclusions).
+  I recomputed it at the start and before returning. The previous reviewed digest was
+  `a3b1ed11…aada8`.
+- Decisions r2 unchanged. Coordination revision 2 unchanged (`d33f363c…d02f`).
+
+### Coverage and evidence
+
+- **Recheck by finding ID**, B1-F1 to B1-F3. Delta read:
+  - `department.rs`: the new `lock_principals_on` and its five call sites, with lock order
+    re-derived for remove, clear, assign/replace, delete-cascade and add (which locks through
+    `check_principal_on`, already before the insert);
+  - the F2 assertion;
+  - the new race test;
+  - the new `routes/channel_department_tests.rs` mounted from `routes/channel.rs`.
+- **New tests checked for discriminating power:**
+  - the race test fails without the fix (the author's mutation log shows a lock timeout);
+  - the JSON test deserializes real JSON, so it exercises the `present` deserializer.
+- **Executed by B** (`openbot_dept_p02_test` plus `own_database`, `SQLX_OFFLINE=true`, 4 threads):
+  - `department` → 54 passed, including the race test and the JSON test
+    (`logs/01DEP-P02-B1-R2-reviewer-department-tests.txt`, sha `eb76e57b4c7fad61…`). The binary was
+    current with the restored source; a mutated build would fail the race test;
+  - `source_modules` → 8 passed;
+  - `cargo fmt --check` clean;
+  - `git diff --check` clean.
+- **Evidence manifest:** `logs/01DEP-P02-B1-R2.evidence.json` validated against the digest: 3
+  PASS, 1 FAIL (the retained mutation run), 1 NOT EXERCISED.
+- **Reused from B1-R1:** the affected caller and contract run (548 passed), the pages, invite and
+  SMTP run, and the inspection of the rest of the batch. Since R1, changes are confined to the
+  department `_on` functions and tests.
+
+### Outcome
+
+**PASS for digest `cbca0a00bf06f97d453c5191aac2f98984cf9062aae79101246ba6bd8aa5438f`.**
+
+- B1-F1, B1-F2 and B1-F3 are fixed.
+- There are no open actionable findings for p02 B1. B2-F1..F3 (optional) remain open as recorded.
+- The full repository gate was not run (I003). The pre-existing `pages::tests::rendered_markup_carries_no_inline_javascript`
+  failure is unrelated, as recorded at B2-R1.
+
+### Process and instruction feedback
+
+- The author's mutation run, removing the fix and showing the new race test fail, is exactly the
+  evidence a competing-claimant test needs.
+  - Candidate instruction (scope: concurrency corrections): retain such a mutation run whenever a
+    race fix adds a test.
