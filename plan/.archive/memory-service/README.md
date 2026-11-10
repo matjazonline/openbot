@@ -8,8 +8,10 @@
 > - The detailed check logs (`phases/*/docs/logs/`) were removed at archival. Commands and
 >   results stay recorded in each phase's TASK.md and REVIEW.md. The log files are still in git
 >   history at that commit, so links to them name files that are no longer here.
-> - Phases 01–04 kept their records outside git (`tmp/memory-service-run/`); COORDINATION.md
->   describes them.
+> - Phases 01–04 kept their records outside git, in `tmp/memory-service-run/`. Their progress
+>   record and review rounds were moved to [`phases/p01-p04/`](phases/p01-p04/progress.md) at
+>   archival, without logs or frozen snapshots; COORDINATION.md and those records still name
+>   the old tmp/ paths.
 > - Historical commands and paths, including `plan/memory-service/…`, stay as recorded.
 
 > **No backward compatibility.** We don't need backward compatibility and will reset the database
