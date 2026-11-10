@@ -1,0 +1,22 @@
+openbot test db companies present: t
+building the memory service in /Users/mac03/.codex/worktrees/60a0/openbot/tmp/memory-service-run/merge/services/memory
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.52s
+provisioned database memory_live_5cdb2491e171 owned by memory_live_5cdb2491e171
+isolation: neither role can read the other's database
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.79s
+     Running unittests src/lib.rs (/Users/mac03/.codex/worktrees/60a0/openbot/target/debug/deps/open_bots-b3fb49a4c0332dfc)
+
+running 6 tests
+test adapters::persistence::memory::live_tests::e2e::memory_e2e_a_revoked_credential_is_replaced_and_the_save_delivered_once ... ok
+test adapters::persistence::memory::live_tests::e2e::memory_e2e_labels_follow_consumption_and_no_lower_reader_sees_them ... ok
+test adapters::persistence::memory::live_tests::e2e::memory_e2e_tampered_labels_and_missing_authority_save_nothing ... ok
+test adapters::persistence::memory::live_tests::memory_integration_live_competing_delivery_workers_deliver_each_intent_once ... ok
+test adapters::persistence::memory::live_tests::memory_integration_live_provisioning_save_recall_capture_and_disable ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::memory_steps_tests::e2e::memory_e2e_thread_readers_6_8_9_load_only_levels_0_to_6_from_the_real_service ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 4024 filtered out; finished in 5.50s
+
+memory integration: live tests passed against the real service
+exit 0
+probe tables left: 0
+leftovers: 

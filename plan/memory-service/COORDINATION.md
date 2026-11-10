@@ -2,7 +2,7 @@
 
 - Authority: /Users/mac03/.codex/worktrees/60a0/openbot/plan/memory-service/COORDINATION.md (worktree 60a0, detached HEAD on a6bed48a; untracked)
 - Writer: root session 6fedfb2e-40aa-486c-bd0b-051b5a3add7b (main conversation), worktree /Users/mac03/.codex/worktrees/60a0/openbot
-- Revision: 4 (2026-11-10: I003 gains U7)
+- Revision: 7 (2026-11-10: p06 accepted, plan complete; pushed under I001 r2)
 
 Phases run sequentially in this one worktree. Phases 01–04 (the standalone service) and the phase-05
 architecture gate plus batch P7b were completed under `implement-opus-reviewed`; their records stay at
@@ -63,7 +63,7 @@ Phase 05 continues under `implement-opus-reviewed-2_2` from 2026-11-08 ~20:10Z.
 | --- | --- | --- | --- |
 | p01–p04 | root 6fedfb2e (implement-opus-reviewed) | 60a0 | tmp/memory-service-run/progress.md (accepted locally) |
 | p05 | root 6fedfb2e (implement-opus-reviewed-2_2 from ~20:10Z); **accepted in phase 2026-11-10** (final digest 88808f5a…b0a1) | 60a0 | plan/memory-service/phases/p05/docs/TASK.md, HANDOFF.md |
-| p06 | root 6fedfb2e (implement-opus-reviewed-2_2), started 2026-11-10 | 60a0 | plan/memory-service/phases/p06/docs/TASK.md, HANDOFF.md |
+| p06 | root 6fedfb2e (implement-opus-reviewed-2_2), started 2026-11-10; **accepted in phase 2026-11-10** (final integrated digest 58acbacb…8e39, merge HEAD 801839fd); the commit carrying this record is pushed to origin/main per I001 r2 | 60a0 (merge in tmp/memory-service-run/merge) | plan/memory-service/phases/p06/docs/TASK.md, HANDOFF.md |
 
 ## Cross-phase notices
 None.

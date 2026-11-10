@@ -724,3 +724,148 @@ findings are in agent-review-findings.md, and outcomes are in REVIEW.md.
 - Outcome: **PASS for digest 3617afd03fefe97f517200b0a4a266940ab3441f0e27c9f5b8b4d20f2c249405 (freeze tree 607df2cd) for
   p06-B3 (R1–R2)**. No open B3 findings.
 - Return-time freshness: HEAD a6bed48a; digest recomputed 3617afd0…9405, MATCH.
+
+## MEM-P06-C-R1 — final integration review of the merged tree (p06-C): CHANGES REQUIRED (F1, records only)
+
+- 2026-11-10; stage final integration review.
+- Identity:
+  - Merge worktree tmp/memory-service-run/merge, branch `memory-service-merge`, clean.
+  - First request: HEAD 5c8528a0, digest 03e238f9…b88b2c recomputed, MATCH.
+  - Addendum: HEAD a534a6a7 (parent 5c8528a0, documentation only), digest 19b979d5…4f0c recomputed, MATCH.
+  - Inputs: COORDINATION revision 6 sha256 3c074da9…; the remerge diff b7f407ad…161b; the post-merge fixes diff
+    715e5ba3…b110. All match.
+  - 12 GiB free, so no mutation probes.
+  - I001 r2 read: the push to `origin/main` is allowed only after 06C passes and B gives a final pass on this tree.
+    Deploys and resets stay unauthorized.
+- 41be07b2 against the tree I passed at MEM-P06-B3-R2 (607df2cd): it matches for every path of this plan.
+  - The only differences outside the records are other sessions' files: the organization plans 01–07 and
+    `agent-workflow-call`, the "Organization plans" banners in three sibling READMEs, and their
+    `NO_BACKWARD_COMPATIBILITY_NOTES` lines.
+  - 41be07b2 keeps a6bed48a's versions of those and adds only `implementation-decisions.md` to the list.
+  - `services/memory` at HEAD is 41be07b2's plus the journey fix.
+- Conflict resolutions (`git show --remerge-diff 084053ee`), against both sides' intent:
+  - Init migration:
+    - The continuation guard keeps both `memory_parked` and main's `local_agent_parked`. Each keeps its own form;
+      memory's mirrors `effect_parked`.
+    - The stop-reason CHECK lists both.
+    - The effect-wait guard takes main's "exactly one scoped owner" count and adds a `memory_deliveries` branch
+      with the same `run.deadline=NEW.deadline` condition memory had before. The constraint is now main's
+      `workflow_effect_wait_guard`, and nothing references the old name.
+    - Main's `completed→pending` local-agent clause needs no memory counterpart: memory resumes through its own
+      wake.
+  - `wait_commit`: memory resume first (it returns `None` for other waits), then local agents, then message
+    receipts. The guard gives each effect wait exactly one owner, so the order cannot change the outcome.
+  - `polling`: both terminal conditions are kept.
+  - `provisioning::is_reserved_tool_name`, `marker_owned_effect_kind` and its test: both kinds are kept.
+  - Handler routing: memory (when configured) before main's six handlers, which include `local_agent`.
+  - `mcp/policy`: `reserved` and `test_root` are both kept. `validate`, which `client` and `client_resolved` call,
+    still refuses reserved origins first.
+  - Memory-origin reservation:
+    - It moved to `guarded_http::HttpDestinationPolicy::reserving`, and `workflow_http` re-exports it.
+    - Integration execution now receives the memory URL (`infra/integrations.rs:33-38`, `setup/clients.rs`).
+    - Integration MCP uses the shared reserved client.
+    - No other production policy or raw client reaches company destinations: the remaining `default()`
+      constructions are tests or test constructors.
+  - `mail.rs`: main's fields plus `integrations`, the reserved `http_destinations` and the post-construction
+    `with_memory`.
+  - `src/main.rs`: every listed note file exists at HEAD, and every current non-archived plan carrying the note
+    is listed. The dropped entries are plans that main archived.
+  - Module lists and the history freeze test (brace restored, both tests kept): correct.
+- Integration effects with no conflict:
+  - Exactness belongs only to memory (`batch_commit` is the one funnel).
+    - `data.url` builds a URL from inputs, and the registry marks it pure/recompute, so Pure is right.
+    - `local_agent.run` is Unaccounted, so a later `memory.save` saves at the ceiling, which is the safe default.
+    - The output of the local-agent step passes the same funnel: `continue_delivery`, then the handler's
+      completion.
+    - The exhaustive test now forces every new kind to be classified.
+  - Local-agent and memory parking are separate:
+    - each has its own effect-wait owner;
+    - `confirm_suspension` checks both;
+    - the retirement kinds list both.
+  - Doop/agent tools:
+    - the prepared agent carries both main's `mcp_error_policy` (version 6) and memory's `memory`/`capture`
+      fields;
+    - `validate_mcp_results` treats memory tools as `Other`;
+    - no new `AgentToolTarget` variant was added, and the exhaustive match would catch one.
+  - Of the other 31 overlapping files that merged cleanly, I spot-checked lease, worker, registry, authority,
+    setup and services. Both sides' additions are present.
+  - CI:
+    - `ci.yml` is main's file plus memory's `memory-integration` job and memory-settings browser step.
+    - The new `memory-service.yml` is memory's alone.
+    - The memory job needs no Node: OpenBot compiles without the plugin build.
+- 06C evidence and classification:
+  - The 11 failures shared with main: confirmed. MEM-P06-C-baseline-main.txt has 3859 tests, so it is main's
+    binary.
+  - The `mcp_dropped_call` flake: confirmed on both trees.
+  - Doop: 80/82 on both trees in parallel (main 3859 with its own target; merge 4030), 82/82 serially on the merge;
+    timeouts at the same steps.
+  - Stack budget (4030, after the fix): no overflow; the failures are the same set plus Doop.
+  - Unavailable (Docker, pg_stat_statements, the doop-test CA): honestly recorded.
+  - Problems (F1): the transport check is a failing CI gate, pre-existing on main but unreported; `git diff
+    --check` is unreported; the merge mcp-flake log is main's binary; 10 versus 12; no log for the post-fix
+    rerun.
+- 5c8528a0:
+  - `cargo metadata --no-deps` reads `target_directory`, which honours `CARGO_TARGET_DIR` and config.
+  - The merge worktree has no `services/memory/target`, so my live run below reached the binary in the shared
+    target only through the fix. Correct.
+- The decisions note a534a6a7 matches retention.rs (405, 518, 541) except for one wording point (F2a).
+- Push readiness:
+  - `cd73cc45` is an ancestor of HEAD, and the local `origin/main` is cd73cc45, so the push fast-forwards.
+  - The push carries 971fc627, a6bed48a, 41be07b2, 084053ee, 29d51abc, 5c8528a0 and a534a6a7.
+  - Nothing from tmp/, `.env` or the model is tracked.
+  - The secret-like strings are synthetic test fixtures.
+  - It holds once F1 is recorded, and the push report must say that CI's `verify` job already stops at the
+    transport check on main.
+  - The paid smoke stays open, as recorded.
+- Reviewer evidence. Private cluster 127.0.0.1:55432, DATABASE_URL unset, `.env` not read, merge target dir only
+  for the merge worktree, my own database `open_bots_c06r1b_test`, dropped afterwards.
+  - OpenBot on the final binary (4030 tests; no rebuild): `cargo test --locked --offline --lib -- memory_ exactness
+    data_url`, 170 passed, 0 failed, 7 ignored (logs/MEM-P06-C-R1-B-merge-memory-focused.txt).
+  - `scripts/memory-integration.sh` on the merge with the shared `CARGO_TARGET_DIR`: isolation both ways, 6/6,
+    exit 0, no probe table, database or role left (logs/MEM-P06-C-R1-B-merge-memory-integration.txt).
+  - Boundaries at HEAD: `git diff --check` 0; integration-boundary tests and check 0; integration docs 0; sample
+    boundary tests and check 0; transport check 1, the same on cd73cc45 and 41be07b2
+    (logs/MEM-P06-C-R1-B-boundaries.txt).
+  - Not rerun: the full suite and the stack budget (root's logs reviewed), browser protocols, the service gates
+    and the journey (root's logs reviewed).
+- Findings: F1 (Minor, records only); F2 (optional a, b). No finding against the code or the conflict
+  resolutions.
+- Outcome: **CHANGES REQUIRED for digest 19b979d52842d2f65549197f24ed6ea155cad2f8ef1ba2057f96100d85a24f0c (HEAD
+  a534a6a7)**: F1, a records-only correction. The code, merge resolution and post-merge fixes are acceptable as
+  they stand.
+- Hygiene: my boundary run wrote `scripts/__pycache__/integration-boundary.cpython-314.pyc` into the merge
+  worktree. It is not ignored, and it changed the digest to 26120e66…. I removed it, and the worktree is clean
+  again. A lesson for running these checks on a frozen tree: use `PYTHONDONTWRITEBYTECODE=1`.
+- Return-time freshness: merge HEAD a534a6a7, clean; digest recomputed 19b979d5…4f0c, MATCH.
+
+## MEM-P06-C-R2 — recheck of the integrated tree (C-F1, C-F2): PASS
+
+- 2026-11-10; stage final integration review, recheck.
+  - Merge worktree HEAD 801839fd (parent a534a6a7), clean.
+  - Digest 58acbacb…aa8e39 recomputed at start (`PYTHONDONTWRITEBYTECODE=1`): MATCH.
+  - Delta `git show 801839fd`: implementation-decisions.md (+10/−5) and the last line of phases/p05/docs/TASK.md
+    (−1). Documentation and records only; no code, script, CI or migration change.
+- C-F1 fixed in the records. I checked each item against the logs and the tree:
+  - (a) The "Pre-existing CI blocker" bullet is accurate. The `Pass` line names `scripts/tests/transport-boundary.sh`,
+    which exists and is the ci.yml:126 regression step.
+  - (b) `git diff --check cd73cc45 HEAD` exits 2 only on files under `docs/logs/`: my rerun flags 0 files outside
+    them.
+  - (c), (d) and (e) match the logs: 3859 versus 4030 test totals, 70 passed / 12 failed, and the cited post-fix
+    runs.
+- C-F2:
+  - (a) is taken, and the new wording matches the code.
+  - (b) Not taken, and I accept the reason. The two cited tests exist (mcp/policy.rs:271,
+    workflow_http/tests.rs:154). A gateway test with a loopback memory URL could not tell the wiring apart, because
+    the default policy already refuses loopback.
+- Nothing else changed since MEM-P06-C-R1, so its code, merge-resolution and integration conclusions stand. No new
+  checks were needed for a records-only delta, and I ran nothing in the merge worktree beyond git reads and the
+  snapshot.
+- Push readiness:
+  - The push fast-forwards from cd73cc45. The paid smoke stays open, as recorded.
+  - The push report must carry the pre-existing CI transport-check blocker (TASK "Pre-existing CI blocker"): CI's
+    `verify` job stops at that step on main and will after the push.
+- Findings: none new. C-F1 resolved; C-F2 (a) taken, (b) not taken with an accepted reason.
+- Outcome: **PASS for digest 58acbacb9e1cebcb2f3ec470ef643959cf97dcbc09fc7e48b192edf056aa8e39 (merge HEAD 801839fd)**:
+  the final pass on the integrated tree that I001 r2 requires. Push readiness holds, under the conditions recorded
+  above.
+- Return-time freshness: merge HEAD 801839fd, clean; digest recomputed 58acbacb…8e39, MATCH.

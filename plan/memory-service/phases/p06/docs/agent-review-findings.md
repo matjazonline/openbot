@@ -932,3 +932,107 @@ b86dc1e8992a694729b968f3b9b5511100f6cd4e8ea39f154ed55e33d0f64b0e; freeze tree 54
     `serve` alone receives `MEMORY_ANTHROPIC_API_KEY`, as an assignment and never in argv, and the paid wrapper
     passes the renamed variable. Reviewer journey rerun: see the MEM-P06-B3-R2 note.
   - (e) Recorded in TASK.
+
+## MEM-P06-C findings — common context
+
+2026-11-10; workflow `implement-opus-reviewed-2_2`; task
+/Users/mac03/.codex/worktrees/60a0/openbot/plan/memory-service/phases/p06/docs/TASK.md (`## Integration and 06C`), against
+plan 06C (06-operations-and-verification.md, "Batch 06C") and COORDINATION revision 6 (I001 r2, I002 r1, I003 r5);
+review record REVIEW.md; batch p06-C (the integrated tree to be pushed); stage final integration review; round note
+MEM-P06-C-R1; reviewer claude-opus-5-5, effort xhigh (B abdd866fb428eea05); phase `p06`.
+- Artifact: worktree tmp/memory-service-run/merge, branch `memory-service-merge`, HEAD a534a6a7, clean. Digest
+  19b979d52842d2f65549197f24ed6ea155cad2f8ef1ba2057f96100d85a24f0c, excluding `plan/memory-service/phases/p06/docs`.
+  The first request named HEAD 5c8528a0 (digest 03e238f9…b88b2c); a534a6a7 adds only the decisions note.
+- History: 41be07b2 (this plan's paths, on a6bed48a); 084053ee merges origin/main cd73cc45 (merge-base 78a93628);
+  29d51abc holds the merge fixes; 5c8528a0 is the script fix; a534a6a7 is documentation.
+
+## MEM-P06-C-F1 — the 06C record omits two non-passing gates and cites one log that is main's binary
+
+- Context: round MEM-P06-C-R1; TASK `## Integration and 06C` (lines 1405-1466 in the primary worktree); AGENTS.md
+  "Record commands and results … do not claim full verification when required checks could not run"; plan 06C
+  ("Record exact commands, revisions … results").
+- Classification: Minor, actionable, records only. No code change is asked for.
+- Evidence:
+  - (a) The transport boundary check failed, and the record does not say so.
+    - MEM-P06-C-openbot-gate-1.txt `== transport-check` exits 1: "an RFC Message-ID was constructed outside the
+      email adapter in src/adapters/persistence/workflow/channel_reply_continuation_views_support.rs" (line 59).
+    - TASK's "Pass" list names only the "transport-boundary tests", which is the script's own regression tests.
+    - The check is a CI `verify` step (.github/workflows/ci.yml:127).
+    - It is pre-existing. My runs on exported trees of origin/main cd73cc45, of 41be07b2 and of HEAD all exit 1 on
+      the same line, and neither side changes the file or the script (logs/MEM-P06-C-R1-B-boundaries.txt).
+    - So CI's `verify` job already stops at that step on main, and will stop there on this push. None of its later
+      steps run in CI: fetch, clippy, migrations, sqlx, the suite, browser protocols and budgets.
+    - This is not a regression, but it must be recorded, and it belongs in the push report.
+  - (b) `git diff --check`, one of 06C's listed gates, exits 2 (gate-1 `== whitespace`).
+    - The output flags trailing whitespace and blank lines at EOF in this plan's committed logs (p05 and p06
+      `docs/logs/*.txt` and `*.patch.txt`).
+    - The record does not mention it.
+    - CI's `Patch whitespace` step runs `git diff --check` with no base, which on a clean checkout checks nothing.
+      So CI is unaffected (my run at HEAD: exit 0).
+    - Record it as a known record-file result, or strip the logs.
+  - (c) One log named as merge evidence ran main's test binary.
+    - MEM-P06-C-merge-mcp-flake.txt ran a binary of 3859 tests in all six runs. That count is main's binary
+      (baseline-main and baseline-doop-parallel also total 3859); the merge's binary has 4030.
+    - It is therefore main evidence (5/6 failing) and belongs to the shared-target incident in the "Correction"
+      paragraph.
+    - The merge's own flake evidence is MEM-P06-C-merge-three-isolated.txt (4030 tests; 4 of its 6
+      `mcp_dropped_call` runs fail) and the full suite.
+    - MEM-P06-C-browser.txt and -browser-2.txt are also 3859-test runs. They are superseded by -browser-3 and
+      -browser-4, which have 4030 tests and cover every protocol TASK names. They should be marked superseded.
+  - (d) TASK says the first parallel merge run of Doop "showed 10 failures". MEM-P06-C-merge-doop-isolated.txt
+    shows 70 passed and 12 failed.
+  - (e) The full-suite log ran before 29d51abc: the exactness test is among its 15 failures. TASK's "25 pass after
+    the fix" has no log.
+    - The post-fix whole-suite evidence is the stack-budget run in MEM-P06-C-budgets.txt (4030 tests, the exactness
+      test `ok`, failures limited to the classified set plus Doop timeouts).
+    - My focused run on the final binary is logs/MEM-P06-C-R1-B-merge-memory-focused.txt.
+    - Cite one of these.
+- Required correction:
+  - Record (a) as a failing CI gate that is pre-existing on main, both in TASK and in the push report.
+  - Record (b), (c), (d) and (e) as above.
+  - No rebuild or code change is needed.
+- Instruction lesson (for root to judge): when two worktrees share one `CARGO_TARGET_DIR`, every test log should
+  carry the binary's total test count, so it is plain which tree it ran.
+- Resolution history: 2026-11-10 open. 2026-11-10 MEM-P06-C-R2: fixed in the records (TASK "Integration and 06C"
+  and "Review MEM-P06-C-R1 and corrections").
+  - (a) A "Pre-existing CI blocker" bullet records the transport-check failure: identical on cd73cc45 and 41be07b2,
+    the CI verify job stopping there on main and after the push, and the push report saying so. The "Pass" line now
+    names only `scripts/tests/transport-boundary.sh` (ci.yml:126).
+  - (b) `git diff --check cd73cc45 HEAD` is recorded (exit 2, my rerun agrees). The logs stay verbatim, and 801839fd
+    fixes the one hit outside `docs/logs/`, a blank line at the end of the p05 TASK. Recheck: no file outside
+    `docs/logs/` is flagged.
+  - (c) The main-binary logs are relabelled, and the merge's flake evidence is cited (three-isolated, 4/6, and the
+    full suite).
+  - (d) 12, not 10.
+  - (e) The unlogged "25 pass" is withdrawn. The record cites the stack-budget run and my focused run.
+
+## MEM-P06-C-F2 — optional: one sentence in the decisions note, one untested piece of wiring
+
+- Context: round MEM-P06-C-R1; a534a6a7 (implementation-decisions.md "Phase 06 implementation notes"); the
+  memory-origin reservation applied to integration execution (src/infra/integrations.rs:33-38).
+- Classification: optional suggestion; nothing blocks.
+- Evidence and suggestions:
+  - (a) The note says both removals run "each in its own transaction that re-checks its predicate".
+    - That holds for sources: the delete in `remove_unreferenced_sources` (retention.rs:541-576) repeats both
+      reference checks.
+    - It does not hold for operations. `remove_unreferenced_operations` (retention.rs:518) locks the candidates
+      `FOR UPDATE SKIP LOCKED` and then deletes through `delete_operations`, which does not re-check.
+    - The predicate cannot change anyway. Only the generation commit names an operation
+      (generation.rs:1234), and it runs before the operation finishes.
+    - Suggested wording: "sources re-check their references on delete; operations rely on the row lock, and
+      nothing names a finished operation".
+    - Also, the code's `< now() - 30 days` means more than 30 days, not "30 or more".
+    - The function names, line numbers (405, 518, 541) and everything else in the note match the code.
+  - (b) No test covers `infra::integrations::gateway(…, Some(url))`.
+    - `memory_integration_http_connection_to_the_memory_service_origin_is_refused` reserves a guarded policy
+      directly. Its new comment says integration execution reserves the same origin, but nothing asserts it.
+    - A small test that builds the gateway's transports with a memory URL and expects
+      `client(&transports.http, origin)` to fail would pin the wiring.
+- Instruction lesson: none supported.
+- Resolution history: 2026-11-10 open (optional). 2026-11-10 MEM-P06-C-R2:
+  - (a) taken in 801839fd: "more than 30 days"; sources locked, then re-checked in a fresh snapshot; operations rely
+    on the `FOR UPDATE SKIP LOCKED` row lock, since only the operation's own commit names it. This matches
+    retention.rs:518-576 and generation.rs:1234;
+  - (b) not taken, reason accepted. Two tests pin the mechanism: the policy test (mcp/policy.rs:271) and the shared
+    guarded client test (workflow_http/tests.rs:154). The wiring is one `match`. A gateway test with a loopback
+    memory URL would pass with or without the reservation, because the default policy already refuses loopback.

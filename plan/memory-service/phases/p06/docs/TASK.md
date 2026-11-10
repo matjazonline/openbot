@@ -1380,3 +1380,174 @@ reported as the one open item.
     `memory_recall_` and `memory_preparation_` suites.
 - Checks: service and OpenBot clippy `-D warnings` exit 0, fmt clean
   (`logs/MEM-P06-B3-R2-checks.txt`); the live script and the journey as above; the race test 3×.
+
+## Integration and 06C (accepted)
+- Commit `41be07b2` on branch `memory-service` (from a6bed48a) holds only this plan's paths. It
+  excludes tmp/, `.env`, the other session's organization-plan copies and the three sibling plan
+  READMEs; `src/main.rs` carries only this plan's startup-note line. The other session's files
+  are backed up in `tmp/preserved-other-session-20261110/`; the attempt to clear them from the
+  primary worktree was blocked by the permission check, and they were left in place.
+- Merge in a separate worktree, `tmp/memory-service-run/merge`, on branch `memory-service-merge`:
+  merge commit `084053ee` of `origin/main` cd73cc45. 13 conflicts were resolved:
+  - both sides kept in the module lists, handlers, wait wake-ups, continuation rules and
+    stop-reason list;
+  - the effect-wait guard is main's "exactly one owner" form, plus a `memory_deliveries` owner;
+  - the memory-origin reservation moved to `guarded_http::HttpDestinationPolicy` and also
+    applies to main's integration execution (`infra/integrations.rs` gets the memory URL);
+  - `mail.rs` keeps the post-construction `with_memory` and adds main's `integrations` field;
+  - the startup notes keep the memory-service paths and drop the plans main removed;
+  - test adaptation: `client()` now takes the connection's origin.
+- Integration fixes after the merge, committed as `29d51abc` on `memory-service-merge`:
+  - `memory_tools` is declared `pub(super)`, which is equivalent and fits main's
+    integration-boundary parser (a 16-token window);
+  - the exactness table classifies main's new step kinds: `data.url` is Pure (URL construction
+    only) and `local_agent.run` is Unaccounted (output of unknown level).
+- 06C on the merged tree (logs `MEM-P06-C-*`):
+  - **Pass:**
+    - fmt; the transport check's own regression tests (`scripts/tests/transport-boundary.sh`,
+      not the check itself: see "Pre-existing CI blocker" below); sample, integration (after
+      the fix) and docs boundaries;
+    - `cargo fetch --locked`; workflow evidence (tests and the tracked check);
+    - `cargo check --locked --offline --all-targets`; clippy `-D warnings`;
+    - migrations on a fresh database; `sqlx prepare --check`; `test --no-run`; source modules;
+    - integration conformance families; the lease budget;
+    - deploy and key-rotation script tests; knowledge-prepare tests; doop-probe;
+    - CSS current; run-counts 2/2; the SSE navigation group 25/25;
+    - browser protocols: vault, HTML injection and team autocomplete, knowledge, memory
+      settings, agent authoring, local agents, workflow agent picker, session revocation
+      (`MEM-P06-C-browser-3.txt`, `MEM-P06-C-browser-4.txt`; `browser.txt` and `browser-2.txt`
+      ran main's binary through the shared target dir and are superseded, review C-R1 F1 (c)).
+  - **Full suite** (network-isolated): 3991 passed, 15 failed, 24 ignored.
+    - Fixed after this run: the exhaustive exactness classification
+      (`memory_access_level_every_step_kind_and_tool_target_is_classified`). The full-suite log
+      predates 29d51abc and shows it failing. It passes in the stack-budget run, made after the
+      fix (`MEM-P06-C-budgets.txt`), and in B's focused run on the final binary
+      (`MEM-P06-C-R1-B-merge-memory-focused.txt`, `memory_ exactness data_url` 170/0/7). The
+      earlier "25 pass after the fix" had no log and is withdrawn (review C-R1 F1 (e)).
+    - Already failing on clean main, verified on a cd73cc45 worktree with the same filter: inline
+      JS in `workflow_authoring/sample.rs` (a fixture string), both auth-limit tests, 6
+      cloudroom e2e tests (need the Node peer and plugin built with npm), and 2 wire tests (need
+      the cloudroom plugin's Node packages).
+    - Flaky already on main: `mcp_dropped_call_…`, with the same "completed 3 of 4" message.
+      - Main's binary: 3 of 6 runs fail (`MEM-P06-C-baseline-mcp-flake.txt`) and 5 of 6
+        (`MEM-P06-C-merge-mcp-flake.txt`). Correction, review C-R1 F1 (c): despite its name,
+        the second log ran main's binary (3859 tests) through the shared target dir, so it is
+        main evidence.
+      - The merge's binary (4030 tests): 4 of 6 runs fail (`MEM-P06-C-merge-three-isolated.txt`),
+        and it fails once in the full suite.
+    - Doop timeouts under load, not a regression.
+      - The `doop_` group alone, serially (`--test-threads=1`) on the merge: 82/82.
+      - In parallel, the merge and a clean cd73cc45 worktree with its own target dir each
+        gave 80 passed and 2 failed, the same 2 tests on both:
+        `doop_agent_observe_policy_keeps_error_observation_available_to_the_model` and
+        `doop_agent_published_editor_approvals_and_worker_restart_reuse_one_canvas`.
+        Logs: `MEM-P06-C-baseline-doop-parallel.txt`, `MEM-P06-C-merge-doop-parallel-2.txt`.
+      - The first parallel merge run showed 12 failures (`MEM-P06-C-merge-doop-isolated.txt`,
+        70 passed; "10" was a miscount, review C-R1 F1 (d)). It ran right after the stack-budget
+        suite, on a busier machine, and is superseded by the rerun above.
+  - **Stack budget** at 2048 KiB: no stack overflow; the run's failures are the same set plus
+    Doop timeouts.
+  - **Correction:** a shared `CARGO_TARGET_DIR` between the merge and the main baseline worktree
+    made some merge runs use main's test binary (identical crate name). Those runs were thrown
+    away and repeated after a forced rebuild, which lists 4 `memory_e2e_` tests and 4030 tests.
+    The baseline worktree was removed. The later Doop baseline used its own worktree and
+    target dir; both were removed afterwards, along with its test database.
+  - **Live integration** (`scripts/memory-integration.sh`, real service built from the merge's
+    `services/memory`): the two-way role isolation check passed; 6/6 live tests passed (2
+    `memory_integration_live_`, 4 `memory_e2e_`); the Messages API stand-in was called.
+    Log `MEM-P06-C-merge-memory-integration.txt`.
+  - **Script fix found while running 06C**, committed as `5c8528a0`:
+    `scripts/memory-integration.sh` and `services/memory/scripts/standalone-journey.sh`
+    assumed the binary at `<dir>/target/debug/memory-service`, which is wrong whenever
+    `CARGO_TARGET_DIR` or a configured target-dir is set. Both now read `target_directory`
+    from `cargo metadata --no-deps` (the journey with `--offline`). CI sets neither, so CI's
+    path is unchanged; the live run above used it with a shared target dir.
+  - **Service gates on the merge's `services/memory`** (identical to `41be07b2`'s plus the
+    journey fix):
+    - `extracted-build.sh` (tracked files only, plus the model, in a copy outside any
+      checkout): all 11 `verify.sh` steps passed, the suite at 175 passed, 0 failed, 2 ignored
+      (the backup and load tests, which have their own gates). Log
+      `MEM-P06-C-merge-extracted-build.txt`.
+    - `backup-restore-check.sh` (PostgreSQL 18 client tools): 1/1. Log
+      `MEM-P06-C-merge-backup-restore.txt`.
+    - `standalone-journey.sh` with a shared `CARGO_TARGET_DIR` (exercising the fix): 13 steps
+      passed against the stand-in provider, with counters printed. Log
+      `MEM-P06-C-merge-standalone-journey.txt`.
+  - **Pre-existing CI blocker, not fixed here (review C-R1 F1 (a)):**
+    `scripts/transport-boundary-check.sh` exits 1 on the merge: "an RFC Message-ID was
+    constructed outside the email adapter in
+    src/adapters/persistence/workflow/channel_reply_continuation_views_support.rs" (line 59).
+    - It fails identically on origin/main cd73cc45 and on 41be07b2. Neither the script nor
+      that file differs between cd73cc45 and the merge, and the file is not this plan's.
+    - It is a CI `verify` step (ci.yml:127). So CI's verify job already stops there on main,
+      and it will after this push too: none of the later verify steps run in CI (fetch, clippy,
+      migrations, sqlx, the full suite, the browser checks, the budgets). All of those were run
+      locally here. The push report says so. `gh` is not installed here, so main's CI status
+      was not read.
+  - **`git diff --check` (review C-R1 F1 (b)):** CI runs it on a clean checkout (ci.yml:123), where
+    it checks nothing, so it passes there and at HEAD. Over the pushed range
+    (`git diff --check cd73cc45 HEAD`) it exits 2 on this plan's committed log files (verbatim
+    command output and saved mutation patches with trailing whitespace or blank lines at EOF).
+    They are kept verbatim as evidence. The one other hit, a blank line at the end of
+    `phases/p05/docs/TASK.md`, is fixed in 801839fd, so no file outside `docs/logs/` is flagged.
+  - **Unavailable here:**
+    - Docker: the knowledge production image, the memory-service image job and the image
+      journey;
+    - the pg_stat_statements activation, which is CI PostgreSQL configuration;
+    - `doop-test.py`: Python 3.14 refuses its test CA ("Missing Authority Key Identifier"),
+      which is environmental and also on main.
+- Re-fetched before the final review: `origin/main` is still cd73cc45 and is an ancestor of
+  `memory-service-merge`, so the push is a fast-forward.
+- Frozen for the final integration review: `memory-service-merge` at `5c8528a0`, clean
+  worktree, digest `03e238f9cdc877c282de59f1d986994fac722604a0fb74d2850116e401b88b2c`, excluding
+  `plan/memory-service/phases/p06/docs` (records). Round MEM-P06-C-R1 requested from B.
+- The paid smoke (U9) is not run: `MEMORY_SMOKE_ANTHROPIC_API_KEY` is the user's to set, and the
+  run waits for their confirmation. It is reported as open at push time if still unset.
+- Before B started, a documentation-only commit `a534a6a7` appended the 06A "as implemented"
+  note to `implementation-decisions.md`, as A1-R2 F8 (c) required: A1-R1 F5 amends D9's
+  provenance sentence. New frozen digest
+  `19b979d52842d2f65549197f24ed6ea155cad2f8ef1ba2057f96100d85a24f0c` (HEAD a534a6a7, same
+  exclusion); B was told in the same round.
+
+### Review MEM-P06-C-R1 and corrections
+- B: CHANGES REQUIRED, for the records only. The code, every conflict resolution, the
+  post-merge fixes and the decisions note were accepted. 41be07b2 matches the B3-R2 pass for
+  every path of this plan.
+- F1 (fixed in the records): (a) the pre-existing transport-check failure and what it means for
+  CI; (b) `git diff --check` over the pushed range; (c) the main-binary logs relabelled; (d) 12,
+  not 10, failures in the first parallel Doop run; (e) the exactness evidence cited from logs.
+  All are recorded in "Integration and 06C" above.
+- F2 (optional):
+  - (a) Taken, in 801839fd. The note now says "more than 30 days", that sources are re-checked
+    in a fresh snapshot, and that the operation removal relies on its row lock. The same commit
+    drops the trailing blank line in the p05 TASK record.
+  - (b) Not taken: pinning the integration-execution reservation inside `gateway(…, Some(url))`.
+    - The mechanism is already pinned at both layers:
+      `memory_integration_company_connections_cannot_reach_the_memory_service_origin` (the
+      policy, before any resolution), and
+      `memory_integration_http_connection_to_the_memory_service_origin_is_refused` (the shared
+      guarded client that integration execution uses).
+    - The wiring is one `match` on whether memory is configured.
+    - A test of it would need either a test-only accessor on `HttpDestinationPolicy` or a
+      DB-backed gateway fixture making a resolving call, since the default policy refuses a
+      loopback memory URL as private anyway.
+- New frozen digest `58acbacb9e1cebcb2f3ec470ef643959cf97dcbc09fc7e48b192edf056aa8e39` (HEAD
+  801839fd, clean, same exclusion). Recheck MEM-P06-C-R2 requested.
+
+### Acceptance (2026-11-10)
+- B PASS MEM-P06-C-R2 at digest `58acbacb9e1cebcb2f3ec470ef643959cf97dcbc09fc7e48b192edf056aa8e39`
+  (HEAD 801839fd, clean), recomputed by root. It is the final pass on the integrated tree that
+  I001 r2 requires, with no open findings.
+- **Phase 06 accepted in phase, and the plan is complete**: phases 01–06 are accepted. Re-fetched
+  before the push: `origin/main` is still cd73cc45, an ancestor of HEAD.
+- Records commit: this plan's final records (COORDINATION, the p06 TASK/HANDOFF/REVIEW/notes/
+  findings and the C logs) are copied into the merge worktree and committed on top. They are
+  excluded from the digest, so it is unchanged, with one exception: COORDINATION.md lies
+  outside the exclusion, and its revision line and p06 status row change (snapshot digest
+  97fd52ff… at the records commit). `git diff 801839fd <records commit>` touches only
+  `phases/p06/docs/` and those two COORDINATION lines. Then `memory-service-merge` is pushed to
+  `origin/main` as a fast-forward.
+- Open for the user:
+  - the paid smoke (U9), which waits for their key and confirmation;
+  - the pre-existing transport-check failure, which stops CI's `verify` job on main and after
+    the push (another plan's file).

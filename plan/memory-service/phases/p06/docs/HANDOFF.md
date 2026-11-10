@@ -44,3 +44,22 @@
 - 2026-11-10 (later): **p06-B3 (06B, B2-F1, U8/U9) accepted in phase**: B PASS MEM-P06-B3-R2 at
   digest 3617afd0…9405 (tree 607df2cd), recomputed by root. Next: integration with origin/main
   (TASK.md "Push authorization"), then 06C on the merged tree.
+- 2026-11-10 (later): integration done. Branch `memory-service` commit `41be07b2` (this plan's
+  paths only); merge of `origin/main` cd73cc45 in worktree `tmp/memory-service-run/merge`,
+  branch `memory-service-merge`: `084053ee` merge, `29d51abc` merge fixes (exactness kinds,
+  `pub(super)` module), `5c8528a0` binary location from `cargo metadata`. 06C ran on the merged
+  tree and passed, except failures already on clean main, a flake already on main, and the
+  checks unavailable here (TASK.md "Integration and 06C"). Re-fetched: main unchanged, so the push
+  is a fast-forward. Frozen digest 03e238f9…b88b2c (HEAD 5c8528a0, clean; records excluded).
+  Final integration review MEM-P06-C-R1 sent to B. Next: on a pass, copy this plan's final
+  records into the merge worktree and commit them, then re-fetch and push
+  `memory-service-merge:main`. Then clean up: merge worktree (node_modules symlink, model copy),
+  the c06 databases and the private cluster, and stop B. The paid smoke stays open for the user.
+- 2026-11-10 (later): **phase 06 accepted; plan complete.** B PASS MEM-P06-C-R2 at digest
+  58acbacb…8e39 (HEAD 801839fd), recomputed by root. C-F1 was fixed in the records, C-F2 (a)
+  was taken and C-F2 (b) declined with an accepted reason. The final records are committed
+  into the merge worktree, then `memory-service-merge` is pushed to origin/main as a
+  fast-forward.
+  - Open: the paid smoke (user key); the transport-check CI blocker, pre-existing on main.
+  - Cleanup after the push: the merge worktree (with its node_modules symlink and model copy),
+    the c06 databases, the private cluster, and stopping B.

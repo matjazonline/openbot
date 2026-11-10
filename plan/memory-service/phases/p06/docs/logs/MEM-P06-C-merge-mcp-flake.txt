@@ -1,0 +1,129 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.18s
+     Running unittests src/lib.rs (/Users/mac03/.codex/worktrees/60a0/openbot/target/debug/deps/open_bots-b3fb49a4c0332dfc)
+
+running 1 test
+test adapters::mcp::tests::mcp_dropped_call_sends_protocol_cancellation_and_joins_cleanup ... FAILED
+
+failures:
+
+---- adapters::mcp::tests::mcp_dropped_call_sends_protocol_cancellation_and_joins_cleanup stdout ----
+
+thread 'adapters::mcp::tests::mcp_dropped_call_sends_protocol_cancellation_and_joins_cleanup' (24940129) panicked at src/adapters/mcp/tests.rs:417:5:
+assertion `left == right` failed
+  left: Err("unused required exchanges: completed 3 of 4")
+ right: Ok(4)
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    adapters::mcp::tests::mcp_dropped_call_sends_protocol_cancellation_and_joins_cleanup
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 3858 filtered out; finished in 0.05s
+
+error: test failed, to rerun pass `--lib`
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.17s
+     Running unittests src/lib.rs (/Users/mac03/.codex/worktrees/60a0/openbot/target/debug/deps/open_bots-b3fb49a4c0332dfc)
+
+running 1 test
+test adapters::mcp::tests::mcp_dropped_call_sends_protocol_cancellation_and_joins_cleanup ... FAILED
+
+failures:
+
+---- adapters::mcp::tests::mcp_dropped_call_sends_protocol_cancellation_and_joins_cleanup stdout ----
+
+thread 'adapters::mcp::tests::mcp_dropped_call_sends_protocol_cancellation_and_joins_cleanup' (24940190) panicked at src/adapters/mcp/tests.rs:417:5:
+assertion `left == right` failed
+  left: Err("unused required exchanges: completed 3 of 4")
+ right: Ok(4)
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    adapters::mcp::tests::mcp_dropped_call_sends_protocol_cancellation_and_joins_cleanup
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 3858 filtered out; finished in 0.05s
+
+error: test failed, to rerun pass `--lib`
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.18s
+     Running unittests src/lib.rs (/Users/mac03/.codex/worktrees/60a0/openbot/target/debug/deps/open_bots-b3fb49a4c0332dfc)
+
+running 1 test
+test adapters::mcp::tests::mcp_dropped_call_sends_protocol_cancellation_and_joins_cleanup ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3858 filtered out; finished in 0.00s
+
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.17s
+     Running unittests src/lib.rs (/Users/mac03/.codex/worktrees/60a0/openbot/target/debug/deps/open_bots-b3fb49a4c0332dfc)
+
+running 1 test
+test adapters::mcp::tests::mcp_dropped_call_sends_protocol_cancellation_and_joins_cleanup ... FAILED
+
+failures:
+
+---- adapters::mcp::tests::mcp_dropped_call_sends_protocol_cancellation_and_joins_cleanup stdout ----
+
+thread 'adapters::mcp::tests::mcp_dropped_call_sends_protocol_cancellation_and_joins_cleanup' (24940312) panicked at src/adapters/mcp/tests.rs:417:5:
+assertion `left == right` failed
+  left: Err("unused required exchanges: completed 3 of 4")
+ right: Ok(4)
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    adapters::mcp::tests::mcp_dropped_call_sends_protocol_cancellation_and_joins_cleanup
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 3858 filtered out; finished in 0.05s
+
+error: test failed, to rerun pass `--lib`
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.18s
+     Running unittests src/lib.rs (/Users/mac03/.codex/worktrees/60a0/openbot/target/debug/deps/open_bots-b3fb49a4c0332dfc)
+
+running 1 test
+test adapters::mcp::tests::mcp_dropped_call_sends_protocol_cancellation_and_joins_cleanup ... FAILED
+
+failures:
+
+---- adapters::mcp::tests::mcp_dropped_call_sends_protocol_cancellation_and_joins_cleanup stdout ----
+
+thread 'adapters::mcp::tests::mcp_dropped_call_sends_protocol_cancellation_and_joins_cleanup' (24940378) panicked at src/adapters/mcp/tests.rs:417:5:
+assertion `left == right` failed
+  left: Err("unused required exchanges: completed 3 of 4")
+ right: Ok(4)
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    adapters::mcp::tests::mcp_dropped_call_sends_protocol_cancellation_and_joins_cleanup
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 3858 filtered out; finished in 0.05s
+
+error: test failed, to rerun pass `--lib`
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.17s
+     Running unittests src/lib.rs (/Users/mac03/.codex/worktrees/60a0/openbot/target/debug/deps/open_bots-b3fb49a4c0332dfc)
+
+running 1 test
+test adapters::mcp::tests::mcp_dropped_call_sends_protocol_cancellation_and_joins_cleanup ... FAILED
+
+failures:
+
+---- adapters::mcp::tests::mcp_dropped_call_sends_protocol_cancellation_and_joins_cleanup stdout ----
+
+thread 'adapters::mcp::tests::mcp_dropped_call_sends_protocol_cancellation_and_joins_cleanup' (24940439) panicked at src/adapters/mcp/tests.rs:417:5:
+assertion `left == right` failed
+  left: Err("unused required exchanges: completed 3 of 4")
+ right: Ok(4)
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    adapters::mcp::tests::mcp_dropped_call_sends_protocol_cancellation_and_joins_cleanup
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 3858 filtered out; finished in 0.06s
+
+error: test failed, to rerun pass `--lib`

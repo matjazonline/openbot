@@ -1,0 +1,1086 @@
+== conformance-integration_portability_
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.18s
+     Running unittests src/lib.rs (/Users/mac03/.codex/worktrees/60a0/openbot/target/debug/deps/open_bots-b3fb49a4c0332dfc)
+exit 0
+== conformance-integration_service_contract_
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.18s
+     Running unittests src/lib.rs (/Users/mac03/.codex/worktrees/60a0/openbot/target/debug/deps/open_bots-b3fb49a4c0332dfc)
+exit 0
+== conformance-vault_google_e2e_
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.17s
+     Running unittests src/lib.rs (/Users/mac03/.codex/worktrees/60a0/openbot/target/debug/deps/open_bots-b3fb49a4c0332dfc)
+exit 0
+== vault-1
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.17s
+     Running unittests src/lib.rs (/Users/mac03/.codex/worktrees/60a0/openbot/target/debug/deps/open_bots-b3fb49a4c0332dfc)
+
+running 1 test
+test adapters::http::routes::ui_vault_bindings::tests::authoring::vault_authoring_picker_is_owner_scoped_and_only_exposes_approved_metadata ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3858 filtered out; finished in 0.51s
+
+exit 0
+== vault-2
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.18s
+     Running unittests src/lib.rs (/Users/mac03/.codex/worktrees/60a0/openbot/target/debug/deps/open_bots-b3fb49a4c0332dfc)
+
+running 1 test
+test adapters::persistence::workflow::tests::http_tests::vault_tests::execution::native_portability::native_journeys::owner_browser::vault_authoring_owner_forms_and_reconnect_states_emit_real_browser_markup ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3858 filtered out; finished in 0.79s
+
+exit 0
+== vault-browser
+✖ vault dark: native picker progress, escaped private metadata and recoverable consent (455.019458ms)
+✖ vault light: native picker progress, escaped private metadata and recoverable consent (83.388292ms)
+✔ vault dark: owner secrets start blank and reconnect failures remain recoverable (500.159292ms)
+✔ vault light: owner secrets start blank and reconnect failures remain recoverable (407.423625ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 2
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 30786.356208
+
+✖ failing tests:
+
+test at scripts/tests/vault-authoring-browser.mjs:12:40
+✖ vault dark: native picker progress, escaped private metadata and recoverable consent (455.019458ms)
+  Error: ENOENT: no such file or directory, open '/private/tmp/claude-501/-Users-mac03--codex-worktrees-60a0-openbot/6fedfb2e-40aa-486c-bd0b-051b5a3add7b/scratchpad/browser/vault/source.html'
+      at Object.openSync (node:fs:621:18)
+      at readFileSync (node:fs:487:35)
+      at fixture (file:///Users/mac03/.codex/worktrees/60a0/openbot/tmp/memory-service-run/merge/scripts/tests/vault-authoring-browser.mjs:9:25)
+      at Server.<anonymous> (file:///Users/mac03/.codex/worktrees/60a0/openbot/tmp/memory-service-run/merge/scripts/tests/vault-authoring-browser.mjs:28:63)
+      at Server.emit (node:events:514:28)
+      at parserOnIncoming (node:_http_server:1293:12)
+      at HTTPParser.parserOnHeadersComplete (node:_http_common:125:17) {
+    errno: -2,
+    code: 'ENOENT',
+    syscall: 'open',
+    path: '/private/tmp/claude-501/-Users-mac03--codex-worktrees-60a0-openbot/6fedfb2e-40aa-486c-bd0b-051b5a3add7b/scratchpad/browser/vault/source.html'
+  }
+
+test at scripts/tests/vault-authoring-browser.mjs:12:40
+✖ vault light: native picker progress, escaped private metadata and recoverable consent (83.388292ms)
+  Error: ENOENT: no such file or directory, open '/private/tmp/claude-501/-Users-mac03--codex-worktrees-60a0-openbot/6fedfb2e-40aa-486c-bd0b-051b5a3add7b/scratchpad/browser/vault/source.html'
+      at Object.openSync (node:fs:621:18)
+      at readFileSync (node:fs:487:35)
+      at fixture (file:///Users/mac03/.codex/worktrees/60a0/openbot/tmp/memory-service-run/merge/scripts/tests/vault-authoring-browser.mjs:9:25)
+      at Server.<anonymous> (file:///Users/mac03/.codex/worktrees/60a0/openbot/tmp/memory-service-run/merge/scripts/tests/vault-authoring-browser.mjs:28:63)
+      at Server.emit (node:events:514:28)
+      at parserOnIncoming (node:_http_server:1293:12)
+      at HTTPParser.parserOnHeadersComplete (node:_http_common:125:17) {
+    errno: -2,
+    code: 'ENOENT',
+    syscall: 'open',
+    path: '/private/tmp/claude-501/-Users-mac03--codex-worktrees-60a0-openbot/6fedfb2e-40aa-486c-bd0b-051b5a3add7b/scratchpad/browser/vault/source.html'
+  }
+exit 1
+== html-dump
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.19s
+     Running unittests src/lib.rs (/Users/mac03/.codex/worktrees/60a0/openbot/target/debug/deps/open_bots-b3fb49a4c0332dfc)
+
+running 1 test
+test adapters::http::pages::tests::dump_html_injection_browser_fixtures ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3858 filtered out; finished in 0.00s
+
+exit 0
+== html-browser
+✔ form feedback and another member’s team autocomplete stay text under production CSP (701.537083ms)
+✔ served team autocomplete renders account strings as text and keeps selection working (170.785708ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 2
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 858.01225
+exit 0
+== -dump
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.19s
+     Running unittests src/lib.rs (/Users/mac03/.codex/worktrees/60a0/openbot/target/debug/deps/open_bots-b3fb49a4c0332dfc)
+
+running 17 tests
+test adapters::http::pages::knowledge::tests::dump_knowledge_browser_fixtures ... FAILED
+test adapters::persistence::workflow::reads::tests::dump_run_list_query_shapes ... FAILED
+test adapters::http::pages::tests::dump_application_javascript ... FAILED
+test adapters::http::pages::tests::dump_html_injection_browser_fixtures ... FAILED
+test adapters::http::routes::workflows::ui::authoring::tests::agent_picker_tests::dump_autonomous_workflow_agent_picker_browser_fixtures ... FAILED
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::e2e::driver::history_crash_child_entry ... FAILED
+test adapters::persistence::workflow::tests::local_agent_tests::e2e::native::cloudroom_e2e_native_claude_packaged_plugin_pairing_workflow_ui_restart_followup_stop ... FAILED
+test adapters::persistence::workflow::tests::local_agent_tests::e2e::native::cloudroom_e2e_native_codex_packaged_plugin_pairing_workflow_ui_restart_followup_stop ... FAILED
+test adapters::http::routes::ui_profile::session_tests::dump_session_revocation_browser_fixtures ... FAILED
+test adapters::smtp::server::tests::test_dkim_verification_with_gmail_raw_email ... ok
+test adapters::persistence::workflow::tests::local_agent_tests::e2e::native::cloudroom_e2e_native_opencode_packaged_plugin_pairing_workflow_ui_restart_followup_stop ... FAILED
+test adapters::persistence::local_agents::management::tests::dump_cloudroom_management_browser_fixtures ... FAILED
+test adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::live_tests::doop_e2e_live_company_documents ... FAILED
+test adapters::http::routes::ui_agents::authoring::browser_fixtures::dump_autonomous_agent_authoring_browser_fixtures ... FAILED
+test adapters::persistence::doop_live_setup_tests::lifecycle::doop_lifecycle_live_company_keys ... FAILED
+test adapters::persistence::doop_live_setup_tests::doop_live_company_setup ... FAILED
+test adapters::smtp::server::tests::test_spf_verification_with_google_ip ... ok
+
+failures:
+
+---- adapters::http::pages::knowledge::tests::dump_knowledge_browser_fixtures stdout ----
+
+thread 'adapters::http::pages::knowledge::tests::dump_knowledge_browser_fixtures' (24942384) panicked at src/adapters/http/pages/knowledge_tests.rs:7:53:
+KNOWLEDGE_BROWSER_FIXTURES: NotPresent
+
+---- adapters::persistence::workflow::reads::tests::dump_run_list_query_shapes stdout ----
+
+thread 'adapters::persistence::workflow::reads::tests::dump_run_list_query_shapes' (24942393) panicked at src/adapters/persistence/workflow/reads_tests.rs:366:10:
+RUN_LIST_QUERY_SHAPES names the output file: NotPresent
+
+---- adapters::http::pages::tests::dump_application_javascript stdout ----
+
+thread 'adapters::http::pages::tests::dump_application_javascript' (24942385) panicked at src/adapters/http/pages/tests.rs:4778:37:
+APP_JS_OUT: NotPresent
+
+---- adapters::http::pages::tests::dump_html_injection_browser_fixtures stdout ----
+
+thread 'adapters::http::pages::tests::dump_html_injection_browser_fixtures' (24942386) panicked at src/adapters/http/pages/tests.rs:4788:58:
+fixture directory: NotPresent
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- adapters::http::routes::workflows::ui::authoring::tests::agent_picker_tests::dump_autonomous_workflow_agent_picker_browser_fixtures stdout ----
+
+thread 'adapters::http::routes::workflows::ui::authoring::tests::agent_picker_tests::dump_autonomous_workflow_agent_picker_browser_fixtures' (24942389) panicked at src/adapters/http/routes/workflows/ui/authoring/agent_picker_tests.rs:282:58:
+explicit owned fixture directory: NotPresent
+
+---- adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::e2e::driver::history_crash_child_entry stdout ----
+
+thread 'adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::e2e::driver::history_crash_child_entry' (24942398) panicked at src/adapters/persistence/workflow/agent_history_process_driver.rs:75:54:
+parent-owned fixture specification: NotPresent
+
+---- adapters::persistence::workflow::tests::local_agent_tests::e2e::native::cloudroom_e2e_native_claude_packaged_plugin_pairing_workflow_ui_restart_followup_stop stdout ----
+
+thread 'adapters::persistence::workflow::tests::local_agent_tests::e2e::native::cloudroom_e2e_native_claude_packaged_plugin_pairing_workflow_ui_restart_followup_stop' (24942394) panicked at src/adapters/persistence/workflow/local_agent_native_e2e_tests.rs:28:5:
+assertion `left == right` failed: native acceptance needs explicit opt-in
+  left: Err(NotPresent)
+ right: Ok("1")
+
+---- adapters::persistence::workflow::tests::local_agent_tests::e2e::native::cloudroom_e2e_native_codex_packaged_plugin_pairing_workflow_ui_restart_followup_stop stdout ----
+
+thread 'adapters::persistence::workflow::tests::local_agent_tests::e2e::native::cloudroom_e2e_native_codex_packaged_plugin_pairing_workflow_ui_restart_followup_stop' (24942395) panicked at src/adapters/persistence/workflow/local_agent_native_e2e_tests.rs:28:5:
+assertion `left == right` failed: native acceptance needs explicit opt-in
+  left: Err(NotPresent)
+ right: Ok("1")
+
+---- adapters::http::routes::ui_profile::session_tests::dump_session_revocation_browser_fixtures stdout ----
+
+thread 'adapters::http::routes::ui_profile::session_tests::dump_session_revocation_browser_fixtures' (24942388) panicked at src/adapters/http/routes/ui_profile_session_tests.rs:317:62:
+fixture directory: NotPresent
+
+---- adapters::persistence::workflow::tests::local_agent_tests::e2e::native::cloudroom_e2e_native_opencode_packaged_plugin_pairing_workflow_ui_restart_followup_stop stdout ----
+
+thread 'adapters::persistence::workflow::tests::local_agent_tests::e2e::native::cloudroom_e2e_native_opencode_packaged_plugin_pairing_workflow_ui_restart_followup_stop' (24942396) panicked at src/adapters/persistence/workflow/local_agent_native_e2e_tests.rs:28:5:
+assertion `left == right` failed: native acceptance needs explicit opt-in
+  left: Err(NotPresent)
+ right: Ok("1")
+
+---- adapters::persistence::local_agents::management::tests::dump_cloudroom_management_browser_fixtures stdout ----
+
+thread 'adapters::persistence::local_agents::management::tests::dump_cloudroom_management_browser_fixtures' (24942392) panicked at src/adapters/persistence/local_agents/management/tests.rs:361:64:
+fixture directory: NotPresent
+
+---- adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::live_tests::doop_e2e_live_company_documents stdout ----
+
+thread 'adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::live_tests::doop_e2e_live_company_documents' (24942397) panicked at src/adapters/persistence/doop_live_input.rs:58:36:
+bounded private setup input: Error("EOF while parsing a value", line: 1, column: 0)
+
+---- adapters::http::routes::ui_agents::authoring::browser_fixtures::dump_autonomous_agent_authoring_browser_fixtures stdout ----
+
+thread 'adapters::http::routes::ui_agents::authoring::browser_fixtures::dump_autonomous_agent_authoring_browser_fixtures' (24942387) panicked at src/adapters/http/routes/ui_agents/authoring/browser_fixtures.rs:282:10:
+explicit fixture output directory: NotPresent
+
+---- adapters::persistence::doop_live_setup_tests::lifecycle::doop_lifecycle_live_company_keys stdout ----
+
+thread 'adapters::persistence::doop_live_setup_tests::lifecycle::doop_lifecycle_live_company_keys' (24942391) panicked at src/adapters/persistence/doop_live_input.rs:58:36:
+bounded private setup input: Error("EOF while parsing a value", line: 1, column: 0)
+
+---- adapters::persistence::doop_live_setup_tests::doop_live_company_setup stdout ----
+
+thread 'adapters::persistence::doop_live_setup_tests::doop_live_company_setup' (24942390) panicked at src/adapters/persistence/doop_live_input.rs:58:36:
+bounded private setup input: Error("EOF while parsing a value", line: 1, column: 0)
+
+
+failures:
+    adapters::http::pages::knowledge::tests::dump_knowledge_browser_fixtures
+    adapters::http::pages::tests::dump_application_javascript
+    adapters::http::pages::tests::dump_html_injection_browser_fixtures
+    adapters::http::routes::ui_agents::authoring::browser_fixtures::dump_autonomous_agent_authoring_browser_fixtures
+    adapters::http::routes::ui_profile::session_tests::dump_session_revocation_browser_fixtures
+    adapters::http::routes::workflows::ui::authoring::tests::agent_picker_tests::dump_autonomous_workflow_agent_picker_browser_fixtures
+    adapters::persistence::doop_live_setup_tests::doop_live_company_setup
+    adapters::persistence::doop_live_setup_tests::lifecycle::doop_lifecycle_live_company_keys
+    adapters::persistence::local_agents::management::tests::dump_cloudroom_management_browser_fixtures
+    adapters::persistence::workflow::reads::tests::dump_run_list_query_shapes
+    adapters::persistence::workflow::tests::local_agent_tests::e2e::native::cloudroom_e2e_native_claude_packaged_plugin_pairing_workflow_ui_restart_followup_stop
+    adapters::persistence::workflow::tests::local_agent_tests::e2e::native::cloudroom_e2e_native_codex_packaged_plugin_pairing_workflow_ui_restart_followup_stop
+    adapters::persistence::workflow::tests::local_agent_tests::e2e::native::cloudroom_e2e_native_opencode_packaged_plugin_pairing_workflow_ui_restart_followup_stop
+    adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::live_tests::doop_e2e_live_company_documents
+    adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::e2e::driver::history_crash_child_entry
+
+test result: FAILED. 2 passed; 15 failed; 0 ignored; 0 measured; 3842 filtered out; finished in 0.08s
+
+error: test failed, to rerun pass `--lib`
+exit 101
+== -browser
+node:internal/modules/cjs/loader:1568
+  throw err;
+  ^
+
+Error: Cannot find module '/Users/mac03/.codex/worktrees/60a0/openbot/tmp/memory-service-run/merge/scripts/tests'
+    at Module._resolveFilename (node:internal/modules/cjs/loader:1564:15)
+    at wrapResolveFilename (node:internal/modules/cjs/loader:1118:27)
+    at defaultResolveImplForCJSLoading (node:internal/modules/cjs/loader:1142:10)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1169:12)
+    at Module._load (node:internal/modules/cjs/loader:1341:5)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:261:19)
+    at Module.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:154:5)
+    at node:internal/main/run_main_module:33:47 {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: []
+}
+
+Node.js v24.21.0
+✖ scripts/tests (27.58375ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 31.016625
+
+✖ failing tests:
+
+test at scripts/tests:1:1
+✖ scripts/tests (27.58375ms)
+  'test failed'
+exit 1
+== -dump
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.18s
+     Running unittests src/lib.rs (/Users/mac03/.codex/worktrees/60a0/openbot/target/debug/deps/open_bots-b3fb49a4c0332dfc)
+
+running 17 tests
+test adapters::http::pages::tests::dump_application_javascript ... FAILED
+test adapters::http::pages::tests::dump_html_injection_browser_fixtures ... FAILED
+test adapters::http::pages::knowledge::tests::dump_knowledge_browser_fixtures ... FAILED
+test adapters::persistence::workflow::reads::tests::dump_run_list_query_shapes ... FAILED
+test adapters::http::routes::ui_profile::session_tests::dump_session_revocation_browser_fixtures ... FAILED
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::e2e::driver::history_crash_child_entry ... FAILED
+test adapters::smtp::server::tests::test_dkim_verification_with_gmail_raw_email ... ok
+test adapters::persistence::local_agents::management::tests::dump_cloudroom_management_browser_fixtures ... FAILED
+test adapters::persistence::workflow::tests::local_agent_tests::e2e::native::cloudroom_e2e_native_opencode_packaged_plugin_pairing_workflow_ui_restart_followup_stop ... FAILED
+test adapters::persistence::doop_live_setup_tests::doop_live_company_setup ... FAILED
+test adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::live_tests::doop_e2e_live_company_documents ... FAILED
+test adapters::persistence::doop_live_setup_tests::lifecycle::doop_lifecycle_live_company_keys ... FAILED
+test adapters::http::routes::ui_agents::authoring::browser_fixtures::dump_autonomous_agent_authoring_browser_fixtures ... FAILED
+test adapters::http::routes::workflows::ui::authoring::tests::agent_picker_tests::dump_autonomous_workflow_agent_picker_browser_fixtures ... FAILED
+test adapters::persistence::workflow::tests::local_agent_tests::e2e::native::cloudroom_e2e_native_claude_packaged_plugin_pairing_workflow_ui_restart_followup_stop ... FAILED
+test adapters::persistence::workflow::tests::local_agent_tests::e2e::native::cloudroom_e2e_native_codex_packaged_plugin_pairing_workflow_ui_restart_followup_stop ... FAILED
+test adapters::smtp::server::tests::test_spf_verification_with_google_ip ... ok
+
+failures:
+
+---- adapters::http::pages::tests::dump_application_javascript stdout ----
+
+thread 'adapters::http::pages::tests::dump_application_javascript' (24942460) panicked at src/adapters/http/pages/tests.rs:4778:37:
+APP_JS_OUT: NotPresent
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- adapters::http::pages::tests::dump_html_injection_browser_fixtures stdout ----
+
+thread 'adapters::http::pages::tests::dump_html_injection_browser_fixtures' (24942461) panicked at src/adapters/http/pages/tests.rs:4788:58:
+fixture directory: NotPresent
+
+---- adapters::http::pages::knowledge::tests::dump_knowledge_browser_fixtures stdout ----
+
+thread 'adapters::http::pages::knowledge::tests::dump_knowledge_browser_fixtures' (24942459) panicked at src/adapters/http/pages/knowledge_tests.rs:7:53:
+KNOWLEDGE_BROWSER_FIXTURES: NotPresent
+
+---- adapters::persistence::workflow::reads::tests::dump_run_list_query_shapes stdout ----
+
+thread 'adapters::persistence::workflow::reads::tests::dump_run_list_query_shapes' (24942468) panicked at src/adapters/persistence/workflow/reads_tests.rs:366:10:
+RUN_LIST_QUERY_SHAPES names the output file: NotPresent
+
+---- adapters::http::routes::ui_profile::session_tests::dump_session_revocation_browser_fixtures stdout ----
+
+thread 'adapters::http::routes::ui_profile::session_tests::dump_session_revocation_browser_fixtures' (24942463) panicked at src/adapters/http/routes/ui_profile_session_tests.rs:317:62:
+fixture directory: NotPresent
+
+---- adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::e2e::driver::history_crash_child_entry stdout ----
+
+thread 'adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::e2e::driver::history_crash_child_entry' (24942473) panicked at src/adapters/persistence/workflow/agent_history_process_driver.rs:75:54:
+parent-owned fixture specification: NotPresent
+
+---- adapters::persistence::local_agents::management::tests::dump_cloudroom_management_browser_fixtures stdout ----
+
+thread 'adapters::persistence::local_agents::management::tests::dump_cloudroom_management_browser_fixtures' (24942467) panicked at src/adapters/persistence/local_agents/management/tests.rs:361:64:
+fixture directory: NotPresent
+
+---- adapters::persistence::workflow::tests::local_agent_tests::e2e::native::cloudroom_e2e_native_opencode_packaged_plugin_pairing_workflow_ui_restart_followup_stop stdout ----
+
+thread 'adapters::persistence::workflow::tests::local_agent_tests::e2e::native::cloudroom_e2e_native_opencode_packaged_plugin_pairing_workflow_ui_restart_followup_stop' (24942471) panicked at src/adapters/persistence/workflow/local_agent_native_e2e_tests.rs:28:5:
+assertion `left == right` failed: native acceptance needs explicit opt-in
+  left: Err(NotPresent)
+ right: Ok("1")
+
+---- adapters::persistence::doop_live_setup_tests::doop_live_company_setup stdout ----
+
+thread 'adapters::persistence::doop_live_setup_tests::doop_live_company_setup' (24942465) panicked at src/adapters/persistence/doop_live_input.rs:58:36:
+bounded private setup input: Error("EOF while parsing a value", line: 1, column: 0)
+
+---- adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::live_tests::doop_e2e_live_company_documents stdout ----
+
+thread 'adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::live_tests::doop_e2e_live_company_documents' (24942472) panicked at src/adapters/persistence/doop_live_input.rs:58:36:
+bounded private setup input: Error("EOF while parsing a value", line: 1, column: 0)
+
+---- adapters::persistence::doop_live_setup_tests::lifecycle::doop_lifecycle_live_company_keys stdout ----
+
+thread 'adapters::persistence::doop_live_setup_tests::lifecycle::doop_lifecycle_live_company_keys' (24942466) panicked at src/adapters/persistence/doop_live_input.rs:58:36:
+bounded private setup input: Error("EOF while parsing a value", line: 1, column: 0)
+
+---- adapters::http::routes::ui_agents::authoring::browser_fixtures::dump_autonomous_agent_authoring_browser_fixtures stdout ----
+
+thread 'adapters::http::routes::ui_agents::authoring::browser_fixtures::dump_autonomous_agent_authoring_browser_fixtures' (24942462) panicked at src/adapters/http/routes/ui_agents/authoring/browser_fixtures.rs:282:10:
+explicit fixture output directory: NotPresent
+
+---- adapters::http::routes::workflows::ui::authoring::tests::agent_picker_tests::dump_autonomous_workflow_agent_picker_browser_fixtures stdout ----
+
+thread 'adapters::http::routes::workflows::ui::authoring::tests::agent_picker_tests::dump_autonomous_workflow_agent_picker_browser_fixtures' (24942464) panicked at src/adapters/http/routes/workflows/ui/authoring/agent_picker_tests.rs:282:58:
+explicit owned fixture directory: NotPresent
+
+---- adapters::persistence::workflow::tests::local_agent_tests::e2e::native::cloudroom_e2e_native_claude_packaged_plugin_pairing_workflow_ui_restart_followup_stop stdout ----
+
+thread 'adapters::persistence::workflow::tests::local_agent_tests::e2e::native::cloudroom_e2e_native_claude_packaged_plugin_pairing_workflow_ui_restart_followup_stop' (24942469) panicked at src/adapters/persistence/workflow/local_agent_native_e2e_tests.rs:28:5:
+assertion `left == right` failed: native acceptance needs explicit opt-in
+  left: Err(NotPresent)
+ right: Ok("1")
+
+---- adapters::persistence::workflow::tests::local_agent_tests::e2e::native::cloudroom_e2e_native_codex_packaged_plugin_pairing_workflow_ui_restart_followup_stop stdout ----
+
+thread 'adapters::persistence::workflow::tests::local_agent_tests::e2e::native::cloudroom_e2e_native_codex_packaged_plugin_pairing_workflow_ui_restart_followup_stop' (24942470) panicked at src/adapters/persistence/workflow/local_agent_native_e2e_tests.rs:28:5:
+assertion `left == right` failed: native acceptance needs explicit opt-in
+  left: Err(NotPresent)
+ right: Ok("1")
+
+
+failures:
+    adapters::http::pages::knowledge::tests::dump_knowledge_browser_fixtures
+    adapters::http::pages::tests::dump_application_javascript
+    adapters::http::pages::tests::dump_html_injection_browser_fixtures
+    adapters::http::routes::ui_agents::authoring::browser_fixtures::dump_autonomous_agent_authoring_browser_fixtures
+    adapters::http::routes::ui_profile::session_tests::dump_session_revocation_browser_fixtures
+    adapters::http::routes::workflows::ui::authoring::tests::agent_picker_tests::dump_autonomous_workflow_agent_picker_browser_fixtures
+    adapters::persistence::doop_live_setup_tests::doop_live_company_setup
+    adapters::persistence::doop_live_setup_tests::lifecycle::doop_lifecycle_live_company_keys
+    adapters::persistence::local_agents::management::tests::dump_cloudroom_management_browser_fixtures
+    adapters::persistence::workflow::reads::tests::dump_run_list_query_shapes
+    adapters::persistence::workflow::tests::local_agent_tests::e2e::native::cloudroom_e2e_native_claude_packaged_plugin_pairing_workflow_ui_restart_followup_stop
+    adapters::persistence::workflow::tests::local_agent_tests::e2e::native::cloudroom_e2e_native_codex_packaged_plugin_pairing_workflow_ui_restart_followup_stop
+    adapters::persistence::workflow::tests::local_agent_tests::e2e::native::cloudroom_e2e_native_opencode_packaged_plugin_pairing_workflow_ui_restart_followup_stop
+    adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::live_tests::doop_e2e_live_company_documents
+    adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::e2e::driver::history_crash_child_entry
+
+test result: FAILED. 2 passed; 15 failed; 0 ignored; 0 measured; 3842 filtered out; finished in 0.08s
+
+error: test failed, to rerun pass `--lib`
+exit 101
+== -browser
+node:internal/modules/cjs/loader:1568
+  throw err;
+  ^
+
+Error: Cannot find module '/Users/mac03/.codex/worktrees/60a0/openbot/tmp/memory-service-run/merge/scripts/tests'
+    at Module._resolveFilename (node:internal/modules/cjs/loader:1564:15)
+    at wrapResolveFilename (node:internal/modules/cjs/loader:1118:27)
+    at defaultResolveImplForCJSLoading (node:internal/modules/cjs/loader:1142:10)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1169:12)
+    at Module._load (node:internal/modules/cjs/loader:1341:5)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:261:19)
+    at Module.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:154:5)
+    at node:internal/main/run_main_module:33:47 {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: []
+}
+
+Node.js v24.21.0
+✖ scripts/tests (29.072042ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 32.538
+
+✖ failing tests:
+
+test at scripts/tests:1:1
+✖ scripts/tests (29.072042ms)
+  'test failed'
+exit 1
+== -dump
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.18s
+     Running unittests src/lib.rs (/Users/mac03/.codex/worktrees/60a0/openbot/target/debug/deps/open_bots-b3fb49a4c0332dfc)
+
+running 17 tests
+test adapters::http::pages::tests::dump_application_javascript ... FAILED
+test adapters::http::pages::knowledge::tests::dump_knowledge_browser_fixtures ... FAILED
+test adapters::http::pages::tests::dump_html_injection_browser_fixtures ... FAILED
+test adapters::persistence::workflow::reads::tests::dump_run_list_query_shapes ... FAILED
+test adapters::http::routes::workflows::ui::authoring::tests::agent_picker_tests::dump_autonomous_workflow_agent_picker_browser_fixtures ... FAILED
+test adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::live_tests::doop_e2e_live_company_documents ... FAILED
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::e2e::driver::history_crash_child_entry ... FAILED
+test adapters::smtp::server::tests::test_dkim_verification_with_gmail_raw_email ... ok
+test adapters::http::routes::ui_profile::session_tests::dump_session_revocation_browser_fixtures ... FAILED
+test adapters::persistence::local_agents::management::tests::dump_cloudroom_management_browser_fixtures ... FAILED
+test adapters::persistence::workflow::tests::local_agent_tests::e2e::native::cloudroom_e2e_native_codex_packaged_plugin_pairing_workflow_ui_restart_followup_stop ... FAILED
+test adapters::http::routes::ui_agents::authoring::browser_fixtures::dump_autonomous_agent_authoring_browser_fixtures ... FAILED
+test adapters::persistence::doop_live_setup_tests::doop_live_company_setup ... FAILED
+test adapters::persistence::workflow::tests::local_agent_tests::e2e::native::cloudroom_e2e_native_opencode_packaged_plugin_pairing_workflow_ui_restart_followup_stop ... FAILED
+test adapters::persistence::workflow::tests::local_agent_tests::e2e::native::cloudroom_e2e_native_claude_packaged_plugin_pairing_workflow_ui_restart_followup_stop ... FAILED
+test adapters::persistence::doop_live_setup_tests::lifecycle::doop_lifecycle_live_company_keys ... FAILED
+test adapters::smtp::server::tests::test_spf_verification_with_google_ip ... ok
+
+failures:
+
+---- adapters::http::pages::tests::dump_application_javascript stdout ----
+
+thread 'adapters::http::pages::tests::dump_application_javascript' (24942534) panicked at src/adapters/http/pages/tests.rs:4778:37:
+APP_JS_OUT: NotPresent
+
+---- adapters::http::pages::knowledge::tests::dump_knowledge_browser_fixtures stdout ----
+
+thread 'adapters::http::pages::knowledge::tests::dump_knowledge_browser_fixtures' (24942533) panicked at src/adapters/http/pages/knowledge_tests.rs:7:53:
+KNOWLEDGE_BROWSER_FIXTURES: NotPresent
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- adapters::http::pages::tests::dump_html_injection_browser_fixtures stdout ----
+
+thread 'adapters::http::pages::tests::dump_html_injection_browser_fixtures' (24942535) panicked at src/adapters/http/pages/tests.rs:4788:58:
+fixture directory: NotPresent
+
+---- adapters::persistence::workflow::reads::tests::dump_run_list_query_shapes stdout ----
+
+thread 'adapters::persistence::workflow::reads::tests::dump_run_list_query_shapes' (24942542) panicked at src/adapters/persistence/workflow/reads_tests.rs:366:10:
+RUN_LIST_QUERY_SHAPES names the output file: NotPresent
+
+---- adapters::http::routes::workflows::ui::authoring::tests::agent_picker_tests::dump_autonomous_workflow_agent_picker_browser_fixtures stdout ----
+
+thread 'adapters::http::routes::workflows::ui::authoring::tests::agent_picker_tests::dump_autonomous_workflow_agent_picker_browser_fixtures' (24942538) panicked at src/adapters/http/routes/workflows/ui/authoring/agent_picker_tests.rs:282:58:
+explicit owned fixture directory: NotPresent
+
+---- adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::live_tests::doop_e2e_live_company_documents stdout ----
+
+thread 'adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::live_tests::doop_e2e_live_company_documents' (24942546) panicked at src/adapters/persistence/doop_live_input.rs:58:36:
+bounded private setup input: Error("EOF while parsing a value", line: 1, column: 0)
+
+---- adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::e2e::driver::history_crash_child_entry stdout ----
+
+thread 'adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::e2e::driver::history_crash_child_entry' (24942547) panicked at src/adapters/persistence/workflow/agent_history_process_driver.rs:75:54:
+parent-owned fixture specification: NotPresent
+
+---- adapters::http::routes::ui_profile::session_tests::dump_session_revocation_browser_fixtures stdout ----
+
+thread 'adapters::http::routes::ui_profile::session_tests::dump_session_revocation_browser_fixtures' (24942537) panicked at src/adapters/http/routes/ui_profile_session_tests.rs:317:62:
+fixture directory: NotPresent
+
+---- adapters::persistence::local_agents::management::tests::dump_cloudroom_management_browser_fixtures stdout ----
+
+thread 'adapters::persistence::local_agents::management::tests::dump_cloudroom_management_browser_fixtures' (24942541) panicked at src/adapters/persistence/local_agents/management/tests.rs:361:64:
+fixture directory: NotPresent
+
+---- adapters::persistence::workflow::tests::local_agent_tests::e2e::native::cloudroom_e2e_native_codex_packaged_plugin_pairing_workflow_ui_restart_followup_stop stdout ----
+
+thread 'adapters::persistence::workflow::tests::local_agent_tests::e2e::native::cloudroom_e2e_native_codex_packaged_plugin_pairing_workflow_ui_restart_followup_stop' (24942544) panicked at src/adapters/persistence/workflow/local_agent_native_e2e_tests.rs:28:5:
+assertion `left == right` failed: native acceptance needs explicit opt-in
+  left: Err(NotPresent)
+ right: Ok("1")
+
+---- adapters::http::routes::ui_agents::authoring::browser_fixtures::dump_autonomous_agent_authoring_browser_fixtures stdout ----
+
+thread 'adapters::http::routes::ui_agents::authoring::browser_fixtures::dump_autonomous_agent_authoring_browser_fixtures' (24942536) panicked at src/adapters/http/routes/ui_agents/authoring/browser_fixtures.rs:282:10:
+explicit fixture output directory: NotPresent
+
+---- adapters::persistence::doop_live_setup_tests::doop_live_company_setup stdout ----
+
+thread 'adapters::persistence::doop_live_setup_tests::doop_live_company_setup' (24942539) panicked at src/adapters/persistence/doop_live_input.rs:58:36:
+bounded private setup input: Error("EOF while parsing a value", line: 1, column: 0)
+
+---- adapters::persistence::workflow::tests::local_agent_tests::e2e::native::cloudroom_e2e_native_opencode_packaged_plugin_pairing_workflow_ui_restart_followup_stop stdout ----
+
+thread 'adapters::persistence::workflow::tests::local_agent_tests::e2e::native::cloudroom_e2e_native_opencode_packaged_plugin_pairing_workflow_ui_restart_followup_stop' (24942545) panicked at src/adapters/persistence/workflow/local_agent_native_e2e_tests.rs:28:5:
+assertion `left == right` failed: native acceptance needs explicit opt-in
+  left: Err(NotPresent)
+ right: Ok("1")
+
+---- adapters::persistence::workflow::tests::local_agent_tests::e2e::native::cloudroom_e2e_native_claude_packaged_plugin_pairing_workflow_ui_restart_followup_stop stdout ----
+
+thread 'adapters::persistence::workflow::tests::local_agent_tests::e2e::native::cloudroom_e2e_native_claude_packaged_plugin_pairing_workflow_ui_restart_followup_stop' (24942543) panicked at src/adapters/persistence/workflow/local_agent_native_e2e_tests.rs:28:5:
+assertion `left == right` failed: native acceptance needs explicit opt-in
+  left: Err(NotPresent)
+ right: Ok("1")
+
+---- adapters::persistence::doop_live_setup_tests::lifecycle::doop_lifecycle_live_company_keys stdout ----
+
+thread 'adapters::persistence::doop_live_setup_tests::lifecycle::doop_lifecycle_live_company_keys' (24942540) panicked at src/adapters/persistence/doop_live_input.rs:58:36:
+bounded private setup input: Error("EOF while parsing a value", line: 1, column: 0)
+
+
+failures:
+    adapters::http::pages::knowledge::tests::dump_knowledge_browser_fixtures
+    adapters::http::pages::tests::dump_application_javascript
+    adapters::http::pages::tests::dump_html_injection_browser_fixtures
+    adapters::http::routes::ui_agents::authoring::browser_fixtures::dump_autonomous_agent_authoring_browser_fixtures
+    adapters::http::routes::ui_profile::session_tests::dump_session_revocation_browser_fixtures
+    adapters::http::routes::workflows::ui::authoring::tests::agent_picker_tests::dump_autonomous_workflow_agent_picker_browser_fixtures
+    adapters::persistence::doop_live_setup_tests::doop_live_company_setup
+    adapters::persistence::doop_live_setup_tests::lifecycle::doop_lifecycle_live_company_keys
+    adapters::persistence::local_agents::management::tests::dump_cloudroom_management_browser_fixtures
+    adapters::persistence::workflow::reads::tests::dump_run_list_query_shapes
+    adapters::persistence::workflow::tests::local_agent_tests::e2e::native::cloudroom_e2e_native_claude_packaged_plugin_pairing_workflow_ui_restart_followup_stop
+    adapters::persistence::workflow::tests::local_agent_tests::e2e::native::cloudroom_e2e_native_codex_packaged_plugin_pairing_workflow_ui_restart_followup_stop
+    adapters::persistence::workflow::tests::local_agent_tests::e2e::native::cloudroom_e2e_native_opencode_packaged_plugin_pairing_workflow_ui_restart_followup_stop
+    adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::live_tests::doop_e2e_live_company_documents
+    adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::e2e::driver::history_crash_child_entry
+
+test result: FAILED. 2 passed; 15 failed; 0 ignored; 0 measured; 3842 filtered out; finished in 0.08s
+
+error: test failed, to rerun pass `--lib`
+exit 101
+== -browser
+node:internal/modules/cjs/loader:1568
+  throw err;
+  ^
+
+Error: Cannot find module '/Users/mac03/.codex/worktrees/60a0/openbot/tmp/memory-service-run/merge/scripts/tests'
+    at Module._resolveFilename (node:internal/modules/cjs/loader:1564:15)
+    at wrapResolveFilename (node:internal/modules/cjs/loader:1118:27)
+    at defaultResolveImplForCJSLoading (node:internal/modules/cjs/loader:1142:10)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1169:12)
+    at Module._load (node:internal/modules/cjs/loader:1341:5)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:261:19)
+    at Module.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:154:5)
+    at node:internal/main/run_main_module:33:47 {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: []
+}
+
+Node.js v24.21.0
+✖ scripts/tests (26.038208ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 29.36275
+
+✖ failing tests:
+
+test at scripts/tests:1:1
+✖ scripts/tests (26.038208ms)
+  'test failed'
+exit 1
+== -dump
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.17s
+     Running unittests src/lib.rs (/Users/mac03/.codex/worktrees/60a0/openbot/target/debug/deps/open_bots-b3fb49a4c0332dfc)
+
+running 17 tests
+test adapters::persistence::workflow::reads::tests::dump_run_list_query_shapes ... FAILED
+test adapters::http::pages::tests::dump_application_javascript ... FAILED
+test adapters::http::pages::tests::dump_html_injection_browser_fixtures ... FAILED
+test adapters::http::pages::knowledge::tests::dump_knowledge_browser_fixtures ... FAILED
+test adapters::persistence::workflow::tests::local_agent_tests::e2e::native::cloudroom_e2e_native_claude_packaged_plugin_pairing_workflow_ui_restart_followup_stop ... FAILED
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::e2e::driver::history_crash_child_entry ... FAILED
+test adapters::http::routes::ui_profile::session_tests::dump_session_revocation_browser_fixtures ... FAILED
+test adapters::persistence::workflow::tests::local_agent_tests::e2e::native::cloudroom_e2e_native_codex_packaged_plugin_pairing_workflow_ui_restart_followup_stop ... FAILED
+test adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::live_tests::doop_e2e_live_company_documents ... FAILED
+test adapters::smtp::server::tests::test_dkim_verification_with_gmail_raw_email ... ok
+test adapters::persistence::local_agents::management::tests::dump_cloudroom_management_browser_fixtures ... FAILED
+test adapters::http::routes::workflows::ui::authoring::tests::agent_picker_tests::dump_autonomous_workflow_agent_picker_browser_fixtures ... FAILED
+test adapters::persistence::doop_live_setup_tests::doop_live_company_setup ... FAILED
+test adapters::persistence::workflow::tests::local_agent_tests::e2e::native::cloudroom_e2e_native_opencode_packaged_plugin_pairing_workflow_ui_restart_followup_stop ... FAILED
+test adapters::persistence::doop_live_setup_tests::lifecycle::doop_lifecycle_live_company_keys ... FAILED
+test adapters::http::routes::ui_agents::authoring::browser_fixtures::dump_autonomous_agent_authoring_browser_fixtures ... FAILED
+test adapters::smtp::server::tests::test_spf_verification_with_google_ip ... ok
+
+failures:
+
+---- adapters::persistence::workflow::reads::tests::dump_run_list_query_shapes stdout ----
+
+thread 'adapters::persistence::workflow::reads::tests::dump_run_list_query_shapes' (24942616) panicked at src/adapters/persistence/workflow/reads_tests.rs:366:10:
+RUN_LIST_QUERY_SHAPES names the output file: NotPresent
+
+---- adapters::http::pages::tests::dump_application_javascript stdout ----
+
+thread 'adapters::http::pages::tests::dump_application_javascript' (24942608) panicked at src/adapters/http/pages/tests.rs:4778:37:
+APP_JS_OUT: NotPresent
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- adapters::http::pages::tests::dump_html_injection_browser_fixtures stdout ----
+
+thread 'adapters::http::pages::tests::dump_html_injection_browser_fixtures' (24942609) panicked at src/adapters/http/pages/tests.rs:4788:58:
+fixture directory: NotPresent
+
+---- adapters::http::pages::knowledge::tests::dump_knowledge_browser_fixtures stdout ----
+
+thread 'adapters::http::pages::knowledge::tests::dump_knowledge_browser_fixtures' (24942607) panicked at src/adapters/http/pages/knowledge_tests.rs:7:53:
+KNOWLEDGE_BROWSER_FIXTURES: NotPresent
+
+---- adapters::persistence::workflow::tests::local_agent_tests::e2e::native::cloudroom_e2e_native_claude_packaged_plugin_pairing_workflow_ui_restart_followup_stop stdout ----
+
+thread 'adapters::persistence::workflow::tests::local_agent_tests::e2e::native::cloudroom_e2e_native_claude_packaged_plugin_pairing_workflow_ui_restart_followup_stop' (24942617) panicked at src/adapters/persistence/workflow/local_agent_native_e2e_tests.rs:28:5:
+assertion `left == right` failed: native acceptance needs explicit opt-in
+  left: Err(NotPresent)
+ right: Ok("1")
+
+---- adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::e2e::driver::history_crash_child_entry stdout ----
+
+thread 'adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::e2e::driver::history_crash_child_entry' (24942621) panicked at src/adapters/persistence/workflow/agent_history_process_driver.rs:75:54:
+parent-owned fixture specification: NotPresent
+
+---- adapters::http::routes::ui_profile::session_tests::dump_session_revocation_browser_fixtures stdout ----
+
+thread 'adapters::http::routes::ui_profile::session_tests::dump_session_revocation_browser_fixtures' (24942611) panicked at src/adapters/http/routes/ui_profile_session_tests.rs:317:62:
+fixture directory: NotPresent
+
+---- adapters::persistence::workflow::tests::local_agent_tests::e2e::native::cloudroom_e2e_native_codex_packaged_plugin_pairing_workflow_ui_restart_followup_stop stdout ----
+
+thread 'adapters::persistence::workflow::tests::local_agent_tests::e2e::native::cloudroom_e2e_native_codex_packaged_plugin_pairing_workflow_ui_restart_followup_stop' (24942618) panicked at src/adapters/persistence/workflow/local_agent_native_e2e_tests.rs:28:5:
+assertion `left == right` failed: native acceptance needs explicit opt-in
+  left: Err(NotPresent)
+ right: Ok("1")
+
+---- adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::live_tests::doop_e2e_live_company_documents stdout ----
+
+thread 'adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::live_tests::doop_e2e_live_company_documents' (24942620) panicked at src/adapters/persistence/doop_live_input.rs:58:36:
+bounded private setup input: Error("EOF while parsing a value", line: 1, column: 0)
+
+---- adapters::persistence::local_agents::management::tests::dump_cloudroom_management_browser_fixtures stdout ----
+
+thread 'adapters::persistence::local_agents::management::tests::dump_cloudroom_management_browser_fixtures' (24942615) panicked at src/adapters/persistence/local_agents/management/tests.rs:361:64:
+fixture directory: NotPresent
+
+---- adapters::http::routes::workflows::ui::authoring::tests::agent_picker_tests::dump_autonomous_workflow_agent_picker_browser_fixtures stdout ----
+
+thread 'adapters::http::routes::workflows::ui::authoring::tests::agent_picker_tests::dump_autonomous_workflow_agent_picker_browser_fixtures' (24942612) panicked at src/adapters/http/routes/workflows/ui/authoring/agent_picker_tests.rs:282:58:
+explicit owned fixture directory: NotPresent
+
+---- adapters::persistence::doop_live_setup_tests::doop_live_company_setup stdout ----
+
+thread 'adapters::persistence::doop_live_setup_tests::doop_live_company_setup' (24942613) panicked at src/adapters/persistence/doop_live_input.rs:58:36:
+bounded private setup input: Error("EOF while parsing a value", line: 1, column: 0)
+
+---- adapters::persistence::workflow::tests::local_agent_tests::e2e::native::cloudroom_e2e_native_opencode_packaged_plugin_pairing_workflow_ui_restart_followup_stop stdout ----
+
+thread 'adapters::persistence::workflow::tests::local_agent_tests::e2e::native::cloudroom_e2e_native_opencode_packaged_plugin_pairing_workflow_ui_restart_followup_stop' (24942619) panicked at src/adapters/persistence/workflow/local_agent_native_e2e_tests.rs:28:5:
+assertion `left == right` failed: native acceptance needs explicit opt-in
+  left: Err(NotPresent)
+ right: Ok("1")
+
+---- adapters::persistence::doop_live_setup_tests::lifecycle::doop_lifecycle_live_company_keys stdout ----
+
+thread 'adapters::persistence::doop_live_setup_tests::lifecycle::doop_lifecycle_live_company_keys' (24942614) panicked at src/adapters/persistence/doop_live_input.rs:58:36:
+bounded private setup input: Error("EOF while parsing a value", line: 1, column: 0)
+
+---- adapters::http::routes::ui_agents::authoring::browser_fixtures::dump_autonomous_agent_authoring_browser_fixtures stdout ----
+
+thread 'adapters::http::routes::ui_agents::authoring::browser_fixtures::dump_autonomous_agent_authoring_browser_fixtures' (24942610) panicked at src/adapters/http/routes/ui_agents/authoring/browser_fixtures.rs:282:10:
+explicit fixture output directory: NotPresent
+
+
+failures:
+    adapters::http::pages::knowledge::tests::dump_knowledge_browser_fixtures
+    adapters::http::pages::tests::dump_application_javascript
+    adapters::http::pages::tests::dump_html_injection_browser_fixtures
+    adapters::http::routes::ui_agents::authoring::browser_fixtures::dump_autonomous_agent_authoring_browser_fixtures
+    adapters::http::routes::ui_profile::session_tests::dump_session_revocation_browser_fixtures
+    adapters::http::routes::workflows::ui::authoring::tests::agent_picker_tests::dump_autonomous_workflow_agent_picker_browser_fixtures
+    adapters::persistence::doop_live_setup_tests::doop_live_company_setup
+    adapters::persistence::doop_live_setup_tests::lifecycle::doop_lifecycle_live_company_keys
+    adapters::persistence::local_agents::management::tests::dump_cloudroom_management_browser_fixtures
+    adapters::persistence::workflow::reads::tests::dump_run_list_query_shapes
+    adapters::persistence::workflow::tests::local_agent_tests::e2e::native::cloudroom_e2e_native_claude_packaged_plugin_pairing_workflow_ui_restart_followup_stop
+    adapters::persistence::workflow::tests::local_agent_tests::e2e::native::cloudroom_e2e_native_codex_packaged_plugin_pairing_workflow_ui_restart_followup_stop
+    adapters::persistence::workflow::tests::local_agent_tests::e2e::native::cloudroom_e2e_native_opencode_packaged_plugin_pairing_workflow_ui_restart_followup_stop
+    adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::live_tests::doop_e2e_live_company_documents
+    adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::e2e::driver::history_crash_child_entry
+
+test result: FAILED. 2 passed; 15 failed; 0 ignored; 0 measured; 3842 filtered out; finished in 0.08s
+
+error: test failed, to rerun pass `--lib`
+exit 101
+== -browser
+node:internal/modules/cjs/loader:1568
+  throw err;
+  ^
+
+Error: Cannot find module '/Users/mac03/.codex/worktrees/60a0/openbot/tmp/memory-service-run/merge/scripts/tests'
+    at Module._resolveFilename (node:internal/modules/cjs/loader:1564:15)
+    at wrapResolveFilename (node:internal/modules/cjs/loader:1118:27)
+    at defaultResolveImplForCJSLoading (node:internal/modules/cjs/loader:1142:10)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1169:12)
+    at Module._load (node:internal/modules/cjs/loader:1341:5)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:261:19)
+    at Module.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:154:5)
+    at node:internal/main/run_main_module:33:47 {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: []
+}
+
+Node.js v24.21.0
+✖ scripts/tests (27.196791ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 30.560833
+
+✖ failing tests:
+
+test at scripts/tests:1:1
+✖ scripts/tests (27.196791ms)
+  'test failed'
+exit 1
+== -dump
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.17s
+     Running unittests src/lib.rs (/Users/mac03/.codex/worktrees/60a0/openbot/target/debug/deps/open_bots-b3fb49a4c0332dfc)
+
+running 17 tests
+test adapters::persistence::workflow::reads::tests::dump_run_list_query_shapes ... FAILED
+test adapters::http::pages::tests::dump_html_injection_browser_fixtures ... FAILED
+test adapters::http::pages::knowledge::tests::dump_knowledge_browser_fixtures ... FAILED
+test adapters::http::pages::tests::dump_application_javascript ... FAILED
+test adapters::http::routes::workflows::ui::authoring::tests::agent_picker_tests::dump_autonomous_workflow_agent_picker_browser_fixtures ... FAILED
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::e2e::driver::history_crash_child_entry ... FAILED
+test adapters::smtp::server::tests::test_dkim_verification_with_gmail_raw_email ... ok
+test adapters::http::routes::ui_profile::session_tests::dump_session_revocation_browser_fixtures ... FAILED
+test adapters::persistence::local_agents::management::tests::dump_cloudroom_management_browser_fixtures ... FAILED
+test adapters::persistence::workflow::tests::local_agent_tests::e2e::native::cloudroom_e2e_native_opencode_packaged_plugin_pairing_workflow_ui_restart_followup_stop ... FAILED
+test adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::live_tests::doop_e2e_live_company_documents ... FAILED
+test adapters::http::routes::ui_agents::authoring::browser_fixtures::dump_autonomous_agent_authoring_browser_fixtures ... FAILED
+test adapters::persistence::workflow::tests::local_agent_tests::e2e::native::cloudroom_e2e_native_codex_packaged_plugin_pairing_workflow_ui_restart_followup_stop ... FAILED
+test adapters::persistence::doop_live_setup_tests::doop_live_company_setup ... FAILED
+test adapters::persistence::workflow::tests::local_agent_tests::e2e::native::cloudroom_e2e_native_claude_packaged_plugin_pairing_workflow_ui_restart_followup_stop ... FAILED
+test adapters::persistence::doop_live_setup_tests::lifecycle::doop_lifecycle_live_company_keys ... FAILED
+test adapters::smtp::server::tests::test_spf_verification_with_google_ip ... ok
+
+failures:
+
+---- adapters::persistence::workflow::reads::tests::dump_run_list_query_shapes stdout ----
+
+thread 'adapters::persistence::workflow::reads::tests::dump_run_list_query_shapes' (24942696) panicked at src/adapters/persistence/workflow/reads_tests.rs:366:10:
+RUN_LIST_QUERY_SHAPES names the output file: NotPresent
+
+---- adapters::http::pages::tests::dump_html_injection_browser_fixtures stdout ----
+
+thread 'adapters::http::pages::tests::dump_html_injection_browser_fixtures' (24942689) panicked at src/adapters/http/pages/tests.rs:4788:58:
+fixture directory: NotPresent
+
+---- adapters::http::pages::knowledge::tests::dump_knowledge_browser_fixtures stdout ----
+
+thread 'adapters::http::pages::knowledge::tests::dump_knowledge_browser_fixtures' (24942687) panicked at src/adapters/http/pages/knowledge_tests.rs:7:53:
+KNOWLEDGE_BROWSER_FIXTURES: NotPresent
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- adapters::http::pages::tests::dump_application_javascript stdout ----
+
+thread 'adapters::http::pages::tests::dump_application_javascript' (24942688) panicked at src/adapters/http/pages/tests.rs:4778:37:
+APP_JS_OUT: NotPresent
+
+---- adapters::http::routes::workflows::ui::authoring::tests::agent_picker_tests::dump_autonomous_workflow_agent_picker_browser_fixtures stdout ----
+
+thread 'adapters::http::routes::workflows::ui::authoring::tests::agent_picker_tests::dump_autonomous_workflow_agent_picker_browser_fixtures' (24942692) panicked at src/adapters/http/routes/workflows/ui/authoring/agent_picker_tests.rs:282:58:
+explicit owned fixture directory: NotPresent
+
+---- adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::e2e::driver::history_crash_child_entry stdout ----
+
+thread 'adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::e2e::driver::history_crash_child_entry' (24942701) panicked at src/adapters/persistence/workflow/agent_history_process_driver.rs:75:54:
+parent-owned fixture specification: NotPresent
+
+---- adapters::http::routes::ui_profile::session_tests::dump_session_revocation_browser_fixtures stdout ----
+
+thread 'adapters::http::routes::ui_profile::session_tests::dump_session_revocation_browser_fixtures' (24942691) panicked at src/adapters/http/routes/ui_profile_session_tests.rs:317:62:
+fixture directory: NotPresent
+
+---- adapters::persistence::local_agents::management::tests::dump_cloudroom_management_browser_fixtures stdout ----
+
+thread 'adapters::persistence::local_agents::management::tests::dump_cloudroom_management_browser_fixtures' (24942695) panicked at src/adapters/persistence/local_agents/management/tests.rs:361:64:
+fixture directory: NotPresent
+
+---- adapters::persistence::workflow::tests::local_agent_tests::e2e::native::cloudroom_e2e_native_opencode_packaged_plugin_pairing_workflow_ui_restart_followup_stop stdout ----
+
+thread 'adapters::persistence::workflow::tests::local_agent_tests::e2e::native::cloudroom_e2e_native_opencode_packaged_plugin_pairing_workflow_ui_restart_followup_stop' (24942699) panicked at src/adapters/persistence/workflow/local_agent_native_e2e_tests.rs:28:5:
+assertion `left == right` failed: native acceptance needs explicit opt-in
+  left: Err(NotPresent)
+ right: Ok("1")
+
+---- adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::live_tests::doop_e2e_live_company_documents stdout ----
+
+thread 'adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::live_tests::doop_e2e_live_company_documents' (24942700) panicked at src/adapters/persistence/doop_live_input.rs:58:36:
+bounded private setup input: Error("EOF while parsing a value", line: 1, column: 0)
+
+---- adapters::http::routes::ui_agents::authoring::browser_fixtures::dump_autonomous_agent_authoring_browser_fixtures stdout ----
+
+thread 'adapters::http::routes::ui_agents::authoring::browser_fixtures::dump_autonomous_agent_authoring_browser_fixtures' (24942690) panicked at src/adapters/http/routes/ui_agents/authoring/browser_fixtures.rs:282:10:
+explicit fixture output directory: NotPresent
+
+---- adapters::persistence::workflow::tests::local_agent_tests::e2e::native::cloudroom_e2e_native_codex_packaged_plugin_pairing_workflow_ui_restart_followup_stop stdout ----
+
+thread 'adapters::persistence::workflow::tests::local_agent_tests::e2e::native::cloudroom_e2e_native_codex_packaged_plugin_pairing_workflow_ui_restart_followup_stop' (24942698) panicked at src/adapters/persistence/workflow/local_agent_native_e2e_tests.rs:28:5:
+assertion `left == right` failed: native acceptance needs explicit opt-in
+  left: Err(NotPresent)
+ right: Ok("1")
+
+---- adapters::persistence::doop_live_setup_tests::doop_live_company_setup stdout ----
+
+thread 'adapters::persistence::doop_live_setup_tests::doop_live_company_setup' (24942693) panicked at src/adapters/persistence/doop_live_input.rs:58:36:
+bounded private setup input: Error("EOF while parsing a value", line: 1, column: 0)
+
+---- adapters::persistence::workflow::tests::local_agent_tests::e2e::native::cloudroom_e2e_native_claude_packaged_plugin_pairing_workflow_ui_restart_followup_stop stdout ----
+
+thread 'adapters::persistence::workflow::tests::local_agent_tests::e2e::native::cloudroom_e2e_native_claude_packaged_plugin_pairing_workflow_ui_restart_followup_stop' (24942697) panicked at src/adapters/persistence/workflow/local_agent_native_e2e_tests.rs:28:5:
+assertion `left == right` failed: native acceptance needs explicit opt-in
+  left: Err(NotPresent)
+ right: Ok("1")
+
+---- adapters::persistence::doop_live_setup_tests::lifecycle::doop_lifecycle_live_company_keys stdout ----
+
+thread 'adapters::persistence::doop_live_setup_tests::lifecycle::doop_lifecycle_live_company_keys' (24942694) panicked at src/adapters/persistence/doop_live_input.rs:58:36:
+bounded private setup input: Error("EOF while parsing a value", line: 1, column: 0)
+
+
+failures:
+    adapters::http::pages::knowledge::tests::dump_knowledge_browser_fixtures
+    adapters::http::pages::tests::dump_application_javascript
+    adapters::http::pages::tests::dump_html_injection_browser_fixtures
+    adapters::http::routes::ui_agents::authoring::browser_fixtures::dump_autonomous_agent_authoring_browser_fixtures
+    adapters::http::routes::ui_profile::session_tests::dump_session_revocation_browser_fixtures
+    adapters::http::routes::workflows::ui::authoring::tests::agent_picker_tests::dump_autonomous_workflow_agent_picker_browser_fixtures
+    adapters::persistence::doop_live_setup_tests::doop_live_company_setup
+    adapters::persistence::doop_live_setup_tests::lifecycle::doop_lifecycle_live_company_keys
+    adapters::persistence::local_agents::management::tests::dump_cloudroom_management_browser_fixtures
+    adapters::persistence::workflow::reads::tests::dump_run_list_query_shapes
+    adapters::persistence::workflow::tests::local_agent_tests::e2e::native::cloudroom_e2e_native_claude_packaged_plugin_pairing_workflow_ui_restart_followup_stop
+    adapters::persistence::workflow::tests::local_agent_tests::e2e::native::cloudroom_e2e_native_codex_packaged_plugin_pairing_workflow_ui_restart_followup_stop
+    adapters::persistence::workflow::tests::local_agent_tests::e2e::native::cloudroom_e2e_native_opencode_packaged_plugin_pairing_workflow_ui_restart_followup_stop
+    adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::live_tests::doop_e2e_live_company_documents
+    adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::e2e::driver::history_crash_child_entry
+
+test result: FAILED. 2 passed; 15 failed; 0 ignored; 0 measured; 3842 filtered out; finished in 0.09s
+
+error: test failed, to rerun pass `--lib`
+exit 101
+== -browser
+node:internal/modules/cjs/loader:1568
+  throw err;
+  ^
+
+Error: Cannot find module '/Users/mac03/.codex/worktrees/60a0/openbot/tmp/memory-service-run/merge/scripts/tests'
+    at Module._resolveFilename (node:internal/modules/cjs/loader:1564:15)
+    at wrapResolveFilename (node:internal/modules/cjs/loader:1118:27)
+    at defaultResolveImplForCJSLoading (node:internal/modules/cjs/loader:1142:10)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1169:12)
+    at Module._load (node:internal/modules/cjs/loader:1341:5)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:261:19)
+    at Module.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:154:5)
+    at node:internal/main/run_main_module:33:47 {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: []
+}
+
+Node.js v24.21.0
+✖ scripts/tests (25.39725ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 28.861083
+
+✖ failing tests:
+
+test at scripts/tests:1:1
+✖ scripts/tests (25.39725ms)
+  'test failed'
+exit 1
+== -dump
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.18s
+     Running unittests src/lib.rs (/Users/mac03/.codex/worktrees/60a0/openbot/target/debug/deps/open_bots-b3fb49a4c0332dfc)
+
+running 17 tests
+test adapters::http::pages::tests::dump_application_javascript ... FAILED
+test adapters::http::pages::knowledge::tests::dump_knowledge_browser_fixtures ... FAILED
+test adapters::persistence::workflow::reads::tests::dump_run_list_query_shapes ... FAILED
+test adapters::http::pages::tests::dump_html_injection_browser_fixtures ... FAILED
+test adapters::persistence::local_agents::management::tests::dump_cloudroom_management_browser_fixtures ... FAILED
+test adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::live_tests::doop_e2e_live_company_documents ... FAILED
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::e2e::driver::history_crash_child_entry ... FAILED
+test adapters::smtp::server::tests::test_dkim_verification_with_gmail_raw_email ... ok
+test adapters::http::routes::ui_profile::session_tests::dump_session_revocation_browser_fixtures ... FAILED
+test adapters::persistence::doop_live_setup_tests::lifecycle::doop_lifecycle_live_company_keys ... FAILED
+test adapters::http::routes::workflows::ui::authoring::tests::agent_picker_tests::dump_autonomous_workflow_agent_picker_browser_fixtures ... FAILED
+test adapters::persistence::workflow::tests::local_agent_tests::e2e::native::cloudroom_e2e_native_claude_packaged_plugin_pairing_workflow_ui_restart_followup_stop ... FAILED
+test adapters::persistence::workflow::tests::local_agent_tests::e2e::native::cloudroom_e2e_native_opencode_packaged_plugin_pairing_workflow_ui_restart_followup_stop ... FAILED
+test adapters::persistence::workflow::tests::local_agent_tests::e2e::native::cloudroom_e2e_native_codex_packaged_plugin_pairing_workflow_ui_restart_followup_stop ... FAILED
+test adapters::persistence::doop_live_setup_tests::doop_live_company_setup ... FAILED
+test adapters::http::routes::ui_agents::authoring::browser_fixtures::dump_autonomous_agent_authoring_browser_fixtures ... FAILED
+test adapters::smtp::server::tests::test_spf_verification_with_google_ip ... ok
+
+failures:
+
+---- adapters::http::pages::tests::dump_application_javascript stdout ----
+
+thread 'adapters::http::pages::tests::dump_application_javascript' (24942763) panicked at src/adapters/http/pages/tests.rs:4778:37:
+APP_JS_OUT: NotPresent
+
+---- adapters::http::pages::knowledge::tests::dump_knowledge_browser_fixtures stdout ----
+
+thread 'adapters::http::pages::knowledge::tests::dump_knowledge_browser_fixtures' (24942762) panicked at src/adapters/http/pages/knowledge_tests.rs:7:53:
+KNOWLEDGE_BROWSER_FIXTURES: NotPresent
+
+---- adapters::persistence::workflow::reads::tests::dump_run_list_query_shapes stdout ----
+
+thread 'adapters::persistence::workflow::reads::tests::dump_run_list_query_shapes' (24942771) panicked at src/adapters/persistence/workflow/reads_tests.rs:366:10:
+RUN_LIST_QUERY_SHAPES names the output file: NotPresent
+
+---- adapters::http::pages::tests::dump_html_injection_browser_fixtures stdout ----
+
+thread 'adapters::http::pages::tests::dump_html_injection_browser_fixtures' (24942764) panicked at src/adapters/http/pages/tests.rs:4788:58:
+fixture directory: NotPresent
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- adapters::persistence::local_agents::management::tests::dump_cloudroom_management_browser_fixtures stdout ----
+
+thread 'adapters::persistence::local_agents::management::tests::dump_cloudroom_management_browser_fixtures' (24942770) panicked at src/adapters/persistence/local_agents/management/tests.rs:361:64:
+fixture directory: NotPresent
+
+---- adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::live_tests::doop_e2e_live_company_documents stdout ----
+
+thread 'adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::live_tests::doop_e2e_live_company_documents' (24942776) panicked at src/adapters/persistence/doop_live_input.rs:58:36:
+bounded private setup input: Error("EOF while parsing a value", line: 1, column: 0)
+
+---- adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::e2e::driver::history_crash_child_entry stdout ----
+
+thread 'adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::e2e::driver::history_crash_child_entry' (24942777) panicked at src/adapters/persistence/workflow/agent_history_process_driver.rs:75:54:
+parent-owned fixture specification: NotPresent
+
+---- adapters::http::routes::ui_profile::session_tests::dump_session_revocation_browser_fixtures stdout ----
+
+thread 'adapters::http::routes::ui_profile::session_tests::dump_session_revocation_browser_fixtures' (24942766) panicked at src/adapters/http/routes/ui_profile_session_tests.rs:317:62:
+fixture directory: NotPresent
+
+---- adapters::persistence::doop_live_setup_tests::lifecycle::doop_lifecycle_live_company_keys stdout ----
+
+thread 'adapters::persistence::doop_live_setup_tests::lifecycle::doop_lifecycle_live_company_keys' (24942769) panicked at src/adapters/persistence/doop_live_input.rs:58:36:
+bounded private setup input: Error("EOF while parsing a value", line: 1, column: 0)
+
+---- adapters::http::routes::workflows::ui::authoring::tests::agent_picker_tests::dump_autonomous_workflow_agent_picker_browser_fixtures stdout ----
+
+thread 'adapters::http::routes::workflows::ui::authoring::tests::agent_picker_tests::dump_autonomous_workflow_agent_picker_browser_fixtures' (24942767) panicked at src/adapters/http/routes/workflows/ui/authoring/agent_picker_tests.rs:282:58:
+explicit owned fixture directory: NotPresent
+
+---- adapters::persistence::workflow::tests::local_agent_tests::e2e::native::cloudroom_e2e_native_claude_packaged_plugin_pairing_workflow_ui_restart_followup_stop stdout ----
+
+thread 'adapters::persistence::workflow::tests::local_agent_tests::e2e::native::cloudroom_e2e_native_claude_packaged_plugin_pairing_workflow_ui_restart_followup_stop' (24942773) panicked at src/adapters/persistence/workflow/local_agent_native_e2e_tests.rs:28:5:
+assertion `left == right` failed: native acceptance needs explicit opt-in
+  left: Err(NotPresent)
+ right: Ok("1")
+
+---- adapters::persistence::workflow::tests::local_agent_tests::e2e::native::cloudroom_e2e_native_opencode_packaged_plugin_pairing_workflow_ui_restart_followup_stop stdout ----
+
+thread 'adapters::persistence::workflow::tests::local_agent_tests::e2e::native::cloudroom_e2e_native_opencode_packaged_plugin_pairing_workflow_ui_restart_followup_stop' (24942775) panicked at src/adapters/persistence/workflow/local_agent_native_e2e_tests.rs:28:5:
+assertion `left == right` failed: native acceptance needs explicit opt-in
+  left: Err(NotPresent)
+ right: Ok("1")
+
+---- adapters::persistence::workflow::tests::local_agent_tests::e2e::native::cloudroom_e2e_native_codex_packaged_plugin_pairing_workflow_ui_restart_followup_stop stdout ----
+
+thread 'adapters::persistence::workflow::tests::local_agent_tests::e2e::native::cloudroom_e2e_native_codex_packaged_plugin_pairing_workflow_ui_restart_followup_stop' (24942774) panicked at src/adapters/persistence/workflow/local_agent_native_e2e_tests.rs:28:5:
+assertion `left == right` failed: native acceptance needs explicit opt-in
+  left: Err(NotPresent)
+ right: Ok("1")
+
+---- adapters::persistence::doop_live_setup_tests::doop_live_company_setup stdout ----
+
+thread 'adapters::persistence::doop_live_setup_tests::doop_live_company_setup' (24942768) panicked at src/adapters/persistence/doop_live_input.rs:58:36:
+bounded private setup input: Error("EOF while parsing a value", line: 1, column: 0)
+
+---- adapters::http::routes::ui_agents::authoring::browser_fixtures::dump_autonomous_agent_authoring_browser_fixtures stdout ----
+
+thread 'adapters::http::routes::ui_agents::authoring::browser_fixtures::dump_autonomous_agent_authoring_browser_fixtures' (24942765) panicked at src/adapters/http/routes/ui_agents/authoring/browser_fixtures.rs:282:10:
+explicit fixture output directory: NotPresent
+
+
+failures:
+    adapters::http::pages::knowledge::tests::dump_knowledge_browser_fixtures
+    adapters::http::pages::tests::dump_application_javascript
+    adapters::http::pages::tests::dump_html_injection_browser_fixtures
+    adapters::http::routes::ui_agents::authoring::browser_fixtures::dump_autonomous_agent_authoring_browser_fixtures
+    adapters::http::routes::ui_profile::session_tests::dump_session_revocation_browser_fixtures
+    adapters::http::routes::workflows::ui::authoring::tests::agent_picker_tests::dump_autonomous_workflow_agent_picker_browser_fixtures
+    adapters::persistence::doop_live_setup_tests::doop_live_company_setup
+    adapters::persistence::doop_live_setup_tests::lifecycle::doop_lifecycle_live_company_keys
+    adapters::persistence::local_agents::management::tests::dump_cloudroom_management_browser_fixtures
+    adapters::persistence::workflow::reads::tests::dump_run_list_query_shapes
+    adapters::persistence::workflow::tests::local_agent_tests::e2e::native::cloudroom_e2e_native_claude_packaged_plugin_pairing_workflow_ui_restart_followup_stop
+    adapters::persistence::workflow::tests::local_agent_tests::e2e::native::cloudroom_e2e_native_codex_packaged_plugin_pairing_workflow_ui_restart_followup_stop
+    adapters::persistence::workflow::tests::local_agent_tests::e2e::native::cloudroom_e2e_native_opencode_packaged_plugin_pairing_workflow_ui_restart_followup_stop
+    adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::live_tests::doop_e2e_live_company_documents
+    adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::e2e::driver::history_crash_child_entry
+
+test result: FAILED. 2 passed; 15 failed; 0 ignored; 0 measured; 3842 filtered out; finished in 0.08s
+
+error: test failed, to rerun pass `--lib`
+exit 101
+== -browser
+node:internal/modules/cjs/loader:1568
+  throw err;
+  ^
+
+Error: Cannot find module '/Users/mac03/.codex/worktrees/60a0/openbot/tmp/memory-service-run/merge/scripts/tests'
+    at Module._resolveFilename (node:internal/modules/cjs/loader:1564:15)
+    at wrapResolveFilename (node:internal/modules/cjs/loader:1118:27)
+    at defaultResolveImplForCJSLoading (node:internal/modules/cjs/loader:1142:10)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1169:12)
+    at Module._load (node:internal/modules/cjs/loader:1341:5)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:261:19)
+    at Module.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:154:5)
+    at node:internal/main/run_main_module:33:47 {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: []
+}
+
+Node.js v24.21.0
+✖ scripts/tests (27.211625ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 30.571792
+
+✖ failing tests:
+
+test at scripts/tests:1:1
+✖ scripts/tests (27.211625ms)
+  'test failed'
+exit 1

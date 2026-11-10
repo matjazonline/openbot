@@ -1,0 +1,61 @@
+== check-css
+
+> openbots@1.0.0 check:css
+> bash scripts/check-css.sh
+
+≈ tailwindcss v4.1.12
+
+/*! 🌼 daisyUI 5.0.50 */
+Done in 350ms
+exit 0
+== run-counts
+
+> openbots@1.0.0 test:run-counts
+> node --test scripts/tests/run-counts.mjs
+
+✔ channel: snapshot before pane, OOB list, competing reads, reconnect and navigation (2147.936292ms)
+✔ channel: pane before first snapshot stays uninitialized and then hydrates (389.158125ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 2
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2886.254417
+exit 0
+== sse-navigation
+✔ library payload carries the agent's own fields and no retired runtime fields (2.144583ms)
+✔ accepted library writes show progress, prevent duplicate submits, and restore on failure (1.550208ms)
+✔ response form supports keyboard navigation and submit and shows request progress without dropping form fields (467.312541ms)
+✔ ordinary page links release every stream before navigation (3.44325ms)
+✔ HTMX/prevented clicks, modified clicks, downloads and new tabs keep streams (3.71725ms)
+✔ anchors and non-document protocols keep streams (1.051958ms)
+✔ native filter submissions release all streams on every navigation (6.399584ms)
+✔ cancelled, HTMX, dialog and other-window submissions retain streams (1.688125ms)
+✔ late attribution and reconnect keep both replies, composer and stream owner (735.754791ms)
+✔ a reconnect backlog keeps an explicit 200-message live window and the composer (733.288ms)
+✔ a late body read cannot remove preserved steps after a cancel or navigation (1340.335334ms)
+✔ an actual SSE disconnect reconciles and preserves an unfinished note and disclosure (955.666125ms)
+✔ a waiting parent refreshes a child badge on the child wakeup without reconnecting (634.939375ms)
+✔ board: two window reads completing out of order show the later choice (450.529625ms)
+✔ board: opening a run while a filter read is in flight keeps the chosen filters (1265.663667ms)
+✔ list: a wake-up during a filter read reads the new filter instead of undoing it (596.090833ms)
+✔ board: a filter change while a wake-up read is in flight wins (586.126ms)
+✔ board: a burst of run events reads at most once per two seconds and shows the final state (7157.852375ms)
+✔ board: constant change still reads every two seconds and never starves (10914.950875ms)
+✔ phone: a stream-driven or polled pane reload leaves the reader on the list; opening a run still moves them (1354.182417ms)
+✔ board: reads slower than the interval never overlap and keep landing under constant change (12237.245375ms)
+✔ board: a run change during a filter read is read again after it, on the new leaf (4669.665834ms)
+✔ board: two quick filter changes do not leave the coalescer waiting for ever (2798.801833ms)
+✔ sample progress, failed request recovery and late navigation response use the requesting form (734.701209ms)
+✔ actual sample textarea template preserves leading newlines for every raw JSON field (259.211041ms)
+ℹ tests 25
+ℹ suites 0
+ℹ pass 25
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 45212.589791
+exit 0

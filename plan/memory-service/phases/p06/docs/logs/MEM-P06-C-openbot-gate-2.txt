@@ -1,0 +1,48 @@
+== migrate
+Applied 20260817000000/migrate init schema (293.133084ms)
+exit 0
+== sqlx-prepare-check
+    Checking open_bots v0.1.0 (/Users/mac03/.codex/worktrees/60a0/openbot/tmp/memory-service-run/merge)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 19.78s
+exit 0
+== test-no-run
+   Compiling tokio-rustls v0.26.4
+   Compiling uuid v1.26.1
+   Compiling tungstenite v0.26.2
+   Compiling sqlx-core v0.8.6
+   Compiling uuid-simd v0.8.0
+   Compiling hyper-rustls v0.27.9
+   Compiling lettre v0.11.23
+   Compiling jsonschema v0.33.0
+   Compiling tokio-tungstenite v0.26.2
+   Compiling reqwest v0.13.4
+   Compiling axum v0.8.4
+   Compiling rig-core v0.42.0
+   Compiling rmcp v1.8.0
+   Compiling sqlx-postgres v0.8.6
+   Compiling axum-extra v0.10.1
+   Compiling sqlx v0.8.6
+   Compiling rig-agent v0.42.0
+   Compiling open_bots v0.1.0 (/Users/mac03/.codex/worktrees/60a0/openbot/tmp/memory-service-run/merge)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 4m 07s
+  Executable unittests src/lib.rs (/Users/mac03/.codex/worktrees/60a0/openbot/target/debug/deps/open_bots-b3fb49a4c0332dfc)
+  Executable unittests src/main.rs (/Users/mac03/.codex/worktrees/60a0/openbot/target/debug/deps/open_bots-2ec6e98ffff1f18c)
+  Executable tests/source_modules.rs (/Users/mac03/.codex/worktrees/60a0/openbot/target/debug/deps/source_modules-a797909b4ca7620f)
+exit 0
+== source-modules
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.73s
+     Running tests/source_modules.rs (/Users/mac03/.codex/worktrees/60a0/openbot/target/debug/deps/source_modules-a797909b4ca7620f)
+
+running 8 tests
+test comments_and_strings_do_not_declare_modules ... ok
+test unresolved_forms_and_recursive_includes_fail_explicitly ... ok
+test cfg_attr_paths_and_literal_includes_are_connected ... ok
+test included_files_resolve_nested_modules_and_includes_like_rustc ... ok
+test removed_module_and_removed_ancestor_leave_detectable_orphans ... ok
+test conditional_inline_paths_keep_the_ordinary_directory_reachable ... ok
+test inline_path_and_conditional_modules_are_connected ... ok
+test every_rust_source_is_connected_to_a_cargo_target ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.62s
+
+exit 0

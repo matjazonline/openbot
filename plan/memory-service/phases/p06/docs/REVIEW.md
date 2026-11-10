@@ -20,6 +20,22 @@
 | MEM-P06-B2-R1 | batch review | p06-B2 (A4: auth breaker, after-restore, backup check, operations docs, overload/load, OpenBot A4-8/A4-9 and restore SQL) | claude-opus-5-5 / xhigh (B abdd866fb428eea05) | a83ffe8402206d2cbee9aa6856c4666fc130a5f500bb3dffa42e08bef8e9afd1 (freeze tree fb435320) | **PASS** for p06-B2; optional F1 (breaker test timing, static gauge). Service 174/0/2, backup check 1/0, OpenBot `memory` 167/0/3; no reviewer mutation probes (disk at the floor) | [notes](agent-review-notes.md) MEM-P06-B2-R1; [findings](agent-review-findings.md) |
 | MEM-P06-B3-R1 | batch review | p06-B3 (06B.1 standalone journey, 06B.2 `memory_e2e_`, 06B.3 topology and isolation, 06B.4 competing claimants, B2-F1, U8/U9 paid smoke) | claude-opus-5-5 / xhigh (B abdd866fb428eea05) | b86dc1e8992a694729b968f3b9b5511100f6cd4e8ea39f154ed55e33d0f64b0e (freeze tree 540efd56) | CHANGES REQUIRED: 2 Minor actionable (F1 isolation check fails on a fresh, unmigrated OpenBot database, as in CI; F2 provenance and production-image coverage), 1 optional (F3 a–e); B2-F1 resolved. Journey 13/13; live script 6/0 only after a manual migration; focused service tests 3× ok | [notes](agent-review-notes.md) MEM-P06-B3-R1; [findings](agent-review-findings.md) |
 | MEM-P06-B3-R2 | correction recheck (F1, F2, F3a–e) | p06-B3 | claude-opus-5-5 / xhigh (B abdd866fb428eea05) | 3617afd03fefe97f517200b0a4a266940ab3441f0e27c9f5b8b4d20f2c249405 (freeze tree 607df2cd) | **PASS** for the whole batch p06-B3 (R1–R2): F1 fixed (no-grant probe table; reviewer live script on a never-migrated database 6/0), F2 fixed (raw-fetch provenance; image journey recorded unavailable, carried to 06C), F3 a–e taken. Journey 13/13; race test 3×; clippy/fmt clean | [notes](agent-review-notes.md) MEM-P06-B3-R2; [findings](agent-review-findings.md) |
+| MEM-P06-C-R1 | final integration review | p06-C (merged tree for origin/main: 41be07b2 + merge 084053ee + fixes 29d51abc, 5c8528a0, doc a534a6a7) | claude-opus-5-5 / xhigh (B abdd866fb428eea05) | 19b979d52842d2f65549197f24ed6ea155cad2f8ef1ba2057f96100d85a24f0c (HEAD a534a6a7; first request 03e238f9…b88b2c at 5c8528a0) | CHANGES REQUIRED, records only: F1 Minor (06C record omits the failing transport check, pre-existing on main, and `git diff --check`; one merge log is main's binary; 10 vs 12; no post-fix log); F2 optional. No code or merge-resolution finding. Reviewer: merge `memory_`/exactness/data_url 170/0/7, live script 6/6 with shared target, boundaries | [notes](agent-review-notes.md) MEM-P06-C-R1; [findings](agent-review-findings.md) |
+| MEM-P06-C-R2 | final integration recheck (C-F1, C-F2) | p06-C (merged tree, HEAD 801839fd) | claude-opus-5-5 / xhigh (B abdd866fb428eea05) | 58acbacb9e1cebcb2f3ec470ef643959cf97dcbc09fc7e48b192edf056aa8e39 (HEAD 801839fd) | **PASS** — final pass on the integrated tree (I001 r2): C-F1 fixed in the records, C-F2 (a) taken, (b) not taken (reason accepted). Records-only delta; the pre-existing CI transport-check blocker must be in the push report | [notes](agent-review-notes.md) MEM-P06-C-R2; [findings](agent-review-findings.md) |
+
+## MEM-P06-C-R2
+
+- **PASS** for the integrated tree (digest 58acbacb…8e39, HEAD 801839fd). This is the final pass I001 r2 requires before the push.
+- [MEM-P06-C-F1](agent-review-findings.md#mem-p06-c-f1--the-06c-record-omits-two-non-passing-gates-and-cites-one-log-that-is-mains-binary): fixed in the records.
+- [MEM-P06-C-F2](agent-review-findings.md#mem-p06-c-f2--optional-one-sentence-in-the-decisions-note-one-untested-piece-of-wiring): (a) taken; (b) not taken, reason accepted.
+- Carry to the push report: CI's `verify` job stops at the pre-existing transport-check failure, both on main and after the push. The paid smoke is still open.
+
+## MEM-P06-C-R1
+
+- **CHANGES REQUIRED** (records only) for the merged tree (digest 19b979d5…4f0c, HEAD a534a6a7).
+- [MEM-P06-C-F1](agent-review-findings.md#mem-p06-c-f1--the-06c-record-omits-two-non-passing-gates-and-cites-one-log-that-is-mains-binary): record the failing transport check (a CI `verify` step, pre-existing on origin/main) and `git diff --check`, relabel the merge mcp-flake log (main's 3859-test binary), fix 10→12, cite the post-fix log.
+- Optional: [MEM-P06-C-F2](agent-review-findings.md#mem-p06-c-f2--optional-one-sentence-in-the-decisions-note-one-untested-piece-of-wiring) (a, b).
+- Conflict resolutions, integration effects, 5c8528a0 and the decisions note: accepted. 41be07b2 matches the tree passed at MEM-P06-B3-R2 for every path of this plan.
 
 ## MEM-P06-B3-R2
 

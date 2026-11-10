@@ -1,0 +1,20 @@
+standalone-journey: building the extracted copy in /private/tmp/claude-501/-Users-mac03--codex-worktrees-60a0-openbot/6fedfb2e-40aa-486c-bd0b-051b5a3add7b/scratchpad/journey/memory-journey.wuVyRg/memory
+memory_standalone_provision ok
+memory_standalone_save ok
+memory_standalone_search ok
+memory_standalone_classification ok
+memory_standalone_fetch ok
+memory_standalone_timeline ok
+memory_standalone_context ok
+memory_standalone_mcp ok
+memory_standalone_generation outcome=saved memories=1
+memory_standalone_generation ok
+memory_standalone_correct ok
+memory_standalone_delete ok
+memory_standalone_purge ok
+memory_standalone_tenant_delete ok
+memory_standalone journey passed
+memory_generation_settled_total{state="completed",outcome="saved"} 1
+memory_provider_tokens_total{kind="input"} 50
+memory_provider_tokens_total{kind="output"} 40
+standalone-journey: 13 steps passed (stand-in provider)
