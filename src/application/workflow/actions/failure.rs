@@ -1,5 +1,6 @@
 //! One classification for every action-owned workflow step (`http.request`, `tool.call`,
-//! `mcp.call`, `message.send`, `message.reply`). The handler always reports `SafeToRetry`: the shared database predicate
+//! `mcp.call`, `message.send`, `message.reply`; see `marker_owned_effect_kind` for the full set,
+//! including `memory.save`). The handler always reports `SafeToRetry`: the shared database predicate
 //! `workflow_action_retry_safe` is the only source of `EffectOutcomeUnknown`. It keeps this
 //! label when the execution has no possible-dispatch marker (nothing can have been sent),
 //! and replaces it with the marker/receipt/evidence truth whenever a marker exists.
@@ -7,11 +8,13 @@ use crate::app_error::AppError;
 use crate::application::workflow::lease::WorkflowFailure;
 use crate::domain::workflow::{FailureClass, FailureCode, RetrySafety, StepFailure};
 
-/// Step kinds whose only effect path is ActionService's marker-first protocol.
+/// Step kinds whose only effect path starts with a committed record of the effect: ActionService's
+/// marker-first protocol, or the equivalent named below.
 ///
 /// Invariant (04.10-D3, F011): every `WorkflowHandler` that supports one of these kinds
-/// must perform effects solely through `ActionService` remote/local dispatch, so that no
-/// effect-bearing I/O happens before a committed possible-dispatch marker. Then "no marker
+/// must perform effects solely through `ActionService` remote/local dispatch (or the kind's
+/// documented equivalent below), so that no effect-bearing I/O happens before a committed
+/// possible-dispatch marker. Then "no marker
 /// for this execution" proves "no effect", and an interrupted attempt without a marker may
 /// retry. A new handler or tool bridge for these kinds (phases 06/08) must keep the
 /// invariant or remove its kind from this list first.
@@ -23,6 +26,11 @@ use crate::domain::workflow::{FailureClass, FailureCode, RetrySafety, StepFailur
 /// `agent.run` joins (06-D4): its only effects are saved model tool calls dispatched through
 /// the same ActionService entries, and its provider calls are charged checkpoint
 /// reservations, not effects; an unresolved reservation stays charged across a retry.
+///
+/// `memory.save` joins (phase 05 E4): the step itself sends nothing. Its delivery intent
+/// (`memory_deliveries`) commits in the transaction that parks the step, and only the delivery
+/// worker sends it after that commit. The committed intent plus park is its marker. An attempt
+/// interrupted before that commit has no intent, so it sent nothing and may retry.
 pub fn marker_owned_effect_kind(kind: &str) -> bool {
     matches!(
         kind,
@@ -33,6 +41,9 @@ pub fn marker_owned_effect_kind(kind: &str) -> bool {
             | "message.reply"
             | "message.ask"
             | "agent.run"
+            // Phase 05 E4: its only effect path is the delivery intent, committed in the same
+            // transaction that parks the step, so an attempt without one sent nothing.
+            | "memory.save"
             | "local_agent.run"
     )
 }
@@ -41,20 +52,18 @@ pub fn marker_owned_effect_kind(kind: &str) -> bool {
 /// reads, and the tool-free model steps, whose provider calls are ledger-charged
 /// reservations (an unresolved one stays charged across a retry), not effects.
 pub fn effect_free_kind(kind: &str) -> bool {
-    matches!(
-        kind,
-        "data.map"
-            | "channel.no_reply"
-            | "decision.rule"
-            | "decision.human"
-            | "decision.agent"
-            | "context.history"
-            | "memory.load"
-            | "ai.classify"
-            | "jev.evaluate"
-            | "wait.event"
-            | "wait.timer"
-    )
+    super::super::batch::is_pure_kind(kind)
+        || matches!(
+            kind,
+            "decision.human"
+                | "decision.agent"
+                | "context.history"
+                | "memory.load"
+                | "ai.classify"
+                | "jev.evaluate"
+                | "wait.event"
+                | "wait.timer"
+        )
 }
 
 /// The one predicate for Rust lease retirement and pending recovery: without a
@@ -156,6 +165,9 @@ pub fn action_step_failure(
         };
     }
     let (class, suffix) = match outcome {
+        Preparation(AppError::McpAuthentication) if matches!(family, ActionFamily::Mcp) => {
+            (Terminal, "authentication_rejected")
+        }
         Preparation(
             AppError::NotFound(_) | AppError::BadRequest(_) | AppError::InvalidCredentials,
         ) => (Terminal, "rejected"),
@@ -325,18 +337,19 @@ mod tests {
             "message.reply",
             "message.ask",
             "agent.run",
+            "memory.save",
             "local_agent.run",
         ] {
             assert!(marker_owned_effect_kind(kind));
         }
-        for kind in ["memory.save", "context.history", "data.map"] {
+        for kind in ["memory.load", "context.history", "data.map"] {
             assert!(!marker_owned_effect_kind(kind), "{kind}");
         }
     }
 
     #[test]
     fn workflow_effect_free_kinds_are_exactly_the_reads_pure_waits_and_model_steps() {
-        let unknown = ["memory.save", "workflow.call", "flow.repeat"];
+        let unknown = ["workflow.call", "flow.repeat"];
         for kind in crate::application::workflow::registry::TYPES {
             let effect_free = effect_free_kind(kind);
             assert!(

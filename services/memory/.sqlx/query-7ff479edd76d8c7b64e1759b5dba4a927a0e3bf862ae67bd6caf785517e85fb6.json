@@ -1,0 +1,26 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT count(*) AS \"count!\" FROM (\n                 SELECT 1 FROM observation_parts AS p\n                   JOIN observations AS o ON (o.tenant_id, o.id) = (p.tenant_id, p.observation_id)\n                   JOIN namespaces AS n ON (n.tenant_id, n.id) = (p.tenant_id, p.namespace_id)\n                  WHERE p.tenant_id = $1 AND p.namespace_id = ANY($2)\n                    AND p.access_level <= $3::smallint AND p.model_id = $4\n                    AND n.state = 'active' AND (o.expires_at IS NULL OR o.expires_at > now())\n                  LIMIT $5) AS eligible",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "count!",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "UuidArray",
+        "Int2",
+        "Text",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "7ff479edd76d8c7b64e1759b5dba4a927a0e3bf862ae67bd6caf785517e85fb6"
+}

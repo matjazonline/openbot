@@ -1,0 +1,35 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "WITH due AS ( SELECT tenant_id, id, spend_day, reserved_tokens, cancel_requested_at IS NOT NULL AS cancel, outcome_code FROM generation_operations WHERE state = 'dispatched' AND lease_until + make_interval(secs => $2) < now() ORDER BY tenant_id, id LIMIT $1 FOR UPDATE SKIP LOCKED) UPDATE generation_operations AS o SET state = CASE WHEN due.cancel THEN 'cancelled' ELSE 'unknown' END, outcome_code = CASE WHEN due.cancel THEN coalesce(due.outcome_code, 'cancel_requested') ELSE 'lease_expired' END, finished_at = now(), lease_owner = NULL, lease_until = NULL, reserved_tokens = 0, used_tokens = o.used_tokens + due.reserved_tokens FROM due WHERE (o.tenant_id, o.id) = (due.tenant_id, due.id) RETURNING due.tenant_id, due.spend_day, due.reserved_tokens",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "tenant_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "spend_day",
+        "type_info": "Date"
+      },
+      {
+        "ordinal": 2,
+        "name": "reserved_tokens",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Float8"
+      ]
+    },
+    "nullable": [
+      false,
+      true,
+      false
+    ]
+  },
+  "hash": "fab2f7bd5b4f6ca7cd85ad92d19d731636a2b1783c7aa7cb5799701b9efff3e1"
+}

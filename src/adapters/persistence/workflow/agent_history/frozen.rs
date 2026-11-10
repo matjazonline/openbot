@@ -21,6 +21,15 @@ pub(super) async fn restore_on(
         .bind(fence.scope.company.as_uuid()).bind(fence.scope.run.as_uuid()).bind(fence.scope.execution.as_uuid())
         .fetch_one(&mut *db).await?;
     let Some(saved) = saved else { return Ok(None) };
+    // The frozen capture flag (E8, U7) and recall pack are bound before history, as when they
+    // were frozen (E7).
+    let prepared = prepared.with_capture(saved.get("capture") == Some(&Value::Bool(true)));
+    let prepared = match saved.get("memory") {
+        Some(memory) => {
+            prepared.with_memory(serde_json::from_value(memory.clone()).map_err(|_| invalid())?)?
+        }
+        None => prepared,
+    };
     let history: FrozenAgentHistory =
         serde_json::from_value(saved["history"].clone()).map_err(|_| invalid())?;
     // The saved department first: it rebuilds the preamble, whose length the frozen history's
@@ -45,22 +54,36 @@ pub(super) async fn freeze_on(
     db: &mut PgConnection,
     fence: WorkflowFence,
     prepared: PreparedAgent,
+    recall: Option<crate::application::workflow::memory_recall::FetchedRecall>,
+    capture: bool,
 ) -> AppResult<PreparedAgent> {
     if let Some(saved) = restore_on(db, fence, prepared.clone()).await? {
+        // An existing freeze wins; a pack fetched for this attempt is discarded unseen (E7), and
+        // its capture flag stays what the first freeze decided (U7).
         return Ok(saved);
     }
+    let prepared = prepared.with_capture(capture);
+    let prepared = match recall {
+        Some(fetched) if prepared.binds_memory() => {
+            prepared.with_memory(super::recall::freeze_memory_on(db, fence, fetched).await?)?
+        }
+        _ => prepared,
+    };
     let scope = action(fence);
-    let history = Box::pin(super::selection::select_on(db, scope, &prepared)).await?;
-    super::super::knowledge::raise_content_level_on(
+    let selected = Box::pin(super::selection::select_on(db, scope, &prepared)).await?;
+    let history = selected.history;
+    // An inexact earlier exchange lowers the reading run (E3).
+    super::super::knowledge::absorb_content_on(
         db,
         scope.company,
         scope.run,
         history.selected_level,
+        selected.exact,
     )
     .await?;
     let prepared = prepared.with_frozen_history(history)?;
     let document = serde_json::to_value(&prepared).map_err(|_| invalid())?;
-    let changed = sqlx::query("UPDATE agent_history_exchanges AS exchange SET frozen_preparation=$4,access_level=GREATEST(exchange.access_level,run.content_level) FROM workflow_runs AS run WHERE exchange.company_id=$1 AND exchange.run_id=$2 AND exchange.execution_id=$3 AND exchange.frozen_preparation IS NULL AND run.company_id=exchange.company_id AND run.id=exchange.run_id")
+    let changed = sqlx::query("UPDATE agent_history_exchanges AS exchange SET frozen_preparation=$4,access_level=GREATEST(exchange.access_level,run.content_level),content_exact=exchange.content_exact AND run.content_exact FROM workflow_runs AS run WHERE exchange.company_id=$1 AND exchange.run_id=$2 AND exchange.execution_id=$3 AND exchange.frozen_preparation IS NULL AND run.company_id=exchange.company_id AND run.id=exchange.run_id")
         .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(scope.execution.as_uuid()).bind(document)
         .execute(&mut *db).await?;
     if changed.rows_affected() != 1 {

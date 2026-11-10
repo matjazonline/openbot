@@ -6,6 +6,7 @@ target
 .claude
 .opencode
 plan
+services
 docs
 deploy
 README.md

@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT o.tenant_id, o.id FROM namespaces AS n JOIN observations AS o ON (o.tenant_id, o.namespace_id) = (n.tenant_id, n.id) WHERE n.state = 'deleted' AND n.content_removed_at IS NULL AND NOT EXISTS (SELECT 1 FROM generation_operations AS u WHERE u.tenant_id = n.tenant_id AND u.namespace_id = n.id AND u.finished_at IS NULL) LIMIT $1 FOR UPDATE OF o SKIP LOCKED",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "tenant_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "9e68a242a894d04ac9198a06efce9738672a4ed17f78aba683706a4cc0fb88e0"
+}

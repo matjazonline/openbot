@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE generation_operations SET state = 'accepted', lease_owner = NULL, lease_until = NULL, reserved_tokens = 0 WHERE tenant_id = $1 AND id = $2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "dcba7ab22ed90a03fae5e95feea2d20cca029ab45bc5c5ae79bf42863bbcccf2"
+}

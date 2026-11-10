@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT true AS \"locked!\" FROM tenant_generation_schedule WHERE tenant_id = $1\n                FOR UPDATE SKIP LOCKED",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "locked!",
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "b56881876ac99021a01b3ce807c807dda3bd43cc08616a60d6a9cdea9c3d05b4"
+}

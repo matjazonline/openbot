@@ -37,14 +37,17 @@ production_source() {
 }
 
 # Run one pattern over the production code of every matching file, reporting the file each hit came
-# from -- `rg` reads one file at a time here, so it cannot name it for us.
+# from -- `rg` reads one file at a time here, so it cannot name it for us. Test files are known by
+# name: `*_tests.rs`, `tests.rs`, and `test_support.rs` or `*_test_support.rs` (a test's helpers,
+# loaded through `#[path]` from the test that uses them). Every other name is scanned as
+# production code, so a helper with another name fails here until it is renamed.
 scan_production() {
     local description="$1" pattern="$2"
     shift 2
     local file
     while IFS= read -r file; do
         case "$file" in
-            *_tests.rs|*/tests.rs|*/test_support.rs|*/test_support/*.rs) continue ;;
+            *_tests.rs|*/tests.rs|*/test_support.rs|*_test_support.rs|*/test_support/*.rs) continue ;;
         esac
         if production_source "$file" | rg -n --pcre2 "$pattern" >>"$failures"; then
             printf '%s in %s\n' "$description" "$file" >>"$failures"

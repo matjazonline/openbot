@@ -542,5 +542,72 @@ async fn knowledge_run_level_workflow_tool_child_and_saved_result_replay_taint_p
     assert_eq!(llm.finish().await.unwrap(), 2);
 }
 
+/// F5 (E3): a workflow-tool child's exactness reaches the calling agent run with its result
+/// (`call_result`'s absorb): an inexact child lowers an exact caller; an exact child keeps it.
+#[tokio::test]
+async fn memory_access_level_workflow_tool_child_exactness_reaches_the_calling_run() {
+    use crate::adapters::persistence::workflow::knowledge::{self, exactness_fixture};
+    for child_exact in [true, false] {
+        let setup = Box::pin(ToolSetup::new(echo_child())).await;
+        let p = setup.persistence();
+        let claim = setup.claim("exact-child").await;
+        let scope = claim.fence.scope;
+        exactness_fixture::mark_exact(p.pool(), scope.company, scope.run).await;
+        let llm = scripted_llm(vec![
+            LlmTurn::tool_call(DECLARED, json!({"question":"Exact question"})),
+            LlmTurn::text("\"continued\""),
+        ])
+        .await;
+        register_scripted_agent_base_url(setup.agent, &llm.base_url);
+        let runtime = setup.runtime();
+        assert!(matches!(
+            Box::pin(runtime.execute(&kind(), &claim)).await,
+            WorkflowHandlerOutcome::Suspended(_)
+        ));
+        let child = setup.child_of(scope).await;
+        if child_exact {
+            exactness_fixture::mark_exact(p.pool(), child.company, child.run).await;
+        } else {
+            let mut tx = p.pool().begin().await.unwrap();
+            knowledge::lower_content_exact_on(&mut tx, child.company, child.run)
+                .await
+                .unwrap();
+            tx.commit().await.unwrap();
+        }
+        assert!(exactness_fixture::exact(p.pool(), scope.company, scope.run).await);
+        p.advance_pure(child, budget()).await.unwrap();
+        assert!(matches!(
+            p.resume_wait(scope).await.unwrap(),
+            WaitProgress::Continued
+        ));
+        assert_eq!(
+            exactness_fixture::exact(p.pool(), scope.company, scope.run).await,
+            child_exact,
+            "child_exact={child_exact}"
+        );
+        let continued = p
+            .claim_io(scope, WorkflowWorkerId(Uuid::new_v4()), lease())
+            .await
+            .unwrap()
+            .unwrap();
+        assert!(matches!(
+            Box::pin(runtime.execute(&kind(), &continued)).await,
+            WorkflowHandlerOutcome::Completed(Ok(_))
+        ));
+        assert_eq!(
+            exactness_fixture::exact(p.pool(), scope.company, scope.run).await,
+            child_exact,
+            "the saved result replays without changing the bit"
+        );
+        assert_eq!(llm.finish().await.unwrap(), 2);
+    }
+}
+
 #[path = "agent_history_cascade_tests.rs"]
 mod history_cascade;
+
+#[path = "doop_binary_child_tests.rs"]
+mod doop_binary;
+
+#[path = "doop_binary_mcp_child_tests.rs"]
+mod doop_binary_mcp;

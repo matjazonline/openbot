@@ -144,6 +144,10 @@ pub(super) const CANDIDATES_SQL: &str = concat!(
                                   ON receipt.company_id = action.company_id AND receipt.invocation_id = action.invocation_id
                                 WHERE action.company_id = wait.company_id AND action.execution_id = wait.execution_id
                                   AND action.wait_id = wait.id)
+                            -- or on its memory.save intent's terminal state (phase 05 E8)
+                            OR EXISTS (SELECT 1 FROM memory_deliveries AS intent
+                                WHERE intent.company_id = wait.company_id AND intent.wait_id = wait.id
+                                  AND intent.state IN ('delivered','failed','expired','cancelled'))
                             OR EXISTS (SELECT 1 FROM workflow_local_agent_calls AS call
                                 WHERE call.company_id=wait.company_id AND call.run_id=wait.run_id
                                   AND call.execution_id=wait.execution_id AND call.wait_id=wait.id

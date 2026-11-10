@@ -72,6 +72,10 @@ pub fn agent_action_target(
                     "provisioning"
                 }
                 crate::entities::agent_capability::AgentBuiltinTool::SearchKnowledge => "knowledge",
+                crate::entities::agent_capability::AgentBuiltinTool::SearchMemory
+                | crate::entities::agent_capability::AgentBuiltinTool::MemoryTimeline
+                | crate::entities::agent_capability::AgentBuiltinTool::MemoryDetails
+                | crate::entities::agent_capability::AgentBuiltinTool::SaveMemory => "memory",
             })?,
         },
         AgentBindingSource::Workflow { .. } => {

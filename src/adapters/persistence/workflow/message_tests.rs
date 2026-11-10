@@ -602,3 +602,51 @@ mod knowledge_views;
 
 #[path = "knowledge_view_delivery_tests.rs"]
 mod knowledge_delivery_views;
+
+/// Memory E2 on stored rows: a manual run in a channel has an attached session, so its actor's
+/// user scope is refused, while a company-wide manual run of the same binding by the same actor is
+/// eligible (the SQL reads the attachment, not only the pure rule).
+#[tokio::test]
+async fn memory_scope_a_manual_run_in_a_channel_has_no_user_scope() {
+    use crate::adapters::persistence::workflow::checkpoints::memory_tools::user_scope_owner_on;
+    use support::{admitted, admitted_as, bound, new_channel, published};
+    let f = Fixture::new().await;
+    let example: Value =
+        serde_json::from_str(&registry::example("data.map").unwrap().source).unwrap();
+    let version = Box::pin(published(
+        &f,
+        "data.map",
+        example["steps"]["start"]["with"].clone(),
+    ))
+    .await;
+    let target = Box::pin(bound(&f, version)).await;
+    let channel = new_channel(&f, "memory-attached").await;
+    let attached = admitted(&f, target, channel, "in-channel").await;
+    let company_wide = admitted_as(&f, target, RelatedAssociation::Company, "company-wide").await;
+    let company = f.target.company;
+    let mut conn = f.persistence.pool().acquire().await.unwrap();
+    let session_attached: bool = sqlx::query_scalar(
+        "SELECT session.channel_id IS NOT NULL FROM workflow_agent_sessions AS bound \
+         JOIN agent_history_sessions AS session \
+           ON session.company_id=bound.company_id AND session.id=bound.session_id \
+         WHERE bound.company_id=$1 AND bound.run_id=$2",
+    )
+    .bind(company.as_uuid())
+    .bind(attached.run.as_uuid())
+    .fetch_one(&mut *conn)
+    .await
+    .unwrap();
+    assert!(session_attached, "the channel run's session is attached");
+    assert_eq!(
+        user_scope_owner_on(&mut conn, company, attached.run)
+            .await
+            .unwrap(),
+        None
+    );
+    assert_eq!(
+        user_scope_owner_on(&mut conn, company, company_wide.run)
+            .await
+            .unwrap(),
+        Some(f.target.actor.user_id())
+    );
+}

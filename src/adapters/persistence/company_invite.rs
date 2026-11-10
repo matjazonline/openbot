@@ -597,6 +597,13 @@ impl CompanyInvitePersistence for PostgresPersistence {
             user_id,
         )
         .await?;
+        // After the membership lock (memory E9): the user's namespace in this company goes.
+        super::memory::retire_namespaces_on(
+            &mut transaction,
+            company_id,
+            crate::application::memory::NamespaceOwner::User(user_id),
+        )
+        .await?;
         super::integrations::lifecycle::revoke_membership_on(
             &mut transaction,
             &crate::adapters::integrations::owner::owner_for_user(user_id),

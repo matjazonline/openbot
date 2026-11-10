@@ -73,8 +73,9 @@ control commands use the revision just read and a stable `command_key`. Re-read 
 | Expired wait | Allow deadline maintenance to settle it. Human, timer/event, child, message receipt and reconciliation waits have durable deadline/recovery paths. Inspect persistent overdue gauges and worker logs; do not extend deadlines by hand. Budget waits retain the run deadline. |
 
 Worker capacity is `WORKFLOW_WORKER_SLOTS` (1–16, default 2) per process. Startup requires
-`DATABASE_MAX_CONNECTIONS >= 12 + 2 × WORKFLOW_WORKER_SLOTS` (default pool 20): twelve connections
-cover shared workers/listener/headroom including the final-reply publisher and metrics sampler; two per workflow slot cover
+`DATABASE_MAX_CONNECTIONS >= 14 + 2 × WORKFLOW_WORKER_SLOTS` (default pool 20): fourteen connections
+cover shared workers/listener/headroom including the final-reply publisher, metrics sampler and
+the memory lifecycle and delivery workers; two per workflow slot cover
 work and renewal. Tenant admission limits and fair polling are additional controls; increasing
 slots does not remove them. Mixed-load tests exercise full tenants, unsupported work, poison,
 waiting and hung work, quiet tenants and sustained refill. Inspect queue age before increasing
@@ -232,6 +233,50 @@ failed, retry, lease_lost, error. Existing delivery unknown/dead/retry and overd
 continues to apply. Never add message text, recipient lists or approval tokens to logs or labels.
 These changes require a fresh database using the sole initialization migration; no old rows are
 rewritten and there is no compatibility rollout.
+
+## Agent memory tools
+
+An agent bound to the memory tools can search, browse and read memories of three scopes: the
+company's, its own (the agent's), and the person's own private memory. Results never exceed the
+run's read ceiling, and a run that reads memory is classified at the highest level it was shown
+before the model sees it. `save_memory` saves to the agent's memory by default, or to the
+person's private memory; the save is delivered in the background and labelled by what the run has
+seen. Saving into company memory is a workflow step, not a tool.
+
+An agent bound to `search_memory` also recalls automatically while memory is enabled: before its
+first model call, a pack of its scopes' memories within the read ceiling is frozen into the run's
+context as untrusted data, at most a quarter of what the request leaves after its output reserve
+and mandatory context, and never more than 8,192 tokens. A slow (past
+`MEMORY_SERVICE_RECALL_DEADLINE_MS`) or unavailable service lets the run continue without it. A
+run resuming after an interruption re-checks the memory it was shown earlier, recalled or read by
+its tools, before calling the model again: memory deleted, corrected or above the ceiling since
+fails the step with `memory.context_revoked`, as does memory having been disabled for the
+company since; if the service cannot answer, the step retries with `memory.context_unavailable`.
+
+An owner or admin can also turn on capture per agent in company Settings (Memory → Capture),
+separately for private sessions and for threads, each with a token allowance per window, an
+output limit and an expiry, and a reason that is recorded with who changed it. A completed
+exchange is then sent to the memory service to be summarized into memory: only its input and the
+agent's accepted answer, never tool arguments or results, recalled memory or internal notes.
+Private-session capture covers a person's own manual runs in a private session that is not
+attached to a channel or thread and lands in that person's private memory; scheduled,
+message-triggered and child runs never reach private memory. Thread capture covers every
+completed exchange of the agent in a channel thread, whatever started the run (customer messages
+included), and lands in the agent's memory, labelled at the thread's lowest-reader level, so any
+reader cleared to that level in any channel the agent serves can recall it, and a thread with a
+public or external reader is captured at level 0. Child branches, failed or cancelled runs and
+samples are never captured. Capture stays idle while the operator's generation cap for
+the company is 0 and while the deployment has no memory service configured; the first exchange after turning it on can be missed while the target memory
+is still being created. Captures are delivered in the background with the same request on every
+retry until their expiry; switching capture off stops new windows, not ones already queued.
+
+Private memory is reachable only from a person's own manual start in a private session (not in a
+channel or thread), and from children of that run run as the same person. Scheduled and
+message-triggered runs never reach it. The author of the workflow, its binding or its agent is not
+checked: an owner or admin who manually runs a colleague's workflow lets that workflow's agent read
+their private memory, and the workflow can send what it read wherever its author chose. Run only
+workflows you trust with your private memory, as authorized admins can already inspect a private
+run.
 
 ## Agent history and retention
 

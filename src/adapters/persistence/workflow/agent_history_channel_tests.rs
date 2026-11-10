@@ -201,3 +201,152 @@ async fn agent_history_channel_terminal_delivery_failure_preserves_business_succ
 
 #[path = "agent_history_channel_retention_tests.rs"]
 mod retention;
+
+/// Phase 05 E8 (U3, U7): with the memory service configured, a completed exchange of a customer
+/// email thread, with the agent's `threads` capture on, becomes one generation request in the
+/// agent's own memory, labelled for the thread's lowest reader: the external customer makes it
+/// public (producing ceiling 0, consumed unknown because thread input is conversational). The
+/// deployment's own delivery worker sends it to the fake service. Seeded rows stand in for an
+/// enabled tenant and a ready agent namespace (no lifecycle worker run is needed for that).
+#[tokio::test]
+async fn memory_capture_a_thread_exchange_is_captured_into_the_agent_memory_at_the_thread_level() {
+    use crate::adapters::memory_service::contract_fake::ContractFake;
+    let fake = ContractFake::start(MEMORY_ADMIN).await;
+    fake.state.lock().unwrap().generation_cap = 100_000;
+    let d = Box::pin(Deployment::with_memory(
+        vec![LlmTurn::text(r#"{"body":"Captured thread answer"}"#)],
+        &fake,
+    ))
+    .await;
+    let company = d.fixture.target.company.as_uuid();
+    let actor = d.fixture.target.actor.user_id();
+    let pool = d.p().pool();
+    let provisioner = crate::infra::memory_config::ProvisionerToken::parse(MEMORY_ADMIN.into())
+        .unwrap()
+        .credential_id();
+    sqlx::query(
+        "INSERT INTO memory_tenants (company_id, state, revision, disable_epoch, \
+           provisioner_credential_id, generation_cap, changed_by, changed_at) \
+         VALUES ($1, 'enabled', 1, 0, $3, 100000, $2, clock_timestamp())",
+    )
+    .bind(company)
+    .bind(actor)
+    .bind(provisioner)
+    .execute(pool)
+    .await
+    .unwrap();
+    let mut selected = example(1);
+    prepend_agent(&mut selected);
+    Box::pin(bind(&d, selected)).await;
+    let agents: Vec<Uuid> = sqlx::query_scalar("SELECT id FROM agents WHERE company_id = $1")
+        .bind(company)
+        .fetch_all(pool)
+        .await
+        .unwrap();
+    for agent in &agents {
+        let namespace = Uuid::new_v4();
+        let envelope = d
+            .p()
+            .credential_cipher()
+            .unwrap()
+            .seal_envelope(
+                &crate::adapters::persistence::credentials::CredentialContext::memory_client_credential(
+                    company, namespace,
+                ),
+                &secrecy::SecretString::from(fake.client_token(company, namespace)),
+            )
+            .unwrap();
+        sqlx::query(
+            "INSERT INTO memory_namespaces (company_id, id, scope_kind, agent_id, state, \
+               credential_id, credential_envelope) \
+             VALUES ($1, $2, 'agent', $3, 'ready', gen_random_uuid(), $4)",
+        )
+        .bind(company)
+        .bind(namespace)
+        .bind(agent)
+        .bind(envelope)
+        .execute(pool)
+        .await
+        .unwrap();
+        sqlx::query(
+            "INSERT INTO memory_agent_capture (company_id, agent_id, kind, enabled, \
+               allowance_tokens, max_output_tokens, expiry_hours, revision, changed_by, reason, \
+               changed_at) \
+             VALUES ($1, $2, 'threads', true, 4000, 500, 12, 1, $3, 'Thread capture pilot', \
+               clock_timestamp())",
+        )
+        .bind(company)
+        .bind(agent)
+        .bind(actor)
+        .execute(pool)
+        .await
+        .unwrap();
+    }
+    d.email(customer_email(&d, "history-captured", None)).await;
+    let delivery = Delivery::start(&d, ProviderCase::Accept);
+    let sent = || fake.state.lock().unwrap().generations.len();
+    Box::pin(d.run_until("captured thread reply", async || {
+        responses_published(&d, 1).await && delivered(&d, 1).await && sent() == 1
+    }))
+    .await;
+    delivery.stop().await;
+    let rows = exchanges(&d).await;
+    assert_eq!(rows.len(), 1);
+    assert_eq!(rows[0]["scope"], "thread");
+    let exchange: Uuid = serde_json::from_value(rows[0]["id"].clone()).unwrap();
+    assert_eq!(
+        rows[0]["preparation"]["capture"],
+        json!(true),
+        "armed at preparation"
+    );
+    let (agent, namespace): (Uuid, Uuid) = sqlx::query_as(
+        "SELECT exchange.agent_id, namespace.id FROM agent_history_exchanges AS exchange \
+         JOIN memory_namespaces AS namespace ON namespace.company_id = exchange.company_id \
+           AND namespace.agent_id = exchange.agent_id \
+         WHERE exchange.company_id = $1 AND exchange.id = $2",
+    )
+    .bind(company)
+    .bind(exchange)
+    .fetch_one(pool)
+    .await
+    .unwrap();
+    let state: String = sqlx::query_scalar(
+        "SELECT state FROM memory_deliveries WHERE company_id = $1 AND kind = 'generation'",
+    )
+    .bind(company)
+    .fetch_one(pool)
+    .await
+    .unwrap();
+    assert_eq!(state, "delivered");
+    let (sent_to, body) = {
+        let service = fake.state.lock().unwrap();
+        let (sent_to, body, _) = &service.generations[&format!("ob.g.{}", exchange.simple())];
+        (sent_to.clone(), body.clone())
+    };
+    assert_eq!(
+        sent_to,
+        namespace.hyphenated().to_string(),
+        "agent {agent}'s own memory"
+    );
+    assert_eq!(
+        body["producing_ceiling"],
+        json!(0),
+        "an external reader is public"
+    );
+    assert_eq!(body["consumed"], json!({"kind":"unknown"}));
+    assert_eq!(
+        (
+            body["allowance_tokens"].clone(),
+            body["max_output_tokens"].clone()
+        ),
+        (json!(4000), json!(500))
+    );
+    let events = body["events"].as_array().unwrap();
+    assert_eq!(events.len(), 2);
+    assert_eq!(
+        events[1]["text"],
+        json!(r#"{"body":"Captured thread answer"}"#)
+    );
+    assert!(events.iter().all(|event| event["access_level"] == json!(0)));
+    assert_eq!(d.llm.finish().await.unwrap(), 1);
+}

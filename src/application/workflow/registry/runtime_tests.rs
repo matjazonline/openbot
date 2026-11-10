@@ -1,5 +1,79 @@
 use super::tests::*;
 use super::*;
+
+fn private_export_compiled(call: &Value, catalog: &Value) -> CompiledWorkflow {
+    let mut sample = example("mcp.call").unwrap();
+    let tool = catalog["tools"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|tool| tool["name"] == call["tool"])
+        .unwrap();
+    sample.facts.tools[0].name = TypeName::parse(call["tool"].as_str().unwrap()).unwrap();
+    sample.facts.tools[0].input_schema = tool["inputSchema"].clone();
+    sample.facts.tools[0].output_schema = tool.get("outputSchema").cloned().unwrap_or(json!(true));
+    changed(&mut sample, |source| {
+        source["steps"]["start"]["with"]["tool"] = json!({"literal":call["tool"]});
+        source["steps"]["start"]["with"]["arguments"] = json!({"literal":call["arguments"]});
+    });
+    compile_example(&sample).unwrap()
+}
+
+#[test]
+fn doop_private_export_actual_results_fit_registry_and_inline_overflow_still_fails() {
+    let provenance: Value = serde_json::from_str(include_str!(
+        "../../../adapters/mcp/fixtures/doop/private-exports-provenance.json"
+    ))
+    .unwrap();
+    let catalog: Value = serde_json::from_str(include_str!(
+        "../../../adapters/mcp/fixtures/doop/private-exports-tools.json"
+    ))
+    .unwrap();
+    for (name, source) in [
+        (
+            "screenshot",
+            include_str!("../../../adapters/mcp/fixtures/doop/private-screenshot.json"),
+        ),
+        (
+            "png",
+            include_str!("../../../adapters/mcp/fixtures/doop/private-png.json"),
+        ),
+        (
+            "jpg",
+            include_str!("../../../adapters/mcp/fixtures/doop/private-jpg.json"),
+        ),
+        (
+            "pdf",
+            include_str!("../../../adapters/mcp/fixtures/doop/private-pdf.json"),
+        ),
+        (
+            "pdf-small",
+            include_str!("../../../adapters/mcp/fixtures/doop/private-pdf-small.json"),
+        ),
+    ] {
+        let compiled = private_export_compiled(&provenance["calls"][name], &catalog);
+        let mut output: Value = serde_json::from_str(source).unwrap();
+        // Production McpCallResult normalizes the optional status at ingress;
+        // the guarded transport test checks these same captured results.
+        output["isError"] = json!(false);
+        compiled.validate_step_output(&step(), &output).unwrap();
+        let content = output["content"].as_array_mut().unwrap();
+        content.push(
+            json!({"type":"image","data":"AAAA".repeat(MAX_TEXT / 4),"mimeType":"image/png"}),
+        );
+        compiled.validate_step_output(&step(), &output).unwrap();
+        let last = output["content"]
+            .as_array_mut()
+            .unwrap()
+            .last_mut()
+            .unwrap();
+        last["data"] = json!("AAAA".repeat(MAX_TEXT / 4 + 1));
+        assert!(
+            compiled.validate_step_output(&step(), &output).is_err(),
+            "{name}"
+        );
+    }
+}
 fn prepare(compiled: &CompiledWorkflow, input: &Value) -> Result<Value, Diagnostic> {
     let params = json!({});
     let run = json!({});
@@ -65,13 +139,16 @@ fn workflow_registry_each_type_validates_dynamic_required_inputs() {
         let mut example = example(name).unwrap();
         let (field, bad) = match name {
             "context.history" => ("max_tokens", json!(0)),
-            "memory.load" | "memory.save" => ("scope", json!({"kind":"user"})),
+            // The scope is a literal (E4); the dynamic inputs are the query and the facts.
+            "memory.load" => ("query", json!("")),
+            "memory.save" => ("facts", json!([])),
             "jev.evaluate" => ("state", json!(true)),
             "ai.classify" => continue, // Context is intentionally schema-free JSON; declaration must be static.
             "agent.run" | "decision.agent" => ("agent", json!(3)),
             "decision.rule" => ("data", json!(3)),
             "decision.human" => ("deadline", json!("bad")),
             "data.map" | "channel.no_reply" => ("value", json!(3)),
+            "data.url" => ("segments", json!(vec!["x"; 17])),
             "http.request" => ("method", json!("BOGUS")),
             "local_agent.run" => ("profile_id", json!(3)),
             "tool.call" | "mcp.call" => ("arguments", json!({"key":3})),
@@ -260,4 +337,22 @@ fn workflow_registry_child_params_are_static_and_resources_match_by_slot() {
         code(&call(&declares("mcp"), &needs_http)),
         Some("registry.child_resources")
     );
+}
+
+/// E4: a memory scope is a literal, so publication can resolve its agent; a reference is refused.
+#[test]
+fn memory_scope_step_scope_must_be_a_literal() {
+    for name in ["memory.load", "memory.save"] {
+        let mut example = example(name).unwrap();
+        changed(&mut example, |v| {
+            v["input_schema"] =
+                json!({"type":"object","properties":{"value":true},"required":["value"]});
+            v["steps"]["start"]["with"]["scope"] = json!({"ref":"/input/value"});
+        });
+        let Err(error) = compile_example(&example) else {
+            panic!("{name}: a referenced scope compiled");
+        };
+        assert_eq!(error.code, "registry.literal", "{name}");
+        assert_eq!(&*error.field_path, "/steps/start/with/scope");
+    }
 }

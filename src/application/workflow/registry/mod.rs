@@ -42,6 +42,11 @@ pub const MAX_REVIEWERS: usize = crate::domain::workflow::TokenAllowance::MAX_RE
 /// messages and deliveries in one transaction, and a receipt locks at most this many parents.
 pub const MAX_MESSAGE_DESTINATIONS: usize = 20;
 pub const MAX_ITEMS: usize = 256;
+/// `memory.load` (E4): a query within the service's 1,024-character bound, at most 20 items.
+pub const MAX_MEMORY_QUERY: usize = 1_024;
+pub const MAX_MEMORY_LOAD: usize = 20;
+/// `memory.save` (E4): at most 64 facts in one atomic request.
+pub const MAX_MEMORY_FACTS: usize = 64;
 pub const MAX_TEXT: usize = 16_384;
 pub const MAX_HEADERS: usize = 64;
 pub const MAX_CONTEXT_TOKENS: usize = 131_072;
@@ -49,7 +54,7 @@ pub const MAX_IDENTIFIER: usize = 128;
 pub const MAX_PATH: usize = 2048;
 pub const MAX_DEADLINE: usize = 64;
 pub const MAX_CORRELATION: usize = 256;
-pub const TYPES: [&str; 22] = [
+pub const TYPES: [&str; 23] = [
     "context.history",
     "memory.load",
     "memory.save",
@@ -61,6 +66,7 @@ pub const TYPES: [&str; 22] = [
     "decision.human",
     "decision.agent",
     "data.map",
+    "data.url",
     "channel.no_reply",
     "http.request",
     "tool.call",

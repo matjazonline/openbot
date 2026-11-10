@@ -1,0 +1,34 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "WITH lexemes AS (\n                 SELECT t.lexeme,\n                        '''' || replace(replace(t.lexeme, '\\', '\\\\'), '''', '''''') || '''' AS quoted\n                   FROM unnest(to_tsvector('simple', $5)) AS t\n                  ORDER BY t.positions[1], t.lexeme LIMIT $6\n               ), phrases AS (\n                 SELECT phraseto_tsquery('simple', token) AS phrase FROM unnest($7::text[]) AS token\n               ), q AS (\n                 SELECT (SELECT string_agg(quoted, ' & ')::tsquery FROM lexemes) AS every,\n                        (SELECT string_agg(quoted, ' | ')::tsquery FROM lexemes) AS any,\n                        (SELECT string_agg('(' || phrase::text || ')', ' | ')::tsquery\n                           FROM phrases WHERE numnode(phrase) > 0) AS ids\n               )\n               SELECT o.id, o.occurred_at\n                 FROM q, observations AS o\n                 JOIN namespaces AS n ON (n.tenant_id, n.id) = (o.tenant_id, o.namespace_id)\n                WHERE q.every IS NOT NULL\n                  AND (o.search_tsv @@ q.every OR (q.ids IS NOT NULL AND o.search_tsv @@ q.ids))\n                  AND o.tenant_id = $1 AND o.namespace_id = ANY($2)\n                  AND o.access_level <= $3::smallint AND n.state = 'active'\n                  AND (o.expires_at IS NULL OR o.expires_at > now())\n                ORDER BY (o.search_tsv @@ q.every) DESC, ts_rank_cd(o.search_tsv, q.any) DESC,\n                         o.occurred_at DESC, o.id\n                LIMIT $4",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "occurred_at",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "UuidArray",
+        "Int2",
+        "Int8",
+        "Text",
+        "Int8",
+        "TextArray"
+      ]
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "67270ad122d7782f55ae75bef8a9c6eca0233331e59a66830f89dca232c10bf1"
+}

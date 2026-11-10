@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE service_settings SET embedding_model_id = $1 WHERE embedding_model_id IS NULL",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "f6777b18db0155cacefdfaff944d4831fedbafd6b56e32c5dd8538ddab245bc2"
+}

@@ -23,30 +23,50 @@ pub(super) fn workflow(
     f: &foundation::Foundation,
     clients: &clients::Clients,
     mail: &Mail,
+    memory: Option<&crate::infra::memory_config::MemoryServiceConfig>,
 ) -> anyhow::Result<Arc<crate::infra::workflow::WorkflowEngine>> {
-    Ok(Arc::new(
-        crate::infra::workflow::WorkflowEngine::new(
-            (*f.persistence).clone(),
-            crate::infra::workflow::WorkflowEngineSetup {
-                integrations: clients.integrations.clone(),
-                config: &f.config,
-                composer: mail.composer.clone(),
-                mcp_client: clients.mcp.clone(),
-                monitoring: f.monitoring.clone(),
-                slots: crate::infra::workflow::worker_slots(
-                    std::env::var("WORKFLOW_WORKER_SLOTS").ok().as_deref(),
-                    crate::infra::db::max_connections(),
-                )?,
-                knowledge: f.knowledge.clone(),
+    let engine = crate::infra::workflow::WorkflowEngine::new(
+        (*f.persistence).clone(),
+        crate::infra::workflow::WorkflowEngineSetup {
+            integrations: clients.integrations.clone(),
+            config: &f.config,
+            composer: mail.composer.clone(),
+            mcp_client: clients.mcp.clone(),
+            monitoring: f.monitoring.clone(),
+            slots: crate::infra::workflow::worker_slots(
+                std::env::var("WORKFLOW_WORKER_SLOTS").ok().as_deref(),
+                crate::infra::db::max_connections(),
+            )?,
+            knowledge: f.knowledge.clone(),
+            // No company HTTP connection may reach the memory service (phase 05 E5).
+            http_destinations: match memory {
+                Some(config) => crate::adapters::workflow_http::HttpDestinationPolicy::default()
+                    .reserving(&config.base_url)?,
+                None => crate::adapters::workflow_http::HttpDestinationPolicy::default(),
             },
-        )?
-        .with_jev_assets(Arc::new(
-            crate::adapters::workflow_jev::JevAssetReader::new(
-                (*f.persistence).clone(),
-                f.storage.clone(),
-            ),
-        )),
-    ))
+        },
+    )?
+    .with_jev_assets(Arc::new(
+        crate::adapters::workflow_jev::JevAssetReader::new(
+            (*f.persistence).clone(),
+            f.storage.clone(),
+        ),
+    ));
+    let engine = match memory {
+        Some(config) => {
+            let service = Arc::new(crate::adapters::memory_service::MemoryServiceHttp::new(
+                config,
+            )?);
+            engine.with_memory(
+                service.clone(),
+                service,
+                config.provisioner.credential_id(),
+                config.background_in_flight,
+            )
+        }
+        None => engine,
+    };
+    Ok(Arc::new(engine))
 }
 pub(super) fn threads(
     f: &foundation::Foundation,

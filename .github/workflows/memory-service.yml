@@ -1,0 +1,97 @@
+name: Memory service
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        # PostgreSQL 18 with pgvector 0.8.7, the version used in development.
+        image: pgvector/pgvector:0.8.7-pg18-bookworm@sha256:c29f30688a9ad961691bdf0ec1650717cc132a5814619d80f80463d6e4c42e47
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      # A superuser maintenance URL on the disposable CI server; tests and verify.sh create and
+      # drop memtest_*/memverify_* databases there. DATABASE_URL is deliberately unset.
+      MEMORY_TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5432/postgres
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.95.0
+        with:
+          components: clippy, rustfmt
+      # verify.sh runs it as `cargo sqlx` (its `prepare` refuses any other invocation).
+      - name: Install sqlx-cli 0.8.6
+        run: |
+          cargo install sqlx-cli --version 0.8.6 --no-default-features --features rustls,postgres --locked --root "$GITHUB_WORKSPACE/.memory-tools"
+          echo "$GITHUB_WORKSPACE/.memory-tools/bin" >> "$GITHUB_PATH"
+      - name: Fetch locked dependencies (before network isolation)
+        working-directory: services/memory
+        run: cargo fetch --locked
+      # The pinned model and ONNX Runtime (~520 MB), cached by the manifest that pins them and
+      # verified by size and SHA-256; the extracted copy takes the prepared directory along.
+      - name: Cache model artifacts
+        uses: actions/cache@v4
+        with:
+          path: services/memory/assets/model
+          key: memory-model-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('services/memory/assets/model-manifest.json') }}
+      - name: Prepare and verify the pinned model (build network only)
+        run: python3 -I services/memory/scripts/prepare-model.py --download
+      # The gate runs from a copy holding only the tracked service files; a root build is not
+      # evidence of independence.
+      - name: Extracted-copy full gate
+        run: services/memory/scripts/extracted-build.sh
+      # pg_dump and pg_restore must match the server's major version (18); the runner's own
+      # client is older, so install 18 from the PostgreSQL project's apt repository (PGDG).
+      - name: Install the PostgreSQL 18 client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-common
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+          sudo apt-get install -y postgresql-client-18
+      - name: Backup and restore check
+        working-directory: services/memory
+        env:
+          MEMORY_PG_BIN: /usr/lib/postgresql/18/bin
+        run: scripts/backup-restore-check.sh
+      # A generic client against the service built from an extracted copy, with the Messages
+      # API stand-in (no paid call; scripts/memory-paid-smoke.sh is run by hand only).
+      - name: Standalone journey
+        env:
+          MEMORY_PSQL: /usr/lib/postgresql/18/bin/psql
+        run: services/memory/scripts/standalone-journey.sh
+
+  image:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the service image from its own directory
+        run: docker build --tag memory-service-ci services/memory
+      - name: Non-root, network-denied, read-only startup
+        run: |
+          user="$(docker image inspect memory-service-ci --format '{{.Config.User}}')"
+          test "$user" = "memory:memory"
+          docker run --rm --network none --read-only memory-service-ci version
+          # The packaged model validates and self-checks with no network and no database.
+          # Peak RSS budget (two sessions): failing it is the early signal, not a crash.
+          docker run --rm --network none --read-only memory-service-ci model-check | tee model-check.json
+          python3 -c 'import json,sys; r=json.load(open("model-check.json")); assert r["dimensions"] == 384 and r["sessions"] == 2 and r["oversized_input_refused"], r; assert r["peak_rss_bytes"] <= 2560 * 1024 * 1024, r["peak_rss_bytes"]'
+          # Without a database the service must refuse to start explicitly.
+          set +e
+          docker run --rm --network none --read-only -e MEMORY_DATABASE_URL=postgres://x@127.0.0.1:1/x \
+            -e MEMORY_DB_CONNECT_TIMEOUT_MS=1000 memory-service-ci serve 2>&1 | tee startup.log
+          status=${PIPESTATUS[0]}
+          set -e
+          test "$status" -ne 0
+          grep -q "cannot connect to the memory database" startup.log

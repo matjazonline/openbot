@@ -22,6 +22,11 @@ impl HttpDestinationPolicy {
             origins,
         )?))
     }
+
+    /// Refuses every request to `service_url`'s origin (the memory service, phase 05 E5).
+    pub fn reserving(self, service_url: &str) -> AppResult<Self> {
+        self.0.reserving(service_url).map(Self)
+    }
 }
 
 pub(crate) async fn client(

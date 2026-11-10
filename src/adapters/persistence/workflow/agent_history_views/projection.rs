@@ -79,7 +79,9 @@ struct StoredInspection {
 pub(super) fn frozen(value: Value) -> AppResult<FrozenHistoryInspection> {
     // Typed allowlist: stored dispatch targets are parsed but only shared model declarations leave this boundary.
     let stored: StoredInspection = serde_json::from_value(value).map_err(|_| invalid())?;
-    if stored.version != 5 || stored.history.selected.len() > 16 {
+    if stored.version != crate::application::workflow::agent::PREPARED_AGENT_VERSION
+        || stored.history.selected.len() > 16
+    {
         return Err(invalid());
     }
     stored.history.validate().map_err(|_| invalid())?;

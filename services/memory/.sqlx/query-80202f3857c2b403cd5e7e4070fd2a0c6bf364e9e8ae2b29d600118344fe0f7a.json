@@ -1,0 +1,35 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT o.id, o.namespace_id, o.access_level::smallint AS \"level!\"\n                 FROM observations AS o JOIN namespaces AS n\n                   ON (n.tenant_id, n.id) = (o.tenant_id, o.namespace_id)\n                WHERE o.tenant_id = $1 AND o.id = ANY($2) AND n.state = 'active'\n                  AND (o.expires_at IS NULL OR o.expires_at > now())",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "namespace_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "level!",
+        "type_info": "Int2"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "UuidArray"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      null
+    ]
+  },
+  "hash": "80202f3857c2b403cd5e7e4070fd2a0c6bf364e9e8ae2b29d600118344fe0f7a"
+}

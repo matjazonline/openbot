@@ -85,7 +85,7 @@ fn values(name: &str) -> Value {
         "context.history" => json!({"max_tokens":1000}),
         "memory.load" => json!({"scope":{"kind":"company"},"query":"preferences","limit":10}),
         "memory.save" => {
-            json!({"scope":{"kind":"agent","id":"assistant"},"facts":["Prefers concise replies"]})
+            json!({"scope":{"kind":"company"},"facts":["Prefers concise replies"]})
         }
         "jev.evaluate" => {
             json!({"connection":"service","model":"jev-1.14.0","state":{"ticket":"Payment failed"},"questions":{
@@ -112,6 +112,7 @@ fn values(name: &str) -> Value {
             json!({"agent":"reviewer","context":{"message":"hello"},"data_schema":schema})
         }
         "data.map" | "channel.no_reply" => json!({"value":"hello","output_schema":schema}),
+        "data.url" => json!({"origin":"https://example.test","segments":["c","canvas-a"]}),
         "http.request" => {
             json!({"connection":"service","method":"POST","path":"/messages","headers":{"Accept":"application/json"},"body":{"message":"hello"}})
         }

@@ -57,7 +57,10 @@ pub(super) fn runtime(persistence: &PostgresPersistence) -> MessageRuntime {
     MessageRuntime::new(persistence.clone(), composer, APP_DOMAIN.into(), lease())
 }
 
-pub(super) async fn new_channel(fixture: &Fixture, slug: &str) -> Uuid {
+pub(in crate::adapters::persistence::workflow::tests) async fn new_channel(
+    fixture: &Fixture,
+    slug: &str,
+) -> Uuid {
     ChannelPersistence::create(
         &fixture.persistence,
         fixture.target.company.as_uuid(),

@@ -589,3 +589,6 @@ mod updates;
 
 #[path = "knowledge_checkpoint.rs"]
 mod knowledge;
+
+#[path = "memory_tool_checkpoint.rs"]
+pub(super) mod memory_tools;

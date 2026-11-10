@@ -282,10 +282,10 @@ async fn native_refusal(f: &HistoryThread, claim: &ClaimedWorkflow) {
             .unwrap();
     let error=sqlx::query(
         "INSERT INTO agent_history_exchanges \
-         (company_id,id,conversation_id,agent_id,revision_id,manifest_id,run_id,execution_id,job_id,position,input_digest,provenance,access_level,state) \
+         (company_id,id,conversation_id,agent_id,revision_id,manifest_id,run_id,execution_id,job_id,position,input_digest,provenance,access_level,content_exact,state) \
          SELECT execution.company_id,execution.id,conversation.id,template.agent_id,selected.revision_id,ownership.manifest_id, \
              execution.run_id,execution.id,job.id,conversation.last_exchange_order+1, \
-             sha256(convert_to((execution.frozen_inputs->'context')::text,'UTF8')),template.provenance,run.content_level,'queued' \
+             sha256(convert_to((execution.frozen_inputs->'context')::text,'UTF8')),template.provenance,run.content_level,run.content_exact,'queued' \
          FROM workflow_executions AS execution \
          JOIN workflow_runs AS run ON run.company_id=execution.company_id AND run.id=execution.run_id \
          JOIN background_tasks AS job ON job.company_id=execution.company_id AND job.workflow_execution_id=execution.id \

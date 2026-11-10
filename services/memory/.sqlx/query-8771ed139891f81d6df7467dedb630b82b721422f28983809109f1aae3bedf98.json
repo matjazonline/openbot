@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE credentials SET label = $3 WHERE (tenant_id, id) IN (SELECT * FROM UNNEST($1::uuid[], $2::uuid[]))",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "UuidArray",
+        "UuidArray",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "8771ed139891f81d6df7467dedb630b82b721422f28983809109f1aae3bedf98"
+}

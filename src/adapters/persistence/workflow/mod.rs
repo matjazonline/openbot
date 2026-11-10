@@ -77,6 +77,7 @@ mod lease;
 mod lease_claim;
 pub mod local_agents;
 pub mod mcp;
+mod memory_steps;
 pub mod message;
 mod message_intents;
 mod metrics;

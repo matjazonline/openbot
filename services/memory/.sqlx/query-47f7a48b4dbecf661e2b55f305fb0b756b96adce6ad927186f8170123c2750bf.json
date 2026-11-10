@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO observation_parts (tenant_id, observation_id, namespace_id, access_level, revision, ordinal, byte_start, byte_end, model_id, embedding) SELECT $1, $2, $3, $4::smallint, $5, u.ordinal, u.byte_start, u.byte_end, $6, u.embedding::vector FROM UNNEST($7::int[], $8::int[], $9::int[], $10::text[]) AS u(ordinal, byte_start, byte_end, embedding)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Int2",
+        "Int8",
+        "Text",
+        "Int4Array",
+        "Int4Array",
+        "Int4Array",
+        "TextArray"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "47f7a48b4dbecf661e2b55f305fb0b756b96adce6ad927186f8170123c2750bf"
+}

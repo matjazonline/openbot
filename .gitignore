@@ -1,5 +1,7 @@
 /target
 /node_modules
+# Local scratch space for runs and backups; never committed.
+/tmp/
 *.log
 .env
 .env.test

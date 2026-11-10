@@ -52,7 +52,7 @@ and frozen into the run; the memory tools and steps speak that vocabulary, and k
    save accepts `unit` (default) or `personal`. `company` and `user` are removed; a manual session
    by a person uses `personal` for that person's namespace, under the same own-session rule the
    `user` scope has today (`memory_scope_user_memory_requires_the_actors_own_manual_session`,
-   `src/adapters/persistence/workflow/memory_tool_tests.rs:489`).
+   `src/adapters/persistence/workflow/memory_tool_tests.rs:506`).
 3. Save accepts an optional `subject`, a principal id the run can see (a thread participant or
    directory entry), recorded as provenance (decision 3). A purge-by-subject operator command lists
    and deletes records across the company's unit namespaces through the service's existing

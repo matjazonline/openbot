@@ -20,7 +20,15 @@ use secrecy::{ExposeSecret, SecretString};
 use sse_stream::{Sse, SseStream};
 use std::{collections::HashMap, io, sync::Arc};
 
-type Error = StreamableHttpError<io::Error>;
+pub(super) type Error = StreamableHttpError<HttpFailure>;
+
+#[derive(Debug, thiserror::Error)]
+pub(super) enum HttpFailure {
+    #[error("MCP service rejected the configured credentials")]
+    Authentication,
+    #[error("MCP HTTP operation failed")]
+    Unavailable,
+}
 #[derive(Clone)]
 pub(super) struct BoundedHttp {
     pub client: reqwest::Client,
@@ -65,7 +73,7 @@ impl Cleanup {
     }
 }
 fn failed() -> Error {
-    StreamableHttpError::Client(io::Error::other("MCP HTTP operation failed"))
+    StreamableHttpError::Client(HttpFailure::Unavailable)
 }
 impl BoundedHttp {
     fn request(
@@ -114,7 +122,7 @@ fn bounded(
     }.boxed()
 }
 impl StreamableHttpClient for BoundedHttp {
-    type Error = io::Error;
+    type Error = HttpFailure;
     async fn post_message(
         &self,
         uri: Arc<str>,
@@ -165,6 +173,9 @@ impl StreamableHttpClient for BoundedHttp {
                 .map_err(|_| failed())?
         };
         let status = response.status();
+        if matches!(status, StatusCode::UNAUTHORIZED | StatusCode::FORBIDDEN) {
+            return Err(StreamableHttpError::Client(HttpFailure::Authentication));
+        }
         if !status.is_success() {
             return Err(failed());
         }

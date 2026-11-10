@@ -1,0 +1,53 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT s.id, s.external_ref, s.revision, s.access_level::smallint AS \"level!\",\n                      s.content, (s.expires_at IS NOT NULL AND s.expires_at <= now()) AS \"expired!\"\n                 FROM generation_operation_sources AS g\n                 JOIN sources AS s ON (s.tenant_id, s.id) = (g.tenant_id, g.source_id)\n                WHERE g.tenant_id = $1 AND g.operation_id = $2",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "external_ref",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "revision",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "level!",
+        "type_info": "Int2"
+      },
+      {
+        "ordinal": 4,
+        "name": "content",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 5,
+        "name": "expired!",
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      null,
+      true,
+      null
+    ]
+  },
+  "hash": "2f36e7f18aeca1df4f81a4ca68592f8d9cbea800feee396151941de9f0c842a8"
+}

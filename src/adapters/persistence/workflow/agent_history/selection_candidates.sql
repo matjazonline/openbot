@@ -1,4 +1,4 @@
-SELECT exchange.id, exchange.position, exchange.access_level::smallint AS access_level,
+SELECT exchange.id, exchange.position, exchange.access_level::smallint AS access_level, exchange.content_exact,
        octet_length((execution.frozen_inputs->'context')::text) AS input_bytes,
        octet_length(exchange.output::text) AS output_bytes
 FROM agent_history_exchanges AS exchange

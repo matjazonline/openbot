@@ -1,0 +1,49 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT id, state, spend_day, reserved_tokens, cancel_requested_at FROM generation_operations WHERE tenant_id = $1 AND state IN ('accepted', 'claimed', 'dispatched') AND ($2::uuid IS NULL OR namespace_id = $2) AND ($3::uuid IS NULL OR credential_id = $3) AND ($4::uuid IS NULL OR id = $4) ORDER BY id FOR NO KEY UPDATE",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "state",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "spend_day",
+        "type_info": "Date"
+      },
+      {
+        "ordinal": 3,
+        "name": "reserved_tokens",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 4,
+        "name": "cancel_requested_at",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      false,
+      true
+    ]
+  },
+  "hash": "ca2f9c948cc5d617230bc91516a254d41b7d3c1682bcd626fbf942ee12f64749"
+}

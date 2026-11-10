@@ -1,0 +1,113 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT state, fence, lease_owner, lease_until > now() AS \"live!\",\n                      expires_at <= now() AS \"expired!\", request, session_id, summary,\n                      producing_ceiling::smallint AS \"ceiling!\", watermark_kind,\n                      watermark_level::smallint AS \"watermark!\", max_output_tokens,\n                      allowance_tokens, reserved_tokens, spend_day, expires_at\n                 FROM generation_operations WHERE tenant_id = $1 AND id = $2 FOR UPDATE",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "state",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "fence",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 2,
+        "name": "lease_owner",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 3,
+        "name": "live!",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 4,
+        "name": "expired!",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 5,
+        "name": "request",
+        "type_info": "Jsonb"
+      },
+      {
+        "ordinal": 6,
+        "name": "session_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 7,
+        "name": "summary",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 8,
+        "name": "ceiling!",
+        "type_info": "Int2"
+      },
+      {
+        "ordinal": 9,
+        "name": "watermark_kind",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 10,
+        "name": "watermark!",
+        "type_info": "Int2"
+      },
+      {
+        "ordinal": 11,
+        "name": "max_output_tokens",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 12,
+        "name": "allowance_tokens",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 13,
+        "name": "reserved_tokens",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 14,
+        "name": "spend_day",
+        "type_info": "Date"
+      },
+      {
+        "ordinal": 15,
+        "name": "expires_at",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      null,
+      null,
+      true,
+      true,
+      false,
+      null,
+      false,
+      null,
+      false,
+      false,
+      false,
+      true,
+      false
+    ]
+  },
+  "hash": "d6a3b8078caea4051414d2044ab9af04f058dbe852a1d53f26f5abebe94080a2"
+}

@@ -245,11 +245,15 @@ async fn workflow_failure_commit_failure_rolls_back_all_retirement_writes() {
 
 #[tokio::test]
 async fn workflow_failure_interrupted_and_expired_effects_cannot_replay() {
+    // `memory.save` served here until Phase 05 F2 made it marker-owned (its intent commits with the
+    // park), leaving no I/O kind unknown without a marker; an unresolved marker is the example now.
     for expired in [false, true] {
-        let source: Value =
-            serde_json::from_str(&registry::example("memory.save").unwrap().source).unwrap();
-        let (f, scope) = fixture_source(source).await;
-        let owned = claim(&f, scope).await;
+        let (f, owned) = action_dispatch_tests::unresolved_marker(
+            lease_source(),
+            crate::application::agent::ActionRecovery::Reconcile,
+        )
+        .await;
+        let scope = owned.fence.scope;
         if expired {
             expire(&f, scope).await;
             assert!(
@@ -351,4 +355,27 @@ async fn workflow_failure_exhausted_expiry_routes_and_deadline_delay_rolls_back(
             );
         }
     }
+}
+
+/// The failure router is one caller of the shared progression writer: a routed final error of
+/// a raising read (`context.history`) commits a null output and keeps the run exact (E3).
+#[tokio::test]
+async fn memory_access_level_routed_failure_passes_the_exactness_hook() {
+    use crate::adapters::persistence::workflow::knowledge::exactness_fixture::{exact, mark_exact};
+    let (f, scope) = fixture_source(source(Some("$end"))).await;
+    mark_exact(f.persistence().pool(), scope.company, scope.run).await;
+    let owned = claim(&f, scope).await;
+    assert!(
+        f.persistence()
+            .settled()
+            .release_io(
+                owned.fence,
+                policy(),
+                failure(FailureClass::Terminal, RetrySafety::SafeToRetry)
+            )
+            .await
+            .unwrap()
+    );
+    assert_eq!(snapshot(&f).await["runs"][0]["state"], "failed");
+    assert!(exact(f.persistence().pool(), scope.company, scope.run).await);
 }

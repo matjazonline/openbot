@@ -84,6 +84,11 @@ pub(super) async fn check_readiness(
                 authority::builtin_knowledge_tool(tool)?;
                 continue;
             }
+            ToolKind::Memory => {
+                authority::builtin_memory_tool(tx, tool, super::workflow_tools::ToolCheck::Run)
+                    .await?;
+                continue;
+            }
             ToolKind::Http => {
                 http::registered_on(tx, company, tool).await?;
                 continue;

@@ -141,6 +141,7 @@ pub(super) async fn supported_publication(
                 }
                 ToolKind::Provisioning => builtin_provisioning_tool(tool)?,
                 ToolKind::Knowledge => builtin_knowledge_tool(tool)?,
+                ToolKind::Memory => builtin_memory_tool(tx, tool, check).await?,
                 ToolKind::Http => {
                     http::registered_on(tx, current.company_id(), tool).await?;
                 }
@@ -164,6 +165,27 @@ pub(super) async fn supported_publication(
                 .values()
                 .map(|child| (child.as_ref(), workflow_tools::ToolCheck::Run)),
         );
+    }
+    Ok(())
+}
+
+/// A trusted memory built-in, published only while the company has memory enabled (phase 05
+/// U1/E5). A published one keeps running after a disable: each call then answers
+/// `memory.not_enabled` (06-D5 revocation at runtime) instead of failing the whole run.
+pub(super) async fn builtin_memory_tool(
+    db: &mut PgConnection,
+    tool: &ToolSnapshot,
+    check: workflow_tools::ToolCheck,
+) -> AppResult<()> {
+    if crate::application::workflow::memory_tools::trusted_memory_tool(tool)?.is_none() {
+        return Err(missing());
+    }
+    if matches!(check, workflow_tools::ToolCheck::Publish)
+        && !crate::adapters::persistence::memory::memory_enabled_on(db, tool.company_id).await?
+    {
+        return Err(AppError::NotFound(
+            "Memory is not enabled for this company".into(),
+        ));
     }
     Ok(())
 }

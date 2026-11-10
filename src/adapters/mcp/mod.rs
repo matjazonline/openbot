@@ -1,5 +1,6 @@
 //! Guarded Streamable HTTP adapter. All rmcp types stay behind the application session port.
 mod connection;
+mod errors;
 mod http;
 #[cfg(test)]
 pub(crate) mod pinned_fixture;
@@ -81,7 +82,12 @@ impl McpClient for HttpMcpClient {
     ) -> AppResult<Box<dyn McpSession>> {
         self.connect_control(endpoint, token, preparation::Control::owned(&self.shutdown))
             .await
-            .map_err(|error| failed(&error.to_string()))
+            .map_err(|error| match error {
+                crate::application::services::mcp_client::McpPreparationFailure::Authentication => {
+                    AppError::McpAuthentication
+                }
+                error => failed(&error.to_string()),
+            })
     }
     async fn connect_prepared(
         &self,
@@ -130,7 +136,7 @@ impl Session {
                     params
                 }))
                 .await
-                .map_err(|_| failed("MCP discovery failed"))?;
+                .map_err(|error| errors::service(error, "MCP discovery failed"))?;
             for tool in page.tools {
                 let name = McpToolName::try_from(tool.name.into_owned())
                     .map_err(|_| failed("Invalid MCP tool name"))?;
@@ -200,7 +206,7 @@ impl McpSession for Session {
                 rmcp::service::PeerRequestOptions::no_options(),
             )
             .await
-            .map_err(|_| failed("MCP effect indeterminate; do not retry"))?;
+            .map_err(|error| errors::service(error, "MCP effect indeterminate; do not retry"))?;
         *self
             .pending_call
             .lock()
@@ -214,7 +220,7 @@ impl McpSession for Session {
         }
         let result = response
             .map_err(|_| failed("MCP effect indeterminate; do not retry"))?
-            .map_err(|_| failed("MCP effect indeterminate; do not retry"))?;
+            .map_err(|error| errors::service(error, "MCP effect indeterminate; do not retry"))?;
         let rmcp::model::ServerResult::CallToolResult(result) = result else {
             return Err(failed("MCP effect indeterminate; do not retry"));
         };
@@ -245,6 +251,9 @@ impl McpSession for Session {
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod doop_tests;
 
 impl Session {
     /// The typed boundary: `_meta` and unknown remote fields are dropped by rmcp's model,

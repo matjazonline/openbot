@@ -1,0 +1,73 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT o.id, n.external_id AS namespace, o.kind, o.title, o.body, o.occurred_at,\n                          o.access_level::smallint AS \"level!\", o.revision, o.index_state\n                     FROM observations AS o JOIN namespaces AS n\n                       ON (n.tenant_id, n.id) = (o.tenant_id, o.namespace_id)\n                    WHERE o.tenant_id = $1 AND o.namespace_id = ANY($2) AND o.id = ANY($3)\n                      AND o.access_level <= $4::smallint AND n.state = 'active'\n                      AND (o.expires_at IS NULL OR o.expires_at > now())",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "namespace",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "kind",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "title",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "body",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 5,
+        "name": "occurred_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 6,
+        "name": "level!",
+        "type_info": "Int2"
+      },
+      {
+        "ordinal": 7,
+        "name": "revision",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 8,
+        "name": "index_state",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "UuidArray",
+        "UuidArray",
+        "Int2"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      null,
+      false,
+      false
+    ]
+  },
+  "hash": "34d83709befc0c7daa1178a3ad3a9524c4cbbeded2d5a38adab71f1c0d8812d1"
+}

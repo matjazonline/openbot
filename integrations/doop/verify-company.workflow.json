@@ -1,0 +1,319 @@
+{
+  "format_version": 1,
+  "workflow_id": "6722b695-1d1e-4a7f-bb22-ef4b6c090201",
+  "input_schema": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "parameter_schema": {
+    "type": "object",
+    "properties": {
+      "expected_bot_id": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 128
+      },
+      "expected_workspace_id": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 128
+      },
+      "verification_canvas_id": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 128
+      }
+    },
+    "required": [
+      "expected_bot_id",
+      "expected_workspace_id",
+      "verification_canvas_id"
+    ],
+    "additionalProperties": false
+  },
+  "output_schema": {
+    "type": "object",
+    "properties": {
+      "verified": {
+        "const": true
+      },
+      "bot_id": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 128
+      },
+      "workspace_id": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 128
+      },
+      "canvas_id": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 128
+      }
+    },
+    "required": [
+      "verified",
+      "bot_id",
+      "workspace_id",
+      "canvas_id"
+    ],
+    "additionalProperties": false
+  },
+  "resources": [
+    {
+      "slot": "service",
+      "kind": "mcp"
+    }
+  ],
+  "entry": "profile",
+  "steps": {
+    "profile": {
+      "type": "mcp.call",
+      "with": {
+        "connection": {
+          "literal": "service"
+        },
+        "tool": {
+          "literal": "get_profile"
+        },
+        "arguments": {
+          "literal": {}
+        }
+      },
+      "routes": {
+        "success": "verify_bot"
+      }
+    },
+    "verify_bot": {
+      "type": "data.map",
+      "with": {
+        "value": {
+          "eq": [
+            {
+              "default": {
+                "ref": "/steps/profile/output/structuredContent/id",
+                "value": {
+                  "literal": ""
+                }
+              }
+            },
+            {
+              "ref": "/params/expected_bot_id"
+            }
+          ]
+        },
+        "output_schema": {
+          "literal": {
+            "const": true
+          }
+        }
+      },
+      "routes": {
+        "success": "verify_workspace_present"
+      }
+    },
+    "verify_workspace_present": {
+      "type": "data.map",
+      "with": {
+        "value": {
+          "and": [
+            {
+              "exists": "/steps/profile/output/structuredContent/managed_workspace_id"
+            },
+            {
+              "ne": [
+                {
+                  "default": {
+                    "ref": "/steps/profile/output/structuredContent/managed_workspace_id",
+                    "value": {
+                      "literal": ""
+                    }
+                  }
+                },
+                {
+                  "literal": ""
+                }
+              ]
+            }
+          ]
+        },
+        "output_schema": {
+          "literal": {
+            "const": true
+          }
+        }
+      },
+      "routes": {
+        "success": "verify_workspace"
+      }
+    },
+    "verify_workspace": {
+      "type": "data.map",
+      "with": {
+        "value": {
+          "eq": [
+            {
+              "default": {
+                "ref": "/steps/profile/output/structuredContent/managed_workspace_id",
+                "value": {
+                  "literal": ""
+                }
+              }
+            },
+            {
+              "ref": "/params/expected_workspace_id"
+            }
+          ]
+        },
+        "output_schema": {
+          "literal": {
+            "const": true
+          }
+        }
+      },
+      "routes": {
+        "success": "canvas"
+      }
+    },
+    "canvas": {
+      "type": "mcp.call",
+      "with": {
+        "connection": {
+          "literal": "service"
+        },
+        "tool": {
+          "literal": "get_canvas"
+        },
+        "arguments": {
+          "object": {
+            "canvas_id": {
+              "ref": "/params/verification_canvas_id"
+            }
+          }
+        }
+      },
+      "routes": {
+        "success": "verify_canvas_id"
+      }
+    },
+    "verify_canvas_id": {
+      "type": "data.map",
+      "with": {
+        "value": {
+          "eq": [
+            {
+              "default": {
+                "ref": "/steps/canvas/output/structuredContent/canvas/id",
+                "value": {
+                  "literal": ""
+                }
+              }
+            },
+            {
+              "ref": "/params/verification_canvas_id"
+            }
+          ]
+        },
+        "output_schema": {
+          "literal": {
+            "const": true
+          }
+        }
+      },
+      "routes": {
+        "success": "verify_canvas_workspace"
+      }
+    },
+    "verify_canvas_workspace": {
+      "type": "data.map",
+      "with": {
+        "value": {
+          "eq": [
+            {
+              "default": {
+                "ref": "/steps/canvas/output/structuredContent/workspace_id",
+                "value": {
+                  "literal": ""
+                }
+              }
+            },
+            {
+              "ref": "/params/expected_workspace_id"
+            }
+          ]
+        },
+        "output_schema": {
+          "literal": {
+            "const": true
+          }
+        }
+      },
+      "routes": {
+        "success": "verified"
+      }
+    },
+    "verified": {
+      "type": "data.map",
+      "with": {
+        "value": {
+          "object": {
+            "verified": {
+              "literal": true
+            },
+            "bot_id": {
+              "ref": "/params/expected_bot_id"
+            },
+            "workspace_id": {
+              "ref": "/params/expected_workspace_id"
+            },
+            "canvas_id": {
+              "ref": "/params/verification_canvas_id"
+            }
+          }
+        },
+        "output_schema": {
+          "literal": {
+            "type": "object",
+            "properties": {
+              "verified": {
+                "const": true
+              },
+              "bot_id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128
+              },
+              "workspace_id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128
+              },
+              "canvas_id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128
+              }
+            },
+            "required": [
+              "verified",
+              "bot_id",
+              "workspace_id",
+              "canvas_id"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "routes": {
+        "success": "$end"
+      }
+    }
+  },
+  "limits": {
+    "max_steps": 8,
+    "max_context_bytes": 65536
+  }
+}

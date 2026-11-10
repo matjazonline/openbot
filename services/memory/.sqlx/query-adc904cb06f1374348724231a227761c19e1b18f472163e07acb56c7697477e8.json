@@ -1,0 +1,41 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT s.id, s.external_ref, s.revision, s.access_level::smallint AS \"level!\"\n                 FROM generation_operation_sources AS g\n                 JOIN sources AS s ON (s.tenant_id, s.id) = (g.tenant_id, g.source_id)\n                WHERE g.tenant_id = $1 AND g.operation_id = $2",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "external_ref",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "revision",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "level!",
+        "type_info": "Int2"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      null
+    ]
+  },
+  "hash": "adc904cb06f1374348724231a227761c19e1b18f472163e07acb56c7697477e8"
+}

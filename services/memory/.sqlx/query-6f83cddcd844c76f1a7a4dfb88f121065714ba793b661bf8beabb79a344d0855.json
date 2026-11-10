@@ -1,0 +1,29 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT s.tenant_id, s.id FROM sources AS s WHERE s.content IS NOT NULL AND NOT EXISTS ( SELECT 1 FROM generation_operation_sources AS g JOIN generation_operations AS o ON (o.tenant_id, o.id) = (g.tenant_id, g.operation_id) WHERE g.tenant_id = s.tenant_id AND g.source_id = s.id AND o.finished_at IS NULL) AND ((s.expires_at IS NOT NULL AND s.expires_at <= now()) OR (s.recorded_at < now() - make_interval(secs => $2) AND NOT EXISTS ( SELECT 1 FROM generation_operation_sources AS g JOIN generation_operations AS o ON (o.tenant_id, o.id) = (g.tenant_id, g.operation_id) WHERE g.tenant_id = s.tenant_id AND g.source_id = s.id AND o.finished_at > now() - make_interval(secs => $2)))) ORDER BY s.recorded_at LIMIT $1 FOR NO KEY UPDATE OF s SKIP LOCKED",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "tenant_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Float8"
+      ]
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "6f83cddcd844c76f1a7a4dfb88f121065714ba793b661bf8beabb79a344d0855"
+}

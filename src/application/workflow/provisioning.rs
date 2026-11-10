@@ -97,6 +97,7 @@ pub fn is_reserved_tool_name(name: &str) -> bool {
     crate::application::workflow::message::is_builtin_message_tool(name)
         || is_builtin_provisioning_tool(name)
         || crate::application::workflow::knowledge::is_builtin_knowledge_tool(name)
+        || crate::application::workflow::memory_tools::is_builtin_memory_tool(name)
         || name == crate::application::local_agents::workflow::KIND
 }
 

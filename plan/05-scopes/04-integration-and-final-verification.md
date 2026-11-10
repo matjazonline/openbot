@@ -6,12 +6,13 @@
 
 ## Order
 
-This plan runs after [04-root-unit](../04-root-unit/README.md) and after the memory service
-integration is on `main`. [01](01-unit-and-principal-namespaces.md) then
+This plan runs after [04-root-unit](../04-root-unit/README.md). The memory service integration it
+builds on has been on `main` since 2026-11-10. [01](01-unit-and-principal-namespaces.md) then
 [02](02-scope-resolution-and-tools.md) then
-[03](03-knowledge-scopes.md); 03 depends on 02's snapshot only and may run before 01 if the memory
-integration is late. Update `plan/memory-service/05-openbot-integration.md`
-batch 05A item 2 to point here instead of describing company, agent and user scopes.
+[03](03-knowledge-scopes.md); 03 depends on 02's snapshot only. The archived memory-service plan
+(`plan/.archive/memory-service/05-openbot-integration.md`, batch 05A item 2) still describes
+company, agent and user scopes. It stays as recorded; the new scope vocabulary is documented in
+the files named in 03A.
 
 ## Batch 03A Documentation
 

@@ -70,6 +70,41 @@ fn fence() -> WorkflowFence {
 }
 
 #[test]
+fn doop_agent_mcp_error_policy_is_frozen_in_preparation_and_checkpoint_identity() {
+    let mut configured = inputs();
+    let observe = PreparedAgent::new(
+        selection(vec![]),
+        &configured,
+        PreparedStep::AgentRun { targets: vec![] },
+    )
+    .unwrap();
+    configured["mcp_error_policy"] = json!("fail_step");
+    let strict = PreparedAgent::new(
+        selection(vec![]),
+        &configured,
+        PreparedStep::AgentRun { targets: vec![] },
+    )
+    .unwrap();
+    let observe_spec = observe.spec(fence()).unwrap();
+    let strict_spec = strict.spec(fence()).unwrap();
+    assert_eq!(strict_spec.prepared["version"], 6);
+    assert_eq!(strict_spec.prepared["mcp_error_policy"], "fail_step");
+    assert_eq!(observe_spec.prepared["mcp_error_policy"], "observe");
+    assert_ne!(
+        observe_spec.identity.capability_fingerprint,
+        strict_spec.identity.capability_fingerprint
+    );
+    let mut old = strict_spec.prepared;
+    old["version"] = json!(5);
+    old.as_object_mut().unwrap().remove("mcp_error_policy");
+    assert_ne!(
+        serde_json::to_value(&strict).unwrap(),
+        old,
+        "recomputed preparation refuses old saved state"
+    );
+}
+
+#[test]
 fn workflow_agent_preparation_declares_provider_safe_names_and_delimits_context() {
     let prepared = PreparedAgent::new(
         selection(vec!["crm.lookup"]),

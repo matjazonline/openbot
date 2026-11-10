@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE generation_operations SET cancel_requested_at = now(), outcome_code = $3 WHERE tenant_id = $1 AND id = ANY($2)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "UuidArray",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "9750a8f7aa47c85e6e1add8fa13ed68025f68c6d2d7c98e07223bea59515cade"
+}

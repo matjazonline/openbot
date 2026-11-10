@@ -462,3 +462,42 @@ async fn knowledge_run_level_schedule_uses_configured_run_as_ceiling() {
         .bind(command.company_id().as_uuid()).bind(command.proposed_run_id().as_uuid()).fetch_one(f.persistence().pool()).await.unwrap();
     assert_eq!(knowledge, json!({"ceiling":9,"content":0}));
 }
+
+/// E3/U2 at admission: schedule params are authored configuration (exact), manual input and a
+/// human trigger message are conversational (inexact), and an agent or system trigger message
+/// carries its producing run's bit.
+#[tokio::test]
+async fn memory_access_level_admission_exactness_follows_the_trigger_source() {
+    use crate::adapters::persistence::workflow::knowledge::exactness_fixture::exact;
+    let f = AdmissionFixture::new().await;
+    let c = Conversation::new(&f).await;
+    let company = f.binding.target.company;
+    let pool = f.persistence().pool();
+    let occurrence = Occurrence::new(&f, company, c.channel).await;
+    let scheduled = f.prepare(occurrence.request(&f, "exact-schedule")).await;
+    f.persistence().admit(&scheduled).await.unwrap();
+    assert!(exact(pool, company, scheduled.proposed_run_id()).await);
+    let manual = f.prepare(f.request("exact-manual", f.manual())).await;
+    f.persistence().admit(&manual).await.unwrap();
+    assert!(!exact(pool, company, manual.proposed_run_id()).await);
+    let human = f.prepare(c.request(&f, "exact-human", c.message)).await;
+    f.persistence().admit(&human).await.unwrap();
+    assert!(!exact(pool, company, human.proposed_run_id()).await);
+    for (role, bit, expected) in [("system", true, true), ("agent", false, false)] {
+        let message = Uuid::new_v4();
+        sqlx::query("INSERT INTO messages(id,company_id,author_principal_id,subject,clean_text_body,direction,role,correlation_id,content_hash,audience,content_exact) SELECT $1,$2,id,'Agent','text','outbound',$3,$4,$5,'external_conversation',$6 FROM principals WHERE company_id=$2 AND user_id=$7")
+            .bind(message).bind(company.as_uuid()).bind(role).bind(Uuid::new_v4()).bind(vec![2_u8;32]).bind(bit)
+            .bind(f.binding.target.actor.user_id()).execute(pool).await.unwrap();
+        sqlx::query("INSERT INTO thread_messages(id,company_id,channel_id,thread_id,message_id,entry_kind) VALUES($1,$2,$3,$4,$5,'conversation')")
+            .bind(Uuid::new_v4()).bind(company.as_uuid()).bind(c.channel).bind(c.thread).bind(message).execute(pool).await.unwrap();
+        let command = f
+            .prepare(c.request(&f, &format!("exact-{role}"), message))
+            .await;
+        f.persistence().admit(&command).await.unwrap();
+        assert_eq!(
+            exact(pool, company, command.proposed_run_id()).await,
+            expected,
+            "{role}"
+        );
+    }
+}

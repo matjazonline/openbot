@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE generation_operations SET spend_day = $3, reserved_tokens = reservation WHERE tenant_id = $1 AND id = $2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Date"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "acb6952d3ca6b058dea6500a0754962f91bebc73479df3d8f456f0e6fddc4086"
+}

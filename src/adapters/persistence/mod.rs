@@ -31,6 +31,7 @@ pub mod integration;
 pub(crate) mod integrations;
 pub mod knowledge;
 pub mod local_agents;
+pub mod memory;
 pub(crate) mod model_usage;
 pub mod notification;
 pub mod onboarding;
@@ -251,8 +252,10 @@ mod tests {
         );
     }
 
-    /// p08 P08-Q1: long-term memory providers are gone, schema and all. The workflow memory steps
-    /// are a separate, still-unhandled language feature and own no storage.
+    /// p08 P08-Q1: long-term memory providers are gone, schema and all. Phase 05 of the memory
+    /// service adds client-side configuration only (connection state, per-namespace credentials and
+    /// the remote lifecycle); the corpus lives in the standalone service. So the memory tables and
+    /// columns are an exact allowlist, and the removed provider schema stays absent by name.
     #[tokio::test]
     async fn the_memory_provider_schema_is_gone() {
         let Some(pool) = test_pool().await else {
@@ -262,18 +265,120 @@ mod tests {
         let tables: Vec<String> = sqlx::query_scalar(
             r#"SELECT table_name::text
                  FROM information_schema.tables
-                WHERE table_schema = 'public' AND table_name LIKE 'memory%'
+                WHERE table_schema = 'public'
+                  AND (table_name LIKE 'memory%' OR table_name LIKE 'hydradb%')
                 ORDER BY table_name"#,
         )
         .fetch_all(&pool)
         .await
         .expect("the table catalog is readable");
-        assert!(tables.is_empty(), "memory tables remain: {tables:?}");
+        // Exact, so the legacy provider tables (`memory_provider_connections`,
+        // `memory_remote_resource_lifecycles`, `memory_cleanup_jobs`) and any `hydradb%` table fail.
+        assert_eq!(
+            tables,
+            [
+                "memory_agent_capture",
+                "memory_deliveries",
+                "memory_lifecycles",
+                "memory_namespaces",
+                "memory_tenants"
+            ],
+            "memory tables are exactly the service client's configuration and delivery intents"
+        );
+
+        // Every column of those tables, so no corpus column (content, text, embedding) can land.
+        let client_columns: Vec<String> = sqlx::query_scalar(
+            r#"SELECT table_name || '.' || column_name
+                 FROM information_schema.columns
+                WHERE table_schema = 'public' AND table_name LIKE 'memory%'
+                ORDER BY table_name, column_name"#,
+        )
+        .fetch_all(&pool)
+        .await
+        .expect("the column catalog is readable");
+        assert_eq!(
+            client_columns,
+            [
+                "memory_agent_capture.agent_id",
+                "memory_agent_capture.allowance_tokens",
+                "memory_agent_capture.changed_at",
+                "memory_agent_capture.changed_by",
+                "memory_agent_capture.company_id",
+                "memory_agent_capture.enabled",
+                "memory_agent_capture.expiry_hours",
+                "memory_agent_capture.kind",
+                "memory_agent_capture.max_output_tokens",
+                "memory_agent_capture.reason",
+                "memory_agent_capture.revision",
+                "memory_deliveries.attempts",
+                "memory_deliveries.available_at",
+                "memory_deliveries.company_id",
+                "memory_deliveries.created_at",
+                "memory_deliveries.disable_epoch",
+                "memory_deliveries.exchange_id",
+                "memory_deliveries.execution_id",
+                "memory_deliveries.expires_at",
+                "memory_deliveries.fence",
+                "memory_deliveries.id",
+                "memory_deliveries.idempotency_key",
+                "memory_deliveries.invocation_id",
+                "memory_deliveries.kind",
+                "memory_deliveries.lease_owner",
+                "memory_deliveries.lease_until",
+                "memory_deliveries.namespace_id",
+                "memory_deliveries.outcome_code",
+                "memory_deliveries.request",
+                "memory_deliveries.result",
+                "memory_deliveries.run_id",
+                "memory_deliveries.state",
+                "memory_deliveries.transient_retries",
+                "memory_deliveries.updated_at",
+                "memory_deliveries.wait_id",
+                "memory_lifecycles.attempts",
+                "memory_lifecycles.available_at",
+                "memory_lifecycles.company_id",
+                "memory_lifecycles.desired",
+                "memory_lifecycles.fence",
+                "memory_lifecycles.generation",
+                "memory_lifecycles.id",
+                "memory_lifecycles.lease_owner",
+                "memory_lifecycles.lease_until",
+                "memory_lifecycles.namespace_id",
+                "memory_lifecycles.observed",
+                "memory_lifecycles.outcome_code",
+                "memory_lifecycles.owner_id",
+                "memory_lifecycles.owner_kind",
+                "memory_lifecycles.provisioner_credential_id",
+                "memory_lifecycles.resource",
+                "memory_lifecycles.state",
+                "memory_lifecycles.transient_retries",
+                "memory_lifecycles.updated_at",
+                "memory_namespaces.agent_id",
+                "memory_namespaces.company_id",
+                "memory_namespaces.created_at",
+                "memory_namespaces.credential_envelope",
+                "memory_namespaces.credential_id",
+                "memory_namespaces.id",
+                "memory_namespaces.scope_kind",
+                "memory_namespaces.state",
+                "memory_namespaces.user_id",
+                "memory_tenants.changed_at",
+                "memory_tenants.changed_by",
+                "memory_tenants.company_id",
+                "memory_tenants.disable_epoch",
+                "memory_tenants.generation_cap",
+                "memory_tenants.provisioner_credential_id",
+                "memory_tenants.revision",
+                "memory_tenants.state",
+            ],
+            "memory client columns are an exact allowlist"
+        );
 
         let columns: Vec<String> = sqlx::query_scalar(
             r#"SELECT table_name || '.' || column_name
                  FROM information_schema.columns
                 WHERE table_schema = 'public'
+                  AND table_name NOT LIKE 'memory%'
                   AND (column_name LIKE '%memory%' OR column_name LIKE 'hydradb%')
                   AND (table_name, column_name) <> ('runtime_metric_samples', 'memory_limit_bytes')
                 ORDER BY table_name, column_name"#,
@@ -281,7 +386,10 @@ mod tests {
         .fetch_all(&pool)
         .await
         .expect("the column catalog is readable");
-        assert!(columns.is_empty(), "memory columns remain: {columns:?}");
+        assert!(
+            columns.is_empty(),
+            "memory or provider columns remain: {columns:?}"
+        );
 
         let functions: Vec<String> = sqlx::query_scalar(
             r#"SELECT proname::text
@@ -292,9 +400,11 @@ mod tests {
         .fetch_all(&pool)
         .await
         .expect("the function catalog is readable");
-        assert!(
-            functions.is_empty(),
-            "memory functions remain: {functions:?}"
+        // Exactly the delivery intents' run-cancellation trigger (E9); no legacy memory function.
+        assert_eq!(
+            functions,
+            ["cancel_memory_deliveries_of_run"],
+            "memory functions are exactly the client's own"
         );
     }
 
@@ -498,6 +608,10 @@ mod agent_config_tests;
 #[cfg(test)]
 mod legacy_runtime_schema_tests;
 
+#[cfg(test)]
+mod doop_live_input;
+#[cfg(test)]
+mod doop_live_setup_tests;
 pub mod mcp;
 #[cfg(test)]
 mod mcp_tests;

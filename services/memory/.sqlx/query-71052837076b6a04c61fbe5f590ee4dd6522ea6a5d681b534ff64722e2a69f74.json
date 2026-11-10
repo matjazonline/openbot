@@ -1,0 +1,53 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT g.credential_id, g.namespace_id, n.external_id, g.read_max::smallint AS read_max, g.write_max::smallint AS write_max, g.operations FROM credential_grants AS g JOIN namespaces AS n ON (n.tenant_id, n.id) = (g.tenant_id, g.namespace_id) WHERE g.tenant_id = $1 AND g.credential_id = ANY($2) AND n.state = 'active' ORDER BY g.credential_id, n.external_id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "credential_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "namespace_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "external_id",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "read_max",
+        "type_info": "Int2"
+      },
+      {
+        "ordinal": 4,
+        "name": "write_max",
+        "type_info": "Int2"
+      },
+      {
+        "ordinal": 5,
+        "name": "operations",
+        "type_info": "TextArray"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "UuidArray"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      null,
+      null,
+      false
+    ]
+  },
+  "hash": "71052837076b6a04c61fbe5f590ee4dd6522ea6a5d681b534ff64722e2a69f74"
+}

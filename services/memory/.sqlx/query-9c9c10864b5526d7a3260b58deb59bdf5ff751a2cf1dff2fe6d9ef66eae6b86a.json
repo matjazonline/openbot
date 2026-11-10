@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE admin_credentials SET revoked_at = coalesce(revoked_at, now()) WHERE id = $1 RETURNING scope",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "scope",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "9c9c10864b5526d7a3260b58deb59bdf5ff751a2cf1dff2fe6d9ef66eae6b86a"
+}

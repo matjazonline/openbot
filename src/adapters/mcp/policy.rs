@@ -13,8 +13,27 @@ use std::{
 #[derive(Clone, Default)]
 pub struct EndpointPolicy {
     internal: HashSet<McpEndpoint>,
+    /// Operator-owned service origins no company connection may reach, exceptions included.
+    reserved: Vec<url::Origin>,
+    #[cfg(test)]
+    test_root: Option<reqwest::Certificate>,
 }
 impl EndpointPolicy {
+    /// Refuses every endpoint on `service_url`'s origin (scheme, host, effective port): the
+    /// memory service (phase 05 E5). Defense in depth only: no company holds a memory client
+    /// credential, and an alias of the same host (an IP for a name) is not recognised.
+    pub fn reserving(mut self, service_url: &str) -> AppResult<Self> {
+        let url = url::Url::parse(service_url)
+            .map_err(|_| AppError::BadRequest("Reserved service URL is invalid".into()))?;
+        let origin = url.origin();
+        if !origin.is_tuple() {
+            return Err(AppError::BadRequest(
+                "Reserved service URL is invalid".into(),
+            ));
+        }
+        self.reserved.push(origin);
+        Ok(self)
+    }
     pub fn new(endpoints: impl IntoIterator<Item = String>) -> AppResult<Self> {
         let mut internal = HashSet::new();
         for endpoint in endpoints {
@@ -27,10 +46,24 @@ impl EndpointPolicy {
             }
             internal.insert(endpoint);
         }
-        Ok(Self { internal })
+        Ok(Self {
+            internal,
+            reserved: Vec::new(),
+            #[cfg(test)]
+            test_root: None,
+        })
+    }
+    /// Trust the disposable ingress CA in an isolated libtest process.
+    #[cfg(test)]
+    pub(crate) fn with_test_root_certificate(mut self, root: reqwest::Certificate) -> Self {
+        self.test_root = Some(root);
+        self
     }
     pub fn validate(&self, endpoint: &McpEndpoint) -> AppResult<()> {
         let url = url::Url::parse(endpoint.as_str()).map_err(|_| denied())?;
+        if self.reserved.contains(&url.origin()) {
+            return Err(denied());
+        }
         if self.internal.contains(endpoint) {
             return Ok(());
         }
@@ -83,10 +116,16 @@ impl EndpointPolicy {
         {
             return Err(denied());
         }
-        pinned_client(host, &addresses)
+        let builder = pinned_client_builder(host, &addresses);
+        #[cfg(test)]
+        let builder = match self.test_root.clone() {
+            Some(root) => builder.add_root_certificate(root),
+            None => builder,
+        };
+        builder.build().map_err(|_| denied())
     }
 }
-fn pinned_client(host: &str, addresses: &[SocketAddr]) -> AppResult<reqwest::Client> {
+fn pinned_client_builder(host: &str, addresses: &[SocketAddr]) -> reqwest::ClientBuilder {
     reqwest::Client::builder()
         .no_proxy()
         .redirect(reqwest::redirect::Policy::none())
@@ -96,8 +135,6 @@ fn pinned_client(host: &str, addresses: &[SocketAddr]) -> AppResult<reqwest::Cli
         .read_timeout(Duration::from_secs(10))
         .resolve_to_addrs(host, addresses)
         .pool_max_idle_per_host(1)
-        .build()
-        .map_err(|_| denied())
 }
 fn denied() -> AppError {
     AppError::BadRequest("MCP destination is prohibited or unavailable".into())
@@ -186,7 +223,9 @@ mod tests {
         });
         // Exercise the actual connector with a deliberately unresolvable host. The policy
         // validator above is separately exercised; only this test directly supplies its pin.
-        let client = pinned_client("rebind.invalid", &[address]).unwrap();
+        let client = pinned_client_builder("rebind.invalid", &[address])
+            .build()
+            .unwrap();
         let response = client
             .get(format!("http://rebind.invalid:{}/", address.port()))
             .send()
@@ -224,5 +263,40 @@ mod tests {
             assert!(blocked(ip.parse().unwrap()));
         }
         assert!(!blocked("8.8.8.8".parse().unwrap()));
+    }
+
+    /// Phase 05 E5 defense in depth: the memory service's origin is refused for every company
+    /// connection, even one an operator listed as an internal exception; other origins are not.
+    #[tokio::test]
+    async fn memory_integration_company_connections_cannot_reach_the_memory_service_origin() {
+        let endpoint = |v: &str| McpEndpoint::try_from(v.to_owned()).unwrap();
+        let policy = EndpointPolicy::new(["http://10.0.0.7:8085/mcp".into()])
+            .unwrap()
+            .reserving("http://10.0.0.7:8085/")
+            .unwrap()
+            .reserving("https://memory.example.com/")
+            .unwrap();
+        for url in [
+            "http://10.0.0.7:8085/mcp",
+            "https://memory.example.com/mcp",
+            "https://MEMORY.example.com:443/v1/observations/search",
+        ] {
+            assert!(policy.validate(&endpoint(url)).is_err(), "{url}");
+        }
+        // Refused before any resolution or connection.
+        assert!(
+            policy
+                .client(&endpoint("https://memory.example.com/mcp"))
+                .await
+                .is_err()
+        );
+        for url in [
+            "https://memory.example.com:8443/mcp",
+            "https://example.com/mcp",
+            "https://other.memory.example.com/mcp",
+        ] {
+            assert!(policy.validate(&endpoint(url)).is_ok(), "{url}");
+        }
+        assert!(EndpointPolicy::default().reserving("not a url").is_err());
     }
 }

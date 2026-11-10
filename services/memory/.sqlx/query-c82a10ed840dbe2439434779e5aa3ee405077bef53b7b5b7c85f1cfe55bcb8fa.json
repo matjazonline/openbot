@@ -1,0 +1,33 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO sources (tenant_id, namespace_id, id, external_ref, revision, access_level, session_id, content, content_sha256, occurred_at, expires_at, recorded_by) VALUES ($1, $2, $3, $4, $5, $6::smallint, $7, $8, $9, $10, $11, $12) ON CONFLICT (tenant_id, namespace_id, external_ref, revision) DO NOTHING RETURNING id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Text",
+        "Text",
+        "Int2",
+        "Uuid",
+        "Text",
+        "Bytea",
+        "Timestamptz",
+        "Timestamptz",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "c82a10ed840dbe2439434779e5aa3ee405077bef53b7b5b7c85f1cfe55bcb8fa"
+}

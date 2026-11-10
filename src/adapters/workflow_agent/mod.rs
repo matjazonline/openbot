@@ -2,7 +2,8 @@
 //! through the HTTP, MCP, messaging or provisioning runtime's direct-tool entry, one call at a
 //! time. A workflow
 //! tool starts its pinned child through the workflow tool runtime instead (07-D2 §D2.3a).
-//! Knowledge search commits a read observation and its classification locally, without actions.
+//! Knowledge search and the memory tools commit their observation and classification locally,
+//! without actions.
 use crate::{
     adapters::{
         workflow_http::HttpRuntime, workflow_mcp::McpRuntime, workflow_message::MessageRuntime,
@@ -16,6 +17,7 @@ use crate::{
         knowledge::{KnowledgeToolCall, KnowledgeToolDispatch},
         lease::WorkflowFence,
         mcp::{McpToolCall, McpToolTarget},
+        memory_tools::{MemoryToolCall, MemoryToolDispatch},
         message::{MessageObservation, MessageToolCall},
         provisioning::ProvisioningToolCall,
         tools::{TOOL_LIMIT, WorkflowToolCall, WorkflowToolDispatch, tool_error},
@@ -38,6 +40,9 @@ pub struct AgentActionTools {
     /// fails closed.
     provisioning: Option<Arc<ProvisioningRuntime>>,
     knowledge: Option<Arc<dyn KnowledgeToolDispatch>>,
+    /// The memory tools (phase 05 E5), composed only while the memory service is configured;
+    /// without them a published memory tool fails closed.
+    memory: Option<Arc<dyn MemoryToolDispatch>>,
 }
 impl AgentActionTools {
     pub fn new(http: Arc<HttpRuntime>, mcp: Arc<McpRuntime>, message: Arc<MessageRuntime>) -> Self {
@@ -48,6 +53,7 @@ impl AgentActionTools {
             workflow: None,
             provisioning: None,
             knowledge: None,
+            memory: None,
         }
     }
     pub fn with_workflow_tools(mut self, workflow: Arc<dyn WorkflowToolDispatch>) -> Self {
@@ -62,6 +68,13 @@ impl AgentActionTools {
         self.knowledge = Some(knowledge);
         self
     }
+    pub fn with_memory(mut self, memory: Arc<dyn MemoryToolDispatch>) -> Self {
+        self.set_memory(memory);
+        self
+    }
+    pub fn set_memory(&mut self, memory: Arc<dyn MemoryToolDispatch>) {
+        self.memory = Some(memory);
+    }
 }
 
 // Box each owned call payload so adding a tool does not grow the async dispatch frame.
@@ -72,6 +85,7 @@ enum ToolInvocation {
     Provisioning(Box<ProvisioningToolCall>),
     Message(Box<MessageToolCall>),
     Knowledge(Box<KnowledgeToolCall>),
+    Memory(Box<MemoryToolCall>),
 }
 fn invocation(
     tool: &PreparedTool,
@@ -128,6 +142,14 @@ fn invocation(
             call,
             arguments,
         })),
+        AgentToolTarget::Memory { tool: memory } => {
+            ToolInvocation::Memory(Box::new(MemoryToolCall {
+                origin: crate::application::agent::ToolCallOrigin::Agent(tool.origin),
+                tool: *memory,
+                call,
+                arguments,
+            }))
+        }
     })
 }
 #[async_trait]
@@ -175,6 +197,14 @@ impl AgentToolDispatch for AgentActionTools {
                         )
                     })?;
                     Box::pin(knowledge.call_knowledge_tool(fence, *call)).await
+                }
+                ToolInvocation::Memory(call) => {
+                    let memory = self.memory.as_ref().ok_or_else(|| {
+                        AppError::ServiceUnavailable(
+                            "Memory tools are unavailable to this worker".into(),
+                        )
+                    })?;
+                    Box::pin(memory.call_memory_tool(fence, *call)).await
                 }
             }
         }

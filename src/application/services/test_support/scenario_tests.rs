@@ -4,6 +4,147 @@ use crate::services::test_support::{
 };
 
 #[tokio::test]
+async fn computed_response_uses_checked_request_and_captures_no_headers() {
+    let mut server = scripted_scenario(vec![ScriptedExchange::computed(
+        |request| {
+            if request.method != "POST"
+                || !request.header_matches("authorization", "Bearer fixture-key")
+            {
+                return Err("required model request");
+            }
+            Ok(())
+        },
+        |request| {
+            Ok(ScriptedResponse::json(
+                request.body["actual_receipt"].clone(),
+            ))
+        },
+    )])
+    .await;
+    let actual = serde_json::json!({"canvas_id":uuid::Uuid::new_v4().to_string()});
+    let body = serde_json::json!({"actual_receipt":actual});
+    let response: Value = reqwest::Client::new()
+        .post(&server.base_url)
+        .bearer_auth("fixture-key")
+        .json(&body)
+        .send()
+        .await
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+    assert_eq!(response, actual);
+    assert_eq!(server.observed(), vec![body]);
+    assert_eq!(server.finish().await, Ok(1));
+}
+
+#[tokio::test]
+async fn computed_response_is_not_built_after_a_request_mismatch() {
+    let server = scripted_scenario(vec![ScriptedExchange::computed(
+        |_| Err("expected actual tool receipt"),
+        |_| panic!("a rejected request must not build a reply"),
+    )])
+    .await;
+    assert!(
+        reqwest::Client::new()
+            .post(&server.base_url)
+            .json(&Value::Null)
+            .send()
+            .await
+            .is_err()
+    );
+    assert_eq!(
+        server.finish().await.unwrap_err(),
+        "request mismatch: expected actual tool receipt"
+    );
+}
+
+#[tokio::test]
+async fn computed_response_failure_has_fixed_diagnostics_and_no_fake_success() {
+    let mut server = scripted_scenario(vec![ScriptedExchange::computed(
+        |_| Ok(()),
+        |_| Err("private prompt or authentication must not be returned"),
+    )])
+    .await;
+    assert!(
+        reqwest::Client::new()
+            .post(&server.base_url)
+            .json(&Value::Null)
+            .send()
+            .await
+            .is_err()
+    );
+    assert!(server.observed().is_empty());
+    assert_eq!(
+        server.finish().await.unwrap_err(),
+        "computed fixture response rejected"
+    );
+}
+
+#[tokio::test]
+async fn computed_response_enforces_existing_body_header_count_and_header_text_limits() {
+    let mut body = ScriptedResponse::json(Value::Null);
+    body.body = "x".repeat(MAX_REQUEST_BYTES + 1);
+    let mut count = ScriptedResponse::json(Value::Null);
+    count.headers = (0..33)
+        .map(|index| (format!("X-{index}"), "ok".into()))
+        .collect();
+    let mut text = ScriptedResponse::json(Value::Null);
+    text.headers = vec![("X-Budget".into(), "x".repeat(16 * 1024 - 11))];
+    for response in [body, count, text] {
+        let mut server = scripted_scenario(vec![ScriptedExchange::computed(
+            |_| Ok(()),
+            move |_| Ok(response),
+        )])
+        .await;
+        assert!(
+            reqwest::Client::new()
+                .post(&server.base_url)
+                .json(&Value::Null)
+                .send()
+                .await
+                .is_err()
+        );
+        assert!(server.observed().is_empty());
+        assert_eq!(
+            server.finish().await.unwrap_err(),
+            "fixture response exceeds fixed bounds"
+        );
+    }
+}
+
+#[tokio::test]
+async fn computed_response_accepts_exact_body_and_header_limits() {
+    let mut body = ScriptedResponse::json(Value::Null);
+    body.body = "x".repeat(MAX_REQUEST_BYTES);
+    let mut count = ScriptedResponse::json(Value::Null);
+    count.headers = (0..32)
+        .map(|index| (format!("X-{index}"), "ok".into()))
+        .collect();
+    let mut text = ScriptedResponse::json(Value::Null);
+    text.headers = vec![("X-Budget".into(), "x".repeat(16 * 1024 - 12))];
+    for response in [body, count, text] {
+        let expected = response.body.len();
+        let server = scripted_scenario(vec![ScriptedExchange::computed(
+            |_| Ok(()),
+            move |_| Ok(response),
+        )])
+        .await;
+        let bytes = reqwest::Client::new()
+            .post(&server.base_url)
+            .json(&Value::Null)
+            .send()
+            .await
+            .unwrap()
+            .bytes()
+            .await
+            .unwrap();
+        assert_eq!(bytes.len(), expected);
+        assert_eq!(server.finish().await, Ok(1));
+    }
+}
+
+#[tokio::test]
 async fn registration_is_scoped_and_missing_external_endpoints_fail_locally() {
     for endpoint in [
         None,

@@ -62,13 +62,12 @@ async fn knowledge_run_level_http_current_connection_level_allows_classified_dis
         .await
         .unwrap();
     tx.commit().await.unwrap();
-    assert!(
-        runtime(&setup)
-            .run(&setup.kind, &setup.claim)
-            .await
-            .completed_result()
-            .is_ok()
-    );
+    knowledge::exactness_fixture::mark_exact(p.pool(), scope.company, scope.run).await;
+    let output = runtime(&setup)
+        .run(&setup.kind, &setup.claim)
+        .await
+        .completed_result()
+        .unwrap();
     server.await.unwrap();
     assert_eq!(
         action_counts(&setup.fixture).await,
@@ -78,6 +77,21 @@ async fn knowledge_run_level_http_current_connection_level_allows_classified_dis
             receipts: 1
         }
     );
+    // The fenced completion is one caller of the shared writer: an `http.request` output is
+    // external content and lowers the run's exactness (phase 05 E3).
+    crate::application::workflow::completion::WorkflowCompletion::complete_io(
+        p,
+        crate::application::workflow::lease::FencedWorkflowResult {
+            policy: crate::application::workflow::lease::LeasePolicy::new(Duration::from_secs(3))
+                .unwrap(),
+            fence: setup.claim.fence,
+            output,
+        },
+    )
+    .await
+    .unwrap()
+    .unwrap();
+    assert!(!knowledge::exactness_fixture::exact(p.pool(), scope.company, scope.run).await);
 }
 
 #[tokio::test]

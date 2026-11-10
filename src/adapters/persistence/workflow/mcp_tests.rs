@@ -35,6 +35,8 @@ mod reconciliation_tests;
 
 #[path = "mcp_agent_tests.rs"]
 mod agent_tests;
+#[path = "mcp_snapshot_tests.rs"]
+mod snapshot_tests;
 
 fn code(failure: &WorkflowFailure) -> &str {
     failure.failure.code().as_str()
@@ -493,6 +495,12 @@ async fn workflow_mcp_refusals_and_protection_are_terminal_without_network() {
 mod catalog_tests;
 #[path = "mcp_recovery_tests.rs"]
 mod recovery_tests;
+
+#[path = "mcp_authentication_tests.rs"]
+mod authentication_tests;
+
+#[path = "doop_setup_tests.rs"]
+mod doop_setup_tests;
 
 #[path = "action_approval_mcp_tests.rs"]
 mod approval_tests;

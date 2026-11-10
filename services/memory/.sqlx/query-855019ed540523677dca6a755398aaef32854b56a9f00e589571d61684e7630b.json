@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM tenant_generation_schedule WHERE tenant_id IN ( SELECT s.tenant_id FROM tenants AS t JOIN tenant_generation_schedule AS s ON s.tenant_id = t.id WHERE t.state = 'deleted' AND t.content_removed_at IS NULL AND NOT EXISTS (SELECT 1 FROM namespaces AS n WHERE n.tenant_id = t.id AND n.content_removed_at IS NULL) LIMIT $1 FOR UPDATE OF s SKIP LOCKED)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "855019ed540523677dca6a755398aaef32854b56a9f00e589571d61684e7630b"
+}

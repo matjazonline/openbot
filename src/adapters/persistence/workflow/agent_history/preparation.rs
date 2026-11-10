@@ -11,9 +11,9 @@ pub(super) struct LockedAgent {
     pub facts: scope::Facts,
     pub selection: ResolvedAgent,
 }
-struct Candidate {
-    prepared: PreparedAgent,
-    context: Option<Context>,
+pub(super) struct Candidate {
+    pub(super) prepared: PreparedAgent,
+    pub(super) context: Option<Context>,
 }
 
 pub(in crate::adapters::persistence::workflow) enum Preparation {
@@ -26,13 +26,25 @@ pub(in crate::adapters::persistence::workflow) async fn prepare(
     persistence: &PostgresPersistence,
     claim: &ClaimedWorkflow,
     policy: LeasePolicy,
+    memory: crate::application::workflow::memory_recall::MemoryPreparation,
 ) -> AppResult<Preparation> {
     let bound = WriteBound::start("agent_history.prepare", policy);
+    let capture = memory.capture;
+    let recall = std::sync::Mutex::new(memory.recall);
     let attempt = bound
         .attempt(Box::pin(async {
             let mut connection = bound.acquire(persistence.pool()).await?;
             let mut tx = bound.begin(&mut connection).await?;
-            let body = Box::pin(prepare_on(&mut tx, claim, &bound, persistence.app_domain())).await;
+            let fetched = recall.lock().map_err(|_| invalid())?.take();
+            let body = Box::pin(prepare_on(
+                &mut tx,
+                claim,
+                &bound,
+                persistence.app_domain(),
+                fetched,
+                capture,
+            ))
+            .await;
             bound.end(tx, body).await
         }))
         .await;
@@ -96,6 +108,8 @@ async fn prepare_on(
     claim: &ClaimedWorkflow,
     bound: &WriteBound,
     domain: Option<&str>,
+    recall: Option<crate::application::workflow::memory_recall::FetchedRecall>,
+    capture: bool,
 ) -> AppResult<End<Preparation>> {
     let candidate = Box::pin(candidate_on(tx, claim, bound, domain)).await?;
     let prepared = match candidate.context {
@@ -124,6 +138,8 @@ async fn prepare_on(
                 tx,
                 claim.fence,
                 candidate.prepared.with_history(exchange)?,
+                recall,
+                capture,
             ))
             .await?
         }
@@ -201,7 +217,7 @@ pub(super) async fn locked_on(
     })
 }
 
-async fn candidate_on(
+pub(super) async fn candidate_on(
     tx: &mut Transaction<'_, Postgres>,
     claim: &ClaimedWorkflow,
     bound: &WriteBound,

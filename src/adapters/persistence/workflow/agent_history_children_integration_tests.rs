@@ -116,7 +116,81 @@ async fn finish_child(setup: &AgentSetup, branch: Branch) -> ClaimedWorkflow {
 }
 
 async fn journey(initial: AccessLevel) {
-    let setup = Box::pin(agent_setup("http://127.0.0.1:1")).await;
+    journey_with(initial, false).await;
+}
+
+/// Phase 05 E8 stand-in rows: an enabled tenant allowing generation, a ready user namespace for
+/// the run actor, and both capture switches on for the agent (acceptance reads only these).
+async fn seed_capture(setup: &AgentSetup) {
+    let pool = setup.fixture.persistence.pool();
+    let company = setup.fixture.target.company.as_uuid();
+    let actor = setup.fixture.target.actor.user_id();
+    sqlx::query(
+        "INSERT INTO memory_tenants (company_id, state, revision, disable_epoch, \
+           provisioner_credential_id, generation_cap, changed_by, changed_at) \
+         VALUES ($1, 'enabled', 1, 0, gen_random_uuid(), 100000, $2, clock_timestamp())",
+    )
+    .bind(company)
+    .bind(actor)
+    .execute(pool)
+    .await
+    .unwrap();
+    for (kind, agent, user) in [
+        ("user", None, Some(actor)),
+        ("agent", Some(setup.agent), None),
+    ] {
+        sqlx::query(
+            "INSERT INTO memory_namespaces (company_id, id, scope_kind, agent_id, user_id, state, \
+               credential_id, credential_envelope) \
+             VALUES ($1, gen_random_uuid(), $2, $3, $4, 'ready', gen_random_uuid(), 'stand-in')",
+        )
+        .bind(company)
+        .bind(kind)
+        .bind(agent)
+        .bind(user)
+        .execute(pool)
+        .await
+        .unwrap();
+    }
+    sqlx::query(
+        "INSERT INTO memory_agent_capture (company_id, agent_id, kind, enabled, allowance_tokens, \
+           max_output_tokens, expiry_hours, revision, changed_by, reason, changed_at) \
+         SELECT $1, $2, kind, true, 4000, 500, 12, 1, $3, 'Capture pilot', clock_timestamp() \
+         FROM unnest(ARRAY['private_sessions', 'threads']) AS kind",
+    )
+    .bind(company)
+    .bind(setup.agent)
+    .bind(actor)
+    .execute(pool)
+    .await
+    .unwrap();
+}
+
+async fn journey_with(initial: AccessLevel, capture: bool) {
+    let mut setup = Box::pin(agent_setup("http://127.0.0.1:1")).await;
+    if capture {
+        seed_capture(&setup).await;
+        // A runtime with the memory service configured arms capture (U7). This agent has no
+        // memory tools and its namespaces are ready, so the service is never contacted.
+        let config = crate::infra::memory_config::MemoryServiceConfig {
+            base_url: "http://127.0.0.1:9".into(),
+            provisioner: crate::infra::memory_config::ProvisionerToken::parse(
+                "msk_adm_0190f1a2b3c44d5e8f9a0b1c2d3e4f50_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                    .into(),
+            )
+            .unwrap(),
+            request_timeout: Duration::from_secs(1),
+            recall_deadline: Duration::from_millis(500),
+            interactive_in_flight: 1,
+            background_in_flight: 1,
+        };
+        setup.recall = Some(Arc::new(
+            crate::application::workflow::memory_recall::MemoryRecall::new(
+                Arc::new(setup.fixture.persistence.clone()),
+                Arc::new(crate::adapters::memory_service::MemoryServiceHttp::new(&config).unwrap()),
+            ),
+        ));
+    }
     let graph = graph(&setup).await;
     let mut llm = scripted_llm(vec![
         LlmTurn::text("\"parent accepted\""),
@@ -156,8 +230,17 @@ async fn journey(initial: AccessLevel) {
     );
     stamp(&setup, &branch.child, AccessLevel::L5).await;
     let last = finish_child(&setup, branch).await;
+    // Prepared here before the runtime runs it; with capture, as a configured runtime prepares
+    // (U7), so the frozen preparation is armed.
     let prepared = p
-        .prepare_agent(&last, lease())
+        .prepare_agent_with_recall(
+            &last,
+            lease(),
+            crate::application::workflow::memory_recall::MemoryPreparation {
+                recall: None,
+                capture,
+            },
+        )
         .await
         .unwrap()
         .expect_ready();
@@ -180,6 +263,41 @@ async fn journey(initial: AccessLevel) {
     assert!(requests[2].to_string().contains("parent accepted"));
     assert!(!requests[2].to_string().contains("CHILD PRIVATE"));
     assert_eq!(llm.finish().await.unwrap(), 3);
+    if capture {
+        // Both exchanges of the creator's own manual root are captured; the child branch never.
+        let captured: Vec<(String, String)> = sqlx::query_as(
+            "SELECT conversation.scope_kind, namespace.scope_kind FROM memory_deliveries AS delivery \
+             JOIN agent_history_exchanges AS exchange ON exchange.company_id = delivery.company_id \
+               AND exchange.id = delivery.exchange_id \
+             JOIN agent_history_conversations AS conversation \
+               ON conversation.company_id = exchange.company_id AND conversation.id = exchange.conversation_id \
+             JOIN memory_namespaces AS namespace ON namespace.company_id = delivery.company_id \
+               AND namespace.id = delivery.namespace_id \
+             WHERE delivery.company_id = $1 AND delivery.kind = 'generation'",
+        )
+        .bind(setup.fixture.target.company.as_uuid())
+        .fetch_all(p.pool())
+        .await
+        .unwrap();
+        assert_eq!(
+            captured,
+            vec![
+                ("private_session".to_owned(), "user".to_owned()),
+                ("private_session".to_owned(), "user".to_owned())
+            ]
+        );
+        let texts: String = sqlx::query_scalar(
+            "SELECT string_agg(request::text, ' ') FROM memory_deliveries WHERE company_id = $1",
+        )
+        .bind(setup.fixture.target.company.as_uuid())
+        .fetch_one(p.pool())
+        .await
+        .unwrap();
+        assert!(
+            !texts.contains("CHILD PRIVATE"),
+            "the child branch is never captured"
+        );
+    }
 }
 
 async fn assert_branches(setup: &AgentSetup, root: RunId, child_run: RunId) {
@@ -210,6 +328,13 @@ async fn agent_history_children_same_agent_private_branch_completes_without_pare
 #[tokio::test]
 async fn agent_history_level_child_branch_inherits_content_and_result_taints_parent() {
     journey(AccessLevel::L5).await;
+}
+
+/// Phase 05 E8: with both switches on, a manual root's private-session exchanges are captured
+/// into the creator's memory and its child branch's never are.
+#[tokio::test]
+async fn memory_capture_a_child_branch_is_never_captured() {
+    journey_with(AccessLevel::PUBLIC, true).await;
 }
 
 #[tokio::test]
@@ -354,4 +479,48 @@ async fn claim_after_first(
     .await
     .unwrap()
     .unwrap()
+}
+
+/// E2 with U4 on real runs: a manual root's child, run as the root's actor through the production
+/// child path, inherits the root's user scope; the parent walk reaches the root's session and
+/// admission.
+#[tokio::test]
+async fn memory_scope_a_manual_roots_child_inherits_the_user_scope() {
+    let setup = Box::pin(agent_setup("http://127.0.0.1:1")).await;
+    let graph = graph(&setup).await;
+    let llm = scripted_llm(vec![LlmTurn::text("\"parent accepted\"")]).await;
+    register_scripted_agent_base_url(setup.agent, &llm.base_url);
+    let branch = Box::pin(begin(&setup, &graph, AccessLevel::PUBLIC)).await;
+    assert_eq!(llm.finish().await.unwrap(), 1);
+    let p = &setup.fixture.persistence;
+    let mut conn = p.pool().acquire().await.unwrap();
+    let actor: Uuid =
+        sqlx::query_scalar("SELECT actor_id FROM workflow_runs WHERE company_id=$1 AND id=$2")
+            .bind(branch.parent.company.as_uuid())
+            .bind(branch.parent.run.as_uuid())
+            .fetch_one(&mut *conn)
+            .await
+            .unwrap();
+    for run in [branch.parent.run, branch.child.fence.scope.run] {
+        let owner = super::checkpoints::memory_tools::user_scope_owner_on(
+            &mut conn,
+            branch.parent.company,
+            run,
+        )
+        .await
+        .unwrap();
+        assert_eq!(owner, Some(actor), "{run:?}");
+    }
+    let parent: Option<Uuid> =
+        sqlx::query_scalar("SELECT parent_run_id FROM workflow_runs WHERE company_id=$1 AND id=$2")
+            .bind(branch.parent.company.as_uuid())
+            .bind(branch.child.fence.scope.run.as_uuid())
+            .fetch_one(&mut *conn)
+            .await
+            .unwrap();
+    assert_eq!(
+        parent,
+        Some(branch.parent.run.as_uuid()),
+        "a real child run"
+    );
 }

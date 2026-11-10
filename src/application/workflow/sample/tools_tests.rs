@@ -9,7 +9,7 @@ fn tool_bundle() -> Arc<PublishedBundle> {
     leaf["workflow_id"] = json!(Uuid::from_u128(2));
     leaf["input_schema"] = json!({"type":"object"});
     leaf["parameter_schema"] = json!({"type":"object"});
-    leaf["output_schema"] = json!({"type":"object","properties":{"saved_ids":{"type":"array","items":{"type":"string"}}},"required":["saved_ids"],"additionalProperties":false});
+    leaf["output_schema"] = json!({"type":"object","properties":{"saved":{"type":"array"},"access_level":{"type":"integer"},"replayed":{"type":"boolean"}},"required":["saved","access_level","replayed"],"additionalProperties":false});
     let child = build(&leaf, DependencySnapshots::default(), vec![]);
     let definition = child.compiled().graph().definition();
     let tool = ToolSnapshot {
@@ -41,7 +41,13 @@ fn direct_agent_tools_and_pinned_workflow_tools_stay_in_sample() {
     let bundle = tool_bundle();
     let mut req = request(vec![
         script(1, "start", vec![json!("done")]),
-        script(2, "start", vec![json!({"saved_ids":["sample-only"]})]),
+        script(
+            2,
+            "start",
+            vec![
+                json!({"saved":[{"id":"00000000-0000-4000-8000-000000000001","revision":1}],"access_level":0,"replayed":false}),
+            ],
+        ),
     ]);
     req.scripts[0].responses[0].tools = vec![
         ScriptedToolCall {
@@ -73,7 +79,8 @@ fn direct_agent_tools_and_pinned_workflow_tools_stay_in_sample() {
             .iter()
             .any(|effect| effect.kind == SampleEffectKind::WorkflowChild)
     );
-    req.scripts[0].responses[0].tools[1].output = Some(json!({"saved_ids":[]}));
+    req.scripts[0].responses[0].tools[1].output =
+        Some(json!({"saved":[],"access_level":0,"replayed":false}));
     assert!(
         execute(bundle.clone(), req.clone())
             .unwrap()
@@ -136,7 +143,13 @@ fn protected_step_workflow_tool_needs_approval_and_executes_child() {
     );
     let mut req = request(vec![
         script(1, "start", vec![json!(null)]),
-        script(2, "start", vec![json!({"saved_ids":["sample"]})]),
+        script(
+            2,
+            "start",
+            vec![
+                json!({"saved":[{"id":"00000000-0000-4000-8000-000000000002","revision":1}],"access_level":0,"replayed":false}),
+            ],
+        ),
     ]);
     assert!(
         execute(bundle.clone(), req.clone())
@@ -149,7 +162,7 @@ fn protected_step_workflow_tool_needs_approval_and_executes_child() {
     let report = execute(bundle.clone(), req.clone()).unwrap();
     complete(&report);
     assert_eq!(report.effects.len(), 2);
-    req.scripts[0].responses[0].output = json!({"saved_ids":["replacement"]});
+    req.scripts[0].responses[0].output = json!({"saved":[{"id":"00000000-0000-4000-8000-000000000003","revision":1}],"access_level":0,"replayed":false});
     assert_eq!(execute(bundle, req).unwrap().status, SampleStatus::Stopped);
 }
 

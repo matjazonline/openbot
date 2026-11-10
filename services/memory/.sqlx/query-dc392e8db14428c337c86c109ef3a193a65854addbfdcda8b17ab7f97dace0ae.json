@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT c.tenant_id, c.id FROM namespaces AS n JOIN sessions AS c ON (c.tenant_id, c.namespace_id) = (n.tenant_id, n.id) WHERE n.state = 'deleted' AND n.content_removed_at IS NULL AND NOT EXISTS (SELECT 1 FROM generation_operations AS u WHERE u.tenant_id = n.tenant_id AND u.namespace_id = n.id AND u.finished_at IS NULL) AND NOT EXISTS (SELECT 1 FROM generation_operations AS g WHERE (g.tenant_id, g.namespace_id) = (n.tenant_id, n.id) AND g.session_id = c.id) AND NOT EXISTS (SELECT 1 FROM sources AS s WHERE (s.tenant_id, s.namespace_id) = (n.tenant_id, n.id) AND s.session_id = c.id) AND NOT EXISTS (SELECT 1 FROM observations AS o WHERE (o.tenant_id, o.namespace_id) = (n.tenant_id, n.id) AND o.session_id = c.id) LIMIT $1 FOR UPDATE OF c SKIP LOCKED",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "tenant_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "dc392e8db14428c337c86c109ef3a193a65854addbfdcda8b17ab7f97dace0ae"
+}

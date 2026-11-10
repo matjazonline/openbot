@@ -251,6 +251,7 @@ pub(super) enum CallResult {
 #[derive(sqlx::FromRow)]
 struct ChildOutcome {
     content_level: i16,
+    content_exact: bool,
     workflow_id: Uuid,
     version_id: Uuid,
     terminal_state: Option<String>,
@@ -265,7 +266,7 @@ pub(super) async fn call_result(
     child: Uuid,
 ) -> AppResult<CallResult> {
     let outcome = sqlx::query_as::<_, ChildOutcome>(
-        "SELECT child.workflow_id, child.version_id, child.content_level::smallint AS content_level, event.terminal_state, event.terminal_execution_id \
+        "SELECT child.workflow_id, child.version_id, child.content_level::smallint AS content_level, child.content_exact, event.terminal_state, event.terminal_execution_id \
          FROM workflow_runs AS child \
          LEFT JOIN workflow_run_events AS event ON event.company_id = child.company_id \
            AND event.run_id = child.id AND event.sequence = child.terminal_wakeup_sequence \
@@ -282,7 +283,9 @@ pub(super) async fn call_result(
     }
     let level = crate::entities::access_level::AccessLevel::try_from(outcome.content_level)
         .map_err(|_| invalid())?;
-    super::knowledge::raise_content_level_on(db, scope.company, scope.run, level).await?;
+    // An inexact child lowers the calling run with its result (E3).
+    super::knowledge::absorb_content_on(db, scope.company, scope.run, level, outcome.content_exact)
+        .await?;
     let message = |state: &str| format!("Workflow tool child run {child} {state}");
     let result = match outcome.terminal_state.as_deref() {
         Some("succeeded") => {

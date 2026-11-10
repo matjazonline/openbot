@@ -1,0 +1,30 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "(SELECT o.id FROM observations AS o\n                  JOIN namespaces AS n ON (n.tenant_id, n.id) = (o.tenant_id, o.namespace_id)\n                 WHERE o.tenant_id = $1 AND o.namespace_id = ANY($2)\n                   AND o.access_level <= $3::smallint AND n.state = 'active'\n                   AND (o.expires_at IS NULL OR o.expires_at > now())\n                   AND (o.occurred_at, o.id) < ($4, $5)\n                   AND (NOT $8::bool OR o.session_id = $9)\n                 ORDER BY o.occurred_at DESC, o.id DESC LIMIT $6)\n               UNION ALL\n               (SELECT o.id FROM observations AS o\n                  JOIN namespaces AS n ON (n.tenant_id, n.id) = (o.tenant_id, o.namespace_id)\n                 WHERE o.tenant_id = $1 AND o.namespace_id = ANY($2)\n                   AND o.access_level <= $3::smallint AND n.state = 'active'\n                   AND (o.expires_at IS NULL OR o.expires_at > now())\n                   AND (o.occurred_at, o.id) > ($4, $5)\n                   AND (NOT $8::bool OR o.session_id = $9)\n                 ORDER BY o.occurred_at, o.id LIMIT $7)",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "UuidArray",
+        "Int2",
+        "Timestamptz",
+        "Uuid",
+        "Int8",
+        "Int8",
+        "Bool",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "5784f82263f6baf5e28c27ed9bf3e4e0adf4342198f5dcf7e3cd7d8ec92ddec9"
+}

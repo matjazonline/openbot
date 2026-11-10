@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM sessions WHERE (tenant_id, id) IN (SELECT * FROM UNNEST($1::uuid[], $2::uuid[]))",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "UuidArray",
+        "UuidArray"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "3fcb7da2a30d180687cf2a729667070fff3162f2e351300498866802ebc37bab"
+}

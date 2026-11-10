@@ -1,0 +1,29 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT revoked_at IS NOT NULL AS \"revoked!\",\n                      coalesce(expires_at <= now(), false) AS \"expired!\"\n                 FROM credentials WHERE tenant_id = $1 AND id = $2 FOR SHARE SKIP LOCKED",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "revoked!",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 1,
+        "name": "expired!",
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null,
+      null
+    ]
+  },
+  "hash": "15136a0bbfb23c99cf3c5a43e3d628c96e0f48280d65b5cffb400f02f737a5fe"
+}

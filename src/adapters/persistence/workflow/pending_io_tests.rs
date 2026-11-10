@@ -36,11 +36,34 @@ async fn workflow_poison_io_activation_and_wrong_kind_park() {
 
 #[tokio::test]
 async fn workflow_poison_effect_output_and_spent_pending_reconcile() {
+    // `memory.save` served here until Phase 05 F2 made it marker-owned (its intent commits with the
+    // park), leaving no I/O kind unknown without a marker; an unresolved marker is the example now.
+    use crate::application::agent::ActionRecovery;
     for spent in [false, true] {
-        let source: Value =
-            serde_json::from_str(&registry::example("memory.save").unwrap().source).unwrap();
-        let (f, scope) = fixture_source(source).await;
+        // Spent: a replayable marker whose lease expired puts the job back to pending; once
+        // the run's horizon outgrows the provider's retention its effect is unknown again.
+        let recovery = if spent {
+            ActionRecovery::ProviderIdempotency
+        } else {
+            ActionRecovery::Reconcile
+        };
+        let (f, owned) = action_dispatch_tests::unresolved_marker(lease_source(), recovery).await;
+        let scope = owned.fence.scope;
         if spent {
+            expire(&f, scope).await;
+            assert!(
+                f.persistence()
+                    .settled()
+                    .claim_io(scope, worker(), policy())
+                    .await
+                    .unwrap()
+                    .is_none()
+            );
+            assert_eq!(snapshot(&f).await["jobs"][0]["status"], "pending");
+            sqlx::query("UPDATE workflow_runs SET deadline=clock_timestamp()+interval '2 years'")
+                .execute(f.persistence().pool())
+                .await
+                .unwrap();
             sqlx::query("UPDATE background_tasks SET retry_count=max_retries WHERE id=$1")
                 .bind(scope.job.0)
                 .execute(f.persistence().pool())
@@ -54,13 +77,6 @@ async fn workflow_poison_effect_output_and_spent_pending_reconcile() {
                     .unwrap()
             );
         } else {
-            let owned = f
-                .persistence()
-                .settled()
-                .claim_io(scope, worker(), policy())
-                .await
-                .unwrap()
-                .unwrap();
             assert!(
                 f.persistence()
                     .settled()

@@ -28,7 +28,15 @@ pub(super) fn gateway(
     p: &PostgresPersistence,
     c: &AppConfig,
     mcp: Arc<dyn crate::application::services::mcp_client::McpClient>,
+    memory_url: Option<&str>,
 ) -> anyhow::Result<IntegrationServices> {
+    // No integration call may reach the memory service either (phase 05 E5).
+    let http = match memory_url {
+        Some(url) => {
+            crate::adapters::guarded_http::HttpDestinationPolicy::default().reserving(url)?
+        }
+        None => crate::adapters::guarded_http::HttpDestinationPolicy::default(),
+    };
     let registry = Arc::new(configured_registry(c, GoogleOAuthConfig::from_env())?);
     let vault = PostgresVault::with_registry(p.clone(), registry.clone());
     let bindings = Arc::new(PostgresIntegrationBindings {
@@ -48,10 +56,7 @@ pub(super) fn gateway(
             registry,
             credentials: Arc::new(vault.clone()),
             transports: Arc::new(
-                crate::adapters::integrations::execution::IntegrationTransports {
-                    http: crate::adapters::guarded_http::HttpDestinationPolicy::default(),
-                    mcp,
-                },
+                crate::adapters::integrations::execution::IntegrationTransports { http, mcp },
             ),
         },
     );

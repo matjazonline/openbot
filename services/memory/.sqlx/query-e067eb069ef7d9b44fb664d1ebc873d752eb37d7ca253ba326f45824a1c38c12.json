@@ -1,0 +1,77 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT state, fence, lease_owner, cancel_requested_at IS NOT NULL AS \"cancel!\",\n                      outcome_code, expires_at <= now() AS \"expired!\", reserved_tokens, spend_day,\n                      attempts, request\n                 FROM generation_operations WHERE tenant_id = $1 AND id = $2 FOR UPDATE",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "state",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "fence",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 2,
+        "name": "lease_owner",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 3,
+        "name": "cancel!",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 4,
+        "name": "outcome_code",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 5,
+        "name": "expired!",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 6,
+        "name": "reserved_tokens",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 7,
+        "name": "spend_day",
+        "type_info": "Date"
+      },
+      {
+        "ordinal": 8,
+        "name": "attempts",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 9,
+        "name": "request",
+        "type_info": "Jsonb"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      null,
+      true,
+      null,
+      false,
+      true,
+      false,
+      true
+    ]
+  },
+  "hash": "e067eb069ef7d9b44fb664d1ebc873d752eb37d7ca253ba326f45824a1c38c12"
+}

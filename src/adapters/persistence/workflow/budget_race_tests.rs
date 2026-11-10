@@ -2,11 +2,16 @@ use super::*;
 
 #[tokio::test]
 async fn workflow_budget_runtime_unknown_effect_exhaustion_reconciles() {
-    let mut source: Value =
-        serde_json::from_str(&registry::example("memory.save").unwrap().source).unwrap();
+    // `memory.save` served here until Phase 05 F2 made it marker-owned (its intent commits with the
+    // park), leaving no I/O kind unknown without a marker; an unresolved marker is the example now.
+    let mut source = lease_source();
     source["limits"]["root_budget"] = json!({"activations":10,"model_calls":1,"repetitions":1});
-    let (f, scope) = fixture_source(source).await;
-    let fence = claim(&f, scope).await;
+    let (f, owned) = action_dispatch_tests::unresolved_marker(
+        source,
+        crate::application::agent::ActionRecovery::Reconcile,
+    )
+    .await;
+    let (fence, scope) = (owned.fence, owned.fence.scope);
     f.persistence()
         .settled()
         .reserve_budget(

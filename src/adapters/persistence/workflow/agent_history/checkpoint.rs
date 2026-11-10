@@ -44,7 +44,7 @@ async fn record_on(
             Err(invalid())
         };
     }
-    if prepared["version"] != 5 {
+    if prepared["version"] != crate::application::workflow::agent::PREPARED_AGENT_VERSION {
         return Err(invalid());
     }
     let reference =
@@ -125,7 +125,7 @@ pub(in crate::adapters::persistence::workflow) async fn check_prepared_on(
     actual_mode: AgentUseMode,
     prepared: &Value,
 ) -> AppResult<()> {
-    if prepared["version"] != 5 {
+    if prepared["version"] != crate::application::workflow::agent::PREPARED_AGENT_VERSION {
         return Err(invalid());
     }
     record_on(db, scope, actual_mode, prepared).await?;
@@ -164,7 +164,8 @@ pub(in crate::adapters::persistence::workflow) async fn attach_on(
     let changed = sqlx::query(
         "UPDATE agent_history_exchanges AS exchange SET state='active',checkpoint_id=$4, \
          activated_at=COALESCE(exchange.activated_at,clock_timestamp()), \
-         access_level=GREATEST(exchange.access_level,run.content_level) \
+         access_level=GREATEST(exchange.access_level,run.content_level), \
+         content_exact=exchange.content_exact AND run.content_exact \
          FROM workflow_runs AS run WHERE exchange.company_id=$1 AND exchange.run_id=$2 AND exchange.id=$3 \
            AND run.company_id=exchange.company_id AND run.id=exchange.run_id AND exchange.state='queued'",
     ).bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(row.id).bind(checkpoint).execute(db).await?;
@@ -267,17 +268,45 @@ pub(in crate::adapters::persistence::workflow) async fn accepted_on(
     };
     let changed = sqlx::query(
         "UPDATE agent_history_exchanges AS exchange SET state=$4,output=$5,finished_at=clock_timestamp(), \
-         access_level=GREATEST(exchange.access_level,run.content_level) \
+         access_level=GREATEST(exchange.access_level,run.content_level), \
+         content_exact=exchange.content_exact AND run.content_exact \
          FROM workflow_runs AS run WHERE exchange.company_id=$1 AND exchange.run_id=$2 AND exchange.id=$3 \
            AND run.company_id=exchange.company_id AND run.id=exchange.run_id AND exchange.state='active'",
     ).bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(row.id)
-        .bind(if output.is_some() {"completed"} else {"failed"}).bind(output).execute(db).await?;
+        .bind(if output.is_some() {"completed"} else {"failed"}).bind(&output).execute(&mut *db).await?;
     if changed.rows_affected() != 1 {
         return Err(missing());
     }
     tracing::info!(company_id=%scope.company.as_uuid(),run_id=%scope.run.as_uuid(),exchange_id=%row.id,
         durability="staged", state=if checkpoint.state==RunState::Completed {"completed"} else {"failed"},
         event="agent_history.completed", "Agent exchange terminal result staged in current transaction");
+    // Capture (E8) only for a completed exchange whose preparation a runtime with the memory
+    // service configured froze (U7), in this accepting transaction.
+    if let (Some(output), true) = (&output, prepared.get("capture") == Some(&Value::Bool(true))) {
+        let input = prepared.get("context").ok_or_else(invalid)?;
+        // Boxed: a new seam in the acceptance chain (src/AGENTS.md stack budget).
+        let captured = Box::pin(super::capture::capture_on(
+            db,
+            scope,
+            row.id,
+            row.agent_id,
+            input,
+            output,
+        ))
+        .await?;
+        // A skip is counted from this structured line (p06 A2-4: persistence holds no
+        // monitoring handle; `metric` names the counter a log pipeline derives).
+        if let crate::adapters::persistence::memory::deliveries::CaptureEnqueue::Skipped(reason) =
+            &captured
+        {
+            tracing::info!(company_id=%scope.company.as_uuid(),exchange_id=%row.id,
+                metric="memory_capture_skipped_total", reason=*reason, event="memory.capture",
+                "Memory capture skipped at acceptance");
+        } else {
+            tracing::info!(company_id=%scope.company.as_uuid(),exchange_id=%row.id,
+                capture=?captured, event="memory.capture", "Memory capture decided at acceptance");
+        }
+    }
     tracing::info!(company_id=%scope.company.as_uuid(),exchange_id=%row.id,
         durability="staged", event="agent_history.released", "Agent turn released in current transaction");
     Ok(())

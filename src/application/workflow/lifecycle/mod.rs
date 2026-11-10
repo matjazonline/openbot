@@ -31,6 +31,7 @@ pub struct DefinitionService<A, P, D, C> {
     decoder: D,
     directory: C,
     refused_kinds: &'static [&'static str],
+    memory_gate: Option<Arc<dyn crate::application::memory::MemoryPublicationGate>>,
 }
 impl<A, P, D, C> DefinitionService<A, P, D, C> {
     pub fn new(authorization: A, persistence: P, decoder: D, directory: C) -> Self {
@@ -40,7 +41,18 @@ impl<A, P, D, C> DefinitionService<A, P, D, C> {
             decoder,
             directory,
             refused_kinds: &[],
+            memory_gate: None,
         }
+    }
+
+    /// With the memory service configured, a version using a memory step publishes only while
+    /// the company has memory enabled (E4); without it the kinds stay refused.
+    pub fn with_memory_gate(
+        mut self,
+        gate: Arc<dyn crate::application::memory::MemoryPublicationGate>,
+    ) -> Self {
+        self.memory_gate = Some(gate);
+        self
     }
 
     /// Step kinds this deployment registers but cannot run: a version using one is refused at

@@ -1,0 +1,20 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO audit_events (id, tenant_id, actor_kind, actor_id, action, target_kind, target_id, outcome, correlation_id, details) SELECT $1, $2, 'system', $3, 'generation.settle', 'generation', $4, $5, (SELECT correlation_id FROM generation_operations WHERE tenant_id = $2 AND id = $7), $6",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Text",
+        "Text",
+        "Jsonb",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "b4dcba57fe3c686df5d74cf0549becf247f3cc641640b9b6520127534b15f831"
+}

@@ -1,0 +1,34 @@
+{
+  "source": "https://github.com/kgoedecke/doop",
+  "revision": "01584b34f6cadcf21767127280cc6e320a6d748a",
+  "sdk": "1.30.0",
+  "protocol": "2025-03-26",
+  "capture": "DC06 current-image-capture-R1: complete fresh same-image all/e2e families on disk and private Garage, local TLS, normal humans and bot keys",
+  "normalization": "Replace known synthetic account/workspace/canvas/frame/key IDs and loopback origin; no credential values saved",
+  "files": {
+    "initialize.json": "06951225b48a9bee6cfc9c37ad28422c9a30bc26bc0c7b1bbd594786465eddcd",
+    "tools.json": "c085e146362c5d729393deca5aaa3a52677bdae8fe15eb40a683640184e855f5",
+    "profile.json": "b3f6b5424ede3526c1a87eec61fd4e1eae6097838b8f2dd0b97b30221e93c62f",
+    "create-canvas.json": "ed5a8cb290955a548d87d0d4fde14ead3032bed90c2688b3a4deab6f1ac9afaa",
+    "foreign-canvas-error.json": "73335357c54ef07b93ea29c6926e06bee63fc39c9f3f8821c2fbc88728ae823d",
+    "screenshot.json": "16ea9e262f90235f2b4a64853269a5a5374739f290e2c21a17f3faf05e06971e",
+    "pdf.json": "cff0b811aa7d15a7ef831009b2aeb42b277232c2f9d07d6e528a9551633673d7",
+    "get-canvas.json": "f536274c4b4fe0d87dde4f61182a6a18bb990b8d07b1aa7a419f54e1d1fe4e46",
+    "guide.json": "eee578dab5c758471e6e2bc79c85324caf72bb1784b429464e257ec647651946",
+    "get-frame.json": "e1a7c72b37cb12428f867ee86165d9a6c05973e8584fea42a4b35559e1eb219d"
+  },
+  "source_identity": {
+    "revision": "01584b34f6cadcf21767127280cc6e320a6d748a",
+    "fingerprint": "e0c063c43c5bc70018eb8e09d0add0d32ef35159fff843bc9646da7ebe4c4464",
+    "kind": "packaged managed source"
+  },
+  "limitations": "Synthetic local deployment and deterministic normal-provider HTTP fixtures. No production/public CA/DNS, paid inference, OS clipboard or model visual-review claim. Actual full Openbot and separate Doop service verification are recorded separately in phase06; this record covers current local-image integration. Restore is a same-schema database restore with retained assets, not full object-store backup recovery.",
+  "image": {
+    "image_id": "sha256:425a2d2e718285f11fd9b18bf110dd173c689d0f0378a94f5ebe4f9872e52d43",
+    "manifest_digest": "sha256:425a2d2e718285f11fd9b18bf110dd173c689d0f0378a94f5ebe4f9872e52d43",
+    "archive_sha256": "7e85e67b892e8b0c523f089cbe2b8a4612861634e9ed5b7c5a64efba721e046d",
+    "user": "node"
+  },
+  "lock_sha256": "9fc8b3c110b390a9c46975da45c3a297090096703f9d9721dcea19f84dad28e3",
+  "openbot_helper_sha256": "0e55a4d3b1631a859c48b7ce23cca5ef1783ff77b3096f08658ccc58ffdb71d3"
+}

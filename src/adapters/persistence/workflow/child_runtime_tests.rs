@@ -586,3 +586,37 @@ async fn workflow_call_child_inherits_the_parents_delivery_policy() {
         assert_eq!(stored, policy.as_str());
     }
 }
+
+/// A child starts with its parent's exactness, and an inexact child's result lowers the parent
+/// through the child-completion caller of the shared writer (phase 05 E3).
+#[tokio::test]
+async fn memory_access_level_child_copies_exactness_and_an_inexact_child_lowers_its_parent() {
+    use crate::adapters::persistence::workflow::knowledge::{
+        exactness_fixture::{exact, mark_exact},
+        lower_content_exact_on,
+    };
+    for child_inexact in [false, true] {
+        let (f, parent) = AdmissionFixture::caller(data_map()).await;
+        let p = f.persistence();
+        mark_exact(p.pool(), parent.company, parent.run).await;
+        let child = f.spawn(parent).await;
+        assert!(exact(p.pool(), child.company, child.run).await, "copied");
+        if child_inexact {
+            let mut tx = p.pool().begin().await.unwrap();
+            lower_content_exact_on(&mut tx, child.company, child.run)
+                .await
+                .unwrap();
+            tx.commit().await.unwrap();
+        }
+        p.advance_pure(child, budget(4)).await.unwrap();
+        assert!(matches!(
+            p.resume_wait(parent).await.unwrap(),
+            WaitProgress::Completed(_)
+        ));
+        assert_eq!(state(&f, parent.run).await, "succeeded");
+        assert_eq!(
+            exact(p.pool(), parent.company, parent.run).await,
+            !child_inexact
+        );
+    }
+}

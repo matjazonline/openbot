@@ -65,7 +65,7 @@ pub(super) fn targets(
     company: CompanyId,
     tools: &[crate::application::agent::ResolvedAgentTool],
 ) -> AppResult<Vec<AgentToolTarget>> {
-    use crate::entities::agent_capability::{AgentBindingSource, AgentBuiltinTool};
+    use crate::entities::agent_capability::AgentBindingSource;
     tools
         .iter()
         .map(|tool| {
@@ -83,19 +83,7 @@ pub(super) fn targets(
                     .workflow
                     .ok_or_else(invalid)?,
                 },
-                AgentBindingSource::Builtin { tool } => match tool {
-                    AgentBuiltinTool::MessageSend | AgentBuiltinTool::MessageReply => {
-                        AgentToolTarget::Message {
-                            name: TypeName::parse(tool.name()).map_err(|_| invalid())?,
-                        }
-                    }
-                    AgentBuiltinTool::ListCompanyAgents | AgentBuiltinTool::CreateAgentChannel => {
-                        AgentToolTarget::Provisioning {
-                            name: TypeName::parse(tool.name()).map_err(|_| invalid())?,
-                        }
-                    }
-                    AgentBuiltinTool::SearchKnowledge => AgentToolTarget::Knowledge,
-                },
+                AgentBindingSource::Builtin { tool } => AgentToolTarget::builtin(*tool)?,
             })
         })
         .collect()
@@ -108,21 +96,32 @@ impl AgentPreparation for PostgresPersistence {
         claim: &ClaimedWorkflow,
         policy: LeasePolicy,
     ) -> AppResult<AgentPreparationResult> {
+        self.prepare_agent_with_recall(claim, policy, Default::default())
+            .await
+    }
+
+    async fn prepare_agent_with_recall(
+        &self,
+        claim: &ClaimedWorkflow,
+        policy: LeasePolicy,
+        memory: crate::application::workflow::memory_recall::MemoryPreparation,
+    ) -> AppResult<AgentPreparationResult> {
         let scope = claim.fence.scope;
         let action = crate::application::workflow::actions::ActionScope {
             company: scope.company,
             run: scope.run,
             execution: scope.execution,
         };
-        let prepared = match Box::pin(super::agent_history::prepare(self, claim, policy)).await? {
-            super::agent_history::Preparation::Ready(prepared) => *prepared,
-            super::agent_history::Preparation::Parked(wait) => {
-                return Ok(AgentPreparationResult::Parked(wait));
-            }
-            super::agent_history::Preparation::AtCapacity => {
-                return Ok(AgentPreparationResult::AtCapacity);
-            }
-        };
+        let prepared =
+            match Box::pin(super::agent_history::prepare(self, claim, policy, memory)).await? {
+                super::agent_history::Preparation::Ready(prepared) => *prepared,
+                super::agent_history::Preparation::Parked(wait) => {
+                    return Ok(AgentPreparationResult::Parked(wait));
+                }
+                super::agent_history::Preparation::AtCapacity => {
+                    return Ok(AgentPreparationResult::AtCapacity);
+                }
+            };
         let provider = ModelProvider::from(prepared.selection().agent().model.provider.as_str());
         let secret = crate::application::use_cases::company::CompanyPersistence::model_api_key(
             self,

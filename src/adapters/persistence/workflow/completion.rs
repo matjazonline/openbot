@@ -140,7 +140,10 @@ pub(super) async fn complete_on(
     let successor = batch_commit::complete(
         db,
         scope,
-        &activation,
+        batch_commit::CompletedStep {
+            activated: &activation,
+            graph: binding.bundle().compiled().graph(),
+        },
         &completion,
         run.max_steps,
         completion_job::CompletionOwner::Fenced(result.fence),

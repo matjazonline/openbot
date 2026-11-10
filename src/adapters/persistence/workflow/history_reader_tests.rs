@@ -30,7 +30,7 @@ async fn message(
     let p = f.persistence();
     let company = f.binding.target.company.as_uuid();
     let message = Uuid::new_v4();
-    sqlx::query("INSERT INTO messages (id, company_id, author_principal_id, subject, clean_text_body, direction, role, audience, correlation_id, content_hash) SELECT $1,$2,id,'History',$3,'inbound',$4,$5,$6,$7 FROM principals WHERE company_id=$2 AND user_id=$8")
+    sqlx::query("INSERT INTO messages (id, company_id, author_principal_id, subject, clean_text_body, direction, role, audience, correlation_id, content_hash, content_exact) SELECT $1,$2,id,'History',$3,'inbound',$4,$5,$6,$7,CASE WHEN $4='human' THEN NULL ELSE true END FROM principals WHERE company_id=$2 AND user_id=$8")
         .bind(message).bind(company).bind(body).bind(role).bind(audience).bind(Uuid::new_v4()).bind(vec![0_u8; 32])
         .bind(f.binding.target.actor.user_id()).execute(p.pool()).await.unwrap();
     sqlx::query("INSERT INTO thread_messages (id,company_id,channel_id,thread_id,message_id,entry_kind,created_at) VALUES ($1,$2,$3,$4,$5,$6,CURRENT_TIMESTAMP - make_interval(days => $7))")
@@ -283,3 +283,73 @@ mod knowledge_history_race_tests;
 
 #[path = "knowledge_history_lease_tests.rs"]
 mod knowledge_history_lease_tests;
+
+/// `context.history` lowers the reading run's exactness when any returned message is human
+/// (conversational input, derived from the role) or was written by an inexact run; exact
+/// agent messages keep it (phase 05 E3). The run is admitted on an exact agent message in its
+/// own thread, so the snapshot holds no other human row and the expected bit takes both values.
+#[tokio::test]
+async fn memory_access_level_history_read_lowers_for_conversational_or_inexact_messages() {
+    use crate::adapters::persistence::workflow::knowledge::exactness_fixture::{exact, mark_exact};
+    async fn stored(
+        f: &AdmissionFixture,
+        c: &Conversation,
+        days: i32,
+        role: &str,
+        exact: Option<bool>,
+    ) -> Uuid {
+        let message = Uuid::new_v4();
+        let company = f.binding.target.company.as_uuid();
+        sqlx::query("INSERT INTO messages (id, company_id, author_principal_id, subject, clean_text_body, direction, role, audience, correlation_id, content_hash, content_exact) SELECT $1,$2,id,'History','a turn','inbound',$3,'external_conversation',$4,$5,$6 FROM principals WHERE company_id=$2 AND user_id=$7")
+            .bind(message).bind(company).bind(role).bind(Uuid::new_v4()).bind(vec![0_u8; 32]).bind(exact)
+            .bind(f.binding.target.actor.user_id()).execute(f.persistence().pool()).await.unwrap();
+        sqlx::query("INSERT INTO thread_messages (id,company_id,channel_id,thread_id,message_id,entry_kind,created_at) VALUES ($1,$2,$3,$4,$5,'conversation',CURRENT_TIMESTAMP - make_interval(days => $6))")
+            .bind(Uuid::new_v4()).bind(company).bind(c.channel).bind(c.thread).bind(message).bind(days)
+            .execute(f.persistence().pool()).await.unwrap();
+        message
+    }
+    let mut seen = Vec::new();
+    for (case, role, stored_exact) in [
+        ("agent_exact", "agent", Some(true)),
+        ("agent_inexact", "agent", Some(false)),
+        ("system_inexact", "system", Some(false)),
+        ("human", "human", None),
+    ] {
+        let f = AdmissionFixture::with_binding(
+            BindingFixture::from_source(source(131_072, 65_536)).await,
+        )
+        .await;
+        let base = Conversation::new(&f).await;
+        let thread = Uuid::new_v4();
+        sqlx::query("INSERT INTO threads (id, company_id, channel_id, subject) VALUES ($1,$2,$3,'Agent only')")
+            .bind(thread).bind(f.binding.target.company.as_uuid()).bind(base.channel)
+            .execute(f.persistence().pool()).await.unwrap();
+        let mut c = Conversation {
+            channel: base.channel,
+            thread,
+            message: Uuid::nil(),
+        };
+        let earlier = stored(&f, &c, 2, role, stored_exact).await;
+        c.message = stored(&f, &c, 1, "agent", Some(true)).await;
+        let claim = claimed(&f, &c, case).await;
+        let scope = claim.fence.scope;
+        mark_exact(f.persistence().pool(), scope.company, scope.run).await;
+        let read = ids(&history(&f, &claim).await);
+        assert_eq!(
+            read.len(),
+            2,
+            "{case}: only the earlier turn and the agent trigger: {read:?}"
+        );
+        assert!(
+            read.contains(&earlier) && read.contains(&c.message),
+            "{case}"
+        );
+        let kept = exact(f.persistence().pool(), scope.company, scope.run).await;
+        assert_eq!(kept, case == "agent_exact", "{case}");
+        seen.push(kept);
+    }
+    assert!(
+        seen.contains(&true) && seen.contains(&false),
+        "the expectation discriminates"
+    );
+}

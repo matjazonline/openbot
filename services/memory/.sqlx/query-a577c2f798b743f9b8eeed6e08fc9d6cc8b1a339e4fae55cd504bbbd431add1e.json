@@ -1,0 +1,24 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT id FROM observations WHERE tenant_id = $1 AND generation_operation_id = $2 AND access_level <= $3::smallint AND (expires_at IS NULL OR expires_at > now()) ORDER BY output_ordinal",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Int2"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "a577c2f798b743f9b8eeed6e08fc9d6cc8b1a339e4fae55cd504bbbd431add1e"
+}

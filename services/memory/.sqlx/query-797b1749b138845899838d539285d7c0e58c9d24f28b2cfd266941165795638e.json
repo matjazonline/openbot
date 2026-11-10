@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT revoked_at IS NOT NULL AS \"revoked!\",\n                  coalesce(expires_at <= now(), false) AS \"expired!\"\n             FROM admin_credentials WHERE id = $1 FOR SHARE",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "revoked!",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 1,
+        "name": "expired!",
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null,
+      null
+    ]
+  },
+  "hash": "797b1749b138845899838d539285d7c0e58c9d24f28b2cfd266941165795638e"
+}

@@ -469,27 +469,42 @@ pub(crate) enum MessageStampSource {
         run: crate::domain::workflow::RunId,
     },
 }
+/// A message's stamped level and its stored exactness (phase 05 E3): none for human rows,
+/// whose exactness is derived from the role when read; the run's bit for a workflow's agent
+/// or system row; false for an agent or system row written outside a workflow run.
+struct MessageStamp {
+    level: crate::entities::access_level::AccessLevel,
+    content_exact: Option<bool>,
+}
 impl MessageStampSource {
-    async fn level_on(
+    async fn stamp_on(
         self,
         db: &mut sqlx::PgConnection,
         company: Uuid,
-    ) -> AppResult<crate::entities::access_level::AccessLevel> {
+        role: MessageRole,
+    ) -> AppResult<MessageStamp> {
         use crate::entities::access_level::AccessLevel;
+        let carries_bit = role != MessageRole::Human;
         let Self::Workflow {
             company: scoped,
             run,
         } = self
         else {
-            return Ok(AccessLevel::PUBLIC);
+            return Ok(MessageStamp {
+                level: AccessLevel::PUBLIC,
+                content_exact: carries_bit.then_some(false),
+            });
         };
         if scoped.as_uuid() != company {
             return Err(AppError::NotFound("Workflow message scope".into()));
         }
-        let level: i16=sqlx::query_scalar("SELECT content_level::smallint FROM workflow_runs WHERE company_id=$1 AND id=$2 FOR SHARE")
+        let (level, exact): (i16, bool) = sqlx::query_as("SELECT content_level::smallint,content_exact FROM workflow_runs WHERE company_id=$1 AND id=$2 FOR SHARE")
             .bind(company).bind(run.as_uuid()).fetch_optional(db).await?
             .ok_or_else(|| AppError::NotFound("Workflow message scope".into()))?;
-        AccessLevel::try_from(level).map_err(|e| AppError::Internal(e.into()))
+        Ok(MessageStamp {
+            level: AccessLevel::try_from(level).map_err(|e| AppError::Internal(e.into()))?,
+            content_exact: carries_bit.then_some(exact),
+        })
     }
 }
 
@@ -789,14 +804,14 @@ pub(super) async fn insert_canonical_message(
             &crate::adapters::response_schema::JsonResponseValidator,
         )?;
     }
-    let level = stamp.level_on(connection, company_id).await?;
+    let stamp = stamp.stamp_on(connection, company_id, write.role).await?;
     let id = write.id;
     sqlx::query(
         r#"INSERT INTO messages (
                 id, company_id, author_principal_id, authored_identity_id, subject,
                 clean_text_body, attachments, direction, role, correlation_id, content_hash,
-                created_at, audience, structured_response, access_level
-           ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15::smallint)"#,
+                created_at, audience, structured_response, access_level, content_exact
+           ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15::smallint, $16)"#,
     )
     .bind(id.as_uuid())
     .bind(company_id)
@@ -812,7 +827,8 @@ pub(super) async fn insert_canonical_message(
     .bind(write.created_at)
     .bind(write.audience.as_str())
     .bind(write.structured.as_ref().map(sqlx::types::Json))
-    .bind(level.as_i16())
+    .bind(stamp.level.as_i16())
+    .bind(stamp.content_exact)
     .execute(&mut *connection)
     .await
     .map_err(AppError::from)?;

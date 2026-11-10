@@ -192,6 +192,41 @@ impl RunKnowledge {
     }
 }
 
+/// Where human-written text entering a run came from (phase 05 E3, user decision U2).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum HumanInputClass {
+    /// Agent instructions, skills, workflow literals and schedule params: an owner or admin
+    /// authored them, and the agent already sends them into every audience it serves.
+    AuthoredConfiguration,
+    /// Human messages, manual and interactive run input, `decision.human` free-text feedback
+    /// and `message.ask` replies. Their stored level (0) does not prove what a person typed.
+    ConversationalInput,
+}
+
+/// What an exactness answer is for: the run's own accounting, or a save into a memory scope.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ExactnessTarget {
+    Run,
+    AgentScope,
+    UserScope,
+    CompanyScope,
+}
+
+/// Whether human input of `class` leaves a level exact for `target`. The one place U2 lives:
+/// changing it is one arm here plus its tests.
+pub const fn human_input_exactness(class: HumanInputClass, target: ExactnessTarget) -> bool {
+    match (class, target) {
+        (HumanInputClass::ConversationalInput, _) => false,
+        // Other agents recall company memories in audiences that never received this agent's
+        // configuration (U2 addendum).
+        (HumanInputClass::AuthoredConfiguration, ExactnessTarget::CompanyScope) => false,
+        (
+            HumanInputClass::AuthoredConfiguration,
+            ExactnessTarget::Run | ExactnessTarget::AgentScope | ExactnessTarget::UserScope,
+        ) => true,
+    }
+}
+
 #[cfg(test)]
 #[path = "knowledge_level_tests.rs"]
 mod knowledge_tests;

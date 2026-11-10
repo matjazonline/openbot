@@ -1,0 +1,25 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE observations AS o SET index_lease_until = now() + make_interval(secs => $4) FROM UNNEST($1::uuid[], $2::uuid[], $3::bigint[]) AS h(tenant_id, id, fence) WHERE (o.tenant_id, o.id, o.index_fence) = (h.tenant_id, h.id, h.fence) AND o.index_lease_until IS NOT NULL RETURNING o.id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "UuidArray",
+        "UuidArray",
+        "Int8Array",
+        "Float8"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "0cf354d1969df40a278b4d1080236bcf8ba4aa0ed06a55d4f12acbdb119cac3d"
+}

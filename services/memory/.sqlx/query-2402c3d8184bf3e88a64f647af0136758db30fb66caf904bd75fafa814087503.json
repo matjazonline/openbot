@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO admin_credentials (id, scope, label, verifier) VALUES ($1, 'operator', $2, $3)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Bytea"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "2402c3d8184bf3e88a64f647af0136758db30fb66caf904bd75fafa814087503"
+}

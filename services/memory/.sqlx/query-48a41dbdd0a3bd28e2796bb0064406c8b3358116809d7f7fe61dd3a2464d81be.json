@@ -1,0 +1,41 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT state, next_attempt_at <= now() AS \"due!\", expires_at <= now() AS \"expired!\",\n                      reservation\n                 FROM generation_operations WHERE tenant_id = $1 AND id = $2\n                  FOR UPDATE SKIP LOCKED",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "state",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "due!",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 2,
+        "name": "expired!",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 3,
+        "name": "reservation",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      null,
+      null,
+      false
+    ]
+  },
+  "hash": "48a41dbdd0a3bd28e2796bb0064406c8b3358116809d7f7fe61dd3a2464d81be"
+}

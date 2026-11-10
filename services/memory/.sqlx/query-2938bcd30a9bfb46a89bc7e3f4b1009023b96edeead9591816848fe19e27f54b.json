@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT EXISTS (SELECT 1 FROM tenants WHERE managed_by = $1) AS \"remaining!\"",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "remaining!",
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "2938bcd30a9bfb46a89bc7e3f4b1009023b96edeead9591816848fe19e27f54b"
+}

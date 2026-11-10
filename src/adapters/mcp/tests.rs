@@ -416,3 +416,5 @@ async fn mcp_dropped_call_sends_protocol_cancellation_and_joins_cleanup() {
     assert!(adapter.workers.lock().await.is_empty());
     assert_eq!(server.finish().await, Ok(4));
 }
+#[path = "authentication_tests.rs"]
+mod authentication;

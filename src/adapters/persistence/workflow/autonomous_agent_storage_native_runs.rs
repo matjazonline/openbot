@@ -95,7 +95,8 @@ async fn insert(f: &AdmissionFixture, owner: NativeRun<'_>) -> ActivationRequest
         &mut tx,
         &RunRow {
             company,
-            knowledge: levels,
+            knowledge: levels.levels,
+            content_exact: levels.exact,
             run,
             binding: owner.binding,
             association: RelatedAssociation::Company,

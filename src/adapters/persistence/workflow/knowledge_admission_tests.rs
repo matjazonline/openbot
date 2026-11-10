@@ -21,7 +21,7 @@ async fn outsider(f: &AdmissionFixture, c: &Conversation) {
 }
 pub(super) async fn stamped(f: &AdmissionFixture, c: &Conversation, stamp: AccessLevel) -> Uuid {
     let id = Uuid::new_v4();
-    sqlx::query("INSERT INTO messages(id,company_id,author_principal_id,subject,clean_text_body,direction,role,correlation_id,content_hash,audience,access_level) SELECT $1,$2,id,'Private','classified input','outbound','system',$3,$4,'external_conversation',$5::smallint FROM principals WHERE company_id=$2 AND user_id=$6")
+    sqlx::query("INSERT INTO messages(id,company_id,author_principal_id,subject,clean_text_body,direction,role,correlation_id,content_hash,audience,access_level,content_exact) SELECT $1,$2,id,'Private','classified input','outbound','system',$3,$4,'external_conversation',$5::smallint,true FROM principals WHERE company_id=$2 AND user_id=$6")
         .bind(id).bind(f.binding.target.company.as_uuid()).bind(Uuid::new_v4()).bind(vec![1_u8;32]).bind(stamp.as_i16()).bind(f.binding.target.actor.user_id()).execute(f.persistence().pool()).await.unwrap();
     sqlx::query("INSERT INTO thread_messages(id,company_id,channel_id,thread_id,message_id,entry_kind) VALUES($1,$2,$3,$4,$5,'conversation')")
         .bind(Uuid::new_v4()).bind(f.binding.target.company.as_uuid()).bind(c.channel).bind(c.thread).bind(id).execute(f.persistence().pool()).await.unwrap();
@@ -249,4 +249,54 @@ async fn knowledge_run_level_manual_uses_actual_admin_starter_and_keeps_member_r
             ));
         }
     }
+}
+
+/// Exactness only falls, never changes after the run ends, and a message's bit has the
+/// role's shape (phase 05 E3).
+#[tokio::test]
+async fn memory_access_level_schema_only_lowers_exactness_and_shapes_message_bits() {
+    use crate::adapters::persistence::workflow::knowledge::{
+        exactness_fixture::{exact, mark_exact},
+        lower_content_exact_on,
+    };
+    let f = AdmissionFixture::new().await;
+    let command = f.prepare(f.request("exact-guards", f.manual())).await;
+    f.persistence().admit(&command).await.unwrap();
+    let (company, run) = (command.company_id(), command.proposed_run_id());
+    let pool = f.persistence().pool();
+    mark_exact(pool, company, run).await;
+    let mut tx = pool.begin().await.unwrap();
+    lower_content_exact_on(&mut tx, company, run).await.unwrap();
+    lower_content_exact_on(&mut tx, company, run).await.unwrap();
+    tx.commit().await.unwrap();
+    assert!(!exact(pool, company, run).await);
+    let raised = sqlx::query("UPDATE workflow_runs SET content_exact=true WHERE id=$1")
+        .bind(run.as_uuid())
+        .execute(pool)
+        .await
+        .unwrap_err();
+    assert_eq!(
+        raised.as_database_error().unwrap().constraint(),
+        Some("workflow_guard:workflow_run_knowledge")
+    );
+    let c = Conversation::new(&f).await;
+    for (role, bit) in [("human", Some(true)), ("agent", None), ("system", None)] {
+        let error = sqlx::query("INSERT INTO messages(id,company_id,author_principal_id,subject,clean_text_body,direction,role,correlation_id,content_hash,audience,content_exact) SELECT $1,$2,id,'Shape','text','outbound',$3,$4,$5,'external_conversation',$6 FROM principals WHERE company_id=$2 AND user_id=$7")
+            .bind(Uuid::new_v4()).bind(company.as_uuid()).bind(role).bind(Uuid::new_v4()).bind(vec![3_u8;32]).bind(bit)
+            .bind(f.binding.target.actor.user_id()).execute(pool).await.unwrap_err();
+        assert_eq!(
+            error.as_database_error().unwrap().constraint(),
+            Some("messages_content_exact_shape"),
+            "{role}"
+        );
+    }
+    let changed = sqlx::query("UPDATE messages SET content_exact=true WHERE id=$1")
+        .bind(c.message)
+        .execute(pool)
+        .await
+        .unwrap_err();
+    assert_eq!(
+        changed.as_database_error().unwrap().constraint(),
+        Some("workflow_guard:message_access_level")
+    );
 }

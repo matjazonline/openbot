@@ -58,8 +58,8 @@ async fn classified(h: &Harness, thread: Uuid) -> CanonicalMessageId {
         source: None,
     };
     // A valid immutable stamped row fixture. Actual producer/run stamping is covered by p03.
-    sqlx::query("INSERT INTO messages(id,company_id,author_principal_id,subject,clean_text_body,attachments,direction,role,correlation_id,content_hash,audience,access_level) \
-        SELECT $1,$2,principal.id,$3,$4,$5,'outbound','agent',$6,decode(repeat('ab',32),'hex'),'external_conversation',5 \
+    sqlx::query("INSERT INTO messages(id,company_id,author_principal_id,subject,clean_text_body,attachments,direction,role,correlation_id,content_hash,audience,access_level,content_exact) \
+        SELECT $1,$2,principal.id,$3,$4,$5,'outbound','agent',$6,decode(repeat('ab',32),'hex'),'external_conversation',5,true \
         FROM principals AS principal WHERE principal.company_id=$2 AND principal.user_id=$7")
         .bind(id).bind(h.company_id).bind(SUBJECT).bind(BODY)
         .bind(serde_json::json!({"version":"1","items":[attachment]})).bind(Uuid::new_v4()).bind(h.owner.user_id)

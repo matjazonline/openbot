@@ -21,8 +21,9 @@ pub trait WorkflowHandler: Send + Sync {
     fn supports(&self, kind: &WorkflowStepKind) -> bool;
     /// Effect permission, receipts and replay safety remain the handler's contract.
     /// A handler for an action-owned kind (`actions::marker_owned_effect_kind`) must
-    /// perform effects only through ActionService's marker-first dispatch: retirement
-    /// treats "no marker" as "no effect" for those kinds.
+    /// perform effects only after a committed record of them: ActionService's marker-first
+    /// dispatch, or the kind's documented equivalent there (`memory.save`'s intent committed
+    /// with its park). Retirement treats "no marker" as "no effect" for those kinds.
     async fn execute(
         &self,
         kind: &WorkflowStepKind,
@@ -210,7 +211,7 @@ where
         }
         let kind = self.port.step_kind(scope).await?;
         match kind.0.as_str() {
-            "data.map" | "decision.rule" | "channel.no_reply" => {
+            kind if super::batch::is_pure_kind(kind) => {
                 self.port
                     .advance_pure(scope, BatchBudget::new(16, Duration::from_millis(100))?)
                     .await?;

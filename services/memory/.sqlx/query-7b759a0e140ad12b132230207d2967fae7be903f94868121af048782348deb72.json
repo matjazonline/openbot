@@ -1,0 +1,26 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT c.tenant_id, c.id FROM ( SELECT DISTINCT ON (o.tenant_id) o.tenant_id, o.id, o.created_at FROM generation_operations AS o JOIN tenants AS t ON t.id = o.tenant_id WHERE o.state = 'accepted' AND o.next_attempt_at <= now() AND t.state = 'active' AND NOT EXISTS (SELECT 1 FROM generation_operations AS f WHERE f.tenant_id = o.tenant_id AND f.state IN ('claimed', 'dispatched')) ORDER BY o.tenant_id, o.created_at, o.id) AS c LEFT JOIN tenant_generation_schedule AS s ON s.tenant_id = c.tenant_id ORDER BY s.last_claimed_at NULLS FIRST, c.created_at, c.id LIMIT 16",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "tenant_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "7b759a0e140ad12b132230207d2967fae7be903f94868121af048782348deb72"
+}

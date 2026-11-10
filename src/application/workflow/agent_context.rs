@@ -18,12 +18,16 @@ impl PreparedAgent {
     pub fn history_budget(&self, seed: &LogicalSeed) -> AppResult<AgentHistoryBudget> {
         seed.validate()?;
         let contract = self.response_contract()?;
-        let mandatory = json!({
+        let mut mandatory = json!({
             "preamble": crate::services::response_contract::final_answer_preamble(
                 self.preamble().to_owned(), Some(&contract)),
             "tools": self.declarations(),
             "current": untrusted_context_prompt(self.logical_input().value())?,
         });
+        // A recalled pack is mandatory input: history gets what remains (E7).
+        if let Some(memory) = self.memory_prompt()? {
+            mandatory["memory"] = Value::String(memory);
+        }
         let policy = self.policy()?;
         let budget = AgentHistoryBudget {
             // Includes JSON escaping; the fixed allowance covers request/message framing.
@@ -80,6 +84,7 @@ impl PreparedTool {
                 {
                     super::super::provisioning::LIST_COMPANY_AGENTS_DESCRIPTION.into()
                 }
+                AgentToolTarget::Memory { tool } => tool.description().into(),
                 _ => format!("Workflow tool {}", self.name),
             },
             parameters: self.input_schema.clone(),

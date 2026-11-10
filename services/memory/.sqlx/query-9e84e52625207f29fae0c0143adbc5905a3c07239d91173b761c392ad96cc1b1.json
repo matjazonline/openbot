@@ -1,0 +1,20 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT (now() AT TIME ZONE 'UTC')::date AS \"day!\"",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "day!",
+        "type_info": "Date"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "9e84e52625207f29fae0c0143adbc5905a3c07239d91173b761c392ad96cc1b1"
+}

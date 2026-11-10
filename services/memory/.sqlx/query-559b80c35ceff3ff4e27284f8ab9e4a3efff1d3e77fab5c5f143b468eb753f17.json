@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO sessions (tenant_id, namespace_id, id, external_id) VALUES ($1, $2, $3, $4) ON CONFLICT (tenant_id, namespace_id, external_id) DO NOTHING",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "559b80c35ceff3ff4e27284f8ab9e4a3efff1d3e77fab5c5f143b468eb753f17"
+}

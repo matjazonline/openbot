@@ -109,9 +109,9 @@ async fn spoken_agent(persistence: &PostgresPersistence) -> SpokenAgent {
     sqlx::query(
         r#"INSERT INTO messages
                (id, company_id, author_principal_id, subject, clean_text_body, direction, role,
-                correlation_id, content_hash, audience)
+                correlation_id, content_hash, audience, content_exact)
            VALUES ($1, $2, $3, 'Help', 'On it', 'outbound', 'agent', $4,
-                   decode(repeat('cd', 32), 'hex'), 'external_conversation')"#,
+                   decode(repeat('cd', 32), 'hex'), 'external_conversation', false)"#,
     )
     .bind(message_id)
     .bind(company_id)

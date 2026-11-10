@@ -1,4 +1,5 @@
 use super::*;
+use crate::adapters::persistence::workflow::knowledge::exactness_fixture;
 use crate::application::workflow::WorkflowActor;
 use crate::application::workflow::decisions::{DecisionCommandKey, DecisionId, SubmitDecision};
 
@@ -67,6 +68,13 @@ async fn channel_reply_authoring_native_real_review_closes_reject_and_publishes_
             .read_decision(company, f.reviewer, DecisionId(decision))
             .await
             .unwrap();
+        let run: Uuid = sqlx::query_scalar("SELECT run_id FROM workflow_decisions WHERE id=$1")
+            .bind(decision)
+            .fetch_one(f.d.p().pool())
+            .await
+            .unwrap();
+        let run = RunId::new(run);
+        exactness_fixture::mark_exact(f.d.p().pool(), CompanyId::new(company.as_uuid()), run).await;
         service
             .decisions()
             .submit_decision(SubmitDecision {
@@ -95,6 +103,11 @@ async fn channel_reply_authoring_native_real_review_closes_reject_and_publishes_
         let (state,output,message): (String,Value,Option<Uuid>) = sqlx::query_as("SELECT run.state,execution.committed_output,final.message_id FROM workflow_runs AS run JOIN workflow_executions AS execution ON execution.company_id=run.company_id AND execution.id=run.terminal_execution_id JOIN channel_reply_decisions AS final ON final.company_id=run.company_id AND final.run_id=run.id WHERE run.binding_id=$1")
             .bind(f.binding).fetch_one(f.d.p().pool()).await.unwrap();
         assert_eq!(state, "succeeded");
+        // The reviewer's submitted body is conversational input and lowers the run, through the
+        // approved continuation (a caller of the shared writer) or the rejection (phase 05 E3).
+        assert!(
+            !exactness_fixture::exact(f.d.p().pool(), CompanyId::new(company.as_uuid()), run).await
+        );
         assert_eq!(
             reply_count(&f.d).await,
             if choice == "approve" { 2 } else { 1 }

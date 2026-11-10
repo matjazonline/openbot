@@ -1,0 +1,61 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT id, access_level::smallint AS \"level!\", content_sha256, session_id,\n                                  occurred_at, expires_at, recorded_by\n                             FROM sources WHERE tenant_id = $1 AND namespace_id = $2\n                              AND external_ref = $3 AND revision = $4",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "level!",
+        "type_info": "Int2"
+      },
+      {
+        "ordinal": 2,
+        "name": "content_sha256",
+        "type_info": "Bytea"
+      },
+      {
+        "ordinal": 3,
+        "name": "session_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 4,
+        "name": "occurred_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 5,
+        "name": "expires_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 6,
+        "name": "recorded_by",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      null,
+      false,
+      true,
+      false,
+      true,
+      true
+    ]
+  },
+  "hash": "9e7f0ef8eca2568465cbf1c5270c6fa6522c6734b7fd3811f8661cf53a9bbf25"
+}

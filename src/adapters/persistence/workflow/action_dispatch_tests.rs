@@ -500,6 +500,7 @@ mod replay_tests;
 
 #[path = "action_receipt_tests.rs"]
 mod action_receipt_tests;
+pub(super) use action_receipt_tests::unresolved_marker;
 
 #[path = "action_dispatch_resolution_tests.rs"]
 mod resolution_tests;

@@ -1,0 +1,32 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT o.id, o.body FROM observations AS o\n                 JOIN namespaces AS n ON (n.tenant_id, n.id) = (o.tenant_id, o.namespace_id)\n                 JOIN UNNEST($2::uuid[], $5::bigint[]) AS r(id, revision)\n                   ON r.id = o.id AND r.revision = o.revision\n                WHERE o.tenant_id = $1 AND o.namespace_id = ANY($3)\n                  AND o.access_level <= $4::smallint AND n.state = 'active'\n                  AND (o.expires_at IS NULL OR o.expires_at > now())",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "body",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "UuidArray",
+        "UuidArray",
+        "Int2",
+        "Int8Array"
+      ]
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "b0567f317bc6b22ed111c654f09c9861acb54bb9a494209229046d33926d6f9a"
+}

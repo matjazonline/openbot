@@ -107,12 +107,20 @@ pub(super) struct NativeCase {
     pub(super) target: TargetSeed,
 }
 impl NativeCase {
-    pub(super) async fn new() -> Self {
-        Box::pin(Self::with_hidden(1)).await
+    pub(super) fn new() -> impl std::future::Future<Output = Self> {
+        Self::with_hidden(1)
     }
-    pub(super) async fn with_hidden(hidden_count: usize) -> Self {
+    pub(super) fn with_hidden(hidden_count: usize) -> impl std::future::Future<Output = Self> {
+        Self::with_policy(hidden_count, None)
+    }
+    pub(super) async fn with_policy(
+        hidden_count: usize,
+        mcp_error_policy: Option<crate::application::workflow::agent::McpErrorPolicy>,
+    ) -> Self {
         assert!((1..=18).contains(&hidden_count));
-        let f = Box::new(Box::pin(HistoryThread::new()).await);
+        // Box the native history/provider fixture seam, retaining the existing stack budget.
+        let fixture = Box::pin(Fixture::new()).await;
+        let f = Box::new(Box::pin(HistoryThread::with_policy(fixture, mcp_error_policy)).await);
         let mut turns = vec![LlmTurn::text("\"public-a\""), LlmTurn::text("\"public-b\"")];
         turns.extend((0..hidden_count).map(|_| LlmTurn::text("\"hidden\"")));
         let llm = scripted_llm(turns).await;
@@ -159,6 +167,13 @@ impl NativeCase {
         sqlx::query("UPDATE agent_history_exchanges SET frozen_preparation=$3 WHERE company_id=$1 AND execution_id=$2")
             .bind(self.target.claim.fence.scope.company.as_uuid()).bind(self.target.claim.fence.scope.execution.as_uuid()).bind(document)
             .execute(self.f.s.pool()).await
+    }
+
+    pub(super) async fn raw_target(&self) -> Value {
+        sqlx::query_scalar("SELECT to_jsonb(exchange) FROM agent_history_exchanges AS exchange WHERE company_id=$1 AND id=$2")
+            .bind(self.target.claim.fence.scope.company.as_uuid())
+            .bind(self.target.claim.fence.scope.execution.as_uuid())
+            .fetch_one(self.f.s.pool()).await.unwrap()
     }
 
     pub(super) async fn metadata(&self, claim: &ClaimedWorkflow) -> Value {

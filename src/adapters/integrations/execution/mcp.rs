@@ -36,7 +36,9 @@ fn preparation_error(
     use crate::application::services::mcp_client::McpPreparationFailure as Failure;
     match error {
         Failure::Denied => IntegrationError::Denied.into(),
-        Failure::Changed | Failure::Deadline | Failure::Unavailable => {
+        // A remote credential refusal does not revoke local execution authority.
+        // Keep the gateway's existing unavailable/retry outcome for this path.
+        Failure::Changed | Failure::Deadline | Failure::Unavailable | Failure::Authentication => {
             ResolutionError::Retry(RetryReason::Unavailable, None)
         }
         Failure::Cancelled => ResolutionError::Cancelled,

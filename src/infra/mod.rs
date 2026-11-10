@@ -11,6 +11,7 @@ pub mod app;
 pub mod config;
 pub mod db;
 pub mod events;
+pub mod memory_config;
 pub mod runtime_metrics;
 pub mod setup;
 pub mod workflow;

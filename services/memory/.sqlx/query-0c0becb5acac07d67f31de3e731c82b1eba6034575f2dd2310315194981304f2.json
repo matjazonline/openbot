@@ -1,0 +1,31 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE observations SET title = $3, body = $4, revision = revision + 1, access_level = $5::smallint, producing_ceiling = $6::smallint, watermark_kind = $7, watermark_level = $8::smallint, source_max_level = $9::smallint, carried_level = $10::smallint, updated_at = now(), index_state = 'pending', index_error = NULL, index_attempts = 0, next_index_at = now(), index_lease_until = NULL, index_fence = index_fence + 1 WHERE tenant_id = $1 AND id = $2 RETURNING revision",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "revision",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Text",
+        "Text",
+        "Int2",
+        "Int2",
+        "Text",
+        "Int2",
+        "Int2",
+        "Int2"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "0c0becb5acac07d67f31de3e731c82b1eba6034575f2dd2310315194981304f2"
+}

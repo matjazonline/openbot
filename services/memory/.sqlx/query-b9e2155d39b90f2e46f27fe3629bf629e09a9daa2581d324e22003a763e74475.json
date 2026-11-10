@@ -1,0 +1,68 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT\n                     (SELECT count(*) FROM generation_operations WHERE state = 'accepted')\n                       AS \"accepted!\",\n                     (SELECT count(*) FROM generation_operations WHERE state = 'dispatched')\n                       AS \"dispatched!\",\n                     coalesce((SELECT extract(epoch FROM now() - min(created_at))::float8\n                                 FROM generation_operations WHERE state = 'accepted'), 0)\n                       AS \"oldest_accepted!\",\n                     (SELECT count(*) FROM generation_operations\n                       WHERE state = 'unknown' AND finished_at > now() - interval '1 day')\n                       AS \"unknown!\",\n                     (SELECT count(DISTINCT tenant_id) FROM generation_operations\n                       WHERE state = 'accepted') AS \"tenants_waiting!\",\n                     coalesce((SELECT max(queued) FROM (SELECT count(*) AS queued\n                                 FROM generation_operations WHERE state = 'accepted'\n                                GROUP BY tenant_id) AS per_tenant), 0) AS \"max_tenant_queue!\",\n                     (SELECT count(*) FROM observations WHERE index_state = 'pending')\n                       AS \"index_pending!\",\n                     coalesce((SELECT extract(epoch FROM now() - min(updated_at))::float8\n                                 FROM observations WHERE index_state = 'pending'), 0)\n                       AS \"oldest_index_pending!\",\n                     (SELECT count(*) FROM observations WHERE index_state = 'failed')\n                       AS \"index_failed!\"",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "accepted!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 1,
+        "name": "dispatched!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 2,
+        "name": "oldest_accepted!",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 3,
+        "name": "unknown!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 4,
+        "name": "tenants_waiting!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 5,
+        "name": "max_tenant_queue!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 6,
+        "name": "index_pending!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 7,
+        "name": "oldest_index_pending!",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 8,
+        "name": "index_failed!",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+    ]
+  },
+  "hash": "b9e2155d39b90f2e46f27fe3629bf629e09a9daa2581d324e22003a763e74475"
+}

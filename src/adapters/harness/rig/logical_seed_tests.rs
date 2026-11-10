@@ -1,4 +1,5 @@
 use super::*;
+use serde_json::Value;
 
 fn seeded(
     provider: &str,
@@ -183,4 +184,74 @@ fn agent_history_preparation_seed_boundaries_preserve_existing_checkpoint_ceilin
         run.with_seed(seed).is_err(),
         "seed counts toward existing 2MiB checkpoint ceiling"
     );
+}
+
+#[tokio::test]
+async fn doop_binary_history_all_providers_format_nested_seed_and_current_input_after_restore() {
+    let mut png: Value =
+        serde_json::from_str(include_str!("../../mcp/fixtures/doop/screenshot.json")).unwrap();
+    let mut pdf: Value =
+        serde_json::from_str(include_str!("../../mcp/fixtures/doop/pdf.json")).unwrap();
+    png["isError"] = json!(false);
+    pdf["isError"] = json!(true);
+    let bytes = [
+        png["content"][0]["data"].as_str().unwrap().to_owned(),
+        pdf["content"][0]["resource"]["blob"]
+            .as_str()
+            .unwrap()
+            .to_owned(),
+    ];
+    let input = json!({"nested":[png]});
+    let output = json!({"nested":[pdf]});
+    let registry = ProviderRegistry::standard().unwrap();
+    for provider in KEYS {
+        let seed = LogicalSeed::new(vec![LogicalSeedPair {
+            input: input.clone(),
+            output: output.clone(),
+        }])
+        .unwrap();
+        assert!(
+            seed.characters().unwrap() < 4096,
+            "rendered budget uses the omitted view"
+        );
+        let base = seeded(provider, None);
+        let saved = RunCheckpoint::new(
+            base.identity,
+            crate::services::harness::runs::untrusted_context_prompt(&input).unwrap(),
+            base.policy,
+        )
+        .unwrap()
+        .with_seed(seed)
+        .unwrap();
+        let restored: RunCheckpoint =
+            serde_json::from_slice(&serde_json::to_vec(&saved).unwrap()).unwrap();
+        restored.validate().unwrap();
+        assert_eq!(
+            restored.seed, saved.seed,
+            "raw bounded history identity survives restore"
+        );
+        let forbidden = bytes.clone();
+        let llm = scripted_scenario(vec![ScriptedExchange::new(
+            move |request| {
+                let body = request.body.to_string();
+                if forbidden.iter().any(|value| body.contains(value)) {
+                    return Err("binary bytes reached provider");
+                }
+                if !body.contains("binaryContentOmitted")
+                    || !body.contains("Visual inspection was not performed")
+                {
+                    return Err("omission status missing");
+                }
+                Ok(())
+            },
+            ScriptedResponse::json(response(provider, Reply::Text)),
+        )])
+        .await;
+        let model = model(&registry, provider, "tenant-key", &llm.base_url);
+        model
+            .completion(request(history(&restored).unwrap()))
+            .await
+            .unwrap();
+        assert_eq!(llm.finish().await, Ok(1));
+    }
 }

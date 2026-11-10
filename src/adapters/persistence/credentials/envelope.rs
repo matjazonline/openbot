@@ -118,6 +118,16 @@ impl CredentialContext {
             ],
         }
     }
+    /// One memory-service namespace's client token (memory decisions E1).
+    pub fn memory_client_credential(company_id: Uuid, namespace_id: Uuid) -> Self {
+        Self {
+            scope: "memory_client_credential",
+            fields: vec![
+                company_id.as_bytes().to_vec(),
+                namespace_id.as_bytes().to_vec(),
+            ],
+        }
+    }
     pub fn company_mcp_credential(company_id: Uuid, connection_id: Uuid) -> Self {
         Self {
             scope: "company_mcp_credential",

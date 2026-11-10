@@ -1,0 +1,51 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT p.observation_id, p.revision, p.byte_start, p.byte_end, o.occurred_at\n                     FROM observation_parts AS p\n                     JOIN observations AS o ON (o.tenant_id, o.id) = (p.tenant_id, p.observation_id)\n                     JOIN namespaces AS n ON (n.tenant_id, n.id) = (p.tenant_id, p.namespace_id)\n                    WHERE p.tenant_id = $1 AND p.namespace_id = ANY($2)\n                      AND p.access_level <= $3::smallint AND p.model_id = $6\n                      AND n.state = 'active' AND (o.expires_at IS NULL OR o.expires_at > now())\n                    ORDER BY p.embedding <=> $5::real[]::vector\n                    LIMIT $4",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "observation_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "revision",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 2,
+        "name": "byte_start",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 3,
+        "name": "byte_end",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 4,
+        "name": "occurred_at",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "UuidArray",
+        "Int2",
+        "Int8",
+        "Float4Array",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "f9344e308361c91c1718f4366b723d21b1f28b2bd3fccd65c934183dfc4a5a86"
+}

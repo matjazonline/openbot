@@ -1,0 +1,61 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT l.observation_id, l.source_id, s.revision AS \"source_revision?\",\n                  l.parent_observation_id, l.parent_revision,\n                  coalesce(s.access_level, p.access_level)::smallint AS \"target_level!\",\n                  CASE WHEN s.id IS NOT NULL THEN s.expires_at ELSE p.expires_at END\n                    AS target_expires_at\n             FROM observation_links AS l\n             LEFT JOIN sources AS s ON (s.tenant_id, s.id) = (l.tenant_id, l.source_id)\n             LEFT JOIN observations AS p\n               ON (p.tenant_id, p.id) = (l.tenant_id, l.parent_observation_id)\n             LEFT JOIN namespaces AS pn ON (pn.tenant_id, pn.id) = (p.tenant_id, p.namespace_id)\n            WHERE l.tenant_id = $1 AND l.observation_id = ANY($2)\n              AND ((s.id IS NOT NULL AND s.namespace_id = ANY($3)\n                    AND s.access_level <= $4::smallint\n                    AND (s.expires_at IS NULL OR s.expires_at > now()))\n                OR (p.id IS NOT NULL AND p.namespace_id = ANY($3) AND pn.state = 'active'\n                    AND p.access_level <= $4::smallint\n                    AND (p.expires_at IS NULL OR p.expires_at > now())))\n            ORDER BY l.observation_id, l.ordinal",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "observation_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "source_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "source_revision?",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "parent_observation_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 4,
+        "name": "parent_revision",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 5,
+        "name": "target_level!",
+        "type_info": "Int2"
+      },
+      {
+        "ordinal": 6,
+        "name": "target_expires_at",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "UuidArray",
+        "UuidArray",
+        "Int2"
+      ]
+    },
+    "nullable": [
+      false,
+      true,
+      false,
+      true,
+      true,
+      null,
+      null
+    ]
+  },
+  "hash": "4696cd774a5f8bb195b0ff93077a8747ae7f7b13f4c5da2dbf832ada4ed3c478"
+}

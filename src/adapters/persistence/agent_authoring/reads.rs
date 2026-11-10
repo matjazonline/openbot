@@ -46,7 +46,14 @@ impl AgentAuthoringReads for PostgresPersistence {
             let mut tx =
                 super::super::agent_publication::begin_authorized(self, request.scope).await?;
             let result = match request.kind {
-                AgentToolKind::Builtin => super::catalog::builtins()?,
+                AgentToolKind::Builtin => {
+                    let memory = crate::adapters::persistence::memory::memory_enabled_on(
+                        &mut tx,
+                        request.scope.company,
+                    )
+                    .await?;
+                    super::catalog::builtins(memory)?
+                }
                 AgentToolKind::Http => super::catalog::http(&mut tx, &request).await?,
                 AgentToolKind::Mcp => super::catalog::mcp(&mut tx, &request).await?,
                 AgentToolKind::Workflow => super::catalog::workflows(&mut tx, &request).await?,

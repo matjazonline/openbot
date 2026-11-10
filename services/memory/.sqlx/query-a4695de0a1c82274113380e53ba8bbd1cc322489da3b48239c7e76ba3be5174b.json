@@ -1,0 +1,25 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE generation_operations SET state = 'claimed', lease_owner = $3, lease_until = now() + make_interval(secs => $4), fence = fence + 1 WHERE tenant_id = $1 AND id = $2 RETURNING fence",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "fence",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Float8"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "a4695de0a1c82274113380e53ba8bbd1cc322489da3b48239c7e76ba3be5174b"
+}

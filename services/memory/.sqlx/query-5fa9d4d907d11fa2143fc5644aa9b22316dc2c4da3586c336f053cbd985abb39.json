@@ -1,0 +1,31 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT o.occurred_at, o.session_id FROM observations AS o JOIN namespaces AS n ON (n.tenant_id, n.id) = (o.tenant_id, o.namespace_id) WHERE o.tenant_id = $1 AND o.id = $2 AND o.namespace_id = ANY($3) AND o.access_level <= $4::smallint AND n.state = 'active' AND (o.expires_at IS NULL OR o.expires_at > now())",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "occurred_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 1,
+        "name": "session_id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "UuidArray",
+        "Int2"
+      ]
+    },
+    "nullable": [
+      false,
+      true
+    ]
+  },
+  "hash": "5fa9d4d907d11fa2143fc5644aa9b22316dc2c4da3586c336f053cbd985abb39"
+}

@@ -1,0 +1,20 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT count(*) AS \"count!\" FROM admin_credentials\n                    WHERE scope = 'operator' AND revoked_at IS NULL\n                      AND (expires_at IS NULL OR expires_at > now())",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "count!",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "ecc8134c11ad659d76a955623d8827e53b9bd4c67d3f6035dc6fc38a437291a9"
+}

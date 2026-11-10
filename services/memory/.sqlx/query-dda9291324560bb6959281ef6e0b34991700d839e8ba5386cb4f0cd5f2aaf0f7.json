@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE generation_operations SET state = 'cancelled', outcome_code = $3, finished_at = now(), lease_owner = NULL, lease_until = NULL, reserved_tokens = 0 WHERE tenant_id = $1 AND id = ANY($2)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "UuidArray",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "dda9291324560bb6959281ef6e0b34991700d839e8ba5386cb4f0cd5f2aaf0f7"
+}

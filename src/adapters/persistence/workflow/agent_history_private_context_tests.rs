@@ -237,6 +237,7 @@ async fn republish_anthropic(f: &mut ManualHistory) {
     .unwrap();
     f.f.s.fixture.publish_agent(f.f.agent).await;
     f.binding=history_contract_binding(&mut f.f.s,"history",HistoryContract {
+        mcp_error_policy:None,
         input:json!({"type":["object","array","string","number","boolean","null"]}),
         output:json!({"type":"object","properties":{"ok":{"type":"boolean"}},"required":["ok"],"additionalProperties":false}),
     }).await;

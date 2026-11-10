@@ -413,3 +413,9 @@ mod authoring_journey;
 
 #[path = "autonomous_agent_e2e/mod.rs"]
 mod e2e;
+
+#[path = "doop_binary_agent_tests.rs"]
+mod doop_binary;
+
+#[path = "doop_binary_workflow_tests.rs"]
+mod doop_binary_workflow;

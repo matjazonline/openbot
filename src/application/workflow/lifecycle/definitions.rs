@@ -194,8 +194,65 @@ impl<
         let decoded = self.decoder.decode(draft.source())?;
         let captured = self.directory.capture(actor, draft).await?;
         let bundle = compile_bundle(decoded, draft, version, captured, self.refused_kinds)?;
+        if let Some(gate) = &self.memory_gate
+            && let Some(path) = memory_step_path(&bundle)
+            && !gate.memory_enabled(draft.company()).await?
+        {
+            return Err(compiler::Diagnostic::at(
+                "memory.not_enabled",
+                "Memory is not enabled for this company; an owner or admin enables it in company settings",
+                &path,
+                compiler::input_span(bundle.compiled().source_map(), &path),
+            )
+            .into());
+        }
         Ok(Arc::new(bundle))
     }
+}
+
+/// The first memory step of a bundle, as a diagnostic path.
+fn memory_step_path(bundle: &PublishedBundle) -> Option<String> {
+    bundle
+        .compiled()
+        .graph()
+        .definition()
+        .steps
+        .iter()
+        .find(|(_, step)| step.step_type.as_str().starts_with("memory."))
+        .map(|(id, _)| format!("/steps/{id}/type"))
+}
+
+/// A memory step's agent scope names an agent this bundle captured (E4): the key resolves to
+/// that agent at runtime, and nothing else can be named.
+fn memory_scopes_resolve(bundle: &PublishedBundle) -> LifecycleResult<()> {
+    for (id, step) in &bundle.compiled().graph().definition().steps {
+        if !step.step_type.as_str().starts_with("memory.") {
+            continue;
+        }
+        let Some(crate::domain::workflow::Binding::Literal(scope)) = step.inputs.get("scope")
+        else {
+            continue;
+        };
+        let Some(key) = scope.get("agent").and_then(serde_json::Value::as_str) else {
+            continue;
+        };
+        if !bundle
+            .snapshots()
+            .agents
+            .iter()
+            .any(|agent| agent.key.as_str() == key)
+        {
+            let path = format!("/steps/{id}/with/scope/agent");
+            return Err(compiler::Diagnostic::at(
+                "memory.unknown_agent",
+                "A memory scope agent must be an agent this workflow runs",
+                &path,
+                compiler::input_span(bundle.compiled().source_map(), &path),
+            )
+            .into());
+        }
+    }
+    Ok(())
 }
 
 /// Freeze a decoded draft with its captured dependencies, then hold it to the workflow identity
@@ -245,6 +302,7 @@ pub fn compile_bundle(
         )
         .into());
     }
+    memory_scopes_resolve(&bundle)?;
     Ok(bundle)
 }
 

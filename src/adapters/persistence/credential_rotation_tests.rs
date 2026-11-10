@@ -58,6 +58,12 @@ async fn isolated_connection() -> Option<PgConnection> {
                updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
                PRIMARY KEY (company_id, installation_id, credential_kind)
            ) ON COMMIT PRESERVE ROWS"#,
+        r#"CREATE TEMPORARY TABLE memory_namespaces (
+               company_id UUID NOT NULL,
+               id UUID NOT NULL,
+               credential_envelope TEXT,
+               PRIMARY KEY (company_id, id)
+           ) ON COMMIT PRESERVE ROWS"#,
         r#"CREATE TEMPORARY TABLE company_resend_api_integrations (
                company_id UUID PRIMARY KEY,
                webhook_token TEXT NOT NULL,
@@ -615,3 +621,89 @@ async fn rotation_covers_company_mcp_credentials_with_tenant_bound_envelopes() {
 
 #[path = "credential_rotation_http_tests.rs"]
 mod http_tests;
+
+/// The memory client credentials arm (review p7b1 m2): keyset paging across a page boundary, a
+/// rotation that reopens under the namespace-bound context, and the compare-and-swap rewrap.
+#[tokio::test]
+async fn rotation_covers_memory_client_credentials_with_namespace_bound_envelopes() {
+    use crate::adapters::persistence::memory::inventory;
+    let Some(mut connection) = isolated_connection().await else {
+        return;
+    };
+    let (old_writer, rotator) = rotation_ciphers();
+    let company_id = Uuid::new_v4();
+    let mut namespaces: Vec<Uuid> = (0..3).map(|_| Uuid::new_v4()).collect();
+    namespaces.sort();
+    for (index, namespace) in namespaces.iter().enumerate() {
+        let envelope = old_writer
+            .seal_envelope(
+                &CredentialContext::memory_client_credential(company_id, *namespace),
+                &SecretString::from(format!("msk_cli_token_{index}")),
+            )
+            .unwrap();
+        sqlx::query("INSERT INTO memory_namespaces (company_id, id, credential_envelope) VALUES ($1, $2, $3)")
+            .bind(company_id).bind(namespace).bind(envelope).execute(&mut connection).await.unwrap();
+    }
+    // A namespace without a credential (provisioning or removing) is not inventoried.
+    sqlx::query(
+        "INSERT INTO memory_namespaces (company_id, id, credential_envelope) VALUES ($1, $2, NULL)",
+    )
+    .bind(company_id)
+    .bind(Uuid::new_v4())
+    .execute(&mut connection)
+    .await
+    .unwrap();
+
+    let first = inventory::page(&mut connection, None, 2).await.unwrap();
+    let last = first
+        .last()
+        .map(|entry| (entry.company_id, entry.namespace_id));
+    let second = inventory::page(&mut connection, last, 2).await.unwrap();
+    let walked: Vec<Uuid> = first
+        .iter()
+        .chain(&second)
+        .map(|entry| entry.namespace_id)
+        .collect();
+    assert_eq!(walked, namespaces, "every credential once, in key order");
+    assert_eq!(second.len(), 1);
+
+    let report = rotate_locked(&mut connection, &rotator).await.unwrap();
+    assert!(report.complete);
+    assert_eq!(report.rotated, 3);
+    for (index, namespace) in namespaces.iter().enumerate() {
+        let stored: String = sqlx::query_scalar(
+            "SELECT credential_envelope FROM memory_namespaces WHERE company_id = $1 AND id = $2",
+        )
+        .bind(company_id)
+        .bind(namespace)
+        .fetch_one(&mut connection)
+        .await
+        .unwrap();
+        let context = CredentialContext::memory_client_credential(company_id, *namespace);
+        assert_eq!(
+            rotator
+                .open_envelope(&context, &stored)
+                .unwrap()
+                .expose_secret(),
+            format!("msk_cli_token_{index}")
+        );
+        // Bound to its namespace: another namespace's context does not open it.
+        let swapped = CredentialContext::memory_client_credential(company_id, Uuid::new_v4());
+        assert!(rotator.open_envelope(&swapped, &stored).is_err());
+    }
+
+    // A rewrap computed from a value that has since been reissued changes nothing.
+    let target = namespaces[0];
+    let mut transaction = sqlx::Connection::begin(&mut connection).await.unwrap();
+    let stale = inventory::rewrap(
+        &mut transaction,
+        company_id,
+        target,
+        "enc:v2:stale",
+        "enc:v2:new",
+    )
+    .await
+    .unwrap();
+    assert_eq!(stale.rows_affected(), 0);
+    transaction.rollback().await.unwrap();
+}

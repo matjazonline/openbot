@@ -1,0 +1,31 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT o.state, o.outcome_code FROM generation_operations AS o JOIN namespaces AS n ON (n.tenant_id, n.id) = (o.tenant_id, o.namespace_id) WHERE o.tenant_id = $1 AND o.id = $2 AND o.namespace_id = ANY($3) AND n.state = 'active' AND o.input_level <= $4::smallint",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "state",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "outcome_code",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "UuidArray",
+        "Int2"
+      ]
+    },
+    "nullable": [
+      false,
+      true
+    ]
+  },
+  "hash": "152a57c91bad9fe60a6768e4a9b5a1d7ce76b1b40053d0108dee70bbbc17addd"
+}

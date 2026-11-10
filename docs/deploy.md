@@ -509,7 +509,7 @@ documents the full set.
 
 | Setting | Requirement |
 | --- | --- |
-| `DATABASE_MAX_CONNECTIONS` | Database pool size, default 20. Startup refuses a pool smaller than `12 + 2 × WORKFLOW_WORKER_SLOTS`, naming both keys. |
+| `DATABASE_MAX_CONNECTIONS` | Database pool size, default 20. Startup refuses a pool smaller than `14 + 2 × WORKFLOW_WORKER_SLOTS`, naming both keys. |
 | `WORKFLOW_WORKER_SLOTS` | Concurrent workflow workers per process; 1–16, default 2. Each slot needs two pool connections (its claim or handler transaction and its lease renewal). |
 | `RUNTIME_THREAD_STACK_BYTES` | Stack reserved per async runtime thread; 2 MiB–256 MiB, default 16 MiB. A background job's chain of `async fn` frames can overrun Tokio's 2 MiB default in an unoptimized build; `scripts/stack-budget.sh` is what notices it growing. |
 | `SMTP_ALLOW_PLAINTEXT_LOCAL` | Development-only, default `false`; plaintext is accepted only with no credentials and a host that resolves exclusively to loopback. Never enable it for a deployed relay. |
@@ -718,6 +718,224 @@ Use isolated scripted samples before a controlled live evaluation and inspect
 run history and company model usage. Provider usage is billed by TypeSafe; local
 estimates and configured prices are not invoices. Operational failure/recovery and
 revocation semantics are in the [Jev runbook](workflow-operations.md#typesafe-jev-evaluation).
+
+### Memory service
+
+OpenBot can use the standalone memory service (`services/memory`, built and deployed on its own)
+over its published HTTP contract only. Give the service its own database and role
+(`services/memory/scripts/provision-db.sh` creates both and revokes public connect), and keep
+OpenBot's own database role a non-superuser: a superuser can read every database on the server,
+which would undo the separation. Neither application reads the other's tables. Configure OpenBot
+with these startup-read keys:
+
+| Key | Default and bounds |
+| --- | --- |
+| `MEMORY_SERVICE_URL` | Unset: memory is unavailable. https, or http only to a loopback host; no userinfo, query or fragment. |
+| `MEMORY_SERVICE_PROVISIONER_TOKEN` | Required with the URL (a secret). The service's provisioner admin credential, `msk_adm_<id>_<secret>`. |
+| `MEMORY_SERVICE_TIMEOUT_MS` | 12000; 1000–30000. |
+| `MEMORY_SERVICE_RECALL_DEADLINE_MS` | 2000; 250–5000, and below the timeout. |
+| `MEMORY_SERVICE_INTERACTIVE_IN_FLIGHT` | 8; 1–32. Each company gets at most 2. |
+| `MEMORY_SERVICE_BACKGROUND_IN_FLIGHT` | 4; 1–16. Each company gets at most 1. |
+
+Startup checks only these values: their bounds, the URL's form and the token's shape. Any
+`MEMORY_SERVICE_*` key set without the URL fails startup. Startup never contacts the service, so
+neither the URL nor the token is verified there; the first contact is the memory lifecycle worker.
+Without the URL, startup warns and names up to 20 unfinished memory lifecycles (remote tenants or
+namespaces still to be created or deleted), which then stay unreconciled until the URL returns.
+
+Memory is opt-in per company: an owner or admin enables it in company Settings, which records the
+tenant and lets the lifecycle worker create it in the service under the configured provisioner
+credential. Disabling stops new memory work and disables the service tenant; data is retained. A
+run that was already shown memory fails with `memory.context_revoked` if it resumes after the
+disable.
+Deleting a company, agent, member or account records a durable request to delete the matching
+service tenant or namespace, which the worker sends after creating it first (so an earlier
+uncertain create cannot land later). An outage, a capacity refusal or a revoked provisioner
+credential is retried without limit, backing off to five minutes. A definite refusal ends the
+lifecycle `failed` and stops: the tenant is not managed by this provisioner
+(`tenant_unmanageable`), a create conflict (`tenant_conflict`, `namespace_conflict`), more than
+4,000 live credentials of one namespace in one pass (`credential_list_truncated`), or a response
+outside the contract (`protocol_error`) after eight attempts. A namespace deletion never completes
+on a `404` that could mean another provisioner manages the tenant: the worker checks whether it
+still manages the tenant and otherwise waits with `provisioner_mismatch` (see rotation below);
+while the tenant is disabled, a deletion whose namespace the service never created waits
+(`tenant_disabled`) until the tenant is enabled or deleted. An owner or admin re-drives failed
+provisioning (not a deletion) with "Retry failed provisioning" in company Settings, which appears
+only when something failed and disables nothing. A namespace whose id the service has tombstoned
+(`namespace_conflict`) is replaced by a new one at its next use.
+
+Agents can also bind four memory tools (`search_memory`, `memory_timeline`, `memory_details`,
+`save_memory`). An agent version using one publishes only while memory is enabled for the company;
+after a disable a published agent keeps running and each memory call answers `memory.not_enabled`.
+Company HTTP and MCP connections whose origin equals `MEMORY_SERVICE_URL` are refused (an alias of
+the same host, such as its IP address, is not recognised). Enabling memory is refused while the URL
+is unset. If you remove the URL while companies still have memory enabled, the agent editor still
+lists the memory tools and agents using them still publish, but every memory call fails (nothing is
+read or saved; the step retries, then fails). Automatic recall and capture stop, and a run resuming
+with memory it was shown earlier retries `memory.context_unavailable` instead of showing it
+unchecked. Restore the URL, or disable memory in those companies, which removes the tools from the
+editor and refuses new publication.
+
+Capture (owner/admin, per agent, off by default) turns completed private-session or thread
+exchanges into generation requests. It runs only while the service reports a generation cap above
+0 for the tenant (`generation_daily_token_cap`, cached each time the tenant's lifecycle settles:
+create, enable or disable; settings show "generation off (operator cap 0)" otherwise). A cap raised
+later is picked up only at the next disable and enable, and disabling fails pending memory work,
+so set the cap before companies enable memory. The service answers `generation_disabled` when
+its current cap or provider refuses; that capture then fails terminally. Captures share the
+delivery worker, its lanes and its retries with saves, and keep their policy expiry (at most
+168 hours). Without the URL nothing new is captured: only an agent preparation made while the
+service was configured is armed for capture, so at most the runs in flight when the URL was
+removed can still queue one. Queued captures wait unsent until the URL returns (unexpired ones are
+then sent, expired ones settled without sending) or memory is disabled, which fails them and drops
+their text.
+
+With the URL set, the `memory.load` and `memory.save` workflow steps are available, and a version
+using one publishes only while memory is enabled for the company (`memory.not_enabled` otherwise);
+a run reaching one after memory was disabled fails terminally with the same code. Without the URL
+both kinds are refused at publication as unsupported. `memory.save` commits its frozen request as a
+delivery intent (`memory_deliveries`) together with the step's wait, and the memory delivery worker
+sends it: the same idempotency key and body on every retry, outages retried with backoff until the
+intent's six-day deadline, a definite refusal failing the step. A `401` for the namespace's
+stored credential is not a refusal: the intent retries, spending no attempt, and the namespace's
+lifecycle is queued to check that credential against the service's live listing. If the service
+no longer has it (after a restore, or after an operator revoked it by hand), the worker issues a
+new one and swaps it in without the namespace leaving `ready`, so the waiting intent is then
+delivered. Recall and the memory tools answer `memory.forbidden` for that call and queue the same
+check. To stop OpenBot's access, disable memory for the company or disable its tenant in the
+service; a revoked client credential is simply replaced. Disabling memory fails every
+undelivered intent (`disabled`); removing its agent or member, or cancelling its run, cancels it.
+The delivery worker sends up to `MEMORY_SERVICE_BACKGROUND_IN_FLIGHT` saves at once, one per lane,
+under its own request permits, separate from the lifecycle worker's. Its lanes take turns for
+their short claims and completions, so it holds at most one database connection at any lane
+count. That is the one connection the startup pool check reserves for it.
+
+The worker lists only one namespace's live credentials (`credentials/list` with its label and
+`active_only`), in pages of 1,000 and at most four pages per pass; revoked credentials no longer
+count. A namespace with more live credentials than that fails `credential_list_truncated`.
+
+Settled memory rows are removed by a maintenance task every five minutes (500 rows per batch, at
+most eight batches per table per run):
+- a settled delivery intent (`delivered`, `failed`, `expired`, `cancelled`) seven days after it
+  was created, once nothing can replay or read it: a capture intent, or a save whose run is gone,
+  or finished with its deadline passed (a control retry can reopen a finished run until then);
+- a settled `absent` lifecycle row 30 days after it settled, once its company or namespace row is
+  gone. Failed rows stay until an operator re-drives or removes them.
+
+Memory requests carry an `x-correlation-id`: a delivery sends its intent key (`ob.s.…` for a
+save, `ob.g.<exchange>` for a capture), and recall and the memory tools send
+`ob.r.<run>.<execution>`. The service logs and audits it, so one id follows a capture from the
+exchange's acceptance through the service's generation operation; the observations it saved
+then appear in later recalls under those recalls' own ids. OpenBot also counts
+`memory_deliveries_settled_total{kind,state}`, `memory_delivery_completions_lost_total`,
+`memory_delivery_transient_retries_total`, `memory_recall_total{outcome}` and
+`memory_recall_omitted_total` through its metrics endpoint, and logs a skipped capture with
+`metric="memory_capture_skipped_total"` and its reason.
+
+The task records `memory_deliveries_rows{state}` and `memory_lifecycles_rows{state}` for the open
+states, `memory_lifecycle_failed_rows`, `memory_lifecycle_stuck_rows`,
+`memory_lifecycle_postponed_rows{outcome}` (`provisioner_mismatch`, `tenant_disabled`,
+`tenant_recheck`), and
+`memory_retention_backlog_rows{table}`: rows already eligible that one run did not reach. A
+backlog above 10,000 logs a warning each run; raise capacity before raising the batch bounds.
+Removing those rows is also why a memory-service restore must be reconciled within 30 days: see
+"Restoring the memory service" below.
+
+A lifecycle retrying an outage for 12 retries or more (about half an hour) is stuck: the worker
+logs it once at `error`. Stuck and failed lifecycles are named in a startup warning (up to 20),
+and in company Settings while the company exists. For a deleted company, find them with:
+
+```sql
+SELECT id, company_id, resource, namespace_id, desired, state, attempts, transient_retries,
+       outcome_code, updated_at
+  FROM memory_lifecycles
+ WHERE state = 'failed' OR (state IN ('pending', 'claimed') AND transient_retries >= 12)
+ ORDER BY updated_at;
+```
+
+After fixing the cause (for example restoring the provisioner credential), re-drive one row:
+
+```sql
+UPDATE memory_lifecycles
+   SET state = 'pending', attempts = 0, transient_retries = 0, outcome_code = NULL,
+       generation = generation + 1, available_at = now(), updated_at = now()
+ WHERE id = '<lifecycle id>' AND state = 'failed';
+```
+
+#### Rotating the provisioner credential
+
+The service records which admin credential manages each tenant; rotation moves that management
+with an operator-only call. Follow this order:
+
+1. An operator issues the new provisioner credential (`admin_credentials/issue`, scope
+   `provisioner`).
+2. Switch `MEMORY_SERVICE_PROVISIONER_TOKEN` to the new token and restart OpenBot. Until step 3
+   lands, every lifecycle recorded under the old credential id waits with `provisioner_mismatch`
+   (no attempt spent, no destructive call): the worker only checks, with a credential listing and
+   a create, whether the new credential manages the tenant yet. Rows created meanwhile under the
+   new id wait the same way. Settings show the mismatch, and
+   `memory_lifecycle_postponed_rows{outcome="provisioner_mismatch"}` counts the rows.
+3. The operator runs `admin.tenants.reassign {"from": "<old id>", "to": "<new id>"}`, repeating
+   until it answers `"remaining": false`. It moves tombstoned tenants too, so pending deletions
+   complete.
+4. Within five minutes each row's next pass sees that the new credential manages its tenant and
+   re-records the company's rows under the new id, then proceeds.
+5. Revoke the old credential.
+
+Reassigning before switching the token fails the old process's steps instead of postponing them,
+so keep this order. Edges:
+- An absent step for a disabled tenant waits until the tenant is enabled or deleted.
+- Never configure an operator token as the provisioner: an operator manages every tenant, so the
+  check above would adopt every row.
+- The check's create can itself create a tenant the service never had (one whose first create
+  never landed). That tenant is then managed by the configured credential, which is correct.
+- A `failed` row stays failed through rotation; re-drive it with "Retry failed provisioning" (or
+  the statement above for a deleted company).
+
+#### Restoring the memory service
+
+A restore brings the service back to the backup's moment. OpenBot's own rows say what happened
+since, so it re-applies them. The service side is in its README, "Backup and restore".
+
+1. Stop memory traffic: unset `MEMORY_SERVICE_URL` and restart OpenBot. Its memory workers stop
+   and queued intents wait; memory steps and tools fail meanwhile, as described above.
+2. Restore the service database, then run the service's `migrate` and `admin after-restore`.
+   Revoke again any admin credential revoked after the backup, and re-apply tenant settings and
+   caps changed after it.
+3. In OpenBot's database, with `backup_time` set to the moment the backup was taken, run:
+
+<!-- tested: memory-restore-sql -->
+```sql
+BEGIN;
+-- Re-drive every lifecycle row that changed after the backup. A tenant row re-applies its
+-- enable or disable, a namespace row re-creates or deletes again, and a present namespace
+-- checks its stored credential and replaces one the restored service never had.
+UPDATE memory_lifecycles
+   SET state = 'pending', generation = generation + 1, attempts = 0, transient_retries = 0,
+       outcome_code = 'service_restored', lease_owner = NULL, lease_until = NULL,
+       available_at = clock_timestamp(), updated_at = clock_timestamp()
+ WHERE updated_at >= :'backup_time';
+-- Cancel open captures: one may already have run after the backup, and running it again would
+-- be a second inference. Open saves are kept; resending one re-creates the memory the restore lost.
+UPDATE memory_deliveries
+   SET state = 'cancelled', outcome_code = 'service_restored', request = NULL,
+       lease_owner = NULL, lease_until = NULL, updated_at = clock_timestamp()
+ WHERE kind = 'generation' AND state IN ('pending', 'claimed');
+COMMIT;
+```
+
+   For example: `psql -v backup_time='2026-11-10 03:00:00+00' -f restore.sql`.
+4. Set `MEMORY_SERVICE_URL` again and restart. The lifecycle worker re-applies the rows; watch
+   `memory_lifecycles_rows{state="pending"}` fall to 0 and check company Settings for failures.
+
+Limits:
+- Lifecycle rows are kept 30 days after they settle `absent`, so a backup older than that cannot
+  be reconciled this way: deletions older than 30 days would come back.
+- Memories saved or generated after the backup are lost; OpenBot does not resend a settled save.
+- A memory tenant deleted directly in the service, outside OpenBot, cannot be recreated (its id
+  is the company id). Every credential of it answers `401`, its intents retry until their
+  deadline, and its lifecycle fails `tenant_conflict`. That company's memory stays failed until
+  the service database is restored or reset. This is an unsupported operator action.
 
 ### Google connected apps
 
