@@ -1997,3 +1997,24 @@ this block records what changed against E1–E12.
     PackItem when the pack lands.
   - E10: the editor catalogue lists the memory kinds where the memory service is configured, and their
     notes name `memory.not_enabled`.
+
+## Phase 06 implementation notes (06A, as implemented)
+The full phase 06 record (gates, implementation, checks and reviews) is
+`phases/p06/docs/TASK.md` and `phases/p06/docs/REVIEW.md`. This section records only what amends
+an earlier decision here.
+
+- D9 retention, amended by review MEM-P06-A1-R1 F5 (recorded as asked in A1-R2 F8 (c)). D9 says
+  "Identity, revision, level and digest stay for provenance". As implemented, they stay while
+  anything references the source:
+  - A source whose content was nulled 30 or more days ago, and that no link and no operation
+    names, is deleted (`remove_unreferenced_sources`,
+    `services/memory/src/adapters/postgres/retention.rs:541`).
+  - A finished operation that no observation names is deleted with its op-source rows 30 days
+    after it finished (`remove_unreferenced_operations`, same file, line 518). Both run from
+    `sweep_aged_once` (line 405), each in its own transaction that re-checks its predicate.
+  - Consequences:
+    - re-recording a removed revision creates a fresh source row, because revision immutability
+      holds only while something references the revision;
+    - `GET generations/{id}` for a removed operation answers `not_found`;
+    - OpenBot's capture refs are per exchange and never re-recorded, so OpenBot never meets
+      either case.
