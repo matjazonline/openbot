@@ -1,0 +1,173 @@
+{
+ "version": 1,
+ "round": "MEM-P05-B6-R1",
+ "artifact": "88808f5ad06857e86e417fe9593fd6b72185bdc01b42ad52871054c77e81b0a1",
+ "checks": [
+  {
+   "criteria": [
+    "E11 live tests against the real service via scripts/memory-integration.sh (build, provision-db, bootstrap, provisioner, loopback serve, Messages stand-in, --ignored, nonzero count, stand-in called, cleanup)",
+    "E1/E2 provisioning with real credentials",
+    "E4 save delivered, E7 search/fetch/pack/validate",
+    "E8 operator cap refresh, capture delivered and generated",
+    "E9 disable refuses reads and new freezes",
+    "E8 competing delivery workers against the real service"
+   ],
+   "command": "MEMORY_INTEGRATION_ADMIN_URL=postgres://postgres@127.0.0.1:55432/postgres MEMORY_PSQL=/opt/homebrew/opt/postgresql@18/bin/psql TEST_DATABASE_URL=postgres://postgres@127.0.0.1:55432/open_bots_root_test scripts/memory-integration.sh",
+   "fixture": "private cluster 127.0.0.1:55432 (pgvector); throwaway memory_live_* database and role, dropped (0 left)",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/MEM-P05-B6-R1-live.txt",
+     "sha256": "4ddfc232e66e3fe0fc517dd746532468961cb75e76532a4ae8fe180227c4726d"
+    }
+   ],
+   "reason": "2 passed on the final tree; earlier runs found the B5 source-revision defect (fixed), a wrong label expectation and the trap bug (fixed)"
+  },
+  {
+   "criteria": [
+    "all five prefixes listed nonzero on the final tree"
+   ],
+   "command": "cargo test --locked --offline --lib -- <prefix> --list for memory_scope_ memory_access_level_ memory_integration_ memory_preparation_ memory_capture_ memory_integration_live_",
+   "fixture": "none",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/MEM-P05-B6-R1-prefix-counts.txt",
+     "sha256": "13f9b0ae22e8b5cfd47e55ced37db9fbe84e60d3284bf9db1d0f7a6c9eec1658"
+    }
+   ],
+   "reason": "43, 25, 53, 13, 16, live 2"
+  },
+  {
+   "criteria": [
+    "scripts/stack-budget.sh: the lib suite at the stock 2 MiB (all five prefixes pass; full lib suite)"
+   ],
+   "command": "TEST_DATABASE_URL=postgres://postgres@127.0.0.1:55432/open_bots_root_test scripts/stack-budget.sh",
+   "fixture": "open_bots_root_test",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/MEM-P05-B6-R1-stack-budget.txt",
+     "sha256": "a231cf618c78a82767b5429018d43afbba0c64d35e2117fd0a3fef34cfb83a10"
+    }
+   ],
+   "reason": "3689 passed, 3 failed, 13 ignored, no stack overflow. Failures pre-existing and unrelated: rendered_markup_carries_no_inline_javascript (workflow_authoring/sample.rs:153, unchanged since base) and two security_auth_limits_* (private cluster --locale=C; auth_attempts unchanged since base). memory_integration_ 51 passed + 2 live ignored; the other prefixes all pass. The fmt-only reflow afterwards was rerun: memory_capture_ memory_integration_ 67 passed"
+  },
+  {
+   "criteria": [
+    "boundary scripts"
+   ],
+   "command": "scripts/tests/transport-boundary.sh; scripts/transport-boundary-check.sh; python3 scripts/tests/workflow-sample-boundary.py; python3 scripts/workflow-sample-boundary.py; (cd services/memory && scripts/boundary-check.sh)",
+   "fixture": "none",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/MEM-P05-B6-R1-boundaries.txt",
+     "sha256": "3bcf717d1868900b4d7d1a1f7815d24f9128962b1293680136f9f8f2e6977fe5"
+    },
+    {
+     "path": "logs/MEM-P05-B6-R1-boundaries-rest.txt",
+     "sha256": "477983df2ce48e73ad1e23c14153b46927d4cb32f5392e3b6ff8bb862bfcee6c"
+    }
+   ],
+   "reason": "all pass except transport-boundary-check's pre-existing offender channel_reply_continuation_views_support.rs:59 (unchanged since base, recorded earlier)"
+  },
+  {
+   "criteria": [
+    "credential rotation"
+   ],
+   "command": "scripts/tests/credential-key-rotation.sh; credential_rotation_tests inside the stack-budget suite",
+   "fixture": "none / open_bots_root_test",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/MEM-P05-B6-R1-credential-rotation-script.txt",
+     "sha256": "3ddbc0e774ee727d438513c3ad4a5c7fc6203e847efa6ffab28dd0f0da6e55a4"
+    }
+   ],
+   "reason": "script tests passed; the database rotation tests passed in the full suite"
+  },
+  {
+   "criteria": [
+    "sqlx offline cache matches the migrated schema",
+    "fresh migration of the edited init schema"
+   ],
+   "command": "DATABASE_URL=postgres://postgres@127.0.0.1:55432/open_bots_mem_prepare cargo sqlx migrate run; cargo sqlx prepare --check -- --all-targets",
+   "fixture": "fresh open_bots_mem_prepare",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/MEM-P05-B6-R1-sqlx-prepare.txt",
+     "sha256": "0b0bc97685951402c8bc46396fbfeee72f3e02d3abe3deecb8403cf7ffa4f6b8"
+    }
+   ],
+   "reason": "migrate exit 0, prepare exit 0 (local sqlx-cli 0.9.0; CI pins 0.8.6)"
+  },
+  {
+   "criteria": [
+    "browser check of the settings memory section: escaped agent name, labelled fields, blank reason refused, posted policy, saved section swapped in, both themes readable"
+   ],
+   "command": "MEMORY_SETTINGS_BROWSER_FIXTURES=<dir> cargo test --lib dump_memory_settings_browser_fixtures -- --ignored; node --test scripts/tests/memory-settings-browser.mjs",
+   "fixture": "Playwright Chromium (@playwright/test 1.55.1 from the main checkout's node_modules, linked for the run and removed)",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/MEM-P05-B6-R1-browser.txt",
+     "sha256": "b64740f0467751702f79684851a39fb24bc4af8b1e5555aa64073796ec442fff"
+    },
+    {
+     "path": "logs/MEM-P05-B6-R1-browser-light.png",
+     "sha256": "05199a6d0b804c382fba836cde9af02b0ae006948b16c31ba484a50ee7a878bd"
+    },
+    {
+     "path": "logs/MEM-P05-B6-R1-browser-dark.png",
+     "sha256": "67b1f7d4cb8cf0e7bf92c194eca35d984bd4ec1de7723a0e029ec95300ea5fb6"
+    }
+   ],
+   "reason": "1 passed; screenshots looked at: the first showed labels detached from fields, relaid as labelled blocks"
+  },
+  {
+   "criteria": [
+    "clippy -D warnings (all targets)",
+    "formatting",
+    "whitespace"
+   ],
+   "command": "cargo clippy --locked --offline --all-targets -- -D warnings; cargo fmt --all -- --check; git diff --check",
+   "fixture": "none",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/MEM-P05-B6-R1-clippy.txt",
+     "sha256": "534f599f34e6c082e3f78b6e9a5db5a85be7a4b83c72be13af031ce6d68c2d2a"
+    },
+    {
+     "path": "logs/MEM-P05-B6-R1-fmt-check.txt",
+     "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+     "path": "logs/MEM-P05-B6-R1-diff-check.txt",
+     "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "CI execution of the new memory-integration job and browser step",
+    "Docker/Linux isolation"
+   ],
+   "command": "not run",
+   "fixture": "none",
+   "status": "NOT EXERCISED",
+   "reason": "CI is unavailable here (I001/I002: no pushes); the YAML parses (ruby YAML) and the script runs locally"
+  },
+  {
+   "criteria": [
+    "full suite including integration-test targets and node suites"
+   ],
+   "command": "not run",
+   "fixture": "none",
+   "status": "NOT EXERCISED",
+   "reason": "the lib suite ran in full at 2 MiB; the all-target full suite stays 06C"
+  }
+ ]
+}

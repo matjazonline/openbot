@@ -1,0 +1,33 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO generation_operations (tenant_id, namespace_id, id, credential_id, idempotency_key, session_id, summary, state, outcome_code, request, producing_ceiling, watermark_kind, watermark_level, source_max_level, input_level, allowance_tokens, max_output_tokens, reservation, expires_at, finished_at, correlation_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11::smallint, $12, $13::smallint, $14::smallint, $15::smallint, $16, $17, $18, $19, CASE WHEN $8 = 'completed' THEN now() END, $20)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Text",
+        "Uuid",
+        "Bool",
+        "Text",
+        "Text",
+        "Jsonb",
+        "Int2",
+        "Text",
+        "Int2",
+        "Int2",
+        "Int2",
+        "Int8",
+        "Int4",
+        "Int8",
+        "Timestamptz",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "11d477d9723a4c1b5cb3e3d751420d79733a1470c1aacec2c5f1e8f762efa4e0"
+}

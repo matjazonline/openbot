@@ -1,0 +1,11 @@
+   Compiling open_bots v0.1.0 (/Users/mac03/.codex/worktrees/60a0/openbot)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2m 23s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-6c472bc7410f7b21)
+
+running 3 tests
+test adapters::persistence::memory::delivery_tests::memory_integration_delivery_settles_an_unopenable_credential_poison_batch ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::memory_steps_tests::memory_integration_interrupted_save_without_an_intent_retries ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::memory_steps_tests::memory_integration_terminal_intent_wakes_and_fails_the_parked_save ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 3632 filtered out; finished in 2.16s
+

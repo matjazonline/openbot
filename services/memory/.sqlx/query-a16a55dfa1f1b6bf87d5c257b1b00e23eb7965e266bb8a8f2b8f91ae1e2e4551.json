@@ -1,0 +1,29 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT s.tenant_id, s.id FROM sources AS s WHERE s.content IS NULL AND s.content_nulled_at < now() - make_interval(secs => $2) AND NOT EXISTS (SELECT 1 FROM observation_links AS l WHERE l.tenant_id = s.tenant_id AND l.source_id = s.id) AND NOT EXISTS (SELECT 1 FROM generation_operation_sources AS g WHERE g.tenant_id = s.tenant_id AND g.source_id = s.id) ORDER BY s.content_nulled_at LIMIT $1 FOR UPDATE OF s SKIP LOCKED",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "tenant_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Float8"
+      ]
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "a16a55dfa1f1b6bf87d5c257b1b00e23eb7965e266bb8a8f2b8f91ae1e2e4551"
+}

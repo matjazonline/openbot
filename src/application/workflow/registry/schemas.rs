@@ -15,11 +15,33 @@ pub(super) fn array(items: Value, min: usize, max: usize) -> Value {
 pub(super) fn object(properties: Value, required: &[&str]) -> Value {
     json!({"type":"object","properties":properties,"required":required,"additionalProperties":false})
 }
+/// A memory scope (E4): the company, or one agent of this bundle by key. No tenant, company or
+/// user id: steps have no user scope, and the scope is a literal resolved at publication.
 pub(super) fn scope() -> Value {
     json!({"oneOf":[
-        object(json!({"kind":{"const":"company"},"id":identifier()}), &["kind"]),
-        object(json!({"kind":{"enum":["agent","user"]},"id":identifier()}), &["kind","id"])
+        object(json!({"kind":{"const":"company"}}), &["kind"]),
+        object(json!({"kind":{"const":"agent"},"agent":identifier()}), &["kind","agent"])
     ]})
+}
+/// One loaded memory (E4): level-aware, with its revision; no namespace or tenant identity.
+pub(super) fn memory_item() -> Value {
+    object(
+        json!({"id":uuid(),"scope":{"enum":["company","agent"]},"kind":{"type":"string","maxLength":32},
+            "title":{"type":"string","maxLength":256},"content":{"type":"string","maxLength":MAX_TEXT},
+            "occurred_at":{"type":"string","format":"date-time","maxLength":MAX_DEADLINE},
+            "access_level":{"type":"integer","minimum":0,"maximum":9},
+            "revision":{"type":"integer","minimum":1}}),
+        &[
+            "id",
+            "scope",
+            "kind",
+            "title",
+            "content",
+            "occurred_at",
+            "access_level",
+            "revision",
+        ],
+    )
 }
 /// Explicit company-member reviewers: 1..16 unique `{"kind":"user","id":<uuid>}` items, the
 /// 04.11 destination shape. There are no groups or external reviewers (05-D2 §4.1).
@@ -65,12 +87,6 @@ pub(super) fn history_item() -> Value {
             "body",
             "truncated",
         ],
-    )
-}
-pub(super) fn provenance_item() -> Value {
-    object(
-        json!({"id":identifier(),"source":identifier(),"content":text(MAX_TEXT)}),
-        &["id", "source", "content"],
     )
 }
 /// One entry per destination, in destination order. Only an all-accepted invocation succeeds;

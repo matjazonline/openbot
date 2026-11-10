@@ -1,0 +1,32 @@
+--- src/adapters/persistence/workflow/memory_tool_checkpoint.rs	2026-11-09 11:25:06
++++ tmp/memory-service-run/mut-b3/tree/src/adapters/persistence/workflow/memory_tool_checkpoint.rs	2026-11-09 11:49:03
+@@ -445,6 +445,20 @@
+     facts: &[String],
+     bound: &WriteBound,
+ ) -> AppResult<End<MemorySaveOutcome>> {
++    // MUTATION A: the run's levels read before the run lock, as a claim-time snapshot would be.
++    let pre: (i16, i16, bool) = sqlx::query_as(
++        "SELECT knowledge_ceiling::smallint, content_level::smallint, content_exact \
++         FROM workflow_runs WHERE company_id=$1 AND id=$2",
++    )
++    .bind(fence.scope.company.as_uuid())
++    .bind(fence.scope.run.as_uuid())
++    .fetch_one(&mut **tx)
++    .await?;
++    let pre = crate::adapters::persistence::memory::deliveries::LockedRun {
++        ceiling: AccessLevel::try_from(pre.0).map_err(|_| invalid())?,
++        content: AccessLevel::try_from(pre.1).map_err(|_| invalid())?,
++        content_exact: pre.2,
++    };
+     let loaded = load_call(tx, fence, call, bound).await?;
+     if let Some(result) = &loaded.completed {
+         return Ok(End::Rollback(MemorySaveOutcome::Accepted(result.clone())));
+@@ -479,7 +493,7 @@
+         external_sources: save_sources(recalled_on(tx, fence).await?),
+     };
+     use crate::adapters::persistence::memory::deliveries::SaveEnqueue;
+-    let id = match crate::adapters::persistence::memory::deliveries::enqueue_save_on(tx, &intent)
++    let id = match crate::adapters::persistence::memory::deliveries::freeze_save_on(tx, &intent, pre)
+         .await?
+     {
+         SaveEnqueue::Enqueued { id, .. } => id,

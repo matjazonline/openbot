@@ -1,0 +1,9 @@
+== reviewer B: mutation L on freeze tree 2a0d2550 (2026-11-09T20:23:15Z); df: /dev/disk3s5   228Gi   171Gi    32Gi    85%    2.2M  333M    1%   /System/Volumes/Data
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 3m 29s
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::recall::memory_preparation_resumed_attempts_revalidate_recorded_tool_items ... FAILED
+thread 'adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::recall::memory_preparation_resumed_attempts_revalidate_recorded_tool_items' (22957221) panicked at src/adapters/persistence/workflow/memory_recall_tests.rs:481:13:
+test result: FAILED. 31 passed; 1 failed; 0 ignored; 0 measured; 3654 filtered out; finished in 10.55s
+error: test failed, to rerun pass `--lib`
+cargo exit 101
+deleted /Users/mac03/.codex/worktrees/60a0/openbot/tmp/memory-service-run/mut-b4r3-rev
+/dev/disk3s5   228Gi   171Gi    32Gi    85%    2.2M  336M    1%   /System/Volumes/Data

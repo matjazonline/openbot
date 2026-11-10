@@ -1,0 +1,24 @@
+   Compiling open_bots v0.1.0 (/Users/mac03/.codex/worktrees/60a0/openbot)
+warning: variant `User` is never constructed
+  --> src/adapters/persistence/memory/deliveries.rs:36:5
+   |
+33 | pub(crate) enum SaveScope {
+   |                 --------- variant in this enum
+...
+36 |     User(Uuid),
+   |     ^^^^
+   |
+   = note: `SaveScope` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `open_bots` (lib test) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2m 12s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-6c472bc7410f7b21)
+
+running 3 tests
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::memory_steps_tests::memory_integration_run_cancellation_cancels_the_parked_intent ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::memory_steps_tests::memory_integration_save_and_load_steps_round_trip_through_the_intent ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::memory_steps_tests::memory_integration_steps_fail_terminally_once_memory_is_disabled ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 3627 filtered out; finished in 1.23s
+

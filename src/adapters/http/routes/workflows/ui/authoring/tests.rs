@@ -448,6 +448,30 @@ async fn the_catalogue_lists_every_runnable_type_and_the_agents_a_step_can_name(
     assert!(html.contains("no explicit model: workflows refuse this agent"));
 }
 
+/// E10: with the memory service configured the editor lists the memory steps, whose notes say
+/// publication needs memory enabled for the company.
+#[tokio::test]
+async fn the_catalogue_lists_memory_steps_only_when_the_memory_service_is_configured() {
+    let Some(mut f) = Fixture::new().await else {
+        return;
+    };
+    f.engine = crate::infra::workflow::WorkflowEngine::for_tests(f.persistence.clone())
+        .with_unserved_memory()
+        .services();
+    let Html(html) = catalogue(f.ui(f.owner), f.query()).await.unwrap();
+    for kind in ["memory.load", "memory.save"] {
+        assert!(
+            f.engine
+                .step_catalogue()
+                .iter()
+                .any(|e| e.type_name == kind),
+            "{kind}"
+        );
+        assert!(html.contains(kind), "{kind}");
+    }
+    assert!(html.contains("memory.not_enabled"));
+}
+
 /// An approved MCP operation inserted as rows (no reviewed discovery): enough for the editor's
 /// listing, which reads only the approval rows.
 async fn approved_rows(f: &Fixture, slug: &str, tools: &[String]) -> Uuid {
@@ -613,6 +637,9 @@ mod sample_tests;
 
 #[path = "jev_tests.rs"]
 mod jev_tests;
+
+#[path = "memory_tests.rs"]
+mod memory_tests;
 
 /// Plan `new-board-view` 02: the Workflows page's "Runs" opens the board, and a workflow's pane
 /// links to that workflow's board.

@@ -197,6 +197,7 @@ pub(crate) fn agent_library_form_page(body: &str) -> String {
 mod model_usage;
 pub use model_usage::model_usage_page;
 
+pub mod company_memory;
 pub mod company_typesafe;
 
 #[cfg(test)]

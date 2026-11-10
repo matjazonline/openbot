@@ -1,0 +1,36 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT access_level::smallint AS \"level!\", revision,\n                      (expires_at IS NOT NULL AND expires_at <= now()) AS \"expired!\"\n                 FROM observations WHERE tenant_id = $1 AND namespace_id = $2 AND id = $3\n                  FOR UPDATE",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "level!",
+        "type_info": "Int2"
+      },
+      {
+        "ordinal": 1,
+        "name": "revision",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 2,
+        "name": "expired!",
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null,
+      false,
+      null
+    ]
+  },
+  "hash": "35c8b8dfb2f0951b34626c4d9e35c3592aad068a950b97ff9db6466d47eaa176"
+}

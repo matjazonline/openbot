@@ -25,6 +25,7 @@ struct Candidate {
     id: Uuid,
     position: i64,
     access_level: i16,
+    content_exact: bool,
     input_bytes: i32,
     output_bytes: i32,
 }
@@ -34,11 +35,18 @@ struct Payload {
     output: Value,
 }
 
+/// The frozen selection and whether every selected exchange was exact: the `bool_and` beside
+/// `selected_level`'s max (phase 05 E3). Exactness stays out of the frozen document.
+pub(super) struct SelectedHistory {
+    pub history: FrozenAgentHistory,
+    pub exact: bool,
+}
+
 pub(super) async fn select_on(
     db: &mut PgConnection,
     scope: ActionScope,
     prepared: &PreparedAgent,
-) -> AppResult<FrozenAgentHistory> {
+) -> AppResult<SelectedHistory> {
     // Mandatory content is checked before fetching any history payload.
     prepared.history_budget(&LogicalSeed::default())?;
     let source = source_on(db, scope).await?;
@@ -46,6 +54,7 @@ pub(super) async fn select_on(
     let mut selected = Vec::new();
     let mut pairs = Vec::new();
     let mut raw_bytes = 0usize;
+    let mut exact = true;
     for candidate in candidates {
         let raw = usize::try_from(candidate.input_bytes + candidate.output_bytes)
             .map_err(|_| invalid())?
@@ -66,6 +75,7 @@ pub(super) async fn select_on(
         }
         pairs = proposed;
         raw_bytes += raw;
+        exact &= candidate.content_exact;
         selected.push(SelectedAgentExchange {
             id: AgentExchangeId::new(candidate.id),
             position: AgentExchangeOrder::try_from(candidate.position as u64)?,
@@ -100,7 +110,7 @@ pub(super) async fn select_on(
         selected=history.selected.len(), omitted_eligible=history.omitted_eligible,
         selected_level=history.selected_level.as_i16(), content_level=history.content_level.as_i16(),
         durability="staged", event="agent_history.selected", "Agent history suffix selected in current transaction");
-    Ok(history)
+    Ok(SelectedHistory { history, exact })
 }
 
 async fn source_on(db: &mut PgConnection, scope: ActionScope) -> AppResult<Source> {

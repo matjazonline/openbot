@@ -1,0 +1,32 @@
+   Compiling open_bots v0.1.0 (/Users/mac03/.codex/worktrees/60a0/openbot/tmp/memory-service-run/mut-b3/tree)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1m 10s
+     Running unittests src/lib.rs (/Users/mac03/.codex/worktrees/60a0/openbot/tmp/memory-service-run/mut-b3/target/debug/deps/open_bots-0312fde2b93b807b)
+
+running 3 tests
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::memory_integration_agent_memory_tools_search_and_save_through_the_production_dispatch ... FAILED
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::memory_access_level_tool_read_commits_its_rise_before_the_model_sees_it ... FAILED
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::memory_access_level_competing_rise_and_tool_save_freeze_the_committed_level ... ok
+
+failures:
+
+---- adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::memory_integration_agent_memory_tools_search_and_save_through_the_production_dispatch stdout ----
+
+thread 'adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::memory_integration_agent_memory_tools_search_and_save_through_the_production_dispatch' (21964889) panicked at src/adapters/persistence/workflow/memory_tool_tests.rs:291:5:
+assertion `left == right` failed: raised to the highest exposed item
+  left: 0
+ right: 5
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::memory_access_level_tool_read_commits_its_rise_before_the_model_sees_it stdout ----
+
+thread 'adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::memory_access_level_tool_read_commits_its_rise_before_the_model_sees_it' (21964888) panicked at src/adapters/persistence/workflow/memory_tool_tests.rs:779:5:
+no result before the observation commits
+
+
+failures:
+    adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::memory_access_level_tool_read_commits_its_rise_before_the_model_sees_it
+    adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::memory_integration_agent_memory_tools_search_and_save_through_the_production_dispatch
+
+test result: FAILED. 1 passed; 2 failed; 0 ignored; 0 measured; 3662 filtered out; finished in 3.35s
+
+error: test failed, to rerun pass `--lib`

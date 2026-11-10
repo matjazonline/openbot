@@ -256,6 +256,10 @@ pub struct WorkflowAgentRuntime<S, T> {
     tools: T,
     notices: Option<DecisionNotices>,
     lease: LeasePolicy,
+    /// Automatic recall and revalidation (phase 05 E7). Always present: until a configured
+    /// recall replaces it, nothing is recalled and earlier memory is never replayed unvalidated
+    /// (U5), so no composition can leave a resumed attempt unchecked.
+    recall: std::sync::Arc<crate::application::workflow::memory_recall::MemoryRecall>,
 }
 
 impl<S, T> WorkflowAgentRuntime<S, T>
@@ -263,19 +267,41 @@ where
     S: WorkflowCheckpointStore + AgentPreparation,
     T: AgentToolDispatch,
 {
+    /// Composition-time access to the tool dispatch, before the runtime is shared.
+    pub fn tools_mut(&mut self) -> &mut T {
+        &mut self.tools
+    }
+
+    /// Composition-time automatic recall (E7), before the runtime is shared.
+    pub fn set_recall(
+        &mut self,
+        recall: std::sync::Arc<crate::application::workflow::memory_recall::MemoryRecall>,
+    ) {
+        self.recall = recall;
+    }
+
     pub fn new(
         providers: super::providers::ProviderRegistry,
         store: S,
         tools: T,
         notices: Option<DecisionNotices>,
         lease: LeasePolicy,
-    ) -> Self {
+    ) -> Self
+    where
+        S: crate::application::workflow::memory_recall::MemoryRecallPersistence + Clone + 'static,
+    {
+        let recall = std::sync::Arc::new(
+            crate::application::workflow::memory_recall::MemoryRecall::unconfigured(
+                std::sync::Arc::new(store.clone()),
+            ),
+        );
         Self {
             providers,
             store,
             tools,
             notices,
             lease,
+            recall,
         }
     }
 
@@ -285,7 +311,26 @@ where
             .run_deadline
             .min(tokio::time::Instant::now() + std::time::Duration::from_millis(MAX_CLAIM_MS));
         use crate::application::workflow::agent::AgentPreparationResult;
-        let launch = match self.store.prepare_agent(claim, self.lease).await? {
+        use crate::application::workflow::memory_recall::{RecallStep, RecallValidation};
+        // Boxed: recall descends into the memory service; the parent holds a pointer (src/AGENTS.md).
+        let step = Box::pin(self.recall.step(claim, self.lease)).await?;
+        let (fetched, resumed) = match step {
+            RecallStep::None => (None, false),
+            RecallStep::Fresh(fetched) => (Some(fetched), false),
+            RecallStep::Resumed => (None, true),
+        };
+        let launch = match self
+            .store
+            .prepare_agent_with_recall(
+                claim,
+                self.lease,
+                crate::application::workflow::memory_recall::MemoryPreparation {
+                    recall: fetched,
+                    capture: self.recall.configured(),
+                },
+            )
+            .await?
+        {
             AgentPreparationResult::Ready(launch) => launch,
             AgentPreparationResult::Parked(wait) => {
                 return Ok(WorkflowHandlerOutcome::Suspended(SuspendedWorkflow {
@@ -305,6 +350,25 @@ where
                 })));
             }
         };
+        // Once per claimed attempt, before its first provider entry (E7); never per tool round.
+        let validation = self
+            .recall
+            .validate(claim, self.lease, &launch.prepared, resumed);
+        match Box::pin(validation).await? {
+            RecallValidation::Valid => {}
+            RecallValidation::Revoked => {
+                return Ok(memory_failure(
+                    FailureClass::Terminal,
+                    "memory.context_revoked",
+                ));
+            }
+            RecallValidation::Unavailable => {
+                return Ok(memory_failure(
+                    FailureClass::Retryable,
+                    "memory.context_unavailable",
+                ));
+            }
+        }
         Ok(
             match Box::pin(self.run_ready(claim, &launch, deadline)).await? {
                 Driven::Completed(output) => WorkflowHandlerOutcome::Completed(
@@ -429,6 +493,19 @@ where
 }
 
 /// The validated final JSON value; never the sanitized prose of an unstructured reply.
+/// A recall revalidation outcome as the step's failure (E7).
+fn memory_failure(class: FailureClass, code: &'static str) -> WorkflowHandlerOutcome {
+    WorkflowHandlerOutcome::Completed(Err(WorkflowFailure {
+        failure: StepFailure::new(
+            class,
+            FailureCode::parse(code).expect("static failure code"),
+            None,
+        )
+        .expect("bounded memory failure"),
+        safety: RetrySafety::SafeToRetry,
+    }))
+}
+
 fn structured(output: &AgentExecutionOutput) -> AppResult<serde_json::Value> {
     let response = output
         .structured

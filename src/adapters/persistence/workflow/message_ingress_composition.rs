@@ -29,6 +29,7 @@ pub(super) fn engine(
             // Five DB connections: preserve the existing single-slot ingress fixture budget.
             slots: 1,
             knowledge: knowledge.clone(),
+            http_destinations: crate::adapters::workflow_http::HttpDestinationPolicy::default(),
         },
     )
     .unwrap();

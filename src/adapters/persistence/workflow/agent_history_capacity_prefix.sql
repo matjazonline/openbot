@@ -14,11 +14,11 @@ SELECT prefix.job_id,job.company_id,job.channel_id,job.thread_id,job.correlation
     job.max_retries,NULL,NULL,NULL,NULL,job.run_at,job.created_at,job.updated_at,prefix.id
 FROM background_tasks AS job CROSS JOIN ah_history_prefix AS prefix WHERE job.company_id=$1 AND job.workflow_execution_id=$3 AND job.id=$4;
 INSERT INTO agent_history_exchanges(company_id,id,conversation_id,agent_id,revision_id,manifest_id,run_id,execution_id,job_id,
-    position,input_digest,provenance,access_level,state,output,frozen_preparation,payload_retained,payload_expired_at,
+    position,input_digest,provenance,access_level,content_exact,state,output,frozen_preparation,payload_retained,payload_expired_at,
     preparation_digest,created_at,activated_at,finished_at)
 SELECT exchange.company_id,prefix.id,exchange.conversation_id,exchange.agent_id,exchange.revision_id,exchange.manifest_id,
     exchange.run_id,prefix.id,prefix.job_id,prefix.position,exchange.input_digest,exchange.provenance,exchange.access_level,
-    'cancelled',NULL,CASE WHEN $8='retained' THEN jsonb_set($7::jsonb,'{history_exchange}',to_jsonb(prefix.id::text)) ELSE NULL END,
+    exchange.content_exact,'cancelled',NULL,CASE WHEN $8='retained' THEN jsonb_set($7::jsonb,'{history_exchange}',to_jsonb(prefix.id::text)) ELSE NULL END,
     $8='retained',CASE WHEN $8='expired' THEN clock_timestamp() ELSE NULL END,
     sha256(convert_to(jsonb_set($7::jsonb,'{history_exchange}',to_jsonb(prefix.id::text))::text,'UTF8')),
     exchange.created_at,exchange.activated_at,exchange.finished_at

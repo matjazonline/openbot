@@ -1,0 +1,42 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT id, revision, access_level::smallint AS \"level!\",\n                      (expires_at IS NOT NULL AND expires_at <= now()) AS \"expired!\"\n                 FROM sources WHERE tenant_id = $1 AND namespace_id = $2 AND id = ANY($3)\n                ORDER BY id FOR SHARE",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "revision",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "level!",
+        "type_info": "Int2"
+      },
+      {
+        "ordinal": 3,
+        "name": "expired!",
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "UuidArray"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      null,
+      null
+    ]
+  },
+  "hash": "b59473ce7af7faa09593c3cb5df5475b095673bc766f76ec63a68bc79fc5277a"
+}

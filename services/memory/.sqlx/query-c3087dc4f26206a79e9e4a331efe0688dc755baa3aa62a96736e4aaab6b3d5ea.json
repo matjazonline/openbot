@@ -1,0 +1,99 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "WITH lexemes AS (\n                 SELECT t.lexeme FROM unnest(to_tsvector('simple', $5)) AS t\n                  ORDER BY t.positions[1], t.lexeme LIMIT $9\n               ), q AS (\n                 SELECT string_agg('''' || replace(replace(lexeme, '\\', '\\\\'), '''', '''''') || '''',\n                                   ' | ')::tsquery AS query FROM lexemes\n               )\n               SELECT o.id, n.external_id AS namespace, o.kind, o.title, o.occurred_at,\n                      o.access_level::smallint AS \"level!\", o.revision, o.index_state,\n                      o.expires_at,\n                      CASE WHEN $11::bool\n                           THEN encode(sha256(convert_to(o.title, 'UTF8') || decode('00', 'hex')\n                                              || convert_to(o.body, 'UTF8')), 'hex')\n                      END AS digest,\n                      CASE WHEN $12::bool THEN octet_length(to_json(o.body)::text) END\n                        AS body_json_bytes,\n                      CASE WHEN NOT $10::bool THEN ''\n                           WHEN pt.part IS NOT NULL AND q.query IS NOT NULL\n                                AND to_tsvector('simple', pt.part) @@ q.query\n                           THEN ts_headline('simple', pt.part, q.query,\n                                'MaxFragments=1, MaxWords=40, MinWords=5, StartSel=\"\", StopSel=\"\"')\n                           WHEN pt.part IS NOT NULL THEN pt.part\n                           WHEN q.query IS NULL OR o.body = '' THEN ''\n                           ELSE ts_headline('simple', o.body, q.query,\n                                'MaxFragments=1, MaxWords=40, MinWords=5, StartSel=\"\", StopSel=\"\"')\n                      END AS \"snippet!\"\n                 FROM UNNEST($2::uuid[], $6::int[], $7::int[], $8::bigint[])\n                      AS r(id, byte_start, byte_end, revision)\n                CROSS JOIN q\n                 JOIN observations AS o ON o.tenant_id = $1 AND o.id = r.id\n                 JOIN namespaces AS n ON (n.tenant_id, n.id) = (o.tenant_id, o.namespace_id)\n                CROSS JOIN LATERAL (\n                      SELECT CASE WHEN r.byte_end > r.byte_start AND o.revision = r.revision\n                                  THEN convert_from(substring(convert_to(o.body, 'UTF8')\n                                       FROM r.byte_start + 1 FOR r.byte_end - r.byte_start), 'UTF8')\n                             END AS part) AS pt\n                WHERE o.namespace_id = ANY($3) AND o.access_level <= $4::smallint\n                  AND n.state = 'active' AND (o.expires_at IS NULL OR o.expires_at > now())",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "namespace",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "kind",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "title",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "occurred_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 5,
+        "name": "level!",
+        "type_info": "Int2"
+      },
+      {
+        "ordinal": 6,
+        "name": "revision",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 7,
+        "name": "index_state",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 8,
+        "name": "expires_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 9,
+        "name": "digest",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 10,
+        "name": "body_json_bytes",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 11,
+        "name": "snippet!",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "UuidArray",
+        "UuidArray",
+        "Int2",
+        "Text",
+        "Int4Array",
+        "Int4Array",
+        "Int8Array",
+        "Int8",
+        "Bool",
+        "Bool",
+        "Bool"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      null,
+      false,
+      false,
+      true,
+      null,
+      null,
+      null
+    ]
+  },
+  "hash": "c3087dc4f26206a79e9e4a331efe0688dc755baa3aa62a96736e4aaab6b3d5ea"
+}

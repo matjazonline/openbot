@@ -1,0 +1,29 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT o.tenant_id, o.id FROM generation_operations AS o WHERE o.finished_at < now() - make_interval(secs => $2) AND NOT EXISTS (SELECT 1 FROM observations AS x WHERE x.tenant_id = o.tenant_id AND x.generation_operation_id = o.id) ORDER BY o.finished_at LIMIT $1 FOR UPDATE SKIP LOCKED",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "tenant_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Float8"
+      ]
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "0fd94b57dc310d7e876a2f287d64e4d75073e63dfa981752ca371bef0f4d007f"
+}

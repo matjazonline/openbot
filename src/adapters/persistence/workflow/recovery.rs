@@ -312,7 +312,10 @@ async fn route_failure(
             batch_commit::complete(
                 db,
                 scope,
-                &activation,
+                batch_commit::CompletedStep {
+                    activated: &activation,
+                    graph,
+                },
                 &completion,
                 run.max_steps,
                 completion_job::CompletionOwner::Recovered,

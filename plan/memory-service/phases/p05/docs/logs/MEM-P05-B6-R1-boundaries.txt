@@ -1,0 +1,4 @@
+runtime boundary gate regression tests passed
+transport boundary check failed:
+59:            &format!("<outcome-answer-{}@partner.test>", Uuid::new_v4()),
+an RFC Message-ID was constructed outside the email adapter in src/adapters/persistence/workflow/channel_reply_continuation_views_support.rs

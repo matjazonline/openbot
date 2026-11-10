@@ -1,0 +1,26 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT (SELECT extversion FROM pg_extension WHERE extname = 'vector') AS version,\n                          (SELECT format_type(atttypid, atttypmod) FROM pg_attribute\n                            WHERE attrelid = 'observation_parts'::regclass\n                              AND attname = 'embedding' AND NOT attisdropped) AS column_type",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "version",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "column_type",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      null,
+      null
+    ]
+  },
+  "hash": "0faaf245fc02aa96de668b7a0f46e0448b72f89ff976dcef130ad07d2efe2c53"
+}

@@ -397,42 +397,100 @@ impl AgentPersistence for PostgresPersistence {
     /// with it, so this is the only way an agent that has spoken can be deleted.
     async fn delete(&self, id: Uuid) -> AppResult<()> {
         let mut transaction = self.pool.begin().await.map_err(AppError::from)?;
-        // Locking the agent first means a concurrent `create_agent_principal_on` -- whose foreign
-        // key check needs a share lock on this row -- either committed before us, so its principal
-        // is demoted below, or waits and then fails against the deleted agent. It cannot slip a
-        // fresh agent principal in between the demotion and the delete.
-        let company_id: Option<Option<Uuid>> =
-            sqlx::query_scalar!("SELECT company_id FROM agents WHERE id = $1 FOR UPDATE", id)
-                .fetch_optional(&mut *transaction)
-                .await
-                .map_err(AppError::from)?;
-        let Some(company_id) = company_id else {
+        let Some(locks) = lock_agent_delete_on(&mut transaction, id).await? else {
             return Ok(());
         };
-        // A library agent has no company and so no principal. Grants stay on the demoted
-        // principal, as `remove_member` leaves a removed member's: with no identity left, no
-        // inbound address can reach them.
-        if let Some(company_id) = company_id {
-            sqlx::query!(
-                r#"UPDATE principals
-                   SET kind = 'external', agent_id = NULL, updated_at = CURRENT_TIMESTAMP
-                   WHERE company_id = $1 AND agent_id = $2"#,
-                company_id,
-                id
-            )
-            .execute(&mut *transaction)
-            .await
-            .map_err(AppError::from)?;
-        }
-        sqlx::query!("DELETE FROM agents WHERE id = $1", id)
-            .execute(&mut *transaction)
-            .await
-            .map_err(agent_delete_error)?;
+        finish_agent_delete_on(&mut transaction, locks).await?;
         // Run history is held by deferred foreign keys, so it is refused here, at commit.
         transaction.commit().await.map_err(agent_delete_error)?;
 
         Ok(())
     }
+}
+
+/// Proof that [`lock_agent_delete_on`] ran: private fields, so the finish cannot run without it.
+pub(in crate::adapters::persistence) struct AgentDeleteLocks {
+    agent: Uuid,
+    /// `None` for a library agent.
+    company: Option<Uuid>,
+}
+
+/// The locks agent deletion takes before writing: its company `FOR KEY SHARE`, then the agent
+/// `FOR UPDATE`. `None` when the agent is gone.
+///
+/// The company comes first (memory E2 order users → company → … → agent): company deletion
+/// takes `FOR UPDATE` and then the memory rows before cascading to agents, so an agent delete
+/// holding the agent and then retiring its namespaces would deadlock with it (review p7b r1 M4).
+/// `KEY SHARE` blocks only that deletion, never `FOR NO KEY UPDATE` writers.
+///
+/// Locking the agent next means a concurrent `create_agent_principal_on` -- whose foreign key
+/// check needs a share lock on this row -- either committed before us, so its principal is
+/// demoted below, or waits and then fails against the deleted agent. It cannot slip a fresh
+/// agent principal in between the demotion and the delete.
+pub(in crate::adapters::persistence) async fn lock_agent_delete_on(
+    transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    id: Uuid,
+) -> AppResult<Option<AgentDeleteLocks>> {
+    let company: Option<Option<Uuid>> =
+        sqlx::query_scalar("SELECT company_id FROM agents WHERE id = $1")
+            .bind(id)
+            .fetch_optional(&mut **transaction)
+            .await?;
+    let Some(company) = company else {
+        return Ok(None);
+    };
+    if let Some(company) = company {
+        sqlx::query("SELECT id FROM companies WHERE id = $1 FOR KEY SHARE")
+            .bind(company)
+            .fetch_optional(&mut **transaction)
+            .await?;
+    }
+    // An agent never changes company, so the company read above is the one locked.
+    let company_id: Option<Option<Uuid>> =
+        sqlx::query_scalar!("SELECT company_id FROM agents WHERE id = $1 FOR UPDATE", id)
+            .fetch_optional(&mut **transaction)
+            .await
+            .map_err(AppError::from)?;
+    Ok(company_id.map(|company| AgentDeleteLocks { agent: id, company }))
+}
+
+/// Everything after [`lock_agent_delete_on`]: retire the namespaces, demote the principal, delete.
+pub(in crate::adapters::persistence) async fn finish_agent_delete_on(
+    transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    locks: AgentDeleteLocks,
+) -> AppResult<()> {
+    let AgentDeleteLocks {
+        agent: id,
+        company: company_id,
+    } = locks;
+    // A library agent has no company and so no principal. Grants stay on the demoted
+    // principal, as `remove_member` leaves a removed member's: with no identity left, no
+    // inbound address can reach them.
+    if let Some(company_id) = company_id {
+        // After the agent lock (memory E9): a lazy provisioning holding it `FOR SHARE`
+        // committed first and its namespace is retired here, or it waits and finds no agent.
+        super::memory::retire_namespaces_on(
+            transaction,
+            company_id,
+            crate::application::memory::NamespaceOwner::Agent(id),
+        )
+        .await?;
+        sqlx::query!(
+            r#"UPDATE principals
+                   SET kind = 'external', agent_id = NULL, updated_at = CURRENT_TIMESTAMP
+                   WHERE company_id = $1 AND agent_id = $2"#,
+            company_id,
+            id
+        )
+        .execute(&mut **transaction)
+        .await
+        .map_err(AppError::from)?;
+    }
+    sqlx::query!("DELETE FROM agents WHERE id = $1", id)
+        .execute(&mut **transaction)
+        .await
+        .map_err(agent_delete_error)?;
+    Ok(())
 }
 
 /// Name what still holds an agent instead of reporting every refusal as one cause.

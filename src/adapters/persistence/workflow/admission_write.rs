@@ -15,7 +15,8 @@ pub(super) async fn create(
         tx,
         &RunRow {
             company: command.company_id(),
-            knowledge,
+            knowledge: knowledge.levels,
+            content_exact: knowledge.exact,
             run: command.proposed_run_id(),
             binding: command.binding(),
             association: command.association(),
@@ -82,6 +83,8 @@ pub(super) struct ParentLink {
 /// identity is the admitting binding, or the parent's for a child (provenance only).
 pub(super) struct RunRow<'a> {
     pub knowledge: crate::entities::access_level::RunKnowledge,
+    /// Whether `knowledge.content()` accounts for everything the run starts with (phase 05 E3).
+    pub content_exact: bool,
     pub company: CompanyId,
     pub run: RunId,
     pub binding: &'a ConfiguredBinding,
@@ -138,9 +141,9 @@ pub(super) async fn insert_run(db: &mut PgConnection, row: &RunRow<'_>) -> AppRe
         "INSERT INTO workflow_runs (company_id, id, binding_id, binding_revision, workflow_id, version_id, \
          channel_id, thread_id, actor_id, trigger_id, correlation_id, bundle_digest, input, params, resources, \
          max_steps, max_context_bytes, deadline, parent_run_id, parent_execution_id, rerun_of_run_id, \
-         delivery_policy, knowledge_ceiling, content_level) \
+         delivery_policy, knowledge_ceiling, content_level, content_exact) \
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17, \
-         COALESCE($18, CURRENT_TIMESTAMP + make_interval(secs => $19)), $20, $21, $22, $23, $24::smallint, $25::smallint)",
+         COALESCE($18, CURRENT_TIMESTAMP + make_interval(secs => $19)), $20, $21, $22, $23, $24::smallint, $25::smallint, $26)",
     ).bind(row.company.as_uuid()).bind(row.run.as_uuid())
         .bind(row.binding.id().as_uuid()).bind(revision(row.binding.revision().get())?)
         .bind(definition.workflow_id.as_uuid()).bind(definition.version_id.as_uuid()).bind(channel).bind(thread)
@@ -154,7 +157,8 @@ pub(super) async fn insert_run(db: &mut PgConnection, row: &RunRow<'_>) -> AppRe
         .bind(row.parent.map(|parent| parent.run.as_uuid()))
         .bind(row.parent.map(|parent| parent.execution.as_uuid()))
         .bind(row.rerun_of.map(|original| original.as_uuid()))
-        .bind(row.delivery_policy.as_str()).bind(row.knowledge.ceiling().as_i16()).bind(row.knowledge.content().as_i16()).execute(db).await?;
+        .bind(row.delivery_policy.as_str()).bind(row.knowledge.ceiling().as_i16()).bind(row.knowledge.content().as_i16())
+        .bind(row.content_exact).execute(db).await?;
     Ok(())
 }
 

@@ -1,0 +1,34 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT r.tenant_id, r.kind, r.key FROM tenants AS t JOIN idempotency_records AS r ON r.tenant_id = t.id WHERE t.state = 'deleted' AND t.content_removed_at IS NULL AND NOT EXISTS (SELECT 1 FROM namespaces AS n WHERE n.tenant_id = t.id AND n.content_removed_at IS NULL) LIMIT $1 FOR UPDATE OF r SKIP LOCKED",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "tenant_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "kind",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "key",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "27e66cd8b8ee30c1391346d315812192198e909f056cc2b1fb61cb41abea5c47"
+}

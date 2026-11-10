@@ -1,0 +1,27 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO idempotency_records (tenant_id, kind, key, request_sha256, credential_id, result, request_expires_at) VALUES ($1, $2, $3, $4, $5, '{}'::jsonb, $6) ON CONFLICT (tenant_id, kind, key) DO NOTHING RETURNING key",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "key",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Text",
+        "Bytea",
+        "Uuid",
+        "Timestamptz"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "726c00390b1f4042285a7258dce1f35efa0085783d47a89de417b4309250cae1"
+}

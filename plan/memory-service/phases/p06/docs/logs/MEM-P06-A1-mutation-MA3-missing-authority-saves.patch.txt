@@ -1,0 +1,12 @@
+--- a/services/memory/src/adapters/postgres/generation.rs
++++ b/services/memory/src/adapters/postgres/generation.rs
+@@ -1080,7 +1080,8 @@
+                 // never a save (only a `Saved` settlement re-checked its authority).
+                 let stop = match authority {
+                     Some(authority) => authority.stop,
+-                    None => Some(("cancelled", "authority_missing")),
++                    // MUTATION MA3: a missing parent row saves.
++                    None => None,
+                 };
+                 if let Some((state, code)) = stop {
+                     (state, code.to_owned(), used)

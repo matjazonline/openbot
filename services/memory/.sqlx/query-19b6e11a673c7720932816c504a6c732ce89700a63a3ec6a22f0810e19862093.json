@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE observations SET index_lease_until = NULL, index_attempts = greatest(index_attempts - 1, 0), next_index_at = now() + interval '30 seconds' WHERE tenant_id = $1 AND id = $2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "19b6e11a673c7720932816c504a6c732ce89700a63a3ec6a22f0810e19862093"
+}

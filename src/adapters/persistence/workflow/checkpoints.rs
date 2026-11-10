@@ -589,3 +589,6 @@ mod updates;
 
 #[path = "knowledge_checkpoint.rs"]
 mod knowledge;
+
+#[path = "memory_tool_checkpoint.rs"]
+pub(in crate::adapters::persistence::workflow) mod memory_tools;

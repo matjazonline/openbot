@@ -1,0 +1,189 @@
+{
+  "version": 1,
+  "round": "MEM-P05-B2-R1",
+  "artifact": "d20858a7e356ccd1cce9dbad6bff214a2bdf37dd60dd3ad00c7e8fab10c2f314",
+  "checks": [
+    {
+      "criteria": [
+        "E3 exactness hooks and coverage"
+      ],
+      "command": "cargo test --locked --offline --lib -- memory_access_level_ <six exactness regressions>",
+      "fixture": "own_database + open_bots_a8_test (127.0.0.1:55432)",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/MEM-P05-B2-R1-a8-p7c1-focused-2.txt",
+          "sha256": "fdab3c91de2947de8f024348aa3c5622e64175d692184ccdd196662c6360e1bc"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "E8 delivery queue",
+        "E9 disable/owner settlement and race",
+        "E2 schema allowlist"
+      ],
+      "command": "cargo test --locked --offline --lib -- memory::delivery_tests memory_integration_delivery_classifies the_memory_provider_schema_is_gone worker_slots_respect_the_pool memory_scope_ memory_integration_",
+      "fixture": "own_database",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/MEM-P05-B2-R1-a8-p7c2a-delivery-3.txt",
+          "sha256": "6c09f85d37b08ac5e38938c5703a3e06f7e553c45a4acd4f8d8ee26a6cda3493"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "E4 steps, gating, registry"
+      ],
+      "command": "cargo test --locked --offline --lib -- memory_ registry:: infra::workflow:: the_memory_provider_schema_is_gone",
+      "fixture": "own_database",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/MEM-P05-B2-R1-a8-p7c2c-steps-2.txt",
+          "sha256": "8b43954cef6d0dec4c03ca8e28264db46d5f0add3b28e304e8dae69144f623d7"
+        },
+        {
+          "path": "logs/MEM-P05-B2-R1-a8-p7c2c-cancel-1.txt",
+          "sha256": "b5fdc55ddab02866edbbf23b85f4b47461112939fba4186511d517513deaedd4"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "regression: workflow, thread, memory, infra, registry"
+      ],
+      "command": "cargo test --locked --offline --lib -- persistence::workflow:: persistence::thread:: application::workflow:: persistence::memory:: infra::workflow:: registry::",
+      "fixture": "own_database + open_bots_a8_test",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/MEM-P05-B2-R1-a8-p7c-regression-2.txt",
+          "sha256": "7eec3987df22a64cc5564f7c776b68280fabd91727a6ae1cc60856e1a93ce8ac"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "regression correction: sample fixtures on the E4 output shapes"
+      ],
+      "command": "cargo test --locked --offline --lib -- workflow::sample:: memory_steps_tests memory_access_level_",
+      "fixture": "pure + own_database",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/MEM-P05-B2-R1-a8-p7c-sample-1.txt",
+          "sha256": "8efbc3cc11121f1b2f8f704526cde8027c7a5dbe8f2ec4098fcf7f7688329139"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "final focused gate on the formatted tree"
+      ],
+      "command": "cargo test --locked --offline --lib -- memory_ workflow::sample:: registry:: infra::workflow:: the_memory_provider_schema_is_gone worker_slots_respect_the_pool <exactness regressions> credential_rotation",
+      "fixture": "own_database + open_bots_a8_test",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/MEM-P05-B2-R1-a8-p7c-final-focused.txt",
+          "sha256": "5250939ecd04ae273ed6a23f471b4837483034a36d811493a25e49665a19c766"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "E6 race mutations A and B each fail their test"
+      ],
+      "command": "cargo test --locked --offline --lib -- memory_access_level_competing_recall_and_save_freeze_preserve_the_watermark memory_access_level_load_output_never_precedes_its_committed_observation (isolated mutated copy, own CARGO_TARGET_DIR)",
+      "fixture": "open_bots_a8_test",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/MEM-P05-B2-R1-a8-mutation-e6-ab.txt",
+          "sha256": "9412cdd42b002bb69306602f4e5d907aa4dba95f42535adc7cf0613ed53e8c7c"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "clippy -D warnings"
+      ],
+      "command": "cargo clippy --locked --offline --all-targets -- -D warnings",
+      "fixture": "none",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/MEM-P05-B2-R1-a8-clippy-1.txt",
+          "sha256": "012fb4f1aca3e621170b517c07b1002654142563db1b344e3a417c1e6b0286c6"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "fmt"
+      ],
+      "command": "cargo fmt --all -- --check",
+      "fixture": "none",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/MEM-P05-B2-R1-a8-fmt.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "sqlx prepare check on a fresh schema"
+      ],
+      "command": "cargo sqlx prepare --check -- --all-targets",
+      "fixture": "open_bots_a8_prepare (migrated, dropped)",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/MEM-P05-B2-R1-a8-sqlx-prepare-check.txt",
+          "sha256": "a5232120c0fd69997915b26c410e6f79014366c68b32fda0e38546d07587b2a6"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "sample boundary"
+      ],
+      "command": "python3 scripts/workflow-sample-boundary.py",
+      "fixture": "none",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/MEM-P05-B2-R1-a8-sample-boundary-1.txt",
+          "sha256": "228c0f0f23407594379b257a3e3684550f2f3eb1741d27acbc9be312e22e6d2d"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "full suite",
+        "stack budget",
+        "live-service tests",
+        "browser check",
+        "Docker/CI"
+      ],
+      "command": "not run",
+      "fixture": "none",
+      "status": "NOT EXERCISED",
+      "reason": "06C/05 gate scope; Docker and CI unavailable here; live tests not written yet"
+    },
+    {
+      "criteria": [
+        "B2d agent memory tools and tool-level E6"
+      ],
+      "command": "not implemented",
+      "fixture": "none",
+      "status": "NOT EXERCISED",
+      "reason": "handed on: not implemented in this batch (see TASK B2d)"
+    }
+  ]
+}

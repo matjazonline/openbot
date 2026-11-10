@@ -1,0 +1,58 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT id, external_id, state, generation_daily_token_cap, managed_by, disabled_by, disabled_by_scope FROM tenants WHERE external_id = $1 FOR SHARE",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "external_id",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "state",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "generation_daily_token_cap",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 4,
+        "name": "managed_by",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 5,
+        "name": "disabled_by",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 6,
+        "name": "disabled_by_scope",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "36124c42d97451b889ff93950cf5cad5e4370feb44cdcc569ad158016dbcc08a"
+}

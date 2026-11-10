@@ -1,0 +1,35 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT request_sha256, credential_id, result FROM idempotency_records WHERE tenant_id = $1 AND kind = 'namespaces.purge' AND key = $2",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "request_sha256",
+        "type_info": "Bytea"
+      },
+      {
+        "ordinal": 1,
+        "name": "credential_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "result",
+        "type_info": "Jsonb"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "f816d19bb0c268d9b7ce159656466970ebaa8c94e969650f83b07c5545ca845e"
+}

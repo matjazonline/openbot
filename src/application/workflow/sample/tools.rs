@@ -112,6 +112,7 @@ impl Session {
             ToolKind::Message
             | ToolKind::Provisioning
             | ToolKind::Knowledge
+            | ToolKind::Memory
             | ToolKind::Slot(_)
             | ToolKind::Http => {
                 let output = fixture.ok_or_else(|| {

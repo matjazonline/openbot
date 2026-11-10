@@ -1,0 +1,47 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.01s
+     Running unittests src/lib.rs (target/debug/deps/memory_service-ae31e76356c4111f)
+
+running 38 tests
+kill: 34766: No such process
+test adapters::anthropic::tests::memory_observation_anthropic_adapter_sends_the_d9_request_and_parses_output ... ok
+test adapters::anthropic::tests::memory_observation_anthropic_errors_map_to_retry_terminal_or_unknown ... ok
+test adapters::postgres::generation_tests::memory_generation_lease_loss_aborts_the_call_and_stale_workers_cannot_commit ... ok
+test adapters::postgres::generation_tests::memory_generation_competing_sweepers_split_the_work_exactly ... ok
+test adapters::postgres::generation_tests::memory_generation_ambiguity_retries_and_terminal_errors_never_resend ... ok
+test adapters::postgres::generation_tests::memory_generation_retention_does_not_stall_behind_recently_reused_evidence ... ok
+test adapters::postgres::generation_tests::memory_generation_acceptance_is_atomic_private_and_idempotent ... ok
+test adapters::postgres::generation_tests::memory_generation_competing_claimants_keep_one_in_flight_per_tenant_fairly ... ok
+test adapters::postgres::generation_tests::memory_generation_worker_saves_labelled_output_once_and_indexes_it ... ok
+test adapters::postgres::generation_tests::memory_generation_spend_cap_is_terminal_and_overshoot_is_counted ... ok
+test adapters::postgres::generation_tests::memory_generation_retention_races_acceptance_and_dispatch_safely ... ok
+test adapters::postgres::generation_tests::memory_generation_shutdown_aborts_in_flight_calls_and_returns_claims ... ok
+test adapters::postgres::observability_tests::memory_operations_correlation_ids_reach_audit_and_operations ... ok
+test adapters::postgres::observability_tests::memory_operations_logs_never_carry_content_or_secrets ... ok
+test adapters::postgres::generation_tests::memory_generation_write_up_grants_cannot_probe_unreadable_revisions ... ok
+test adapters::postgres::generation_tests::memory_generation_revocation_expiry_and_deletion_stop_operations ... ok
+test adapters::postgres::operations_tests::memory_operations_audit_and_spend_rows_age_out_at_400_days ... ok
+test adapters::postgres::operations_tests::memory_operations_a_stale_indexer_commit_after_removal_writes_nothing ... ok
+test adapters::postgres::operations_tests::memory_operations_credential_listing_pages_by_label_and_activity ... ok
+test adapters::postgres::generation_tests::memory_generation_retention_is_bounded_spares_live_inputs_and_backs_off ... ok
+test adapters::postgres::generation_tests::memory_generation_reaper_frees_a_dispatched_slot_only_after_lease_and_grace ... ok
+test adapters::postgres::operations_tests::memory_operations_expired_observations_are_removed_once_by_competing_sweepers ... ok
+test adapters::postgres::operations_tests::memory_operations_a_saved_settlement_without_its_credential_row_is_a_stop ... ok
+test adapters::postgres::operations_tests::memory_operations_reassign_moves_tenants_in_batches_and_refuses_bad_targets ... ok
+test adapters::postgres::operations_tests::memory_operations_purge_leaves_a_cross_namespace_copy_and_drops_its_parent_link ... ok
+test adapters::postgres::operations_tests::memory_operations_idempotency_records_age_out_and_keys_never_execute_twice ... ok
+test adapters::postgres::operations_tests::memory_operations_unreferenced_operations_and_nulled_sources_age_out ... ok
+test adapters::postgres::operations_tests::memory_operations_tenant_removal_blanks_every_credential_label_beyond_one_batch ... ok
+test domain::correlation::tests::memory_operations_correlation_ids_accept_only_the_id_alphabet ... ok
+test adapters::postgres::generation_tests::memory_generation_stalled_heartbeat_with_a_slow_provider_never_doubles_calls ... ok
+test adapters::postgres::generation_tests::memory_generation_restart_never_resends_and_labels_stay_frozen ... ok
+test adapters::postgres::storage_tests::memory_contract_memory_operations_map_errors_to_statuses ... ok
+test adapters::postgres::storage_tests::memory_mcp_memory_operations_match_http_over_postgres ... ok
+test adapters::postgres::operations_tests::memory_operations_reassign_waits_for_in_flight_requests_and_races_old_writes ... ok
+test adapters::postgres::generation_tests::memory_generation_reaper_racing_live_heartbeats_never_reaps_a_held_lease ... ok
+test adapters::postgres::operations_tests::memory_operations_identical_purges_race_to_one_execution_and_one_replay ... ok
+test adapters::postgres::operations_tests::memory_operations_purge_cancels_inference_then_removes_every_content_row ... ok
+test adapters::postgres::observability_tests::memory_operations_metrics_export_is_operator_only_and_counts_requests ... ok
+
+test result: ok. 38 passed; 0 failed; 0 ignored; 0 measured; 132 filtered out; finished in 4.02s
+
+exit 0

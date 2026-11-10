@@ -1,5 +1,6 @@
 use super::*;
 use crate::adapters::persistence::workflow::tests::binding_tests::BindingFixture;
+use crate::entities::agent_capability::AgentBuiltinTool;
 use crate::{
     application::{
         knowledge::{KnowledgeLibrary, test_support::DeterministicTextEmbedder},
@@ -28,6 +29,21 @@ impl SearchFixture {
     }
 
     pub(super) async fn with_budget(level: AccessLevel, budget: Option<u32>) -> Self {
+        Box::pin(Self::with_tools(
+            level,
+            budget,
+            &[AgentBuiltinTool::SearchKnowledge],
+        ))
+        .await
+    }
+
+    /// The agent bound to `tools`. Memory tools need memory enabled before the agent is
+    /// registered, so the fixture enables it first when any is bound.
+    pub(super) async fn with_tools(
+        level: AccessLevel,
+        budget: Option<u32>,
+        tools: &[AgentBuiltinTool],
+    ) -> Self {
         let mut fixture = Fixture::new().await;
         fixture.persistence = PostgresPersistence::with_credential_cipher(
             fixture.persistence.pool().clone(),
@@ -50,7 +66,15 @@ impl SearchFixture {
         .execute(fixture.persistence.pool())
         .await
         .unwrap();
-        let agent = configure_agent(&fixture).await;
+        if tools.iter().any(|tool| tool.is_memory()) {
+            use crate::application::memory::MemorySettingsStore;
+            fixture
+                .persistence
+                .enable_memory(fixture.target.company, fixture.target.actor, 0, PROVISIONER)
+                .await
+                .unwrap();
+        }
+        let agent = configure_agent(&fixture, tools).await;
         let version = publish(&fixture, budget).await;
         let binding = BindingFixture::from_version(fixture, version);
         let configured = binding
@@ -96,6 +120,14 @@ impl SearchFixture {
     }
 
     pub(super) fn runtime(&self) -> WorkflowAgentRuntime<PostgresPersistence, AgentActionTools> {
+        self.runtime_with(|tools| tools)
+    }
+
+    /// The production agent runtime with `compose` applied to its action tools.
+    pub(super) fn runtime_with(
+        &self,
+        compose: impl FnOnce(AgentActionTools) -> AgentActionTools,
+    ) -> WorkflowAgentRuntime<PostgresPersistence, AgentActionTools> {
         let p = self.p();
         let http = HttpRuntime::with_approvals(
             p.clone(),
@@ -109,8 +141,10 @@ impl SearchFixture {
             lease(),
         );
         let message = MessageRuntime::new(p.clone(), composer(p), "agents.test".into(), lease());
-        let tools = AgentActionTools::new(Arc::new(http), Arc::new(mcp), Arc::new(message))
-            .with_knowledge(Arc::new(self.knowledge()));
+        let tools = compose(
+            AgentActionTools::new(Arc::new(http), Arc::new(mcp), Arc::new(message))
+                .with_knowledge(Arc::new(self.knowledge())),
+        );
         WorkflowAgentRuntime::new(
             ProviderRegistry::standard().unwrap(),
             p.clone(),
@@ -121,8 +155,17 @@ impl SearchFixture {
     }
 
     pub(super) async fn prepare(&self, arguments: Value) -> KnowledgeToolCall {
-        let llm = scripted_llm(vec![LlmTurn::tool_call(SEARCH_KNOWLEDGE, arguments)]).await;
-        register_scripted_agent_base_url(self.agent, &llm.base_url);
+        let prepared = self.prepare_tool(SEARCH_KNOWLEDGE, arguments).await;
+        KnowledgeToolCall {
+            origin: prepared.origin,
+            call: prepared.call,
+            arguments: prepared.arguments,
+        }
+    }
+
+    /// Runs the agent until the model's call of `name` is canonically prepared, then pauses it
+    /// there, so a test can dispatch that call itself.
+    pub(super) async fn prepare_tool(&self, name: &str, arguments: Value) -> PreparedCall {
         let runtime = WorkflowAgentRuntime::new(
             ProviderRegistry::standard().unwrap(),
             self.p().clone(),
@@ -130,6 +173,18 @@ impl SearchFixture {
             Some(notices(self.p())),
             lease(),
         );
+        self.prepare_tool_on(&runtime, name, arguments).await
+    }
+
+    /// `prepare_tool` through a caller-composed pausing runtime (e.g. with recall composed).
+    pub(super) async fn prepare_tool_on(
+        &self,
+        runtime: &WorkflowAgentRuntime<PostgresPersistence, PreparedOnly>,
+        name: &str,
+        arguments: Value,
+    ) -> PreparedCall {
+        let llm = scripted_llm(vec![LlmTurn::tool_call(name, arguments)]).await;
+        register_scripted_agent_base_url(self.agent, &llm.base_url);
         let outcome =
             Box::pin(runtime.execute(&WorkflowStepKind("agent.run".into()), &self.claim)).await;
         assert!(outcome.completed_result().is_err());
@@ -143,9 +198,9 @@ impl SearchFixture {
             serde_json::from_value(prepared["tools"].clone()).unwrap();
         let tool = tools
             .iter()
-            .find(|tool| tool.name.as_str() == SEARCH_KNOWLEDGE)
+            .find(|tool| tool.name.as_str() == name)
             .unwrap();
-        KnowledgeToolCall {
+        PreparedCall {
             origin: crate::application::agent::ToolCallOrigin::Agent(tool.origin),
             call: crate::application::workflow::actions::ModelToolCallId::parse(
                 pending.invocation_id.0.to_string(),
@@ -198,7 +253,16 @@ impl SearchFixture {
     }
 }
 
-async fn configure_agent(f: &Fixture) -> Uuid {
+/// A model tool call the agent prepared and paused before dispatching.
+pub(super) struct PreparedCall {
+    pub(super) origin: crate::application::agent::ToolCallOrigin,
+    pub(super) call: crate::application::workflow::actions::ModelToolCallId,
+    pub(super) arguments: Value,
+}
+
+pub(super) const PROVISIONER: Uuid = Uuid::from_u128(0x0190f1a2_b3c4_4d5e_8f9a_0b1c2d3e4f50);
+
+pub(super) async fn configure_agent(f: &Fixture, tools: &[AgentBuiltinTool]) -> Uuid {
     let agent = AgentPersistence::create(
         &f.persistence,
         f.target.company.as_uuid(),
@@ -207,11 +271,12 @@ async fn configure_agent(f: &Fixture) -> Uuid {
             slug: "assistant".into(),
             provider: Some(SCRIPTED_PROVIDER.into()),
             model: Some(SCRIPTED_MODEL.into()),
-            tool_bindings: Some(vec![
-                crate::entities::agent_capability::AgentToolBinding::builtin(
-                    crate::entities::agent_capability::AgentBuiltinTool::SearchKnowledge,
-                ),
-            ]),
+            tool_bindings: Some(
+                tools
+                    .iter()
+                    .map(|tool| crate::entities::agent_capability::AgentToolBinding::builtin(*tool))
+                    .collect(),
+            ),
             system_prompt: Some("Answer with the requested JSON string.".into()),
             ..Default::default()
         },
@@ -235,7 +300,7 @@ async fn configure_agent(f: &Fixture) -> Uuid {
     agent.id
 }
 
-async fn publish(f: &Fixture, budget: Option<u32>) -> VersionId {
+pub(super) async fn publish(f: &Fixture, budget: Option<u32>) -> VersionId {
     let directory = AgentPublicationDirectory {
         persistence: f.persistence.clone(),
         inner: Preflight,
@@ -311,7 +376,7 @@ async fn admit(binding: &BindingFixture, actor: WorkflowActor) -> ClaimedWorkflo
     .unwrap()
 }
 
-struct PreparedOnly;
+pub(super) struct PreparedOnly;
 
 #[async_trait]
 impl AgentToolDispatch for PreparedOnly {

@@ -1,0 +1,29 @@
+== reviewer B: mutation A on frozen tree dfeeca6774cffca03ca7302a7e73b0d6a64dd270 (2026-11-09T11:22:13Z)
+patching file 'src/adapters/persistence/workflow/memory_tool_checkpoint.rs'
+patch exit 0
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 3m 15s
+     Running unittests src/lib.rs (/Users/mac03/.codex/worktrees/60a0/openbot/tmp/memory-service-run/mut-b3-rev/target/debug/deps/open_bots-0312fde2b93b807b)
+
+running 3 tests
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::memory_access_level_competing_rise_and_tool_save_freeze_the_committed_level ... FAILED
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::memory_access_level_tool_read_commits_its_rise_before_the_model_sees_it ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::memory_integration_agent_memory_tools_search_and_save_through_the_production_dispatch ... ok
+
+failures:
+
+---- adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::memory_access_level_competing_rise_and_tool_save_freeze_the_committed_level stdout ----
+
+thread 'adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::memory_access_level_competing_rise_and_tool_save_freeze_the_committed_level' (22046337) panicked at src/adapters/persistence/workflow/memory_tool_tests.rs:768:13:
+assertion `left == right` failed: exact=true rise_first=true
+  left: Object {"kind": String("exact"), "level": Number(4)}
+ right: Object {"kind": String("exact"), "level": Number(6)}
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::memory_access_level_competing_rise_and_tool_save_freeze_the_committed_level
+
+test result: FAILED. 2 passed; 1 failed; 0 ignored; 0 measured; 3662 filtered out; finished in 1.57s
+
+error: test failed, to rerun pass `--lib`
+cargo exit 101

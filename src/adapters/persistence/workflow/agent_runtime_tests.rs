@@ -51,6 +51,8 @@ struct AgentSetup {
     connection: HttpConnection,
     agent: Uuid,
     claim: ClaimedWorkflow,
+    /// A configured memory composition for `agent_runtime` (phase 05); none by default.
+    recall: Option<Arc<crate::application::workflow::memory_recall::MemoryRecall>>,
 }
 
 fn http_directory(
@@ -185,6 +187,7 @@ async fn agent_setup_source(
         connection,
         agent: agent.id,
         claim,
+        recall: None,
     }
 }
 
@@ -204,14 +207,18 @@ fn agent_runtime(
         lease(),
     );
     let message = MessageRuntime::new(p.clone(), composer(p), "agents.test".into(), lease());
-    WorkflowAgentRuntime::new(
+    let mut runtime = WorkflowAgentRuntime::new(
         ProviderRegistry::standard().unwrap(),
         p.clone(),
         AgentActionTools::new(Arc::new(http), Arc::new(mcp), Arc::new(message))
             .with_workflow_tools(Arc::new(p.clone())),
         Some(notices(p)),
         lease(),
-    )
+    );
+    if let Some(recall) = &setup.recall {
+        runtime.set_recall(recall.clone());
+    }
+    runtime
 }
 
 async fn usage_rows(p: &PostgresPersistence, run: RunId) -> i64 {
@@ -823,6 +830,9 @@ mod recovery;
 
 #[path = "agent_model_step_tests.rs"]
 mod model_steps;
+
+#[path = "memory_park_race_tests.rs"]
+mod memory_park_race;
 
 #[path = "knowledge_search_tests.rs"]
 mod knowledge_search;

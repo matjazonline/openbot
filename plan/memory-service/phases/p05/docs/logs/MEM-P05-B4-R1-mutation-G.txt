@@ -1,0 +1,25 @@
+   Compiling open_bots v0.1.0 (/Users/mac03/.codex/worktrees/60a0/openbot/tmp/memory-service-run/mut-b4/tree)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 55.77s
+     Running unittests src/lib.rs (/Users/mac03/.codex/worktrees/60a0/openbot/tmp/memory-service-run/mut-b4/target/debug/deps/open_bots-0312fde2b93b807b)
+
+running 2 tests
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::recall::memory_preparation_a_changed_ceiling_discards_the_fetched_pack_unseen ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::recall::memory_preparation_a_revoked_or_unverifiable_pack_stops_the_resumed_attempt ... FAILED
+
+failures:
+
+---- adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::recall::memory_preparation_a_revoked_or_unverifiable_pack_stops_the_resumed_attempt stdout ----
+
+thread 'adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::recall::memory_preparation_a_revoked_or_unverifiable_pack_stops_the_resumed_attempt' (22492353) panicked at src/adapters/persistence/workflow/memory_recall_tests.rs:252:9:
+assertion `left == right` failed: changed
+  left: (Retryable, "agent.unresolved")
+ right: (Terminal, "memory.context_revoked")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::recall::memory_preparation_a_revoked_or_unverifiable_pack_stops_the_resumed_attempt
+
+test result: FAILED. 1 passed; 1 failed; 0 ignored; 0 measured; 3680 filtered out; finished in 1.18s
+
+error: test failed, to rerun pass `--lib`

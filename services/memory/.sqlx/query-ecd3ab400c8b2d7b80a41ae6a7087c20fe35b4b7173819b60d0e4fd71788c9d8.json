@@ -1,0 +1,41 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT revision, index_fence, access_level::smallint AS \"level!\",\n                      (expires_at IS NOT NULL AND expires_at <= now()) AS \"expired!\"\n                 FROM observations WHERE tenant_id = $1 AND id = $2 FOR NO KEY UPDATE",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "revision",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 1,
+        "name": "index_fence",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 2,
+        "name": "level!",
+        "type_info": "Int2"
+      },
+      {
+        "ordinal": 3,
+        "name": "expired!",
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      null,
+      null
+    ]
+  },
+  "hash": "ecd3ab400c8b2d7b80a41ae6a7087c20fe35b4b7173819b60d0e4fd71788c9d8"
+}

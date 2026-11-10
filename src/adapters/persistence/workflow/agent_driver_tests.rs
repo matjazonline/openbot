@@ -1,6 +1,7 @@
 //! D4 driver behaviour around saved calls: protected-tool approval cycles, the token pause
 //! resuming the exact saved request, invented tool names, output repair and target rebinds.
 use super::*;
+use crate::adapters::persistence::workflow::knowledge::exactness_fixture;
 
 /// D4: a protected saved tool call parks the agent for approval; approval continues the same
 /// job, and the saved call executes exactly once before the model answers.
@@ -22,6 +23,7 @@ async fn workflow_agent_run_protected_tool_waits_for_approval_and_dispatches_onc
     let kind = WorkflowStepKind("agent.run".into());
     let p = &setup.fixture.persistence;
     let scope = setup.claim.fence.scope;
+    exactness_fixture::mark_exact(p.pool(), scope.company, scope.run).await;
     let first = Box::pin(runtime.execute(&kind, &setup.claim)).await;
     assert!(
         matches!(first, WorkflowHandlerOutcome::Suspended(_)),
@@ -57,6 +59,9 @@ async fn workflow_agent_run_protected_tool_waits_for_approval_and_dispatches_onc
     .await
     .unwrap();
     assert_eq!((dispatches, retries), (1, 0));
+    // The approved call's HTTP result reached the model through the checkpoint funnel and
+    // lowered the run (phase 05 E3).
+    assert!(!exactness_fixture::exact(p.pool(), scope.company, scope.run).await);
 }
 
 /// D4 F007: a request over the token allowance parks before I/O with no usage or debit;
@@ -164,11 +169,16 @@ async fn workflow_agent_run_refuses_model_invented_tool_without_dispatch() {
     ])
     .await;
     register_scripted_agent_base_url(setup.agent, &llm.base_url);
+    let scope = setup.claim.fence.scope;
+    let pool = setup.fixture.persistence.pool();
+    exactness_fixture::mark_exact(pool, scope.company, scope.run).await;
     let outcome = Box::pin(
         agent_runtime(&setup).execute(&WorkflowStepKind("agent.run".into()), &setup.claim),
     )
     .await;
     assert_eq!(outcome.completed_result().unwrap(), json!("refused"));
+    // A result for no prepared tool is not trusted to be accounted (phase 05 E3).
+    assert!(!exactness_fixture::exact(pool, scope.company, scope.run).await);
     let mut llm = llm;
     let requests = llm.observed();
     assert!(requests[1]["messages"].to_string().contains("unknown_tool"));

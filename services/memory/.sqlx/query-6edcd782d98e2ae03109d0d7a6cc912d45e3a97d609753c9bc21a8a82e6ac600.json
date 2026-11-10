@@ -1,0 +1,21 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO observations (tenant_id, namespace_id, id, session_id, kind, title, body, access_level, producing_ceiling, watermark_kind, watermark_level, source_max_level, origin, generation_operation_id, output_ordinal, occurred_at) SELECT o.tenant_id, o.namespace_id, $3::uuid, o.session_id, $4::text, $5::text, $6::text, o.input_level, o.producing_ceiling, o.watermark_kind, o.watermark_level, o.source_max_level, 'generated', o.id, $7::int, $8::timestamptz FROM generation_operations AS o WHERE o.tenant_id = $1 AND o.id = $2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Text",
+        "Text",
+        "Text",
+        "Int4",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "6edcd782d98e2ae03109d0d7a6cc912d45e3a97d609753c9bc21a8a82e6ac600"
+}

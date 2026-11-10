@@ -1,0 +1,57 @@
+   Compiling open_bots v0.1.0 (/Users/mac03/.codex/worktrees/60a0/openbot/tmp/memory-service-run/mut-b5/tree)
+warning: field `enabled` is never read
+   --> src/adapters/persistence/memory/deliveries.rs:297:5
+    |
+296 | struct CapturePolicyRow {
+    |        ---------------- field in this struct
+297 |     enabled: bool,
+    |     ^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `open_bots` (lib test) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1m 10s
+     Running unittests src/lib.rs (/Users/mac03/.codex/worktrees/60a0/openbot/tmp/memory-service-run/mut-b5/target/debug/deps/open_bots-0312fde2b93b807b)
+
+running 15 tests
+test adapters::persistence::memory::delivery_tests::capture_intents::memory_capture_generation_disabled_is_terminal_and_an_expired_intent_is_never_sent ... ok
+test adapters::persistence::memory::delivery_tests::capture_intents::memory_capture_switch_cap_readiness_and_bounds_gate_the_freeze ... FAILED
+test adapters::persistence::memory::delivery_tests::capture_intents::memory_capture_a_retry_replays_the_frozen_request ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_graph::descendants::history_integration::memory_capture_a_child_branch_is_never_captured ... ok
+test adapters::persistence::memory::delivery_tests::capture_intents::memory_capture_agent_delete_interleaved_with_a_freeze_does_not_deadlock ... ok
+test application::memory::delivery::tests::memory_integration_delivery_classifies_every_service_answer ... ok
+test adapters::persistence::memory::delivery_tests::capture_intents::memory_capture_freezes_one_generation_intent_and_delivers_it_once ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::memory_tests::memory_capture_settings_form_is_owner_admin_only_revision_checked_and_states_its_reach ... ok
+test adapters::persistence::memory::delivery_tests::capture_intents::memory_capture_agent_delete_races_the_freeze_in_both_orders ... ok
+test adapters::persistence::memory::delivery_tests::capture_intents::memory_capture_competing_delivery_claimants_send_once ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::capture::memory_capture_a_switched_on_target_is_provisioned_at_preparation ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::capture::memory_capture_an_accepted_private_session_exchange_is_captured_for_its_creator ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::capture::memory_capture_an_agent_without_the_switch_captures_nothing ... ok
+test adapters::persistence::memory::delivery_tests::capture_intents::memory_capture_switch_off_races_the_freeze_in_both_orders ... FAILED
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::channel_reply_e2e::history::memory_capture_a_thread_exchange_is_captured_into_the_agent_memory_at_the_thread_level ... ok
+
+failures:
+
+---- adapters::persistence::memory::delivery_tests::capture_intents::memory_capture_switch_cap_readiness_and_bounds_gate_the_freeze stdout ----
+
+thread 'adapters::persistence::memory::delivery_tests::capture_intents::memory_capture_switch_cap_readiness_and_bounds_gate_the_freeze' (23089429) panicked at src/adapters/persistence/memory/capture_tests.rs:330:5:
+assertion `left == right` failed
+  left: Enqueued { id: fca46620-b8d3-4d85-8db8-b5cb0bf32d4c, replayed: false }
+ right: Skipped("off")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- adapters::persistence::memory::delivery_tests::capture_intents::memory_capture_switch_off_races_the_freeze_in_both_orders stdout ----
+
+thread 'adapters::persistence::memory::delivery_tests::capture_intents::memory_capture_switch_off_races_the_freeze_in_both_orders' (23089430) panicked at src/adapters/persistence/memory/capture_tests.rs:499:13:
+assertion `left == right` failed
+  left: Enqueued { id: 12d04205-15db-49de-8357-664857f910e5, replayed: false }
+ right: Skipped("off")
+
+
+failures:
+    adapters::persistence::memory::delivery_tests::capture_intents::memory_capture_switch_cap_readiness_and_bounds_gate_the_freeze
+    adapters::persistence::memory::delivery_tests::capture_intents::memory_capture_switch_off_races_the_freeze_in_both_orders
+
+test result: FAILED. 13 passed; 2 failed; 0 ignored; 0 measured; 3685 filtered out; finished in 8.70s
+
+error: test failed, to rerun pass `--lib`

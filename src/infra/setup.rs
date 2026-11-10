@@ -64,9 +64,10 @@ pub struct Application {
 
 pub async fn init_app_state() -> anyhow::Result<Application> {
     let foundation = foundation::build(Arc::new(AppConfig::from_env())).await?;
-    let clients = clients::build(&foundation)?;
+    let memory = memory_service_startup(&foundation).await?;
+    let clients = clients::build(&foundation, memory.as_ref())?;
     let mail = mail::build(&foundation)?;
-    let workflow = mail::workflow(&foundation, &clients, &mail)?;
+    let workflow = mail::workflow(&foundation, &clients, &mail, memory.as_ref())?;
     let threads = mail::threads(&foundation, &mail, &workflow);
     let transports = mail::transports(&foundation, &clients, &mail, threads.clone())?;
     let inbound = inbound::build(&foundation, &clients, threads.clone(), &workflow)?;
@@ -94,6 +95,55 @@ pub async fn init_app_state() -> anyhow::Result<Application> {
         },
     )?;
     Ok(Application { http, workers })
+}
+
+/// Reads the memory-service keys (E1). Without a URL memory is unavailable; any unfinished remote
+/// lifecycle is then named in a warning instead of being stranded silently. Nothing here contacts
+/// the service.
+async fn memory_service_startup(
+    foundation: &foundation::Foundation,
+) -> anyhow::Result<Option<crate::infra::memory_config::MemoryServiceConfig>> {
+    let config =
+        crate::infra::memory_config::MemoryServiceConfig::from_env().map_err(anyhow::Error::msg)?;
+    let pool = foundation.persistence.pool();
+    match &config {
+        Some(config) => {
+            tracing::info!(
+                provisioner_credential_id = %config.provisioner.credential_id(),
+                interactive_in_flight = config.interactive_in_flight,
+                background_in_flight = config.background_in_flight,
+                "Memory service configured; not contacted at startup"
+            );
+            // Failed lifecycles need an operator (docs/deploy.md, "Memory service").
+            let (failed, more) =
+                crate::adapters::persistence::memory::pending_lifecycles(pool, &["failed"], 20)
+                    .await?;
+            if !failed.is_empty() {
+                tracing::warn!(
+                    lifecycles = ?failed,
+                    more,
+                    "Memory lifecycles failed (not retried until re-driven) or stuck in an outage"
+                );
+            }
+        }
+        None => {
+            let (pending, more) = crate::adapters::persistence::memory::pending_lifecycles(
+                pool,
+                &["pending", "claimed", "failed"],
+                20,
+            )
+            .await?;
+            if !pending.is_empty() {
+                tracing::warn!(
+                    lifecycles = ?pending,
+                    more,
+                    "MEMORY_SERVICE_URL is unset while memory lifecycles are unfinished; their \
+                     remote tenants and namespaces will not be reconciled"
+                );
+            }
+        }
+    }
+    Ok(config)
 }
 
 struct HttpComponents {

@@ -1,0 +1,17 @@
+--- a/src/adapters/persistence/memory/retention.rs
++++ b/src/adapters/persistence/memory/retention.rs
+@@ -28,12 +28,12 @@
+ const SETTLED_LIFECYCLE: &str = "lifecycle.state = 'settled' AND lifecycle.desired = 'absent' \
+      AND lifecycle.observed = 'absent' \
+      AND lifecycle.updated_at < now() - make_interval(days => $1) \
+-     AND CASE WHEN lifecycle.resource = 'namespace' \
++     AND (true OR CASE WHEN lifecycle.resource = 'namespace' \
+               THEN NOT EXISTS (SELECT 1 FROM memory_namespaces AS namespace \
+                     WHERE namespace.company_id = lifecycle.company_id \
+                       AND namespace.id = lifecycle.namespace_id) \
+               ELSE NOT EXISTS (SELECT 1 FROM memory_tenants AS tenant \
+-                    WHERE tenant.company_id = lifecycle.company_id) END";
++                    WHERE tenant.company_id = lifecycle.company_id) END)"; // MUTATION MB2
+ 
+ /// `$1` the retention in days, `$2` the batch.
+ pub(super) fn delivery_sweep() -> String {

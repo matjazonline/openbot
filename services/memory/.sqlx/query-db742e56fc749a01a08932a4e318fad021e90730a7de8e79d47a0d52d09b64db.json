@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE tenant_generation_schedule SET last_claimed_at = now() WHERE tenant_id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "db742e56fc749a01a08932a4e318fad021e90730a7de8e79d47a0d52d09b64db"
+}

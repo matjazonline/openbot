@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE credentials SET revoked_at = now()\n                            WHERE tenant_id = $1 AND id = $2 RETURNING revoked_at AS \"revoked_at!\"",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "revoked_at!",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      true
+    ]
+  },
+  "hash": "2d5e54dfc6648f4f3985e82b4d74d2ab94982620f56018853af8ee73988d879b"
+}

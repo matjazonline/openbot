@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM observation_links WHERE tenant_id = $1 AND observation_id = $2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "ec8442423fd3fd4d5cb6d644e85d8ec0b2679f809d5c9738c7bcd270abd9c0fd"
+}

@@ -746,6 +746,8 @@ mod resolution_tests;
 #[path = "completion_tests.rs"]
 mod completion_tests;
 
+#[path = "memory_steps_tests.rs"]
+mod memory_steps_tests;
 #[path = "wait_tests.rs"]
 mod wait_tests;
 

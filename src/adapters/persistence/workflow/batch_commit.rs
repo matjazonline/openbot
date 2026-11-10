@@ -2,6 +2,29 @@
 use super::*;
 use crate::application::workflow::{activation::*, batch::PureCompletion};
 
+/// The execution being completed and the frozen graph it belongs to. The graph names the
+/// step's kind, which decides whether its committed output keeps the run exact (phase 05 E3):
+/// this writer is the one funnel every step output passes, so the hook lives here.
+#[derive(Clone, Copy)]
+pub(super) struct CompletedStep<'a> {
+    pub activated: &'a ActivatedExecution,
+    pub graph: &'a crate::domain::workflow::ValidatedWorkflow,
+}
+impl CompletedStep<'_> {
+    fn output_exact(self, output: &serde_json::Value) -> AppResult<bool> {
+        let definition = self
+            .graph
+            .definition()
+            .steps
+            .get(&self.activated.step)
+            .ok_or_else(invalid)?;
+        Ok(crate::application::workflow::exactness::step_output_exact(
+            definition.step_type.as_str(),
+            output,
+        ))
+    }
+}
+
 pub(super) enum CompletionProgress {
     Advanced(Option<ActivationRequest>),
     Parked,
@@ -11,13 +34,15 @@ pub(super) enum CompletionProgress {
 pub(super) async fn complete(
     db: &mut PgConnection,
     request: ActivationRequest,
-    activated: &ActivatedExecution,
+    step: CompletedStep<'_>,
     completion: &PureCompletion,
     max_steps: i32,
     owner: completion_job::CompletionOwner,
     notices: Option<&crate::application::workflow::decisions::DecisionNotices>,
 ) -> AppResult<CompletionProgress> {
     check_deadline(db, request).await?;
+    let activated = step.activated;
+    let exact = step.output_exact(&completion.output)?;
     // Box the proposal/approval boundary: every completion family reaches this writer.
     let Some(final_reply) = Box::pin(channel_reply_refusal::prepare_on(
         db, request, completion, owner, notices,
@@ -66,10 +91,10 @@ pub(super) async fn complete(
         return Err(invalid());
     }
     let changed = sqlx::query(
-        "UPDATE workflow_runs SET state = $3, terminal_execution_id = $4 WHERE company_id = $1 AND id = $2 \
-         AND state IN ('queued','running') AND deadline > clock_timestamp()",
+        "UPDATE workflow_runs SET state = $3, terminal_execution_id = $4, content_exact = content_exact AND $5 \
+         WHERE company_id = $1 AND id = $2 AND state IN ('queued','running') AND deadline > clock_timestamp()",
     ).bind(request.company.as_uuid()).bind(request.run.as_uuid()).bind(match completion.state { RunState::Running => "running", RunState::Succeeded => "succeeded", RunState::Failed => "failed", _ => return Err(invalid()) })
-        .bind(if next.is_none() { Some(request.execution.as_uuid()) } else { None }).execute(&mut *db).await?;
+        .bind(if next.is_none() { Some(request.execution.as_uuid()) } else { None }).bind(exact).execute(&mut *db).await?;
     if changed.rows_affected() != 1 {
         return Err(AppError::Conflict(
             "Workflow deadline or state changed".into(),

@@ -87,7 +87,21 @@ async fn resume_waiting(
         }
         return Box::pin(decision_timed_out(db, scope, wait.id)).await;
     }
-    let wake = if wait.reason == "effect" {
+    let memory = if wait.reason == "effect" {
+        memory_steps::effect_resume_on(db, scope, wait.id).await?
+    } else {
+        None
+    };
+    let wake = if let Some(memory) = memory {
+        // A memory.save parked on its delivery intent (phase 05 E8).
+        match memory {
+            memory_steps::MemoryResume::Pending => return Ok(WaitProgress::Pending),
+            memory_steps::MemoryResume::Failed(outcome) => {
+                return Box::pin(memory_effect_failed(db, scope, wait.id, &outcome)).await;
+            }
+            memory_steps::MemoryResume::Delivered(output) => Wake::Effect(output),
+        }
+    } else if wait.reason == "effect" {
         // Explicit, before the generic event lookup (04.11-D2 §4.4, D4 §M).
         match message::receipts::effect_resume_on(db, scope, wait.id).await? {
             message::receipts::EffectResume::Pending => return Ok(WaitProgress::Pending),
@@ -219,6 +233,26 @@ async fn effect_failed(db: &mut PgConnection, scope: ActivationRequest) -> AppRe
     saved(db, scope, CommitDisposition::Committed, true).await
 }
 
+/// A terminal memory intent fails its step with the intent's outcome (E2, E8).
+async fn memory_effect_failed(
+    db: &mut PgConnection,
+    scope: ActivationRequest,
+    wait: Uuid,
+    outcome: &str,
+) -> AppResult<WaitProgress> {
+    let settled = sqlx::query("UPDATE workflow_waits SET state='completed',settled_at=clock_timestamp() WHERE company_id=$1 AND run_id=$2 AND execution_id=$3 AND id=$4 AND reason='effect' AND state='waiting'")
+        .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(scope.execution.as_uuid()).bind(wait).execute(&mut *db).await?;
+    if settled.rows_affected() != 1 {
+        return Err(invalid());
+    }
+    sqlx::query("UPDATE workflow_runs SET state='running',waiting_reason=NULL WHERE company_id=$1 AND id=$2")
+        .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).execute(&mut *db).await?;
+    let failure = crate::application::workflow::memory::save_failed(outcome).failure;
+    recovery::route_parked_failure(db, scope, &failure).await?;
+    waits::audit(db, scope, "memory_delivery_failed").await?;
+    saved(db, scope, CommitDisposition::Committed, true).await
+}
+
 async fn advance(
     db: &mut PgConnection,
     scope: ActivationRequest,
@@ -267,7 +301,11 @@ async fn advance(
         }
         Err(error) => return Err(error),
     };
-    commit_wake(db, scope, &run, &activation, completion, event, notices).await
+    let step = batch_commit::CompletedStep {
+        activated: &activation,
+        graph: binding.bundle().compiled().graph(),
+    };
+    commit_wake(db, scope, &run, step, completion, event, notices).await
 }
 
 /// Complete the parked step with its wake output: the activation limit, the consumed event (if
@@ -276,12 +314,13 @@ pub(super) async fn commit_wake(
     db: &mut PgConnection,
     scope: ActivationRequest,
     run: &waits::WaitRun,
-    activation: &ActivatedExecution,
+    step: batch_commit::CompletedStep<'_>,
     completion: crate::application::workflow::batch::PureCompletion,
     event: Option<Uuid>,
     notices: Option<&crate::application::workflow::decisions::DecisionNotices>,
 ) -> AppResult<WaitProgress> {
     let max_steps = u64::try_from(run.max_steps).map_err(|_| invalid())?;
+    let activation = step.activated;
     if activation.ordinal > max_steps
         || (activation.ordinal >= max_steps
             && matches!(completion.target, TransitionTarget::Step(_)))
@@ -303,7 +342,7 @@ pub(super) async fn commit_wake(
     let successor = batch_commit::complete(
         db,
         scope,
-        activation,
+        step,
         &completion,
         run.max_steps,
         completion_job::CompletionOwner::Parked(WaitId::new(source_wait)),

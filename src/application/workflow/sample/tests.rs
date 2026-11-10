@@ -302,8 +302,14 @@ fn bounded_root_budget_and_external_kinds_never_fall_back() {
             "context.history",
             json!({"items":[],"token_count":0,"omitted":0}),
         ),
-        ("memory.load", json!({"items":[]})),
-        ("memory.save", json!({"saved_ids":["sample"]})),
+        (
+            "memory.load",
+            json!({"items":[],"exposed_level":0,"omitted":0}),
+        ),
+        (
+            "memory.save",
+            json!({"saved":[{"id":"00000000-0000-4000-8000-000000000002","revision":1}],"access_level":0,"replayed":false}),
+        ),
         ("http.request", json!({"status":200,"headers":{},"body":{}})),
         ("message.reply", message_result()),
         (

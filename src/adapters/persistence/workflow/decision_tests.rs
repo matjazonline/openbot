@@ -615,3 +615,29 @@ async fn workflow_decision_park_waits_for_a_preference_toggle_in_flight() {
         "the park saw the committed opt-in and sent the notice"
     );
 }
+
+/// The decision writer is one caller of the shared progression writer: the declared choice is
+/// an authored enum and stays exact, while free-text feedback or data lowers it (phase 05 E3).
+#[tokio::test]
+async fn memory_access_level_decision_choice_stays_exact_and_feedback_lowers() {
+    use crate::adapters::persistence::workflow::knowledge::exactness_fixture::{exact, mark_exact};
+    for feedback in ["", "the code is 7731"] {
+        let f = Box::pin(DecisionFixture::configured(1, |source| {
+            source["steps"]["start"]["with"]["data_schema"] = json!({"literal":{"type":"null"}});
+        }))
+        .await;
+        let pool = f.persistence().pool();
+        mark_exact(pool, f.scope.company, f.scope.run).await;
+        let view = f.park().await;
+        let mut command = f.submit(&view, 0, "exactness");
+        command.data = Value::Null;
+        command.feedback = feedback.into();
+        let applied = f.persistence().submit_decision(command).await.unwrap();
+        assert_eq!(applied.disposition, DecisionDisposition::Applied);
+        assert_eq!(
+            exact(pool, f.scope.company, f.scope.run).await,
+            feedback.is_empty(),
+            "{feedback:?}"
+        );
+    }
+}

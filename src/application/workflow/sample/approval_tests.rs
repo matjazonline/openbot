@@ -12,7 +12,13 @@ fn protected_request(
     let reference = &bundle.snapshots().agents[0];
     let mut request = request(vec![
         script(1, "start", vec![json!("done")]),
-        script(2, "start", vec![json!({"saved_ids":["sample-only"]})]),
+        script(
+            2,
+            "start",
+            vec![
+                json!({"saved":[{"id":"00000000-0000-4000-8000-000000000001","revision":1}],"access_level":0,"replayed":false}),
+            ],
+        ),
     ]);
     request.scripts[0].responses[0].tools = vec![ScriptedToolCall {
         name: name(tool.binding.alias.as_str()),

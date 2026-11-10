@@ -1,0 +1,113 @@
+// ---- Reviewer B probe (MEM-P05-B2-R1); appended to an isolated copy only, never the worktree ----
+/// PROBE: a parked memory.save whose intent turns terminal (disable / expiry / service refusal)
+/// must be found by the poller and fail its step on resume; then try a control retry.
+#[tokio::test]
+async fn review_probe_terminal_intent_wakes_and_fails_the_step() {
+    use crate::application::workflow::polling::WorkflowPolling;
+    use crate::application::workflow::{WorkflowInspection, WorkflowRunTransitions};
+    for case in ["disabled", "expired", "refused"] {
+        let (f, scope) = fixture_source(source()).await;
+        let m = memory(&f, scope).await;
+        let p = &m.persistence;
+        let runtime = MemoryStepRuntime::new(p.clone(), m.client.clone());
+        let claim = p
+            .settled()
+            .claim_io(scope, worker(), policy())
+            .await
+            .unwrap()
+            .unwrap();
+        let WorkflowHandlerOutcome::Suspended(parked) = runtime
+            .execute(&WorkflowStepKind("memory.save".into()), &claim)
+            .await
+        else {
+            panic!("{case}: memory.save parks");
+        };
+        assert!(p.confirm_suspension(claim.fence, parked.wait).await.unwrap());
+        let listed = |page: &crate::application::workflow::polling::PollPage| {
+            page.candidates
+                .iter()
+                .filter(|c| c.scope.run == scope.run)
+                .map(|c| format!("{:?}", c.work))
+                .collect::<Vec<_>>()
+        };
+        let before = p.poll_work(None, 128).await.unwrap();
+        eprintln!("PROBE[{case}] poll before terminal: {:?}", listed(&before));
+        match case {
+            "disabled" => {
+                p.disable_memory(scope.company, f.binding.target.actor, 1)
+                    .await
+                    .unwrap();
+            }
+            "expired" => {
+                sqlx::query("UPDATE memory_deliveries SET expires_at = created_at + interval '1 microsecond' WHERE company_id=$1 AND wait_id=$2")
+                    .bind(scope.company.as_uuid()).bind(parked.wait.as_uuid()).execute(p.pool()).await.unwrap();
+                let delivery = MemoryDeliveryWorker::new(Arc::new(p.clone()), m.client.clone());
+                assert!(delivery.pass(&CancellationToken::new()).await.unwrap());
+            }
+            _ => {
+                m.fake.fault("observations/save", &[403]);
+                let delivery = MemoryDeliveryWorker::new(Arc::new(p.clone()), m.client.clone());
+                assert!(delivery.pass(&CancellationToken::new()).await.unwrap());
+            }
+        }
+        let (state, outcome): (String, Option<String>) = sqlx::query_as(
+            "SELECT state, outcome_code FROM memory_deliveries WHERE company_id=$1 AND wait_id=$2",
+        )
+        .bind(scope.company.as_uuid())
+        .bind(parked.wait.as_uuid())
+        .fetch_one(p.pool())
+        .await
+        .unwrap();
+        eprintln!("PROBE[{case}] intent: {state} {outcome:?}");
+        let after = p.poll_work(None, 128).await.unwrap();
+        eprintln!("PROBE[{case}] poll after terminal: {:?}", listed(&after));
+        let progress = p.resume_wait(scope).await;
+        eprintln!("PROBE[{case}] resume_wait: {progress:?}");
+        let (run_state, waiting): (String, Option<String>) = sqlx::query_as(
+            "SELECT state, waiting_reason FROM workflow_runs WHERE company_id=$1 AND id=$2",
+        )
+        .bind(scope.company.as_uuid())
+        .bind(scope.run.as_uuid())
+        .fetch_one(p.pool())
+        .await
+        .unwrap();
+        let wait_state: String = sqlx::query_scalar(
+            "SELECT state FROM workflow_waits WHERE company_id=$1 AND id=$2",
+        )
+        .bind(scope.company.as_uuid())
+        .bind(parked.wait.as_uuid())
+        .fetch_one(p.pool())
+        .await
+        .unwrap();
+        let events: Vec<String> = sqlx::query_scalar(
+            "SELECT event_kind FROM workflow_run_events WHERE company_id=$1 AND run_id=$2 ORDER BY sequence",
+        )
+        .bind(scope.company.as_uuid())
+        .bind(scope.run.as_uuid())
+        .fetch_all(p.pool())
+        .await
+        .unwrap();
+        eprintln!("PROBE[{case}] run={run_state} waiting={waiting:?} wait={wait_state} events={events:?}");
+        let head = p.head(scope.company, scope.run).await.unwrap().unwrap();
+        let retried = p
+            .retry(crate::application::workflow::RetryCommand {
+                company_id: scope.company,
+                actor: f.binding.target.actor,
+                run_id: scope.run,
+                expected_revision: head.revision,
+                command_key: IdempotencyKey::parse(&format!("probe-retry-{case}")).unwrap(),
+            })
+            .await;
+        eprintln!("PROBE[{case}] control retry: {retried:?}");
+        if matches!(retried, Ok(crate::application::workflow::RetryResult::Applied { .. })) {
+            let reclaimed = p.settled().claim_io(scope, worker(), policy()).await;
+            eprintln!("PROBE[{case}] reclaim: {:?}", reclaimed.as_ref().map(|c| c.is_some()));
+            if let Ok(Some(claim)) = reclaimed {
+                let outcome = runtime
+                    .execute(&WorkflowStepKind("memory.save".into()), &claim)
+                    .await;
+                eprintln!("PROBE[{case}] retried execute: {outcome:?}");
+            }
+        }
+    }
+}

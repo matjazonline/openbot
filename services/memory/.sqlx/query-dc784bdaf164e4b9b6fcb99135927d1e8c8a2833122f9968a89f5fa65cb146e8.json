@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM sources WHERE (tenant_id, id) IN (SELECT * FROM UNNEST($1::uuid[], $2::uuid[]))",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "UuidArray",
+        "UuidArray"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "dc784bdaf164e4b9b6fcb99135927d1e8c8a2833122f9968a89f5fa65cb146e8"
+}

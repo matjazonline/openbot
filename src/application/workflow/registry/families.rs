@@ -11,22 +11,37 @@ impl Registration<'_> {
                     &["items", "token_count", "omitted"],
                 ),
             )),
-            "memory.load" => Ok(contract(
-                json!({"scope":scope(),"query":text(MAX_TEXT),"limit":integer(MAX_ITEMS)}),
-                &["scope", "query", "limit"],
-                object(
-                    json!({"items":array(provenance_item(),0,MAX_ITEMS)}),
-                    &["items"],
-                ),
-            )),
-            "memory.save" => Ok(contract(
-                json!({"scope":scope(),"facts":array(text(MAX_TEXT),1,MAX_ITEMS)}),
-                &["scope", "facts"],
-                object(
-                    json!({"saved_ids":array(identifier(),1,MAX_ITEMS)}),
-                    &["saved_ids"],
-                ),
-            )),
+            "memory.load" => {
+                // A literal scope, so publication resolves its agent against the bundle (E4).
+                self.literal("scope")?;
+                Ok(contract(
+                    json!({"scope":scope(),"query":text(MAX_MEMORY_QUERY),"limit":integer(MAX_MEMORY_LOAD)}),
+                    &["scope", "query", "limit"],
+                    object(
+                        json!({"items":array(memory_item(),0,MAX_MEMORY_LOAD),
+                            "exposed_level":{"type":"integer","minimum":0,"maximum":9},
+                            "omitted":{"type":"integer","minimum":0}}),
+                        &["items", "exposed_level", "omitted"],
+                    ),
+                ))
+            }
+            "memory.save" => {
+                self.literal("scope")?;
+                let saved = object(
+                    json!({"id":uuid(),"revision":{"type":"integer","minimum":1}}),
+                    &["id", "revision"],
+                );
+                Ok(contract(
+                    json!({"scope":scope(),"facts":array(text(MAX_TEXT),1,MAX_MEMORY_FACTS)}),
+                    &["scope", "facts"],
+                    object(
+                        json!({"saved":array(saved,1,MAX_MEMORY_FACTS),
+                            "access_level":{"type":"integer","minimum":0,"maximum":9},
+                            "replayed":{"type":"boolean"}}),
+                        &["saved", "access_level", "replayed"],
+                    ),
+                ))
+            }
             "ai.classify" | "agent.run" | "data.map" | "channel.no_reply" => self.schema_output(),
             "decision.rule" | "decision.human" | "decision.agent" => self.decision(),
             "wait.event" | "wait.timer" => self.wait(),

@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE namespaces SET state = 'deleted', deleted_at = now() WHERE tenant_id = $1 AND id = $2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "7771900ff88b84dfb23e47e6e12dbd515a7643db1af04b47b9ff0348536a848c"
+}

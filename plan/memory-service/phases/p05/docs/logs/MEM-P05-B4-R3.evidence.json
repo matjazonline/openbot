@@ -1,0 +1,90 @@
+{
+ "version": 1,
+ "round": "MEM-P05-B4-R3",
+ "artifact": "8490e2e6c999eea62a7738e2e762b18c1fbda91cbec21f106612bc761d4f78ee",
+ "checks": [
+  {
+   "criteria": [
+    "F6 a deleted tool item revokes the resumed attempt with no provider entry",
+    "corrected and unchanged cases still hold",
+    "recall and tool tests unaffected"
+   ],
+   "command": "TEST_DATABASE_URL=postgres://postgres@127.0.0.1:55432/open_bots_root_test cargo test --locked --offline --lib -- memory_preparation memory_tools::",
+   "fixture": "open_bots_root_test",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/MEM-P05-B4-R3-focused.txt",
+     "sha256": "578a38980b5efb115160571ee49952bc5d258c341804ca1d82cbdc69fe069124"
+    }
+   ],
+   "reason": "32 passed, 0 failed; R3 delta is this test file and two docs, so R2's widened selection (929/0) stands for unchanged code"
+  },
+  {
+   "criteria": [
+    "reviewer mutation L (deleted id passes) fails the tool-item revalidation test on the deleted case"
+   ],
+   "command": "isolated copy tmp/memory-service-run/mut-b4r3/tree of the final source (diff -rq clean), B's patch logs/MEM-P05-B4-R2-B-mutation-L-deleted-tool-item-passes.patch.txt applied with patch -p0, own CARGO_TARGET_DIR (deleted after): cargo test --locked --offline --lib -- memory_preparation memory_tools::",
+   "fixture": "open_bots_root_test",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/MEM-P05-B4-R2-B-mutation-L-deleted-tool-item-passes.patch.txt",
+     "sha256": "e83f98eddf5a5e3599cca121c42eb7985e15a8dc650c76fb05ae39069acbb67c"
+    },
+    {
+     "path": "logs/MEM-P05-B4-R3-mutation-L.txt",
+     "sha256": "4a5bcdaa317ef1303b09413c1b4da606bf88fb81e7eff353e8d533ae20522826"
+    }
+   ],
+   "reason": "31 passed, 1 failed: memory_preparation_resumed_attempts_revalidate_recorded_tool_items, message 'deleted', (Retryable, agent.unresolved) != (Terminal, memory.context_revoked)"
+  },
+  {
+   "criteria": [
+    "clippy -D warnings (lib + tests)"
+   ],
+   "command": "cargo clippy --locked --offline --lib --tests -- -D warnings",
+   "fixture": "none",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/MEM-P05-B4-R3-clippy.txt",
+     "sha256": "90b86f268acdcae997623f468568fc5d64e99c3255668af43845a2f8a017b403"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "formatting",
+    "whitespace"
+   ],
+   "command": "cargo fmt --all -- --check; git diff --check",
+   "fixture": "none",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/MEM-P05-B4-R3-fmt-check.txt",
+     "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+     "path": "logs/MEM-P05-B4-R3-diff-check.txt",
+     "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "full suite",
+    "stack-budget script",
+    "live memory service",
+    "Docker/CI/Linux isolation",
+    "browser check",
+    "skipped_budget end to end"
+   ],
+   "command": "not run",
+   "fixture": "none",
+   "status": "NOT EXERCISED",
+   "reason": "full suite + stack budget at the 05 gate/06C; live service and browser at the 05 gate; skipped_budget needs a request policy near its limit"
+  }
+ ]
+}

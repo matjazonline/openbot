@@ -24,6 +24,9 @@ mod ownership;
 #[path = "agent_history_knowledge_resume_tests.rs"]
 mod history_resume;
 
+#[path = "memory_tool_tests.rs"]
+mod memory_tools;
+
 #[tokio::test]
 async fn knowledge_search_driver_persists_observation_and_classification_before_continuing() {
     let f = Box::pin(SearchFixture::new(AccessLevel::L5)).await;
@@ -37,12 +40,17 @@ async fn knowledge_search_driver_persists_observation_and_classification_before_
     ])
     .await;
     register_scripted_agent_base_url(f.agent, &llm.base_url);
+    let scope = f.claim.fence.scope;
+    use crate::adapters::persistence::workflow::knowledge::exactness_fixture::{exact, mark_exact};
+    mark_exact(f.p().pool(), scope.company, scope.run).await;
     let runtime = f.runtime();
     let result = Box::pin(runtime.execute(&WorkflowStepKind("agent.run".into()), &f.claim)).await;
     assert_eq!(
         result.completed_result().unwrap(),
         json!("From sales.md: the discount floor is 60.")
     );
+    // A knowledge observation raises the level itself and keeps the run exact (E3).
+    assert!(exact(f.p().pool(), scope.company, scope.run).await);
     let requests = llm.observed();
     let tool = &requests[0]["tools"][0]["function"];
     assert_eq!(tool["name"], SEARCH_KNOWLEDGE);

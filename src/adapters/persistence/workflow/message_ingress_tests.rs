@@ -66,14 +66,41 @@ struct Deployment {
         BTreeMap<crate::domain::workflow::ResourceName, crate::domain::workflow::RuntimeResourceId>,
 }
 
+/// The fake memory service's admin token (`Deployment::with_memory`).
+const MEMORY_ADMIN: &str =
+    "msk_adm_0190f1a2b3c44d5e8f9a0b1c2d3e4f50_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
+
 impl Deployment {
     async fn new(turns: Vec<LlmTurn>) -> Self {
+        Box::pin(Self::build(turns, None)).await
+    }
+
+    /// The same deployment with the memory service configured against `memory` (phase 05): its
+    /// recall arms capture and its delivery worker sends to the fake.
+    async fn with_memory(
+        turns: Vec<LlmTurn>,
+        memory: &crate::adapters::memory_service::contract_fake::ContractFake,
+    ) -> Self {
+        Box::pin(Self::build(turns, Some(memory))).await
+    }
+
+    async fn build(
+        turns: Vec<LlmTurn>,
+        memory: Option<&crate::adapters::memory_service::contract_fake::ContractFake>,
+    ) -> Self {
         // The engine's warnings land in this test's captured output, shown when it fails.
         let _ = tracing_subscriber::fmt()
             .with_test_writer()
             .with_env_filter("open_bots=warn")
             .try_init();
-        let fixture = Fixture::new().await;
+        let mut fixture = Fixture::new().await;
+        if memory.is_some() {
+            // Namespace credentials are sealed envelopes the delivery worker opens.
+            fixture.persistence = PostgresPersistence::with_credential_cipher(
+                fixture.persistence.pool().clone(),
+                crate::adapters::persistence::credentials::CredentialCipher::for_test(),
+            );
+        }
         let p = fixture.persistence.clone();
         let company = fixture.target.company.as_uuid();
         let agent = AgentPersistence::create(
@@ -130,8 +157,31 @@ impl Deployment {
                 .register(Arc::new(EmailRenderer::new(APP_DOMAIN)))
                 .unwrap(),
         );
-        let composition::Composition { engine, knowledge } =
-            composition::engine(&p, &config, renderers.clone());
+        let composition::Composition {
+            mut engine,
+            knowledge,
+        } = composition::engine(&p, &config, renderers.clone());
+        if let Some(fake) = memory {
+            let config = crate::infra::memory_config::MemoryServiceConfig {
+                base_url: fake.base_url.clone(),
+                provisioner: crate::infra::memory_config::ProvisionerToken::parse(
+                    MEMORY_ADMIN.into(),
+                )
+                .unwrap(),
+                request_timeout: Duration::from_secs(5),
+                recall_deadline: Duration::from_secs(1),
+                interactive_in_flight: 2,
+                background_in_flight: 1,
+            };
+            let client =
+                Arc::new(crate::adapters::memory_service::MemoryServiceHttp::new(&config).unwrap());
+            engine = engine.with_memory(
+                client.clone(),
+                client,
+                config.provisioner.credential_id(),
+                config.background_in_flight,
+            );
+        }
         let threads = composition::threads(&p, &config, renderers, engine.intent_wakeups.clone());
         Self {
             fixture,

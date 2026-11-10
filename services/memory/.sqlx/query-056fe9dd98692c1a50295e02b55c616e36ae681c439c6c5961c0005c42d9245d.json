@@ -1,0 +1,30 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT write_max::smallint AS write_max, 'generate' = ANY(operations) AS \"generate!\"\n             FROM credential_grants WHERE tenant_id = $1 AND credential_id = $2 AND namespace_id = $3",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "write_max",
+        "type_info": "Int2"
+      },
+      {
+        "ordinal": 1,
+        "name": "generate!",
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null,
+      null
+    ]
+  },
+  "hash": "056fe9dd98692c1a50295e02b55c616e36ae681c439c6c5961c0005c42d9245d"
+}

@@ -1,0 +1,9 @@
+   Compiling open_bots v0.1.0 (/Users/mac03/.codex/worktrees/60a0/openbot)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1m 55s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-6c472bc7410f7b21)
+
+running 1 test
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_tests::memory_access_level_workflow_tool_child_exactness_reaches_the_calling_run ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3644 filtered out; finished in 2.02s
+

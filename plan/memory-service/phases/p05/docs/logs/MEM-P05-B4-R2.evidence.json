@@ -1,0 +1,160 @@
+{
+ "version": 1,
+ "round": "MEM-P05-B4-R2",
+ "artifact": "507e893896000e551a847db69b4179ba7b399d7683e4feb2e82fd9a8401f8f1b",
+ "checks": [
+  {
+   "criteria": [
+    "R2 focused selection listed (nonzero), widened to every WorkflowAgentRuntime caller"
+   ],
+   "command": "cargo test --locked --offline --lib -- memory_ knowledge_search agent_history agent_runtime autonomous_agent workflow::agent harness::rig exactness agent_preparation agent_publication agent_authoring adapters::memory_service:: message_tests:: mcp_agent workflow_tool message_agent agent_recovery agent_model_step classify decision --list",
+   "fixture": "none",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/MEM-P05-B4-R2-list.txt",
+     "sha256": "efbbd6012671babce8b13ef9b3f83ce0cbb6c21226109489680ee288c1030d25"
+    }
+   ],
+   "reason": "931 listed"
+  },
+  {
+   "criteria": [
+    "F1 resumed pack without a configured service is retryable unavailable",
+    "F2 recorded tool items revalidated on resume",
+    "F3 recall deadline",
+    "F3 two concurrent three-scope recalls in one company",
+    "structural recall guard regressions across agent runtimes",
+    "B3 tool tests revalidating earlier reads"
+   ],
+   "command": "TEST_DATABASE_URL=postgres://postgres@127.0.0.1:55432/open_bots_root_test cargo test --locked --offline --lib -- memory_ knowledge_search agent_history agent_runtime autonomous_agent workflow::agent harness::rig exactness agent_preparation agent_publication agent_authoring adapters::memory_service:: message_tests:: mcp_agent workflow_tool message_agent agent_recovery agent_model_step classify decision",
+   "fixture": "open_bots_root_test",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/MEM-P05-B4-R2-focused.txt",
+     "sha256": "209c3e85ba9ad474b23ada5cf547d7ee2f78b30ea47d4b52e406f6e36ad2dfc4"
+    }
+   ],
+   "reason": "929 passed, 0 failed, 2 pre-existing ignored"
+  },
+  {
+   "criteria": [
+    "stack at the stock 2 MiB (early signal; full stack-budget at the gate)"
+   ],
+   "command": "RUST_MIN_STACK=2097152 cargo test --locked --offline --lib -- memory_tools:: knowledge_search agent_runtime mcp_agent agent_recovery",
+   "fixture": "open_bots_root_test",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/MEM-P05-B4-R2-stack-2mib.txt",
+     "sha256": "ed78644dafdf2a51b461209432239fc97cd4ac92b653e1e4f7d91c62589e48a6"
+    }
+   ],
+   "reason": "161 passed"
+  },
+  {
+   "criteria": [
+    "clippy -D warnings (lib + tests)"
+   ],
+   "command": "cargo clippy --locked --offline --lib --tests -- -D warnings",
+   "fixture": "none",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/MEM-P05-B4-R2-clippy.txt",
+     "sha256": "7f7401505eebde4b9cca43eb045123d1ee95edc4cd2d1d805326c5aac2bae2e5"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "formatting",
+    "whitespace"
+   ],
+   "command": "cargo fmt --all -- --check; git diff --check",
+   "fixture": "none",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/MEM-P05-B4-R2-fmt-check.txt",
+     "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+     "path": "logs/MEM-P05-B4-R2-diff-check.txt",
+     "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "mutation H (deadline = request timeout) fails the deadline test",
+    "mutation I (permit per pack request) fails the concurrent-recall test",
+    "mutation J (tool items not revalidated) fails the tool-item revalidation test",
+    "mutation K (no client replays as valid) fails the unconfigured-resume test"
+   ],
+   "command": "isolated copy tmp/memory-service-run/mut-b4r2/tree of the final source (diff -rq clean), own CARGO_TARGET_DIR (deleted after); each mutation alone: cargo test --locked --offline --lib -- memory_preparation",
+   "fixture": "open_bots_root_test",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/MEM-P05-B4-R2-mutation-H-deadline-from-request-timeout.patch.txt",
+     "sha256": "e8da1b0523ab22cabc5e1eefc8b56b8fd7b76adabbe0589f7605adfc9a91d7fb"
+    },
+    {
+     "path": "logs/MEM-P05-B4-R2-mutation-H.txt",
+     "sha256": "aa8371e098ad6f52e07a3edba8ca8988744287803c3fb25687e266a31c18e55b"
+    },
+    {
+     "path": "logs/MEM-P05-B4-R2-mutation-I-permit-per-request.patch.txt",
+     "sha256": "41dc601a3dd7a121b7905439ee475e23fe6faffed98721c04b5202abfd5d7266"
+    },
+    {
+     "path": "logs/MEM-P05-B4-R2-mutation-I.txt",
+     "sha256": "c209beb59aa01f76e245c4c1df433f3f2dda418c8f851fc69bf9ec30bae282a4"
+    },
+    {
+     "path": "logs/MEM-P05-B4-R2-mutation-J-no-tool-item-revalidation.patch.txt",
+     "sha256": "1962547c45436068553ba53bbb9abe550b0ada80a7fe1ced7bcee94dba79b260"
+    },
+    {
+     "path": "logs/MEM-P05-B4-R2-mutation-J.txt",
+     "sha256": "70089574e8c8f526725cce863155566b74bf2847f3f2b6f1b8e56c308978a333"
+    },
+    {
+     "path": "logs/MEM-P05-B4-R2-mutation-K-unconfigured-replays.patch.txt",
+     "sha256": "fd894cfbbddb18d730028ed1e533520a6a95ca8116cd61678027fe5c3bb19add"
+    },
+    {
+     "path": "logs/MEM-P05-B4-R2-mutation-K.txt",
+     "sha256": "5ba59b069921ea190ea249dfcec091917c1fb64f8be0232f71aa62bece6568b2"
+    }
+   ],
+   "reason": "each: exactly its target test fails, 12 of 13 pass"
+  },
+  {
+   "criteria": [
+    "sqlx offline cache",
+    "fresh migration"
+   ],
+   "command": "not rerun",
+   "fixture": "none",
+   "status": "NOT EXERCISED",
+   "reason": "R2 changes no migration and no query macro"
+  },
+  {
+   "criteria": [
+    "full suite",
+    "stack-budget script",
+    "live memory service",
+    "Docker/CI/Linux isolation",
+    "browser check",
+    "skipped_budget end to end"
+   ],
+   "command": "not run",
+   "fixture": "none",
+   "status": "NOT EXERCISED",
+   "reason": "full suite + stack budget at the 05 gate/06C; live service and browser at the 05 gate; skipped_budget needs a request policy near its limit"
+  }
+ ]
+}

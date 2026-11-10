@@ -215,6 +215,7 @@ pub(super) struct ChildStart<'a> {
 struct ParentRun {
     knowledge_ceiling: i16,
     content_level: i16,
+    content_exact: bool,
     actor_id: Uuid,
     channel_id: Option<Uuid>,
     thread_id: Option<Uuid>,
@@ -232,7 +233,7 @@ pub(super) async fn create_on(
     start: &ChildStart<'_>,
 ) -> AppResult<ParkedWorkflow> {
     let parent = sqlx::query_as::<_, ParentRun>(
-        "SELECT actor_id, channel_id, thread_id, correlation_id, delivery_policy, knowledge_ceiling::smallint AS knowledge_ceiling, content_level::smallint AS content_level FROM workflow_runs \
+        "SELECT actor_id, channel_id, thread_id, correlation_id, delivery_policy, knowledge_ceiling::smallint AS knowledge_ceiling, content_level::smallint AS content_level, content_exact FROM workflow_runs \
          WHERE company_id=$1 AND id=$2",
     )
     .bind(scope.company.as_uuid())
@@ -335,6 +336,8 @@ async fn insert_child_on(
                 parent.knowledge_ceiling,
                 parent.content_level,
             )?,
+            // A child starts from everything its parent consumed, exact or not (E3).
+            content_exact: parent.content_exact,
             run: child,
             binding: start.binding,
             association,

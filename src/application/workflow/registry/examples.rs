@@ -85,7 +85,7 @@ fn values(name: &str) -> Value {
         "context.history" => json!({"max_tokens":1000}),
         "memory.load" => json!({"scope":{"kind":"company"},"query":"preferences","limit":10}),
         "memory.save" => {
-            json!({"scope":{"kind":"agent","id":"assistant"},"facts":["Prefers concise replies"]})
+            json!({"scope":{"kind":"company"},"facts":["Prefers concise replies"]})
         }
         "jev.evaluate" => {
             json!({"connection":"service","model":"jev-1.14.0","state":{"ticket":"Payment failed"},"questions":{

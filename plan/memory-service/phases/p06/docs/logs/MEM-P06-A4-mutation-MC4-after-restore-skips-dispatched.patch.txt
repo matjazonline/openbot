@@ -1,0 +1,5 @@
+src/adapters/postgres/generation.rs
+---               WHERE state IN ('accepted', 'claimed', 'dispatched') \
+              ORDER BY tenant_id, id FOR UPDATE"
++++               WHERE state IN ('accepted', 'claimed') \
+              ORDER BY tenant_id, id FOR UPDATE"

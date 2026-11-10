@@ -269,6 +269,7 @@ const NO_BACKWARD_COMPATIBILITY_NOTES: &[&str] = &[
     "plan/memory-service/04-observation-generation.md",
     "plan/memory-service/05-openbot-integration.md",
     "plan/memory-service/06-operations-and-verification.md",
+    "plan/memory-service/implementation-decisions.md",
     "plan/memory_management/general_plan_instructions.md",
     "plan/opencode_microvm_sandbox_plan.md",
     "plan/outreach_allowlist_plan.md",

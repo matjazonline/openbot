@@ -65,7 +65,9 @@ fn workflow_registry_each_type_validates_dynamic_required_inputs() {
         let mut example = example(name).unwrap();
         let (field, bad) = match name {
             "context.history" => ("max_tokens", json!(0)),
-            "memory.load" | "memory.save" => ("scope", json!({"kind":"user"})),
+            // The scope is a literal (E4); the dynamic inputs are the query and the facts.
+            "memory.load" => ("query", json!("")),
+            "memory.save" => ("facts", json!([])),
             "jev.evaluate" => ("state", json!(true)),
             "ai.classify" => continue, // Context is intentionally schema-free JSON; declaration must be static.
             "agent.run" | "decision.agent" => ("agent", json!(3)),
@@ -259,4 +261,22 @@ fn workflow_registry_child_params_are_static_and_resources_match_by_slot() {
         code(&call(&declares("mcp"), &needs_http)),
         Some("registry.child_resources")
     );
+}
+
+/// E4: a memory scope is a literal, so publication can resolve its agent; a reference is refused.
+#[test]
+fn memory_scope_step_scope_must_be_a_literal() {
+    for name in ["memory.load", "memory.save"] {
+        let mut example = example(name).unwrap();
+        changed(&mut example, |v| {
+            v["input_schema"] =
+                json!({"type":"object","properties":{"value":true},"required":["value"]});
+            v["steps"]["start"]["with"]["scope"] = json!({"ref":"/input/value"});
+        });
+        let Err(error) = compile_example(&example) else {
+            panic!("{name}: a referenced scope compiled");
+        };
+        assert_eq!(error.code, "registry.literal", "{name}");
+        assert_eq!(&*error.field_path, "/steps/start/with/scope");
+    }
 }

@@ -1,0 +1,12 @@
+--- a/src/adapters/persistence/memory/retention.rs
++++ b/src/adapters/persistence/memory/retention.rs
+@@ -21,8 +21,7 @@
+      AND intent.created_at < now() - make_interval(days => $1) \
+      AND (intent.kind = 'generation' OR NOT EXISTS (SELECT 1 FROM workflow_runs AS run \
+           WHERE run.company_id = intent.company_id AND run.id = intent.run_id \
+-            AND (run.state NOT IN ('succeeded', 'failed', 'cancelled') \
+-                 OR run.deadline >= now())))";
++            AND (run.state NOT IN ('succeeded', 'failed', 'cancelled'))))"; // MUTATION MB1
+ 
+ /// Settled absent lifecycle rows whose owner row is gone, 30 days after they settled.
+ const SETTLED_LIFECYCLE: &str = "lifecycle.state = 'settled' AND lifecycle.desired = 'absent' \

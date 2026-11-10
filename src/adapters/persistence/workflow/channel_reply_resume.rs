@@ -24,6 +24,7 @@ impl WorkflowFinalizations for PostgresPersistence {
 
 #[derive(sqlx::FromRow)]
 struct ResumeRun {
+    binding_id: Uuid,
     state: String,
     max_steps: i32,
     continuation_count: i16,
@@ -40,7 +41,7 @@ pub(super) async fn resume_on(
         return Ok(FinalizationProgress::Unstaged);
     };
     channel_reply_completion::prelock_on(db, scope).await?;
-    let run: Option<ResumeRun>=sqlx::query_as("SELECT run.state,run.max_steps,job.continuation_count,job.status,(execution.completed_at IS NOT NULL) AS completed \
+    let run: Option<ResumeRun>=sqlx::query_as("SELECT run.binding_id,run.state,run.max_steps,job.continuation_count,job.status,(execution.completed_at IS NOT NULL) AS completed \
         FROM workflow_runs AS run JOIN workflow_executions AS execution ON execution.company_id=run.company_id AND execution.run_id=run.id \
         JOIN background_tasks AS job ON job.company_id=execution.company_id AND job.workflow_execution_id=execution.id \
         WHERE run.company_id=$1 AND run.id=$2 AND execution.id=$3 AND job.id=$4 FOR UPDATE OF run,execution,job")
@@ -78,6 +79,24 @@ async fn complete_saved_on(
     let activation = activation::activate_on(db, scope)
         .await?
         .ok_or_else(invalid)?;
+    // The frozen graph names the step's kind for the exactness hook (phase 05 E3).
+    let binding = admission_binding::read_saved_binding(
+        db,
+        scope.company,
+        WorkflowBindingId::new(run.binding_id),
+        scope.run.as_uuid(),
+    )
+    .await?;
+    // A reviewer's edit becomes the published output: conversational input (E3).
+    let submitted: Option<Value> =
+        sqlx::query_scalar("SELECT data FROM workflow_decisions WHERE company_id=$1 AND id=$2")
+            .bind(scope.company.as_uuid())
+            .bind(decision)
+            .fetch_one(&mut *db)
+            .await?;
+    if !crate::application::workflow::exactness::reviewed_output_exact(submitted.as_ref()) {
+        super::knowledge::lower_content_exact_on(db, scope.company, scope.run).await?;
+    }
     let completion = PureCompletion {
         output: saved.business_output,
         route: wait_commit::saved_route(&saved.completion_route)?,
@@ -96,7 +115,10 @@ async fn complete_saved_on(
     let result = Box::pin(batch_commit::complete(
         db,
         scope,
-        &activation,
+        batch_commit::CompletedStep {
+            activated: &activation,
+            graph: binding.bundle().compiled().graph(),
+        },
         &completion,
         run.max_steps,
         owner,

@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM credential_grants WHERE (tenant_id, credential_id, namespace_id) IN (SELECT * FROM UNNEST($1::uuid[], $2::uuid[], $3::uuid[]))",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "UuidArray",
+        "UuidArray",
+        "UuidArray"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "4545e2d1af4f73c3c6eec3916ab3eed7212aff35b7827c5610e820925057f018"
+}

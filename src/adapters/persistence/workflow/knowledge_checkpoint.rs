@@ -188,12 +188,14 @@ async fn load_call(
     })
 }
 
-struct FrozenSelection {
-    selection: ResolvedAgent,
-    access: KnowledgeSearchAccess,
+/// The run's frozen agent selection for the executing `agent.run` step; the memory tools use it
+/// too.
+pub(super) struct FrozenSelection {
+    pub(super) selection: ResolvedAgent,
+    pub(super) access: KnowledgeSearchAccess,
 }
 
-async fn frozen_selection(
+pub(super) async fn frozen_selection(
     tx: &mut Transaction<'_, Postgres>,
     fence: WorkflowFence,
 ) -> AppResult<FrozenSelection> {

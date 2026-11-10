@@ -1,0 +1,19 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO observation_links (tenant_id, observation_id, ordinal, parent_observation_id, parent_revision, source_level) SELECT $1, $2, u.ordinal, u.parent, u.revision, u.level::smallint FROM UNNEST($3::int[], $4::uuid[], $5::bigint[], $6::smallint[]) AS u(ordinal, parent, revision, level)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Int4Array",
+        "UuidArray",
+        "Int8Array",
+        "Int2Array"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "5c4b5278ed4b8bca9453210a8a8db485b12781ba53f46d2e196514b7ce197f1d"
+}

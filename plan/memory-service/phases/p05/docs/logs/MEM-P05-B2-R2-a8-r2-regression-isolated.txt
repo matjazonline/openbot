@@ -1,0 +1,38 @@
+
+running 3 tests
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::budget_runtime_tests::race_tests::workflow_budget_runtime_unknown_effect_exhaustion_reconciles ... FAILED
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::recovery_tests::workflow_failure_interrupted_and_expired_effects_cannot_replay ... FAILED
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::pending_io_tests::workflow_poison_effect_output_and_spent_pending_reconcile ... FAILED
+
+failures:
+
+---- adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::budget_runtime_tests::race_tests::workflow_budget_runtime_unknown_effect_exhaustion_reconciles stdout ----
+
+thread 'adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::budget_runtime_tests::race_tests::workflow_budget_runtime_unknown_effect_exhaustion_reconciles' (21441928) panicked at src/adapters/persistence/workflow/budget_race_tests.rs:30:5:
+assertion `left == right` failed
+  left: String("failed")
+ right: "waiting"
+
+---- adapters::persistence::workflow::tests::admission_tests::lease_tests::recovery_tests::workflow_failure_interrupted_and_expired_effects_cannot_replay stdout ----
+
+thread 'adapters::persistence::workflow::tests::admission_tests::lease_tests::recovery_tests::workflow_failure_interrupted_and_expired_effects_cannot_replay' (21441930) panicked at src/adapters/persistence/workflow/recovery_tests.rs:272:9:
+assertion `left == right` failed
+  left: Null
+ right: "reconciliation"
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- adapters::persistence::workflow::tests::admission_tests::lease_tests::pending_io_tests::workflow_poison_effect_output_and_spent_pending_reconcile stdout ----
+
+thread 'adapters::persistence::workflow::tests::admission_tests::lease_tests::pending_io_tests::workflow_poison_effect_output_and_spent_pending_reconcile' (21441929) panicked at src/adapters/persistence/workflow/pending_io_tests.rs:81:9:
+assertion `left == right` failed
+  left: String("failed")
+ right: "waiting"
+
+
+failures:
+    adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::budget_runtime_tests::race_tests::workflow_budget_runtime_unknown_effect_exhaustion_reconciles
+    adapters::persistence::workflow::tests::admission_tests::lease_tests::pending_io_tests::workflow_poison_effect_output_and_spent_pending_reconcile
+    adapters::persistence::workflow::tests::admission_tests::lease_tests::recovery_tests::workflow_failure_interrupted_and_expired_effects_cannot_replay
+
+test result: FAILED. 0 passed; 3 failed; 0 ignored; 0 measured; 3643 filtered out; finished in 1.42s
+

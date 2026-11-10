@@ -5,6 +5,52 @@ on:
   pull_request:
 
 jobs:
+  # Phase 05 E11: OpenBot's memory adapter, workers and freezes against the real memory service,
+  # built from services/memory and served on loopback, with a stand-in for the Messages API.
+  memory-integration:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        # The memory service needs pgvector; OpenBot's own test databases live on the same server.
+        image: pgvector/pgvector:0.8.7-pg18-bookworm@sha256:c29f30688a9ad961691bdf0ec1650717cc132a5814619d80f80463d6e4c42e47
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: open_bots_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d open_bots_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      SQLX_OFFLINE: "true"
+      TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5432/open_bots_test
+      # Superuser maintenance URL: the script creates and drops a memory_live_* database and role.
+      MEMORY_INTEGRATION_ADMIN_URL: postgres://postgres:postgres@localhost:5432/postgres
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      # services/memory pins its own toolchain (rust-toolchain.toml); install it explicitly, with
+      # the components that file lists, rather than rely on rustup's implicit install.
+      - name: Install the memory service toolchain
+        run: rustup toolchain install 1.95.0 --profile minimal --component rustfmt,clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            . -> target
+            services/memory -> target
+      - name: Cache memory model artifacts
+        uses: actions/cache@v4
+        with:
+          path: services/memory/assets/model
+          key: memory-model-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('services/memory/assets/model-manifest.json') }}
+      - name: Prepare and verify the pinned model (build network only)
+        run: python3 -I services/memory/scripts/prepare-model.py --download
+      - name: Live memory-service integration
+        run: scripts/memory-integration.sh
+
   verify:
     runs-on: ubuntu-latest
     services:
@@ -129,6 +175,12 @@ jobs:
         run: |
           cargo test --locked --offline --lib dump_knowledge_browser_fixtures -- --ignored
           node --test scripts/tests/knowledge-browser.mjs
+      - name: Memory settings capture forms browser protocol
+        env:
+          MEMORY_SETTINGS_BROWSER_FIXTURES: /tmp/memory-settings-browser
+        run: |
+          cargo test --locked --offline --lib dump_memory_settings_browser_fixtures -- --ignored
+          node --test scripts/tests/memory-settings-browser.mjs
       - name: Agent authoring browser protocol
         env:
           AGENT_AUTHORING_BROWSER_FIXTURES: /tmp/agent-authoring-browser

@@ -1,0 +1,26 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE observations SET index_state = 'failed', index_error = $5, index_lease_until = NULL, next_index_at = now() + least(interval '30 seconds' * power(2, greatest(index_attempts - 1, 0)), interval '1 hour') WHERE tenant_id = $1 AND id = $2 AND index_fence = $3 AND revision = $4 RETURNING id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Int8",
+        "Int8",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "c525139bd281b4e6ba421be13a77b32aa72d79f3bfb8c844f7f28c3ee5e5ad0d"
+}

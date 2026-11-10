@@ -16,6 +16,7 @@ use serde_json::Value;
 struct ChildFact {
     child_run_id: Uuid,
     content_level: i16,
+    content_exact: bool,
     child_ordinal: Option<i32>,
     child_tool_call_id: Option<Uuid>,
     terminal_state: Option<String>,
@@ -30,7 +31,7 @@ pub(super) async fn resume_on(
     notices: Option<&crate::application::workflow::decisions::DecisionNotices>,
 ) -> AppResult<WaitProgress> {
     let fact = sqlx::query_as::<_, ChildFact>(
-        "SELECT wait.child_run_id, child.content_level::smallint AS content_level, wait.child_ordinal, wait.child_tool_call_id, event.terminal_state, event.terminal_execution_id \
+        "SELECT wait.child_run_id, child.content_level::smallint AS content_level, child.content_exact, wait.child_ordinal, wait.child_tool_call_id, event.terminal_state, event.terminal_execution_id \
          FROM workflow_waits AS wait \
          JOIN workflow_runs AS child ON child.company_id = wait.company_id AND child.id = wait.child_run_id \
          LEFT JOIN workflow_run_events AS event ON event.company_id = child.company_id \
@@ -51,7 +52,9 @@ pub(super) async fn resume_on(
     }
     let level = crate::entities::access_level::AccessLevel::try_from(fact.content_level)
         .map_err(|_| invalid())?;
-    super::knowledge::raise_content_level_on(db, scope.company, scope.run, level).await?;
+    // An inexact child lowers its parent with its result (E3).
+    super::knowledge::absorb_content_on(db, scope.company, scope.run, level, fact.content_exact)
+        .await?;
     let round = fact
         .child_ordinal
         .and_then(|ordinal| u32::try_from(ordinal).ok())
@@ -218,7 +221,10 @@ async fn finish(
         db,
         scope,
         run,
-        activation,
+        super::batch_commit::CompletedStep {
+            activated: activation,
+            graph: services.binding.bundle().compiled().graph(),
+        },
         completion,
         None,
         services.notices,

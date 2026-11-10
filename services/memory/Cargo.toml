@@ -1,0 +1,74 @@
+[package]
+name = "memory-service"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.95"
+publish = false
+description = "Standalone memory service: tenants, namespaces, access levels and scoped credentials"
+
+# Its own workspace root wherever the directory is copied (plan/memory-service D1).
+[workspace]
+
+[lib]
+name = "memory_service"
+path = "src/lib.rs"
+
+[[bin]]
+name = "memory-service"
+path = "src/main.rs"
+
+[lints.rust]
+# The poisoned-parent probe (scripts/boundary-check.sh) asserts this cfg never leaks in.
+unexpected_cfgs = { level = "warn", check-cfg = ["cfg(memory_poison)"] }
+
+[dependencies]
+anyhow = "1"
+async-trait = "0.1"
+axum = { version = "0.8", default-features = false, features = ["http1", "json", "tokio", "query"] }
+base64 = "0.22"
+chrono = { version = "0.4", default-features = false, features = ["clock", "serde"] }
+# The pinned local embedding model (D7), loaded from validated files through a dynamically
+# loaded, manifest-pinned ONNX Runtime; never downloaded at runtime. Same pins as OpenBot.
+fastembed = { version = "=7.1.1", default-features = false, features = ["ort-load-dynamic"] }
+getrandom = "0.3"
+http = "1"
+# getrusage for the model check's peak-memory report.
+libc = "0.2"
+# The D9 privacy redaction patterns.
+regex = "1"
+# The Anthropic Messages API client (D9): raw HTTP, rustls, no system proxy.
+reqwest = { version = "=0.13.4", default-features = false, features = ["json", "rustls"] }
+ort = { version = "=2.0.0-rc.13", default-features = false, features = ["load-dynamic", "std", "api-24"] }
+rmcp = { version = "=1.8.0", default-features = false, features = ["server", "transport-streamable-http-server"] }
+schemars = { version = "1", features = ["uuid1", "chrono04"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
+sqlx = { version = "=0.8.6", default-features = false, features = ["postgres", "runtime-tokio-rustls", "macros", "migrate", "uuid", "chrono", "json"] }
+subtle = "2"
+thiserror = "2"
+tokenizers = { version = "=0.23.2", default-features = false, features = ["onig"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "signal", "net", "time", "sync"] }
+tokio-util = { version = "0.7", features = ["rt"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", default-features = false, features = ["env-filter", "fmt", "json", "std", "ansi"] }
+uuid = { version = "1", features = ["serde", "v4", "v7"] }
+
+[dev-dependencies]
+# `ServiceExt::oneshot` drives the router in transport tests.
+tower = { version = "0.5", default-features = false, features = ["util"] }
+jsonschema = { version = "=0.33.0", default-features = false }
+http-body-util = "0.1"
+
+# Test builds hash and parse the ~490 MB model and its 17 MB tokenizer; unoptimized, that takes
+# minutes. These leaf crates are optimized in dev builds only; release is unchanged.
+[profile.dev.package.sha2]
+opt-level = 3
+[profile.dev.package.tokenizers]
+opt-level = 3
+[profile.dev.package.fastembed]
+opt-level = 3
+[profile.dev.package.ndarray]
+opt-level = 3
+[profile.dev.package.serde_json]
+opt-level = 3

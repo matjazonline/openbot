@@ -1,0 +1,10 @@
+Memory service (part of OpenBot, services/memory)
+
+Behavioural reference: Claude-Mem, revision 3ab6e1a215c7bbcf716b9d8d763aa78bacba52a0,
+Copyright 2026 Alex Newman, licensed under the Apache License, Version 2.0. Ideas adapted (no
+code copied): reciprocal rank fusion with k = 60, filtered HNSW iterative scans with a short-leg
+retry, and the observation/session-summary intent. https://www.apache.org/licenses/LICENSE-2.0
+
+Embedding model (phase 03): intfloat/multilingual-e5-small, revision
+614241f622f53c4eeff9890bdc4f31cfecc418b3, MIT licence; see assets/bundled/MODEL-LICENSE.txt and
+assets/bundled/MODEL-NOTICE.txt. ONNX Runtime 1.24.4 (MIT) is pinned in assets/model-manifest.json.

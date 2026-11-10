@@ -1,0 +1,10 @@
+   Compiling open_bots v0.1.0 (/Users/mac03/.codex/worktrees/60a0/openbot)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1m 58s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-6c472bc7410f7b21)
+
+running 2 tests
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::memory_steps_tests::memory_integration_disable_and_run_cancel_overlapping_in_id_order_never_deadlock ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::memory_steps_tests::memory_integration_competing_disable_and_run_cancel_settle_every_intent ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 3645 filtered out; finished in 2.32s
+

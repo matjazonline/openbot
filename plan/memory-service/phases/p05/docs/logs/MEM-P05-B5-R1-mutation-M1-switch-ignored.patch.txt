@@ -1,0 +1,12 @@
+--- a/src/adapters/persistence/memory/deliveries.rs
++++ b/src/adapters/persistence/memory/deliveries.rs
+@@ -392,7 +392,8 @@
+     .bind(intent.kind.as_str())
+     .fetch_optional(&mut *db)
+     .await?;
+-    let Some(policy) = policy.filter(|policy| policy.enabled) else {
++    // MUTATION M1: a switched-off policy still captures.
++    let Some(policy) = policy else {
+         return Ok(CaptureEnqueue::Skipped("off"));
+     };
+     if content.as_i16() > ceiling.as_i16() {

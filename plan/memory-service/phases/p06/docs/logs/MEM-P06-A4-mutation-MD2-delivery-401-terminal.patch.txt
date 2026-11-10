@@ -1,0 +1,6 @@
+src/application/memory/delivery.rs
+---         Err(MemoryServiceError::Unauthorized) => DeliveryResult::Retry {
+            code: "credential_unverified",
+            retry_after: None,
+        },
++++         Err(MemoryServiceError::Unauthorized) => DeliveryResult::Failed("authority"),

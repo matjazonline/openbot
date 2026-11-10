@@ -6,6 +6,7 @@ use crate::application::workflow::{
 use crate::entities::agent_capability::AgentId;
 use persistence_bound::{Attempt, End, Evidence, WriteBound};
 
+mod capture;
 mod checkpoint;
 mod frozen;
 mod selection;
@@ -15,6 +16,7 @@ pub(super) use selection::{
     CANDIDATES_SQL as SELECTION_CANDIDATES_SQL, COUNT_SQL as SELECTION_COUNT_SQL,
 };
 mod preparation;
+mod recall;
 pub(super) mod turn_waits;
 mod turns;
 pub(super) use checkpoint::{

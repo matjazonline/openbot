@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE generation_operations SET state = 'accepted', lease_owner = NULL, lease_until = NULL, reserved_tokens = 0, attempts = greatest(attempts - 1, 0), next_attempt_at = now() + make_interval(secs => $3) WHERE tenant_id = $1 AND id = $2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Float8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "292864608611334da5c9a55a6395b1404d2b3035ce04a2eac997ed77542aedab"
+}

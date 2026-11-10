@@ -66,6 +66,7 @@ pub(super) async fn resolve_tools(
     bindings: &[AgentToolBinding],
 ) -> AppResult<Vec<ResolvedAgentTool>> {
     validate_agent_bindings(bindings).map_err(AppError::BadRequest)?;
+    memory_publication_on(tx, company, bindings.iter().map(|binding| &binding.source)).await?;
     let ordered = ordered_bindings(bindings);
     let mut resolved = BTreeMap::new();
     for binding in ordered {
@@ -106,6 +107,24 @@ pub(super) async fn resolve_tools(
         .iter()
         .map(|binding| resolved.remove(&binding.id).ok_or_else(invalid))
         .collect()
+}
+
+/// An agent version with memory tools publishes only while the company has memory enabled
+/// (phase 05 U1/E5). Admission and live use do not re-check: once memory is disabled a
+/// published agent keeps running and each memory call answers `memory.not_enabled`.
+async fn memory_publication_on<'a>(
+    db: &mut PgConnection,
+    company: CompanyId,
+    mut sources: impl Iterator<Item = &'a AgentBindingSource>,
+) -> AppResult<()> {
+    let uses_memory = sources
+        .any(|source| matches!(source, AgentBindingSource::Builtin { tool } if tool.is_memory()));
+    if uses_memory && !crate::adapters::persistence::memory::memory_enabled_on(db, company).await? {
+        return Err(AppError::NotFound(
+            "Memory is not enabled for this company".into(),
+        ));
+    }
+    Ok(())
 }
 
 /// The same current owner validation for publication and live use of direct agent tools.
@@ -179,6 +198,14 @@ fn builtin(company: CompanyId, tool: AgentBuiltinTool) -> AppResult<ToolSnapshot
             provisioning::ProvisioningKind::CreateAgentChannel,
         ),
         AgentBuiltinTool::SearchKnowledge => knowledge::builtin_knowledge_snapshot(company),
+        AgentBuiltinTool::SearchMemory
+        | AgentBuiltinTool::MemoryTimeline
+        | AgentBuiltinTool::MemoryDetails
+        | AgentBuiltinTool::SaveMemory => {
+            let memory = crate::application::workflow::memory_tools::MemoryTool::from_builtin(tool)
+                .ok_or_else(|| AppError::Internal("Invalid built-in memory tool".into()))?;
+            crate::application::workflow::memory_tools::builtin_memory_snapshot(company, memory)
+        }
     }
 }
 

@@ -148,6 +148,13 @@ impl Fixture {
         &self,
         agent: Uuid,
     ) -> crate::application::agent::PublishedAgentRevision {
+        self.try_publish_agent(agent).await.unwrap()
+    }
+
+    async fn try_publish_agent(
+        &self,
+        agent: Uuid,
+    ) -> AppResult<crate::application::agent::PublishedAgentRevision> {
         use crate::application::agent::{
             AgentPublicationKey, AgentPublicationScope, AgentPublications, PublishAgent,
         };
@@ -156,9 +163,7 @@ impl Fixture {
             actor: self.target.actor,
             agent: crate::entities::agent_capability::AgentId::new(agent),
         };
-        let preview = AgentPublications::preview_agent(&self.persistence, scope)
-            .await
-            .unwrap();
+        let preview = AgentPublications::preview_agent(&self.persistence, scope).await?;
         AgentPublications::publish_agent(
             &self.persistence,
             PublishAgent {
@@ -178,7 +183,6 @@ impl Fixture {
             },
         )
         .await
-        .unwrap()
     }
 
     async fn new() -> Self {

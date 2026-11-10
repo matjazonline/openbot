@@ -1,0 +1,12 @@
+--- a/src/adapters/persistence/workflow/agent_history/capture.rs
++++ b/src/adapters/persistence/workflow/agent_history/capture.rs
+@@ -46,7 +46,8 @@
+     .fetch_one(&mut *db)
+     .await?;
+     let (kind, target) = match (conversation.scope_kind.as_str(), conversation.attached) {
+-        ("thread", _) => (MemoryCaptureKind::Threads, SaveScope::Agent(agent)),
++        // MUTATION M3: child branches are captured like threads.
++        ("thread" | "child_branch", _) => (MemoryCaptureKind::Threads, SaveScope::Agent(agent)),
+         ("private_session", Some(false)) => {
+             let Some(user) = super::super::checkpoints::memory_tools::user_scope_owner_on(
+                 db,

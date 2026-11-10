@@ -1,0 +1,61 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT id, access_level::smallint AS \"level!\", content_sha256, session_id,\n                                  recorded_by, content IS NULL AS \"nulled!\",\n                                  (expires_at IS NOT NULL AND expires_at <= now()) AS \"expired!\"\n                             FROM sources WHERE tenant_id = $1 AND namespace_id = $2\n                              AND external_ref = $3 AND revision = $4 FOR SHARE",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "level!",
+        "type_info": "Int2"
+      },
+      {
+        "ordinal": 2,
+        "name": "content_sha256",
+        "type_info": "Bytea"
+      },
+      {
+        "ordinal": 3,
+        "name": "session_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 4,
+        "name": "recorded_by",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 5,
+        "name": "nulled!",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 6,
+        "name": "expired!",
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      null,
+      false,
+      true,
+      true,
+      null,
+      null
+    ]
+  },
+  "hash": "39ea865006143908538721700e364575395ab62e1e6c18d42d9157e684a80e19"
+}

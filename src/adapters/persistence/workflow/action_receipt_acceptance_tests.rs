@@ -1,4 +1,5 @@
 use super::*;
+use crate::adapters::persistence::workflow::knowledge::exactness_fixture;
 use crate::application::agent::ActionRecovery;
 
 struct LostReceiptAck(Dispatch);
@@ -134,6 +135,8 @@ async fn workflow_action_receipt_resolved_reconcile_retires_safe_and_reclaims_ze
 #[tokio::test]
 async fn workflow_action_receipt_actual_result_precedes_shared_completion_writer() {
     let (f, request, contract) = receipt_fixture(ActionRecovery::Reconcile, false).await;
+    let scope = request.scope();
+    exactness_fixture::mark_exact(f.persistence().pool(), scope.company, scope.run).await;
     let mut provider = dedup(&f, contract, false);
     provider.result = json!({"items":[],"token_count":0,"omitted":0});
     let RemoteDispatchObservation::Committed(receipt) = ActionService::new(adapter(&f, 0))
@@ -161,6 +164,11 @@ async fn workflow_action_receipt_actual_result_precedes_shared_completion_writer
         .unwrap()
         .unwrap();
     assert_eq!(committed.output, receipt.result);
+    // The fenced completion is one caller of the shared writer, keyed by the step's kind: this
+    // fixture's step is `context.history`, an accounted read, so the run stays exact (E3).
+    // `knowledge_run_level_http_current_connection_level_allows_classified_dispatch` shows the
+    // same caller lowering it for `http.request`.
+    assert!(exactness_fixture::exact(f.persistence().pool(), scope.company, scope.run).await);
     let ordered: bool = sqlx::query_scalar("SELECT receipt.created_at<=execution.completed_at AND receipt.result=execution.committed_output FROM workflow_action_receipts AS receipt JOIN workflow_executions AS execution ON execution.company_id=receipt.company_id AND execution.id=receipt.execution_id WHERE receipt.invocation_id=$1")
         .bind(request.subject.invocation.as_uuid()).fetch_one(f.persistence().pool()).await.unwrap();
     assert!(ordered);

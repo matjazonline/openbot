@@ -1,0 +1,13 @@
+--- a/src/application/memory/delivery.rs
++++ b/src/application/memory/delivery.rs
+@@ -124,8 +124,9 @@
+         },
+         Err(MemoryServiceError::Expired) => DeliveryResult::Expired,
+         Err(MemoryServiceError::Conflict { .. }) => DeliveryResult::Failed("conflict"),
++        // MUTATION M5: generation_disabled is retried as an outage.
+         Err(MemoryServiceError::Forbidden { code }) if code == "generation_disabled" => {
+-            DeliveryResult::Failed("generation_disabled")
++            DeliveryResult::Retry { code: "generation_disabled", retry_after: None }
+         }
+         Err(MemoryServiceError::Unauthorized | MemoryServiceError::Forbidden { .. }) => {
+             DeliveryResult::Failed("authority")

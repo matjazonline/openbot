@@ -231,3 +231,18 @@ mod deadline_tests;
 
 #[path = "wait_guard_tests.rs"]
 mod guard_tests;
+
+/// The wait resume is one caller of the shared progression writer: an external event's
+/// payload lowers the run's exactness (phase 05 E3).
+#[tokio::test]
+async fn memory_access_level_event_wake_lowers_exactness() {
+    use crate::adapters::persistence::workflow::knowledge::exactness_fixture::{exact, mark_exact};
+    let (f, scope) = fixture_source(source(false)).await;
+    let p = f.persistence();
+    mark_exact(p.pool(), scope.company, scope.run).await;
+    assert!(recorded(p, signal(scope)).await.unwrap());
+    p.park_wait(scope).await.unwrap().unwrap();
+    assert!(exact(p.pool(), scope.company, scope.run).await);
+    completed(p.resume_wait(scope).await.unwrap());
+    assert!(!exact(p.pool(), scope.company, scope.run).await);
+}

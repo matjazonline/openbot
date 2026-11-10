@@ -1,0 +1,24 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO tenants (id, external_id, managed_by) VALUES ($1, $2, $3) ON CONFLICT (external_id) DO NOTHING RETURNING id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "4afe7ea2de8db216ea3637d5fba85c9ed794e49acc6a26a28dc85f06a8c6b6b6"
+}

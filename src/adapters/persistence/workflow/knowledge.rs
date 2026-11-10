@@ -2,7 +2,10 @@
 use super::*;
 use crate::adapters::persistence::participant::{membership_from_db, reader_level};
 use crate::entities::{
-    access_level::{AccessLevel, RunKnowledge, audience_level},
+    access_level::{
+        AccessLevel, ExactnessTarget, HumanInputClass, RunKnowledge, audience_level,
+        human_input_exactness,
+    },
     participant::PrincipalKind,
 };
 use std::str::FromStr;
@@ -95,35 +98,59 @@ pub(super) fn stored_levels(ceiling: i16, content: i16) -> AppResult<RunKnowledg
     let content = AccessLevel::try_from(content).map_err(|e| AppError::Internal(e.into()))?;
     RunKnowledge::new(ceiling, content).map_err(|e| AppError::Internal(e.into()))
 }
+/// A new root run's levels and whether its level is exact (phase 05 E3). Manual input is
+/// conversational; schedule params are authored configuration; a trigger message is exact
+/// only when an agent or system wrote it under an exact run.
+pub(super) struct AdmittedKnowledge {
+    pub levels: RunKnowledge,
+    pub exact: bool,
+}
+
+#[derive(sqlx::FromRow)]
+struct TriggerStamp {
+    access_level: i16,
+    role: String,
+    content_exact: Option<bool>,
+}
+
 pub(super) async fn admission_levels_on(
     db: &mut PgConnection,
     command: &PreparedAdmission,
-) -> AppResult<RunKnowledge> {
+) -> AppResult<AdmittedKnowledge> {
     let company = command.company_id();
-    let levels = match command.trigger().source() {
-        TriggerSource::Manual => RunKnowledge::new(
-            actor_level_on(db, company, Some(command.actor().user_id())).await?,
-            AccessLevel::PUBLIC,
+    let (levels, exact) = match command.trigger().source() {
+        TriggerSource::Manual => (
+            RunKnowledge::new(
+                actor_level_on(db, company, Some(command.actor().user_id())).await?,
+                AccessLevel::PUBLIC,
+            ),
+            human_input_exactness(HumanInputClass::ConversationalInput, ExactnessTarget::Run),
         ),
-        TriggerSource::Schedule { .. } => RunKnowledge::new(
-            actor_level_on(db, company, Some(command.binding().run_as().user_id())).await?,
-            AccessLevel::PUBLIC,
+        TriggerSource::Schedule { .. } => (
+            RunKnowledge::new(
+                actor_level_on(db, company, Some(command.binding().run_as().user_id())).await?,
+                AccessLevel::PUBLIC,
+            ),
+            human_input_exactness(HumanInputClass::AuthoredConfiguration, ExactnessTarget::Run),
         ),
         TriggerSource::Message { message_id } => {
             let ceiling = thread_audience_on(db, company, command.association()).await?;
-            let stamp: i16 = sqlx::query_scalar(
-                "SELECT access_level::smallint FROM messages WHERE company_id=$1 AND id=$2",
+            let stamp = sqlx::query_as::<_, TriggerStamp>(
+                "SELECT access_level::smallint AS access_level,role,content_exact FROM messages \
+                 WHERE company_id=$1 AND id=$2",
             )
             .bind(company.as_uuid())
             .bind(message_id.as_uuid())
             .fetch_optional(&mut *db)
             .await?
             .ok_or_else(missing)?;
-            let content = AccessLevel::try_from(stamp).map_err(|e| AppError::Internal(e.into()))?;
+            let content = AccessLevel::try_from(stamp.access_level)
+                .map_err(|e| AppError::Internal(e.into()))?;
             if content > ceiling {
                 return Err(AppError::KnowledgeTrigger { content, ceiling });
             }
-            RunKnowledge::new(ceiling, content)
+            let exact = stored_message_exactness(&stamp.role, stamp.content_exact)?;
+            (RunKnowledge::new(ceiling, content), exact)
         }
         TriggerSource::Child { .. } => {
             return Err(AppError::BadRequest(
@@ -131,7 +158,81 @@ pub(super) async fn admission_levels_on(
             ));
         }
     };
-    levels.map_err(|e| AppError::Internal(e.into()))
+    Ok(AdmittedKnowledge {
+        levels: levels.map_err(|e| AppError::Internal(e.into()))?,
+        exact,
+    })
+}
+
+/// A stored message's exactness: human rows carry none and are conversational input; agent
+/// and system rows carry the producing run's bit. Any other shape is malformed.
+pub(super) fn stored_message_exactness(role: &str, stored: Option<bool>) -> AppResult<bool> {
+    let malformed = || AppError::Internal("Malformed stored message exactness".into());
+    match (role, stored) {
+        ("human", None) => Ok(human_input_exactness(
+            HumanInputClass::ConversationalInput,
+            ExactnessTarget::Run,
+        )),
+        ("agent" | "system", Some(exact)) => Ok(exact),
+        _ => Err(malformed()),
+    }
+}
+
+/// Record that the run consumed content its level does not account for. The caller holds the
+/// run's live fence/run lock, as for [`raise_content_level_on`]. Exactness is only lowered.
+pub(crate) async fn lower_content_exact_on(
+    db: &mut PgConnection,
+    company: CompanyId,
+    run: RunId,
+) -> AppResult<()> {
+    let changed =
+        sqlx::query("UPDATE workflow_runs SET content_exact=false WHERE company_id=$1 AND id=$2")
+            .bind(company.as_uuid())
+            .bind(run.as_uuid())
+            .execute(db)
+            .await?;
+    if changed.rows_affected() != 1 {
+        return Err(missing());
+    }
+    Ok(())
+}
+
+/// Absorb consumed content: raise the level and, when the content was inexact, lower the bit.
+pub(crate) async fn absorb_content_on(
+    db: &mut PgConnection,
+    company: CompanyId,
+    run: RunId,
+    level: AccessLevel,
+    exact: bool,
+) -> AppResult<()> {
+    raise_content_level_on(db, company, run, level).await?;
+    if !exact {
+        lower_content_exact_on(db, company, run).await?;
+    }
+    Ok(())
+}
+
+/// The run's current destination audience (E3): a thread's lowest human reader, otherwise
+/// the run actor's clearance. One helper for every memory read and save.
+pub(crate) async fn destination_level_on(
+    db: &mut PgConnection,
+    company: CompanyId,
+    run: RunId,
+) -> AppResult<AccessLevel> {
+    let (actor, channel, thread): (Uuid, Option<Uuid>, Option<Uuid>) = sqlx::query_as(
+        "SELECT run.actor_id, run.channel_id, run.thread_id FROM workflow_runs AS run \
+         WHERE run.company_id=$1 AND run.id=$2",
+    )
+    .bind(company.as_uuid())
+    .bind(run.as_uuid())
+    .fetch_optional(&mut *db)
+    .await?
+    .ok_or_else(missing)?;
+    let association = binding_rows::association_from_columns(channel, thread)?;
+    match association {
+        RelatedAssociation::Thread { .. } => thread_audience_on(db, company, association).await,
+        _ => actor_level_on(db, company, Some(actor)).await,
+    }
 }
 
 /// Commit a read's classification with its output. The caller must already hold its live
@@ -213,5 +314,38 @@ mod tests {
             )
             .is_err()
         );
+    }
+}
+
+/// Test fixtures for exactness (phase 05 E3). Production never raises `content_exact`; most
+/// fixtures admit manual runs, which start inexact, so the hook tests first mark a run exact
+/// with triggers disabled for that one transaction (the precedent in `child_output_tests`).
+#[cfg(test)]
+pub(crate) mod exactness_fixture {
+    use super::*;
+    pub(crate) async fn mark_exact(pool: &sqlx::PgPool, company: CompanyId, run: RunId) {
+        let mut tx = pool.begin().await.unwrap();
+        sqlx::query("SET LOCAL session_replication_role = replica")
+            .execute(&mut *tx)
+            .await
+            .unwrap();
+        let changed = sqlx::query(
+            "UPDATE workflow_runs SET content_exact=true WHERE company_id=$1 AND id=$2",
+        )
+        .bind(company.as_uuid())
+        .bind(run.as_uuid())
+        .execute(&mut *tx)
+        .await
+        .unwrap();
+        assert_eq!(changed.rows_affected(), 1);
+        tx.commit().await.unwrap();
+    }
+    pub(crate) async fn exact(pool: &sqlx::PgPool, company: CompanyId, run: RunId) -> bool {
+        sqlx::query_scalar("SELECT content_exact FROM workflow_runs WHERE company_id=$1 AND id=$2")
+            .bind(company.as_uuid())
+            .bind(run.as_uuid())
+            .fetch_one(pool)
+            .await
+            .unwrap()
     }
 }

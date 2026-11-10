@@ -275,6 +275,7 @@ async fn every_workspace_write_refuses_a_cross_origin_cookie_post() {
     for pattern in WRITE_ROUTES
         .into_iter()
         .chain(super::super::super::typesafe::WRITE_ROUTES)
+        .chain(super::super::super::memory::WRITE_ROUTES)
     {
         app = app.route(pattern, post(|| async { StatusCode::NO_CONTENT }));
     }
@@ -285,6 +286,7 @@ async fn every_workspace_write_refuses_a_cross_origin_cookie_post() {
     for pattern in WRITE_ROUTES
         .into_iter()
         .chain(super::super::super::typesafe::WRITE_ROUTES)
+        .chain(super::super::super::memory::WRITE_ROUTES)
     {
         let path = pattern
             .replace("{workflow_id}", &Uuid::new_v4().to_string())

@@ -80,6 +80,11 @@ pub enum AgentBuiltinTool {
     ListCompanyAgents,
     CreateAgentChannel,
     SearchKnowledge,
+    /// The memory service tools (phase 05 E5), offered only while memory is enabled.
+    SearchMemory,
+    MemoryTimeline,
+    MemoryDetails,
+    SaveMemory,
 }
 impl AgentBuiltinTool {
     pub const fn name(self) -> &'static str {
@@ -89,6 +94,10 @@ impl AgentBuiltinTool {
             Self::ListCompanyAgents => "list_company_agents",
             Self::CreateAgentChannel => "create_agent_channel",
             Self::SearchKnowledge => "search_knowledge",
+            Self::SearchMemory => "search_memory",
+            Self::MemoryTimeline => "memory_timeline",
+            Self::MemoryDetails => "memory_details",
+            Self::SaveMemory => "save_memory",
         }
     }
     pub fn parse(name: &str) -> Option<Self> {
@@ -98,11 +107,21 @@ impl AgentBuiltinTool {
             "list_company_agents" => Some(Self::ListCompanyAgents),
             "create_agent_channel" => Some(Self::CreateAgentChannel),
             "search_knowledge" => Some(Self::SearchKnowledge),
+            "search_memory" => Some(Self::SearchMemory),
+            "memory_timeline" => Some(Self::MemoryTimeline),
+            "memory_details" => Some(Self::MemoryDetails),
+            "save_memory" => Some(Self::SaveMemory),
             _ => None,
         }
     }
     pub const fn is_provisioning(self) -> bool {
         matches!(self, Self::ListCompanyAgents | Self::CreateAgentChannel)
+    }
+    pub const fn is_memory(self) -> bool {
+        matches!(
+            self,
+            Self::SearchMemory | Self::MemoryTimeline | Self::MemoryDetails | Self::SaveMemory
+        )
     }
 }
 

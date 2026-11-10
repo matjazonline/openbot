@@ -1,0 +1,29 @@
+--- src/adapters/memory_service/mod.rs
++++ src/adapters/memory_service/mod.rs (mutation D)
+@@ -394,22 +394,10 @@
+         {
+             return Err(MemoryServiceError::Protocol);
+         }
+-        let deadline = Instant::now() + self.request_timeout;
+-        let _permit = self
+-            .pools
+-            .acquire(MemoryPool::Interactive, first.credential.tenant.0, deadline)
+-            .await?;
+-        let answers = futures::future::join_all(searches.iter().map(|entry| async move {
+-            let answer: WireSearchResponse = self
+-                .send(
+-                    entry.credential,
+-                    "observations/search",
+-                    &search_body(&entry.search),
+-                    deadline,
+-                )
+-                .await?;
+-            hits(answer, entry.search.read_ceiling)
+-        }))
++        // MUTATION D: one interactive permit per request again (the R1 behaviour).
++        let answers = futures::future::join_all(
++            searches.iter().map(|entry| self.search(entry.credential, &entry.search)),
++        )
+         .await;
+         answers.into_iter().collect()
+     }

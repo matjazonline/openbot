@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE observations SET index_state = 'indexed', index_error = NULL, index_lease_until = NULL, index_attempts = 0 WHERE tenant_id = $1 AND id = $2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "fca8514d0949f9fa834e7cc6caf5edcd65a99fd994830290e5fc1612d48bc8e9"
+}

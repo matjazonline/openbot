@@ -424,3 +424,20 @@ async fn workflow_batch_sql_rejects_mutated_choice_route_successor_and_duplicate
 
 #[path = "pending_recovery_tests.rs"]
 mod pending_recovery_tests;
+
+/// The pure batch is one caller of the shared progression writer: map and rule outputs are
+/// derived from accounted inputs and keep the run exact (phase 05 E3).
+#[tokio::test]
+async fn memory_access_level_pure_batch_keeps_exactness() {
+    use crate::adapters::persistence::workflow::knowledge::exactness_fixture::{exact, mark_exact};
+    let (f, request) = fixture(source()).await;
+    let pool = f.persistence().pool();
+    mark_exact(pool, request.company, request.run).await;
+    let result = f
+        .persistence()
+        .advance_pure(request, budget(64))
+        .await
+        .unwrap();
+    assert_eq!(result.disposition, BatchDisposition::Completed);
+    assert!(exact(pool, request.company, request.run).await);
+}

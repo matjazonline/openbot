@@ -1,0 +1,24 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE tenant_spend_days AS d SET reserved = d.reserved + $3 FROM tenants AS t WHERE d.tenant_id = $1 AND d.day = $2 AND t.id = d.tenant_id AND d.reserved + d.used + $3 <= t.generation_daily_token_cap RETURNING d.day",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "day",
+        "type_info": "Date"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Date",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "d664e962d3aed1a8edb0f4e5c2e6a24ef325add8374661b238b9c298ebcb657f"
+}

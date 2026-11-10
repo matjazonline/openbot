@@ -69,6 +69,8 @@ pub enum ToolKind<'a> {
     Provisioning,
     /// A name-only, exactly verified local knowledge search built-in.
     Knowledge,
+    /// A name-only, exactly verified memory service built-in (phase 05 E5).
+    Memory,
     /// A tool reached through one of the workflow's resource slots (MCP or slot-bound HTTP).
     Slot(&'a ResourceName),
     /// A company HTTP operation registered by name.
@@ -100,6 +102,13 @@ impl ToolSnapshot {
             )
         {
             return ToolKind::Knowledge;
+        }
+        if self.contract.connection.is_none()
+            && crate::application::workflow::memory_tools::is_builtin_memory_tool(
+                self.contract.name.as_str(),
+            )
+        {
+            return ToolKind::Memory;
         }
         match &self.contract.connection {
             Some(slot) => ToolKind::Slot(slot),

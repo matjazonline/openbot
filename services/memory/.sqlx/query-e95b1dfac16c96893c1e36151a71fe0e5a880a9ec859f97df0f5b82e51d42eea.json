@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE tenant_spend_days SET reserved = greatest(reserved - $3, 0) WHERE tenant_id = $1 AND day = $2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Date",
+        "Int8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "e95b1dfac16c96893c1e36151a71fe0e5a880a9ec859f97df0f5b82e51d42eea"
+}

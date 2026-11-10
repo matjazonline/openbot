@@ -1,0 +1,12 @@
+--- a/src/application/memory/lifecycle.rs
++++ b/src/application/memory/lifecycle.rs
+@@ -261,7 +261,8 @@
+         if claim.provisioner_credential_id != self.credential_id {
+             // p06 A3-4: after an operator reassigned the tenant to the configured credential,
+             // the company's rows adopt it; nothing moves to an id the service has not confirmed.
+-            match self.manages_tenant(claim.tenant).await {
++            // MUTATION MB4: adopt without the service's confirmation.
++            match Ok::<bool, Step>(true) {
+                 Ok(true) => {
+                     self.store
+                         .adopt_provisioner(&claim, self.credential_id)

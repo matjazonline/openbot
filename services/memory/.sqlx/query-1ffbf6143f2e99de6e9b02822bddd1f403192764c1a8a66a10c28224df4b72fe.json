@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM tenant_spend_days WHERE (tenant_id, day) IN (SELECT * FROM UNNEST($1::uuid[], $2::date[]))",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "UuidArray",
+        "DateArray"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "1ffbf6143f2e99de6e9b02822bddd1f403192764c1a8a66a10c28224df4b72fe"
+}

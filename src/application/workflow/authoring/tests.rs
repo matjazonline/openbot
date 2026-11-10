@@ -141,6 +141,21 @@ use crate::application::workflow::registry;
 
 #[test]
 fn the_catalogue_covers_every_runnable_type_with_a_compiling_example() {
+    // Configured: the memory kinds are listed, noting publication needs memory enabled.
+    let configured = catalogue_reference(&WorkflowSourceDecoder, &[]);
+    assert_eq!(
+        configured
+            .iter()
+            .map(|entry| entry.type_name)
+            .collect::<Vec<_>>(),
+        TYPES
+    );
+    for kind in ["memory.load", "memory.save"] {
+        let entry = configured.iter().find(|e| e.type_name == kind).unwrap();
+        assert!(entry.notes.contains("memory.not_enabled"), "{kind}");
+        assert!(entry.example.contains(kind), "{kind}");
+    }
+    // Unconfigured: they are unhandled, so left out.
     let refused = ["memory.load", "memory.save"];
     let entries = catalogue_reference(&WorkflowSourceDecoder, &refused);
     let names: Vec<_> = entries.iter().map(|entry| entry.type_name).collect();

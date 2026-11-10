@@ -1,0 +1,4549 @@
+{
+  "components": {
+    "schemas": {
+      "AccessLevel": {
+        "description": "Ordered classification; 0 is public.",
+        "maximum": 9,
+        "minimum": 0,
+        "type": "integer"
+      },
+      "ActivityEvent": {
+        "additionalProperties": false,
+        "properties": {
+          "access_level": {
+            "$ref": "#/components/schemas/AccessLevel",
+            "description": "The event's trusted classification; at most the producing ceiling."
+          },
+          "event_id": {
+            "description": "At most 128 bytes; sent to the provider as given, so one that holds a secret or a\n`<private>` span is refused with 400 `secret_in_identifier` (as are such `source_ref`s\nand revisions). Keyword-shaped ids such as `secret:42`, `token:7` or `api-key:prod`\nlook like `key: value` secrets and are refused too.",
+            "maxLength": 128,
+            "minLength": 1,
+            "type": "string"
+          },
+          "exclude": {
+            "default": false,
+            "description": "Excluded events are dropped before capture and never sent.",
+            "type": "boolean"
+          },
+          "occurred_at": {
+            "description": "Events are in non-decreasing `occurred_at` order.",
+            "format": "date-time",
+            "type": "string"
+          },
+          "revision": {
+            "description": "At most 128 bytes; secret-shaped revisions are refused like `source_ref`.",
+            "maxLength": 128,
+            "minLength": 1,
+            "type": "string"
+          },
+          "role": {
+            "$ref": "#/components/schemas/EventRole"
+          },
+          "source_ref": {
+            "description": "At most 512 bytes; stored as given, so a secret-shaped reference (`?token=…`,\n`user:password@` URLs, keyword-shaped ids) is refused with 400 `secret_in_identifier`.",
+            "maxLength": 512,
+            "minLength": 1,
+            "type": "string"
+          },
+          "text": {
+            "description": "The window's texts total at most 512 KiB. `<private>…</private>` spans are removed and\nrecognised secrets replaced with `[REDACTED:<kind>]` before anything is stored or sent.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "event_id",
+          "source_ref",
+          "revision",
+          "occurred_at",
+          "access_level",
+          "role",
+          "text"
+        ],
+        "type": "object"
+      },
+      "AdminCredentialIssueRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "expires_at": {
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "label": {
+            "maxLength": 128,
+            "minLength": 1,
+            "type": "string"
+          },
+          "scope": {
+            "$ref": "#/components/schemas/AdminScope"
+          }
+        },
+        "required": [
+          "scope",
+          "label"
+        ],
+        "type": "object"
+      },
+      "AdminCredentialRevokeRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "credential_id": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "credential_id"
+        ],
+        "type": "object"
+      },
+      "AdminCredentialView": {
+        "properties": {
+          "credential_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "revoked": {
+            "type": "boolean"
+          },
+          "scope": {
+            "$ref": "#/components/schemas/AdminScope"
+          }
+        },
+        "required": [
+          "credential_id",
+          "scope",
+          "revoked"
+        ],
+        "type": "object"
+      },
+      "AdminScope": {
+        "enum": [
+          "operator",
+          "provisioner"
+        ],
+        "type": "string"
+      },
+      "Consumed": {
+        "description": "Consumption evidence for the context that produced a memory.",
+        "oneOf": [
+          {
+            "additionalProperties": false,
+            "description": "Precise accounting: the highest level actually exposed to the producing context.",
+            "properties": {
+              "kind": {
+                "const": "exact",
+                "type": "string"
+              },
+              "level": {
+                "$ref": "#/components/schemas/AccessLevel"
+              }
+            },
+            "required": [
+              "kind",
+              "level"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "description": "Accounting incomplete: the producing context's ceiling is the watermark.",
+            "properties": {
+              "kind": {
+                "const": "unknown",
+                "type": "string"
+              }
+            },
+            "required": [
+              "kind"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "ContextPack": {
+        "properties": {
+          "byte_count": {
+            "description": "The sum of the items' compact JSON sizes as served; excludes the array's n + 1\nbracket/comma bytes and the envelope fields.",
+            "format": "uint32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "candidates_truncated": {
+            "description": "The 200-candidate window was full: more visible candidates were ranked or exist.",
+            "type": "boolean"
+          },
+          "exposed_level": {
+            "$ref": "#/components/schemas/AccessLevel",
+            "description": "The highest level of the included items and their provenance; 0 when empty. Never the\nrequested ceiling, and never raised by skipped candidates. Combine it with the\nconsumer's prior watermark before exposing the pack."
+          },
+          "generated_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "items": {
+            "description": "Included items in candidate order: fused score (or recency), `occurred_at` descending,\nthen id. Each is whole; one that does not fit is skipped and the scan continues.",
+            "items": {
+              "$ref": "#/components/schemas/PackItem"
+            },
+            "type": "array"
+          },
+          "omitted": {
+            "$ref": "#/components/schemas/Omitted"
+          },
+          "pack_digest": {
+            "description": "Lowercase hex SHA-256 of the compact JSON serialization of `items`.",
+            "type": "string"
+          },
+          "semantic": {
+            "$ref": "#/components/schemas/SemanticState",
+            "description": "The search's semantic state for a query pack; `complete` for a recency pack."
+          },
+          "token_count": {
+            "description": "`64 + 2 × byte_count`, or 0 for an empty pack.",
+            "format": "uint32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "valid_until": {
+            "description": "The earliest expiry of the included items and of their visible provenance targets.",
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "exposed_level",
+          "token_count",
+          "byte_count",
+          "omitted",
+          "candidates_truncated",
+          "pack_digest",
+          "generated_at",
+          "semantic"
+        ],
+        "type": "object"
+      },
+      "ContextPackRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "detail": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PackDetail"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "`compact` (default) packs snippets, `full` whole bodies; never partial bodies."
+          },
+          "max_bytes": {
+            "description": "1–262,144; default 65,536. The exact UTF-8 bytes of the items' compact JSON\nserializations as served, summed: the `items` array's brackets and commas (n + 1 bytes)\nand the pack's other fields are not counted.",
+            "format": "uint32",
+            "maximum": 262144,
+            "minimum": 1,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "max_tokens": {
+            "description": "1–65,536; default 8,192. A pack counts 64 + 2 × the UTF-8 bytes of its items' compact\nJSON serializations as served (0 when empty). The bound holds for that encoding, with\nnon-ASCII text unescaped; a client that re-encodes the items (for example escaping\nnon-ASCII) can exceed it.",
+            "format": "uint32",
+            "maximum": 65536,
+            "minimum": 1,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "namespaces": {
+            "items": {
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$",
+              "type": "string"
+            },
+            "maxItems": 16,
+            "minItems": 1,
+            "type": "array"
+          },
+          "query": {
+            "description": "Candidates are the hybrid search results for this query (the same bounds and refusals\nas search); absent or blank, the most recent observations. At most 200 either way.",
+            "maxLength": 1024,
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "read_ceiling": {
+            "$ref": "#/components/schemas/AccessLevel"
+          }
+        },
+        "required": [
+          "namespaces",
+          "read_ceiling"
+        ],
+        "type": "object"
+      },
+      "ContextValidateRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "description": "At most 200 frozen pack items, each answered in request order.",
+            "items": {
+              "$ref": "#/components/schemas/PackedRevision"
+            },
+            "maxItems": 200,
+            "minItems": 1,
+            "type": "array"
+          },
+          "namespaces": {
+            "items": {
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$",
+              "type": "string"
+            },
+            "maxItems": 16,
+            "minItems": 1,
+            "type": "array"
+          },
+          "read_ceiling": {
+            "$ref": "#/components/schemas/AccessLevel"
+          }
+        },
+        "required": [
+          "namespaces",
+          "read_ceiling",
+          "items"
+        ],
+        "type": "object"
+      },
+      "ContextValidateResponse": {
+        "properties": {
+          "checked_at": {
+            "description": "The snapshot the statuses describe. A status cannot retract text already sent to a\nmodel: clients own their retained packs and model requests.",
+            "format": "date-time",
+            "type": "string"
+          },
+          "exposed_level": {
+            "$ref": "#/components/schemas/AccessLevel",
+            "description": "The highest current level among the items reported `valid`, `changed` or `expired`."
+          },
+          "items": {
+            "description": "One status per requested item, in request order; no content.",
+            "items": {
+              "$ref": "#/components/schemas/ValidatedItem"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "items",
+          "exposed_level",
+          "checked_at"
+        ],
+        "type": "object"
+      },
+      "CorrectRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "body": {
+            "description": "At most 16,384 characters and 64 KiB.",
+            "maxLength": 16384,
+            "type": "string"
+          },
+          "context": {
+            "$ref": "#/components/schemas/ProducingContext"
+          },
+          "expected_revision": {
+            "format": "int64",
+            "minimum": 1,
+            "type": "integer"
+          },
+          "expires_at": {
+            "description": "At most 7 days ahead; a new execution after it is refused. Part of the request's\nidentity: a retry must resend the original value unchanged, and a changed value is\n`idempotency_conflict`. Truncated to microseconds before it is hashed or stored.",
+            "format": "date-time",
+            "type": "string"
+          },
+          "idempotency_key": {
+            "description": "1–128 bytes of `[A-Za-z0-9._:-]`, stable across retries.",
+            "pattern": "^[A-Za-z0-9._:-]{1,128}$",
+            "type": "string"
+          },
+          "namespace": {
+            "pattern": "^[A-Za-z0-9._:-]{1,128}$",
+            "type": "string"
+          },
+          "observation_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "read_ceiling": {
+            "$ref": "#/components/schemas/AccessLevel"
+          },
+          "title": {
+            "description": "At most 256 characters and 1 KiB.",
+            "maxLength": 256,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "idempotency_key",
+          "expires_at",
+          "namespace",
+          "read_ceiling",
+          "observation_id",
+          "expected_revision",
+          "title",
+          "body",
+          "context"
+        ],
+        "type": "object"
+      },
+      "CredentialIssueRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "expires_at": {
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "grants": {
+            "items": {
+              "$ref": "#/components/schemas/GrantSpec"
+            },
+            "maxItems": 64,
+            "minItems": 1,
+            "type": "array"
+          },
+          "label": {
+            "maxLength": 128,
+            "minLength": 1,
+            "type": "string"
+          },
+          "tenant": {
+            "pattern": "^[A-Za-z0-9._:-]{1,128}$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "tenant",
+          "label",
+          "grants"
+        ],
+        "type": "object"
+      },
+      "CredentialList": {
+        "properties": {
+          "credentials": {
+            "items": {
+              "$ref": "#/components/schemas/CredentialView"
+            },
+            "type": "array"
+          },
+          "next_after": {
+            "description": "The last credential id of a full page, to pass as `after`; absent when the page was not\nfull, so nothing follows it.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "credentials"
+        ],
+        "type": "object"
+      },
+      "CredentialListRequest": {
+        "additionalProperties": false,
+        "description": "A page of a tenant's client credentials in id order (06A A1-6).",
+        "properties": {
+          "active_only": {
+            "default": false,
+            "description": "Only credentials that are neither revoked nor expired.",
+            "type": "boolean"
+          },
+          "after": {
+            "default": null,
+            "description": "Continue after this credential id: the previous page's `next_after`.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "label": {
+            "default": null,
+            "description": "Only credentials with exactly this label.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "limit": {
+            "default": null,
+            "description": "Page size, 1–1000 (default 1000).",
+            "format": "uint32",
+            "maximum": 1000,
+            "minimum": 1,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "tenant": {
+            "pattern": "^[A-Za-z0-9._:-]{1,128}$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "tenant"
+        ],
+        "type": "object"
+      },
+      "CredentialRevokeRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "credential_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "tenant": {
+            "pattern": "^[A-Za-z0-9._:-]{1,128}$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "tenant",
+          "credential_id"
+        ],
+        "type": "object"
+      },
+      "CredentialView": {
+        "properties": {
+          "credential_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "expires_at": {
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "grants": {
+            "description": "Only active namespaces are listed.",
+            "items": {
+              "$ref": "#/components/schemas/GrantSpec"
+            },
+            "type": "array"
+          },
+          "label": {
+            "type": "string"
+          },
+          "revoked_at": {
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "tenant": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "tenant",
+          "credential_id",
+          "label",
+          "grants"
+        ],
+        "type": "object"
+      },
+      "DeleteRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "expires_at": {
+            "description": "At most 7 days ahead; a new execution after it is refused. Part of the request's\nidentity: a retry must resend the original value unchanged, and a changed value is\n`idempotency_conflict`. Truncated to microseconds before it is hashed or stored.",
+            "format": "date-time",
+            "type": "string"
+          },
+          "idempotency_key": {
+            "description": "1–128 bytes of `[A-Za-z0-9._:-]`, stable across retries.",
+            "pattern": "^[A-Za-z0-9._:-]{1,128}$",
+            "type": "string"
+          },
+          "namespace": {
+            "pattern": "^[A-Za-z0-9._:-]{1,128}$",
+            "type": "string"
+          },
+          "observation_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "read_ceiling": {
+            "$ref": "#/components/schemas/AccessLevel"
+          }
+        },
+        "required": [
+          "idempotency_key",
+          "expires_at",
+          "namespace",
+          "read_ceiling",
+          "observation_id"
+        ],
+        "type": "object"
+      },
+      "DeleteResponse": {
+        "properties": {
+          "deleted": {
+            "type": "boolean"
+          },
+          "observation_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "replayed": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "observation_id",
+          "deleted",
+          "replayed"
+        ],
+        "type": "object"
+      },
+      "ErrorBody": {
+        "description": "Wire shape: `{\"error\":{\"code\",\"message\",\"retryable\",\"details\"},\"request_id\"}`.",
+        "properties": {
+          "error": {
+            "$ref": "#/components/schemas/ErrorPayload"
+          },
+          "request_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "error",
+          "request_id"
+        ],
+        "type": "object"
+      },
+      "ErrorCode": {
+        "oneOf": [
+          {
+            "enum": [
+              "invalid_request",
+              "payload_too_large",
+              "unauthenticated",
+              "credential_expired",
+              "credential_revoked",
+              "forbidden",
+              "tenant_disabled",
+              "generation_disabled",
+              "not_found",
+              "idempotency_conflict",
+              "revision_conflict",
+              "namespace_deleted",
+              "conflict",
+              "request_expired",
+              "classification_refused",
+              "capacity_exceeded",
+              "spend_exhausted",
+              "unavailable",
+              "timeout"
+            ],
+            "type": "string"
+          },
+          {
+            "const": "not_implemented",
+            "description": "Declared in the contract; its use case is not implemented in this release.",
+            "type": "string"
+          }
+        ]
+      },
+      "ErrorPayload": {
+        "properties": {
+          "code": {
+            "$ref": "#/components/schemas/ErrorCode"
+          },
+          "details": true,
+          "message": {
+            "type": "string"
+          },
+          "retryable": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "retryable"
+        ],
+        "type": "object"
+      },
+      "EventRole": {
+        "enum": [
+          "user",
+          "assistant",
+          "tool",
+          "note"
+        ],
+        "type": "string"
+      },
+      "ExternalSource": {
+        "additionalProperties": false,
+        "properties": {
+          "access_level": {
+            "$ref": "#/components/schemas/AccessLevel"
+          },
+          "reference": {
+            "description": "At most 512 bytes.",
+            "maxLength": 512,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "reference",
+          "access_level"
+        ],
+        "type": "object"
+      },
+      "FetchRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "ids": {
+            "description": "At most 64 ids.",
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "maxItems": 64,
+            "minItems": 1,
+            "type": "array"
+          },
+          "namespaces": {
+            "items": {
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$",
+              "type": "string"
+            },
+            "maxItems": 16,
+            "minItems": 1,
+            "type": "array"
+          },
+          "read_ceiling": {
+            "$ref": "#/components/schemas/AccessLevel"
+          }
+        },
+        "required": [
+          "namespaces",
+          "read_ceiling",
+          "ids"
+        ],
+        "type": "object"
+      },
+      "FetchResponse": {
+        "properties": {
+          "exposed_level": {
+            "$ref": "#/components/schemas/AccessLevel"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ObservationDetail"
+            },
+            "type": "array"
+          },
+          "omitted_for_budget": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "unavailable": {
+            "description": "Ids that are foreign, nonexistent, deleted or above the ceiling: indistinguishable.",
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "items",
+          "unavailable",
+          "omitted_for_budget",
+          "exposed_level"
+        ],
+        "type": "object"
+      },
+      "GenerationCancelRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "expires_at": {
+            "description": "At most 7 days ahead; a new execution after it is refused. Part of the request's\nidentity: a retry must resend the original value unchanged, and a changed value is\n`idempotency_conflict`. Truncated to microseconds before it is hashed or stored.",
+            "format": "date-time",
+            "type": "string"
+          },
+          "idempotency_key": {
+            "description": "1–128 bytes of `[A-Za-z0-9._:-]`, stable across retries.",
+            "pattern": "^[A-Za-z0-9._:-]{1,128}$",
+            "type": "string"
+          },
+          "namespace": {
+            "pattern": "^[A-Za-z0-9._:-]{1,128}$",
+            "type": "string"
+          },
+          "operation_id": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "idempotency_key",
+          "expires_at",
+          "namespace",
+          "operation_id"
+        ],
+        "type": "object"
+      },
+      "GenerationRef": {
+        "additionalProperties": false,
+        "properties": {
+          "namespace": {
+            "pattern": "^[A-Za-z0-9._:-]{1,128}$",
+            "type": "string"
+          },
+          "operation_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "read_ceiling": {
+            "$ref": "#/components/schemas/AccessLevel",
+            "description": "At most the grant's `read_max`; an operation whose input level is above it is\n`not_found`, like a foreign or missing one."
+          }
+        },
+        "required": [
+          "namespace",
+          "operation_id",
+          "read_ceiling"
+        ],
+        "type": "object"
+      },
+      "GenerationRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "allowance_tokens": {
+            "format": "uint64",
+            "minimum": 1,
+            "type": "integer"
+          },
+          "consumed": {
+            "$ref": "#/components/schemas/Consumed",
+            "description": "The prior consumed watermark: exact, or unknown (the ceiling is then used)."
+          },
+          "description": {
+            "description": "Untrusted descriptive context for the window (at most 1 KiB), redacted and sent as\ndata. It carries no level of its own: it is covered by the `consumed` attestation, so\nit must not hold anything above that watermark.",
+            "maxLength": 1024,
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "events": {
+            "description": "The complete bounded window: at most 512 events and 512 KiB.",
+            "items": {
+              "$ref": "#/components/schemas/ActivityEvent"
+            },
+            "maxItems": 512,
+            "minItems": 1,
+            "type": "array"
+          },
+          "expires_at": {
+            "description": "At most 7 days ahead; a new execution after it is refused. Part of the request's\nidentity: a retry must resend the original value unchanged, and a changed value is\n`idempotency_conflict`. Truncated to microseconds before it is hashed or stored.",
+            "format": "date-time",
+            "type": "string"
+          },
+          "idempotency_key": {
+            "description": "1–128 bytes of `[A-Za-z0-9._:-]`, stable across retries.",
+            "pattern": "^[A-Za-z0-9._:-]{1,128}$",
+            "type": "string"
+          },
+          "max_output_tokens": {
+            "description": "At most 8,192: the provider's `max_tokens`. Thinking is turned off for this call, so\nthe whole bound is available to the answer.",
+            "format": "uint32",
+            "maximum": 8192,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "namespace": {
+            "pattern": "^[A-Za-z0-9._:-]{1,128}$",
+            "type": "string"
+          },
+          "producing_ceiling": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AccessLevel"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The producing context's trusted authorized read ceiling. Missing →\n`classification_refused`; an event above it refuses the request."
+          },
+          "session_id": {
+            "description": "Required for a session summary, which may only draw on this session's window.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "summary": {
+            "default": false,
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "idempotency_key",
+          "expires_at",
+          "namespace",
+          "consumed",
+          "events",
+          "allowance_tokens",
+          "max_output_tokens"
+        ],
+        "type": "object"
+      },
+      "GenerationState": {
+        "description": "`accepted` (queued), `claimed`/`dispatched` (running; `dispatched` means the provider call\nwas committed to before it was sent), then exactly one terminal state. Nothing ever leaves a\nterminal state: recovery is a new request with new authorization.",
+        "oneOf": [
+          {
+            "enum": [
+              "accepted",
+              "claimed",
+              "dispatched"
+            ],
+            "type": "string"
+          },
+          {
+            "const": "completed",
+            "description": "`outcome` is `saved`, or a skip: `nothing_to_save` (the provider found nothing worth\nkeeping) or `nothing_to_process` (privacy left nothing to send; no call was made).",
+            "type": "string"
+          },
+          {
+            "const": "failed",
+            "description": "`outcome` is a bounded failure code (for example `malformed_output`,\n`output_truncated`, `provider_refused`, `spend_cap_reached`, `source_unavailable` or a\nprovider error type such as `invalid_request_error`), never provider text. A rejection\nof the service's own provider credentials does not fail an operation: it waits in\n`accepted` until the operator fixes them or its `expires_at` passes.",
+            "type": "string"
+          },
+          {
+            "const": "cancelled",
+            "description": "`outcome` names who cancelled (`client_cancelled`, `tenant_disabled`,\n`credential_revoked`, …), or `restored` when an operator restored the service's database\nfrom a backup and the operation was unfinished.",
+            "type": "string"
+          },
+          {
+            "const": "expired",
+            "description": "The request's `expires_at` passed before it could run or be saved.",
+            "type": "string"
+          },
+          {
+            "const": "unknown",
+            "description": "The provider call may have run (timeout, lost lease, crash after the send): its cost is\ncharged, any output was not saved, and it is never re-sent.",
+            "type": "string"
+          }
+        ]
+      },
+      "GenerationStatus": {
+        "properties": {
+          "observations": {
+            "description": "The generated observations still visible under the request's ceiling, in output order.",
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "operation_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "outcome": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "replayed": {
+            "type": "boolean"
+          },
+          "state": {
+            "$ref": "#/components/schemas/GenerationState"
+          }
+        },
+        "required": [
+          "operation_id",
+          "state",
+          "observations",
+          "replayed"
+        ],
+        "type": "object"
+      },
+      "GrantSpec": {
+        "additionalProperties": false,
+        "properties": {
+          "namespace": {
+            "pattern": "^[A-Za-z0-9._:-]{1,128}$",
+            "type": "string"
+          },
+          "operations": {
+            "items": {
+              "$ref": "#/components/schemas/Operation"
+            },
+            "maxItems": 12,
+            "minItems": 1,
+            "type": "array"
+          },
+          "read_max": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AccessLevel"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Required when `operations` holds a read operation."
+          },
+          "write_max": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AccessLevel"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Required when `operations` holds a write operation (including delete and purge)."
+          }
+        },
+        "required": [
+          "namespace",
+          "operations"
+        ],
+        "type": "object"
+      },
+      "IndexItem": {
+        "properties": {
+          "access_level": {
+            "$ref": "#/components/schemas/AccessLevel"
+          },
+          "index_state": {
+            "$ref": "#/components/schemas/IndexState",
+            "description": "`pending`/`failed` items are found by keyword only until semantic indexing succeeds."
+          },
+          "kind": {
+            "$ref": "#/components/schemas/ObservationKind"
+          },
+          "namespace": {
+            "type": "string"
+          },
+          "observation_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "occurred_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "revision": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "snippet": {
+            "description": "At most 320 bytes. Search: the best-matching searchable part, else a keyword headline;\ntimeline: the body's opening.",
+            "type": "string"
+          },
+          "sources": {
+            "description": "Provenance the reader may see (named, active namespace, within the ceiling, unexpired);\nanything else is omitted without a marker.",
+            "items": {
+              "$ref": "#/components/schemas/SourceRef"
+            },
+            "type": "array"
+          },
+          "title": {
+            "description": "At most 256 characters and 1 KiB.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "observation_id",
+          "namespace",
+          "kind",
+          "title",
+          "snippet",
+          "occurred_at",
+          "access_level",
+          "revision",
+          "sources",
+          "index_state"
+        ],
+        "type": "object"
+      },
+      "IndexState": {
+        "enum": [
+          "pending",
+          "indexed",
+          "failed"
+        ],
+        "type": "string"
+      },
+      "IssuedCredential": {
+        "properties": {
+          "credential_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "expires_at": {
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "token": {
+            "description": "Shown once; the service stores only its verifier.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "credential_id",
+          "token"
+        ],
+        "type": "object"
+      },
+      "NamespaceRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "namespace": {
+            "pattern": "^[A-Za-z0-9._:-]{1,128}$",
+            "type": "string"
+          },
+          "tenant": {
+            "pattern": "^[A-Za-z0-9._:-]{1,128}$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "tenant",
+          "namespace"
+        ],
+        "type": "object"
+      },
+      "NamespaceState": {
+        "enum": [
+          "active",
+          "deleted"
+        ],
+        "type": "string"
+      },
+      "NamespaceView": {
+        "properties": {
+          "namespace": {
+            "type": "string"
+          },
+          "state": {
+            "$ref": "#/components/schemas/NamespaceState"
+          },
+          "tenant": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "tenant",
+          "namespace",
+          "state"
+        ],
+        "type": "object"
+      },
+      "ObservationDetail": {
+        "properties": {
+          "access_level": {
+            "$ref": "#/components/schemas/AccessLevel"
+          },
+          "body": {
+            "type": "string"
+          },
+          "content_sha256": {
+            "type": "string"
+          },
+          "index_state": {
+            "$ref": "#/components/schemas/IndexState"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/ObservationKind"
+          },
+          "namespace": {
+            "type": "string"
+          },
+          "observation_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "occurred_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "revision": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "sources": {
+            "items": {
+              "$ref": "#/components/schemas/SourceRef"
+            },
+            "type": "array"
+          },
+          "title": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "observation_id",
+          "namespace",
+          "kind",
+          "title",
+          "body",
+          "occurred_at",
+          "access_level",
+          "revision",
+          "content_sha256",
+          "sources",
+          "index_state"
+        ],
+        "type": "object"
+      },
+      "ObservationKind": {
+        "enum": [
+          "fact",
+          "decision",
+          "discovery",
+          "fix",
+          "outcome",
+          "note",
+          "summary"
+        ],
+        "type": "string"
+      },
+      "Omitted": {
+        "properties": {
+          "budget": {
+            "description": "Visible candidates skipped because they did not fit the remaining budget. A count only:\nno ids or levels, and records the reader may not see are never candidates.",
+            "format": "uint32",
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "budget"
+        ],
+        "type": "object"
+      },
+      "Operation": {
+        "description": "Every tenant-scoped client operation. Grants list a subset per namespace.",
+        "enum": [
+          "save",
+          "search",
+          "timeline",
+          "fetch",
+          "correct",
+          "delete",
+          "context",
+          "sources",
+          "sessions",
+          "generate",
+          "generation_status",
+          "purge"
+        ],
+        "type": "string"
+      },
+      "PackDetail": {
+        "oneOf": [
+          {
+            "const": "full",
+            "description": "Each item's whole body.",
+            "type": "string"
+          },
+          {
+            "const": "compact",
+            "description": "Each item's snippet (at most 320 bytes).",
+            "type": "string"
+          }
+        ]
+      },
+      "PackItem": {
+        "description": "One memory as untrusted data: its text is stored content, never an instruction.",
+        "properties": {
+          "access_level": {
+            "$ref": "#/components/schemas/AccessLevel"
+          },
+          "content_sha256": {
+            "description": "SHA-256 over the title, NUL and the whole body, as in fetch, whatever `detail` is.",
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/ObservationKind"
+          },
+          "namespace": {
+            "type": "string"
+          },
+          "observation_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "occurred_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "revision": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "sources": {
+            "description": "Provenance the reader may see; anything else is omitted without a marker.",
+            "items": {
+              "$ref": "#/components/schemas/SourceRef"
+            },
+            "type": "array"
+          },
+          "sources_sha256": {
+            "description": "Lowercase hex SHA-256 of the compact JSON of `sources` as served; send it back to\n`context.validate`, which reports `changed` when the visible provenance differs.",
+            "type": "string"
+          },
+          "text": {
+            "description": "The body (`full`) or the snippet (`compact`).",
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "observation_id",
+          "namespace",
+          "kind",
+          "title",
+          "text",
+          "occurred_at",
+          "access_level",
+          "revision",
+          "content_sha256",
+          "sources",
+          "sources_sha256"
+        ],
+        "type": "object"
+      },
+      "PackItemStatus": {
+        "oneOf": [
+          {
+            "const": "valid",
+            "description": "Still visible under this request's grants and ceiling, at the same revision and with\nthe same visible provenance.",
+            "type": "string"
+          },
+          {
+            "const": "changed",
+            "description": "Visible, but corrected since (the frozen text is stale) or its visible provenance\ndiffers (a link's target expired, was deleted, or left the ceiling or namespaces).",
+            "type": "string"
+          },
+          {
+            "const": "expired",
+            "description": "Visible apart from its own expiry, until the retention sweeper removes it.",
+            "type": "string"
+          },
+          {
+            "const": "unavailable",
+            "description": "Deleted, purged, foreign, in an unnamed or deleted namespace, or above the ceiling:\nindistinguishable.",
+            "type": "string"
+          }
+        ]
+      },
+      "PackedRevision": {
+        "additionalProperties": false,
+        "properties": {
+          "observation_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "revision": {
+            "format": "int64",
+            "minimum": 1,
+            "type": "integer"
+          },
+          "sources_sha256": {
+            "description": "The frozen item's `sources_sha256`.",
+            "pattern": "^[0-9a-f]{64}$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "observation_id",
+          "revision",
+          "sources_sha256"
+        ],
+        "type": "object"
+      },
+      "ProducingContext": {
+        "additionalProperties": false,
+        "description": "Trusted host facts about the context that produced the memory (plan 01 access contract).",
+        "properties": {
+          "consumed": {
+            "$ref": "#/components/schemas/Consumed"
+          },
+          "expected_access_level": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AccessLevel"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "external_sources": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/ExternalSource"
+            },
+            "maxItems": 64,
+            "type": "array"
+          },
+          "producing_ceiling": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AccessLevel"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The producing context's trusted authorized ceiling. Missing → `classification_refused`."
+          },
+          "sources": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/SourceRef"
+            },
+            "maxItems": 64,
+            "type": "array"
+          }
+        },
+        "required": [
+          "consumed"
+        ],
+        "type": "object"
+      },
+      "PurgeRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "expires_at": {
+            "description": "At most 7 days ahead; a new execution after it is refused. Part of the request's\nidentity: a retry must resend the original value unchanged, and a changed value is\n`idempotency_conflict`. Truncated to microseconds before it is hashed or stored.",
+            "format": "date-time",
+            "type": "string"
+          },
+          "idempotency_key": {
+            "description": "1–128 bytes of `[A-Za-z0-9._:-]`, stable across retries.",
+            "pattern": "^[A-Za-z0-9._:-]{1,128}$",
+            "type": "string"
+          },
+          "namespace": {
+            "pattern": "^[A-Za-z0-9._:-]{1,128}$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "idempotency_key",
+          "expires_at",
+          "namespace"
+        ],
+        "type": "object"
+      },
+      "PurgeResponse": {
+        "properties": {
+          "namespace": {
+            "type": "string"
+          },
+          "purged": {
+            "type": "boolean"
+          },
+          "replayed": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "namespace",
+          "purged",
+          "replayed"
+        ],
+        "type": "object"
+      },
+      "RecordedSource": {
+        "properties": {
+          "external_ref": {
+            "type": "string"
+          },
+          "revision": {
+            "type": "string"
+          },
+          "source_id": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source_id",
+          "external_ref",
+          "revision"
+        ],
+        "type": "object"
+      },
+      "SaveItem": {
+        "additionalProperties": false,
+        "properties": {
+          "body": {
+            "description": "At most 16,384 characters and 64 KiB.",
+            "maxLength": 16384,
+            "type": "string"
+          },
+          "expires_at": {
+            "description": "Truncated to microseconds, the stored precision.",
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "kind": {
+            "$ref": "#/components/schemas/ObservationKind"
+          },
+          "occurred_at": {
+            "description": "Truncated to microseconds, the stored precision.",
+            "format": "date-time",
+            "type": "string"
+          },
+          "title": {
+            "description": "At most 256 characters and 1 KiB.",
+            "maxLength": 256,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "title",
+          "body",
+          "occurred_at"
+        ],
+        "type": "object"
+      },
+      "SaveRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "context": {
+            "$ref": "#/components/schemas/ProducingContext"
+          },
+          "expires_at": {
+            "description": "At most 7 days ahead; a new execution after it is refused. Part of the request's\nidentity: a retry must resend the original value unchanged, and a changed value is\n`idempotency_conflict`. Truncated to microseconds before it is hashed or stored.",
+            "format": "date-time",
+            "type": "string"
+          },
+          "idempotency_key": {
+            "description": "1–128 bytes of `[A-Za-z0-9._:-]`, stable across retries.",
+            "pattern": "^[A-Za-z0-9._:-]{1,128}$",
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/SaveItem"
+            },
+            "maxItems": 256,
+            "minItems": 1,
+            "type": "array"
+          },
+          "namespace": {
+            "pattern": "^[A-Za-z0-9._:-]{1,128}$",
+            "type": "string"
+          },
+          "session_id": {
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "idempotency_key",
+          "expires_at",
+          "namespace",
+          "context",
+          "items"
+        ],
+        "type": "object"
+      },
+      "SaveResponse": {
+        "properties": {
+          "observations": {
+            "items": {
+              "$ref": "#/components/schemas/SavedObservation"
+            },
+            "type": "array"
+          },
+          "replayed": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "observations",
+          "replayed"
+        ],
+        "type": "object"
+      },
+      "SavedObservation": {
+        "properties": {
+          "access_level": {
+            "$ref": "#/components/schemas/AccessLevel"
+          },
+          "index_state": {
+            "$ref": "#/components/schemas/IndexState"
+          },
+          "observation_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "revision": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "observation_id",
+          "revision",
+          "access_level",
+          "index_state"
+        ],
+        "type": "object"
+      },
+      "SearchRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "limit": {
+            "description": "Default 20, maximum 100.",
+            "format": "uint32",
+            "maximum": 100,
+            "minimum": 1,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "namespaces": {
+            "items": {
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$",
+              "type": "string"
+            },
+            "maxItems": 16,
+            "minItems": 1,
+            "type": "array"
+          },
+          "query": {
+            "description": "At most 1,024 characters and at most 500 embedding-model tokens: a longer query (for\nexample 1,024 CJK characters, about one token each) is refused with 400\n`invalid_request`, never truncated, so split it client-side. The keyword leg matches\nobservations holding all of its first 32 words, or any of its identifier-like tokens\n(with a digit, `_ . @ / : -` inside, or an internal capital) as a phrase; a blank query\nmatches nothing.",
+            "maxLength": 1024,
+            "type": "string"
+          },
+          "read_ceiling": {
+            "$ref": "#/components/schemas/AccessLevel"
+          }
+        },
+        "required": [
+          "namespaces",
+          "read_ceiling",
+          "query"
+        ],
+        "type": "object"
+      },
+      "SearchResponse": {
+        "properties": {
+          "exposed_level": {
+            "$ref": "#/components/schemas/AccessLevel",
+            "description": "The highest level of everything returned, provenance included; 0 when empty."
+          },
+          "items": {
+            "description": "Fused order: reciprocal rank over the keyword and semantic legs, then `occurred_at`\ndescending, then id.",
+            "items": {
+              "$ref": "#/components/schemas/IndexItem"
+            },
+            "type": "array"
+          },
+          "semantic": {
+            "$ref": "#/components/schemas/SemanticState",
+            "description": "`partial` when the exact semantic scan was needed but more than 100,000 eligible parts\nexist; the semantic leg is then approximate. Never silently short."
+          }
+        },
+        "required": [
+          "items",
+          "exposed_level",
+          "semantic"
+        ],
+        "type": "object"
+      },
+      "SemanticState": {
+        "enum": [
+          "complete",
+          "partial"
+        ],
+        "type": "string"
+      },
+      "SessionCloseRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "expires_at": {
+            "description": "At most 7 days ahead; a new execution after it is refused. Part of the request's\nidentity: a retry must resend the original value unchanged, and a changed value is\n`idempotency_conflict`. Truncated to microseconds before it is hashed or stored.",
+            "format": "date-time",
+            "type": "string"
+          },
+          "idempotency_key": {
+            "description": "1–128 bytes of `[A-Za-z0-9._:-]`, stable across retries.",
+            "pattern": "^[A-Za-z0-9._:-]{1,128}$",
+            "type": "string"
+          },
+          "namespace": {
+            "pattern": "^[A-Za-z0-9._:-]{1,128}$",
+            "type": "string"
+          },
+          "session_id": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "idempotency_key",
+          "expires_at",
+          "namespace",
+          "session_id"
+        ],
+        "type": "object"
+      },
+      "SessionOpenRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "expires_at": {
+            "description": "At most 7 days ahead; a new execution after it is refused. Part of the request's\nidentity: a retry must resend the original value unchanged, and a changed value is\n`idempotency_conflict`. Truncated to microseconds before it is hashed or stored.",
+            "format": "date-time",
+            "type": "string"
+          },
+          "external_id": {
+            "pattern": "^[A-Za-z0-9._:-]{1,128}$",
+            "type": "string"
+          },
+          "idempotency_key": {
+            "description": "1–128 bytes of `[A-Za-z0-9._:-]`, stable across retries.",
+            "pattern": "^[A-Za-z0-9._:-]{1,128}$",
+            "type": "string"
+          },
+          "namespace": {
+            "pattern": "^[A-Za-z0-9._:-]{1,128}$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "idempotency_key",
+          "expires_at",
+          "namespace",
+          "external_id"
+        ],
+        "type": "object"
+      },
+      "SessionState": {
+        "enum": [
+          "open",
+          "closed"
+        ],
+        "type": "string"
+      },
+      "SessionView": {
+        "properties": {
+          "external_id": {
+            "type": "string"
+          },
+          "replayed": {
+            "type": "boolean"
+          },
+          "session_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "state": {
+            "$ref": "#/components/schemas/SessionState"
+          }
+        },
+        "required": [
+          "session_id",
+          "external_id",
+          "state",
+          "replayed"
+        ],
+        "type": "object"
+      },
+      "SourceRecord": {
+        "additionalProperties": false,
+        "properties": {
+          "access_level": {
+            "$ref": "#/components/schemas/AccessLevel"
+          },
+          "content": {
+            "description": "At most 256 KiB.",
+            "maxLength": 262144,
+            "type": "string"
+          },
+          "expires_at": {
+            "description": "Truncated to microseconds, the stored precision; a re-record compares the stored value.",
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "external_ref": {
+            "description": "At most 512 bytes; stored as given, so a secret-shaped reference (`?token=…`,\n`user:password@` URLs, keyword-shaped ids such as `secret:42`) is refused with 400\n`secret_in_identifier`.",
+            "maxLength": 512,
+            "minLength": 1,
+            "type": "string"
+          },
+          "occurred_at": {
+            "description": "Truncated to microseconds, the stored precision; a re-record compares the stored value.",
+            "format": "date-time",
+            "type": "string"
+          },
+          "revision": {
+            "description": "At most 128 bytes; secret-shaped revisions are refused like `external_ref`.",
+            "maxLength": 128,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "external_ref",
+          "revision",
+          "access_level",
+          "occurred_at",
+          "content"
+        ],
+        "type": "object"
+      },
+      "SourceRef": {
+        "oneOf": [
+          {
+            "additionalProperties": false,
+            "description": "An immutable recorded source revision.\nA source in the target namespace.",
+            "properties": {
+              "kind": {
+                "const": "source",
+                "type": "string"
+              },
+              "revision": {
+                "description": "At most 128 bytes.",
+                "maxLength": 128,
+                "minLength": 1,
+                "type": "string"
+              },
+              "source_id": {
+                "format": "uuid",
+                "type": "string"
+              }
+            },
+            "required": [
+              "kind",
+              "source_id",
+              "revision"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "description": "A parent observation at an exact revision (copies, derived summaries).",
+            "properties": {
+              "kind": {
+                "const": "observation",
+                "type": "string"
+              },
+              "observation_id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "revision": {
+                "format": "int64",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "kind",
+              "observation_id",
+              "revision"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "SourcesRecordRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "expires_at": {
+            "description": "At most 7 days ahead; a new execution after it is refused. Part of the request's\nidentity: a retry must resend the original value unchanged, and a changed value is\n`idempotency_conflict`. Truncated to microseconds before it is hashed or stored.",
+            "format": "date-time",
+            "type": "string"
+          },
+          "idempotency_key": {
+            "description": "1–128 bytes of `[A-Za-z0-9._:-]`, stable across retries.",
+            "pattern": "^[A-Za-z0-9._:-]{1,128}$",
+            "type": "string"
+          },
+          "namespace": {
+            "pattern": "^[A-Za-z0-9._:-]{1,128}$",
+            "type": "string"
+          },
+          "session_id": {
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "sources": {
+            "items": {
+              "$ref": "#/components/schemas/SourceRecord"
+            },
+            "maxItems": 512,
+            "minItems": 1,
+            "type": "array"
+          }
+        },
+        "required": [
+          "idempotency_key",
+          "expires_at",
+          "namespace",
+          "sources"
+        ],
+        "type": "object"
+      },
+      "SourcesRecordResponse": {
+        "properties": {
+          "replayed": {
+            "type": "boolean"
+          },
+          "sources": {
+            "items": {
+              "$ref": "#/components/schemas/RecordedSource"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "sources",
+          "replayed"
+        ],
+        "type": "object"
+      },
+      "TenantCreateRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "external_id": {
+            "pattern": "^[A-Za-z0-9._:-]{1,128}$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "external_id"
+        ],
+        "type": "object"
+      },
+      "TenantReassignRequest": {
+        "additionalProperties": false,
+        "description": "Move tenants from one admin credential's management to a provisioner's (06A A1-5), for\nprovisioner rotation. Operator only; repeat until `remaining` is false.",
+        "properties": {
+          "from": {
+            "description": "The admin credential that manages the tenants now (it may be revoked).",
+            "format": "uuid",
+            "type": "string"
+          },
+          "limit": {
+            "default": null,
+            "description": "Tenants to move in this call, 1–500 (default 500), in tenant id order.",
+            "format": "uint32",
+            "maximum": 500,
+            "minimum": 1,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "to": {
+            "description": "An active, unexpired provisioner credential, different from `from`.",
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "from",
+          "to"
+        ],
+        "type": "object"
+      },
+      "TenantReassignResponse": {
+        "properties": {
+          "moved": {
+            "format": "uint32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "remaining": {
+            "description": "Whether `from` still manages tenants after this call.",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "moved",
+          "remaining"
+        ],
+        "type": "object"
+      },
+      "TenantRef": {
+        "additionalProperties": false,
+        "properties": {
+          "tenant": {
+            "pattern": "^[A-Za-z0-9._:-]{1,128}$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "tenant"
+        ],
+        "type": "object"
+      },
+      "TenantSettingsRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "generation_daily_token_cap": {
+            "description": "Tokens per UTC day; 0 disables generation.",
+            "format": "uint64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "tenant": {
+            "pattern": "^[A-Za-z0-9._:-]{1,128}$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "tenant",
+          "generation_daily_token_cap"
+        ],
+        "type": "object"
+      },
+      "TenantState": {
+        "enum": [
+          "active",
+          "disabled",
+          "deleted"
+        ],
+        "type": "string"
+      },
+      "TenantView": {
+        "properties": {
+          "cancelled_operations": {
+            "description": "Operations cancelled by this state change.",
+            "format": "uint64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "disabled_by_scope": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AdminScope"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "generation_daily_token_cap": {
+            "format": "uint64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "state": {
+            "$ref": "#/components/schemas/TenantState"
+          },
+          "tenant": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "tenant",
+          "state",
+          "generation_daily_token_cap",
+          "cancelled_operations"
+        ],
+        "type": "object"
+      },
+      "TimelineRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "after": {
+            "description": "Neighbours after the anchor: 0–20, default 5.",
+            "format": "uint32",
+            "maximum": 20,
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "anchor": {
+            "description": "An observation the reader may see; anything else (foreign, missing, deleted, expired or\nabove the ceiling) is the same 404 `not_found`.",
+            "format": "uuid",
+            "type": "string"
+          },
+          "before": {
+            "description": "Neighbours before the anchor: 0–20, default 5.",
+            "format": "uint32",
+            "maximum": 20,
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "namespaces": {
+            "description": "The neighbourhood is drawn from these namespaces; name one to stay inside it.",
+            "items": {
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$",
+              "type": "string"
+            },
+            "maxItems": 16,
+            "minItems": 1,
+            "type": "array"
+          },
+          "read_ceiling": {
+            "$ref": "#/components/schemas/AccessLevel"
+          },
+          "session_only": {
+            "default": false,
+            "description": "Only neighbours in the anchor's session; an anchor without a session then has none.",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "namespaces",
+          "read_ceiling",
+          "anchor"
+        ],
+        "type": "object"
+      },
+      "TimelineResponse": {
+        "properties": {
+          "exposed_level": {
+            "$ref": "#/components/schemas/AccessLevel",
+            "description": "The highest level of everything returned, provenance included; at least the anchor's."
+          },
+          "items": {
+            "description": "The anchor and its nearest visible neighbours, oldest first (`occurred_at`, then id).\nRecords the reader may not see take no slot and leave no gap marker or count.",
+            "items": {
+              "$ref": "#/components/schemas/IndexItem"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "items",
+          "exposed_level"
+        ],
+        "type": "object"
+      },
+      "ValidatedItem": {
+        "properties": {
+          "observation_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/PackItemStatus"
+          }
+        },
+        "required": [
+          "observation_id",
+          "status"
+        ],
+        "type": "object"
+      }
+    },
+    "securitySchemes": {
+      "bearer": {
+        "scheme": "bearer",
+        "type": "http"
+      }
+    }
+  },
+  "info": {
+    "description": "Tenant- and namespace-scoped memory with ordered 0-9 access levels. Operations marked x-memory-implemented: false are declared but return 501 not_implemented.",
+    "title": "Memory service",
+    "version": "0.1.0"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/admin/v1/admin-credentials/issue": {
+      "post": {
+        "operationId": "admin.admin_credentials.issue",
+        "parameters": [
+          {
+            "description": "Opaque, non-secret correlation id recorded in logs and audit; a malformed value is 400 invalid_request. Never authority.",
+            "in": "header",
+            "name": "x-correlation-id",
+            "required": false,
+            "schema": {
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminCredentialIssueRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IssuedCredential"
+                }
+              }
+            },
+            "description": "Success",
+            "headers": {
+              "x-request-id": {
+                "description": "The service-minted request id (also in error bodies and audit)",
+                "schema": {
+                  "format": "uuid",
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Error",
+            "headers": {
+              "x-request-id": {
+                "description": "The service-minted request id (also in error bodies and audit)",
+                "schema": {
+                  "format": "uuid",
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Operator-only: issue an operator or provisioner credential",
+        "tags": [
+          "admin"
+        ],
+        "x-memory-implemented": true
+      }
+    },
+    "/admin/v1/admin-credentials/revoke": {
+      "post": {
+        "operationId": "admin.admin_credentials.revoke",
+        "parameters": [
+          {
+            "description": "Opaque, non-secret correlation id recorded in logs and audit; a malformed value is 400 invalid_request. Never authority.",
+            "in": "header",
+            "name": "x-correlation-id",
+            "required": false,
+            "schema": {
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminCredentialRevokeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminCredentialView"
+                }
+              }
+            },
+            "description": "Success",
+            "headers": {
+              "x-request-id": {
+                "description": "The service-minted request id (also in error bodies and audit)",
+                "schema": {
+                  "format": "uuid",
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Error",
+            "headers": {
+              "x-request-id": {
+                "description": "The service-minted request id (also in error bodies and audit)",
+                "schema": {
+                  "format": "uuid",
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Operator-only: revoke an admin credential",
+        "tags": [
+          "admin"
+        ],
+        "x-memory-implemented": true
+      }
+    },
+    "/admin/v1/credentials/issue": {
+      "post": {
+        "operationId": "admin.credentials.issue",
+        "parameters": [
+          {
+            "description": "Opaque, non-secret correlation id recorded in logs and audit; a malformed value is 400 invalid_request. Never authority.",
+            "in": "header",
+            "name": "x-correlation-id",
+            "required": false,
+            "schema": {
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CredentialIssueRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IssuedCredential"
+                }
+              }
+            },
+            "description": "Success",
+            "headers": {
+              "x-request-id": {
+                "description": "The service-minted request id (also in error bodies and audit)",
+                "schema": {
+                  "format": "uuid",
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Error",
+            "headers": {
+              "x-request-id": {
+                "description": "The service-minted request id (also in error bodies and audit)",
+                "schema": {
+                  "format": "uuid",
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Issue a client credential with namespace grants",
+        "tags": [
+          "admin"
+        ],
+        "x-memory-implemented": true
+      }
+    },
+    "/admin/v1/credentials/list": {
+      "post": {
+        "operationId": "admin.credentials.list",
+        "parameters": [
+          {
+            "description": "Opaque, non-secret correlation id recorded in logs and audit; a malformed value is 400 invalid_request. Never authority.",
+            "in": "header",
+            "name": "x-correlation-id",
+            "required": false,
+            "schema": {
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CredentialListRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CredentialList"
+                }
+              }
+            },
+            "description": "Success",
+            "headers": {
+              "x-request-id": {
+                "description": "The service-minted request id (also in error bodies and audit)",
+                "schema": {
+                  "format": "uuid",
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Error",
+            "headers": {
+              "x-request-id": {
+                "description": "The service-minted request id (also in error bodies and audit)",
+                "schema": {
+                  "format": "uuid",
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List a tenant's client credentials, one page in id order",
+        "tags": [
+          "admin"
+        ],
+        "x-memory-implemented": true
+      }
+    },
+    "/admin/v1/credentials/revoke": {
+      "post": {
+        "operationId": "admin.credentials.revoke",
+        "parameters": [
+          {
+            "description": "Opaque, non-secret correlation id recorded in logs and audit; a malformed value is 400 invalid_request. Never authority.",
+            "in": "header",
+            "name": "x-correlation-id",
+            "required": false,
+            "schema": {
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CredentialRevokeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CredentialView"
+                }
+              }
+            },
+            "description": "Success",
+            "headers": {
+              "x-request-id": {
+                "description": "The service-minted request id (also in error bodies and audit)",
+                "schema": {
+                  "format": "uuid",
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Error",
+            "headers": {
+              "x-request-id": {
+                "description": "The service-minted request id (also in error bodies and audit)",
+                "schema": {
+                  "format": "uuid",
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Revoke a client credential and cancel work it authorized",
+        "tags": [
+          "admin"
+        ],
+        "x-memory-implemented": true
+      }
+    },
+    "/admin/v1/metrics": {
+      "get": {
+        "operationId": "admin.metrics",
+        "responses": {
+          "200": {
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Prometheus text format 0.0.4",
+            "headers": {
+              "x-request-id": {
+                "description": "The service-minted request id (also in error bodies and audit)",
+                "schema": {
+                  "format": "uuid",
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Error",
+            "headers": {
+              "x-request-id": {
+                "description": "The service-minted request id (also in error bodies and audit)",
+                "schema": {
+                  "format": "uuid",
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Operator-only Prometheus text: per-process counters and database-wide gauges",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/admin/v1/namespaces/create": {
+      "post": {
+        "operationId": "admin.namespaces.create",
+        "parameters": [
+          {
+            "description": "Opaque, non-secret correlation id recorded in logs and audit; a malformed value is 400 invalid_request. Never authority.",
+            "in": "header",
+            "name": "x-correlation-id",
+            "required": false,
+            "schema": {
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NamespaceRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NamespaceView"
+                }
+              }
+            },
+            "description": "Success",
+            "headers": {
+              "x-request-id": {
+                "description": "The service-minted request id (also in error bodies and audit)",
+                "schema": {
+                  "format": "uuid",
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Error",
+            "headers": {
+              "x-request-id": {
+                "description": "The service-minted request id (also in error bodies and audit)",
+                "schema": {
+                  "format": "uuid",
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Create a namespace",
+        "tags": [
+          "admin"
+        ],
+        "x-memory-implemented": true
+      }
+    },
+    "/admin/v1/namespaces/delete": {
+      "post": {
+        "operationId": "admin.namespaces.delete",
+        "parameters": [
+          {
+            "description": "Opaque, non-secret correlation id recorded in logs and audit; a malformed value is 400 invalid_request. Never authority.",
+            "in": "header",
+            "name": "x-correlation-id",
+            "required": false,
+            "schema": {
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NamespaceRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NamespaceView"
+                }
+              }
+            },
+            "description": "Success",
+            "headers": {
+              "x-request-id": {
+                "description": "The service-minted request id (also in error bodies and audit)",
+                "schema": {
+                  "format": "uuid",
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Error",
+            "headers": {
+              "x-request-id": {
+                "description": "The service-minted request id (also in error bodies and audit)",
+                "schema": {
+                  "format": "uuid",
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Tombstone a namespace and remove its grants",
+        "tags": [
+          "admin"
+        ],
+        "x-memory-implemented": true
+      }
+    },
+    "/admin/v1/tenants/create": {
+      "post": {
+        "operationId": "admin.tenants.create",
+        "parameters": [
+          {
+            "description": "Opaque, non-secret correlation id recorded in logs and audit; a malformed value is 400 invalid_request. Never authority.",
+            "in": "header",
+            "name": "x-correlation-id",
+            "required": false,
+            "schema": {
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TenantCreateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenantView"
+                }
+              }
+            },
+            "description": "Success",
+            "headers": {
+              "x-request-id": {
+                "description": "The service-minted request id (also in error bodies and audit)",
+                "schema": {
+                  "format": "uuid",
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Error",
+            "headers": {
+              "x-request-id": {
+                "description": "The service-minted request id (also in error bodies and audit)",
+                "schema": {
+                  "format": "uuid",
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Create a tenant managed by the caller",
+        "tags": [
+          "admin"
+        ],
+        "x-memory-implemented": true
+      }
+    },
+    "/admin/v1/tenants/delete": {
+      "post": {
+        "operationId": "admin.tenants.delete",
+        "parameters": [
+          {
+            "description": "Opaque, non-secret correlation id recorded in logs and audit; a malformed value is 400 invalid_request. Never authority.",
+            "in": "header",
+            "name": "x-correlation-id",
+            "required": false,
+            "schema": {
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TenantRef"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenantView"
+                }
+              }
+            },
+            "description": "Success",
+            "headers": {
+              "x-request-id": {
+                "description": "The service-minted request id (also in error bodies and audit)",
+                "schema": {
+                  "format": "uuid",
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Error",
+            "headers": {
+              "x-request-id": {
+                "description": "The service-minted request id (also in error bodies and audit)",
+                "schema": {
+                  "format": "uuid",
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Tombstone a tenant permanently",
+        "tags": [
+          "admin"
+        ],
+        "x-memory-implemented": true
+      }
+    },
+    "/admin/v1/tenants/disable": {
+      "post": {
+        "operationId": "admin.tenants.disable",
+        "parameters": [
+          {
+            "description": "Opaque, non-secret correlation id recorded in logs and audit; a malformed value is 400 invalid_request. Never authority.",
+            "in": "header",
+            "name": "x-correlation-id",
+            "required": false,
+            "schema": {
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TenantRef"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenantView"
+                }
+              }
+            },
+            "description": "Success",
+            "headers": {
+              "x-request-id": {
+                "description": "The service-minted request id (also in error bodies and audit)",
+                "schema": {
+                  "format": "uuid",
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Error",
+            "headers": {
+              "x-request-id": {
+                "description": "The service-minted request id (also in error bodies and audit)",
+                "schema": {
+                  "format": "uuid",
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Disable a tenant and cancel its queued work",
+        "tags": [
+          "admin"
+        ],
+        "x-memory-implemented": true
+      }
+    },
+    "/admin/v1/tenants/enable": {
+      "post": {
+        "operationId": "admin.tenants.enable",
+        "parameters": [
+          {
+            "description": "Opaque, non-secret correlation id recorded in logs and audit; a malformed value is 400 invalid_request. Never authority.",
+            "in": "header",
+            "name": "x-correlation-id",
+            "required": false,
+            "schema": {
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TenantRef"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenantView"
+                }
+              }
+            },
+            "description": "Success",
+            "headers": {
+              "x-request-id": {
+                "description": "The service-minted request id (also in error bodies and audit)",
+                "schema": {
+                  "format": "uuid",
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Error",
+            "headers": {
+              "x-request-id": {
+                "description": "The service-minted request id (also in error bodies and audit)",
+                "schema": {
+                  "format": "uuid",
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Enable a disabled tenant; never revives cancelled work",
+        "tags": [
+          "admin"
+        ],
+        "x-memory-implemented": true
+      }
+    },
+    "/admin/v1/tenants/reassign": {
+      "post": {
+        "operationId": "admin.tenants.reassign",
+        "parameters": [
+          {
+            "description": "Opaque, non-secret correlation id recorded in logs and audit; a malformed value is 400 invalid_request. Never authority.",
+            "in": "header",
+            "name": "x-correlation-id",
+            "required": false,
+            "schema": {
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TenantReassignRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenantReassignResponse"
+                }
+              }
+            },
+            "description": "Success",
+            "headers": {
+              "x-request-id": {
+                "description": "The service-minted request id (also in error bodies and audit)",
+                "schema": {
+                  "format": "uuid",
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Error",
+            "headers": {
+              "x-request-id": {
+                "description": "The service-minted request id (also in error bodies and audit)",
+                "schema": {
+                  "format": "uuid",
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Operator-only: move tenants to another provisioner's management",
+        "tags": [
+          "admin"
+        ],
+        "x-memory-implemented": true
+      }
+    },
+    "/admin/v1/tenants/settings": {
+      "post": {
+        "operationId": "admin.tenants.settings",
+        "parameters": [
+          {
+            "description": "Opaque, non-secret correlation id recorded in logs and audit; a malformed value is 400 invalid_request. Never authority.",
+            "in": "header",
+            "name": "x-correlation-id",
+            "required": false,
+            "schema": {
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TenantSettingsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenantView"
+                }
+              }
+            },
+            "description": "Success",
+            "headers": {
+              "x-request-id": {
+                "description": "The service-minted request id (also in error bodies and audit)",
+                "schema": {
+                  "format": "uuid",
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Error",
+            "headers": {
+              "x-request-id": {
+                "description": "The service-minted request id (also in error bodies and audit)",
+                "schema": {
+                  "format": "uuid",
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Operator-only tenant settings",
+        "tags": [
+          "admin"
+        ],
+        "x-memory-implemented": true
+      }
+    },
+    "/healthz": {
+      "get": {
+        "operationId": "healthz",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Liveness"
+      }
+    },
+    "/readyz": {
+      "get": {
+        "operationId": "readyz",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Readiness: database reachable and not shutting down"
+      }
+    },
+    "/v1/context/pack": {
+      "post": {
+        "operationId": "context.pack",
+        "parameters": [
+          {
+            "description": "Opaque, non-secret correlation id recorded in logs and audit; a malformed value is 400 invalid_request. Never authority.",
+            "in": "header",
+            "name": "x-correlation-id",
+            "required": false,
+            "schema": {
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ContextPackRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContextPack"
+                }
+              }
+            },
+            "description": "Success",
+            "headers": {
+              "x-request-id": {
+                "description": "The service-minted request id (also in error bodies and audit)",
+                "schema": {
+                  "format": "uuid",
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Error",
+            "headers": {
+              "x-request-id": {
+                "description": "The service-minted request id (also in error bodies and audit)",
+                "schema": {
+                  "format": "uuid",
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "A token- and byte-bounded context pack",
+        "tags": [
+          "client"
+        ],
+        "x-mcp-tool": "memory_context_pack",
+        "x-memory-implemented": true
+      }
+    },
+    "/v1/context/validate": {
+      "post": {
+        "operationId": "context.validate",
+        "parameters": [
+          {
+            "description": "Opaque, non-secret correlation id recorded in logs and audit; a malformed value is 400 invalid_request. Never authority.",
+            "in": "header",
+            "name": "x-correlation-id",
+            "required": false,
+            "schema": {
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ContextValidateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContextValidateResponse"
+                }
+              }
+            },
+            "description": "Success",
+            "headers": {
+              "x-request-id": {
+                "description": "The service-minted request id (also in error bodies and audit)",
+                "schema": {
+                  "format": "uuid",
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Error",
+            "headers": {
+              "x-request-id": {
+                "description": "The service-minted request id (also in error bodies and audit)",
+                "schema": {
+                  "format": "uuid",
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Check whether frozen pack items are still valid and authorized",
+        "tags": [
+          "client"
+        ],
+        "x-mcp-tool": "memory_context_validate",
+        "x-memory-implemented": true
+      }
+    },
+    "/v1/credential": {
+      "get": {
+        "operationId": "credential.get",
+        "parameters": [
+          {
+            "description": "Opaque, non-secret correlation id recorded in logs and audit; a malformed value is 400 invalid_request. Never authority.",
+            "in": "header",
+            "name": "x-correlation-id",
+            "required": false,
+            "schema": {
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CredentialView"
+                }
+              }
+            },
+            "description": "Success",
+            "headers": {
+              "x-request-id": {
+                "description": "The service-minted request id (also in error bodies and audit)",
+                "schema": {
+                  "format": "uuid",
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Error",
+            "headers": {
+              "x-request-id": {
+                "description": "The service-minted request id (also in error bodies and audit)",
+                "schema": {
+                  "format": "uuid",
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The calling credential's tenant, active namespace grants and expiry",
+        "tags": [
+          "client"
+        ],
+        "x-mcp-tool": "memory_credential",
+        "x-memory-implemented": true
+      }
+    },
+    "/v1/generations/cancel": {
+      "post": {
+        "operationId": "generations.cancel",
+        "parameters": [
+          {
+            "description": "Opaque, non-secret correlation id recorded in logs and audit; a malformed value is 400 invalid_request. Never authority.",
+            "in": "header",
+            "name": "x-correlation-id",
+            "required": false,
+            "schema": {
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GenerationCancelRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GenerationStatus"
+                }
+              }
+            },
+            "description": "Success",
+            "headers": {
+              "x-request-id": {
+                "description": "The service-minted request id (also in error bodies and audit)",
+                "schema": {
+                  "format": "uuid",
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Error",
+            "headers": {
+              "x-request-id": {
+                "description": "The service-minted request id (also in error bodies and audit)",
+                "schema": {
+                  "format": "uuid",
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Cancel a generation operation",
+        "tags": [
+          "client"
+        ],
+        "x-mcp-tool": "memory_generation_cancel",
+        "x-memory-implemented": true
+      }
+    },
+    "/v1/generations/request": {
+      "post": {
+        "operationId": "generations.request",
+        "parameters": [
+          {
+            "description": "Opaque, non-secret correlation id recorded in logs and audit; a malformed value is 400 invalid_request. Never authority.",
+            "in": "header",
+            "name": "x-correlation-id",
+            "required": false,
+            "schema": {
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GenerationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GenerationStatus"
+                }
+              }
+            },
+            "description": "Success",
+            "headers": {
+              "x-request-id": {
+                "description": "The service-minted request id (also in error bodies and audit)",
+                "schema": {
+                  "format": "uuid",
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Error",
+            "headers": {
+              "x-request-id": {
+                "description": "The service-minted request id (also in error bodies and audit)",
+                "schema": {
+                  "format": "uuid",
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Request generation over a complete bounded window",
+        "tags": [
+          "client"
+        ],
+        "x-mcp-tool": "memory_generation_request",
+        "x-memory-implemented": true
+      }
+    },
+    "/v1/generations/status": {
+      "post": {
+        "operationId": "generations.status",
+        "parameters": [
+          {
+            "description": "Opaque, non-secret correlation id recorded in logs and audit; a malformed value is 400 invalid_request. Never authority.",
+            "in": "header",
+            "name": "x-correlation-id",
+            "required": false,
+            "schema": {
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GenerationRef"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GenerationStatus"
+                }
+              }
+            },
+            "description": "Success",
+            "headers": {
+              "x-request-id": {
+                "description": "The service-minted request id (also in error bodies and audit)",
+                "schema": {
+                  "format": "uuid",
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Error",
+            "headers": {
+              "x-request-id": {
+                "description": "The service-minted request id (also in error bodies and audit)",
+                "schema": {
+                  "format": "uuid",
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Generation operation status",
+        "tags": [
+          "client"
+        ],
+        "x-mcp-tool": "memory_generation_status",
+        "x-memory-implemented": true
+      }
+    },
+    "/v1/namespaces/purge": {
+      "post": {
+        "operationId": "namespaces.purge",
+        "parameters": [
+          {
+            "description": "Opaque, non-secret correlation id recorded in logs and audit; a malformed value is 400 invalid_request. Never authority.",
+            "in": "header",
+            "name": "x-correlation-id",
+            "required": false,
+            "schema": {
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PurgeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PurgeResponse"
+                }
+              }
+            },
+            "description": "Success",
+            "headers": {
+              "x-request-id": {
+                "description": "The service-minted request id (also in error bodies and audit)",
+                "schema": {
+                  "format": "uuid",
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Error",
+            "headers": {
+              "x-request-id": {
+                "description": "The service-minted request id (also in error bodies and audit)",
+                "schema": {
+                  "format": "uuid",
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Delete every memory in a namespace and tombstone it",
+        "tags": [
+          "client"
+        ],
+        "x-mcp-tool": "memory_purge_namespace",
+        "x-memory-implemented": true
+      }
+    },
+    "/v1/observations/correct": {
+      "post": {
+        "operationId": "observations.correct",
+        "parameters": [
+          {
+            "description": "Opaque, non-secret correlation id recorded in logs and audit; a malformed value is 400 invalid_request. Never authority.",
+            "in": "header",
+            "name": "x-correlation-id",
+            "required": false,
+            "schema": {
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CorrectRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SavedObservation"
+                }
+              }
+            },
+            "description": "Success",
+            "headers": {
+              "x-request-id": {
+                "description": "The service-minted request id (also in error bodies and audit)",
+                "schema": {
+                  "format": "uuid",
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Error",
+            "headers": {
+              "x-request-id": {
+                "description": "The service-minted request id (also in error bodies and audit)",
+                "schema": {
+                  "format": "uuid",
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Correct an observation at an expected revision",
+        "tags": [
+          "client"
+        ],
+        "x-mcp-tool": "memory_correct",
+        "x-memory-implemented": true
+      }
+    },
+    "/v1/observations/delete": {
+      "post": {
+        "operationId": "observations.delete",
+        "parameters": [
+          {
+            "description": "Opaque, non-secret correlation id recorded in logs and audit; a malformed value is 400 invalid_request. Never authority.",
+            "in": "header",
+            "name": "x-correlation-id",
+            "required": false,
+            "schema": {
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeleteRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeleteResponse"
+                }
+              }
+            },
+            "description": "Success",
+            "headers": {
+              "x-request-id": {
+                "description": "The service-minted request id (also in error bodies and audit)",
+                "schema": {
+                  "format": "uuid",
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Error",
+            "headers": {
+              "x-request-id": {
+                "description": "The service-minted request id (also in error bodies and audit)",
+                "schema": {
+                  "format": "uuid",
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Delete an observation and its derived parts",
+        "tags": [
+          "client"
+        ],
+        "x-mcp-tool": "memory_delete",
+        "x-memory-implemented": true
+      }
+    },
+    "/v1/observations/fetch": {
+      "post": {
+        "operationId": "observations.fetch",
+        "parameters": [
+          {
+            "description": "Opaque, non-secret correlation id recorded in logs and audit; a malformed value is 400 invalid_request. Never authority.",
+            "in": "header",
+            "name": "x-correlation-id",
+            "required": false,
+            "schema": {
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FetchRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FetchResponse"
+                }
+              }
+            },
+            "description": "Success",
+            "headers": {
+              "x-request-id": {
+                "description": "The service-minted request id (also in error bodies and audit)",
+                "schema": {
+                  "format": "uuid",
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Error",
+            "headers": {
+              "x-request-id": {
+                "description": "The service-minted request id (also in error bodies and audit)",
+                "schema": {
+                  "format": "uuid",
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Selected observation details, re-checking every id",
+        "tags": [
+          "client"
+        ],
+        "x-mcp-tool": "memory_fetch",
+        "x-memory-implemented": true
+      }
+    },
+    "/v1/observations/save": {
+      "post": {
+        "operationId": "observations.save",
+        "parameters": [
+          {
+            "description": "Opaque, non-secret correlation id recorded in logs and audit; a malformed value is 400 invalid_request. Never authority.",
+            "in": "header",
+            "name": "x-correlation-id",
+            "required": false,
+            "schema": {
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SaveResponse"
+                }
+              }
+            },
+            "description": "Success",
+            "headers": {
+              "x-request-id": {
+                "description": "The service-minted request id (also in error bodies and audit)",
+                "schema": {
+                  "format": "uuid",
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Error",
+            "headers": {
+              "x-request-id": {
+                "description": "The service-minted request id (also in error bodies and audit)",
+                "schema": {
+                  "format": "uuid",
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Save explicit observations at their derived access level",
+        "tags": [
+          "client"
+        ],
+        "x-mcp-tool": "memory_save",
+        "x-memory-implemented": true
+      }
+    },
+    "/v1/observations/search": {
+      "post": {
+        "operationId": "observations.search",
+        "parameters": [
+          {
+            "description": "Opaque, non-secret correlation id recorded in logs and audit; a malformed value is 400 invalid_request. Never authority.",
+            "in": "header",
+            "name": "x-correlation-id",
+            "required": false,
+            "schema": {
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SearchRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchResponse"
+                }
+              }
+            },
+            "description": "Success",
+            "headers": {
+              "x-request-id": {
+                "description": "The service-minted request id (also in error bodies and audit)",
+                "schema": {
+                  "format": "uuid",
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Error",
+            "headers": {
+              "x-request-id": {
+                "description": "The service-minted request id (also in error bodies and audit)",
+                "schema": {
+                  "format": "uuid",
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Hybrid keyword and semantic search returning a compact index",
+        "tags": [
+          "client"
+        ],
+        "x-mcp-tool": "memory_search",
+        "x-memory-implemented": true
+      }
+    },
+    "/v1/observations/timeline": {
+      "post": {
+        "operationId": "observations.timeline",
+        "parameters": [
+          {
+            "description": "Opaque, non-secret correlation id recorded in logs and audit; a malformed value is 400 invalid_request. Never authority.",
+            "in": "header",
+            "name": "x-correlation-id",
+            "required": false,
+            "schema": {
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TimelineRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TimelineResponse"
+                }
+              }
+            },
+            "description": "Success",
+            "headers": {
+              "x-request-id": {
+                "description": "The service-minted request id (also in error bodies and audit)",
+                "schema": {
+                  "format": "uuid",
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Error",
+            "headers": {
+              "x-request-id": {
+                "description": "The service-minted request id (also in error bodies and audit)",
+                "schema": {
+                  "format": "uuid",
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "A bounded authorized neighbourhood around one observation",
+        "tags": [
+          "client"
+        ],
+        "x-mcp-tool": "memory_timeline",
+        "x-memory-implemented": true
+      }
+    },
+    "/v1/sessions/close": {
+      "post": {
+        "operationId": "sessions.close",
+        "parameters": [
+          {
+            "description": "Opaque, non-secret correlation id recorded in logs and audit; a malformed value is 400 invalid_request. Never authority.",
+            "in": "header",
+            "name": "x-correlation-id",
+            "required": false,
+            "schema": {
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SessionCloseRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionView"
+                }
+              }
+            },
+            "description": "Success",
+            "headers": {
+              "x-request-id": {
+                "description": "The service-minted request id (also in error bodies and audit)",
+                "schema": {
+                  "format": "uuid",
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Error",
+            "headers": {
+              "x-request-id": {
+                "description": "The service-minted request id (also in error bodies and audit)",
+                "schema": {
+                  "format": "uuid",
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Close a session boundary",
+        "tags": [
+          "client"
+        ],
+        "x-mcp-tool": "memory_session_close",
+        "x-memory-implemented": true
+      }
+    },
+    "/v1/sessions/open": {
+      "post": {
+        "operationId": "sessions.open",
+        "parameters": [
+          {
+            "description": "Opaque, non-secret correlation id recorded in logs and audit; a malformed value is 400 invalid_request. Never authority.",
+            "in": "header",
+            "name": "x-correlation-id",
+            "required": false,
+            "schema": {
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SessionOpenRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionView"
+                }
+              }
+            },
+            "description": "Success",
+            "headers": {
+              "x-request-id": {
+                "description": "The service-minted request id (also in error bodies and audit)",
+                "schema": {
+                  "format": "uuid",
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Error",
+            "headers": {
+              "x-request-id": {
+                "description": "The service-minted request id (also in error bodies and audit)",
+                "schema": {
+                  "format": "uuid",
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Open a session boundary",
+        "tags": [
+          "client"
+        ],
+        "x-mcp-tool": "memory_session_open",
+        "x-memory-implemented": true
+      }
+    },
+    "/v1/sources/record": {
+      "post": {
+        "operationId": "sources.record",
+        "parameters": [
+          {
+            "description": "Opaque, non-secret correlation id recorded in logs and audit; a malformed value is 400 invalid_request. Never authority.",
+            "in": "header",
+            "name": "x-correlation-id",
+            "required": false,
+            "schema": {
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SourcesRecordRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourcesRecordResponse"
+                }
+              }
+            },
+            "description": "Success",
+            "headers": {
+              "x-request-id": {
+                "description": "The service-minted request id (also in error bodies and audit)",
+                "schema": {
+                  "format": "uuid",
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Error",
+            "headers": {
+              "x-request-id": {
+                "description": "The service-minted request id (also in error bodies and audit)",
+                "schema": {
+                  "format": "uuid",
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Record immutable source revisions as evidence",
+        "tags": [
+          "client"
+        ],
+        "x-mcp-tool": "memory_record_sources",
+        "x-memory-implemented": true
+      }
+    }
+  }
+}

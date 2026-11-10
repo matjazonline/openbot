@@ -1,0 +1,1 @@
+{"operation":"namespaces.purge","request":{"idempotency_key":"client-7.purge-1","expires_at":"2030-01-01T00:00:00Z","namespace":"team-notes"}}

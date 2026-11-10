@@ -219,7 +219,7 @@ async fn workflow_budget_schema_consumption_never_locks_root_run_or_execution() 
 #[tokio::test]
 async fn root_budget_admission_raw_root_without_budget_is_refused() {
     let (f, admitted) = limited().await;
-    let error = sqlx::query("INSERT INTO workflow_runs (company_id,id,binding_id,binding_revision,workflow_id,version_id,actor_id,trigger_id,correlation_id,bundle_digest,input,params,resources,max_steps,max_context_bytes,deadline,knowledge_ceiling) SELECT company_id,$2,binding_id,binding_revision,workflow_id,version_id,actor_id,gen_random_uuid(),gen_random_uuid(),bundle_digest,input,params,resources,max_steps,max_context_bytes,deadline,knowledge_ceiling FROM workflow_runs WHERE id=$1")
+    let error = sqlx::query("INSERT INTO workflow_runs (company_id,id,binding_id,binding_revision,workflow_id,version_id,actor_id,trigger_id,correlation_id,bundle_digest,input,params,resources,max_steps,max_context_bytes,deadline,knowledge_ceiling,content_exact) SELECT company_id,$2,binding_id,binding_revision,workflow_id,version_id,actor_id,gen_random_uuid(),gen_random_uuid(),bundle_digest,input,params,resources,max_steps,max_context_bytes,deadline,knowledge_ceiling,content_exact FROM workflow_runs WHERE id=$1")
         .bind(admitted.run.as_uuid()).bind(Uuid::new_v4())
         .execute(f.persistence().pool()).await.unwrap_err();
     let db = error.as_database_error().unwrap();

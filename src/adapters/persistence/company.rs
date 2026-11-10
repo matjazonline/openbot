@@ -107,22 +107,17 @@ async fn delete_company_with_cleanup(
     owner_id: Option<Uuid>,
 ) -> AppResult<bool> {
     let mut transaction = persistence.pool.begin().await.map_err(AppError::from)?;
-    let company_exists: bool = match owner_id {
-        Some(owner_id) => sqlx::query_scalar(
-            "SELECT EXISTS(SELECT 1 FROM companies WHERE id = $1 AND user_id = $2)",
-        )
-        .bind(id)
-        .bind(owner_id)
-        .fetch_one(&mut *transaction)
-        .await
-        .map_err(AppError::from)?,
-        None => sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM companies WHERE id = $1)")
-            .bind(id)
-            .fetch_one(&mut *transaction)
-            .await
-            .map_err(AppError::from)?,
-    };
-    if !company_exists {
+    // Lock the company first (memory E2): an enable or a lazy provisioning either committed
+    // before this, so its lifecycle is retired below, or waits and then finds no company.
+    let locked: Option<Uuid> = sqlx::query_scalar(
+        "SELECT id FROM companies WHERE id = $1 AND ($2::uuid IS NULL OR user_id = $2) FOR UPDATE",
+    )
+    .bind(id)
+    .bind(owner_id)
+    .fetch_optional(&mut *transaction)
+    .await
+    .map_err(AppError::from)?;
+    if locked.is_none() {
         return Ok(false);
     }
     super::integrations::lifecycle::revoke_company_on(
@@ -132,6 +127,7 @@ async fn delete_company_with_cleanup(
     )
     .await
     .map_err(AppError::from)?;
+    super::memory::retire_company_on(&mut transaction, id).await?;
     sqlx::query("DELETE FROM companies WHERE id = $1")
         .bind(id)
         .execute(&mut *transaction)

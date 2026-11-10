@@ -1,0 +1,19 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO credential_grants (tenant_id, credential_id, namespace_id, read_max, write_max, operations) VALUES ($1, $2, $3, $4::smallint, $5::smallint, $6)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Int2",
+        "Int2",
+        "TextArray"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "e636ce7f0ea22dd5ab1444a5911219c4c79bdc0fa87ebdf0472816415bc3ec35"
+}

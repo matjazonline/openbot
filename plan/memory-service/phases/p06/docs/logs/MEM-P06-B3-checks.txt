@@ -1,0 +1,7 @@
+test result: ok. 175 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 23.88s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+service clippy exit 0
+service fmt ok
+test result: ok. 167 passed; 0 failed; 7 ignored; 0 measured; 3549 filtered out; finished in 93.46s
+openbot clippy exit 0
+openbot fmt ok

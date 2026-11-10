@@ -95,8 +95,8 @@ pub(super) async fn enqueue_on(
     let inserted=sqlx::query_scalar::<_,Uuid>(
         "INSERT INTO agent_history_exchanges \
          (company_id,id,conversation_id,agent_id,revision_id,manifest_id,run_id,execution_id,job_id, \
-          position,input_digest,provenance,access_level,state) \
-         SELECT $1,$2,$3,$4,$5,$6,$7,$2,$8,$9,sha256(convert_to($10::jsonb::text,'UTF8')),$11,run.content_level,'queued' \
+          position,input_digest,provenance,access_level,content_exact,state) \
+         SELECT $1,$2,$3,$4,$5,$6,$7,$2,$8,$9,sha256(convert_to($10::jsonb::text,'UTF8')),$11,run.content_level,run.content_exact,'queued' \
          FROM workflow_runs AS run JOIN workflow_executions AS execution \
            ON execution.company_id=run.company_id AND execution.run_id=run.id \
          WHERE run.company_id=$1 AND run.id=$7 AND execution.id=$2 \

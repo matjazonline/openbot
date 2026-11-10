@@ -40,6 +40,26 @@ impl SourceKey {
     pub(super) fn as_str(&self) -> &str {
         &self.0
     }
+
+    /// The triggering message of a stored message key (none for any other source).
+    pub(super) fn message(stored: &str) -> Option<Uuid> {
+        let source: Value = serde_json::from_str(stored.strip_prefix("v1:")?).ok()?;
+        match source.as_array().map(Vec::as_slice) {
+            Some([kind, message]) if kind == "message" => Uuid::parse_str(message.as_str()?).ok(),
+            _ => None,
+        }
+    }
+
+    /// Whether a stored key is a person's manual start (not a message, schedule or child).
+    /// Anything unreadable is not (fail closed).
+    pub(super) fn is_manual(stored: &str) -> bool {
+        stored
+            .strip_prefix("v1:")
+            .and_then(|source| serde_json::from_str::<Value>(source).ok())
+            .is_some_and(|source| {
+                matches!(source.as_array().map(Vec::as_slice), Some([kind, _]) if kind == "manual")
+            })
+    }
 }
 
 #[async_trait]

@@ -1,0 +1,27 @@
+    Finished `test` profile [unoptimized] target(s) in 1m 49s
+     Running unittests src/lib.rs (/Users/mac03/.codex/worktrees/60a0/openbot/tmp/memory-service-run/review-b-probe/target/debug/deps/open_bots-e47c255d53b02584)
+
+running 1 test
+PROBE[disabled] poll before terminal: []
+PROBE[disabled] intent: failed Some("disabled")
+PROBE[disabled] poll after terminal: ["Wait"]
+PROBE[disabled] resume_wait: Ok(Completed(CommittedWorkflowStep { disposition: Committed, response_disposition: Automatic, output: Null, route: FinalError, target: End, successor: None }))
+PROBE[disabled] run=failed waiting=None wait=completed events=["admitted", "wait_parked", "memory_delivery_failed"]
+PROBE[disabled] control retry: Ok(Unsafe { revision: RunRevision(13) })
+PROBE[expired] poll before terminal: []
+PROBE[expired] intent: expired Some("expired")
+PROBE[expired] poll after terminal: ["Wait"]
+PROBE[expired] resume_wait: Ok(Completed(CommittedWorkflowStep { disposition: Committed, response_disposition: Automatic, output: Null, route: FinalError, target: End, successor: None }))
+PROBE[expired] run=failed waiting=None wait=completed events=["admitted", "wait_parked", "memory_delivery_failed"]
+PROBE[expired] control retry: Ok(Unsafe { revision: RunRevision(13) })
+PROBE[refused] poll before terminal: []
+PROBE[refused] intent: failed Some("authority")
+PROBE[refused] poll after terminal: ["Wait"]
+PROBE[refused] resume_wait: Ok(Completed(CommittedWorkflowStep { disposition: Committed, response_disposition: Automatic, output: Null, route: FinalError, target: End, successor: None }))
+PROBE[refused] run=failed waiting=None wait=completed events=["admitted", "wait_parked", "memory_delivery_failed"]
+PROBE[refused] control retry: Ok(Unsafe { revision: RunRevision(13) })
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::memory_steps_tests::review_probe_terminal_intent_wakes_and_fails_the_step ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3632 filtered out; finished in 2.00s
+
+exit=0

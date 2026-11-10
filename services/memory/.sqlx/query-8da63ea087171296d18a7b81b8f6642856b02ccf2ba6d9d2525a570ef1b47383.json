@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE tenants SET state = 'disabled', disabled_by = $2, disabled_by_scope = $3, state_changed_at = now() WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "8da63ea087171296d18a7b81b8f6642856b02ccf2ba6d9d2525a570ef1b47383"
+}

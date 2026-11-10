@@ -6,6 +6,8 @@ pub struct WorkflowServices {
     pub(super) templates: ProvisioningDeployment,
     pub(super) monitoring: Arc<dyn MonitoringService>,
     pub(super) worker_wakeups: Arc<Notify>,
+    /// The configured memory provisioner credential id; `None` while memory is unconfigured.
+    pub(super) memory_provisioner: Option<Uuid>,
 }
 impl WorkflowServices {
     pub fn agent_authoring_reads(&self) -> &dyn crate::application::agent::AgentAuthoringReads {
@@ -87,19 +89,31 @@ impl WorkflowServices {
     }
 
     /// The editor's step catalogue reference: every kind this deployment runs, each derived from
-    /// a compiling example. Built once; it depends only on the binary.
+    /// a compiling example. The memory kinds are listed only where the memory service is
+    /// configured; their notes say publication still needs memory enabled for the company
+    /// (`memory.not_enabled`). Built once per configuration; it depends only on the binary.
     pub fn step_catalogue(
         &self,
     ) -> &'static [crate::application::workflow::authoring::CatalogueEntry] {
-        static CATALOGUE: std::sync::LazyLock<
-            Vec<crate::application::workflow::authoring::CatalogueEntry>,
-        > = std::sync::LazyLock::new(|| {
+        type Catalogue =
+            std::sync::LazyLock<Vec<crate::application::workflow::authoring::CatalogueEntry>>;
+        static WITHOUT_MEMORY: Catalogue = std::sync::LazyLock::new(|| {
             crate::application::workflow::authoring::catalogue_reference(
                 &WorkflowSourceDecoder,
                 UNHANDLED_STEP_KINDS,
             )
         });
-        &CATALOGUE
+        static WITH_MEMORY: Catalogue = std::sync::LazyLock::new(|| {
+            crate::application::workflow::authoring::catalogue_reference(
+                &WorkflowSourceDecoder,
+                &[],
+            )
+        });
+        if self.refused_kinds().is_empty() {
+            &WITH_MEMORY
+        } else {
+            &WITHOUT_MEMORY
+        }
     }
 
     /// An isolated sample receives only inert validated content and scripted data.
@@ -118,7 +132,17 @@ impl WorkflowServices {
             persistence: self.persistence.clone(),
             http,
             mcp,
-            refused_kinds: UNHANDLED_STEP_KINDS,
+            refused_kinds: self.refused_kinds(),
+        }
+    }
+
+    /// Without the memory service the memory kinds are unhandled; with it they are handled and
+    /// gated per company at publication (E4).
+    fn refused_kinds(&self) -> &'static [&'static str] {
+        if self.memory_provisioner.is_some() {
+            &[]
+        } else {
+            UNHANDLED_STEP_KINDS
         }
     }
 
@@ -132,6 +156,11 @@ impl WorkflowServices {
 
     pub fn jev_connections(&self) -> &dyn crate::application::workflow::jev::JevConnections {
         &self.persistence
+    }
+
+    /// Per-company memory opt-in (U1), owner/admin only.
+    pub fn memory_settings(&self) -> crate::application::memory::MemorySettings<'_> {
+        crate::application::memory::MemorySettings::new(&self.persistence, self.memory_provisioner)
     }
 
     /// Named workflow tool registrations (07-D2, notice WF-C003).
@@ -217,7 +246,16 @@ impl WorkflowServices {
                 },
             },
         };
-        DefinitionService::new(self.authorizer(), p, WorkflowSourceDecoder, directory)
-            .with_refused_kinds(UNHANDLED_STEP_KINDS)
+        let definitions = DefinitionService::new(
+            self.authorizer(),
+            p.clone(),
+            WorkflowSourceDecoder,
+            directory,
+        )
+        .with_refused_kinds(self.refused_kinds());
+        match self.memory_provisioner {
+            Some(_) => definitions.with_memory_gate(Arc::new(p)),
+            None => definitions,
+        }
     }
 }

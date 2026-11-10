@@ -132,3 +132,66 @@ The native service uses explicitly requested server generation over complete bou
 windows. It does not claim to resume Claude-Mem's local stateful observer from isolated events.
 The lifecycle rules for those server operations are specified in
 [04](04-observation-generation.md).
+
+## Implementation verification (P2, 2026-11-08)
+
+Run from `services/memory` with `CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0
+CARGO_PROFILE_TEST_DEBUG=0` (to save disk) and `MEMORY_TEST_DATABASE_URL` unset, because database
+access was not yet available. Logs are under `tmp/memory-service-run/logs/p2-focused-*.log`.
+
+| Command | Selected | Result |
+| --- | --- | --- |
+| `scripts/focused.sh memory_contract_ --network-isolated` | 7 | 7 passed |
+| `scripts/focused.sh memory_mcp_ --network-isolated` | 1 | 1 passed |
+| `scripts/focused.sh memory_access_level_ --network-isolated` | 12 | 12 passed (domain contract) |
+| `scripts/focused.sh memory_authority_ --network-isolated` | 13 | 5 passed (domain/token/policy); 8 DB-backed **unavailable**: they fail explicitly on the missing `MEMORY_TEST_DATABASE_URL` and are not counted as passes |
+
+Unavailable here: the DB-backed authority cases (credential lifecycle, tenant isolation,
+provisioner bounds, sticky operator disable, the disable race with competing claimers, the
+namespace-delete versus grant-issue race, bootstrap/audit). They need a PostgreSQL server.
+The `memory_access_level_` HTTP/MCP/generation/correction denials arrive with those use cases
+(02B–04).
+
+## Implementation verification (P2 correction round 1, 2026-11-08)
+
+This round supersedes the "unavailable" DB entries above: the DB-backed cases have now run.
+Environment: a disposable private cluster owned by the run, PostgreSQL 18.6 (Homebrew,
+aarch64-apple-darwin) with pgvector 0.8.7, on 127.0.0.1:55432 (TCP only, trust auth, superuser
+`postgres`, fsync off), never the development server; `MEMORY_TEST_DATABASE_URL=postgres://postgres@127.0.0.1:55432/postgres`.
+Commands run from `services/memory` with `CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0
+CARGO_PROFILE_TEST_DEBUG=0`. sqlx-cli 0.8.6 was installed under `tmp/memory-service-run/tools` and
+put first on `PATH`; `MEMORY_PSQL=/opt/homebrew/opt/postgresql@18/bin/psql`. Logs are under
+`tmp/memory-service-run/logs/a2-*.log`. `--network-isolated` on macOS is the `sandbox-exec`
+profile, and its self-test passed in every run: loopback allowed, external IPv4/IPv6 refused,
+test server reachable. The Linux iptables/conntrack path did not run here.
+
+First run of the DB-backed suite, before any correction (`a2-db0-<prefix>.log`). Every case
+passed unchanged, so the first execution of `0001_init.sql` and PgStore surfaced no defect.
+
+| Command | Selected | Result |
+| --- | --- | --- |
+| `scripts/focused.sh memory_authority_ --network-isolated` | 13 | 13 passed (8 DB-backed) |
+| `scripts/focused.sh memory_access_level_ --network-isolated` | 12 | 12 passed |
+| `scripts/focused.sh memory_contract_ --network-isolated` | 7 | 7 passed |
+| `scripts/focused.sh memory_mcp_ --network-isolated` | 1 | 1 passed |
+
+After the review corrections (`a2-db1-<prefix>.log`):
+
+| Command | Selected | Result |
+| --- | --- | --- |
+| `scripts/focused.sh memory_authority_ --network-isolated` | 22 | 22 passed (15 DB-backed) |
+| `scripts/focused.sh memory_access_level_ --network-isolated` | 12 | 12 passed |
+| `scripts/focused.sh memory_contract_ --network-isolated` | 9 | 9 passed |
+| `scripts/focused.sh memory_mcp_ --network-isolated` | 3 | 3 passed |
+
+The m1 tests were checked by mutation. With the in-transaction admin re-check disabled, both
+`memory_authority_admin_writes_recheck_*` and `memory_authority_admin_revocation_races_*`
+failed; after restoring it they passed. This was an unisolated `cargo test --lib
+memory_authority_admin` run, not recorded as a gate.
+
+Deferred, not passed: the 01A focused cases for conflicting retries, context exhaustion and
+sibling-namespace reads need the 02B/03B use cases. So do the `memory_access_level_`
+HTTP/MCP/generation/correction denials. Until then those operations answer `501`.
+`memory_authority_disable_races_competing_claimers_without_revival` races ad hoc claimer SQL,
+not production claim code (04B). It shows that disable leaves no live operation; it is not the
+D10 claimer proof.

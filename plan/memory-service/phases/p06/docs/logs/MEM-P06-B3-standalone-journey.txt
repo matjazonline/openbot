@@ -1,0 +1,17 @@
+standalone-journey: building the extracted copy in /var/folders/n2/5y7x75r92zl0ll90154hxdzr0000gn/T//memory-journey.0PBwov/memory
+memory_standalone_provision ok
+memory_standalone_save ok
+memory_standalone_search ok
+memory_standalone_classification ok
+memory_standalone_fetch ok
+memory_standalone_timeline ok
+memory_standalone_context ok
+memory_standalone_mcp ok
+memory_standalone_generation outcome=saved memories=1
+memory_standalone_generation ok
+memory_standalone_correct ok
+memory_standalone_delete ok
+memory_standalone_purge ok
+memory_standalone_tenant_delete ok
+memory_standalone journey passed
+standalone-journey: 13 steps passed (stand-in provider)

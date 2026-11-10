@@ -1,0 +1,36 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT request_sha256, credential_id, result FROM idempotency_records WHERE tenant_id = $1 AND kind = $2 AND key = $3",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "request_sha256",
+        "type_info": "Bytea"
+      },
+      {
+        "ordinal": 1,
+        "name": "credential_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "result",
+        "type_info": "Jsonb"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "b77fec48c576841c5b5e9c76a8b176ca8472f07c70f0639f992eb5f04c7d4ed8"
+}

@@ -1,0 +1,53 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "WITH exhausted AS (\n                     UPDATE observations SET index_state = 'failed', index_error = 'lease_expired',\n                            index_lease_until = NULL\n                      WHERE (tenant_id, id) IN (\n                            SELECT tenant_id, id FROM observations\n                             WHERE index_state = 'pending' AND index_attempts >= 8\n                               AND index_lease_until < now()\n                               FOR NO KEY UPDATE SKIP LOCKED)\n                     RETURNING id\n                   ), due AS (\n                     SELECT o.tenant_id, o.id FROM observations AS o\n                       JOIN tenants AS t ON t.id = o.tenant_id\n                       JOIN namespaces AS n ON (n.tenant_id, n.id) = (o.tenant_id, o.namespace_id)\n                      WHERE o.index_state IN ('pending', 'failed') AND o.index_attempts < 8\n                        AND o.next_index_at <= now()\n                        AND (o.index_lease_until IS NULL OR o.index_lease_until < now())\n                        AND t.state = 'active' AND n.state = 'active'\n                        AND (o.expires_at IS NULL OR o.expires_at > now())\n                      ORDER BY o.next_index_at, o.id\n                      LIMIT $1\n                        FOR NO KEY UPDATE OF o SKIP LOCKED\n                   )\n                   UPDATE observations AS o\n                      SET index_fence = o.index_fence + 1, index_attempts = o.index_attempts + 1,\n                          index_lease_until = now() + make_interval(secs => $2)\n                     FROM due WHERE (o.tenant_id, o.id) = (due.tenant_id, due.id)\n                   RETURNING o.tenant_id, o.id, o.revision, o.index_fence, o.title, o.body",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "tenant_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "revision",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 3,
+        "name": "index_fence",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 4,
+        "name": "title",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 5,
+        "name": "body",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Float8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "a51e44827b7ffcfb35b3c2d429f6af0382c1a15c0375bac692b149cba766ab1a"
+}

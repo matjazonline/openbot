@@ -579,7 +579,10 @@ async fn submit_business_on(
     let successor = Box::pin(batch_commit::complete(
         tx,
         scope,
-        &activation,
+        batch_commit::CompletedStep {
+            activated: &activation,
+            graph: binding.bundle().compiled().graph(),
+        },
         &completion,
         run.max_steps,
         completion_job::CompletionOwner::Parked(WaitId::new(source_wait)),

@@ -1,0 +1,37 @@
+== reviewer B: mutation B on frozen tree dfeeca6774cffca03ca7302a7e73b0d6a64dd270, A reverted (2026-11-09T11:25:33Z)
+patching file 'src/application/workflow/memory_tools/runtime.rs'
+patch exit 0
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1m 14s
+     Running unittests src/lib.rs (/Users/mac03/.codex/worktrees/60a0/openbot/tmp/memory-service-run/mut-b3-rev/target/debug/deps/open_bots-0312fde2b93b807b)
+
+running 3 tests
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::memory_integration_agent_memory_tools_search_and_save_through_the_production_dispatch ... FAILED
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::memory_access_level_tool_read_commits_its_rise_before_the_model_sees_it ... FAILED
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::memory_access_level_competing_rise_and_tool_save_freeze_the_committed_level ... ok
+
+failures:
+
+---- adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::memory_integration_agent_memory_tools_search_and_save_through_the_production_dispatch stdout ----
+
+thread 'adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::memory_integration_agent_memory_tools_search_and_save_through_the_production_dispatch' (22048534) panicked at src/adapters/persistence/workflow/memory_tool_tests.rs:313:5:
+assertion `left == right` failed: raised to the highest exposed item
+  left: 0
+ right: 5
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::memory_access_level_tool_read_commits_its_rise_before_the_model_sees_it stdout ----
+
+thread 'adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::memory_access_level_tool_read_commits_its_rise_before_the_model_sees_it' (22048533) panicked at src/adapters/persistence/workflow/memory_tool_tests.rs:827:5:
+no result before the observation commits
+
+
+failures:
+    adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::memory_access_level_tool_read_commits_its_rise_before_the_model_sees_it
+    adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::memory_integration_agent_memory_tools_search_and_save_through_the_production_dispatch
+
+test result: FAILED. 1 passed; 2 failed; 0 ignored; 0 measured; 3662 filtered out; finished in 3.73s
+
+error: test failed, to rerun pass `--lib`
+cargo exit 101
+deleted /Users/mac03/.codex/worktrees/60a0/openbot/tmp/memory-service-run/mut-b3-rev
+/dev/disk3s5   228Gi   173Gi    30Gi    86%    2.2M  313M    1%   /System/Volumes/Data

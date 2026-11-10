@@ -1,0 +1,13 @@
+== workflow-sample-boundary tests
+.....
+----------------------------------------------------------------------
+Ran 5 tests in 0.032s
+
+OK
+exit 0
+== workflow-sample-boundary
+workflow sample capability boundary passed
+exit 0
+== memory service boundary-check
+boundary: ok
+exit 0

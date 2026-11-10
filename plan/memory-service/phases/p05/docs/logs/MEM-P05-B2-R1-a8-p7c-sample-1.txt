@@ -1,0 +1,54 @@
+   Compiling open_bots v0.1.0 (/Users/mac03/.codex/worktrees/60a0/openbot)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2m 07s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-6c472bc7410f7b21)
+
+running 46 tests
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::memory_steps_tests::memory_integration_run_cancellation_cancels_the_parked_intent ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::memory_steps_tests::memory_access_level_load_output_never_precedes_its_committed_observation ... ok
+test adapters::persistence::workflow::tests::admission_tests::knowledge_admission_tests::memory_access_level_schema_only_lowers_exactness_and_shapes_message_bits ... ok
+test adapters::persistence::workflow::tests::admission_tests::batch_tests::memory_access_level_pure_batch_keeps_exactness ... ok
+test adapters::persistence::memory::delivery_tests::memory_access_level_saved_label_follows_scope_and_exactness ... ok
+test adapters::persistence::workflow::tests::admission_tests::admission_source_tests::memory_access_level_admission_exactness_follows_the_trigger_source ... ok
+test application::workflow::exactness::tests::memory_access_level_every_step_kind_and_tool_target_is_classified ... ok
+test application::workflow::exactness::tests::memory_access_level_human_decision_choice_is_exact_and_free_text_is_not ... ok
+test application::workflow::sample::tests::bounded_root_budget_and_external_kinds_never_fall_back ... ok
+test application::workflow::sample::tests::channel_reply_preview_tests::channel_reply_authoring_five_examples_compile_and_execute_without_production_effects ... ok
+test application::workflow::sample::tests::channel_reply_preview_tests::channel_reply_authoring_native_review_reject_completes_suppressed_and_edit_is_the_response ... ok
+test application::workflow::sample::tests::channel_reply_preview_tests::channel_reply_authoring_sample_child_suppression_does_not_suppress_the_root ... ok
+test application::workflow::sample::tests::channel_reply_preview_tests::channel_reply_authoring_sample_invalid_mapping_is_refused_and_question_approval_is_distinct ... ok
+test application::workflow::sample::tests::channel_reply_preview_tests::channel_reply_authoring_sample_missing_human_script_has_typed_wait_preview ... ok
+test application::workflow::sample::tests::channel_reply_preview_tests::channel_reply_authoring_sample_seals_mapping_and_policy_and_previews_output ... ok
+test application::workflow::sample::tests::channel_reply_preview_tests::channel_reply_authoring_sample_suppression_skips_projection_for_valid_empty_values ... ok
+test application::workflow::sample::tests::channel_reply_terminal_tests::channel_reply_terminal_sample_returns_business_value_without_a_script ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::memory_steps_tests::memory_integration_save_and_load_steps_round_trip_through_the_intent ... ok
+test application::workflow::sample::tests::history_tests::agent_history_samples_actual_agent_identity_separates_streams ... ok
+test application::workflow::sample::tests::history_tests::agent_history_samples_exact_pair_limit_reports_only_recent_complete_suffix ... ok
+test application::workflow::sample::tests::history_tests::agent_history_samples_model_only_step_has_no_logical_seed ... ok
+test application::workflow::sample::tests::history_tests::agent_history_samples_oversized_newest_pair_stops_before_older_pair ... ok
+test application::workflow::sample::tests::history_tests::agent_history_samples_repeated_calls_keep_exact_local_pairs_and_current_input_separate ... ok
+test application::workflow::sample::tests::history_tests::agent_history_samples_same_agent_child_has_its_own_ephemeral_branch ... ok
+test application::workflow::sample::tests::jev_tests::jev_box_sample_rejects_tools_tokens_and_invalid_box ... ok
+test application::workflow::sample::tests::jev_tests::jev_box_sample_uses_only_scripted_answers_and_inert_metadata ... ok
+test application::workflow::sample::tests::jev_tests::workflow_sample_jev_mixed_thresholds_automatic_and_human_paths ... ok
+test application::workflow::sample::tests::missing_invalid_unused_and_oversized_scripts_fail_explicitly ... ok
+test application::workflow::sample::tests::descendants_cannot_replenish_root_budgets_and_report_size_is_bounded ... ok
+test application::workflow::sample::tests::pure_and_scripted_routing_share_compiled_validation ... ok
+test application::workflow::sample::tests::tools_tests::approvals::autonomous_agent_samples_protected_child_binding_requires_explicit_simulated_approval ... ok
+test application::workflow::sample::tests::tools_tests::approvals::autonomous_agent_samples_protected_http_binding_requires_explicit_simulated_approval ... ok
+test application::workflow::sample::tests::tools_tests::direct_agent_tools_and_pinned_workflow_tools_stay_in_sample ... ok
+test application::workflow::sample::tests::repeated_human_revision_carries_edited_artifact_feedback_and_captures_reply ... ok
+test application::workflow::sample::tests::tools_tests::direct_tool_inputs_and_outputs_are_validated ... ok
+test application::workflow::sample::tests::tools_tests::protected_step_workflow_tool_needs_approval_and_executes_child ... ok
+test domain::entities::access_level::knowledge_tests::memory_access_level_human_input_exactness_follows_u2 ... ok
+test adapters::persistence::workflow::tests::admission_tests::decision_tests::memory_access_level_decision_choice_stays_exact_and_feedback_lowers ... ok
+test application::workflow::sample::tests::tools_tests::direct_mcp_tool_uses_the_production_result_envelope ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::memory_steps_tests::memory_integration_steps_fail_terminally_once_memory_is_disabled ... ok
+test adapters::persistence::workflow::tests::admission_tests::batch_tests::child_runtime_tests::memory_access_level_child_copies_exactness_and_an_inexact_child_lowers_its_parent ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::recovery_tests::memory_access_level_routed_failure_passes_the_exactness_hook ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::wait_tests::memory_access_level_event_wake_lowers_exactness ... ok
+test adapters::persistence::workflow::tests::admission_tests::history_reader_tests::memory_access_level_history_read_lowers_for_conversational_or_inexact_messages ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::native::memory_access_level_history_freeze_lowers_for_inexact_exchanges ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::memory_steps_tests::memory_access_level_competing_recall_and_save_freeze_preserve_the_watermark ... ok
+
+test result: ok. 46 passed; 0 failed; 0 ignored; 0 measured; 3586 filtered out; finished in 6.83s
+

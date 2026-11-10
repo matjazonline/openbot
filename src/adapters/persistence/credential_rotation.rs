@@ -80,6 +80,8 @@ enum CredentialTable {
     /// `company_resend_api_integrations.api_key` and `.signing_secret` — two `enc:v2` columns of one
     /// row, walked as the two credentials they are.
     CompanyResendApiIntegrations,
+    /// `memory_namespaces.credential_envelope` — one `enc:v2` client token per namespace.
+    MemoryClientCredentials,
 }
 
 impl CredentialTable {
@@ -92,6 +94,7 @@ impl CredentialTable {
         Self::ModelConnections,
         Self::IntegrationCredentials,
         Self::CompanyResendApiIntegrations,
+        Self::MemoryClientCredentials,
     ];
 }
 
@@ -118,6 +121,10 @@ enum CredentialKey {
     CompanyMcpCredential {
         company_id: Uuid,
         connection_id: Uuid,
+    },
+    MemoryClientCredential {
+        company_id: Uuid,
+        namespace_id: Uuid,
     },
     ModelConnection {
         company_id: Uuid,
@@ -461,6 +468,9 @@ async fn store_rotated_credential(
             sqlx::query("UPDATE workflow_http_credentials SET envelope=$3 WHERE company_id=$1 AND connection_id=$2 AND envelope=$4")
                 .bind(company_id).bind(connection_id).bind(rotated).bind(&row.stored).execute(&mut **transaction).await
         }
+        CredentialKey::MemoryClientCredential { company_id, namespace_id } => {
+            super::memory::inventory::rewrap(transaction, *company_id, *namespace_id, &row.stored, rotated).await
+        }
         CredentialKey::CompanyMcpCredential { company_id, connection_id } => {
             sqlx::query("UPDATE company_mcp_credentials SET envelope = $3 WHERE company_id = $1 AND connection_id = $2 AND envelope = $4")
                 .bind(company_id).bind(connection_id).bind(rotated).bind(&row.stored).execute(&mut **transaction).await
@@ -649,6 +659,30 @@ async fn fetch_credential_batch(
         }
         CredentialTable::CompanyResendApiIntegrations => {
             fetch_company_resend_api_credential_batch(connection, cursor).await
+        }
+        CredentialTable::MemoryClientCredentials => {
+            let after = match cursor {
+                Some(CredentialKey::MemoryClientCredential {
+                    company_id,
+                    namespace_id,
+                }) => Some((*company_id, *namespace_id)),
+                None => None,
+                _ => return Err(AppError::Internal("Invalid memory rotation cursor".into())),
+            };
+            Ok(
+                super::memory::inventory::page(connection, after, CREDENTIAL_BATCH_SIZE)
+                    .await?
+                    .into_iter()
+                    .map(|entry| InventoryRow {
+                        key: CredentialKey::MemoryClientCredential {
+                            company_id: entry.company_id,
+                            namespace_id: entry.namespace_id,
+                        },
+                        format: CredentialFormat::Envelope(entry.context),
+                        stored: entry.envelope,
+                    })
+                    .collect(),
+            )
         }
     }
 }

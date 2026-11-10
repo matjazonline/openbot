@@ -59,8 +59,12 @@ fn workflow_registry_exact_catalogue_and_help_examples_compile() {
         // 06-D6, 07-D1, p09: every kind executes except memory (out of this release), and the
         // editor's catalogue reference shows these notes to authors.
         assert!(!help.notes.contains("Execution unavailable"), "{name}");
+        assert!(
+            !help.notes.contains("Not available in this release"),
+            "{name}"
+        );
         assert_eq!(
-            help.notes.contains("Not available in this release"),
+            help.notes.contains("memory.not_enabled"),
             name.starts_with("memory."),
             "{name}"
         );

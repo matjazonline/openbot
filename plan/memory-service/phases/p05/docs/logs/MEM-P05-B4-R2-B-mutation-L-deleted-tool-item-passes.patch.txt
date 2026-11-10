@@ -1,0 +1,12 @@
+--- src/application/workflow/memory_recall.rs
++++ src/application/workflow/memory_recall.rs (mutation L)
+@@ -321,7 +321,8 @@
+                 fetched
+                     .items
+                     .iter()
+-                    .any(|item| item.observation_id == id && item.revision == revision)
++                    // MUTATION L: an id the fetch no longer returns (deleted) passes.
++                    .all(|item| item.observation_id != id || item.revision == revision)
+             };
+             if !chunk.iter().all(|(id, revision)| current(*id, *revision)) {
+                 return RecallValidation::Revoked;

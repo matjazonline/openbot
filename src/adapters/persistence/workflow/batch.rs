@@ -183,7 +183,10 @@ async fn run_steps(
         let next = batch_commit::complete(
             db,
             current,
-            &activated,
+            batch_commit::CompletedStep {
+                activated: &activated,
+                graph: bundle.compiled().graph(),
+            },
             &completion,
             max_steps,
             completion_job::CompletionOwner::Pure,

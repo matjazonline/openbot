@@ -315,9 +315,11 @@ fn company_settings_body(pane: &CompanyEditPane<'_>) -> String {
                     <p class="mt-1 text-sm opacity-70">Only the company owner can edit these settings.</p>
                 </div>
                 {typesafe}
+                {memory}
             </div>
             "##,
-            typesafe = company_typesafe::loader(pane.company.id)
+            typesafe = company_typesafe::loader(pane.company.id),
+            memory = company_memory::loader(pane.company.id)
         );
     }
 
@@ -359,12 +361,14 @@ fn company_settings_body(pane: &CompanyEditPane<'_>) -> String {
                 </form>
                 {resend_api_section}
                 {typesafe}
+                {memory}
             </div>
         "##,
         name = escape_html_text(&pane.company.name),
         error_html = form_error_banner(pane.error),
         resend_api_section = pane.resend_api_section,
         typesafe = company_typesafe::loader(company_id),
+        memory = company_memory::loader(company_id),
         workspace_links = workspace_links(company_id, pane.counts),
         fields = company_fields(&draft),
     )

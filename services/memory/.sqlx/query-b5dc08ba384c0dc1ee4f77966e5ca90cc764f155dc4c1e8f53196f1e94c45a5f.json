@@ -1,0 +1,24 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT input_level::smallint AS \"level!\" FROM generation_operations\n                WHERE tenant_id = $1 AND namespace_id = $2 AND id = $3 FOR NO KEY UPDATE",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "level!",
+        "type_info": "Int2"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "b5dc08ba384c0dc1ee4f77966e5ca90cc764f155dc4c1e8f53196f1e94c45a5f"
+}

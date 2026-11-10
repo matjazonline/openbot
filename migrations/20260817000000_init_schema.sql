@@ -184,6 +184,15 @@ BEGIN
                                     AND action.execution_id = wait.execution_id AND action.wait_id = wait.id
                                 WHERE wait.company_id = execution.company_id AND wait.execution_id = execution.id
                                     AND wait.reason = 'effect' AND wait.state = 'waiting'))
+                        -- A memory.save parked on its committed delivery intent (phase 05 E4, E8).
+                        OR (attempt.stop_reason='memory_parked' AND execution.completed_at IS NULL
+                            AND run.state='waiting' AND run.waiting_reason='effect'
+                            AND OLD.continuation_count < workflow_job_continuation_limit()
+                            AND EXISTS (SELECT 1 FROM workflow_waits AS wait
+                                JOIN memory_deliveries AS intent ON intent.company_id=wait.company_id
+                                    AND intent.wait_id=wait.id AND intent.execution_id=wait.execution_id
+                                WHERE wait.company_id=execution.company_id AND wait.execution_id=execution.id
+                                    AND wait.reason='effect' AND wait.state='waiting'))
                         OR (attempt.stop_reason='question_parked' AND execution.completed_at IS NULL
                             AND execution.committed_route IS NULL AND run.state='waiting' AND run.waiting_reason='event'
                             AND OLD.continuation_count < workflow_job_continuation_limit()
@@ -3333,8 +3342,11 @@ BEGIN
     IF NEW.event_name IS NOT NULL OR NEW.correlation IS NOT NULL OR NEW.notification_intent IS NOT NULL
         OR NOT EXISTS(SELECT 1 FROM workflow_runs AS run WHERE run.company_id=NEW.company_id
             AND run.id=NEW.run_id AND run.deadline=NEW.deadline)
-        OR NOT EXISTS(SELECT 1 FROM workflow_message_actions AS action WHERE action.company_id=NEW.company_id
+        OR (NOT EXISTS(SELECT 1 FROM workflow_message_actions AS action WHERE action.company_id=NEW.company_id
             AND action.run_id=NEW.run_id AND action.execution_id=NEW.execution_id AND action.wait_id=NEW.id)
+          -- or to the memory.save intent committed with it (phase 05 E4)
+          AND NOT EXISTS(SELECT 1 FROM memory_deliveries AS intent WHERE intent.company_id=NEW.company_id
+            AND intent.run_id=NEW.run_id AND intent.execution_id=NEW.execution_id AND intent.wait_id=NEW.id))
     THEN RAISE EXCEPTION 'workflow effect wait must belong to one message action' USING ERRCODE='23514', CONSTRAINT='workflow_guard:workflow_message_effect_wait_guard'; END IF;
     RETURN NEW;
 END $$;
@@ -4025,6 +4037,9 @@ CREATE TABLE public.messages (
     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     audience text NOT NULL,
     structured_response jsonb,
+    -- Agent and system rows carry the producing run's exactness; human rows carry none, since
+    -- their exactness is derived from the role when read (phase 05 E3).
+    content_exact boolean,
     CONSTRAINT messages_attachments_check CHECK (((attachments IS NULL) OR ((jsonb_typeof(attachments) = 'object'::text) AND ((attachments -> 'version'::text) = '"1"'::jsonb) AND (jsonb_typeof((attachments -> 'items'::text)) = 'array'::text) AND (octet_length((attachments)::text) <= 262144)))),
     CONSTRAINT messages_audience_check CHECK ((audience = ANY (ARRAY['external_conversation'::text, 'internal_only'::text]))),
     CONSTRAINT messages_content_hash_check CHECK ((octet_length(content_hash) = 32)),
@@ -4032,7 +4047,8 @@ CREATE TABLE public.messages (
     CONSTRAINT messages_role_check CHECK ((role = ANY (ARRAY['human'::text, 'agent'::text, 'system'::text]))),
     CONSTRAINT messages_structured_response_body CHECK (((structured_response IS NULL) OR COALESCE(((jsonb_typeof(structured_response) = 'object'::text) AND ((structured_response ->> 'body'::text) = clean_text_body) AND (((structured_response -> 'contract'::text) ->> 'version'::text) = '1'::text) AND (length((structured_response ->> 'fingerprint'::text)) = 64)), false))),
     CONSTRAINT messages_subject_check CHECK ((octet_length(subject) <= 2048)),
-    CONSTRAINT messages_human_public CHECK (role <> 'human' OR access_level = 0)
+    CONSTRAINT messages_human_public CHECK (role <> 'human' OR access_level = 0),
+    CONSTRAINT messages_content_exact_shape CHECK ((role = 'human') = (content_exact IS NULL))
 );
 
 
@@ -4308,7 +4324,7 @@ CREATE TABLE public.task_attempts (
     CONSTRAINT task_attempts_finished_check CHECK ((status = 'processing') = (finished_at IS NULL)),
     CONSTRAINT task_attempts_stop_reason_check CHECK (CASE status
         WHEN 'processing' THEN stop_reason IS NULL
-        WHEN 'completed' THEN stop_reason IS NOT NULL AND stop_reason IN ('completed','effect_parked','question_parked','approval_parked','child_parked','agent_turn_parked')
+        WHEN 'completed' THEN stop_reason IS NOT NULL AND stop_reason IN ('completed','effect_parked','question_parked','approval_parked','child_parked','agent_turn_parked','memory_parked')
         WHEN 'failed' THEN stop_reason IS NULL OR stop_reason IN ('timed_out','lease_lost')
         ELSE false END),
     CONSTRAINT workflow_attempt_failure_shape CHECK ((((workflow_failure_class IS NULL) AND (workflow_failure_code IS NULL) AND (workflow_retry_safety IS NULL) AND (workflow_retirement IS NULL)) OR ((status = 'failed'::text) AND (finished_at IS NOT NULL) AND (workflow_failure_class IS NOT NULL) AND (workflow_failure_class = ANY (ARRAY['retryable'::text, 'terminal'::text])) AND (workflow_failure_code IS NOT NULL) AND ((octet_length(workflow_failure_code) >= 1) AND (octet_length(workflow_failure_code) <= 128)) AND (workflow_retry_safety IS NOT NULL) AND (workflow_retry_safety = ANY (ARRAY['safe'::text, 'unknown'::text])) AND (workflow_retirement IS NOT NULL) AND (workflow_retirement = ANY (ARRAY['live'::text, 'expired'::text, 'deadline'::text, 'cancel'::text, 'guard'::text])))))
@@ -5736,6 +5752,9 @@ CREATE TRIGGER workflow_bundle_immutable BEFORE UPDATE OR DELETE ON public.workf
 CREATE TABLE public.workflow_runs (
     knowledge_ceiling public.access_level NOT NULL,
     content_level public.access_level DEFAULT 0 NOT NULL,
+    -- Whether content_level is a complete account of what the run consumed (phase 05 E3).
+    -- Every writer states it; it is only ever lowered.
+    content_exact boolean NOT NULL,
     company_id uuid NOT NULL,
     id uuid NOT NULL,
     binding_id uuid NOT NULL,
@@ -11621,9 +11640,9 @@ CREATE TABLE public.workflow_history_snapshots (
 CREATE FUNCTION public.guard_workflow_run_snapshot() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
     IF (to_jsonb(NEW) - ARRAY['state','waiting_reason','terminal_execution_id',
-        'terminal_wakeup_sequence','revision','finished_at','content_level']) IS DISTINCT FROM
+        'terminal_wakeup_sequence','revision','finished_at','content_level','content_exact']) IS DISTINCT FROM
        (to_jsonb(OLD) - ARRAY['state','waiting_reason','terminal_execution_id',
-        'terminal_wakeup_sequence','revision','finished_at','content_level']) THEN
+        'terminal_wakeup_sequence','revision','finished_at','content_level','content_exact']) THEN
         RAISE EXCEPTION 'workflow run snapshot is immutable' USING ERRCODE='23514', CONSTRAINT='workflow_guard:guard_workflow_run_snapshot';
     END IF;
     RETURN NEW;
@@ -11849,24 +11868,27 @@ BEGIN
     IF NEW.knowledge_ceiling IS DISTINCT FROM OLD.knowledge_ceiling
        OR NEW.content_level < OLD.content_level
        OR (OLD.state IN ('succeeded','failed','cancelled') AND NEW.content_level IS DISTINCT FROM OLD.content_level)
+       OR (NEW.content_exact AND NOT OLD.content_exact)
+       OR (OLD.state IN ('succeeded','failed','cancelled') AND NEW.content_exact IS DISTINCT FROM OLD.content_exact)
     THEN
         RAISE EXCEPTION 'workflow knowledge facts cannot be lowered or rewritten'
             USING ERRCODE='23514', CONSTRAINT='workflow_guard:workflow_run_knowledge';
     END IF;
     RETURN NEW;
 END $$;
-CREATE TRIGGER workflow_run_knowledge BEFORE UPDATE OF knowledge_ceiling,content_level ON public.workflow_runs
+CREATE TRIGGER workflow_run_knowledge BEFORE UPDATE OF knowledge_ceiling,content_level,content_exact ON public.workflow_runs
     FOR EACH ROW EXECUTE FUNCTION public.guard_workflow_run_knowledge();
 
 CREATE FUNCTION public.guard_message_access_level() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
-    IF NEW.access_level IS DISTINCT FROM OLD.access_level THEN
+    IF NEW.access_level IS DISTINCT FROM OLD.access_level
+        OR NEW.content_exact IS DISTINCT FROM OLD.content_exact THEN
         RAISE EXCEPTION 'message access level is immutable'
             USING ERRCODE='23514', CONSTRAINT='workflow_guard:message_access_level';
     END IF;
     RETURN NEW;
 END $$;
-CREATE TRIGGER message_access_level_immutable BEFORE UPDATE OF access_level ON public.messages
+CREATE TRIGGER message_access_level_immutable BEFORE UPDATE OF access_level,content_exact ON public.messages
     FOR EACH ROW EXECUTE FUNCTION public.guard_message_access_level();
 
 
@@ -12157,7 +12179,8 @@ CREATE TABLE public.agent_capability_bindings (
     FOREIGN KEY(company_id,workflow_id,version_id) REFERENCES public.workflow_versions(company_id,workflow_id,id) DEFERRABLE INITIALLY DEFERRED,
     CHECK(company_id IS NOT NULL OR kind='builtin'),
     CONSTRAINT agent_binding_target_shape CHECK (
-        (kind='builtin' AND builtin IS NOT NULL AND builtin IN ('message_send','message_reply','list_company_agents','create_agent_channel','search_knowledge')
+        (kind='builtin' AND builtin IS NOT NULL AND builtin IN ('message_send','message_reply','list_company_agents','create_agent_channel','search_knowledge',
+            'search_memory','memory_timeline','memory_details','save_memory')
             AND num_nonnulls(builtin,http_connection_id,mcp_connection_id,operation_name,reviewed_version,remote_name,workflow_registration,workflow_id,version_id,params)=1)
         OR (kind='http' AND http_connection_id IS NOT NULL AND operation_name IS NOT NULL
             AND num_nonnulls(builtin,http_connection_id,mcp_connection_id,operation_name,reviewed_version,remote_name,workflow_registration,workflow_id,version_id,params)=2)
@@ -12166,7 +12189,8 @@ CREATE TABLE public.agent_capability_bindings (
         OR (kind='workflow' AND workflow_registration IS NOT NULL AND workflow_id IS NOT NULL AND version_id IS NOT NULL AND params IS NOT NULL
             AND num_nonnulls(builtin,http_connection_id,mcp_connection_id,operation_name,reviewed_version,remote_name,workflow_registration,workflow_id,version_id,params)=4)),
     CONSTRAINT agent_binding_reserved_alias CHECK (
-        NOT (alias LIKE 'message.%' OR alias IN ('list_company_agents','create_agent_channel','search_knowledge'))
+        NOT (alias LIKE 'message.%' OR alias IN ('list_company_agents','create_agent_channel','search_knowledge',
+            'search_memory','memory_timeline','memory_details','save_memory'))
         OR (kind='builtin' AND alias=CASE builtin WHEN 'message_send' THEN 'message.send' WHEN 'message_reply' THEN 'message.reply' ELSE builtin END))
 );
 CREATE TABLE public.agent_draft_bindings (
@@ -13801,6 +13825,8 @@ CREATE TABLE public.agent_history_exchanges (
     input_digest bytea NOT NULL CHECK (octet_length(input_digest)=32),
     provenance jsonb NOT NULL CHECK (jsonb_typeof(provenance)='object' AND octet_length(provenance::text)<=262144),
     access_level public.access_level NOT NULL,
+    -- Follows its run's exactness the way access_level follows content_level (phase 05 E3).
+    content_exact boolean NOT NULL,
     state text NOT NULL CHECK (state IN ('queued','active','completed','failed','cancelled')),
     checkpoint_id uuid,
     output jsonb,
@@ -14042,7 +14068,7 @@ BEGIN
             AND execution.activated_at IS NOT NULL AND execution.completed_at IS NULL
             AND execution.frozen_inputs ? 'context'
             AND NEW.input_digest=sha256(convert_to((execution.frozen_inputs->'context')::text,'UTF8'))
-            AND NEW.access_level=run.content_level
+            AND NEW.access_level=run.content_level AND NEW.content_exact=run.content_exact
             AND NEW.manifest_id=ownership.manifest_id AND NEW.revision_id=selected.revision_id
             AND (NEW.provenance-ARRAY['agent','revision','model','output_contract']::text[])='{}'::jsonb
             AND NEW.provenance->>'agent'=NEW.agent_id::text
@@ -14244,6 +14270,7 @@ END $$;
 
 CREATE FUNCTION public.guard_agent_history_exchange_change() RETURNS trigger LANGUAGE plpgsql AS $$
 DECLARE current_level public.access_level;
+        current_exact boolean;
 BEGIN
     IF TG_OP='DELETE' THEN
         IF NOT EXISTS (SELECT 1 FROM public.companies WHERE id=OLD.company_id) THEN
@@ -14291,9 +14318,9 @@ BEGIN
         RAISE EXCEPTION 'agent output digest is immutable' USING ERRCODE='23514';
     END IF;
     IF OLD.state IN ('completed','cancelled')
-        OR (to_jsonb(NEW)-ARRAY['state','checkpoint_id','output','access_level','activated_at','finished_at','frozen_preparation','preparation_digest','output_digest']::text[])
+        OR (to_jsonb(NEW)-ARRAY['state','checkpoint_id','output','access_level','content_exact','activated_at','finished_at','frozen_preparation','preparation_digest','output_digest']::text[])
             IS DISTINCT FROM
-           (to_jsonb(OLD)-ARRAY['state','checkpoint_id','output','access_level','activated_at','finished_at','frozen_preparation','preparation_digest','output_digest']::text[])
+           (to_jsonb(OLD)-ARRAY['state','checkpoint_id','output','access_level','content_exact','activated_at','finished_at','frozen_preparation','preparation_digest','output_digest']::text[])
         OR (OLD.checkpoint_id IS NOT NULL AND NEW.checkpoint_id IS DISTINCT FROM OLD.checkpoint_id)
         OR (OLD.activated_at IS NOT NULL AND NEW.activated_at IS DISTINCT FROM OLD.activated_at)
         OR NOT public.agent_history_transition_allowed(OLD,NEW)
@@ -14316,9 +14343,10 @@ BEGIN
             RAISE EXCEPTION 'agent exchange does not own its turn' USING ERRCODE='23514';
         END IF;
     END IF;
-    SELECT content_level INTO STRICT current_level FROM public.workflow_runs
+    SELECT content_level,content_exact INTO STRICT current_level,current_exact FROM public.workflow_runs
         WHERE company_id=NEW.company_id AND id=NEW.run_id;
     IF NEW.access_level<OLD.access_level OR NEW.access_level<current_level
+        OR (NEW.content_exact AND NOT (OLD.content_exact AND current_exact))
         OR (NEW.finished_at IS NOT NULL AND NEW.finished_at>clock_timestamp())
         OR (NEW.activated_at IS NOT NULL AND NEW.activated_at>clock_timestamp())
         OR NOT public.agent_history_checkpoint_matches(NEW)
@@ -14380,18 +14408,21 @@ BEGIN
         UPDATE public.agent_history_exchanges SET
             state=CASE WHEN NEW.state='cancelled' THEN 'cancelled' ELSE 'failed' END,
             access_level=GREATEST(access_level,NEW.content_level),
+            content_exact=content_exact AND NEW.content_exact,
             finished_at=COALESCE(finished_at,clock_timestamp())
         WHERE company_id=NEW.company_id AND run_id=NEW.id AND state IN ('queued','active');
         IF NEW.state='failed' THEN
             -- An invalid-output checkpoint may have closed its input before run retirement.
-            UPDATE public.agent_history_exchanges SET access_level=GREATEST(access_level,NEW.content_level)
+            UPDATE public.agent_history_exchanges SET access_level=GREATEST(access_level,NEW.content_level),
+                    content_exact=content_exact AND NEW.content_exact
                 WHERE company_id=NEW.company_id AND run_id=NEW.id
                     AND execution_id=NEW.terminal_execution_id AND state='failed';
         END IF;
     ELSIF OLD.state='failed' AND NEW.state='running' AND OLD.terminal_execution_id IS NOT NULL THEN
         -- The existing run transition guard proves safe native control retry on this job.
         UPDATE public.agent_history_exchanges AS exchange SET state='queued',finished_at=NULL,
-            access_level=GREATEST(exchange.access_level,NEW.content_level)
+            access_level=GREATEST(exchange.access_level,NEW.content_level),
+            content_exact=exchange.content_exact AND NEW.content_exact
         WHERE exchange.company_id=NEW.company_id AND exchange.run_id=NEW.id
             AND exchange.execution_id=OLD.terminal_execution_id AND exchange.state='failed'
             AND public.workflow_control_retry_safe(NEW.company_id,NEW.id,exchange.job_id);
@@ -14406,6 +14437,7 @@ BEGIN
     IF NEW.committed_route='final_error' AND OLD.committed_route IS DISTINCT FROM NEW.committed_route THEN
         UPDATE public.agent_history_exchanges AS exchange SET state='failed',
             access_level=GREATEST(exchange.access_level,run.content_level),
+            content_exact=exchange.content_exact AND run.content_exact,
             finished_at=clock_timestamp()
         FROM public.workflow_runs AS run
         WHERE exchange.company_id=NEW.company_id AND exchange.run_id=NEW.run_id
@@ -14882,3 +14914,200 @@ BEGIN
 END $$;
 CREATE TRIGGER integration_connect_guard BEFORE INSERT OR UPDATE ON integration_connect_attempts
     FOR EACH ROW EXECUTE FUNCTION integration_connect_guard();
+
+-- Memory service client configuration (plan/memory-service implementation-decisions E2).
+-- OpenBot stores only connection state, per-namespace client credentials and the remote
+-- lifecycle; the memory corpus lives in the standalone service's own database.
+CREATE TABLE public.memory_tenants (
+    company_id uuid PRIMARY KEY REFERENCES public.companies(id) ON DELETE CASCADE,
+    state text NOT NULL CHECK (state IN ('enabled', 'disabled')),
+    -- Settings edits, cap-cache refreshes and provisioner-id recording bump `revision` only.
+    revision bigint NOT NULL CHECK (revision > 0),
+    -- Only disable bumps the epoch; an intent created under an older epoch never delivers.
+    disable_epoch bigint NOT NULL CHECK (disable_epoch >= 0),
+    provisioner_credential_id uuid NOT NULL,
+    -- `TenantView.generation_daily_token_cap` at the last create; NULL until one answered.
+    generation_cap bigint CHECK (generation_cap >= 0),
+    changed_by uuid NOT NULL,
+    changed_at timestamptz NOT NULL
+);
+CREATE TABLE public.memory_namespaces (
+    company_id uuid NOT NULL REFERENCES public.memory_tenants(company_id) ON DELETE CASCADE,
+    -- The service namespace external id: random, never an encoded scope.
+    id uuid NOT NULL,
+    scope_kind text NOT NULL CHECK (scope_kind IN ('company', 'agent', 'user')),
+    -- Plain ids, not FKs: the owner may be deleted while removal is still reconciling, and the
+    -- owner-row lock protocol (E2) orders provisioning against that deletion instead.
+    agent_id uuid,
+    user_id uuid,
+    state text NOT NULL CHECK (state IN ('provisioning', 'ready', 'removing')),
+    credential_id uuid,
+    -- `enc:v2` under CredentialContext::memory_client_credential; the envelope records its key version.
+    credential_envelope text CHECK (octet_length(credential_envelope) <= 4096),
+    created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
+    PRIMARY KEY (company_id, id),
+    CHECK ((scope_kind = 'company' AND agent_id IS NULL AND user_id IS NULL)
+        OR (scope_kind = 'agent' AND agent_id IS NOT NULL AND user_id IS NULL)
+        OR (scope_kind = 'user' AND agent_id IS NULL AND user_id IS NOT NULL)),
+    CHECK ((credential_id IS NULL) = (credential_envelope IS NULL)),
+    CHECK (state <> 'ready' OR credential_id IS NOT NULL)
+);
+-- One live namespace per scope; a returning agent or user gets a new row and id (E9).
+CREATE UNIQUE INDEX memory_namespaces_live_scope ON public.memory_namespaces (company_id, scope_kind,
+    COALESCE(agent_id, '00000000-0000-0000-0000-000000000000'::uuid),
+    COALESCE(user_id, '00000000-0000-0000-0000-000000000000'::uuid)) WHERE state <> 'removing';
+-- Capture policy (E8, U3): per agent and conversation kind, off unless an owner or admin turns it
+-- on. Each change records who, why and when. An agent's final delete removes its rows; capture
+-- locks run → tenant → namespace → this row, so that cascade (after removal's namespace lock)
+-- never waits on a capture holding this row.
+CREATE TABLE public.memory_agent_capture (
+    company_id uuid NOT NULL REFERENCES public.memory_tenants(company_id) ON DELETE CASCADE,
+    agent_id uuid NOT NULL,
+    kind text NOT NULL CHECK (kind IN ('private_sessions', 'threads')),
+    enabled boolean NOT NULL,
+    allowance_tokens bigint NOT NULL CHECK (allowance_tokens BETWEEN 1 AND 1000000),
+    max_output_tokens integer NOT NULL CHECK (max_output_tokens BETWEEN 1 AND 8192),
+    expiry_hours integer NOT NULL CHECK (expiry_hours BETWEEN 1 AND 168),
+    revision bigint NOT NULL CHECK (revision > 0),
+    changed_by uuid NOT NULL,
+    reason text NOT NULL CHECK (char_length(reason) BETWEEN 1 AND 500),
+    changed_at timestamptz NOT NULL,
+    PRIMARY KEY (company_id, agent_id, kind),
+    FOREIGN KEY (company_id, agent_id) REFERENCES public.agents(company_id, id) ON DELETE CASCADE
+);
+-- Remote resource lifecycle. No FK to companies: it must outlive its owner so a deletion still
+-- reconciles (persistence AGENTS, remote resources).
+CREATE TABLE public.memory_lifecycles (
+    id uuid PRIMARY KEY,
+    company_id uuid NOT NULL,
+    resource text NOT NULL CHECK (resource IN ('tenant', 'namespace')),
+    namespace_id uuid,
+    owner_kind text NOT NULL CHECK (owner_kind IN ('company', 'agent', 'user')),
+    owner_id uuid NOT NULL,
+    provisioner_credential_id uuid NOT NULL,
+    desired text NOT NULL CHECK (desired IN ('present', 'disabled', 'absent')),
+    observed text NOT NULL CHECK (observed IN ('none', 'present', 'disabled', 'absent')),
+    generation bigint NOT NULL CHECK (generation > 0),
+    fence bigint NOT NULL CHECK (fence >= 0),
+    state text NOT NULL CHECK (state IN ('pending', 'claimed', 'settled', 'failed')),
+    lease_owner uuid,
+    lease_until timestamptz,
+    attempts integer NOT NULL CHECK (attempts BETWEEN 0 AND 8),
+    -- Outage retries (service unavailable, revoked provisioner, interrupted): unbounded, they
+    -- only drive the backoff; a new generation starts both counters afresh.
+    transient_retries integer NOT NULL DEFAULT 0 CHECK (transient_retries >= 0),
+    available_at timestamptz NOT NULL,
+    outcome_code text CHECK (outcome_code ~ '^[a-z_]{1,64}$'),
+    updated_at timestamptz NOT NULL,
+    CHECK ((resource = 'namespace') = (namespace_id IS NOT NULL)),
+    CHECK (resource <> 'tenant' OR owner_kind = 'company'),
+    CHECK (owner_kind <> 'company' OR owner_id = company_id),
+    -- Only a claimed row carries lease data, and it carries all of it.
+    CHECK ((state = 'claimed') = (lease_owner IS NOT NULL)),
+    CHECK ((lease_owner IS NULL) = (lease_until IS NULL)),
+    CHECK (state <> 'failed' OR outcome_code IS NOT NULL)
+);
+CREATE UNIQUE INDEX memory_lifecycles_tenant ON public.memory_lifecycles (company_id) WHERE resource = 'tenant';
+CREATE UNIQUE INDEX memory_lifecycles_namespace ON public.memory_lifecycles (company_id, namespace_id) WHERE resource = 'namespace';
+CREATE INDEX memory_lifecycles_due ON public.memory_lifecycles (available_at, id) WHERE state = 'pending';
+-- The claim's expired-lease arm and the expiry sweep (p06 A3-2), and settled-row retention.
+CREATE INDEX memory_lifecycles_leased ON public.memory_lifecycles (lease_until, id) WHERE state = 'claimed';
+CREATE INDEX memory_lifecycles_settled ON public.memory_lifecycles (updated_at, id)
+    WHERE state = 'settled' AND desired = 'absent';
+-- Promised memory deliveries (E8): a frozen service request committed with the OpenBot outcome
+-- that promises it, delivered by the fenced `MemoryDeliveryWorker`. The request is the exact
+-- body sent on every attempt (same key, same bytes); it never holds entities or credentials.
+CREATE TABLE public.memory_deliveries (
+    company_id uuid NOT NULL REFERENCES public.companies(id) ON DELETE CASCADE,
+    id uuid NOT NULL,
+    namespace_id uuid NOT NULL,
+    kind text NOT NULL CHECK (kind IN ('save', 'generation')),
+    -- Origin: a save comes from a run's execution (and, for a tool, its invocation); a
+    -- generation from an agent-history exchange.
+    run_id uuid,
+    execution_id uuid,
+    invocation_id uuid,
+    exchange_id uuid,
+    -- The effect wait a step parks on, woken by its own poll of this row's terminal state.
+    wait_id uuid,
+    idempotency_key text NOT NULL UNIQUE CHECK (idempotency_key ~ '^[A-Za-z0-9._:-]{1,128}$'),
+    expires_at timestamptz NOT NULL,
+    -- Cleared when the intent settles: a settled intent keeps its key, receipt and outcome, never
+    -- a copy of the memory text (05A.6; service-side correction cannot reach OpenBot's rows).
+    request jsonb CHECK (request IS NULL OR (jsonb_typeof(request) = 'object' AND request->>'version' = '1'
+        AND jsonb_typeof(request->'body') = 'object' AND octet_length(request::text) <= 4194304)),
+    -- The tenant's `disable_epoch` when the intent committed; a claim under a newer epoch fails it.
+    disable_epoch bigint NOT NULL CHECK (disable_epoch >= 0),
+    state text NOT NULL CHECK (state IN ('pending', 'claimed', 'delivered', 'failed', 'expired', 'cancelled')),
+    -- Lease loss or a crash spends one of 8 attempts; outages (unavailable, capacity, an
+    -- ambiguous outcome) only count `transient_retries`, which drives the backoff, until the
+    -- intent's own `expires_at`.
+    attempts integer NOT NULL DEFAULT 0 CHECK (attempts BETWEEN 0 AND 8),
+    transient_retries integer NOT NULL DEFAULT 0 CHECK (transient_retries >= 0),
+    fence bigint NOT NULL DEFAULT 0 CHECK (fence >= 0),
+    lease_owner uuid,
+    lease_until timestamptz,
+    available_at timestamptz NOT NULL,
+    -- The service's answer for a delivered intent (the receipt the effect wait reads).
+    result jsonb CHECK (result IS NULL OR (jsonb_typeof(result) = 'object' AND octet_length(result::text) <= 262144)),
+    outcome_code text CHECK (outcome_code ~ '^[a-z_]{1,64}$'),
+    created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
+    updated_at timestamptz NOT NULL DEFAULT clock_timestamp(),
+    PRIMARY KEY (company_id, id),
+    FOREIGN KEY (company_id, namespace_id) REFERENCES public.memory_namespaces(company_id, id) ON DELETE CASCADE,
+    CHECK ((kind = 'save' AND run_id IS NOT NULL AND execution_id IS NOT NULL AND exchange_id IS NULL)
+        OR (kind = 'generation' AND exchange_id IS NOT NULL AND invocation_id IS NULL)),
+    CHECK (expires_at > created_at),
+    -- Only a claimed row carries lease data, and it carries all of it.
+    CHECK ((state = 'claimed') = (lease_owner IS NOT NULL)),
+    CHECK ((lease_owner IS NULL) = (lease_until IS NULL)),
+    CHECK ((state = 'delivered') = (result IS NOT NULL)),
+    CHECK ((state IN ('pending', 'claimed')) = (request IS NOT NULL)),
+    CHECK ((state IN ('failed', 'expired', 'cancelled')) = (outcome_code IS NOT NULL))
+);
+CREATE INDEX memory_deliveries_due ON public.memory_deliveries (available_at, id) WHERE state = 'pending';
+-- Settled-intent retention (p06 A3-1).
+CREATE INDEX memory_deliveries_settled ON public.memory_deliveries (created_at, id)
+    WHERE state IN ('delivered', 'failed', 'expired', 'cancelled');
+-- The claim's second arm (an expired lease) and the run-cancel trigger's lookup.
+CREATE INDEX memory_deliveries_leased ON public.memory_deliveries (lease_until, id) WHERE state = 'claimed';
+CREATE INDEX memory_deliveries_in_flight ON public.memory_deliveries (company_id, lease_until) WHERE state = 'claimed';
+CREATE INDEX memory_deliveries_open_by_run ON public.memory_deliveries (company_id, run_id, id)
+    WHERE state IN ('pending', 'claimed');
+CREATE UNIQUE INDEX memory_deliveries_by_wait ON public.memory_deliveries (company_id, wait_id) WHERE wait_id IS NOT NULL;
+-- Run cancellation cancels the run's open intents, saves and captures, after its run lock (run →
+-- intent, the save order, E9; a cancelled run is never captured, E8). A save's wait wakes through
+-- its own poll and reads the terminal intent.
+CREATE FUNCTION public.cancel_memory_deliveries_of_run() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    -- Id order, as every multi-intent settlement locks them, so overlaps cannot deadlock.
+    PERFORM 1 FROM public.memory_deliveries
+    WHERE company_id = NEW.company_id AND run_id = NEW.id AND state IN ('pending', 'claimed')
+    ORDER BY id FOR UPDATE;
+    UPDATE public.memory_deliveries SET state = 'cancelled', outcome_code = 'run_cancelled',
+        request = NULL, lease_owner = NULL, lease_until = NULL, updated_at = clock_timestamp()
+    WHERE company_id = NEW.company_id AND run_id = NEW.id AND state IN ('pending', 'claimed');
+    RETURN NULL;
+END $$;
+CREATE TRIGGER memory_deliveries_run_cancelled AFTER UPDATE OF state ON public.workflow_runs
+    FOR EACH ROW WHEN (NEW.state = 'cancelled' AND OLD.state IS DISTINCT FROM NEW.state)
+    EXECUTE FUNCTION public.cancel_memory_deliveries_of_run();
+-- One bounded proof per memory read that reached a run (E6): the classification it raised and
+-- the observations it exposed (id, revision); never their text.
+CREATE TABLE public.workflow_memory_consumptions (
+    company_id uuid NOT NULL,
+    run_id uuid NOT NULL,
+    execution_id uuid NOT NULL,
+    job_id uuid NOT NULL,
+    attempt_number integer NOT NULL,
+    -- The saved tool call for a tool read; the nil uuid for a `memory.load` step.
+    invocation_id uuid NOT NULL,
+    read_ceiling public.access_level NOT NULL,
+    exposed_level public.access_level NOT NULL,
+    items jsonb NOT NULL CHECK (jsonb_typeof(items) = 'array' AND jsonb_array_length(items) <= 64
+        AND octet_length(items::text) <= 65536),
+    created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
+    PRIMARY KEY (company_id, run_id, execution_id, job_id, attempt_number, invocation_id),
+    FOREIGN KEY (company_id, run_id) REFERENCES public.workflow_runs(company_id, id) ON DELETE CASCADE,
+    CHECK (exposed_level <= read_ceiling)
+);

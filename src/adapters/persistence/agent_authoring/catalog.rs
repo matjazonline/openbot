@@ -240,13 +240,22 @@ pub(super) async fn workflows(
     Ok(page(items, more))
 }
 
-pub(super) fn builtins() -> AppResult<AgentToolPage> {
+/// The built-ins an author can bind; the memory tools only while the company has memory
+/// enabled (phase 05 E5), since publication refuses them otherwise.
+pub(super) fn builtins(memory_enabled: bool) -> AppResult<AgentToolPage> {
+    let memory = [
+        AgentBuiltinTool::SearchMemory,
+        AgentBuiltinTool::MemoryTimeline,
+        AgentBuiltinTool::MemoryDetails,
+        AgentBuiltinTool::SaveMemory,
+    ];
     let items = [
         AgentBuiltinTool::MessageReply,
         AgentBuiltinTool::MessageSend,
         AgentBuiltinTool::SearchKnowledge,
     ]
     .into_iter()
+    .chain(memory.into_iter().filter(|_| memory_enabled))
     .map(|tool| {
         Ok(AgentToolOption {
             name: TypeName::parse(tool.name()).map_err(|_| invalid())?,
@@ -265,4 +274,40 @@ fn page(items: Vec<AgentToolOption>, more: bool) -> AgentToolPage {
         None
     };
     AgentToolPage { items, next }
+}
+
+#[cfg(test)]
+mod memory_tests {
+    use super::*;
+
+    /// The memory tools are offered only while the company has memory enabled (E5).
+    #[test]
+    fn memory_scope_catalog_offers_memory_tools_only_while_enabled() {
+        let names = |enabled| -> Vec<String> {
+            builtins(enabled)
+                .unwrap()
+                .items
+                .into_iter()
+                .map(|item| item.name.as_str().to_owned())
+                .collect()
+        };
+        let memory = [
+            "search_memory",
+            "memory_timeline",
+            "memory_details",
+            "save_memory",
+        ];
+        assert!(
+            names(false)
+                .iter()
+                .all(|name| !memory.contains(&name.as_str()))
+        );
+        let enabled = names(true);
+        assert!(
+            memory
+                .iter()
+                .all(|name| enabled.iter().any(|item| item == name))
+        );
+        assert_eq!(enabled.len(), names(false).len() + 4);
+    }
 }

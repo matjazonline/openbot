@@ -1,0 +1,29 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT c.tenant_id, c.id FROM tenants AS t JOIN credentials AS c ON c.tenant_id = t.id WHERE t.state = 'deleted' AND c.label <> $2 LIMIT $1 FOR NO KEY UPDATE OF c SKIP LOCKED",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "tenant_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "4b1a32b1b3e4d636754f5336655b1398a5bda59b2e4e49beb165177e9e42c7f1"
+}

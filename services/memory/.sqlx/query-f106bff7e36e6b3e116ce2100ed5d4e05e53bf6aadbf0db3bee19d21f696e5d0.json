@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT state FROM namespaces WHERE tenant_id = $1 AND id = $2 FOR SHARE SKIP LOCKED",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "state",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "f106bff7e36e6b3e116ce2100ed5d4e05e53bf6aadbf0db3bee19d21f696e5d0"
+}

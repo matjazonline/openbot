@@ -1,0 +1,94 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT o.id, n.external_id AS namespace, o.kind, o.title, o.occurred_at,\n                  o.access_level::smallint AS \"level!\", o.revision, o.index_state, o.expires_at,\n                  CASE WHEN $5::bool THEN left(o.body, 320) ELSE '' END AS \"snippet!\",\n                  CASE WHEN $6::bool\n                       THEN encode(sha256(convert_to(o.title, 'UTF8') || decode('00', 'hex')\n                                          || convert_to(o.body, 'UTF8')), 'hex')\n                  END AS digest,\n                  CASE WHEN $7::bool THEN octet_length(to_json(o.body)::text) END\n                    AS body_json_bytes\n             FROM observations AS o\n             JOIN namespaces AS n ON (n.tenant_id, n.id) = (o.tenant_id, o.namespace_id)\n            WHERE o.tenant_id = $1 AND o.id = ANY($2) AND o.namespace_id = ANY($3)\n              AND o.access_level <= $4::smallint AND n.state = 'active'\n              AND (o.expires_at IS NULL OR o.expires_at > now())",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "namespace",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "kind",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "title",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "occurred_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 5,
+        "name": "level!",
+        "type_info": "Int2"
+      },
+      {
+        "ordinal": 6,
+        "name": "revision",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 7,
+        "name": "index_state",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 8,
+        "name": "expires_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 9,
+        "name": "snippet!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 10,
+        "name": "digest",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 11,
+        "name": "body_json_bytes",
+        "type_info": "Int4"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "UuidArray",
+        "UuidArray",
+        "Int2",
+        "Bool",
+        "Bool",
+        "Bool"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      null,
+      false,
+      false,
+      true,
+      null,
+      null,
+      null
+    ]
+  },
+  "hash": "e07aae266c48a5eba5eace740915f76b8d961ed9ee786f179fab805fd65e840f"
+}

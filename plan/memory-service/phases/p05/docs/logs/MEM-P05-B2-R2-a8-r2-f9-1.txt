@@ -1,0 +1,13 @@
+   Compiling open_bots v0.1.0 (/Users/mac03/.codex/worktrees/60a0/openbot)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2m 02s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-6c472bc7410f7b21)
+
+running 5 tests
+test infra::workflow::tests::production_handler_covers_every_io_kind_or_refuses_it ... ok
+test application::workflow::authoring::tests::the_catalogue_covers_every_runnable_type_with_a_compiling_example ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::the_catalogue_lists_memory_steps_only_when_the_memory_service_is_configured ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::the_catalogue_lists_every_runnable_type_and_the_agents_a_step_can_name ... ok
+test infra::workflow::tests::memory_integration_configured_publication_gates_memory_steps_per_company ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 3632 filtered out; finished in 1.14s
+

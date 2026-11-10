@@ -1,0 +1,48 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT set_config('statement_timeout', $1, true) AS timeout, set_config('hnsw.iterative_scan', 'strict_order', true) AS iterative, set_config('hnsw.ef_search', $2, true) AS ef_search, set_config('hnsw.max_scan_tuples', $3, true) AS max_scan, set_config('hnsw.scan_mem_multiplier', '2', true) AS memory",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "timeout",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "iterative",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "ef_search",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "max_scan",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "memory",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": [
+      null,
+      null,
+      null,
+      null,
+      null
+    ]
+  },
+  "hash": "ada23314d36ccbf0d5ff9f25b01318dd318f7986369c6e404485b658c5cec3ce"
+}

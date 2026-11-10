@@ -22,6 +22,7 @@ use std::str::FromStr;
 struct HistoryRow {
     message_id: Uuid,
     access_level: i16,
+    content_exact: Option<bool>,
     at: DateTime<Utc>,
     role: String,
     audience: String,
@@ -121,6 +122,12 @@ async fn consume_on(
         .into_iter()
         .max()
         .unwrap_or(crate::entities::access_level::AccessLevel::PUBLIC);
+    // Every returned message counts, as for the level: human rows are conversational input,
+    // and an inexact run's message carries its bit (E3).
+    let mut exact = true;
+    for row in &rows {
+        exact &= super::knowledge::stored_message_exactness(&row.role, row.content_exact)?;
+    }
     let history = FrozenHistory {
         max_tokens,
         eligible: u64::try_from(eligible).map_err(|_| invalid())?,
@@ -129,7 +136,7 @@ async fn consume_on(
             .map(HistoryRow::message)
             .collect::<AppResult<_>>()?,
     };
-    super::knowledge::raise_content_level_on(tx, scope.company, scope.run, highest).await?;
+    super::knowledge::absorb_content_on(tx, scope.company, scope.run, highest, exact).await?;
     record_consumption(tx, claim, highest).await?;
     live(tx, claim, bound).await?;
     Ok(history)
@@ -141,7 +148,7 @@ async fn read_rows(
 ) -> AppResult<Vec<HistoryRow>> {
     // Cut one character past the bound to mark truncation without unbounded bodies.
     let rows = sqlx::query_as(
-            "SELECT newest.message_id, message.access_level::smallint AS access_level, association.created_at AS at, message.role, message.audience, \
+            "SELECT newest.message_id, message.access_level::smallint AS access_level, message.content_exact, association.created_at AS at, message.role, message.audience, \
                     association.entry_kind, author.display_label AS author_label, \
                     author_identity.subject AS author_subject, \
                     left(message.subject, $3) AS subject, left(message.clean_text_body, $3) AS body \

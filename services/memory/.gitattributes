@@ -1,0 +1,3 @@
+# Preserve the exact upstream licence bytes; assets/model-manifest.json records their digest.
+# Kept in the service directory so the rule travels with an extracted copy.
+assets/bundled/MODEL-LICENSE.txt -text whitespace=cr-at-eol

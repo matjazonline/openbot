@@ -59,6 +59,17 @@ async fn receipt_fixture(
     Option<ProviderReplayContract>,
 ) {
     let (f, request) = setup_action(recovery, json!({"value":1})).await;
+    receipt_fixture_on(f, request, recovery).await
+}
+async fn receipt_fixture_on(
+    f: AdmissionFixture,
+    request: ActionDispatchRequest,
+    recovery: ActionRecovery,
+) -> (
+    AdmissionFixture,
+    ActionDispatchRequest,
+    Option<ProviderReplayContract>,
+) {
     sqlx::raw_sql("CREATE TABLE fixture_remote_effects (provider_key text PRIMARY KEY)")
         .execute(f.persistence().pool())
         .await
@@ -86,6 +97,35 @@ async fn receipt_fixture(
         .unwrap()
     });
     (f, request, contract)
+}
+/// A claimed attempt of `source`'s I/O step whose remote ActionService dispatch committed its
+/// possible-dispatch marker and then lost the provider's answer: no receipt, so the shared SQL
+/// predicate reports the attempt's effect as unknown (`possible_dispatch`). Recovery and budget
+/// tests use it as their unknown-effect attempt; with `ProviderIdempotency` the marker stays
+/// replayable until the run's horizon outgrows the provider's retention.
+pub(in super::super) async fn unresolved_marker(
+    source: Value,
+    recovery: ActionRecovery,
+) -> (AdmissionFixture, ActionDispatchRequest) {
+    let (f, scope) = fixture_source(source).await;
+    let (f, request) = Box::pin(setup_action_on_fixture(
+        f,
+        scope,
+        recovery,
+        json!({"value":1}),
+    ))
+    .await;
+    let (f, request, contract) = receipt_fixture_on(f, request, recovery).await;
+    let provider = dedup(&f, contract, true);
+    assert!(
+        ActionService::new(adapter(&f, 0))
+            .dispatch_remote(&request, &provider, &CancellationToken::new())
+            .await
+            .is_err()
+    );
+    assert_eq!(provider.calls.load(Ordering::SeqCst), 1);
+    drop(provider);
+    (f, request)
 }
 fn dedup<'a>(
     f: &'a AdmissionFixture,

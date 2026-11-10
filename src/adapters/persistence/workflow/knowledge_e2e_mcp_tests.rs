@@ -33,6 +33,7 @@ fn install_client(j: &mut SalesJourney, server: &mcp_fixture::McpServer) {
             monitoring: Arc::new(crate::adapters::monitoring::InMemoryMonitor::new()),
             slots: 1,
             knowledge: j.d.knowledge.clone(),
+            http_destinations: crate::adapters::workflow_http::HttpDestinationPolicy::default(),
         },
     )
     .unwrap();

@@ -327,3 +327,43 @@ async fn explain_selection(case: &NativeCase) {
         json!({"metadata":metadata,"eligible_count":count,"limit":17,"visible_pairs":2,"hidden_pairs":18,"scope":"owned test fixture; count scan not constant-time"})
     );
 }
+
+/// The history freeze lowers the reading run when a selected exchange was inexact: the
+/// `bool_and` beside `selected_level` (phase 05 E3). The selected exchanges here came from
+/// message-triggered runs, which a human message makes inexact.
+#[tokio::test]
+async fn memory_access_level_history_freeze_lowers_for_inexact_exchanges() {
+    use crate::adapters::persistence::workflow::knowledge::exactness_fixture::{exact, mark_exact};
+    let case = Box::pin(NativeCase::new()).await;
+    let claim = new_high_owner(&case).await;
+    let scope = claim.fence.scope;
+    let pool = case.f.s.pool();
+    mark_exact(pool, scope.company, scope.run).await;
+    let launch = case
+        .f
+        .s
+        .p()
+        .prepare_agent(&claim, policy())
+        .await
+        .unwrap()
+        .expect_ready();
+    let selected: Vec<Uuid> = launch
+        .prepared
+        .frozen_history()
+        .unwrap()
+        .selected
+        .iter()
+        .map(|item| item.id.as_uuid())
+        .collect();
+    assert!(!selected.is_empty());
+    let bits: Vec<bool> = sqlx::query_scalar(
+        "SELECT content_exact FROM agent_history_exchanges WHERE company_id=$1 AND id=ANY($2)",
+    )
+    .bind(scope.company.as_uuid())
+    .bind(&selected)
+    .fetch_all(pool)
+    .await
+    .unwrap();
+    assert!(bits.iter().all(|bit| !bit), "{bits:?}");
+    assert!(!exact(pool, scope.company, scope.run).await);
+}

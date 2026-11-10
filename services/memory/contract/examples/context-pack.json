@@ -1,0 +1,1 @@
+{"operation":"context.pack","request":{"namespaces":["team-notes"],"read_ceiling":6,"query":"database choice","max_tokens":8192,"max_bytes":65536,"detail":"compact"}}

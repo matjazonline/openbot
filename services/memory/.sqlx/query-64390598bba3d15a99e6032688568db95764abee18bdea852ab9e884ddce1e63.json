@@ -1,0 +1,18 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE generation_operations SET state = $3, outcome_code = $4, finished_at = now(), lease_owner = NULL, lease_until = NULL, reserved_tokens = 0, used_tokens = used_tokens + $5 WHERE tenant_id = $1 AND id = $2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Text",
+        "Text",
+        "Int8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "64390598bba3d15a99e6032688568db95764abee18bdea852ab9e884ddce1e63"
+}

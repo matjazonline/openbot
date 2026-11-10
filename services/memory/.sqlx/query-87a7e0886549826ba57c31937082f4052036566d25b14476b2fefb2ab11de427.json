@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM idempotency_records WHERE (tenant_id, kind, key) IN (SELECT * FROM UNNEST($1::uuid[], $2::text[], $3::text[]))",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "UuidArray",
+        "TextArray",
+        "TextArray"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "87a7e0886549826ba57c31937082f4052036566d25b14476b2fefb2ab11de427"
+}

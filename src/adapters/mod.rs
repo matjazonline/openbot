@@ -3,6 +3,7 @@ pub mod embedding;
 pub mod harness;
 pub mod http;
 pub mod mcp;
+pub mod memory_service;
 pub mod monitoring;
 pub mod persistence;
 pub mod protocols;

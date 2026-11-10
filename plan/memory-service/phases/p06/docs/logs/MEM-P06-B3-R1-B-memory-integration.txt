@@ -1,0 +1,9 @@
+building the memory service in /Users/mac03/.codex/worktrees/60a0/openbot/services/memory
+   Compiling memory-service v0.1.0 (/Users/mac03/.codex/worktrees/60a0/openbot/services/memory)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 2.94s
+provisioned database memory_live_c88b9f602d09 owned by memory_live_c88b9f602d09
+isolation: unexpected answer for the service role
+ERROR:  relation "companies" does not exist
+LINE 1: SELECT count(*) FROM companies
+                             ^
+exit 1

@@ -118,6 +118,24 @@ async fn workflow_http_default_denies_special_addresses_and_operator_scope_is_ex
     );
 }
 
+/// Phase 05 E5 defense in depth: a company HTTP connection to the memory service's origin is
+/// refused before any request, even when an operator listed it as a private exception.
+#[tokio::test]
+async fn memory_integration_http_connection_to_the_memory_service_origin_is_refused() {
+    let listed = || HttpDestinationPolicy::new(["http://127.0.0.1:8085".into()]).unwrap();
+    assert!(
+        client(&listed(), &connection("http://127.0.0.1:8085"))
+            .await
+            .is_ok()
+    );
+    let reserved = listed().reserving("http://127.0.0.1:8085/").unwrap();
+    assert!(
+        client(&reserved, &connection("http://127.0.0.1:8085"))
+            .await
+            .is_err()
+    );
+}
+
 #[tokio::test]
 async fn workflow_http_response_redacts_secret_and_sensitive_headers_before_output() {
     let body = r#"{"token":"shh-secret","escaped":"shh-\u0073ecret","authorization":"other-sensitive","shh-secret":"value"}"#;

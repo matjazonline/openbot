@@ -1,0 +1,10 @@
+# Service-owned Cargo configuration (plan/memory-service implementation-decisions D1).
+# Cargo also merges parent-directory configuration; scripts/boundary-check.sh fails when a parent
+# sets any key this file does not set itself, and always when a parent sets an array-valued flag.
+[env]
+# libtest sizes its test threads from RUST_MIN_STACK. Keep it equal to the default of
+# MEMORY_RUNTIME_THREAD_STACK_BYTES (src/infra/config.rs). Raising either requires a stack-budget
+# re-run at the stock 2 MiB in scripts/verify.sh (AGENTS.md, "A raised limit ...").
+RUST_MIN_STACK = "2097152"
+# Compile from the committed .sqlx metadata; `cargo sqlx prepare` overrides it explicitly.
+SQLX_OFFLINE = "true"

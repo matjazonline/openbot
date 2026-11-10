@@ -1,0 +1,9 @@
+   Compiling open_bots v0.1.0 (/Users/mac03/.codex/worktrees/60a0/openbot)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1m 58s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-6c472bc7410f7b21)
+
+running 1 test
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::memory_steps_tests::memory_access_level_load_reads_at_the_thread_audience_and_refuses_a_lower_destination ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3639 filtered out; finished in 1.84s
+

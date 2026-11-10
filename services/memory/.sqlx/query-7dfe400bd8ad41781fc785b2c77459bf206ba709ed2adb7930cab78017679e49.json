@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE tenants AS t SET content_removed_at = now() WHERE t.id = ANY($1) AND NOT EXISTS (SELECT 1 FROM namespaces AS n WHERE n.tenant_id = t.id AND n.content_removed_at IS NULL) AND NOT EXISTS (SELECT 1 FROM credential_grants AS g WHERE g.tenant_id = t.id) AND NOT EXISTS (SELECT 1 FROM idempotency_records AS r WHERE r.tenant_id = t.id) AND NOT EXISTS (SELECT 1 FROM tenant_spend_days AS d WHERE d.tenant_id = t.id) AND NOT EXISTS (SELECT 1 FROM tenant_generation_schedule AS s WHERE s.tenant_id = t.id) AND NOT EXISTS (SELECT 1 FROM credentials AS c WHERE c.tenant_id = t.id AND c.label <> $2)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "UuidArray",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "7dfe400bd8ad41781fc785b2c77459bf206ba709ed2adb7930cab78017679e49"
+}
