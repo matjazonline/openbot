@@ -32,13 +32,18 @@ pub enum StepAccounting {
 
 pub fn step_accounting(kind: &str) -> StepAccounting {
     match kind {
-        "data.map" | "decision.rule" | "channel.no_reply" | "wait.timer" => StepAccounting::Pure,
+        // `data.url` only constructs a URL from inputs (no request), like `data.map`.
+        "data.map" | "data.url" | "decision.rule" | "channel.no_reply" | "wait.timer" => {
+            StepAccounting::Pure
+        }
         "context.history" | "memory.load" => StepAccounting::RaisingRead,
         "agent.run" | "ai.classify" | "decision.agent" => StepAccounting::ModelStep,
         "message.send" | "message.reply" | "memory.save" => StepAccounting::Receipt,
         "workflow.call" | "flow.repeat" => StepAccounting::ChildControl,
         "decision.human" => StepAccounting::HumanDecision,
         "message.ask" => StepAccounting::HumanReply,
+        // A local agent's output can carry content of any level from the machine it ran on.
+        "local_agent.run" => StepAccounting::Unaccounted,
         _ => StepAccounting::Unaccounted,
     }
 }
