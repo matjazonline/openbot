@@ -19,6 +19,8 @@ pub enum McpPreparationFailure {
     Deadline,
     #[error("MCP preparation unavailable")]
     Unavailable,
+    #[error("MCP provider rejected the credential")]
+    Authentication,
 }
 pub type McpPreparationResult<T> = Result<T, McpPreparationFailure>;
 
@@ -72,6 +74,7 @@ impl McpPreparation {
             3 => Some(McpPreparationFailure::Cancelled),
             4 => Some(McpPreparationFailure::Deadline),
             5 => Some(McpPreparationFailure::Unavailable),
+            6 => Some(McpPreparationFailure::Authentication),
             _ => None,
         }
     }
@@ -82,6 +85,7 @@ impl McpPreparation {
             McpPreparationFailure::Cancelled => 3,
             McpPreparationFailure::Deadline => 4,
             McpPreparationFailure::Unavailable => 5,
+            McpPreparationFailure::Authentication => 6,
         };
         let _ = self
             .failure

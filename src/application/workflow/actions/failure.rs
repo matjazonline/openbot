@@ -41,20 +41,18 @@ pub fn marker_owned_effect_kind(kind: &str) -> bool {
 /// reads, and the tool-free model steps, whose provider calls are ledger-charged
 /// reservations (an unresolved one stays charged across a retry), not effects.
 pub fn effect_free_kind(kind: &str) -> bool {
-    matches!(
-        kind,
-        "data.map"
-            | "channel.no_reply"
-            | "decision.rule"
-            | "decision.human"
-            | "decision.agent"
-            | "context.history"
-            | "memory.load"
-            | "ai.classify"
-            | "jev.evaluate"
-            | "wait.event"
-            | "wait.timer"
-    )
+    super::super::batch::is_pure_kind(kind)
+        || matches!(
+            kind,
+            "decision.human"
+                | "decision.agent"
+                | "context.history"
+                | "memory.load"
+                | "ai.classify"
+                | "jev.evaluate"
+                | "wait.event"
+                | "wait.timer"
+        )
 }
 
 /// The one predicate for Rust lease retirement and pending recovery: without a
@@ -156,6 +154,9 @@ pub fn action_step_failure(
         };
     }
     let (class, suffix) = match outcome {
+        Preparation(AppError::McpAuthentication) if matches!(family, ActionFamily::Mcp) => {
+            (Terminal, "authentication_rejected")
+        }
         Preparation(
             AppError::NotFound(_) | AppError::BadRequest(_) | AppError::InvalidCredentials,
         ) => (Terminal, "rejected"),

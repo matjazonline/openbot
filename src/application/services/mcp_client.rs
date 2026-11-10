@@ -10,6 +10,8 @@ use serde_json::Value;
 mod preparation;
 pub use preparation::*;
 
+pub(crate) mod observation;
+
 #[async_trait]
 pub trait McpClient: Send + Sync {
     /// Stop admission, cancel active sessions, and join every supervised transport worker.

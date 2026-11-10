@@ -14553,7 +14553,7 @@ RETURNS boolean LANGUAGE sql VOLATILE AS $$
         WHERE checkpoint.company_id=exchange.company_id AND checkpoint.id=exchange.checkpoint_id
             AND checkpoint.task_id=exchange.job_id AND checkpoint.workflow_run_id=exchange.run_id
             AND checkpoint.workflow_execution_id=exchange.execution_id AND checkpoint.agent_id=exchange.agent_id
-            AND checkpoint.workflow_prepared->>'version'='5'
+            AND checkpoint.workflow_prepared->>'version'='6'
             AND ((exchange.payload_retained AND checkpoint.workflow_prepared=exchange.frozen_preparation)
                 OR (NOT exchange.payload_retained AND exchange.preparation_digest=sha256(convert_to(checkpoint.workflow_prepared::text,'UTF8'))))
             AND checkpoint.checkpoint->'seed'=checkpoint.workflow_prepared->'history'->'seed'
@@ -14625,7 +14625,11 @@ BEGIN
           AND execution.completed_at IS NULL FOR SHARE OF run NOWAIT;
     PERFORM 1 FROM public.agent_history_conversations WHERE company_id=owner.company_id
         AND id=owner.conversation_id AND active_exchange_id=owner.id FOR UPDATE;
-    IF NOT FOUND OR document->>'version' IS DISTINCT FROM '5'
+    IF NOT FOUND OR document->>'version' IS DISTINCT FROM '6'
+        OR document->>'mcp_error_policy' NOT IN ('observe','fail_step')
+        OR document->>'mcp_error_policy' IS DISTINCT FROM
+            (CASE WHEN source.frozen_inputs ? 'mcp_error_policy'
+                THEN source.frozen_inputs->>'mcp_error_policy' ELSE 'observe' END)
         OR document->>'history_exchange' IS DISTINCT FROM owner.id::text
         OR document->'context' IS DISTINCT FROM source.frozen_inputs->'context'
         OR document->'output_schema' IS DISTINCT FROM owner.provenance->'output_contract'->'schema'

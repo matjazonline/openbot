@@ -19,6 +19,8 @@ use std::collections::BTreeSet;
 mod publication_owner;
 pub(super) use publication_owner::capture_on as capture_publication_on;
 pub use publication_owner::{McpPublicationDirectory, McpPublicationSelection};
+#[path = "mcp_reviews.rs"]
+mod reviews;
 #[path = "mcp_runtime.rs"]
 mod runtime;
 
@@ -217,6 +219,52 @@ async fn current_version(
 
 #[async_trait]
 impl McpOperations for PostgresPersistence {
+    async fn reviewed_mcp_operations(
+        &self,
+        company: CompanyId,
+        actor: WorkflowActor,
+        read: McpOperationRead,
+    ) -> AppResult<McpOperationPage> {
+        let mut tx = begin_http(self).await?;
+        let connection = edit_on(
+            &mut tx,
+            company,
+            actor,
+            read.connection,
+            read.catalog_revision,
+        )
+        .await?;
+        let (exact, after) = match &read.selection {
+            McpOperationSelection::Page { after } => (None, after.as_ref()),
+            McpOperationSelection::Exact(name) => (Some(name), None),
+        };
+        let limit = if exact.is_some() {
+            1
+        } else {
+            MCP_REVIEW_PAGE_SIZE + 1
+        };
+        let mut rows = sqlx::query_as::<_, reviews::Row>(reviews::SQL)
+            .bind(company.as_uuid())
+            .bind(read.connection)
+            .bind(exact.map(|name| name.as_str()))
+            .bind(after.map(|name| name.as_str()))
+            .bind(limit as i64)
+            .fetch_all(&mut *tx)
+            .await?;
+        let next = if rows.len() > MCP_REVIEW_PAGE_SIZE {
+            rows.pop();
+            Some(TypeName::parse(rows.last().unwrap().name.as_str()).map_err(|_| invalid())?)
+        } else {
+            None
+        };
+        let operations = rows
+            .into_iter()
+            .map(|row| row.review(&connection))
+            .collect::<AppResult<_>>()?;
+        tx.commit().await?;
+        Ok(McpOperationPage { operations, next })
+    }
+
     async fn register_mcp_operation(
         &self,
         company: CompanyId,

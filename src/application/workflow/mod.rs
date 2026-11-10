@@ -24,6 +24,7 @@ pub mod compiler;
 pub mod completion;
 pub mod connection_level;
 mod contracts;
+mod data_url;
 pub mod decisions;
 pub mod fixtures;
 pub mod guard;

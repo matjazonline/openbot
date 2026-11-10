@@ -26,7 +26,11 @@ use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use uuid::Uuid;
 
-const VERSION: u8 = 5;
+pub const PREPARED_AGENT_VERSION: u8 = 6;
+
+#[path = "agent_mcp_policy.rs"]
+mod mcp_policy;
+pub use mcp_policy::{McpErrorPolicy, McpResultSource};
 
 #[path = "agent_context.rs"]
 mod context;
@@ -113,6 +117,7 @@ pub struct PreparedAgent {
     history_exchange: Option<AgentExchangeId>,
     history: Option<FrozenAgentHistory>,
     output_schema: Value,
+    mcp_error_policy: McpErrorPolicy,
 }
 
 impl PreparedAgent {
@@ -153,8 +158,12 @@ impl PreparedAgent {
         }
         let preamble = preamble(&selection);
         let context = AgentLogicalInput::new(context.clone())?;
+        let mcp_error_policy = McpErrorPolicy::from_inputs(inputs)?;
+        if kind != ModelStep::AgentRun && inputs.get("mcp_error_policy").is_some() {
+            return Err(invalid("MCP error policy requires agent.run"));
+        }
         Ok(Self {
-            version: VERSION,
+            version: PREPARED_AGENT_VERSION,
             step: kind,
             selection,
             tools,
@@ -163,7 +172,35 @@ impl PreparedAgent {
             history_exchange: None,
             history: None,
             output_schema,
+            mcp_error_policy,
         })
+    }
+
+    pub fn validate_mcp_results(
+        &self,
+        invocations: &[crate::services::harness::runs::SavedInvocation],
+    ) -> AppResult<()> {
+        use crate::services::harness::runs::InvocationState;
+        for invocation in invocations {
+            if !matches!(
+                invocation.state,
+                InvocationState::Completed | InvocationState::Failed
+            ) {
+                continue;
+            }
+            let Some(result) = &invocation.result else {
+                continue;
+            };
+            let source = match self.tool(invocation.call.tool_id.as_str()) {
+                Some(tool) if matches!(tool.target, AgentToolTarget::Mcp { .. }) => {
+                    McpResultSource::Mcp
+                }
+                Some(_) => McpResultSource::Other,
+                None => McpResultSource::Unavailable,
+            };
+            self.mcp_error_policy.check_result(source, result)?;
+        }
+        Ok(())
     }
 
     pub fn step(&self) -> ModelStep {

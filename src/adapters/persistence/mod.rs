@@ -480,6 +480,10 @@ mod agent_config_tests;
 #[cfg(test)]
 mod legacy_runtime_schema_tests;
 
+#[cfg(test)]
+mod doop_live_input;
+#[cfg(test)]
+mod doop_live_setup_tests;
 pub mod mcp;
 #[cfg(test)]
 mod mcp_tests;

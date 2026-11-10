@@ -1,0 +1,104 @@
+{
+  "tools": [
+    {
+      "name": "export_frame",
+      "title": "Export frame as image or PDF",
+      "description": "Export the frame's CURRENT design. PNG/JPG return a bounded real image (a JPEG thumbnail when the full file is too large) and authenticated full-download metadata. PDF embeds the full file only when it fits the inline limit; otherwise it returns an authenticated download location. Downloads require a current normal browser session; an MCP bearer alone cannot fetch them. URLs render current stored designs when fetched. PDF has one selectable-text page per frame; frame_ids adds same-canvas pages in order after frame_id. A preview or URL does not establish full visual verification.",
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "frame_id": {
+            "type": "string"
+          },
+          "format": {
+            "description": "default png",
+            "type": "string",
+            "enum": [
+              "png",
+              "jpg",
+              "pdf"
+            ]
+          },
+          "quality": {
+            "description": "jpg only, default 90",
+            "type": "number",
+            "minimum": 1,
+            "maximum": 100
+          },
+          "frame_ids": {
+            "description": "pdf only: more frames from the same canvas to include as extra pages, in this order after frame_id (up to 40 in all)",
+            "maxItems": 40,
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "frame_id"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "execution": {
+        "taskSupport": "forbidden"
+      }
+    },
+    {
+      "name": "get_frame_screenshot",
+      "title": "Screenshot a frame",
+      "description": "Render a frame and return a bounded real image, plus an authenticated full-PNG location. Large renders return a JPEG thumbnail with truthful dimensions; normal-browser-session access is required for the full file and an MCP bearer alone cannot fetch it. Review layout after significant edits and fix visible problems. A thumbnail does not establish that full text or every detail was visually inspected.",
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "frame_id": {
+            "type": "string"
+          },
+          "scale": {
+            "description": "Device scale factor: 1 (default) or 2 for a retina-resolution image",
+            "anyOf": [
+              {
+                "type": "number",
+                "const": 1
+              },
+              {
+                "type": "number",
+                "const": 2
+              }
+            ]
+          },
+          "agent_name": {
+            "description": "Your display name, shown live to everyone on the canvas (e.g. \"Claude\", \"Codex\"). Reuse the SAME name on every call so your work is attributed consistently.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "frame_id"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "execution": {
+        "taskSupport": "forbidden"
+      },
+      "_meta": {
+        "ui": {
+          "resourceUri": "ui://doop/frame-preview-3.html"
+        },
+        "openai/outputTemplate": "ui://doop/frame-preview-3.html",
+        "openai/toolInvocation/invoking": "Rendering the frame\u2026",
+        "openai/toolInvocation/invoked": "Frame rendered"
+      }
+    }
+  ]
+}

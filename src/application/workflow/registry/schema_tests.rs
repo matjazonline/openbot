@@ -70,6 +70,7 @@ fn workflow_registry_schema_budget_retains_external_recursion_depth_node_byte_re
 fn workflow_registry_metadata_matches_effect_families_and_never_claims_authorization() {
     for (name, effect, recovery, shared) in [
         ("data.map", "pure", "recompute", false),
+        ("data.url", "pure", "recompute", false),
         (
             "context.history",
             "bounded_read",
@@ -121,7 +122,7 @@ fn workflow_registry_metadata_matches_effect_families_and_never_claims_authoriza
         assert_eq!(constraints["shared_action_required"], shared);
         assert_eq!(
             constraints["capabilities"].as_array().unwrap().is_empty(),
-            name == "data.map"
+            matches!(name, "data.map" | "data.url")
         );
         assert!(constraints.get("authorized").is_none());
     }

@@ -13,6 +13,8 @@ use std::{
 #[derive(Clone, Default)]
 pub struct EndpointPolicy {
     internal: HashSet<McpEndpoint>,
+    #[cfg(test)]
+    test_root: Option<reqwest::Certificate>,
 }
 impl EndpointPolicy {
     pub fn new(endpoints: impl IntoIterator<Item = String>) -> AppResult<Self> {
@@ -27,7 +29,17 @@ impl EndpointPolicy {
             }
             internal.insert(endpoint);
         }
-        Ok(Self { internal })
+        Ok(Self {
+            internal,
+            #[cfg(test)]
+            test_root: None,
+        })
+    }
+    /// Trust the disposable ingress CA in an isolated libtest process.
+    #[cfg(test)]
+    pub(crate) fn with_test_root_certificate(mut self, root: reqwest::Certificate) -> Self {
+        self.test_root = Some(root);
+        self
     }
     pub fn validate(&self, endpoint: &McpEndpoint) -> AppResult<()> {
         let url = url::Url::parse(endpoint.as_str()).map_err(|_| denied())?;
@@ -83,10 +95,16 @@ impl EndpointPolicy {
         {
             return Err(denied());
         }
-        pinned_client(host, &addresses)
+        let builder = pinned_client_builder(host, &addresses);
+        #[cfg(test)]
+        let builder = match self.test_root.clone() {
+            Some(root) => builder.add_root_certificate(root),
+            None => builder,
+        };
+        builder.build().map_err(|_| denied())
     }
 }
-fn pinned_client(host: &str, addresses: &[SocketAddr]) -> AppResult<reqwest::Client> {
+fn pinned_client_builder(host: &str, addresses: &[SocketAddr]) -> reqwest::ClientBuilder {
     reqwest::Client::builder()
         .no_proxy()
         .redirect(reqwest::redirect::Policy::none())
@@ -96,8 +114,6 @@ fn pinned_client(host: &str, addresses: &[SocketAddr]) -> AppResult<reqwest::Cli
         .read_timeout(Duration::from_secs(10))
         .resolve_to_addrs(host, addresses)
         .pool_max_idle_per_host(1)
-        .build()
-        .map_err(|_| denied())
 }
 fn denied() -> AppError {
     AppError::BadRequest("MCP destination is prohibited or unavailable".into())
@@ -186,7 +202,9 @@ mod tests {
         });
         // Exercise the actual connector with a deliberately unresolvable host. The policy
         // validator above is separately exercised; only this test directly supplies its pin.
-        let client = pinned_client("rebind.invalid", &[address]).unwrap();
+        let client = pinned_client_builder("rebind.invalid", &[address])
+            .build()
+            .unwrap();
         let response = client
             .get(format!("http://rebind.invalid:{}/", address.port()))
             .send()

@@ -8,6 +8,12 @@ use secrecy::SecretString;
 use serde::Deserialize;
 use uuid::Uuid;
 
+/// Display identity for the schema an operator is currently reviewing.
+pub(crate) fn schema_fingerprint(schema: &serde_json::Value) -> String {
+    use sha2::{Digest, Sha256};
+    format!("{:x}", Sha256::digest(schema.to_string().as_bytes()))
+}
+
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct McpConnectionWrite {

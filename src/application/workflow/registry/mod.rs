@@ -49,7 +49,7 @@ pub const MAX_IDENTIFIER: usize = 128;
 pub const MAX_PATH: usize = 2048;
 pub const MAX_DEADLINE: usize = 64;
 pub const MAX_CORRELATION: usize = 256;
-pub const TYPES: [&str; 22] = [
+pub const TYPES: [&str; 23] = [
     "context.history",
     "memory.load",
     "memory.save",
@@ -61,6 +61,7 @@ pub const TYPES: [&str; 22] = [
     "decision.human",
     "decision.agent",
     "data.map",
+    "data.url",
     "channel.no_reply",
     "http.request",
     "tool.call",

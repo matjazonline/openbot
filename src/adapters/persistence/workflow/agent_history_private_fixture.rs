@@ -21,6 +21,7 @@ impl ManualHistory {
             HistoryContract {
                 input: any.clone(),
                 output: any,
+                mcp_error_policy: None,
             },
         )
         .await;

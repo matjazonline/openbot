@@ -106,7 +106,12 @@ async fn initialize(
     let result = tokio::select! {biased;
         _=ready.closed()=>Err(control.record(Failure::Cancelled)),
         result=control.run(async {
-            ().serve_with_ct(transport,control.stop.clone()).await.map_err(|_|control.failure())
+            ().serve_with_ct(transport,control.stop.clone()).await.map_err(|error| {
+                match errors::initialization(error) {
+                    AppError::McpAuthentication => control.record(Failure::Authentication),
+                    _ => control.failure(),
+                }
+            })
         })=>result,
     };
     match result {

@@ -44,7 +44,7 @@ async fn record_on(
             Err(invalid())
         };
     }
-    if prepared["version"] != 5 {
+    if prepared["version"] != crate::application::workflow::agent::PREPARED_AGENT_VERSION {
         return Err(invalid());
     }
     let reference =
@@ -125,7 +125,7 @@ pub(in crate::adapters::persistence::workflow) async fn check_prepared_on(
     actual_mode: AgentUseMode,
     prepared: &Value,
 ) -> AppResult<()> {
-    if prepared["version"] != 5 {
+    if prepared["version"] != crate::application::workflow::agent::PREPARED_AGENT_VERSION {
         return Err(invalid());
     }
     record_on(db, scope, actual_mode, prepared).await?;

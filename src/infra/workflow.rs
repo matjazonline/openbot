@@ -528,6 +528,28 @@ impl WorkflowEngine {
         persistence: PostgresPersistence,
         integrations: Arc<dyn crate::application::integrations::ExecutionGateway>,
     ) -> Self {
+        let client = Arc::new(crate::adapters::mcp::HttpMcpClient::new(
+            crate::adapters::mcp::policy::EndpointPolicy::default(),
+        ));
+        Self::for_tests_with_clients(persistence, integrations, client)
+    }
+
+    pub(crate) fn for_tests_with_mcp(
+        persistence: PostgresPersistence,
+        client: Arc<dyn McpClient>,
+    ) -> Self {
+        Self::for_tests_with_clients(
+            persistence,
+            Arc::new(crate::application::integrations::unavailable::UnavailableIntegrations),
+            client,
+        )
+    }
+
+    fn for_tests_with_clients(
+        persistence: PostgresPersistence,
+        integrations: Arc<dyn crate::application::integrations::ExecutionGateway>,
+        client: Arc<dyn McpClient>,
+    ) -> Self {
         use crate::adapters::protocols::email::EmailRenderer;
         use crate::application::transport::ports::TransportRenderers;
         let renderers = Arc::new(
@@ -536,9 +558,6 @@ impl WorkflowEngine {
                 .unwrap(),
         );
         let composer = DeliveryComposer::new(renderers, Arc::new(persistence.clone()));
-        let client = Arc::new(crate::adapters::mcp::HttpMcpClient::new(
-            crate::adapters::mcp::policy::EndpointPolicy::default(),
-        ));
         let config = crate::infra::config::AppConfig {
             app_domain_name: "agents.test".into(),
             ..crate::infra::config::AppConfig::for_test()

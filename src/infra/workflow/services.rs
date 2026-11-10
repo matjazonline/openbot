@@ -130,6 +130,10 @@ impl WorkflowServices {
         &self.persistence
     }
 
+    pub fn mcp_operations(&self) -> &dyn crate::application::workflow::mcp::McpOperations {
+        &self.persistence
+    }
+
     pub fn jev_connections(&self) -> &dyn crate::application::workflow::jev::JevConnections {
         &self.persistence
     }

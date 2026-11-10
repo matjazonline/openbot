@@ -2,6 +2,11 @@ use super::*;
 impl Registration<'_> {
     pub(super) fn basic(&mut self) -> Result<Contract, Diagnostic> {
         match self.name() {
+            "data.url" => Ok(contract(
+                json!({"origin":text(MAX_PATH),"segments":array(text(super::super::data_url::MAX_SEGMENT_BYTES),0,super::super::data_url::MAX_SEGMENTS)}),
+                &["origin", "segments"],
+                text(super::super::data_url::MAX_URL_BYTES),
+            )),
             "jev.evaluate" => self.jev(),
             "context.history" => Ok(contract(
                 json!({"max_tokens":integer(MAX_CONTEXT_TOKENS)}),
@@ -65,6 +70,21 @@ impl Registration<'_> {
         };
         if self.name() == "agent.run" {
             self.approval(&mut result)?;
+            result.input["properties"]["mcp_error_policy"] =
+                json!({"enum":["observe","fail_step"]});
+            if self.parsed.definition.steps[self.id]
+                .inputs
+                .contains_key("mcp_error_policy")
+            {
+                let value = self.literal("mcp_error_policy")?;
+                if !matches!(value.as_str(), Some("observe" | "fail_step")) {
+                    return Err(self.error(
+                        "registry.mcp_error_policy",
+                        "Choose observe or fail_step",
+                        "mcp_error_policy",
+                    ));
+                }
+            }
         }
         Ok(result)
     }

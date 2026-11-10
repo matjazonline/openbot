@@ -335,6 +335,9 @@ where
                 .open_workflow_checkpoint(claim.fence, &spec, self.lease)
                 .await?,
         )?;
+        launch
+            .prepared
+            .validate_mcp_results(&checkpoint.invocations)?;
         if let Some(output) = checkpoint.final_output.clone() {
             return Ok(Driven::Completed(output));
         }
@@ -464,6 +467,7 @@ fn failure(error: &AppError) -> WorkflowFailure {
         AppError::Execution(ExecutionFailure::Budget) => (Terminal, "budget"),
         AppError::Execution(ExecutionFailure::RepeatedToolCall) => (Terminal, "repeated_tool_call"),
         AppError::Execution(ExecutionFailure::InvalidOutput) => (Terminal, "invalid_output"),
+        AppError::Execution(ExecutionFailure::McpToolFailed) => (Terminal, "mcp_tool_failed"),
         AppError::Execution(ExecutionFailure::CheckpointDenied) => (Terminal, "tokens_refused"),
         AppError::Execution(ExecutionFailure::IndeterminateEffect) => (Terminal, "effect_unknown"),
         AppError::Execution(ExecutionFailure::Protocol) => (Retryable, "provider_protocol"),
@@ -502,5 +506,17 @@ mod guard_tests {
             Some("guard guard_workflow_token_proposal")
         );
         assert_eq!(result.safety, RetrySafety::SafeToRetry);
+    }
+
+    #[test]
+    fn doop_agent_strict_mcp_error_maps_to_a_terminal_failure() {
+        let result = super::failure(&crate::app_error::AppError::Execution(
+            crate::app_error::ExecutionFailure::McpToolFailed,
+        ));
+        assert_eq!(result.failure.code().as_str(), "agent.mcp_tool_failed");
+        assert_eq!(
+            result.failure.class(),
+            crate::domain::workflow::FailureClass::Terminal
+        );
     }
 }

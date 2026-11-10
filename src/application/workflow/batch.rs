@@ -69,6 +69,13 @@ pub struct PureCompletion {
     pub state: RunState,
 }
 
+pub(crate) fn is_pure_kind(kind: &str) -> bool {
+    matches!(
+        kind,
+        "data.map" | "data.url" | "decision.rule" | "channel.no_reply"
+    )
+}
+
 pub fn is_pure(
     bundle: &PublishedBundle,
     step: &crate::domain::workflow::StepId,
@@ -80,10 +87,7 @@ pub fn is_pure(
         .steps
         .get(step)
         .ok_or_else(|| AppError::Database("Unknown workflow step".into()))?;
-    Ok(matches!(
-        definition.step_type.as_str(),
-        "data.map" | "decision.rule" | "channel.no_reply"
-    ))
+    Ok(is_pure_kind(definition.step_type.as_str()))
 }
 
 pub fn execute_pure(
@@ -98,6 +102,10 @@ pub fn execute_pure(
         .get(&activation.step)
         .ok_or_else(invalid)?;
     let (output, route) = match definition.step_type.as_str() {
+        "data.url" => (
+            super::data_url::build(&activation.inputs)?,
+            RouteSelection::Success,
+        ),
         "data.map" | "channel.no_reply" => (
             activation.inputs.get("value").ok_or_else(invalid)?.clone(),
             RouteSelection::Success,

@@ -1,6 +1,7 @@
-//! One company catalog and a separate IDs-only agent selection operation.
+//! Company MCP connections, discovery and explicit operation policy review.
+mod operations;
 use crate::{
-    adapters::http::{app_state::AppState, auth::AuthenticatedUser},
+    adapters::http::auth::AuthenticatedUser,
     app_error::{AppError, AppResult},
     entities::{mcp::*, value_objects::McpConnectionSlug},
     use_cases::mcp::McpConnectionWrite,
@@ -15,8 +16,15 @@ use secrecy::SecretString;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-pub fn router() -> Router<AppState> {
+pub fn router<S>() -> Router<S>
+where
+    S: Clone + Send + Sync + 'static,
+    std::sync::Arc<crate::use_cases::mcp::McpUseCases>: axum::extract::FromRef<S>,
+    std::sync::Arc<crate::infra::workflow::WorkflowServices>: axum::extract::FromRef<S>,
+    std::sync::Arc<crate::adapters::http::session::SessionAuthority>: axum::extract::FromRef<S>,
+{
     Router::new()
+        .merge(operations::router())
         .route(
             "/api/companies/{company}/mcp-connections",
             get(list).post(create),
@@ -107,7 +115,17 @@ pub fn projection(c: &CompanyMcpConnection) -> serde_json::Value {
     serde_json::json!({"id":c.id,"slug":c.slug,"endpoint_url":c.endpoint,"transport":"streamable_http","enabled":c.enabled,
         "auth":{"type":c.auth,"secret_set":c.secret_set},"revision":c.revision,"access_level":c.access_level,
         "tool_grants":c.tool_grants.iter().map(|name| Grant{name:name.clone()}).collect::<Vec<_>>(),
-        "discovered_tools":c.discovered_tools.iter().map(|tool| serde_json::json!({"name":tool.name,"description":tool.description,"input_schema":tool.input_schema,"schema_fingerprint":schema_fingerprint(&tool.input_schema)})).collect::<Vec<_>>()})
+        "discovered_tools":c.discovered_tools.iter().map(tool_projection).collect::<Vec<_>>()})
+}
+
+fn tool_projection(tool: &crate::entities::mcp::McpDiscoveredTool) -> serde_json::Value {
+    use crate::application::use_cases::mcp::schema_fingerprint;
+    serde_json::json!({
+        "name":tool.name, "description":tool.description,
+        "input_schema":tool.input_schema, "output_schema":tool.output_schema,
+        "input_schema_fingerprint":schema_fingerprint(&tool.input_schema),
+        "output_schema_fingerprint":tool.output_schema.as_ref().map(schema_fingerprint)
+    })
 }
 async fn list(
     State(s): State<std::sync::Arc<crate::use_cases::mcp::McpUseCases>>,
@@ -210,8 +228,6 @@ mod tests {
 #[path = "mcp_api_tests.rs"]
 mod api_tests;
 
-/// Display identity of a discovered tool schema.
-fn schema_fingerprint(schema: &serde_json::Value) -> String {
-    use sha2::{Digest, Sha256};
-    format!("{:x}", Sha256::digest(schema.to_string().as_bytes()))
-}
+#[cfg(test)]
+#[path = "mcp_schema_tests.rs"]
+mod schema_tests;

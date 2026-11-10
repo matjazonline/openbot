@@ -63,6 +63,10 @@ jobs:
           scripts/tests/credential-key-rotation.sh
       - name: Knowledge artifact preparation tests
         run: python3 scripts/tests/knowledge-model-prepare.py
+      - name: Disposable Doop test runner boundaries
+        run: |
+          python3 scripts/tests/doop-test.py
+          node --test scripts/tests/doop-probe.mjs
       - name: Knowledge model production image and early memory budget
         run: |
           docker build --tag openbot-knowledge-ci .
@@ -205,3 +209,117 @@ jobs:
       # commit and unknown outcomes are reported, not gated (contention and host IO).
       - name: Lease budget
         run: scripts/test-network-isolation.sh scripts/lease-budget.sh --offline
+
+  doop-integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    services:
+      postgres:
+        image: postgres:18.6-bookworm
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: open_bots_doop_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d open_bots_doop_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/open_bots_doop_test
+      SQLX_OFFLINE: "true"
+      DOOP_TEST_UI_CHROME: /usr/bin/google-chrome
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: doop-integration
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Require the ordinary sandboxed system browser
+        run: |
+          test -x "$DOOP_TEST_UI_CHROME"
+          "$DOOP_TEST_UI_CHROME" --version
+      - name: Prepare the pinned managed Doop source and dependencies
+        run: python3 scripts/doop-test.py setup --managed --directory "$RUNNER_TEMP/doop"
+      - name: Complete separate Doop service gate without inherited credentials
+        run: |
+          python3 - <<'PY'
+          import importlib.util
+          import os
+          from pathlib import Path
+          import subprocess
+          spec = importlib.util.spec_from_file_location("doop_gate", "scripts/doop-test.py")
+          runner = importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(runner)
+          setup = Path(os.environ["RUNNER_TEMP"]) / "doop"
+          source, manifest, identity = runner.select_source(setup, None, None, True)
+          home = Path(os.environ["RUNNER_TEMP"]) / "doop-service-gate-home"
+          (home / "tmp").mkdir(mode=0o700, parents=True)
+          environment = runner.clean_environment(home)
+          environment["PATH"] = str(setup / "tools/node_modules/.bin") + os.pathsep + environment["PATH"]
+          environment["CHROME_PATH"] = os.environ["DOOP_TEST_UI_CHROME"]
+          environment["DOOP_TEST_DATABASE_URL"] = os.environ["DATABASE_URL"]
+          bun = str(setup / "tools/node_modules/.bin/bun")
+          commands = [[bun, "install", "--frozen-lockfile", "--ignore-scripts"]]
+          commands += [[bun, "run", name] + (["--", "--maxWorkers=2"] if name == "test" else [])
+              for name in ("format:check", "typecheck", "lint", "doc-lint", "test", "build")]
+          for command in commands:
+              print("Doop gate:", " ".join(command), flush=True)
+              subprocess.run(command, cwd=source, env=environment, check=True, timeout=1200)
+          runner.reviewed_source(source, identity["fingerprint"], manifest)
+          PY
+      - name: Compile and retain the exact Openbot helper executable
+        run: |
+          cargo fetch --locked
+          cargo test --locked --offline --lib --no-run --message-format=json > "$RUNNER_TEMP/doop-libtest-build.jsonl"
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+          import shutil
+          import subprocess
+          root = Path(os.environ["RUNNER_TEMP"])
+          messages = [json.loads(line) for line in (root / "doop-libtest-build.jsonl").read_text().splitlines()]
+          binaries = [message["executable"] for message in messages
+              if message.get("reason") == "compiler-artifact" and message.get("executable")
+              and message["target"]["name"] == "open_bots" and message["target"]["kind"] == ["lib"]
+              and message["profile"]["test"]]
+          assert len(binaries) == 1, "exactly one current libtest executable is required"
+          helper = root / "openbot-doop-libtest"
+          shutil.copy2(binaries[0], helper)
+          helper.chmod(0o500)
+          names = subprocess.check_output([str(helper), "--list"], text=True).splitlines()
+          for expected in ("doop_live_company_setup", "doop_lifecycle_live_company_keys", "doop_e2e_live_company_documents"):
+              assert sum(name.endswith("::" + expected + ": test") for name in names) == 1, expected
+          digest = hashlib.sha256()
+          with helper.open("rb") as source:
+              for chunk in iter(lambda: source.read(1024 * 1024), b""): digest.update(chunk)
+          (root / "doop-libtest-sha256.txt").write_text(digest.hexdigest() + "\n")
+          PY
+      - name: Prepare the pinned private deployment dependencies and image
+        run: |
+          docker pull postgres:18.6-alpine@sha256:123b17998ccaf47e53b502e8c6a1e79afd8f579c6f3eec83c563da026f957395
+          docker pull dxflrs/garage:v2.5.0@sha256:677e5b758e4425a325b811c425c026bf35a4bf42f7ddbaa773de3f4fd779a5a5
+          python3 scripts/doop-test.py image --managed --directory "$RUNNER_TEMP/doop" --output "$RUNNER_TEMP/doop-image"
+      - name: Require both private storage modes and both actual probe families
+        run: |
+          python3 scripts/doop-test.py acceptance --directory "$RUNNER_TEMP/doop" \
+            --image "$RUNNER_TEMP/doop-image/image.json" --output "$RUNNER_TEMP/doop-acceptance" \
+            --openbot-test-binary "$RUNNER_TEMP/openbot-doop-libtest" \
+            --openbot-test-database "$DATABASE_URL" --ui-chrome "$DOOP_TEST_UI_CHROME"
+      - name: Retain sanitized source image helper and acceptance evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: doop-integration-evidence
+          if-no-files-found: error
+          path: |
+            ${{ runner.temp }}/doop-libtest-sha256.txt
+            ${{ runner.temp }}/doop-image/image.json
+            ${{ runner.temp }}/doop-acceptance

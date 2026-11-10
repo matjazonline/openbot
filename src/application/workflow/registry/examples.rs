@@ -112,6 +112,7 @@ fn values(name: &str) -> Value {
             json!({"agent":"reviewer","context":{"message":"hello"},"data_schema":schema})
         }
         "data.map" | "channel.no_reply" => json!({"value":"hello","output_schema":schema}),
+        "data.url" => json!({"origin":"https://example.test","segments":["c","canvas-a"]}),
         "http.request" => {
             json!({"connection":"service","method":"POST","path":"/messages","headers":{"Accept":"application/json"},"body":{"message":"hello"}})
         }

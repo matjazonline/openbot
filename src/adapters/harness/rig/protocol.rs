@@ -227,7 +227,7 @@ pub(super) fn history(run: &RunCheckpoint) -> AppResult<Vec<Message>> {
         history.push(Message::Assistant {
             id: None,
             content: vec![AssistantContent::Text(Text {
-                text: pair.output.to_string(),
+                text: crate::services::mcp_client::observation::model_data(&pair.output)?,
                 additional_params: None,
             })],
         });
@@ -273,7 +273,7 @@ pub(super) fn history(run: &RunCheckpoint) -> AppResult<Vec<Message>> {
                         call.provider,
                         call.function.name,
                         vec![ToolResultContent::Text(Text {
-                            text: result.to_string(),
+                            text: crate::services::mcp_client::observation::model_data(result)?,
                             additional_params: None,
                         })],
                     )],

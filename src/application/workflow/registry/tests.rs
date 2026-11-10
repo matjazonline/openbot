@@ -37,13 +37,13 @@ pub(super) fn context<'a>(
 }
 #[test]
 fn workflow_registry_exact_catalogue_and_help_examples_compile() {
-    let expected = "agent.run ai.classify channel.no_reply context.history data.map decision.agent decision.human decision.rule flow.repeat http.request jev.evaluate local_agent.run mcp.call memory.load memory.save message.ask message.reply message.send tool.call wait.event wait.timer workflow.call";
+    let expected = "agent.run ai.classify channel.no_reply context.history data.map data.url decision.agent decision.human decision.rule flow.repeat http.request jev.evaluate local_agent.run mcp.call memory.load memory.save message.ask message.reply message.send tool.call wait.event wait.timer workflow.call";
     assert_eq!(
         TYPES.iter().copied().collect::<BTreeSet<_>>(),
         expected.split_whitespace().collect()
     );
-    assert_eq!(TYPES.len(), 22);
-    assert_eq!(TYPES.iter().collect::<BTreeSet<_>>().len(), 22);
+    assert_eq!(TYPES.len(), 23);
+    assert_eq!(TYPES.iter().collect::<BTreeSet<_>>().len(), 23);
     for name in TYPES {
         let example = example(name).unwrap();
         let compiled = compile_example(&example).unwrap_or_else(|e| panic!("{name}: {e:?}"));
@@ -189,4 +189,26 @@ fn workflow_registry_context_history_replaces_context_load() {
     });
     assert!(compile_example(&limit).is_err());
     assert!(compile_example(&example("context.history").unwrap()).is_ok());
+}
+#[test]
+fn doop_agent_mcp_error_policy_requires_an_explicit_literal_enum() {
+    for value in [json!("observe"), json!("fail_step")] {
+        let mut sample = example("agent.run").unwrap();
+        changed(&mut sample, |v| {
+            v["steps"]["start"]["with"]["mcp_error_policy"] = json!({"literal":value})
+        });
+        compile_example(&sample).unwrap();
+    }
+    for binding in [
+        json!({"ref":"/params/policy"}),
+        json!({"ref":"/input/policy"}),
+        json!({"literal":true}),
+        json!({"literal":"ignore"}),
+    ] {
+        let mut sample = example("agent.run").unwrap();
+        changed(&mut sample, |v| {
+            v["steps"]["start"]["with"]["mcp_error_policy"] = binding
+        });
+        assert!(compile_example(&sample).is_err());
+    }
 }

@@ -726,6 +726,7 @@ impl RunCheckpoint {
     }
 
     fn result(&mut self, id: InvocationId, result: Value) -> AppResult<bool> {
+        let result = crate::services::mcp_client::observation::omit_binary_content(result)?;
         if result.to_string().len() > MAX_RESULT_BYTES {
             return Err(invalid("Tool result exceeds checkpoint bound"));
         }

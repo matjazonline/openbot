@@ -544,3 +544,9 @@ async fn knowledge_run_level_workflow_tool_child_and_saved_result_replay_taint_p
 
 #[path = "agent_history_cascade_tests.rs"]
 mod history_cascade;
+
+#[path = "doop_binary_child_tests.rs"]
+mod doop_binary;
+
+#[path = "doop_binary_mcp_child_tests.rs"]
+mod doop_binary_mcp;
