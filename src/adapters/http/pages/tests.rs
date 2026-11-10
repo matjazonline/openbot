@@ -3997,6 +3997,8 @@ fn the_dashboard_shows_a_placeholder_with_one_initial_writer() {
     use crate::entities::dashboard::DashboardWindow;
 
     let html = dashboard_page(&DashboardShell {
+        department: None,
+        departments: &Default::default(),
         user: &mailbox_user(&email),
         scope: DashboardScopeView::Company(&companies[0]),
         selected_company: Some(&companies[0]),
@@ -4134,6 +4136,8 @@ fn every_ui_workspace_first_column_renders_a_sidebar_header() {
     ));
 
     let dashboard_html = dashboard_page(&DashboardShell {
+        department: None,
+        departments: &Default::default(),
         user: &user,
         scope: DashboardScopeView::Company(&company),
         selected_company: Some(&company),
@@ -4145,6 +4149,8 @@ fn every_ui_workspace_first_column_renders_a_sidebar_header() {
     ));
 
     let dashboard_global_html = dashboard_page(&DashboardShell {
+        department: None,
+        departments: &Default::default(),
         user: &user,
         scope: DashboardScopeView::Global,
         selected_company: Some(&company),

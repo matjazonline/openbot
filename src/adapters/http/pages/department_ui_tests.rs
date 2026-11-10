@@ -637,3 +637,145 @@ fn department_ui_agent_settings_show_its_desk_and_departments() {
     ));
     assert!(html.contains("Not in any department."));
 }
+
+/// 01-departments 04B.4: the runs workspace filters by department beside agent and binding, the
+/// view switch offers "Waiting on a person", and that view lists the queue by department with
+/// a department filter.
+#[test]
+fn department_views_run_board_filters_by_department_and_waits_on_people() {
+    let tree = tree();
+    let company_id = tree.company.id;
+    let options = ScopeOptions {
+        departments: vec![
+            ScopeOption {
+                id: tree.revenue.id.as_uuid(),
+                label: "Revenue".into(),
+            },
+            ScopeOption {
+                id: tree.sales.id.as_uuid(),
+                label: "\u{a0}\u{a0}Sales".into(),
+            },
+        ],
+        ..ScopeOptions::default()
+    };
+    let filter = RunFilterView {
+        department: Some(tree.sales.id.as_uuid()),
+        ..RunFilterView::default()
+    };
+    let controls = scope_controls(company_id, filter, &options, RunsView::List);
+    assert!(controls.contains(r#"name="department_id" aria-label="Filter by department""#));
+    assert!(controls.contains(r#"<option value="">Any department</option>"#));
+    assert!(controls.contains(&format!(r#"<option value="{}" selected>"#, tree.sales.id)));
+    // A company without departments gets no department select.
+    let plain = scope_controls(
+        company_id,
+        RunFilterView::default(),
+        &ScopeOptions::default(),
+        RunsView::List,
+    );
+    assert!(!plain.contains("department_id"));
+    assert_eq!(RunsView::parse(Some("waiting")), RunsView::Waiting);
+
+    let toggle = runs_view_toggle(company_id, filter.scope(), RunsView::Waiting);
+    assert!(toggle.contains(&format!(
+        r#"href="/ui/workflow-runs?company_id={company_id}&amp;department_id={}&amp;view=board""#,
+        tree.sales.id
+    )));
+    assert!(toggle.contains(">Waiting on a person</a>"));
+    assert!(toggle.contains(r#"class="tab tab-active""#));
+
+    let all = tree.all();
+    let departments = crate::entities::department::DeskDepartments {
+        departments: all.clone(),
+        owners: Default::default(),
+    };
+    let page = crate::entities::attention::AttentionPage {
+        items: Vec::new(),
+        next_cursor: None,
+        as_of: Utc::now(),
+        working_set_size: 0,
+        truncated: false,
+    };
+    let waiting = runs_waiting(&RunsWaitingView {
+        company_id,
+        scope: filter.scope(),
+        departments: &departments,
+        department: Some(tree.sales.id),
+        page: &page,
+    });
+    assert!(waiting.contains(r#"<input type="hidden" name="view" value="waiting">"#));
+    assert!(waiting.contains(&format!(
+        r#"<option value="{}" selected>&nbsp;&nbsp;Sales &lt;team&gt;</option>"#,
+        tree.sales.id
+    )));
+    assert!(waiting.contains("Decisions waiting on a person and run problems escalated to one"));
+    assert!(waiting.contains("No work items in this view."));
+}
+
+/// 01-departments 04C.2 (B2-F4): the usage page offers grouping by department, keeps it selected,
+/// and labels each row with its department, "No department" included.
+#[test]
+fn department_views_usage_page_groups_by_department() {
+    use crate::application::services::model_usage::{
+        UsageDepartment, UsageGroup, UsageGrouping, UsageQuery, UsageReport, UsageScope,
+    };
+    let company = Uuid::new_v4();
+    let end = Utc::now();
+    let query = UsageQuery {
+        scope: UsageScope {
+            company,
+            actor: Uuid::new_v4(),
+        },
+        start: end - chrono::Duration::days(30),
+        end,
+        grouping: UsageGrouping::Department,
+        agent: None,
+        workflow: None,
+    };
+    let group = |department: UsageDepartment| UsageGroup {
+        provider: None,
+        model: None,
+        workflow: None,
+        department: Some(department),
+        calls: 2,
+        completed_calls: 2,
+        unconfirmed_calls: 0,
+        reported_calls: 2,
+        estimated_calls: 0,
+        mixed_calls: 0,
+        input_tokens: 10,
+        output_tokens: 5,
+        priced_subtotal_usd: None,
+        unpriced_calls: 2,
+    };
+    let report = UsageReport {
+        start: query.start,
+        end: query.end,
+        grouping: UsageGrouping::Department,
+        groups: vec![
+            group(UsageDepartment {
+                id: Some(Uuid::new_v4()),
+                name: "Sales <team>".into(),
+            }),
+            group(UsageDepartment {
+                id: None,
+                name: "No department".into(),
+            }),
+        ],
+        scanned_calls: 4,
+        truncated: false,
+        prices: Vec::new(),
+        prices_truncated: false,
+    };
+    let html = model_usage_page(company, &query, &report);
+    assert!(
+        html.contains(r#"<option value="department" selected>Department</option>"#),
+        "{html}"
+    );
+    let sales = html
+        .find("Sales &lt;team&gt;")
+        .expect("the department's row");
+    let none = html.find("No department").expect("the unowned row");
+    assert!(sales < none);
+    assert!(!html.contains("Sales <team>"));
+}

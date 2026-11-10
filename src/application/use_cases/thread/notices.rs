@@ -68,6 +68,8 @@ pub struct ChannelDirectoryEntry {
     pub address: EmailAddress,
     pub name: String,
     pub description: Option<String>,
+    /// The department that owns the desk; entries arrive grouped by it, root first.
+    pub department: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -150,12 +152,25 @@ fn push_channel_directory(body: &mut String, entries: &[ChannelDirectoryEntry]) 
     }
 
     body.push_str("Desks you can write to:\n");
+    // Under department headings once any desk has a department (01-departments 04C.3); the
+    // entries already arrive in that order, root departments first and "No department" last.
+    let headed = entries.iter().any(|entry| entry.department.is_some());
+    let indent = if headed { "  " } else { "" };
+    let mut heading: Option<Option<&str>> = None;
     for entry in entries {
-        body.push_str(&format!("  - {} \u{2014} {}\n", entry.address, entry.name));
+        let department = entry.department.as_deref();
+        if headed && heading != Some(department) {
+            body.push_str(&format!("  {}:\n", department.unwrap_or("No department")));
+            heading = Some(department);
+        }
+        body.push_str(&format!(
+            "{indent}  - {} \u{2014} {}\n",
+            entry.address, entry.name
+        ));
         if let Some(description) = entry.description.as_deref().map(str::trim)
             && !description.is_empty()
         {
-            body.push_str(&format!("      {description}\n"));
+            body.push_str(&format!("{indent}      {description}\n"));
         }
     }
     body.push('\n');

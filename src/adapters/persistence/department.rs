@@ -769,6 +769,23 @@ async fn role_reach_on(
         .collect())
 }
 
+/// Every department of the company, by slug.
+pub(crate) async fn departments_of_company(
+    pool: &sqlx::PgPool,
+    company: CompanyId,
+) -> AppResult<Vec<Department>> {
+    sqlx::query_as::<_, DepartmentDb>(&format!(
+        "SELECT {DEPARTMENT_COLUMNS} FROM departments AS department \
+         WHERE department.company_id = $1 ORDER BY department.slug, department.id"
+    ))
+    .bind(company.as_uuid())
+    .fetch_all(pool)
+    .await?
+    .into_iter()
+    .map(Department::try_from)
+    .collect()
+}
+
 /// Department persistence with the provisioning templates a department's desk is created and
 /// re-pointed with (01DEP-P03-D7).
 #[derive(Clone)]
@@ -912,16 +929,7 @@ impl DepartmentPersistence for PostgresDepartments {
     }
 
     async fn list_by_company(&self, company: CompanyId) -> AppResult<Vec<Department>> {
-        sqlx::query_as::<_, DepartmentDb>(&format!(
-            "SELECT {DEPARTMENT_COLUMNS} FROM departments AS department \
-             WHERE department.company_id = $1 ORDER BY department.slug, department.id"
-        ))
-        .bind(company.as_uuid())
-        .fetch_all(&self.persistence.pool)
-        .await?
-        .into_iter()
-        .map(Department::try_from)
-        .collect()
+        departments_of_company(&self.persistence.pool, company).await
     }
 
     async fn list_for_user(&self, company: CompanyId, user: Uuid) -> AppResult<Vec<Department>> {
@@ -1071,6 +1079,51 @@ impl DepartmentPersistence for PostgresDepartments {
         .fetch_all(&self.persistence.pool)
         .await?;
         principal_choices(rows)
+    }
+
+    async fn agent_departments(
+        &self,
+        company: CompanyId,
+        agents: &[Uuid],
+    ) -> AppResult<
+        std::collections::HashMap<Uuid, (Vec<crate::entities::department::HeldDepartment>, bool)>,
+    > {
+        let mut connection = self.persistence.pool.acquire().await?;
+        let placed = crate::adapters::persistence::department_roster::agent_departments_on(
+            &mut connection,
+            company,
+            agents,
+        )
+        .await?;
+        Ok(placed
+            .into_iter()
+            .map(|(agent, (listed, more))| {
+                let listed = listed
+                    .into_iter()
+                    .map(|department| crate::entities::department::HeldDepartment {
+                        id: DepartmentId::new(department.id),
+                        name: department.name,
+                        slug: department.slug,
+                        roles: department.roles,
+                    })
+                    .collect();
+                (agent, (listed, more))
+            })
+            .collect())
+    }
+
+    async fn desk_owners(&self, company: CompanyId) -> AppResult<Vec<(Uuid, DepartmentId)>> {
+        let rows: Vec<(Uuid, Uuid)> = sqlx::query_as(
+            "SELECT desk.id, desk.department_id FROM channels AS desk \
+             WHERE desk.company_id = $1 AND desk.department_id IS NOT NULL",
+        )
+        .bind(company.as_uuid())
+        .fetch_all(&self.persistence.pool)
+        .await?;
+        Ok(rows
+            .into_iter()
+            .map(|(desk, department)| (desk, DepartmentId::new(department)))
+            .collect())
     }
 
     async fn desks(

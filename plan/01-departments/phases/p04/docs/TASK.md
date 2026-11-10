@@ -196,10 +196,118 @@ removed; renamed assertions only (`desk_wording_flash_messages_say_desk`, bindin
 - JSON: `Channel` already serializes `department_id`/`members_only` (verify in route tests);
   agent responses need `departments` with held roles.
 
+## B2 implementation (04B.4 + 04C.1–4), on top of 399efe2c
+
+Common read: `DeskDepartments` (entity) = company departments + desk → department map,
+`DepartmentUseCases::desk_departments` (readable company: department *names* are company-visible
+so every surface can say which department a desk belongs to; membership stays with the tab),
+port `desk_owners`; `DeskDepartments::group(items, desk_of)` groups in tree order, "No department"
+last, one unheaded group when nothing is owned. Department filters are validated against it
+(unknown id → `404`).
+
+- **Attention queue (04C.1)**: `AttentionListRequest.department`; the use case narrows the visible
+  desks to that department's and sets the new `AttentionQuery.company_items = false` (SQL `$14` is
+  now `company_items`; `manager` keeps deciding run links); `ReadContext.desk_departments`. Routes
+  `/ui/work`, `/ui/work/list`, JSON `/companies/{id}/attention` take `department_id`. Page: a
+  department select in the header form; tabs, live-reload URL and next-page link keep it; items
+  grouped per page under department headings.
+- **Run board (04B.4)**: `RunFilter.department`, `RunBoardScope.department`, SQL `channel_id IN
+  (SELECT desk.id FROM channels … department_id = $)` on list and board (slow-read log names it);
+  routes carry `department_id` (`ScopeIds`/`Scope`, resolved via `desk_departments`), options list
+  departments in tree order, select "Any department" beside agent/binding (absent with none).
+  "Waiting on a person": `RunsView::Waiting` (`view=waiting`), third tab of the view switch;
+  `waiting_workspace` reads the attention queue (TeamWork — the runs workspace is managers',
+  MAX_LIMIT 100) narrowed by department and renders it grouped (`runs_waiting`). Decisions are
+  the parked human decisions; reconciliation/failure/refusal items are the escalations.
+- **Dashboard (04C.1)**: company view loads `desk_departments` (members only; an operator in a
+  company they are not in gets none); `department_id` validated; sidebar department picker (plain
+  links, like the range picker, so the stream re-subscribes); `dashboard_query` carries it to the
+  panels and SSE; outstanding jobs grouped by department and narrowed to one; the counts and charts
+  stay company-wide (said under the picker).
+- **Model usage (04C.2)**: `UsageGrouping::Department`; `load_calls` joins
+  `model_usage_calls.run_id` → `workflow_runs.channel_id` → `channels.department_id` →
+  `departments` (archived history has no run → "No department"); `UsageGroup.department`; route
+  `group=department`; page option and row label.
+- **`_help` / bounce (04C.3)**: `ChannelPersistence::list_departments` (Postgres via the shared
+  `departments_of_company`; mocks empty), `DirectoryCache::departments`;
+  `writable_channel_directory` orders by department tree rank then address and tags each entry;
+  `push_channel_directory` prints department headings ("No department" last) when any desk is
+  owned, flat otherwise. `ChannelDirectoryEntry.department` is `#[serde(default)]` (queued notices
+  are ours to reset, I001).
+- **JSON (04C.4)**: `AgentResponse.departments` (`HeldDepartment {id, name, slug, roles}`) and
+  `more_departments` on list/get/create/update (port `agent_departments` over p03's
+  `agent_departments_on`, cap 16); channel responses already carried `department_id` and
+  `members_only` (p02) — now asserted.
+- Test support: `test_support::department_use_cases`, `Fixture::departments`, workflows
+  `test_reads`.
+
+### B2 checks (TEST_DATABASE_URL `openbot_dept_p04_test`; SQLX_OFFLINE=true; 4 threads)
+
+| Command | Result | Log |
+| --- | --- | --- |
+| `cargo check --all-targets`, `cargo fmt --check`, `cargo clippy --locked --offline --all-targets -- -D warnings` | clean | — |
+| affected: `-- attention adapters::http reads_tests run_board run_lineage model_usage storage_report storage_tests application::use_cases::thread adapters::smtp department_ channel agent_api tool_tests jev_runtime_recovery dashboard --skip cloudroom` | 1143 passed, 2 failed: `rendered_markup_carries_no_inline_javascript` (pre-existing, unrelated) and `picking_a_library_agent_copies_its_skills_with_the_agent_and_channel` — a **p03 B1 regression** in a test p03 never ran (it passed in p02's affected run): the copy is now refused without a model connection (01DEP-P03-D3, intended). Test fixed by seeding a default connection | `logs/B2-affected-1.txt`, `logs/B2-test-inventory.txt` |
+| `adapters::persistence::skill` after the fix | 13 passed | `logs/B2-skill-rerun.txt` |
+| focused final (B2 + B1 focused + the fixed test) | 41 passed | `logs/B2-focused-final.txt`, `logs/B2-focused-inventory.txt` |
+| CSS rebuilt for new classes; rebuild reproduces | pass | `logs/B2-css-check.txt` |
+
+The p03 regression shows the deferred full gate (I003) can still find more of these; phase 05 runs it.
+
+### B2 verification mapping
+
+| Criterion | Test (decisive assertions) |
+| --- | --- |
+| 04B.4 department filter on list and board | `department_views_runs_narrow_to_the_departments_desks` (list = [run] for its department, empty for another; board counts equal to unscoped for its department, 0 for another); `department_views_runs_department_scope_is_company_scoped` (own resolves; another company's → NotFound; options list only the company's); page `department_views_run_board_filters_by_department_and_waits_on_people` (select, selected, absent without departments, toggle keeps department) |
+| 04B.4 "Waiting on a person" grouped by department | page test above (hidden view, filter, intro, list); route `…scope_is_company_scoped` renders `waiting_workspace` with the department selected |
+| 04C.1 attention grouping + filter | `department_views_attention_groups_and_keeps_the_department` (headings order, next link/live URL/tabs keep the department, select); `department_views_company_items_are_left_out_of_a_department_view` (flag split in SQL); `department_views_attention_department_must_be_the_companys` (own narrows, unknown → 404) |
+| 04C.1 dashboard grouping + filter | `department_views_dashboard_groups_and_narrows_outstanding_jobs` (headings root first, narrowing, empty message, SSE/links carry department, picker text, no picker without departments); `department_views_dashboard_department_must_be_the_companys` |
+| 04C.2 usage by department | `department_views_usage_groups_by_department_with_no_department_last` (aggregation); `model_usage_workflow_exact_provenance_and_grouping` (SQL join path, desk-less run → "No department") |
+| 04C.3 `_help`/bounce under department headings, root first | `department_views_help_and_bounce_list_desks_under_their_department` (format, order, flat when none) |
+| 04C.4 JSON fields | `agent_default_desk_json_create_places_the_agent` (create + update carry `departments` with `["lead"]`), `api_agents_carry_no_retired_runtime_fields` (none → `[]`), `department_desk_ownership_json_fields_are_kept_when_absent` (`department_id` key present, `members_only` boolean on every PUT) |
+
+Stand-ins / not proved: `writable_channel_directory`'s ordering by department rank is exercised
+only through the formatter with pre-ordered entries (the thread mocks return no departments); the
+usage join's positive path (a run on an owned desk) is not seeded — only its desk-less path;
+the attention use case's narrowing to a department's desks is proven by the flag split and the
+empty-department case, not with an item on an owned desk; browser behaviour of the pickers not run.
+
+## B2 corrections after 01DEP-P04-B2-R1 (all five findings)
+
+- **F1** (Medium): `DepartmentUseCases::desk_departments(user, company, readable_desks)`: owners
+  and admins get every department; anyone else gets `list_for_user` (theirs) ∪ the owners of the
+  desks they can read (`AttentionListing.readable_desks`, from the read context), and only those
+  desks in the owner map — the p01 D4 r2 rule, no coordination change. The attention routes (page,
+  list, JSON) list first, then name and check the department with that view; an unseen
+  department is `404`. The runs workspace and the company dashboard are managers' (`&[]`).
+  Test `department_views_a_member_filters_only_by_departments_they_may_see`.
+- **F2** (Medium): the dashboard panel knows the company list is cut at `OUTSTANDING_LIMIT`: a
+  narrowed view with no match says none of the company's first 20 is on the department's desks
+  and it may have later ones; with matches it says only the company's first 20 were looked at.
+  (Querying per department would add a dimension to the snapshot cache; the honest panel is the
+  smaller change.) Tested with a capped snapshot.
+- **F3** (Low): the department select has its own form (`#attention-department`, hidden
+  `company_id` and `view`); the company switch submits no `department_id`. Tested.
+- **F4** (Low): `department_views_usage_page_groups_by_department` (option selected, labels,
+  order, escaping); `department_views_usage_names_the_department_of_the_runs_desk` (a call on a
+  department-owned desk is under that department); `department_views_directory_orders_desks_by_department_root_first`
+  (thread mock now holds departments; a teammate's bounce lists root, child, then none, by
+  address); `department_views_attention_reads_only_the_departments_desks` (recording store: the
+  one-department read gets only the owned desk, `company_items` false, `manager` true).
+- **F5** (optional, done): one check `routes::known_department` used by attention, dashboard and
+  the runs workspace (which now reads `desk_departments` once per scope); `#[serde(default)]`
+  removed from `ChannelDirectoryEntry.department`; the waiting view drops the next-page link and
+  says "Showing the first N. Open the work queue for the rest." with the department kept.
+- Checks: `department_views_` 15 passed; clippy/fmt clean; CSS rebuilt (`B2-css-check.txt` R2 line);
+  affected rerun `logs/B2-R2-affected.txt`.
+
 ## Status
 
+- **B2 accepted in phase**: B2-R1 changes required (F1–F5), corrected; B2-R2 **PASS** for digest
+  `a97fdbeb6c8026e22cfc316bc13f961b61b087a7131c5c4c58ad1c1d2f0c58ba` (root recomputed; coordination
+  r7 unchanged; manifest valid). Optional B2-F6 (misplaced doc comment in `routes/mod.rs`) is
+  carried into B3. Committed after 399efe2c.
 - Merge: committed b1026003; checks above.
 - **B1 accepted in phase**: B1-R1 changes required (F1–F5), corrected; B1-R2 **PASS** for digest
   `9cad3b579f1e5121427ee277b620bebd9a8dffa3786d299f748844354bb63848` (root recomputed; coordination
   r7 unchanged; manifest valid). Committed after b1026003.
-- B2: next.
+- B3: next (04C.5 + 04D docs, plus B2-F6).

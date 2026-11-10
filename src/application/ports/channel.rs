@@ -67,6 +67,12 @@ pub trait ChannelPersistence: Send + Sync {
 
     async fn list_by_company_id(&self, company_id: Uuid) -> AppResult<Vec<Channel>>;
 
+    /// The company's departments, to label its desks by owner (01-departments 04C.3).
+    async fn list_departments(
+        &self,
+        company_id: Uuid,
+    ) -> AppResult<Vec<crate::entities::department::Department>>;
+
     /// Save one channel edit under the channel's gate; any failure leaves it unchanged.
     async fn update(&self, request: ChannelUpdate) -> AppResult<Channel>;
 

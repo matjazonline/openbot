@@ -23,6 +23,7 @@ async fn fixture(slugs: &[&str]) -> ChannelFixture {
     fixture.use_cases = ThreadUseCases::for_test(
         fixture.threads.clone(),
         Arc::new(MockChannelPersistence {
+            departments: Default::default(),
             channels: Mutex::new(channels),
         }),
         fixture.use_cases.company_persistence.clone(),

@@ -130,3 +130,174 @@ Common context for the B1 findings below:
   editors. Align the deleted-desk copy with the button.
 - **Resolution history:** 2026-11-10 open (optional).
   2026-11-10 resolved (B1-R2): only managers get desk links; members see the name and address (`department_ui_tests.rs:294`). The deleted-desk text now reads "Create an additional desk below…" (asserted).
+
+---
+
+# Batch B2 review — round `01DEP-P04-B2-R1`
+
+Common context for the B2 findings below:
+
+- Date 2026-11-10. Batch B2: 04B.4 (run board department filter and "Waiting on a person") and
+  04C.1–4 (dashboard and attention, model usage, `_help`/bounce, JSON). Stage: batch review.
+  Round `01DEP-P04-B2-R1`.
+- Reviewer B: Opus 5.5 (`claude-opus-5-5`), agent `ad409b2d3d149c2c6`.
+- Phase start `b1026003`. Review base and HEAD are `399efe2c` (B1, accepted); B2 is uncommitted.
+- Artifact digest `e167c54ade2bb78b74c80524b9afc479b7b16b869c0a50c09b53c8ab4048171d`
+  (exclusions `plan/01-departments/phases/p04/docs`, `plan/01-departments/COORDINATION.md`).
+- Coordination r7, sha256 `3b556f5a…5414`: I001 r1, I002 r2, I003 r2.
+
+---
+
+## 01DEP-P04-B2-F1 — A plain member sees and can filter by every department, against the accepted rule that a member sees only their own
+
+- **Classification:** actionable defect · **Medium** · authorization/visibility (a change to an
+  accepted decision).
+- **Evidence:**
+  - p01 decision r2 (F4) (`phases/p01/docs/TASK.md:173-177`, plan 01 item 3) says:
+    `visible_departments` "need only company membership … a plain member sees departments where
+    their `person` principal is a member or holds a role … A department the member cannot see is
+    `NotFound`". B1 follows it on the Departments tab.
+  - B2 adds `DepartmentUseCases::desk_departments` (`use_cases/department.rs:351`). It only needs
+    `readable_company` and returns **every** department of the company
+    (`list_by_company` + `desk_owners`).
+  - `/ui/work` and `/ui/work/list` (`load_readable_company`, open to plain members for My work
+    and Unassigned) pass that list to `department_filter` (`pages/attention.rs:36`). So a member's
+    select lists every department name, indented to show the whole tree.
+  - `known_department` (`routes/attention.rs:276-286`) accepts any of them, and so does the JSON
+    `GET /companies/{id}/attention?department_id=` route. A department the member cannot see
+    answers 200, not `NotFound`.
+  - TASK records this as a new rule ("department *names* are company-visible"). The B2 scouting
+    note had planned to go through `visible_departments`. No coordination entry or gate revision
+    records the change, and the assignment says B2 changes no authorization model.
+  - Plan 04's outcome ("everyone sees which department a desk belongs to") covers naming the
+    department of a desk the member can see. It does not cover listing every department.
+  - The other users of `desk_departments` are manager-only, so they are fine: the runs workspace
+    (`load_managed_company`), the company dashboard (managed companies; an operator outside the
+    company gets none), agent JSON (`verify_company_manager`) and usage (manager recheck).
+- **Required:**
+  - For a viewer who is not an owner or admin, offer and accept only:
+    - the departments `visible_departments` returns;
+    - the departments that own a desk the viewer can read, so that the departments of desks on
+      their own items can still be named.
+  - Answer `NotFound` for any other department id, on both the page and the JSON route.
+  - Alternatively, bring a revision of p01 D4 r2 through coordination before keeping the
+    company-wide list.
+  - Add a member test: a department the member is not in, and that owns no desk they can read, is
+    absent from the select and answers 404 as a filter.
+- **Resolution history:** 2026-11-10 open (B2-R1).
+  2026-11-10 resolved (B2-R2, digest `a97fdbeb…0c58ba`), in code under p01 D4 r2 with no coordination change. `DepartmentUseCases::desk_departments(user, company, readable_desks)` (`use_cases/department.rs:353`) gives owners and admins every department; anyone else gets `list_for_user` (the same rule as `visible_departments`) plus the owners of the readable desks they were given, and an owner map cut to those desks. The three attention routes (`routes/attention.rs:104`, `:218`, `:266`) list first, then pass `AttentionListing.readable_desks`, which is `read_context`'s `visible_channel_ids` taken before any department narrowing (`application/attention.rs:177`), so the select stays whole while a department is chosen. An unseen department narrows the read to nothing (only readable desks it owns) and then answers 404 through `known_department`. The other callers (company dashboard, runs workspace) pass `&[]` and are reached only by owners and admins (`list_managed_companies`/`load_managed_company`). Test `department_views_a_member_filters_only_by_departments_they_may_see` (`attention_authorization_tests.rs:251`): `hidden` is absent from the member's departments, named once its desk is readable, and 404 on the JSON route once the desk is made members-only; passed in my run. It does not assert the 404 body; by inspection, `known_department` is the only `NotFound` left on that path.
+
+---
+
+## 01DEP-P04-B2-F2 — The dashboard's department filter narrows the company's first 20 jobs, so it can report "nothing outstanding" for a busy department
+
+- **Classification:** actionable defect · **Medium** · correctness (04C.1 "with a department
+  filter").
+- **Evidence:**
+  - The outstanding query is capped company-wide before any department narrowing:
+    `outstanding(company)` binds `OUTSTANDING_LIMIT` = 20 (`persistence/dashboard.rs:628-633`,
+    `entities/dashboard.rs:263`).
+  - `outstanding_panel` (`pages/dashboard.rs:307-375`) filters those 20 by department at render
+    time. A company can have 20 or more outstanding jobs, none of them on the chosen department's
+    desks among the first 20, while that department has many later in the list.
+  - In that case the panel returns early with "Nothing outstanding on this department's desks."
+    (`:353-359`). That is false, and the "Showing the first 20." note is skipped.
+  - When some do match, the note says "Showing the first 20." under fewer rows, without saying
+    that the 20 were the company's.
+  - The test covers only an uncapped snapshot.
+- **Required:**
+  - Either apply the department in the outstanding query, so the cap counts the department's
+    jobs, or make the panel honest. When the company list is capped and a department is chosen,
+    never claim "nothing outstanding". Say that only the company's first 20 jobs were looked at.
+  - Add a test with a capped snapshot and a department that has no rows among those 20.
+- **Resolution history:** 2026-11-10 open (B2-R1).
+  2026-11-10 resolved (B2-R2): the honest-panel option. `outstanding_panel` (`pages/dashboard.rs:355-379`) knows the company list is cut at `OUTSTANDING_LIMIT`. With no match it says "None of the company's first 20 outstanding jobs is on this department's desks; it may have later ones.", and with matches it says "Only the company's first 20 outstanding jobs were looked at; this department may have more.". The uncut text is unchanged. `department_views_dashboard_groups_and_narrows_outstanding_jobs` asserts both with a capped snapshot, and that the false claim is absent; passed in my run.
+
+---
+
+## 01DEP-P04-B2-F3 — Switching company on the work queue with a department chosen answers 404
+
+- **Classification:** actionable defect · **Low** · UX/correctness.
+- **Evidence:**
+  - The attention header is one GET form, `<select name="company_id">` plus the department select
+    plus "Switch" (`pages/attention.rs:109-117`).
+  - Pick a department, then pick another company and press Switch. The request is
+    `/ui/work?company_id=B&department_id=<A's department>`, and `work_page` →
+    `known_department` answers `404 Department not found` (`routes/attention.rs:205-208`).
+  - So a user in several companies has to reset the department to "All departments" before
+    switching company.
+- **Required:**
+  - Drop the department when the company changes. For example, give the department filter its own
+    form with a hidden `company_id`, or keep the company switch from submitting `department_id`.
+  - Add a page test asserting the company-switch form carries no `department_id`, or a route test
+    showing the switch lands on the other company.
+- **Resolution history:** 2026-11-10 open (B2-R1).
+  2026-11-10 resolved (B2-R2): the department select has its own form, `#attention-department`, with hidden `company_id` and `view` (`pages/attention.rs:148`), and the company switch form submits no `department_id`. Asserted in `department_views_attention_groups_and_keeps_the_department`; passed in my run.
+
+---
+
+## 01DEP-P04-B2-F4 — The usage rendering check the plan asks for is missing, and three of the stated behaviours have no positive test
+
+- **Classification:** actionable defect · **Low** · verification. The plan's "Focused checks":
+  "Rendering tests for the dashboard, attention and usage grouping and the `_help` body".
+- **Evidence:**
+  - **Usage, rendering:** `pages/model_usage.rs` gains the "Department" option and a department
+    row label, and `routes/model_usage.rs:45` accepts `group=department`. No test renders them;
+    `UsageGrouping::Department` appears only in the aggregate test and the persistence test.
+  - **Usage, join:** the persistence test seeds only a run with no desk, giving "No department".
+    The join `run_id → workflow_runs.channel_id → channels.department_id → departments`
+    (`persistence/model_usage/report.rs:149-178`) is never shown to name a department.
+  - **`_help` and bounce order:** `writable_channel_directory` (`thread/ingest/routing.rs:672-713`)
+    is meant to order desks by department tree rank, root first, with no department last. Every
+    `ChannelPersistence` mock's `list_departments` returns `[]`. The formatter test feeds entries
+    already in order, so that ordering is untested.
+  - **Attention narrowing:** the use case's narrowing to one department's desks
+    (`application/attention.rs:142-156`) is tested only with an empty department and through
+    the company-items flag. It is never tested with an item on an owned desk beside one on
+    another desk.
+  - TASK lists these four as stand-ins. They are the behaviours 04C.1–3 state.
+- **Required:** add:
+  - a `model_usage_page` rendering test for `group=department`: the option selected, a department
+    row, and "No department";
+  - a usage persistence case with a run on a department-owned desk;
+  - a thread use-case test whose mock returns departments, asserting root, then child, then
+    "No department", by address within each;
+  - an attention case where a one-department view keeps the owned desk's item and drops the other
+    desk's item.
+- **Resolution history:** 2026-11-10 open (B2-R1).
+  2026-11-10 resolved (B2-R2), all four: `department_views_usage_page_groups_by_department` (`department_ui_tests.rs:718`: option selected, escaped label, department before "No department"); `department_views_usage_names_the_department_of_the_runs_desk` (`agent_history_department_tests.rs:159`: a call on a run whose desk Sales owns is grouped under Sales with id); `department_views_directory_orders_desks_by_department_root_first` (`thread/tests.rs:3276`: the mock now returns departments, the child is defined before its root and the desks arrive out of order, and a bounce lists revenue, ab-sales, zz-sales, then aaa-loose); `department_views_attention_reads_only_the_departments_desks` (`attention_authorization_tests.rs:177`: a recording store shows the one-department read gets only the owned desk with `company_items` false). All passed in my run.
+
+---
+
+## 01DEP-P04-B2-F5 — Small cleanups
+
+- **Classification:** optional suggestion · Low · maintainability.
+- **Evidence and suggestions:**
+  - **Duplicated check.** "A department id must be the company's, or `NotFound`" is written three
+    times: `known_department` (`routes/attention.rs:276`), inline in `DashboardScope::resolve`
+    (`routes/ui_dashboard.rs:245-253`) and `Ui::company_department`
+    (`routes/workflows/ui/runs/mod.rs:328-341`, which also re-reads `desk_departments` on every
+    call). This breaks `src/AGENTS.md` "One decision, one place". Make it one
+    `DeskDepartments::resolve(Option<Uuid>) -> AppResult<Option<DepartmentId>>`.
+  - **Unneeded attribute.** `ChannelDirectoryEntry.department`'s `#[serde(default)]`
+    (`thread/notices.rs:72`) changes nothing for an `Option` field. TASK justifies it with queued
+    notices, which is the kind of compatibility reasoning I001 rules out. Drop it.
+  - **Next-page link.** The "Waiting on a person" view reads at most 100 items. Its "Next page"
+    link, from `attention_list`, leaves the runs workspace for `/ui/work`. Say so, or link within
+    the workspace.
+- **Resolution history:** 2026-11-10 open (optional).
+  2026-11-10 resolved (B2-R2, optional): one `routes::known_department` (`routes/mod.rs:67`) used by attention, dashboard and the runs workspace; `#[serde(default)]` removed from `ChannelDirectoryEntry.department` (`thread/notices.rs:72`); the waiting view drops the next-page link and says "Showing the first N. Open the work queue for the rest." with the department kept (`pages/workflow_runs/board.rs:277-302`). That note has no test (inspection only). The runs workspace still reads `desk_departments` twice on a request with a department (scope resolve and scope options); this is harmless. Moving the helper left a stray doc line, logged as B2-F6.
+
+---
+
+## 01DEP-P04-B2-F6 — `known_department` took over the doc comment of `deserialize_empty_string_as_none`
+
+- **Classification:** optional suggestion · Low · maintainability. Found in round
+  `01DEP-P04-B2-R2` (digest `a97fdbeb6c8026e22cfc316bc13f961b61b087a7131c5c4c58ad1c1d2f0c58ba`).
+- **Evidence:** `routes/mod.rs:64-77`. The new `known_department` was inserted below the doc
+  comment of `deserialize_empty_string_as_none`. So `known_department`'s rustdoc now starts with
+  "A query or form field where an empty string means "not given" rather than a value to parse.",
+  which is not what it does, and `deserialize_empty_string_as_none` (`:79`) has no doc comment.
+  Behaviour is unaffected.
+- **Suggestion:** move line 64 back above `deserialize_empty_string_as_none`.
+- **Resolution history:** 2026-11-10 open (optional, B2-R2).

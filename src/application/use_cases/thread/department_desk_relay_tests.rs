@@ -66,6 +66,7 @@ async fn department_desk_relay_into_a_members_only_desk_stays_trusted() {
     let thread_use_cases = ThreadUseCases::for_test(
         Arc::new(InMemoryThreads::for_company(company_id)),
         Arc::new(MockChannelPersistence {
+            departments: Default::default(),
             channels: Mutex::new(vec![target, member_desk, outside_desk]),
         }),
         company_persistence.clone(),
@@ -139,6 +140,7 @@ async fn department_desk_members_only_thread_party_keeps_replying_after_removal(
         vec![(company_id, "member@acme.com".to_string())],
     ));
     let channels = Arc::new(MockChannelPersistence {
+        departments: Default::default(),
         channels: Mutex::new(vec![desk]),
     });
     let thread_use_cases = ThreadUseCases::for_test(

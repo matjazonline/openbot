@@ -76,7 +76,7 @@ async fn model_usage_workflow_exact_provenance_and_grouping() {
         agent: Some(agent.id),
         workflow: Some(serde_json::from_value(row["workflow_id"].clone()).unwrap()),
     };
-    let report = f.persistence().usage_report(query).await.unwrap();
+    let report = f.persistence().usage_report(query.clone()).await.unwrap();
     assert_eq!(report.groups.len(), 1);
     assert_eq!(
         report.groups[0].workflow,
@@ -84,6 +84,26 @@ async fn model_usage_workflow_exact_provenance_and_grouping() {
     );
     assert_eq!(report.groups[0].calls, 1);
     assert_eq!(report.groups[0].unconfirmed_calls, 1);
+
+    // 01-departments 04C.2: by department, through the run's desk; this run has no desk, so its
+    // call is under "No department".
+    let by_department = f
+        .persistence()
+        .usage_report(UsageQuery {
+            grouping: UsageGrouping::Department,
+            ..query
+        })
+        .await
+        .unwrap();
+    assert_eq!(by_department.groups.len(), 1);
+    assert_eq!(
+        by_department.groups[0].department,
+        Some(crate::application::services::model_usage::UsageDepartment {
+            id: None,
+            name: "No department".into(),
+        })
+    );
+    assert_eq!(by_department.groups[0].calls, 1);
 }
 
 async fn usage_row(f: &AdmissionFixture, run: Uuid, execution: Uuid, agent: Uuid) -> Value {

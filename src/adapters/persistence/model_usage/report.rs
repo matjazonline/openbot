@@ -38,6 +38,8 @@ struct CallRow {
     model: String,
     workflow_id: Uuid,
     agent_id: Option<Uuid>,
+    department_id: Option<Uuid>,
+    department_name: Option<String>,
     input_tokens: i64,
     output_tokens: i64,
     usage_source: Option<String>,
@@ -149,20 +151,28 @@ async fn load_calls(tx: &mut PgConnection, query: &UsageQuery) -> AppResult<Vec<
     // The extra row makes every incomplete report explicit, including selective filters.
     Ok(sqlx::query_as(
         "WITH calls AS MATERIALIZED (
-           SELECT requested_at,request_id,provider,model,workflow_id,agent_id,reserved_input,reserved_output,input_tokens,output_tokens,usage_source
+           SELECT requested_at,request_id,provider,model,workflow_id,agent_id,run_id,reserved_input,reserved_output,input_tokens,output_tokens,usage_source
            FROM (
-             SELECT requested_at,request_id,provider,model,workflow_id,agent_id,reserved_input,reserved_output,input_tokens,output_tokens,usage_source
+             SELECT requested_at,request_id,provider,model,workflow_id,agent_id,run_id,reserved_input,reserved_output,input_tokens,output_tokens,usage_source
              FROM model_usage_calls WHERE company_id=$1 AND requested_at >= $2 AND requested_at < $3
              UNION ALL
-             SELECT requested_at,request_id,provider,model,workflow_id,agent_id,reserved_input,reserved_output,input_tokens,output_tokens,usage_source
+             SELECT requested_at,request_id,provider,model,workflow_id,agent_id,NULL::uuid,reserved_input,reserved_output,input_tokens,output_tokens,usage_source
              FROM model_usage_history WHERE company_id=$1 AND requested_at >= $2 AND requested_at < $3
            ) AS sources ORDER BY requested_at,request_id LIMIT $4)
          SELECT calls.provider,calls.model,calls.workflow_id,calls.agent_id,
+           department.id AS department_id,department.name AS department_name,
            COALESCE(calls.input_tokens,calls.reserved_input) AS input_tokens,
            COALESCE(calls.output_tokens,calls.reserved_output) AS output_tokens,calls.usage_source,
            prices.input_micro_usd_per_million AS input_price,prices.output_micro_usd_per_million AS output_price
          FROM calls LEFT JOIN model_prices AS prices ON prices.company_id=$1
-           AND prices.provider=calls.provider AND prices.model=calls.model ORDER BY calls.requested_at,calls.request_id",
+           AND prices.provider=calls.provider AND prices.model=calls.model
+         -- The department is the run's desk's now (01-departments 04C.2); archived usage keeps
+         -- no run, so it has none.
+         LEFT JOIN workflow_runs AS run ON run.company_id=$1 AND run.id=calls.run_id
+         LEFT JOIN channels AS desk ON desk.company_id=$1 AND desk.id=run.channel_id
+         LEFT JOIN departments AS department ON department.company_id=$1
+           AND department.id=desk.department_id
+         ORDER BY calls.requested_at,calls.request_id",
     ).bind(query.scope.company).bind(query.start).bind(query.end).bind((MAX_CALLS + 1) as i64)
         .fetch_all(tx).await?)
 }
@@ -190,6 +200,7 @@ impl TryFrom<CallRow> for UsageSample {
             model: row.model.into(),
             workflow: row.workflow_id,
             agent: row.agent_id,
+            department: row.department_id.zip(row.department_name),
             input: u64::try_from(row.input_tokens)
                 .map_err(|_| AppError::Internal("Invalid input usage".into()))?,
             output: u64::try_from(row.output_tokens)

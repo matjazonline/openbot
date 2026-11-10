@@ -21,7 +21,7 @@ use crate::{
         creation::CreationProvenance,
         department::{
             Department, DepartmentDesk, DepartmentId, DepartmentMember, DepartmentPrincipal,
-            DepartmentRole, DepartmentRoleHolder, MAX_DEPARTMENT_CHARTER_BYTES,
+            DepartmentRole, DepartmentRoleHolder, DeskDepartments, MAX_DEPARTMENT_CHARTER_BYTES,
             MAX_DEPARTMENT_PRINCIPAL_CHOICES,
         },
         transport::PrincipalId,
@@ -326,6 +326,69 @@ impl DepartmentUseCases {
             members: self.departments.members(company, department.id).await?,
             roles: self.departments.roles(company, department.id).await?,
             department,
+        })
+    }
+
+    /// Each agent's departments and the roles it holds there, for anyone who may read the company.
+    #[instrument(skip_all)]
+    pub async fn agent_departments(
+        &self,
+        user_id: Uuid,
+        company_id: Uuid,
+        agents: &[Uuid],
+    ) -> AppResult<
+        std::collections::HashMap<Uuid, (Vec<crate::entities::department::HeldDepartment>, bool)>,
+    > {
+        readable_company(self.companies.as_ref(), user_id, company_id).await?;
+        self.departments
+            .agent_departments(CompanyId::new(company_id), agents)
+            .await
+    }
+
+    /// Which department owns each desk, as this viewer may see it: every department for an owner
+    /// or admin; for anyone else the departments they belong to or lead
+    /// ([`Self::visible_departments`]) and the owners of the desks they can read
+    /// (`readable_desks`), so the department of a desk in front of them can be named.
+    #[instrument(skip_all)]
+    pub async fn desk_departments(
+        &self,
+        user_id: Uuid,
+        company_id: Uuid,
+        readable_desks: &[Uuid],
+    ) -> AppResult<DeskDepartments> {
+        let access = readable_company(self.companies.as_ref(), user_id, company_id).await?;
+        let company = CompanyId::new(company_id);
+        let departments = self.departments.list_by_company(company).await?;
+        let owners: std::collections::HashMap<Uuid, DepartmentId> = self
+            .departments
+            .desk_owners(company)
+            .await?
+            .into_iter()
+            .collect();
+        if access.membership.manages_company_operations() {
+            return Ok(DeskDepartments {
+                departments,
+                owners,
+            });
+        }
+        let owners: std::collections::HashMap<Uuid, DepartmentId> = owners
+            .into_iter()
+            .filter(|(desk, _)| readable_desks.contains(desk))
+            .collect();
+        let mut seen: std::collections::HashSet<DepartmentId> = self
+            .departments
+            .list_for_user(company, user_id)
+            .await?
+            .into_iter()
+            .map(|department| department.id)
+            .collect();
+        seen.extend(owners.values().copied());
+        Ok(DeskDepartments {
+            departments: departments
+                .into_iter()
+                .filter(|department| seen.contains(&department.id))
+                .collect(),
+            owners,
         })
     }
 

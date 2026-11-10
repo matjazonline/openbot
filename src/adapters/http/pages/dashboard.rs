@@ -11,6 +11,8 @@
 use chrono::{DateTime, Utc};
 use uuid::Uuid;
 
+use crate::entities::department::{DepartmentId, DeskDepartments};
+
 use super::dashboard_query_health::database_query_health_section;
 use super::dashboard_runtime::machine_section;
 use super::{
@@ -86,6 +88,9 @@ pub struct DashboardShell<'a> {
     /// The range the panels will be read over. The shell needs it before any query has run, because
     /// it is what the panel fetch and the stream subscription are both parameterised by.
     pub window: DashboardWindow,
+    /// The company's departments by desk (empty for the rollup), and the one chosen.
+    pub departments: &'a DeskDepartments,
+    pub department: Option<DepartmentId>,
 }
 
 pub struct DashboardPage<'a> {
@@ -101,6 +106,9 @@ pub struct DashboardPage<'a> {
     /// Present only after an operator-authorized runtime query.
     pub runtime: Option<&'a RuntimeMetricSnapshot>,
     pub machine: &'a MachineIdentity,
+    /// The outstanding jobs group under their desk's department and narrow to `department`.
+    pub departments: &'a DeskDepartments,
+    pub department: Option<DepartmentId>,
 }
 
 impl DashboardPage<'_> {
@@ -120,8 +128,9 @@ impl DashboardPage<'_> {
 
 pub fn dashboard_page(shell: &DashboardShell<'_>) -> String {
     let header = sidebar_header("Dashboard", "System metrics, queue health and activity.");
-    let target = dashboard_target(shell.scope, shell.selected_company);
+    let target = dashboard_target(shell.scope, shell.selected_company, shell.department);
     let range = range_picker(target, shell.window);
+    let departments = department_picker(target, shell.window, shell.departments);
     let operator_actions = matches!(shell.scope, DashboardScopeView::Global).then(|| {
         r##"<div class="p-3">
                 <div class="alert alert-info py-2">
@@ -135,6 +144,7 @@ pub fn dashboard_page(shell: &DashboardShell<'_>) -> String {
             {header}
             {operator_actions}
             {range}
+            {departments}
             {scope}
         </aside>"##,
         operator_actions = operator_actions.unwrap_or_default(),
@@ -306,20 +316,66 @@ fn outstanding_panel(page: &DashboardPage<'_>) -> String {
 
     // The company column is noise when every row shares it, which is the whole company-scoped view.
     let show_company = matches!(page.scope, DashboardScopeView::Global);
-    let rows: String = page
+    // A department narrows the list to its desks' jobs (01-departments 04C.1); the rest group
+    // under their desk's department.
+    let shown: Vec<OutstandingTask> = page
         .snapshot
         .outstanding
         .iter()
-        .map(|task| outstanding_row(task, show_company, page.can_open(task.company_id)))
+        .filter(|task| {
+            page.department.is_none_or(|department| {
+                page.departments
+                    .of_desk(task.channel_id)
+                    .map(|owner| owner.id)
+                    == Some(department)
+            })
+        })
+        .cloned()
         .collect();
+    let rows: String = page
+        .departments
+        .group(&shown, |task| task.channel_id)
+        .into_iter()
+        .map(|(heading, tasks)| {
+            let rows: String = tasks
+                .into_iter()
+                .map(|task| outstanding_row(task, show_company, page.can_open(task.company_id)))
+                .collect();
+            match heading {
+                Some(heading) => format!(
+                    r##"<div class="department-group px-4 pt-3 pb-1 text-xs font-semibold uppercase tracking-wide opacity-60">{}</div>{rows}"##,
+                    escape_html_text(&heading)
+                ),
+                None => rows,
+            }
+        })
+        .collect();
+    // The list is the company's, cut at the cap before a department narrows it: a narrowed view
+    // of a cut list must say it looked only at those, never that the department has nothing.
+    let cut = page.snapshot.outstanding.len() as i64 >= OUTSTANDING_LIMIT;
+    if shown.is_empty() {
+        let message = if cut {
+            format!(
+                "None of the company's first {OUTSTANDING_LIMIT} outstanding jobs is on this department's desks; it may have later ones."
+            )
+        } else {
+            "Nothing outstanding on this department's desks.".to_owned()
+        };
+        return panel(
+            "Outstanding workflow step jobs",
+            &format!(r##"<div class="px-4 py-6 text-sm opacity-60">{message}</div>"##),
+        );
+    }
 
     // The cap is a cap, not a total: say so when it bites, or the panel quietly under-reports.
-    let capped = if page.snapshot.outstanding.len() as i64 >= OUTSTANDING_LIMIT {
-        format!(
+    let capped = match (cut, page.department.is_some()) {
+        (false, _) => String::new(),
+        (true, false) => format!(
             r##"<div class="px-4 pb-2 text-xs opacity-60">Showing the first {OUTSTANDING_LIMIT}.</div>"##
-        )
-    } else {
-        String::new()
+        ),
+        (true, true) => format!(
+            r##"<div class="px-4 pb-2 text-xs opacity-60">Only the company's first {OUTSTANDING_LIMIT} outstanding jobs were looked at; this department may have more.</div>"##
+        ),
     };
 
     panel(
@@ -891,16 +947,18 @@ pub(super) fn process_panel(process: &ProcessGauges) -> String {
 /// back to the company view.
 #[derive(Debug, Clone, Copy)]
 enum DashboardTarget {
-    Company(Uuid),
+    /// A company, narrowed to one department's outstanding jobs when one is chosen.
+    Company(Uuid, Option<DepartmentId>),
     System(Option<Uuid>),
 }
 
 fn dashboard_target(
     scope: DashboardScopeView<'_>,
     selected_company: Option<&Company>,
+    department: Option<DepartmentId>,
 ) -> DashboardTarget {
     match scope {
-        DashboardScopeView::Company(company) => DashboardTarget::Company(company.id),
+        DashboardScopeView::Company(company) => DashboardTarget::Company(company.id, department),
         DashboardScopeView::Global => {
             DashboardTarget::System(selected_company.map(|company| company.id))
         }
@@ -914,9 +972,11 @@ fn dashboard_target(
 /// show the right chart for five seconds and then the wrong one for as long as the tab stayed open.
 fn dashboard_query(target: DashboardTarget, window: DashboardWindow) -> String {
     match target {
-        DashboardTarget::Company(company_id) => {
-            format!("?company_id={company_id}&amp;window={}", window.slug())
-        }
+        DashboardTarget::Company(company_id, department) => format!(
+            "?company_id={company_id}&amp;window={}{}",
+            window.slug(),
+            department.map_or_else(String::new, |id| format!("&amp;department_id={id}"))
+        ),
         DashboardTarget::System(Some(company_id)) => format!(
             "?scope=system&amp;company_id={company_id}&amp;window={}",
             window.slug()
@@ -956,6 +1016,51 @@ fn range_picker(target: DashboardTarget, window: DashboardWindow) -> String {
     )
 }
 
+/// The company view's departments, as plain links for the reason the range picker gives: choosing
+/// one re-subscribes the stream. It narrows only the outstanding jobs; the counts and charts are
+/// the whole company's.
+fn department_picker(
+    target: DashboardTarget,
+    window: DashboardWindow,
+    departments: &DeskDepartments,
+) -> String {
+    let DashboardTarget::Company(company_id, chosen) = target else {
+        return String::new();
+    };
+    if departments.departments.is_empty() {
+        return String::new();
+    }
+    let link = |label: &str, depth: usize, department: Option<DepartmentId>| {
+        let selected = department == chosen;
+        format!(
+            r##"<li><a class="{active}" href="/ui/dashboard{query}"{current}>{indent}{label}</a></li>"##,
+            active = if selected { "menu-active" } else { "" },
+            query = dashboard_query(DashboardTarget::Company(company_id, department), window),
+            current = if selected {
+                r#" aria-current="page""#
+            } else {
+                ""
+            },
+            indent = "&nbsp;&nbsp;".repeat(depth),
+            label = escape_html_text(label),
+        )
+    };
+    let items: String = std::iter::once(link("All departments", 0, None))
+        .chain(
+            crate::entities::department::department_tree(&departments.departments)
+                .into_iter()
+                .map(|(depth, department)| link(&department.name, depth, Some(department.id))),
+        )
+        .collect();
+    format!(
+        r##"<div id="dashboard-departments" class="px-4 pb-4">
+            <div class="mb-1 text-xs font-semibold uppercase tracking-wide opacity-60">Department</div>
+            <ul class="menu menu-xs w-full p-0">{items}</ul>
+            <p class="mt-1 text-xs opacity-60">Narrows the outstanding jobs; the counts and charts are the whole company's.</p>
+        </div>"##
+    )
+}
+
 fn scope_picker(shell: &DashboardShell<'_>) -> String {
     if !shell.user.is_operator {
         return scope_legend("This company");
@@ -966,7 +1071,7 @@ fn scope_picker(shell: &DashboardShell<'_>) -> String {
         format!(
             r##"<a class="btn btn-sm join-item justify-start{active}" href="/ui/dashboard{query}"{current}>{name}</a>"##,
             active = if active { " btn-active" } else { "" },
-            query = dashboard_query(DashboardTarget::Company(company.id), shell.window),
+            query = dashboard_query(DashboardTarget::Company(company.id, None), shell.window),
             current = if active { r##" aria-current="page""## } else { "" },
             name = escape_html_text(&company.name),
         )
@@ -1240,6 +1345,8 @@ mod tests {
             company_membership: CompanyMembership::Admin,
         };
         let html = dashboard_page(&DashboardShell {
+            department: None,
+            departments: &Default::default(),
             user: &user,
             scope: DashboardScopeView::Company(&companies[0]),
             selected_company: Some(&companies[0]),
@@ -1281,6 +1388,8 @@ mod tests {
             company_membership: CompanyMembership::Admin,
         };
         let company_html = dashboard_page(&DashboardShell {
+            department: None,
+            departments: &Default::default(),
             user: &user,
             scope: DashboardScopeView::Company(&companies[0]),
             selected_company: Some(&companies[0]),
@@ -1295,6 +1404,8 @@ mod tests {
         );
 
         let html = dashboard_page(&DashboardShell {
+            department: None,
+            departments: &Default::default(),
             user: &user,
             scope: DashboardScopeView::Global,
             selected_company: Some(&companies[0]),
@@ -1357,6 +1468,8 @@ mod tests {
             region: None,
         };
         dashboard_panels(&DashboardPage {
+            department: None,
+            departments: &Default::default(),
             user: &user,
             scope,
             companies,
@@ -1396,6 +1509,8 @@ mod tests {
         let runtime = RuntimeMetricSnapshot::default();
 
         let hidden = dashboard_panels(&DashboardPage {
+            department: None,
+            departments: &Default::default(),
             user: &user,
             scope: DashboardScopeView::Company(&company),
             companies: &companies,
@@ -1410,6 +1525,8 @@ mod tests {
         assert!(!hidden.contains("serving-machine"), "{hidden}");
 
         let visible = dashboard_panels(&DashboardPage {
+            department: None,
+            departments: &Default::default(),
             user: &user,
             scope: DashboardScopeView::Company(&company),
             companies: &companies,
@@ -1660,5 +1777,190 @@ mod tests {
     fn an_empty_window_says_so_instead_of_drawing_an_empty_chart() {
         let panel = throughput_panel(&snapshot(), DashboardWindow::last_hour());
         assert!(panel.contains("Nothing has finished"), "{panel}");
+    }
+
+    /// Two departments, Sales under Revenue, each owning one desk, and a third desk with none.
+    fn desk_departments() -> (DeskDepartments, [Uuid; 3], DepartmentId, DepartmentId) {
+        use crate::entities::department::Department;
+        let department = |name: &str, parent: Option<DepartmentId>| Department {
+            id: DepartmentId::new(Uuid::new_v4()),
+            company_id: Uuid::nil(),
+            name: name.into(),
+            slug: name.to_lowercase().into(),
+            description: None,
+            charter: None,
+            parent_id: parent,
+            created_by: crate::entities::creation::CreationProvenance::system(),
+            created_at: Utc::now(),
+        };
+        let revenue = department("Revenue", None);
+        let sales = department("Sales", Some(revenue.id));
+        let desks = [Uuid::new_v4(), Uuid::new_v4(), Uuid::new_v4()];
+        let departments = DeskDepartments {
+            owners: [(desks[0], sales.id), (desks[1], revenue.id)]
+                .into_iter()
+                .collect(),
+            departments: vec![sales.clone(), revenue.clone()],
+        };
+        (departments, desks, revenue.id, sales.id)
+    }
+
+    /// 01-departments 04C.1: the company view's outstanding jobs group under their desk's
+    /// department, root first and "No department" last, and narrow to one department; the
+    /// department picker keeps the window and says what it narrows.
+    #[test]
+    fn department_views_dashboard_groups_and_narrows_outstanding_jobs() {
+        let (departments, desks, revenue, sales) = desk_departments();
+        let job = |desk: Uuid, status| OutstandingTask {
+            channel_id: Some(desk),
+            ..outstanding(status, false)
+        };
+        let snapshot = DashboardSnapshot {
+            outstanding: vec![
+                job(desks[2], TaskStatus::Pending),
+                job(desks[0], TaskStatus::Processing),
+                job(desks[1], TaskStatus::Pending),
+            ],
+            ..snapshot()
+        };
+        let companies = [company()];
+        let email = crate::entities::value_objects::EmailAddress::from("ops@example.test");
+        let user = MailboxUser {
+            id: Uuid::new_v4(),
+            username: "ops",
+            email: &email,
+            avatar_url: None,
+            is_operator: false,
+            company_membership: CompanyMembership::Admin,
+        };
+        let process = ProcessGauges::default();
+        let machine = MachineIdentity {
+            id: crate::entities::runtime_metrics::MachineId::new("machine-test"),
+            region: None,
+        };
+        let panels = |department| {
+            dashboard_panels(&DashboardPage {
+                department,
+                departments: &departments,
+                user: &user,
+                scope: DashboardScopeView::Company(&companies[0]),
+                companies: &companies,
+                snapshot: &snapshot,
+                window: DashboardWindow::last_hour(),
+                process: Some(&process),
+                query_health: None,
+                runtime: None,
+                machine: &machine,
+            })
+        };
+        let all = panels(None);
+        let heading = |html: &str, name: &str| {
+            html.find(&format!(
+                r#"department-group px-4 pt-3 pb-1 text-xs font-semibold uppercase tracking-wide opacity-60">{name}</div>"#
+            ))
+        };
+        let (r, s, n) = (
+            heading(&all, "Revenue").unwrap(),
+            heading(&all, "Sales").unwrap(),
+            heading(&all, "No department").unwrap(),
+        );
+        assert!(r < s && s < n, "{all}");
+        let only_sales = panels(Some(sales));
+        assert!(heading(&only_sales, "Sales").is_some());
+        assert!(heading(&only_sales, "Revenue").is_none());
+        assert!(heading(&only_sales, "No department").is_none());
+        let none_left = DashboardSnapshot {
+            outstanding: vec![job(desks[2], TaskStatus::Pending)],
+            ..snapshot.clone()
+        };
+        let empty = dashboard_panels(&DashboardPage {
+            department: Some(revenue),
+            departments: &departments,
+            user: &user,
+            scope: DashboardScopeView::Company(&companies[0]),
+            companies: &companies,
+            snapshot: &none_left,
+            window: DashboardWindow::last_hour(),
+            process: Some(&process),
+            query_health: None,
+            runtime: None,
+            machine: &machine,
+        });
+        assert!(empty.contains("Nothing outstanding on this department's desks."));
+
+        // A cut company list never claims a department has nothing (B2-F2).
+        let capped = DashboardSnapshot {
+            outstanding: (0..OUTSTANDING_LIMIT)
+                .map(|_| job(desks[2], TaskStatus::Pending))
+                .collect(),
+            ..snapshot.clone()
+        };
+        let render_capped = |department, snapshot: &DashboardSnapshot| {
+            dashboard_panels(&DashboardPage {
+                department,
+                departments: &departments,
+                user: &user,
+                scope: DashboardScopeView::Company(&companies[0]),
+                companies: &companies,
+                snapshot,
+                window: DashboardWindow::last_hour(),
+                process: Some(&process),
+                query_health: None,
+                runtime: None,
+                machine: &machine,
+            })
+        };
+        let none_seen = render_capped(Some(sales), &capped);
+        assert!(!none_seen.contains("Nothing outstanding on this department's desks."));
+        assert!(none_seen.contains(&format!(
+            "None of the company's first {OUTSTANDING_LIMIT} outstanding jobs is on this department's desks; it may have later ones."
+        )));
+        let mut some = capped.clone();
+        some.outstanding[0] = job(desks[0], TaskStatus::Processing);
+        let narrowed = render_capped(Some(sales), &some);
+        assert!(narrowed.contains(&format!(
+            "Only the company's first {OUTSTANDING_LIMIT} outstanding jobs were looked at; this department may have more."
+        )));
+        assert!(
+            render_capped(None, &capped)
+                .contains(&format!("Showing the first {OUTSTANDING_LIMIT}."))
+        );
+
+        let shell = dashboard_page(&DashboardShell {
+            department: Some(sales),
+            departments: &departments,
+            user: &user,
+            scope: DashboardScopeView::Company(&companies[0]),
+            selected_company: Some(&companies[0]),
+            companies: &companies,
+            window: DashboardWindow::last_hour(),
+        });
+        let company_id = companies[0].id;
+        assert!(shell.contains(&format!(
+            r#"sse-connect="/ui/dashboard/events?company_id={company_id}&amp;window=1h&amp;department_id={sales}""#
+        )));
+        assert!(shell.contains(r#"id="dashboard-departments""#));
+        assert!(shell.contains(&format!(
+            r#"<a class="" href="/ui/dashboard?company_id={company_id}&amp;window=1h">All departments</a>"#
+        )));
+        assert!(shell.contains(&format!(
+            r#"<a class="menu-active" href="/ui/dashboard?company_id={company_id}&amp;window=1h&amp;department_id={sales}" aria-current="page">&nbsp;&nbsp;Sales</a>"#
+        )));
+        assert!(shell.contains(
+            "Narrows the outstanding jobs; the counts and charts are the whole company's."
+        ));
+        // Range links keep the department.
+        assert!(shell.contains(&format!("window=24h&amp;department_id={sales}")));
+        // A company without departments shows no picker.
+        let plain = dashboard_page(&DashboardShell {
+            department: None,
+            departments: &Default::default(),
+            user: &user,
+            scope: DashboardScopeView::Company(&companies[0]),
+            selected_company: Some(&companies[0]),
+            companies: &companies,
+            window: DashboardWindow::last_hour(),
+        });
+        assert!(!plain.contains("dashboard-departments"));
     }
 }

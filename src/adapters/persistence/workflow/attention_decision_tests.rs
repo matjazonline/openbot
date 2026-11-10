@@ -33,6 +33,7 @@ async fn listed(
         principal_id: viewer,
         visible_channel_ids: &[],
         manager,
+        company_items: manager,
         view,
         cursor: None,
         limit: 100,

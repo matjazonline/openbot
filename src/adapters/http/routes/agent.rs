@@ -223,6 +223,35 @@ pub struct AgentResponse {
     pub success: bool,
     pub agent: Agent,
     pub skill_ids: Vec<Uuid>,
+    /// The departments the agent belongs to or holds a role in, with its roles there
+    /// (01-departments 04C.4), by slug; at most 16.
+    pub departments: Vec<crate::entities::department::HeldDepartment>,
+    /// The agent is in more departments than `departments` lists.
+    pub more_departments: bool,
+}
+
+type DepartmentUseCasesState = State<Arc<crate::use_cases::department::DepartmentUseCases>>;
+
+/// The response for `agent`, with its departments read for `user`.
+async fn agent_response(
+    departments: &crate::use_cases::department::DepartmentUseCases,
+    user: Uuid,
+    company: Uuid,
+    agent: Agent,
+    skill_ids: Vec<Uuid>,
+) -> AppResult<AgentResponse> {
+    let (departments, more_departments) = departments
+        .agent_departments(user, company, &[agent.id])
+        .await?
+        .remove(&agent.id)
+        .unwrap_or_default();
+    Ok(AgentResponse {
+        success: true,
+        agent,
+        skill_ids,
+        departments,
+        more_departments,
+    })
 }
 
 /// What an agent answers with when it should not take the company's LLM settings.
@@ -504,11 +533,16 @@ async fn delete_agent_handler(
 async fn list_agents_json(
     State(agent_use_cases): State<Arc<AgentUseCases>>,
     State(skill_use_cases): State<Arc<SkillUseCases>>,
+    State(departments): DepartmentUseCasesState,
     user: AuthenticatedUser,
     Path(company_id): Path<Uuid>,
 ) -> AppResult<impl IntoResponse> {
     let agents = agent_use_cases
         .list_company_agents(user.id, company_id)
+        .await?;
+    let ids: Vec<Uuid> = agents.iter().map(|agent| agent.id).collect();
+    let mut placed = departments
+        .agent_departments(user.id, company_id, &ids)
         .await?;
     let mut response = Vec::with_capacity(agents.len());
     for agent in agents {
@@ -516,10 +550,13 @@ async fn list_agents_json(
             .company_agent_capabilities(user.id, company_id, agent.id)
             .await?
             .ok_or_else(crate::use_cases::agent::agent_not_found)?;
+        let (departments, more_departments) = placed.remove(&agent.id).unwrap_or_default();
         response.push(AgentResponse {
             success: true,
             agent,
             skill_ids: capabilities.skills.iter().map(|skill| skill.id).collect(),
+            departments,
+            more_departments,
         });
     }
     Ok((StatusCode::OK, Json(response)))
@@ -566,6 +603,7 @@ fn json_placement(
 /// JSON API: Create company agent (Protected), with its default desk and its placement.
 async fn create_agent_json(
     State(agent_use_cases): State<Arc<AgentUseCases>>,
+    State(departments): DepartmentUseCasesState,
     user: AuthenticatedUser,
     Path(company_id): Path<Uuid>,
     Json(mut body): Json<serde_json::Value>,
@@ -598,11 +636,16 @@ async fn create_agent_json(
 
     Ok((
         StatusCode::CREATED,
-        Json(AgentResponse {
-            success: true,
-            agent: created.agent,
-            skill_ids: payload.skill_ids.unwrap_or_default(),
-        }),
+        Json(
+            agent_response(
+                &departments,
+                user.id,
+                company_id,
+                created.agent,
+                payload.skill_ids.unwrap_or_default(),
+            )
+            .await?,
+        ),
     ))
 }
 
@@ -610,6 +653,7 @@ async fn create_agent_json(
 async fn get_agent_json(
     State(agent_use_cases): State<Arc<AgentUseCases>>,
     State(skill_use_cases): State<Arc<SkillUseCases>>,
+    State(departments): DepartmentUseCasesState,
     user: AuthenticatedUser,
     Path((company_id, agent_id)): Path<(Uuid, Uuid)>,
 ) -> AppResult<impl IntoResponse> {
@@ -624,11 +668,16 @@ async fn get_agent_json(
         .ok_or_else(crate::use_cases::agent::agent_not_found)?;
     Ok((
         StatusCode::OK,
-        Json(AgentResponse {
-            success: true,
-            agent,
-            skill_ids: capabilities.skills.iter().map(|skill| skill.id).collect(),
-        }),
+        Json(
+            agent_response(
+                &departments,
+                user.id,
+                company_id,
+                agent,
+                capabilities.skills.iter().map(|skill| skill.id).collect(),
+            )
+            .await?,
+        ),
     ))
 }
 
@@ -636,6 +685,7 @@ async fn get_agent_json(
 pub(super) async fn update_agent_json(
     State(agent_use_cases): State<Arc<AgentUseCases>>,
     State(skills): State<Arc<SkillUseCases>>,
+    State(departments): DepartmentUseCasesState,
     user: AuthenticatedUser,
     Path((company_id, agent_id)): Path<(Uuid, Uuid)>,
     Json(body): Json<CompanyAgentJsonUpdate>,
@@ -674,11 +724,16 @@ pub(super) async fn update_agent_json(
 
     Ok((
         StatusCode::OK,
-        Json(AgentResponse {
-            success: true,
-            agent,
-            skill_ids: payload.skill_ids.unwrap_or_default(),
-        }),
+        Json(
+            agent_response(
+                &departments,
+                user.id,
+                company_id,
+                agent,
+                payload.skill_ids.unwrap_or_default(),
+            )
+            .await?,
+        ),
     ))
 }
 

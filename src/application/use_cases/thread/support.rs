@@ -29,6 +29,7 @@ pub(crate) struct DirectoryCache<'a> {
     use_cases: &'a ThreadUseCases,
     companies: HashMap<String, Option<Company>>,
     channels: HashMap<Uuid, Vec<Channel>>,
+    departments: HashMap<Uuid, Vec<crate::entities::department::Department>>,
     access_contexts: HashMap<(Uuid, QualifiedIdentity), PrincipalAccessContext>,
 }
 
@@ -38,6 +39,7 @@ impl<'a> DirectoryCache<'a> {
             use_cases,
             companies: HashMap::new(),
             channels: HashMap::new(),
+            departments: HashMap::new(),
             access_contexts: HashMap::new(),
         }
     }
@@ -62,6 +64,23 @@ impl<'a> DirectoryCache<'a> {
             .list_by_company_id(company_id)
             .await?;
         self.channels.insert(company_id, loaded.clone());
+        Ok(loaded)
+    }
+
+    /// The company's departments, to group its desk directory by.
+    pub(crate) async fn departments(
+        &mut self,
+        company_id: Uuid,
+    ) -> AppResult<Vec<crate::entities::department::Department>> {
+        if let Some(cached) = self.departments.get(&company_id) {
+            return Ok(cached.clone());
+        }
+        let loaded = self
+            .use_cases
+            .channel_persistence
+            .list_departments(company_id)
+            .await?;
+        self.departments.insert(company_id, loaded.clone());
         Ok(loaded)
     }
 

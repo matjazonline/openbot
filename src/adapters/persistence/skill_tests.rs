@@ -381,6 +381,16 @@ async fn picking_a_library_agent_copies_its_skills_with_the_agent_and_channel() 
         .await
         .unwrap();
 
+    // A company agent answers its own desk on an explicit model (01DEP-P03-D3): the copy takes
+    // the company default.
+    sqlx::query(
+        "INSERT INTO company_model_connections(company_id, provider, api_key, models, is_default) \
+         VALUES ($1, 'openai', 'fixture-key', '{gpt-test}', true)",
+    )
+    .bind(company_id)
+    .execute(persistence.pool())
+    .await
+    .unwrap();
     let company_write = AgentWrite {
         name: source_agent.name.clone(),
         slug: format!("picked-{}", Uuid::new_v4().simple()),

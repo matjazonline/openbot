@@ -206,6 +206,8 @@ pub struct RunFilterView<'a> {
     pub binding: Option<Uuid>,
     pub workflow: Option<Uuid>,
     pub agent: Option<Uuid>,
+    /// Runs on the desks of this department.
+    pub department: Option<Uuid>,
     pub state: Option<&'a str>,
 }
 
@@ -225,6 +227,7 @@ impl RunFilterView<'_> {
             ("binding_id", self.binding),
             ("workflow_id", self.workflow),
             ("agent_id", self.agent),
+            ("department_id", self.department),
         ] {
             if let Some(id) = id {
                 query.push_str(&format!("&amp;{name}={id}"));
@@ -252,6 +255,8 @@ pub struct ScopeOptions {
     pub workflows_cut: bool,
     pub agents: Vec<ScopeOption>,
     pub agents_cut: bool,
+    /// The company's departments in tree order (labels indented by depth).
+    pub departments: Vec<ScopeOption>,
 }
 
 /// The workflow and agent selects of either view, each with its "any" choice, the chosen one
@@ -311,6 +316,7 @@ pub fn scope_controls(
             let view_query = match view {
                 RunsView::List => "",
                 RunsView::Board => "&amp;view=board",
+                RunsView::Waiting => "&amp;view=waiting",
             };
             format!(
                 r#"<input type="hidden" name="binding_id" value="{binding}"><span class="text-xs opacity-70">Binding {short} only · <a class="link" href="/ui/workflow-runs?{query}{view_query}">any binding</a></span>"#,
@@ -337,7 +343,18 @@ pub fn scope_controls(
             &options.agents,
             options.agents_cut,
         ),
-    )
+    ) + &if options.departments.is_empty() && filter.department.is_none() {
+        String::new()
+    } else {
+        select(
+            "department_id",
+            "department",
+            "Any department",
+            filter.department,
+            &options.departments,
+            false,
+        )
+    }
 }
 
 pub struct RunListView<'a> {

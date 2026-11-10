@@ -696,6 +696,19 @@ pub async fn invite_update_command(
 }
 
 /// The shipped provisioning templates on the test domain, as production builds them.
+/// Department use cases over `persistence`, with the test provisioning templates.
+pub fn department_use_cases(
+    persistence: &super::PostgresPersistence,
+) -> std::sync::Arc<crate::use_cases::department::DepartmentUseCases> {
+    std::sync::Arc::new(crate::use_cases::department::DepartmentUseCases::new(
+        std::sync::Arc::new(persistence.clone()),
+        std::sync::Arc::new(super::department::PostgresDepartments::new(
+            persistence.clone(),
+            provisioning_templates(),
+        )),
+    ))
+}
+
 pub fn provisioning_templates() -> super::workflow::provisioning::ProvisioningDeployment {
     super::workflow::provisioning::ProvisioningDeployment::new(
         std::sync::Arc::new(

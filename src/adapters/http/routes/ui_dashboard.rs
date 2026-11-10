@@ -82,6 +82,9 @@ struct DashboardQuery {
     scope: Option<DashboardScopeQuery>,
     /// Which trailing range to report over, as a [`DashboardWindow`] slug.
     window: Option<String>,
+    /// A company view's department: its desks' outstanding jobs only; "" is none.
+    #[serde(default, deserialize_with = "super::deserialize_empty_string_as_none")]
+    department_id: Option<Uuid>,
 }
 
 impl DashboardQuery {
@@ -105,6 +108,7 @@ impl DashboardQuery {
 /// Everything a dashboard handler needs about its caller, resolved once.
 struct Dashboard {
     company_use_cases: Arc<CompanyUseCases>,
+    department_use_cases: Arc<crate::use_cases::department::DepartmentUseCases>,
     dashboard_snapshots: Arc<DashboardSnapshotService>,
     database_query_health: Arc<DatabaseQueryHealthService>,
     dashboard_sse_connections: Arc<AtomicU64>,
@@ -139,6 +143,7 @@ impl FromRequestParts<AppState> for Dashboard {
             account,
             caller,
             company_use_cases: state.company_use_cases.clone(),
+            department_use_cases: state.department_use_cases.clone(),
             dashboard_snapshots: state.dashboard_snapshots.clone(),
             database_query_health: state.database_query_health.clone(),
             dashboard_sse_connections: state.dashboard_sse_connections.clone(),
@@ -162,6 +167,11 @@ struct DashboardScope {
     operator: bool,
     /// What the caller is to `selected_company`, from their membership row.
     membership: CompanyMembership,
+    /// The company view's departments by desk; empty for the rollup and for a company the
+    /// caller is not a member of.
+    departments: crate::entities::department::DeskDepartments,
+    /// The department the company view narrows its outstanding jobs to.
+    department: Option<crate::entities::department::DepartmentId>,
 }
 
 impl DashboardScope {
@@ -222,12 +232,28 @@ impl DashboardScope {
             (true, Some(_), false) | (false, _, _) => selected_company.clone(),
         };
 
+        // Department names are read as a member reads them; an operator looking at a company
+        // they are not in sees it without departments.
+        let departments = match &company {
+            Some(company) if membership != CompanyMembership::None => {
+                dashboard
+                    .department_use_cases
+                    // A company view is the managers': every department.
+                    .desk_departments(dashboard.user_id, company.id, &[])
+                    .await?
+            }
+            _ => crate::entities::department::DeskDepartments::default(),
+        };
+        let department = super::known_department(&departments, query.department_id)?;
+
         Ok(Self {
             company,
             selected_company,
             companies,
             operator,
             membership,
+            departments,
+            department,
         })
     }
 
@@ -338,6 +364,8 @@ fn render(
         query_health: reading.query_health.as_ref(),
         runtime: reading.runtime.as_ref(),
         machine: &reading.machine,
+        departments: &scope.departments,
+        department: scope.department,
     })
 }
 
@@ -371,6 +399,8 @@ async fn dashboard_page(
             selected_company: scope.selected_company.as_ref(),
             companies: &scope.companies,
             window: query.window(),
+            departments: &scope.departments,
+            department: scope.department,
         }))
         .into_response(),
     ))
@@ -621,6 +651,8 @@ mod tests {
     #[test]
     fn only_an_operator_may_resolve_the_global_dashboard_scope() {
         let company_user_scope = DashboardScope {
+            department: None,
+            departments: Default::default(),
             company: None,
             selected_company: None,
             companies: Vec::new(),

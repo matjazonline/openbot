@@ -134,6 +134,17 @@ pub trait DepartmentPersistence: Send + Sync {
         company: CompanyId,
         ids: &[PrincipalId],
     ) -> AppResult<Vec<DepartmentPrincipal>>;
+    /// Each agent's departments (member or role holder) by slug, at most 16, and whether it has
+    /// more.
+    async fn agent_departments(
+        &self,
+        company: CompanyId,
+        agents: &[Uuid],
+    ) -> AppResult<
+        std::collections::HashMap<Uuid, (Vec<crate::entities::department::HeldDepartment>, bool)>,
+    >;
+    /// Every department-owned desk of the company with its owner.
+    async fn desk_owners(&self, company: CompanyId) -> AppResult<Vec<(Uuid, DepartmentId)>>;
     /// The desks this department owns, by address.
     async fn desks(
         &self,

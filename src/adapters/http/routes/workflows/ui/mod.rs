@@ -33,6 +33,8 @@ pub(super) struct Ui {
     companies: Arc<CompanyUseCases>,
     users: Arc<UserUseCases>,
     agents: Arc<AgentUseCases>,
+    departments: Arc<crate::use_cases::department::DepartmentUseCases>,
+    attention: Arc<crate::application::attention::AttentionUseCases>,
     config: Arc<AppConfig>,
     user: Uuid,
 }
@@ -50,6 +52,8 @@ impl FromRequestParts<AppState> for Ui {
             companies: state.company_use_cases.clone(),
             users: state.user_use_cases.clone(),
             agents: state.agent_use_cases.clone(),
+            departments: state.department_use_cases.clone(),
+            attention: state.attention_use_cases.clone(),
             config: state.config.clone(),
             user: user.id,
         })
@@ -107,6 +111,44 @@ impl Frame {
             }
         }
     }
+
+    /// The account as a viewer, for reads that take one.
+    fn viewer(&self) -> crate::entities::user::Viewer {
+        crate::entities::user::Viewer {
+            user_id: self.account.id,
+            email: EmailAddress::from(self.account.email.as_str()),
+            email_verified_at: self.account.email_verified_at,
+        }
+    }
+}
+
+/// The department and attention use cases a test `Ui` reads through.
+#[cfg(test)]
+pub(super) fn test_reads(
+    persistence: &crate::adapters::persistence::PostgresPersistence,
+) -> (
+    Arc<crate::use_cases::department::DepartmentUseCases>,
+    Arc<crate::application::attention::AttentionUseCases>,
+) {
+    let shared = Arc::new(persistence.clone());
+    (
+        Arc::new(crate::use_cases::department::DepartmentUseCases::new(
+            shared.clone(),
+            Arc::new(
+                crate::adapters::persistence::department::PostgresDepartments::new(
+                    persistence.clone(),
+                    crate::adapters::persistence::test_support::provisioning_templates(),
+                ),
+            ),
+        )),
+        Arc::new(crate::application::attention::AttentionUseCases::new(
+            shared.clone(),
+            shared.clone(),
+            shared.clone(),
+            shared,
+            Arc::new(crate::adapters::monitoring::InMemoryMonitor::new()),
+        )),
+    )
 }
 
 /// A urlencoded form as its fields in order, repeated and dynamic names included (the

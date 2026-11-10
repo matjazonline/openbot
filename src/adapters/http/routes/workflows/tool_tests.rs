@@ -109,13 +109,16 @@ async fn autonomous_agent_authoring_competing_json_draft_writes_apply_once() {
     )
     .await
     .unwrap();
+    let departments =
+        crate::adapters::persistence::test_support::department_use_cases(&f.persistence);
     let save = |user, tool| {
         let agents = agents.clone();
+        let departments = departments.clone();
         let skills = skills.clone();
         let company = f.company;
         let agent = agent.clone();
         async move {
-            crate::adapters::http::routes::agent::update_agent_json(State(agents), State(skills), by(user), Path((company, agent.id)), body(json!({
+            crate::adapters::http::routes::agent::update_agent_json(State(agents), State(skills), State(departments), by(user), Path((company, agent.id)), body(json!({
                 "expected_revision":agent.draft_revision,
                 "agent":{"name":"Raced","slug":"raced"},
                 "tool_assignments":[{"binding":null,"alias":if tool == "message_reply" {"message.reply"} else {"message.send"},"choice":{"kind":"builtin","tool":tool}}]

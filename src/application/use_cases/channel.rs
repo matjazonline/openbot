@@ -587,6 +587,13 @@ mod tests {
                 .cloned())
         }
 
+        async fn list_departments(
+            &self,
+            _company_id: Uuid,
+        ) -> AppResult<Vec<crate::entities::department::Department>> {
+            Ok(Vec::new())
+        }
+
         async fn list_by_company_id(&self, company_id: Uuid) -> AppResult<Vec<Channel>> {
             Ok(self
                 .channels

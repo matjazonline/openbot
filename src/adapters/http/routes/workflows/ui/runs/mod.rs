@@ -60,8 +60,12 @@ pub struct WorkspaceQuery {
     /// An agent of the company; "" is none.
     #[serde(default, deserialize_with = "deserialize_empty_string_as_none")]
     pub agent_id: Option<Uuid>,
+    /// A department of the company: runs on its desks; "" is none.
+    #[serde(default, deserialize_with = "deserialize_empty_string_as_none")]
+    pub department_id: Option<Uuid>,
     pub state: Option<String>,
-    /// `board` for the board; anything else, or nothing, is the list.
+    /// `board` for the board, `waiting` for what waits on a person; anything else, or nothing,
+    /// is the list.
     pub view: Option<String>,
     /// The board's finished-column window (see [`pages::board_window`]).
     pub window: Option<String>,
@@ -80,6 +84,8 @@ pub struct ListQuery {
     pub workflow_id: Option<Uuid>,
     #[serde(default, deserialize_with = "deserialize_empty_string_as_none")]
     pub agent_id: Option<Uuid>,
+    #[serde(default, deserialize_with = "deserialize_empty_string_as_none")]
+    pub department_id: Option<Uuid>,
     pub state: Option<String>,
     pub after: Option<Uuid>,
     /// The run open in the pane, highlighted in the entries.
@@ -115,12 +121,13 @@ impl RunPage {
     }
 }
 
-/// The scope a request names: binding, workflow and agent ids as given.
+/// The scope a request names: binding, workflow, agent and department ids as given.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct ScopeIds {
     pub binding: Option<Uuid>,
     pub workflow: Option<Uuid>,
     pub agent: Option<Uuid>,
+    pub department: Option<Uuid>,
 }
 
 impl ScopeIds {
@@ -129,6 +136,7 @@ impl ScopeIds {
             binding: query.binding_id,
             workflow: query.workflow_id,
             agent: query.agent_id,
+            department: query.department_id,
         }
     }
 
@@ -137,6 +145,7 @@ impl ScopeIds {
             binding: query.binding_id,
             workflow: query.workflow_id,
             agent: query.agent_id,
+            department: query.department_id,
         }
     }
 
@@ -145,6 +154,7 @@ impl ScopeIds {
             binding: self.binding,
             workflow: self.workflow,
             agent: self.agent,
+            department: self.department,
             state,
         }
     }
@@ -174,6 +184,7 @@ struct Scope {
     binding: Option<WorkflowBindingId>,
     workflow: Option<WorkflowId>,
     agent: Option<Uuid>,
+    department: Option<crate::entities::department::DepartmentId>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -307,7 +318,24 @@ impl Ui {
                 Some(agent) => Some(company_agent(&self.engine, company_id, agent).await?),
                 None => None,
             },
+            department: match ids.department {
+                Some(_) => crate::adapters::http::routes::known_department(
+                    &self.desk_departments(company).await?,
+                    ids.department,
+                )?,
+                None => None,
+            },
         })
+    }
+
+    /// The company's departments by desk. The runs workspace is the managers', so every one.
+    async fn desk_departments(
+        &self,
+        company: Uuid,
+    ) -> AppResult<crate::entities::department::DeskDepartments> {
+        self.departments
+            .desk_departments(self.user, company, &[])
+            .await
     }
 
     /// The workflows and agents the scope controls offer, each at most [`MAX_BINDING_OPTIONS`]
@@ -345,11 +373,20 @@ impl Ui {
                 label: agent.label,
             })
             .collect();
+        let departments = self.desk_departments(company).await?;
+        let departments = crate::entities::department::department_tree(&departments.departments)
+            .into_iter()
+            .map(|(depth, department)| pages::ScopeOption {
+                id: department.id.as_uuid(),
+                label: format!("{}{}", "\u{a0}\u{a0}".repeat(depth), department.name),
+            })
+            .collect();
         Ok(pages::ScopeOptions {
             workflows,
             workflows_cut: definitions.more,
             agents,
             agents_cut,
+            departments,
         })
     }
 
@@ -385,6 +422,7 @@ impl Ui {
             binding: resolved.binding,
             workflow: resolved.workflow,
             agent: resolved.agent,
+            department: resolved.department,
         };
         let board = visible_board(&self.engine, company_id, actor, &scope, window, as_of).await?;
         let workflows: Vec<Uuid> = board
@@ -461,8 +499,10 @@ impl Ui {
 /// GET /ui/workflow-runs — the workspace, with `run_id` open when given: the list, or with
 /// `view=board` the board.
 async fn workspace(ui: Ui, Query(query): Query<WorkspaceQuery>) -> AppResult<Html<String>> {
-    if pages::RunsView::parse(query.view.as_deref()) == pages::RunsView::Board {
-        return board_workspace(ui, query).await;
+    match pages::RunsView::parse(query.view.as_deref()) {
+        pages::RunsView::Board => return board_workspace(ui, query).await,
+        pages::RunsView::Waiting => return waiting_workspace(ui, query).await,
+        pages::RunsView::List => {}
     }
     let frame = ui.frame(query.company_id).await?;
     let Some(company) = frame.company.as_ref().map(|access| &access.company) else {
@@ -554,6 +594,57 @@ async fn board_workspace(ui: Ui, query: WorkspaceQuery) -> AppResult<Html<String
     })))
 }
 
+/// "Waiting on a person" (01-departments 04B.4): the company's open work queue — parked human
+/// decisions and the run problems escalated to a person — grouped by the department of the desk
+/// it came from, narrowed to one department when one is chosen. A read over the attention queue;
+/// it keeps no state of its own.
+async fn waiting_workspace(ui: Ui, query: WorkspaceQuery) -> AppResult<Html<String>> {
+    let frame = ui.frame(query.company_id).await?;
+    let Some(company) = frame.company.as_ref().map(|access| &access.company) else {
+        return Ok(Html(frame.render(&ui.config, |_, _| String::new())));
+    };
+    let company_id = company.id;
+    let departments = ui.desk_departments(company_id).await?;
+    let department =
+        crate::adapters::http::routes::known_department(&departments, query.department_id)?;
+    let viewer = frame.viewer();
+    let listing = ui
+        .attention
+        .list(
+            &viewer,
+            company_id,
+            crate::application::attention::AttentionListRequest {
+                // The runs workspace is the managers': the team's whole queue.
+                view: crate::entities::attention::AttentionView::TeamWork,
+                cursor: None,
+                limit: Some(crate::entities::attention::AttentionQuery::MAX_LIMIT),
+                department,
+            },
+        )
+        .await?;
+    let scope = ScopeIds {
+        department: query.department_id,
+        ..ScopeIds::default()
+    };
+    let list_html = pages::runs_waiting(&pages::RunsWaitingView {
+        company_id,
+        scope: scope.view(None),
+        departments: &departments,
+        department,
+        page: &listing.page,
+    });
+    Ok(Html(frame.render(&ui.config, |user, company| {
+        pages::runs_workspace_page(&pages::RunsWorkspace {
+            user,
+            company,
+            list_html: &list_html,
+            pane_html: &pages::run_empty_pane(
+                "Each item opens the decision or the run it is waiting on.",
+            ),
+        })
+    })))
+}
+
 /// GET /ui/workflow-runs/list — the list region, its entries again, or the next page (see
 /// [`ListPart`]).
 async fn list(ui: Ui, Query(query): Query<ListQuery>) -> AppResult<Html<String>> {
@@ -610,6 +701,7 @@ fn run_filter(scope: Scope, state: Option<String>) -> RunFilter {
         agent: scope.agent,
         // The list is the forensic feed: children stay in it, labelled with their parent.
         lineage: RunLineage::Any,
+        department: scope.department,
     }
 }
 

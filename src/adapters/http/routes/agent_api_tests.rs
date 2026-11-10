@@ -84,6 +84,11 @@ impl Fixture {
         response_json(
             create_agent_json(
                 State(self.agents.clone()),
+                State(
+                    crate::adapters::persistence::test_support::department_use_cases(
+                        &self.persistence,
+                    ),
+                ),
                 AuthenticatedUser { id: self.user },
                 Path(self.company),
                 Json(serde_json::from_value(body).unwrap()),
@@ -109,6 +114,11 @@ impl Fixture {
             update_agent_json(
                 State(self.agents.clone()),
                 State(self.skills.clone()),
+                State(
+                    crate::adapters::persistence::test_support::department_use_cases(
+                        &self.persistence,
+                    ),
+                ),
                 AuthenticatedUser { id: self.user },
                 Path((self.company, id)),
                 Json(serde_json::from_value(body).unwrap()),
@@ -149,6 +159,9 @@ async fn api_agents_carry_no_retired_runtime_fields() {
     }
     assert!(saved.get("sub_agent_ids").is_none());
     assert_eq!(edited["agent"]["description"], "Updated description");
+    // An agent in no department lists none (01-departments 04C.4).
+    assert_eq!(saved["departments"], json!([]));
+    assert_eq!(edited["departments"], json!([]));
     f.cleanup().await;
 }
 
@@ -308,6 +321,17 @@ async fn agent_default_desk_json_create_places_the_agent() {
     .await
     .unwrap();
     assert_eq!(placed, (true, Some("lead".into())));
+    // 01-departments 04C.4: the response names the department and the role the agent holds there.
+    assert_eq!(
+        saved["departments"],
+        json!([{"id": department, "name": "Support", "slug": "support", "roles": ["lead"]}])
+    );
+    assert_eq!(saved["more_departments"], false);
+    let edited = f
+        .update(agent, json!({"name": "Lead", "slug": "lead"}))
+        .await
+        .unwrap();
+    assert_eq!(edited["departments"], saved["departments"]);
 
     for body in [
         json!({"name": "Stray", "slug": "stray", "role": "lead"}),
@@ -317,6 +341,7 @@ async fn agent_default_desk_json_create_places_the_agent() {
     ] {
         let refused = create_agent_json(
             State(f.agents.clone()),
+            State(crate::adapters::persistence::test_support::department_use_cases(&f.persistence)),
             AuthenticatedUser { id: f.user },
             Path(f.company),
             Json(body.clone()),

@@ -54,6 +54,7 @@ fn shapes() -> Vec<Shape> {
             state: state.map(str::to_owned),
             agent,
             lineage,
+            department: None,
         },
         cursor,
     };

@@ -114,6 +114,15 @@ pub struct DepartmentMember {
     pub created_at: DateTime<Utc>,
 }
 
+/// A department a principal belongs to or holds a role in, with the roles it holds there.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct HeldDepartment {
+    pub id: DepartmentId,
+    pub name: String,
+    pub slug: String,
+    pub roles: Vec<DepartmentRole>,
+}
+
 /// The most people and agents the department forms offer as members or leads; a longer list is
 /// cut and says so.
 pub const MAX_DEPARTMENT_PRINCIPAL_CHOICES: usize = 500;
@@ -137,6 +146,65 @@ pub struct DepartmentDesk {
     /// The department's own desk, the one its `department:{id}` record names. A slug edit does
     /// not move it, so its address is this slug, not the department's.
     pub own: bool,
+}
+
+/// Which department owns each desk, for the surfaces that group by department (01-departments
+/// 04B.4, 04C). Names are company-visible: everyone may see which department a desk belongs to;
+/// who is in a department stays with the Departments tab.
+#[derive(Debug, Clone, Default)]
+pub struct DeskDepartments {
+    pub departments: Vec<Department>,
+    /// Desk id to its owning department.
+    pub owners: std::collections::HashMap<Uuid, DepartmentId>,
+}
+
+impl DeskDepartments {
+    pub fn department(&self, id: DepartmentId) -> Option<&Department> {
+        self.departments
+            .iter()
+            .find(|department| department.id == id)
+    }
+
+    /// The department that owns `desk`, if any.
+    pub fn of_desk(&self, desk: Option<Uuid>) -> Option<&Department> {
+        desk.and_then(|desk| self.owners.get(&desk))
+            .and_then(|id| self.department(*id))
+    }
+
+    /// `items` under their desk's department, departments in tree order (a root before its
+    /// children), then those without one under "No department". When no item has a department
+    /// there is one group without a heading, so a company that does not use departments sees its
+    /// list as before. Order within a group is the input order.
+    pub fn group<'t, T>(
+        &self,
+        items: &'t [T],
+        desk: impl Fn(&T) -> Option<Uuid>,
+    ) -> Vec<(Option<String>, Vec<&'t T>)> {
+        let mut groups: Vec<(Option<String>, Vec<&'t T>)> = department_tree(&self.departments)
+            .into_iter()
+            .map(|(_, department)| {
+                let owned = items
+                    .iter()
+                    .filter(|item| {
+                        self.of_desk(desk(item)).map(|owner| owner.id) == Some(department.id)
+                    })
+                    .collect::<Vec<_>>();
+                (Some(department.name.clone()), owned)
+            })
+            .filter(|(_, owned)| !owned.is_empty())
+            .collect();
+        let rest: Vec<&T> = items
+            .iter()
+            .filter(|item| self.of_desk(desk(item)).is_none())
+            .collect();
+        if groups.is_empty() {
+            return vec![(None, rest)];
+        }
+        if !rest.is_empty() {
+            groups.push((Some("No department".to_owned()), rest));
+        }
+        groups
+    }
 }
 
 /// The departments in tree order with their depth (a root is 0): each department, then its

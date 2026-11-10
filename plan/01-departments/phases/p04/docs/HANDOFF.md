@@ -20,10 +20,16 @@
   committed after b1026003. Behaviour changes: the agents directory JSON `desk` is
   `{id, address}`; desk/channel error texts say desk; the assistant desk action is "Create
   additional desk"; the desk form can set a department and members-only.
-- B2 (04B.4 + 04C.1–4), B3 (04C.5 + 04D docs): not started.
+- **B2 accepted in phase** (04B.4 + 04C.1–4): B2-R2 PASS at `a97fdbeb…58ba`; committed after
+  399efe2c. Behaviour changes: department filters on `/ui/work`, the run board and the dashboard
+  (unknown or unseen department → 404); "Waiting on a person" view; model usage `group=department`;
+  `_help`/bounce desks under department headings; agent JSON `departments`/`more_departments`;
+  `AttentionQuery.company_items`. Found and fixed a p03 regression in a test p03 never ran
+  (`picking_a_library_agent_copies_its_skills_with_the_agent_and_channel`).
+- B3 (04C.5 + 04D docs): not started.
 - Known unrelated failure: `rendered_markup_carries_no_inline_javascript` (pre-existing,
   `pages/workflow_authoring/sample.rs`).
 
 ## Next action
 
-B2 (04B.4 run board department filter + "Waiting on a person"; 04C.1–4), see TASK "B2 scouting".
+B3: 04C.5 + 04D docs (draft of docs/departments.md in the session scratchpad) and B2-F6.

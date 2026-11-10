@@ -22,6 +22,9 @@ async fn put(f: &Fixture, body: serde_json::Value) -> Channel {
         .await
         .unwrap();
     let saved: serde_json::Value = serde_json::from_slice(&body).unwrap();
+    // 01-departments 04C.4: the desk response carries its ownership fields, always present.
+    assert!(saved["channel"].get("department_id").is_some(), "{saved}");
+    assert!(saved["channel"]["members_only"].is_boolean(), "{saved}");
     serde_json::from_value(saved["channel"].clone()).unwrap()
 }
 

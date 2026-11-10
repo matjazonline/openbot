@@ -1103,6 +1103,13 @@ mod tests {
         async fn list_by_company_id(&self, _company_id: Uuid) -> AppResult<Vec<Channel>> {
             Ok(self.channels.lock().unwrap().clone())
         }
+
+        async fn list_departments(
+            &self,
+            _company_id: Uuid,
+        ) -> AppResult<Vec<crate::entities::department::Department>> {
+            Ok(Vec::new())
+        }
         async fn update(
             &self,
             _request: crate::application::ports::channel::ChannelUpdate,

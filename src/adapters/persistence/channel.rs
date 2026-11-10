@@ -393,6 +393,17 @@ impl ChannelPersistence for PostgresPersistence {
         db.map(TryInto::try_into).transpose()
     }
 
+    async fn list_departments(
+        &self,
+        company_id: Uuid,
+    ) -> AppResult<Vec<crate::entities::department::Department>> {
+        crate::adapters::persistence::department::departments_of_company(
+            &self.pool,
+            crate::domain::workflow::CompanyId::new(company_id),
+        )
+        .await
+    }
+
     async fn list_by_company_id(&self, company_id: Uuid) -> AppResult<Vec<Channel>> {
         let query = format!(
             "{CHANNEL_SELECT} WHERE ch.company_id = $1 ORDER BY ch.created_at DESC, ch.id DESC"
