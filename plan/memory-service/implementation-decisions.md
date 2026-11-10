@@ -2006,12 +2006,17 @@ an earlier decision here.
 - D9 retention, amended by review MEM-P06-A1-R1 F5 (recorded as asked in A1-R2 F8 (c)). D9 says
   "Identity, revision, level and digest stay for provenance". As implemented, they stay while
   anything references the source:
-  - A source whose content was nulled 30 or more days ago, and that no link and no operation
+  - A source whose content was nulled more than 30 days ago, and that no link and no operation
     names, is deleted (`remove_unreferenced_sources`,
-    `services/memory/src/adapters/postgres/retention.rs:541`).
-  - A finished operation that no observation names is deleted with its op-source rows 30 days
-    after it finished (`remove_unreferenced_operations`, same file, line 518). Both run from
-    `sweep_aged_once` (line 405), each in its own transaction that re-checks its predicate.
+    `services/memory/src/adapters/postgres/retention.rs:541`). The candidates are locked
+    first, so a save citing one waits, and the delete re-checks the references in a fresh
+    snapshot.
+  - A finished operation that no observation names is deleted with its op-source rows more
+    than 30 days after it finished (`remove_unreferenced_operations`, same file, line 518).
+    Its delete relies on the row lock taken with the candidates (`FOR UPDATE SKIP LOCKED`)
+    rather than a re-check; an observation names its operation only from that operation's
+    own commit, before it finished.
+  - Both run from `sweep_aged_once` (line 405), each in its own transaction.
   - Consequences:
     - re-recording a removed revision creates a fresh source row, because revision immutability
       holds only while something references the revision;
