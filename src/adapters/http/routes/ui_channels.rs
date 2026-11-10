@@ -77,7 +77,7 @@ pub struct CompanyQuery {
     pub company_id: Uuid,
 }
 
-const NO_SELECTION: &str = "Select a channel to configure it, or create a new one.";
+const NO_SELECTION: &str = "Select a desk to configure it, or create a new one.";
 
 /// The use cases and the caller every Channels handler starts from.
 ///
@@ -265,7 +265,7 @@ async fn create_channel(
 
     match created {
         Ok(channel) => view.saved_response(&channel).await,
-        Err(err) => rejected(format!("Failed to create channel: {err}")),
+        Err(err) => rejected(format!("Failed to create desk: {err}")),
     }
 }
 
@@ -307,7 +307,7 @@ async fn update_channel(
 
     match saved {
         Ok(channel) => view.saved_response(&channel).await,
-        Err(err) => rejected(format!("Failed to save channel: {err}")),
+        Err(err) => rejected(format!("Failed to save desk: {err}")),
     }
 }
 

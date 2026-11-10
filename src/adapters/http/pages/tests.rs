@@ -409,7 +409,7 @@ fn a_workspace_names_its_list_and_detail_columns_for_the_compact_layout() {
         next_cursor: None,
         selected_thread_id: None,
         activity: no_activity(),
-        detail_html: &empty_detail_pane("Select a channel to get started.", FragmentSwap::Inline),
+        detail_html: &empty_detail_pane("Select a desk to get started.", FragmentSwap::Inline),
     });
 
     assert!(html.contains(r##"class="ui-pane-list"##));
@@ -427,7 +427,7 @@ fn a_workspace_names_its_list_and_detail_columns_for_the_compact_layout() {
 /// that is the server's answer rather than the browser's guess.
 #[test]
 fn a_detail_column_with_nothing_open_says_so() {
-    let placeholder = empty_detail_pane("Select a channel to get started.", FragmentSwap::Inline);
+    let placeholder = empty_detail_pane("Select a desk to get started.", FragmentSwap::Inline);
     assert!(placeholder.contains("data-pane-empty"));
 
     let company = mailbox_company();
@@ -451,7 +451,7 @@ fn a_detail_column_with_nothing_open_says_so() {
 fn compose_button_lives_in_the_thread_column_of_the_selected_channel() {
     let company = mailbox_company();
     let channel = mailbox_channel(company.id);
-    let detail = empty_detail_pane("Select a channel to get started.", FragmentSwap::Inline);
+    let detail = empty_detail_pane("Select a desk to get started.", FragmentSwap::Inline);
     let email = mailbox_account_email();
 
     let without_channel = mailbox_page(&MailboxPage {
@@ -469,7 +469,7 @@ fn compose_button_lives_in_the_thread_column_of_the_selected_channel() {
     });
     // Without a channel there is no thread column, so there is nowhere for Compose to sit.
     assert!(!without_channel.contains("id=\"compose-button\""));
-    assert!(without_channel.contains("Select a channel to see its threads."));
+    assert!(without_channel.contains("Select a desk to see its threads."));
 
     let with_channel = mailbox_page(&MailboxPage {
         user: &mailbox_user(&email),
@@ -531,10 +531,10 @@ fn channel_sidebar_lists_addresses_and_offers_channel_actions() {
     assert!(unselected.contains("inbox@acme.example.com"));
     // Channel management is the /ui Channels workspace now, not the classic page.
     assert!(unselected.contains(&format!("/ui/channels?company_id={}&new=1", company.id)));
-    assert!(!unselected.contains("Edit Channel"));
+    assert!(!unselected.contains("Edit Desk"));
 
     let selected = page(Some(&channel));
-    assert!(selected.contains("Edit Channel"));
+    assert!(selected.contains("Edit Desk"));
     assert!(selected.contains(&format!(
         "/ui/channels?company_id={}&channel_id={}",
         company.id, channel.id
@@ -558,7 +558,7 @@ fn channel_actions_swap_out_of_band_so_picking_a_channel_reveals_edit_channel() 
 
     let inline = channel_actions(company.id, None, FragmentSwap::Inline);
     assert!(!inline.contains("hx-swap-oob"));
-    assert!(!inline.contains("Edit Channel"));
+    assert!(!inline.contains("Edit Desk"));
 }
 
 #[test]
@@ -781,7 +781,7 @@ fn icon_rail_lights_the_workspace_the_response_belongs_to() {
         channels: std::slice::from_ref(&channel),
         selected_channel_id: None,
     };
-    let pane = channel_settings_empty_pane("Select a channel.", FragmentSwap::Inline);
+    let pane = channel_settings_empty_pane("Select a desk.", FragmentSwap::Inline);
     let channels = channel_settings_page(&ChannelSettingsPage {
         user: &mailbox_user(&email),
         companies: std::slice::from_ref(&company),
@@ -1339,6 +1339,7 @@ fn agent_create_pane_opens_on_the_tab_that_was_submitted() {
     );
     assert!(!simple.contains("/ui/agents/new/channel"));
     assert!(!simple.contains(">Next: Channel<"));
+    assert!(!simple.contains(">Next: Desk<"));
     assert!(!simple.contains(r##"<li class="step step-primary">Agent</li>"##));
 
     // A rejected Advanced submit has to come back on the Advanced tab.
@@ -1379,7 +1380,7 @@ fn channel_settings_list_targets_the_pane_and_swaps_out_of_band() {
         selected_channel_id: None,
         ..list
     };
-    assert!(channel_settings_list(&empty, FragmentSwap::Inline).contains("No channels yet"));
+    assert!(channel_settings_list(&empty, FragmentSwap::Inline).contains("No desks yet"));
 }
 
 fn settings_agent(company_id: Uuid, name: &str, slug: &str) -> Agent {
@@ -1616,7 +1617,7 @@ fn channel_create_pane_makes_a_plain_channel_and_keeps_a_rejected_draft() {
     assert!(!fresh.contains(">Easy</button>"));
     assert!(!fresh.contains("/ui/channels/easy"));
     assert!(!fresh.contains("system_prompt"));
-    assert!(fresh.contains("create an assistant channel from the agent's page"));
+    assert!(fresh.contains("create an assistant desk from the agent's page"));
 
     // A rejected submit comes back with what was typed.
     let retried = pane(
@@ -1625,7 +1626,7 @@ fn channel_create_pane_makes_a_plain_channel_and_keeps_a_rejected_draft() {
             slug: "support",
             ..ChannelDraft::default()
         },
-        Some("Failed to create channel: slug already taken"),
+        Some("Failed to create desk: slug already taken"),
     );
     assert!(retried.contains("slug already taken"));
     assert!(retried.contains("value=\"Support\""));
@@ -2364,7 +2365,7 @@ fn a_message_from_another_channel_is_marked_and_keeps_its_own_sender() {
     let html = message_bubble_chat(&delegated, None, scope, RunLinkAccess::Label);
 
     assert!(html.contains(&icon(Icon::Hubot, BUTTON_ICON)));
-    assert!(html.contains(r#"title="From an agent in another channel""#));
+    assert!(html.contains(r#"title="From an agent in another desk""#));
     // The sending channel's address.
     assert!(html.contains("legal@acme.mailagents.test"));
     assert!(!html.contains("<img"));
@@ -2419,7 +2420,7 @@ fn a_thread_opened_by_another_channel_is_marked_and_one_from_a_person_is_not() {
         },
     );
     assert!(row.contains(&icon(Icon::Hubot, BUTTON_ICON)));
-    assert!(row.contains(r#"title="Opened by an agent in another channel""#));
+    assert!(row.contains(r#"title="Opened by an agent in another desk""#));
     // The subject still truncates beside the glyph rather than being replaced by it.
     assert!(row.contains(r#"<span class="truncate font-semibold">Question &lt;script&gt;</span>"#));
 
@@ -3777,7 +3778,7 @@ fn deliveries_page_lists_queued_work_and_escapes_its_subject() {
     // The rail lights the workspace the response belongs to.
     assert!(html.contains(r##"title="Deliveries""##));
     // The channel filter is what the channel_id column and its index exist to serve.
-    assert!(html.contains(r##"<option value="">All channels</option>"##));
+    assert!(html.contains(r##"<option value="">All desks</option>"##));
     assert!(html.contains(&format!(
         r##"<option value="{}">Inbox</option>"##,
         channel.id
@@ -4002,7 +4003,7 @@ fn no_pane_leaks_a_placeholder_constant_into_its_markup() {
         empty_thread_column(),
         empty_detail_pane("Select a thread.", FragmentSwap::Inline),
         agent_settings_empty_pane("Select an agent.", FragmentSwap::Inline),
-        channel_settings_empty_pane("Select a channel.", FragmentSwap::Inline),
+        channel_settings_empty_pane("Select a desk.", FragmentSwap::Inline),
         company_settings_empty_pane("Select a company.", FragmentSwap::Inline),
         team_settings_empty_pane("Select a member.", FragmentSwap::Inline),
         delivery_empty_pane("Select a delivery.", FragmentSwap::Inline),
@@ -4059,7 +4060,7 @@ fn every_ui_workspace_first_column_renders_a_sidebar_header() {
         pane_html: "",
     });
     assert!(channels_html.contains(
-        r##"<h2 class="min-w-0 flex-1 text-base font-semibold leading-tight">Channels</h2>"##
+        r##"<h2 class="min-w-0 flex-1 text-base font-semibold leading-tight">Desks</h2>"##
     ));
 
     let agents_html = agent_settings_page(&AgentSettingsPage {
@@ -4186,7 +4187,7 @@ fn the_profile_pane_offers_the_account_its_own_details_and_never_its_password() 
     assert!(html.contains(r#"name="email" required value="dana@example.com""#));
     assert!(html.contains("Email unverified"));
     assert!(html.contains(
-        "Email-based invitations, restricted channel access, and operator access are unavailable"
+        "Email-based invitations, restricted desk access, and operator access are unavailable"
     ));
 
     // The picture is picked from disk; the URL it was stored at rides along hidden.
@@ -4848,3 +4849,6 @@ mod workflow_conversation_tests;
 
 #[path = "knowledge_view_tests.rs"]
 mod knowledge_views;
+
+#[path = "desk_wording_tests.rs"]
+mod desk_wording;

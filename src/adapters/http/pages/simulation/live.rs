@@ -422,7 +422,7 @@ pub(crate) fn simulate_reply_form(fields: &ReplyFormFields<'_>) -> String {
                             <input type="radio" name="simulation_mode" value="run_test"{run_test_checked} class="mt-0.5 text-base-content focus:ring-warning">
                             <div class="ml-2.5">
                                 <span class="block text-xs font-bold text-base-content">Run_Test</span>
-                                <span class="block text-[11px] text-base-content/70 mt-0.5">Execute full channel & agent, skip email dispatch</span>
+                                <span class="block text-[11px] text-base-content/70 mt-0.5">Execute full desk & agent, skip email dispatch</span>
                             </div>
                         </label>
                         <label class="flex items-start p-2.5 bg-base-200 border border-base-300 rounded-lg cursor-pointer hover:border-success transition">
@@ -599,7 +599,7 @@ pub(crate) fn loaded_thread_overview_card(
                     <span class="text-base-content font-bold">{subject}</span>
                 </div>
                 <div>
-                    <span class="text-base-content/70 font-sans block text-[11px] uppercase font-semibold">Target Channel Address:</span>
+                    <span class="text-base-content/70 font-sans block text-[11px] uppercase font-semibold">Target Desk Address:</span>
                     <span class="text-primary">{target_recipient}</span>
                 </div>
                 <div>

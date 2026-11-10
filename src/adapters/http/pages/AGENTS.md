@@ -1,6 +1,8 @@
 These rules cover how `/ui` is styled. They sit under `src/AGENTS.md`, which still applies to the
 Rust in this directory.
 
+The product word for a channel is desk; identifiers keep channel.
+
 Two shells render from here and they are **not** interchangeable:
 
 - `ui_layout` (`mailbox.rs`) — the mailbox shell. Loads the compiled `assets/app.css` bundle

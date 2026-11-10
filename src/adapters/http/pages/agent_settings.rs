@@ -366,7 +366,7 @@ pub fn assistant_channel_card(
     let banner = match outcome {
         None => String::new(),
         Some(AssistantChannelOutcome::Created { channel, address }) => format!(
-            r#"<div role="status" class="alert alert-success text-sm">Created the team channel {channel} ({address}); it now answers through its workflow.</div>"#,
+            r#"<div role="status" class="alert alert-success text-sm">Created the team desk {channel} ({address}); it now answers through its workflow.</div>"#,
             channel = escape_html_text(channel),
             address = escape_html_text(address),
         ),
@@ -376,8 +376,8 @@ pub fn assistant_channel_card(
         r##"
                 <section id="assistant-channel-card" class="mt-6 space-y-3 rounded-box border border-base-300 p-4">
                     <div>
-                        <h3 class="font-semibold">Assistant channel</h3>
-                        <p class="text-sm opacity-70">Create a team channel (never public) that this agent answers. Autonomous replies send the agent's answer directly; reviewed replies wait for your approval first.</p>
+                        <h3 class="font-semibold">Assistant desk</h3>
+                        <p class="text-sm opacity-70">Create a team desk (never public) that this agent answers. Autonomous replies send the agent's answer directly; reviewed replies wait for your approval first.</p>
                     </div>
                     {banner}
                     <form hx-post="/ui/agents/{agent_id}/assistant-channel?company_id={company_id}"
@@ -385,11 +385,11 @@ pub fn assistant_channel_card(
                         hx-disabled-elt="find button[type='submit']" class="grid gap-3 sm:grid-cols-2">
                         <input type="hidden" name="command_key" value="{command_key}">
                         <label class="form-control w-full">
-                            <div class="label"><span class="text-xs opacity-70">Channel name</span></div>
+                            <div class="label"><span class="text-xs opacity-70">Desk name</span></div>
                             <input class="input w-full" name="channel_name" required maxlength="120" value="{name}">
                         </label>
                         <label class="form-control w-full">
-                            <div class="label"><span class="text-xs opacity-70">Channel address</span></div>
+                            <div class="label"><span class="text-xs opacity-70">Desk address</span></div>
                             <input class="input w-full font-mono" name="channel_slug" required maxlength="64" placeholder="{slug}-assistant">
                         </label>
                         <label class="form-control w-full">
@@ -400,7 +400,7 @@ pub fn assistant_channel_card(
                             </select>
                         </label>
                         <div class="flex items-end">
-                            <button type="submit" class="btn btn-outline">Create assistant channel</button>
+                            <button type="submit" class="btn btn-outline">Create assistant desk</button>
                         </div>
                     </form>
                 </section>

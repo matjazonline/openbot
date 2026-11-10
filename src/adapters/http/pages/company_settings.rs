@@ -166,7 +166,7 @@ pub fn company_settings_page(page: &CompanySettingsPage<'_>) -> String {
         </aside>
         {pane_html}
         "##,
-        header = sidebar_header("Companies", "Every channel, agent and thread lives in one."),
+        header = sidebar_header("Companies", "Every desk, agent and thread lives in one."),
         plus_glyph = icon(Icon::Plus, BUTTON_ICON),
         list_html = company_settings_list(page.list, FragmentSwap::Inline),
         pane_html = page.pane_html,
@@ -354,7 +354,7 @@ fn company_settings_body(pane: &CompanyEditPane<'_>) -> String {
                         <button type="button" class="btn btn-error btn-outline ml-auto"
                             hx-delete="/ui/companies/{company_id}"
                             hx-target="#company-pane" hx-swap="outerHTML"
-                            hx-confirm="Delete company '{name}'? Its channels, agents and threads go with it."
+                            hx-confirm="Delete company '{name}'? Its desks, agents and threads go with it."
                             hx-push-url="/ui/companies">Delete Company</button>
                     </div>
                 </form>
@@ -377,7 +377,7 @@ pub fn company_create_pane(pane: &CompanyCreatePane<'_>) -> String {
         <section id="company-pane"{PANE_SKELETON} class="ui-pane-detail flex min-w-0 flex-1 flex-col bg-base-100">
             <div class="border-b border-base-300 px-4 py-4 sm:px-6">
                 <h2 class="text-xl font-bold">New company</h2>
-                <p class="text-xs opacity-70">A company owns its channels, agents and threads, and its slug is the domain part their addresses are built on.</p>
+                <p class="text-xs opacity-70">A company owns its desks, agents and threads, and its slug is the domain part their addresses are built on.</p>
             </div>
             <div class="flex-1 overflow-y-auto px-4 py-4 sm:px-6">
                 {error_html}
@@ -414,7 +414,7 @@ fn workspace_links(company_id: Uuid, counts: CompanyCounts) -> String {
                 <div class="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-6">
                     <a href="/ui/channels?company_id={company_id}" class="btn btn-ghost h-auto flex-col gap-0 py-2">
                         <span class="text-lg font-bold">{channels}</span>
-                        <span class="text-[11px] font-normal opacity-60">Channels</span>
+                        <span class="text-[11px] font-normal opacity-60">Desks</span>
                     </a>
                     <a href="/ui/agents?company_id={company_id}" class="btn btn-ghost h-auto flex-col gap-0 py-2">
                         <span class="text-lg font-bold">{agents}</span>
@@ -473,7 +473,7 @@ fn company_fields(draft: &CompanyDraft<'_>) -> String {
                         </label>
                     </div>
                     <details class="collapse-arrow collapse border border-base-300 bg-base-200">
-                        <summary class="collapse-title text-sm font-medium">New assistant channel defaults</summary>
+                        <summary class="collapse-title text-sm font-medium">New assistant desk defaults</summary>
                         <div class="collapse-content space-y-4">
                             <label class="form-control"><span class="text-xs opacity-70">Allow trusted senders to add third parties</span>
                                 <select name="default_add_3rd_party" class="select w-full"><option value="true"{default_third_party_yes}>Yes</option><option value="false"{default_third_party_no}>No</option></select>

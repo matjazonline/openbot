@@ -1009,6 +1009,10 @@ async fn test_misspelled_channel_bounce_and_strict_pipeline_validation() {
     let bounce_body = format_bounce_email_body(bounce_single, "mailagents.com");
     assert!(bounce_body.contains("suppport@acme.mailagents.com"));
     assert!(bounce_body.contains("support@acme.mailagents.com"));
+    assert!(bounce_body.contains("one or more desk addresses were not found or misspelled"));
+    assert!(bounce_body.contains("Invalid Desk Slug: 'suppport@acme.mailagents.com'"));
+    assert!(bounce_body.contains("Please check the desk address"));
+    assert!(!bounce_body.to_lowercase().contains("channel"));
 
     thread_use_cases
         .handle_bounce_dispatch(&ingest_single)
@@ -2663,6 +2667,10 @@ async fn disabled_channel_bounces_inbound_mail() {
     assert!(body.contains("support@acme.mailagents.com"));
     assert!(body.contains("switched off"));
     assert!(!body.contains("Did you mean"));
+    assert!(body.contains("one or more desks are currently disabled"));
+    assert!(body.contains("Disabled Desk: 'support@acme.mailagents.com'"));
+    assert!(body.contains("the desk is currently switched off"));
+    assert!(!body.to_lowercase().contains("channel"));
 }
 
 #[tokio::test]
@@ -2945,10 +2953,11 @@ async fn a_team_member_who_mistypes_a_channel_is_told_which_ones_they_can_use() 
     assert_eq!(bounce.available_channels[0].description, None);
 
     let body = format_bounce_email_body(&bounce, "mailagents.com");
-    assert!(body.contains("Channels you can write to:"));
+    assert!(body.contains("Desks you can write to:"));
     assert!(body.contains("support@acme.mailagents.com — Support Desk"));
     assert!(body.contains("Answers customer support and refund questions."));
     assert!(body.contains("billing@acme.mailagents.com — Billing"));
+    assert!(!body.to_lowercase().contains("channel"));
 }
 
 #[tokio::test]
@@ -2968,7 +2977,7 @@ async fn an_outsider_s_bounce_never_discloses_the_channel_directory() {
     );
 
     let body = format_bounce_email_body(&bounce, "mailagents.com");
-    assert!(!body.contains("Channels you can write to:"));
+    assert!(!body.contains("Desks you can write to:"));
     assert!(!body.contains("Support Desk"));
     assert!(
         body.contains("Did you mean:"),
@@ -3025,7 +3034,7 @@ fn the_bounce_body_omits_the_directory_section_when_there_is_nothing_to_list() {
     };
 
     let body = format_bounce_email_body(&bounce, "mailagents.com");
-    assert!(!body.contains("Channels you can write to:"));
+    assert!(!body.contains("Desks you can write to:"));
     assert!(body.contains("support@acme.mailagents.com"));
 }
 
@@ -3155,14 +3164,20 @@ fn the_help_body_lists_channels_and_teaches_the_address_syntax() {
     for suffix in crate::entities::channel::RESERVED_SLUG_SUFFIXES {
         assert!(body.contains(suffix), "the body should name '{suffix}'");
     }
+    assert!(body.contains("Desks you can write to:"));
+    assert!(body.contains("Send to both desks, in that order."));
+    assert!(body.contains("desk name with '+'"));
+    assert!(!body.to_lowercase().contains("channel"));
 }
 
 #[test]
 fn the_help_body_still_teaches_the_syntax_when_there_is_nothing_to_list() {
     let body = format_help_email_body(&[], &CompanySlug::from("acme"), "mailagents.com");
 
-    assert!(!body.contains("Channels you can write to:"));
+    assert!(!body.contains("Desks you can write to:"));
     assert!(body.contains("nothing to list"));
+    assert!(body.contains("not currently a participant of any desk"));
+    assert!(!body.to_lowercase().contains("channel"));
     assert!(
         body.contains("support+quiet@acme.mailagents.com"),
         "the syntax section falls back to a generic example rather than disappearing"

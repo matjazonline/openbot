@@ -23,7 +23,7 @@ pub(crate) fn render_spam_disabled_warning(
                 </svg>
                 Spam scanning is disabled in server configuration
             </div>
-            <div>Channels without participant email restrictions will receive incoming emails without spam filtering.</div>
+            <div>Desks without participant email restrictions will receive incoming emails without spam filtering.</div>
             <label class="flex items-center gap-2 cursor-pointer mt-1 font-medium text-base-content">
                 <input type="checkbox" name="confirm_spam_disabled" value="true" {checkbox_attr} class="rounded bg-base-200 border-base-300 text-base-content focus:ring-warning">
                 <span>I am aware that spam scanning is disabled and confirm saving without participant restrictions.</span>
@@ -49,7 +49,7 @@ fn advanced_channel_form(
                 <input type="hidden" name="add_3rd_party" value="true">
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                        <label for="channel_name" class="block text-xs font-medium text-base-content/80 mb-1">Channel Name</label>
+                        <label for="channel_name" class="block text-xs font-medium text-base-content/80 mb-1">Desk Name</label>
                         <input type="text" id="channel_name" name="name" required
                             data-input="slugify" data-slug-target="channel_slug"
                             class="w-full px-3.5 py-2 bg-base-200 border border-base-300 rounded-lg text-base-content text-sm placeholder-base-content/60 focus:outline-none focus:ring-2 focus:ring-success"
@@ -82,7 +82,7 @@ fn advanced_channel_form(
                 <div class="flex justify-end">
                     <button type="submit"
                         class="px-5 py-2 bg-success hover:bg-success/90 text-success-content text-sm font-semibold rounded-lg shadow-md shadow-success/20 transition cursor-pointer">
-                        Create Channel
+                        Create Desk
                     </button>
                 </div>
             </form>"##
@@ -135,13 +135,13 @@ pub fn channels_page(page: &ChannelsPage<'_>) -> String {
         <div class="flex items-center justify-between mb-6">
             <div>
                 <a href="/companies" class="text-xs text-primary hover:text-primary font-medium mb-1 inline-block">&larr; Back to Companies</a>
-                <h2 class="text-2xl font-bold text-base-content">{company_name} Channels</h2>
-                <p class="text-base-content/70 text-sm mt-0.5">Manage channels for <span class="font-mono text-primary">@{slug}.{app_domain_name}</span></p>
+                <h2 class="text-2xl font-bold text-base-content">{company_name} Desks</h2>
+                <p class="text-base-content/70 text-sm mt-0.5">Manage desks for <span class="font-mono text-primary">@{slug}.{app_domain_name}</span></p>
             </div>
             <button id="channel-form-toggle" type="button" aria-controls="channel-form-card" aria-expanded="{card_expanded}"
                 data-action="toggle-form-card" data-card="channel-form-card"
                 class="px-4 py-2 bg-success hover:bg-success/90 text-success-content text-sm font-semibold rounded-lg shadow-md shadow-success/20 transition cursor-pointer">
-                Add Channel
+                Add Desk
             </button>
         </div>
 
@@ -151,7 +151,7 @@ pub fn channels_page(page: &ChannelsPage<'_>) -> String {
         <div id="channel-form-card" class="{card_hidden} bg-base-100 border border-base-300 rounded-xl p-5 mb-8">
             <div class="flex items-center justify-between mb-4 border-b border-base-300 pb-3">
                 <h3 class="text-md font-semibold text-base-content flex items-center gap-2">
-                    <span class="text-base-content">+</span> Add New Channel
+                    <span class="text-base-content">+</span> Add New Desk
                 </h3>
             </div>
 
@@ -161,7 +161,7 @@ pub fn channels_page(page: &ChannelsPage<'_>) -> String {
 
         <!-- Channels List Section -->
         <div>
-            <h3 class="text-sm font-semibold uppercase tracking-wider text-base-content/70 mb-3">Channels</h3>
+            <h3 class="text-sm font-semibold uppercase tracking-wider text-base-content/70 mb-3">Desks</h3>
             <div id="channel-list" class="space-y-3">
                 {list_html}
             </div>
@@ -173,7 +173,7 @@ pub fn channels_page(page: &ChannelsPage<'_>) -> String {
         list_html = list_html,
     );
 
-    base_layout(&format!("{} Channels", company.name), &content)
+    base_layout(&format!("{} Desks", company.name), &content)
 }
 
 /// The channel list as the page wants it: the same rows as everywhere else, except the channel
@@ -212,7 +212,7 @@ pub fn channel_list_fragment(
     if channels.is_empty() {
         return r##"
             <div class="bg-base-100 border border-dashed border-base-300 rounded-xl p-8 text-center">
-                <p class="text-base-content/70 text-sm">No channels configured yet. Use Add Channel to create your first one.</p>
+                <p class="text-base-content/70 text-sm">No desks configured yet. Use Add Desk to create your first one.</p>
             </div>
         "##
         .to_string();
@@ -242,7 +242,7 @@ pub fn channel_threads_page(
     let content = format!(
         r##"
         <div class="mb-6">
-            <a href="/companies/{company_id}/channels" class="text-xs text-primary hover:text-primary font-medium mb-1 inline-block">&larr; Back to Channels</a>
+            <a href="/companies/{company_id}/channels" class="text-xs text-primary hover:text-primary font-medium mb-1 inline-block">&larr; Back to Desks</a>
             <h2 class="text-2xl font-bold text-base-content">{channel_name} Threads</h2>
             <p class="text-base-content/70 text-sm mt-0.5">Newest conversations for <span class="font-mono text-base-content">/{channel_slug}</span></p>
         </div>
@@ -299,7 +299,7 @@ fn channel_thread_card(
                     "##,
         channel_glyph = other_channel_glyph(
             opened_by_another_channel(thread, app_domain_name),
-            "Opened by an agent in another channel",
+            "Opened by an agent in another desk",
         ),
         subject = escape_html_text(&thread.subject),
         participants = participants,
@@ -321,7 +321,7 @@ pub fn channel_thread_list_fragment(
     let cards = if threads.is_empty() && !out_of_band_pagination {
         r##"
         <div class="bg-base-100 border border-dashed border-base-300 rounded-xl p-8 text-center">
-            <p class="text-base-content/70 text-sm">No threads have been created for this channel yet.</p>
+            <p class="text-base-content/70 text-sm">No threads have been created for this desk yet.</p>
         </div>
         "##
         .to_string()
@@ -397,7 +397,7 @@ pub fn channel_row_fragment(company: &Company, app_domain_name: &str, channel: &
                         class="px-3 py-1.5 text-xs font-medium bg-base-300 hover:bg-base-content/15 text-base-content rounded-lg transition cursor-pointer">
                         Edit
                     </button>
-                    <button hx-delete="/companies/{company_id}/channels/{channel_id}" hx-target="#channel-{channel_id}" hx-swap="outerHTML" hx-confirm="Are you sure you want to delete channel '{name}'?"
+                    <button hx-delete="/companies/{company_id}/channels/{channel_id}" hx-target="#channel-{channel_id}" hx-swap="outerHTML" hx-confirm="Are you sure you want to delete desk '{name}'?"
                         class="px-3 py-1.5 text-xs font-medium bg-error/10 hover:bg-error/20 text-base-content border border-error/40 rounded-lg transition cursor-pointer">
                         Delete
                     </button>
@@ -446,7 +446,7 @@ pub fn channel_edit_fragment(
             class="bg-base-100 border border-success/40 rounded-xl p-4 md:p-5 space-y-4 shadow-lg">
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                    <label class="block text-xs font-medium text-base-content/80 mb-1">Channel Name</label>
+                    <label class="block text-xs font-medium text-base-content/80 mb-1">Desk Name</label>
                     <input type="text" name="name" value="{name}" required data-input="slugify"
                         class="w-full px-3.5 py-2 bg-base-200 border border-base-300 rounded-lg text-base-content text-sm focus:outline-none focus:ring-2 focus:ring-success">
                 </div>
@@ -477,8 +477,8 @@ pub fn channel_edit_fragment(
                     <input type="checkbox" name="enabled" value="true" {enabled_checked}
                         class="mt-0.5 rounded bg-base-200 border-base-300 text-base-content focus:ring-success">
                     <span class="text-xs text-base-content/80">
-                        <span class="font-medium">Channel enabled</span>
-                        <span class="block text-[11px] text-base-content/70">Unticking this keeps the channel and its threads, but mail to its address bounces back to the sender.</span>
+                        <span class="font-medium">Desk enabled</span>
+                        <span class="block text-[11px] text-base-content/70">Unticking this keeps the desk and its threads, but mail to its address bounces back to the sender.</span>
                     </span>
                 </label>
             </div>
@@ -488,7 +488,7 @@ pub fn channel_edit_fragment(
                         class="mt-0.5 rounded bg-base-200 border-base-300 text-base-content focus:ring-success">
                     <span class="text-xs text-base-content/80">
                         <span class="font-medium">Add CC'd outsiders to threads</span>
-                        <span class="block text-[11px] text-base-content/70">Unticking this keeps the channel internal: people outside your team are never added to a thread and are never copied on the agent's reply.</span>
+                        <span class="block text-[11px] text-base-content/70">Unticking this keeps the desk internal: people outside your team are never added to a thread and are never copied on the agent's reply.</span>
                     </span>
                 </label>
             </div>

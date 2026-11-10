@@ -368,7 +368,7 @@ async fn create_channel_handler(
     {
         return match err {
             error @ (AppError::BadRequest(_) | AppError::Conflict(_)) => {
-                view.render(Some(format!("Failed to create channel: {error}")))
+                view.render(Some(format!("Failed to create desk: {error}")))
                     .await
             }
             error => Err(error),
@@ -1001,7 +1001,7 @@ mod tests {
         };
         let sim_result_html =
             pages::channel_simulation_result_fragment(company.id, channel.id, &sim_result);
-        assert!(sim_result_html.contains("Webhook Triggered &amp; Channel Resolved Successfully!"));
+        assert!(sim_result_html.contains("Webhook Triggered &amp; Desk Resolved Successfully!"));
 
         let test_message = stored_email_view(EmailMessageDraft {
             id: Uuid::new_v4(),

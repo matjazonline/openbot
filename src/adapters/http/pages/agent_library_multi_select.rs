@@ -59,7 +59,7 @@ pub fn agent_library_multi_select(agents: &[Agent], selected: &[Uuid], input_nam
     format!(
         r##"<section class="space-y-3" data-library-multi-select>
             <input type="hidden" name="{input_name}" value="{value}">
-            <div><h2 class="font-semibold">Start from the agent library</h2><p class="text-sm opacity-60">Select any number. Each agent gets a channel with the same name and email slug.</p></div>
+            <div><h2 class="font-semibold">Start from the agent library</h2><p class="text-sm opacity-60">Select any number. Each agent gets a desk with the same name and email slug.</p></div>
             <div class="grid grid-cols-1 gap-3 md:grid-cols-2">{cards}</div>
         </section>"##,
         input_name = escape_html_text(input_name),

@@ -539,7 +539,7 @@ async fn the_list_pages_over_runs_an_admin_cannot_see_and_labels_reruns_and_chil
     // The admin's first page holds the newest 50; its second page holds the oldest, hidden one.
     let admin_first = f.list(f.admin, None).await;
     assert!(admin_first.contains("Load more"), "{admin_first}");
-    assert!(admin_first.contains("2 runs of these are on channels you cannot see"));
+    assert!(admin_first.contains("2 runs of these are on desks you cannot see"));
     // "Load more" names only its cursor; the filter form supplies the rest.
     assert!(
         admin_first.contains(
@@ -549,7 +549,7 @@ async fn the_list_pages_over_runs_an_admin_cannot_see_and_labels_reruns_and_chil
     let next = field_after(&admin_first, "list?after=");
     let admin_second = f.list(f.admin, Some((next, 50))).await;
     assert!(!admin_second.contains(r#"id="run-list""#), "entries only");
-    assert!(admin_second.contains("1 run of these is on channels you cannot see"));
+    assert!(admin_second.contains("1 run of these is on desks you cannot see"));
     assert!(!admin_second.contains("Load more"));
     // "Load more" tells the list how far it has read now (50 sent back + 1).
     assert!(
@@ -564,7 +564,7 @@ async fn the_list_pages_over_runs_an_admin_cannot_see_and_labels_reruns_and_chil
     let grown = f.entries(f.admin, 5, runs[10]).await;
     assert!(grown.contains(r#"id="run-list-shown" name="shown" value="50" hx-swap-oob="true""#));
     assert!(!again.contains("Load more") && !again.contains(r#"id="run-list""#));
-    assert!(again.contains("3 runs of these are on channels you cannot see"));
+    assert!(again.contains("3 runs of these are on desks you cannot see"));
     assert_eq!(again.matches("menu-active").count(), 1);
     let active = again.find("menu-active").unwrap();
     let anchor = again[..active].rfind("<a ").unwrap();

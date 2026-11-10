@@ -375,10 +375,9 @@ async fn mailbox_page(
             "Select a thread, or use New Thread to start a new one.",
             pages::FragmentSwap::Inline,
         ),
-        (None, _) => pages::empty_detail_pane(
-            "Select a channel to get started.",
-            pages::FragmentSwap::Inline,
-        ),
+        (None, _) => {
+            pages::empty_detail_pane("Select a desk to get started.", pages::FragmentSwap::Inline)
+        }
     };
 
     Ok(Html(pages::mailbox_page(&pages::MailboxPage {
@@ -935,9 +934,7 @@ async fn create_thread(
     };
 
     let Some(thread) = ingest.thread.clone() else {
-        let reason = ingest
-            .reason()
-            .unwrap_or("The channel rejected this message.");
+        let reason = ingest.reason().unwrap_or("The desk rejected this message.");
         return Ok(compose_error(reason.to_string()));
     };
 
@@ -1071,9 +1068,7 @@ async fn send_reply(
     };
 
     let Some(sent_thread) = ingest.thread.clone() else {
-        let reason = ingest
-            .reason()
-            .unwrap_or("The channel rejected this message.");
+        let reason = ingest.reason().unwrap_or("The desk rejected this message.");
         return Ok(reply_error(reason.to_string()));
     };
 

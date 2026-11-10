@@ -485,8 +485,8 @@ mod tests {
         assert!(channel_page.contains("name=\"library_agent_ids\""));
         assert!(channel_page.contains(&format!("value=\"{}\"", library_agent.id)));
         assert!(channel_page.contains("Scheduler"));
-        assert!(channel_page.contains("Each agent gets a channel with the same name"));
-        assert!(channel_page.contains("Custom agent and channel name"));
+        assert!(channel_page.contains("Each agent gets a desk with the same name"));
+        assert!(channel_page.contains("Custom agent and desk name"));
         assert!(channel_page.contains("Required when creating a custom agent."));
         assert!(
             !channel_page
@@ -538,7 +538,7 @@ mod tests {
             company.id, triage.id
         )));
         assert!(complete_page.contains(
-            "Connect a model in company settings, then create an assistant channel from each agent's page."
+            "Connect a model in company settings, then create an assistant desk from each agent's page."
         ));
         assert!(complete_page.contains(&format!(
             "href=\"/ui?company_id={}&channel_id={}\" class=\"btn btn-primary\">Finish</a>",

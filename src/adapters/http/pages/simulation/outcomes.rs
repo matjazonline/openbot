@@ -121,7 +121,7 @@ pub fn channel_simulation_failure_fragment(failure: &ChannelSimulationFailure<'_
                         <span class="text-base-content">{company_name}</span>
                     </div>
                     <div>
-                        <span class="text-base-content/70 font-sans block text-[11px] uppercase font-semibold">Target Channel:</span>
+                        <span class="text-base-content/70 font-sans block text-[11px] uppercase font-semibold">Target Desk:</span>
                         <span class="text-base-content">{channel_name}</span>
                     </div>
                 </div>
@@ -238,7 +238,7 @@ fn simulation_routing_report(report: &SimulationRoutingReport<'_>) -> String {
                         <span class="text-base-content">{company_name}</span>
                     </div>
                     <div>
-                        <span class="text-base-content/70 font-sans block text-[11px] uppercase font-semibold">Target Channel:</span>
+                        <span class="text-base-content/70 font-sans block text-[11px] uppercase font-semibold">Target Desk:</span>
                         <span class="text-base-content">{channel_name}</span>
                     </div>
                 </div>
@@ -254,7 +254,7 @@ fn simulation_routing_report(report: &SimulationRoutingReport<'_>) -> String {
                 </div>
 
                 <div class="pt-2 border-t border-base-300">
-                    <span class="text-base-content/70 font-sans block text-[11px] uppercase font-semibold mb-1">Channel Config:</span>
+                    <span class="text-base-content/70 font-sans block text-[11px] uppercase font-semibold mb-1">Desk Config:</span>
                     <pre class="bg-base-300 p-3 rounded-lg text-base-content whitespace-pre-wrap border border-base-300 text-[11px]">{channel_config_str}</pre>
                 </div>
             </div>
@@ -306,7 +306,7 @@ pub fn channel_simulation_result_fragment(
         status_banner(
             Icon::Check,
             "bg-success/10 border-success/40 text-base-content",
-            "Webhook Triggered &amp; Channel Resolved Successfully!",
+            "Webhook Triggered &amp; Desk Resolved Successfully!",
         )
     } else if !result.sender_authorized {
         status_banner(
@@ -318,7 +318,7 @@ pub fn channel_simulation_result_fragment(
         status_banner(
             Icon::Alert,
             "bg-warning/10 border-warning/40 text-base-content",
-            "Channel or Company Not Found for recipient address.",
+            "Desk or Company Not Found for recipient address.",
         )
     };
 

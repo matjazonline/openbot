@@ -30,14 +30,14 @@ Before proposing creation, establish:
 - an explicit provider and model, chosen from the models list_company_agents returned;
 - the minimum workflow tools it needs and why;
 - any existing company skills to attach, identified by their exact skill slugs;
-- how its channel replies: autonomous (the agent's answer is sent directly) or reviewed (the requester approves, edits or rejects each answer before it is sent). Explain this difference and let the user choose;
+- how its desk replies: autonomous (the agent's answer is sent directly) or reviewed (the requester approves, edits or rejects each answer before it is sent). Explain this difference and let the user choose;
 - any custom workflow steps. Every new agent's workflow already reads the thread so far, runs the agent and sends its reply. Propose extra steps only when the job needs them: a classifier or data step before the draft, whose output the agent reads, or a rule or agent decision before the reply that can stop it. Anything else, such as HTTP calls, other tools or notifications, is added later in the workflow editor.
 
 Agents publish revisions independently of workflow versions. Later edits belong in the Agents page: save, preview and publish the agent there. Future root admissions select the active revision; queued/running runs, retries and children retain their captured revisions, while current revocation still applies. An agent's concrete HTTP/MCP tools require no duplicate workflow slots. ai.classify and decision.agent use instructions/model only, with no tools or skills. You have no arbitrary agent-publication or standalone-execution tool; report an operation as complete only after its actual command succeeds.
 
-Explain relevant tradeoffs in plain language. Prefer least privilege: do not propose a tool merely because it might be useful. Attach only skills the user explicitly identifies by exact company skill slug; if the user is unsure which skills exist, ask them to check the company skill library rather than inventing one. Tell the user the new channel is team-only: company members can use it, outsiders cannot.
+Explain relevant tradeoffs in plain language. Prefer least privilege: do not propose a tool merely because it might be useful. Attach only skills the user explicitly identifies by exact company skill slug; if the user is unsure which skills exist, ask them to check the company skill library rather than inventing one. Tell the user the new desk is team-only: company members can use it, outsiders cannot.
 
-When the design is complete, show a compact final specification containing name, slug, description, provider and model, reply mode, any custom steps, responsibilities, non-goals, tools, skills, and the proposed system prompt. Ask for explicit confirmation. Only after the user explicitly confirms, call create_agent_channel once with the agreed specification. Then report the new agent, its channel address and that its channel is bound to the chosen reply mode. If the tool refuses, explain the reason and what the user can change; never retry with a different design they did not agree to. Creating requires a company owner or admin writing in the app."#;
+When the design is complete, show a compact final specification containing name, slug, description, provider and model, reply mode, any custom steps, responsibilities, non-goals, tools, skills, and the proposed system prompt. Ask for explicit confirmation. Only after the user explicitly confirms, call create_agent_channel once with the agreed specification. Then report the new agent, its desk address and that its desk is bound to the chosen reply mode. If the tool refuses, explain the reason and what the user can change; never retry with a different design they did not agree to. Creating requires a company owner or admin writing in the app."#;
 
 #[derive(Debug, Clone)]
 pub struct BuiltinAgentDefinition {
@@ -152,5 +152,23 @@ mod tests {
             assert!(prompt.contains(clause), "{clause}");
         }
         assert!(!prompt.contains("inherits the company's model"));
+    }
+
+    /// The product word for a channel is desk; only the tool name keeps `channel`.
+    #[test]
+    fn desk_wording_agent_builder_prompt_says_desk() {
+        let prompt = agent_builder_definition().write.system_prompt.unwrap();
+        for clause in [
+            "how its desk replies",
+            "the new desk is team-only",
+            "its desk address and that its desk is bound",
+        ] {
+            assert!(prompt.contains(clause), "{clause}");
+        }
+        let prose = prompt.replace(CREATE_AGENT_CHANNEL, "");
+        assert!(
+            !prose.to_lowercase().contains("channel"),
+            "the prompt says channel outside the tool name"
+        );
     }
 }

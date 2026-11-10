@@ -1,0 +1,10 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.19s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-c4f538027eed5c31)
+
+running 3 tests
+test application::use_cases::builtin_agent_library::tests::desk_wording_agent_builder_prompt_says_desk ... ok
+test application::use_cases::builtin_agent_library::tests::agent_builder_is_granted_the_provisioning_tools_and_told_their_rules ... ok
+test application::use_cases::builtin_agent_library::tests::agent_builder_definition_is_valid_and_asks_for_confirmation ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 3801 filtered out; finished in 0.00s
+

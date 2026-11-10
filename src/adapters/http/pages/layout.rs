@@ -115,7 +115,7 @@ pub(crate) fn public_layout(title: &str, content: &str) -> String {
 
 /// Navigation shown once a session exists: company-scoped shortcuts plus the account menu.
 const AUTHENTICATED_NAV: &str = r##"
-                <a id="nav-channels" href="#" class="hidden text-base-content/80 hover:text-base-content transition">Channels</a>
+                <a id="nav-channels" href="#" class="hidden text-base-content/80 hover:text-base-content transition">Desks</a>
                 <a id="nav-agents" href="#" class="hidden text-base-content/80 hover:text-base-content transition">Agents</a>
                 <details class="relative">
                     <summary class="list-none text-base-content/80 hover:text-base-content transition cursor-pointer [&::-webkit-details-marker]:hidden">Account</summary>

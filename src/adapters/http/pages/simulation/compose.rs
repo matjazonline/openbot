@@ -78,7 +78,7 @@ fn simulation_compose_form(
                                         <input type="radio" name="simulation_mode" value="run_test" checked data-action="simulation-mode" class="mt-0.5 text-base-content focus:ring-warning">
                                         <div class="ml-2.5">
                                             <span class="block text-xs font-bold text-base-content">Run_Test</span>
-                                            <span class="block text-[11px] text-base-content/70 mt-0.5">Execute full channel & agent, skip email dispatch</span>
+                                            <span class="block text-[11px] text-base-content/70 mt-0.5">Execute full desk & agent, skip email dispatch</span>
                                         </div>
                                     </label>
                                     <label class="flex items-start p-3 bg-base-200 border border-base-300 rounded-lg cursor-pointer hover:border-success transition">
@@ -159,7 +159,7 @@ pub fn channel_simulation_page(
         r##"
         <div class="flex items-center justify-between mb-6">
             <div>
-                <a href="/companies/{company_id}/channels" class="inline-flex items-center gap-1.5 text-xs text-primary hover:text-primary font-medium mb-1">{back_glyph} Back to Channels</a>
+                <a href="/companies/{company_id}/channels" class="inline-flex items-center gap-1.5 text-xs text-primary hover:text-primary font-medium mb-1">{back_glyph} Back to Desks</a>
                 <h2 class="text-2xl font-bold text-base-content">Simulate Webhook: {channel_name}</h2>
                 <p class="text-base-content/70 text-sm mt-0.5">Test incoming email webhook resolution for <span class="font-mono text-base-content">{target_recipient}</span></p>
             </div>

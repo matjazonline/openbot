@@ -100,7 +100,7 @@ pub fn company_row_fragment(company: &Company) -> String {
                 </a>
                 <a href="/companies/{id}/channels" data-action="select-company" data-company-id="{id}"
                     class="px-3 py-1.5 text-xs font-medium bg-success/10 hover:bg-success/20 text-base-content border border-success/40 rounded-lg transition">
-                    Channels
+                    Desks
                 </a>
                 <a href="/companies/{id}/invites" data-action="select-company" data-company-id="{id}"
                     class="px-3 py-1.5 text-xs font-medium bg-primary/10 hover:bg-primary/20 text-primary border border-primary/40 rounded-lg transition">

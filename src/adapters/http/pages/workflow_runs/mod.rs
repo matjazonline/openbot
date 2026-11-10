@@ -400,7 +400,7 @@ pub fn run_list_entries(view: &RunListView<'_>) -> String {
         .collect();
     if view.hidden > 0 {
         html.push_str(&format!(
-            r#"<li class="px-3 py-1 text-xs opacity-70">{} run{} of these {} on channels you cannot see.</li>"#,
+            r#"<li class="px-3 py-1 text-xs opacity-70">{} run{} of these {} on desks you cannot see.</li>"#,
             view.hidden,
             if view.hidden == 1 { "" } else { "s" },
             if view.hidden == 1 { "is" } else { "are" },

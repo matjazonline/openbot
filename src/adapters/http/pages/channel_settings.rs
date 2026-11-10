@@ -130,13 +130,13 @@ pub fn channel_settings_page(page: &ChannelSettingsPage<'_>) -> String {
         {pane_html}
         "##,
         header = sidebar_header_with_action(
-            "Channels",
+            "Desks",
             "Inbound addresses and their routing rules.",
             &format!(
                 r##"<button type="button" class="btn btn-primary btn-xs shrink-0"
                     hx-get="/ui/channels/new?company_id={company_id}"
                     hx-target="#channel-pane" hx-swap="outerHTML" hx-sync="#channel-pane:replace"
-                    hx-push-url="/ui/channels?company_id={company_id}&new=1">{plus_glyph} New Channel</button>"##,
+                    hx-push-url="/ui/channels?company_id={company_id}&new=1">{plus_glyph} New Desk</button>"##,
                 company_id = company.id,
                 plus_glyph = icon(Icon::Plus, BUTTON_ICON),
             ),
@@ -147,7 +147,7 @@ pub fn channel_settings_page(page: &ChannelSettingsPage<'_>) -> String {
     );
 
     ui_shell(&UiShell {
-        title: &format!("{} Channels", company.name),
+        title: &format!("{} Desks", company.name),
         user: page.user,
         company: Some(company),
         section: UiSection::Channels,
@@ -175,7 +175,7 @@ pub fn channel_settings_list(list: &ChannelSettingsList<'_>, swap: FragmentSwap)
         .collect();
 
     let menu_body = if list.channels.is_empty() {
-        r##"<li class="px-2 py-6 text-center text-xs opacity-60">No channels yet. Create your first one below.</li>"##
+        r##"<li class="px-2 py-6 text-center text-xs opacity-60">No desks yet. Create your first one below.</li>"##
             .to_string()
     } else {
         entries
@@ -251,8 +251,8 @@ pub fn channel_edit_pane(pane: &ChannelEditPane<'_>) -> String {
         r##"<button type="button" class="btn btn-error btn-outline ml-auto"
                             hx-delete="/ui/channels/{channel_id}?company_id={company_id}"
                             hx-target="#channel-pane" hx-swap="outerHTML"
-                            hx-confirm="Delete channel '{name}'? Its threads go with it."
-                            hx-push-url="/ui/channels?company_id={company_id}">Delete Channel</button>"##,
+                            hx-confirm="Delete desk '{name}'? Its threads go with it."
+                            hx-push-url="/ui/channels?company_id={company_id}">Delete Desk</button>"##,
         name = escape_html_attr(&pane.channel.name),
     );
 
@@ -310,8 +310,8 @@ pub fn channel_edit_pane(pane: &ChannelEditPane<'_>) -> String {
         delete_action = delete_action,
         workflows_html = super::lazy_card(
             &format!("/ui/workflows/channels/{channel_id}/bindings?company_id={company_id}"),
-            "Loading the workflows on this channel…",
-            "The workflows on this channel could not be loaded.",
+            "Loading the workflows on this desk…",
+            "The workflows on this desk could not be loaded.",
         ),
         schedules_html = channel_schedules_card(&ChannelSchedulesCard {
             company_id,
@@ -327,8 +327,8 @@ pub fn channel_create_pane(pane: &ChannelCreatePane<'_>) -> String {
         r##"
         <section id="channel-pane"{PANE_SKELETON} class="ui-pane-detail flex min-w-0 flex-1 flex-col bg-base-100">
             <div class="border-b border-base-300 px-4 py-4 sm:px-6">
-                <h2 class="text-xl font-bold">New channel in {company_name}</h2>
-                <p class="text-xs opacity-70">A channel is an inbound address at <span class="font-mono">@{company_slug}.{app_domain_name}</span>. An agent answers it through a workflow: create an assistant channel from the agent's page.</p>
+                <h2 class="text-xl font-bold">New desk in {company_name}</h2>
+                <p class="text-xs opacity-70">A desk is an inbound address at <span class="font-mono">@{company_slug}.{app_domain_name}</span>. An agent answers it through a workflow: create an assistant desk from the agent's page.</p>
             </div>
             <div class="flex-1 overflow-y-auto px-4 py-4 sm:px-6">
                 {error_html}
@@ -339,7 +339,7 @@ pub fn channel_create_pane(pane: &ChannelCreatePane<'_>) -> String {
                     <div class="flex items-center gap-3">
                         <button type="submit" class="btn btn-primary">
                             <span class="loading loading-spinner loading-sm hidden [.htmx-request_&]:inline-block"></span>
-                            <span class="[.htmx-request_&]:hidden">Create Channel</span>
+                            <span class="[.htmx-request_&]:hidden">Create Desk</span>
                             <span class="hidden [.htmx-request_&]:inline">Creating...</span>
                         </button>
                         <button type="button" class="btn btn-ghost"
@@ -389,7 +389,7 @@ fn channel_fields(fields: &ChannelFields<'_>) -> String {
         r##"
                     <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
                         <label class="form-control w-full">
-                            <div class="label"><span class="text-xs opacity-70">Channel Name</span></div>
+                            <div class="label"><span class="text-xs opacity-70">Desk Name</span></div>
                             <input type="text" name="name" required value="{name}" placeholder="Inbound Email Handler" data-input="slugify"
                                 class="input w-full">
                         </label>
@@ -400,14 +400,14 @@ fn channel_fields(fields: &ChannelFields<'_>) -> String {
                         <input type="text" name="description" value="{description}" autocomplete="off"
                             placeholder="Answers supplier capacity and delivery-date questions."
                             class="input w-full">
-                        <div class="label"><span class="text-[11px] opacity-60">What this channel is for, in one line. Shown to teammates who mail an address that does not exist, so they can find the channel they meant.</span></div>
+                        <div class="label"><span class="text-[11px] opacity-60">What this desk is for, in one line. Shown to teammates who mail an address that does not exist, so they can find the desk they meant.</span></div>
                     </label>
                     <label class="form-control w-full">
                         <div class="label"><span class="text-xs opacity-70">Alias Addresses (@{company_slug}.{app_domain_name})</span></div>
                         <input type="text" name="alias_slugs" value="{alias_slugs}" autocomplete="off"
                             placeholder="sales, help, contact"
                             class="input w-full font-mono">
-                        <div class="label"><span class="text-[11px] opacity-60">Comma-separated. Mail to any of these reaches this channel, and replies go back out from the address it arrived on.</span></div>
+                        <div class="label"><span class="text-[11px] opacity-60">Comma-separated. Mail to any of these reaches this desk, and replies go back out from the address it arrived on.</span></div>
                     </label>
                     <label class="form-control w-full">
                         <div class="label"><span class="text-xs opacity-70">Participant Emails</span></div>
@@ -421,8 +421,8 @@ fn channel_fields(fields: &ChannelFields<'_>) -> String {
                         <label class="flex cursor-pointer items-start gap-3 rounded-lg border border-base-300 bg-base-200 p-3">
                             <input type="checkbox" name="enabled" value="true" class="checkbox checkbox-sm mt-0.5"{enabled_checked}>
                             <span class="text-xs">
-                                <span class="font-semibold">Channel enabled</span>
-                                <span class="block opacity-70">Unticking this keeps the channel and its threads, but mail sent to its address bounces back to the sender, and other channels can no longer hand work to it.</span>
+                                <span class="font-semibold">Desk enabled</span>
+                                <span class="block opacity-70">Unticking this keeps the desk and its threads, but mail sent to its address bounces back to the sender, and other desks can no longer hand work to it.</span>
                             </span>
                         </label>
                     </div>
@@ -431,7 +431,7 @@ fn channel_fields(fields: &ChannelFields<'_>) -> String {
                             <input type="checkbox" name="add_3rd_party" value="true" class="checkbox checkbox-sm mt-0.5"{add_3rd_party_checked}>
                             <span class="text-xs">
                                 <span class="font-semibold">Add CC'd outsiders to threads</span>
-                                <span class="block opacity-70">Unticking this keeps the channel internal: people outside your team who are CC'd on a message are never added to the thread and are never copied on the agent's reply, and mail they send to this channel bounces.</span>
+                                <span class="block opacity-70">Unticking this keeps the desk internal: people outside your team who are CC'd on a message are never added to the thread and are never copied on the agent's reply, and mail they send to this desk bounces.</span>
                             </span>
                         </label>
                     </div>
@@ -471,10 +471,10 @@ fn spam_disabled_confirmation(spam_scan_enabled: bool, is_public: bool) -> Strin
                     <div class="spam-confirm-box alert alert-warning text-sm transition-opacity{dimmed}">
                         <div class="space-y-2">
                             <div class="font-semibold">Spam scanning is disabled in server configuration</div>
-                            <div class="text-xs">A channel with no participant restrictions receives mail without spam filtering.</div>
+                            <div class="text-xs">A desk with no participant restrictions receives mail without spam filtering.</div>
                             <label class="flex cursor-pointer items-center gap-3">
                                 <input type="checkbox" name="confirm_spam_disabled" value="true" class="checkbox checkbox-sm"{disabled}>
-                                <span class="text-xs">I understand, and confirm saving a <code class="font-mono">@public</code> channel anyway.</span>
+                                <span class="text-xs">I understand, and confirm saving a <code class="font-mono">@public</code> desk anyway.</span>
                             </label>
                         </div>
                     </div>
@@ -547,7 +547,7 @@ pub fn channel_schedules_card(card: &ChannelSchedulesCard<'_>) -> String {
         bindings,
     } = *card;
     let rows_html: String = if schedules.is_empty() {
-        r#"<div class="rounded-lg border border-dashed border-base-300 p-4 text-center text-xs opacity-60">No automated schedules configured for this channel yet.</div>"#.to_string()
+        r#"<div class="rounded-lg border border-dashed border-base-300 p-4 text-center text-xs opacity-60">No automated schedules configured for this desk yet.</div>"#.to_string()
     } else {
         schedules
             .iter()
@@ -640,7 +640,7 @@ pub fn channel_schedules_card(card: &ChannelSchedulesCard<'_>) -> String {
             <div class="flex items-center justify-between">
                 <div>
                     <h3 class="text-sm font-bold">Automated Schedules &amp; Triggers</h3>
-                    <p class="text-xs opacity-60">Start a workflow run on this channel on a recurring interval or once.</p>
+                    <p class="text-xs opacity-60">Start a workflow run on this desk on a recurring interval or once.</p>
                 </div>
             </div>
 

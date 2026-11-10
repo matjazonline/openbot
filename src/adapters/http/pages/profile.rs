@@ -144,7 +144,7 @@ pub fn profile_pane(pane: &ProfilePane<'_>) -> String {
         verification_status = if user.email_verified_at.is_some() {
             "<p class=\"mt-1 text-xs text-success\">Email verified</p>"
         } else {
-            "<p class=\"mt-1 text-xs text-warning\">Email unverified. Email-based invitations, restricted channel access, and operator access are unavailable until you confirm this address.</p>"
+            "<p class=\"mt-1 text-xs text-warning\">Email unverified. Email-based invitations, restricted desk access, and operator access are unavailable until you confirm this address.</p>"
         },
         identity = identity_section(draft, pane.pending, &pane.outcome),
         login_methods = login_methods_section(pane),
@@ -252,7 +252,7 @@ fn identity_section(
         r##"
             <section class="mb-6 rounded-box border border-base-300 bg-base-200 p-6">
                 <h2 class="text-lg font-bold">Account details</h2>
-                <p class="mb-4 text-xs opacity-60">Your name and picture are what your team and your threads show you as; your address is what channels recognise you by.</p>
+                <p class="mb-4 text-xs opacity-60">Your name and picture are what your team and your threads show you as; your address is what desks recognise you by.</p>
                 {banner}
                 {body}
             </section>
@@ -284,7 +284,7 @@ fn identity_form(draft: &ProfileDraft<'_>) -> String {
                                 class="input w-full font-mono">
                         </label>
                     </div>
-                    <p class="text-[11px] opacity-60">A new address is mailed a code before it becomes yours, so it is not your account's until you confirm it. Changing it changes which channels treat you as a participant, and where mail addressed to you arrives. Installing the new address signs out every browser. Sign in again afterward.</p>
+                    <p class="text-[11px] opacity-60">A new address is mailed a code before it becomes yours, so it is not your account's until you confirm it. Changing it changes which desks treat you as a participant, and where mail addressed to you arrives. Installing the new address signs out every browser. Sign in again afterward.</p>
                     <div class="border-t border-base-300 pt-4">
                         <button type="submit" class="btn btn-primary">
                             <span class="loading loading-spinner loading-sm hidden [.htmx-request_&]:inline-block"></span>

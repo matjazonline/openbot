@@ -1,0 +1,8 @@
+Pre-existing failure evidence: adapters::http::pages::tests::rendered_markup_carries_no_inline_javascript
+Offender reported: src/adapters/http/pages/workflow_authoring/sample.rs:153 inline <script> block
+--- git status of sample.rs (empty = unmodified by B2):
+--- HEAD (57adfa7a) line 153 of sample.rs:
+                body: "</pre><script>private text</script>".into(),
+--- last commit touching sample.rs:
+48461f66 Implement automatic agent history, isolation, recovery and inspection
+The check flags any non-comment line containing '<script>' not followed by a quote, in files not ending in tests.rs; sample.rs holds this hostile string inside its inline #[cfg(test)] module. No B2 file is reported.
