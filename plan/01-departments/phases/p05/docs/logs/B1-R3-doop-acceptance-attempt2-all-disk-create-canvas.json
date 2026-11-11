@@ -1,0 +1,14 @@
+{
+  "content": [
+    {
+      "type": "text",
+      "text": "{\n  \"id\": \"canvas-a\",\n  \"name\": \"Synthetic contract\",\n  \"url\": \"/c/canvas-a\",\n  \"workspace_id\": \"workspace-a\"\n}"
+    }
+  ],
+  "structuredContent": {
+    "id": "canvas-a",
+    "name": "Synthetic contract",
+    "url": "/c/canvas-a",
+    "workspace_id": "workspace-a"
+  }
+}

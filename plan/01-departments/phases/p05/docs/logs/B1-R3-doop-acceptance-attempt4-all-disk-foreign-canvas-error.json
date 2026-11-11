@@ -1,0 +1,9 @@
+{
+  "content": [
+    {
+      "type": "text",
+      "text": "Error: no canvas with id canvas-a accessible to this account"
+    }
+  ],
+  "isError": true
+}

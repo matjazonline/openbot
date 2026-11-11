@@ -1,17 +1,25 @@
 # Plan coordination: 01-departments
 
 - Authority: /Users/mac02/.codex/worktrees/2050/openbot/plan/01-departments/COORDINATION.md
-- Writer: root session 68933786-cbe7-4b6b-9387-b5dcb29689a4, worktree
+- Writer: `/root` (Sol 6.1/xhigh, user confirmed; 2026-11-11 continuation), worktree
   /Users/mac02/.codex/worktrees/2050/openbot (branch codex/departments-addressing-plans)
-- Revision: 10
+- Revision: 19
+- Writer handoff: the prior root session 68933786-cbe7-4b6b-9387-b5dcb29689a4 stopped at the
+  committed checkpoint e7bc780e. The user resumed p05 here on 2026-11-11; this root now serializes
+  coordination writes. Instructions and notices from revision 10 remain unchanged.
 
 ## Plan-wide instructions
 
 - 01DEP-I001 / r1: No backward compatibility (plan README, root AGENTS.md). Edit the init schema
   in place; reset databases instead of backfills, dual reads, shims or staged rollouts.
-- 01DEP-I002 / r2: Phases run in order in this one worktree, each committed locally once
+- 01DEP-I002 / r4: Phases run in order in this one worktree, each committed locally once
   accepted. p01–p03 accepted and committed (57adfa7a … 30654e3c). User 2026-11-10 "pull main and
-  continue": origin/main merged into the branch (b1026003), then phase 04, then 05. No push.
+  continue": origin/main merged into the branch (b1026003), then phase 04, then 05.
+  User 2026-11-11 initially asked about push and plan/02-workflow-roles; r3 recorded an action
+  reading. The user clarified this as a readiness/overlap question ("if you push what you have").
+  Current work finishes p05 and assesses the next plan; no push or plan02 implementation has
+  occurred. The accepted-phase local-commit authorization stands.
+  (r2 prohibited push; r3 interpreted the initial question as authorizing push/continuation.)
   (r1: phases 01 -> 02 -> 03 only; 04 and 05 out of scope.)
 - 01DEP-I003 / r2: Verification is per-batch focused checks; the repository's full gate
   (`scripts/check.sh` plus CI-only gates) runs once in phase 05 (05A), as plan 05 specifies. Until
@@ -25,7 +33,7 @@
 | p02 | root 68933786 (A), B per TASK | /Users/mac02/.codex/worktrees/2050/openbot | plan/01-departments/phases/p02/docs/{TASK,HANDOFF}.md — accepted in phase (B2 0c5df403, B1 next commit) |
 | p03 | root 68933786 (A), B per TASK | /Users/mac02/.codex/worktrees/2050/openbot | plan/01-departments/phases/p03/docs/{TASK,HANDOFF}.md — accepted in phase (B1 523732b7, B2 01608b1f, B3 30654e3c) |
 | p04 | root 68933786 (A), B per TASK | /Users/mac02/.codex/worktrees/2050/openbot | plan/01-departments/phases/p04/docs/{TASK,HANDOFF}.md — accepted in phase (B1 399efe2c, B2 5c64e7d1, B3 next commit) |
-| p05 | root 68933786 (A), B per TASK | /Users/mac02/.codex/worktrees/2050/openbot | plan/01-departments/phases/p05/docs/{TASK,HANDOFF}.md — in progress, paused at a checkpoint (start c42fc15d) |
+| p05 | `/root` (A), fresh B per TASK | /Users/mac02/.codex/worktrees/2050/openbot | plan/01-departments/phases/p05/docs/{TASK,HANDOFF}.md — accepted and integrated in worktree at R4 artifact b7159760…89e35 after independent PASS; F1–F3 closed; local checkpoint/publication follows; plan02 assessment only, no implementation (start c42fc15d, checkpoint e7bc780e) |
 
 ## Cross-phase notices
 
@@ -52,7 +60,7 @@
   docs/inter_channel_agent_communication.md paragraph; p02 TASK B1 mapping); p03 -> disposed by
   C004 (no p03 round-trip test; the trusted-relay rule stands as p02 verified and documented);
   p04 -> satisfied (r1; `docs/departments.md` "Members-only desks": relays from other desks stay
-  admitted under the hop budget and loop refusal; B3 artifact 30567a29…c675). Plan 05 open.
+  admitted under the hop budget and loop refusal; B3 artifact 30567a29…c675). p05 -> satisfied for documentation/current contract (r1; current full-run trusted-relay test PASS; shipped guide and unchanged authorization/loop branches inspected; p05 TASK "Coordination dispositions", logs/B1-doc-contract-inspection.txt). Independent R4 review PASS and root p05 integration acceptance complete (artifact b7159760…89e35).
 
 ### 01DEP-C002 / r1
 - State: active (2026-11-10)
@@ -128,4 +136,4 @@
   03C item 4; `department-lead.yaml` header); p04 -> satisfied (r1; `docs/departments.md`
   "Dispatch and escalation", `docs/inter_channel_agent_communication.md` "Department dispatch and
   escalation", `docs/custom_tools.md`: no intake schema until `channel.call`; B3 artifact
-  30567a29…c675). Plan 05 open.
+  30567a29…c675). p05 -> satisfied for documentation/current contract (r1; shipped guide, tool docs and fixture explicitly defer dispatch/escalation to channel.call; planner/writer unchanged since p03, routing changes only directory grouping; p05 TASK "Coordination dispositions", logs/B1-doc-contract-inspection.txt). Independent R4 review PASS and root p05 integration acceptance complete (artifact b7159760…89e35).

@@ -1,0 +1,6 @@
+Command: python3 scripts/tests/integration-boundary.py
+......................
+----------------------------------------------------------------------
+Ran 22 tests in 0.040s
+
+OK

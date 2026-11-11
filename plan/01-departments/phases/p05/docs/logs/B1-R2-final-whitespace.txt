@@ -1,0 +1,4 @@
+Command: git diff --cached --check
+Exit: 0
+Command: git diff --check
+Exit: 0

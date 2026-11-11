@@ -1,0 +1,11 @@
+Command: node --test scripts/tests/team-autocomplete-browser.mjs scripts/tests/html-injection-browser.mjs
+✔ form feedback and another member’s team autocomplete stay text under production CSP (2603.136167ms)
+✔ served team autocomplete renders account strings as text and keeps selection working (1884.73175ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 2
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2791.537916

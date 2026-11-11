@@ -1,0 +1,2 @@
+Command: python3 scripts/check-integration-docs.py
+integration docs: 3 link sets, 164 startup reset notices, configuration and CI inventory PASS

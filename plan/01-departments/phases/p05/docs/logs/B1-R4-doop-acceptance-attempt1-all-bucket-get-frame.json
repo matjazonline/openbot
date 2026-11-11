@@ -1,0 +1,8 @@
+{
+  "content": [
+    {
+      "type": "text",
+      "text": "{\n  \"id\": \"frame-a\",\n  \"pageId\": \"canvas-a:page1\",\n  \"name\": \"Synthetic frame\",\n  \"approvalStatus\": \"draft\",\n  \"approval\": null,\n  \"x\": 0,\n  \"y\": 0,\n  \"width\": 480,\n  \"height\": 320,\n  \"updatedAt\": \"2026-11-11T19:18:43.721Z\",\n  \"updatedBy\": \"Fixture\",\n  \"htmlBytes\": 68,\n  \"image_url\": \"http://127.0.0.1:4400/i/frame-a.png?scale=2\",\n  \"html\": \"<!doctype html><html><body><h1>Synthetic contract</h1></body></html>\"\n}"
+    }
+  ]
+}

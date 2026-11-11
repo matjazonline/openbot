@@ -1,0 +1,12 @@
+Command: /Users/mac02/openbot-p05-r3-wr3kxbjm/docker-bin/docker ps -a --format {{.Names}}
+Command: psql -h 127.0.0.1 -p 52648 -U mac02 -d postgres -X -v ON_ERROR_STOP=1 -Atqc SELECT datname FROM pg_database WHERE datname LIKE 'open_bots_own_%'
+open_bots_own_a4382838f0924623afede04b497f7a88
+Command: dropdb -h 127.0.0.1 -p 52648 -U mac02 --force open_bots_own_a4382838f0924623afede04b497f7a88
+Command: psql -h 127.0.0.1 -p 52648 -U mac02 -d postgres -X -v ON_ERROR_STOP=1 -Atqc SELECT datname FROM pg_database WHERE datname LIKE 'open_bots_own_%'
+Command: pg_ctl -D /var/folders/qc/f8s9x42x5sz6vbh79sb0cfth0000gn/T/openbot-dept-p05-ul20wvf0/query-statistics-cluster -m fast -w stop
+waiting for server to shut down.... done
+server stopped
+Command: /Users/mac02/openbot-p05-r3-wr3kxbjm/docker-bin/docker ps -a --format {{.Names}}
+PASS: all four deployment runtimes removed; native cluster stopped; owned fixture containers removed.
+Owned Docker daemon/images and immutable helpers retained temporarily for independent review.
+No shared database/server, global Docker context or other Colima profile changed.

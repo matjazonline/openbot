@@ -5,6 +5,6 @@
   "bun": "1.3.10",
   "lock_sha256": "9fc8b3c110b390a9c46975da45c3a297090096703f9d9721dcea19f84dad28e3",
   "sdk": "1.30.0",
-  "patch_sha256": "4621d91534b24db5e5cb35f535bda9d579c808120eddcf3876ad67d793ed298c",
-  "fingerprint": "e0c063c43c5bc70018eb8e09d0add0d32ef35159fff843bc9646da7ebe4c4464"
+  "patch_sha256": "b50dcb46770b13ba87dc058462b4dac0d062cb67599090ff17b9743e54deea8b",
+  "fingerprint": "351a2180b4ca8cf7489d21cbdc3aa3ce7d275fc5b08ba56eb045592a43e34e1f"
 }

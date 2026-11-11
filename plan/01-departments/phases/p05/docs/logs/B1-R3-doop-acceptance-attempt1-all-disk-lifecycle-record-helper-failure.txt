@@ -1,0 +1,15 @@
+
+running 1 test
+DOOP_LIFECYCLE_STAGE company=0 stage=provision
+DOOP_LIFECYCLE_STAGE company=0 stage=retired-key
+DOOP_LIFECYCLE_STAGE company=0 stage=restore-current-key
+DOOP_LIFECYCLE_STAGE company=0 stage=disabled
+DOOP_LIFECYCLE_STAGE company=0 stage=reenabled
+DOOP_LIFECYCLE_STAGE company=0 stage=disconnected
+DOOP_LIFECYCLE_STAGE company=1 stage=provision
+DOOP_LIFECYCLE_STAGE company=1 stage=retired-key
+DOOP_LIFECYCLE_STAGE company=1 stage=restore-current-key
+test adapters::persistence::doop_live_setup_tests::lifecycle::doop_lifecycle_live_company_keys has been running for over 60 seconds
+DOOP_LIFECYCLE_STAGE company=1 stage=disabled
+DOOP_LIFECYCLE_STAGE company=1 stage=reenabled
+DOOP_LIFECYCLE_STAGE company=1 stage=disconnected

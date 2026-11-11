@@ -1,0 +1,9 @@
+Command: cargo test --locked --offline --lib dump_autonomous_agent_authoring_browser_fixtures -- --ignored
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.22s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-c4f538027eed5c31)
+
+running 1 test
+test adapters::http::routes::ui_agents::authoring::browser_fixtures::dump_autonomous_agent_authoring_browser_fixtures ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 4167 filtered out; finished in 0.63s
+

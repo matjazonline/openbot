@@ -1,0 +1,6 @@
+{
+  "version": "18.6",
+  "uid": "70",
+  "public_port": false,
+  "database": "fresh native PostgreSQL with persistent owned volume"
+}

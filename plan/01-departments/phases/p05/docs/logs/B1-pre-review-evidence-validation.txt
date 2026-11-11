@@ -1,0 +1,2 @@
+plan/01-departments/phases/p05/docs/logs/01DEP-P05-B1-R1.evidence.json: retained evidence valid {"FAIL": 7, "NOT EXERCISED": 3, "PASS": 56}
+1 evidence manifest(s) validated; declared results are not acceptance

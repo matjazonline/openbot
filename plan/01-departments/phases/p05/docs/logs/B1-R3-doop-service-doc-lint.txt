@@ -1,0 +1,6 @@
+Command: /Users/mac02/openbot-p05-r3-wr3kxbjm/doop/tools/node_modules/.bin/bun run doc-lint
+$ node scripts/doc-lint.mjs
+doc-lint warnings:
+  ! Stale docs: tests/userEventsObservers.test.ts is newer than every file in CLAUDE.md / .context/ - consider updating the docs
+
+doc-lint passed (1 warning(s))

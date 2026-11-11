@@ -72,7 +72,7 @@
       "status": "PASS",
       "files": [
         {
-          "path": "logs/B1-css-check.txt",
+          "path": "logs/B1-R1-css-check.txt",
           "sha256": "1ee814ce333fe175ee82e3031f6fce1e1804735e25010e858d765789b3e251bf"
         }
       ]

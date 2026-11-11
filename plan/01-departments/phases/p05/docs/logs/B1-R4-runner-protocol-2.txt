@@ -1,0 +1,7 @@
+...................Managed package ready: 39972afd182db52f4e21539cbbd7c04bc622cea75bbb570a966c41879259bbf9
+...Managed source ready: 934d628fe8e410ec6694b4cfef2f0f36c78fe358c1a3f269cf7ca2a4f61e5691
+........................
+----------------------------------------------------------------------
+Ran 46 tests in 5.886s
+
+OK

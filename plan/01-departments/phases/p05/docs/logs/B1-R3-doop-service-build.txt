@@ -1,0 +1,27 @@
+Command: /Users/mac02/openbot-p05-r3-wr3kxbjm/doop/tools/node_modules/.bin/bun run build
+$ bun run build:claude-extension && vite build
+$ node scripts/build-claude-extension.mjs
+Built public/claude-extension/doop.mcpb (89 bundled packages)
+vite v8.3.4 building client environment for production...
+transforming...
+✓ 2622 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                                               2.35 kB │ gzip:     1.03 kB
+dist/assets/recorder-C4u_fB9A.js                            126.25 kB
+dist/assets/mupdf-wasm-Bvf0xebB.wasm                     10,409.82 kB │ gzip: 4,778.44 kB
+dist/assets/index-BNfVF2MT.css                              158.81 kB │ gzip:    27.52 kB
+dist/assets/__vite-browser-external_module-BpyoRgE4.js        0.51 kB │ gzip:     0.36 kB │ map:     0.86 kB
+dist/assets/__vite-browser-external_node_fs-DNgMLWrw.js       0.51 kB │ gzip:     0.37 kB │ map:     0.87 kB
+dist/assets/rolldown-runtime-Dd_uD5pT.js                      1.10 kB │ gzip:     0.62 kB
+dist/assets/preload-helper-BLdHbfdN.js                        1.51 kB │ gzip:     0.79 kB
+dist/assets/mupdf-Bgh6SGId.js                                90.87 kB │ gzip:    24.56 kB │ map:   246.51 kB
+dist/assets/jszip.min-BKkSLVCN.js                            95.98 kB │ gzip:    28.52 kB │ map:   220.66 kB
+dist/assets/index-KbEYkl_7.js                             2,972.71 kB │ gzip:   853.66 kB │ map: 9,302.30 kB
+
+[plugin builtin:vite-reporter] 
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 1.44s

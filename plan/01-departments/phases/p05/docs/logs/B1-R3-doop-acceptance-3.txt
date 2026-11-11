@@ -1,0 +1,86 @@
+PASS live Openbot company connections and encrypted custody
+PASS live Doop bot-key rotation revokes both old keys
+PASS live frozen Openbot publications enforce current keys, disable and disconnect
+PASS Openbot disconnect retains remote company documents and private assets
+PASS same-schema owned database restore retains private assets and revoked keys
+PASS real Chromium screenshot returns an inline PNG image
+PASS real Chromium export returns an embedded PDF resource
+PASS private image byte and metadata isolation
+PASS alternate loopback backend cannot bypass private image authorization or warm caches
+PASS actual HTTPS held upload denies publication after its parent deletion completes
+PASS actual image materialization binds a draft to its current parent and preserves canonical source
+PASS actual image screenshot and multipage PDF contain private pixels and the real embedded font
+PASS actual MCP dense previews and full downloads retain private current-session authority
+PASS actual normal browser paints private image and font in an opaque editor frame
+PASS actual browser PDF export control downloads selected private pages with embedded fonts
+PASS actual foreign and signed-out human browsers cannot open the private canvas
+PASS an explicitly invited human opens and edits a private canvas in the normal browser
+PASS human membership removal clears the warm editor and denies browser revalidation
+PASS both bots can work in their own company and foreign humans and frames are denied
+PASS ordinary unmanaged design sync remains available after policy activation
+PASS applied company policy denies sync mint/list and retained keys without frame or edge effects
+PASS managed bot cannot claim a valid ownerless personal canvas; ordinary human can
+PASS managed bot cannot create another workspace or be promoted
+PASS private company canvas cannot enter Community or be deleted through workspace detachment
+PASS bot cannot create a canvas in a foreign workspace
+PASS managed bot cannot create an unrelated personal canvas
+PASS managed canvas owner cannot enable public link access
+PASS foreign company cannot invite the managed bot into its workspace
+PASS managed canvas cannot move into an unrelated personal space
+PASS foreign canvas owner cannot directly invite the managed bot
+PASS competing foreign invitations and personal creates cannot widen the bot audience
+PASS joined bot and human lose live delivery on removal while authorized peer receives each sentinel
+PASS revoked owner loses read/list/frame/duplicate access and workspace creation
+PASS restart preserves binding, revocation, claim denial and retained-key denial
+PASS revoked bot key denies the next MCP request
+PASS known private media and export URLs deny after membership and key revocation
+PASS owner deletion invalidates warm private bytes and the actual open editor
+PASS private acceptance browser cleanup
+PASS live Openbot company connections and encrypted custody
+PASS live Doop bot-key rotation revokes both old keys
+PASS live frozen Openbot publications enforce current keys, disable and disconnect
+PASS Openbot disconnect retains remote company documents and private assets
+PASS same-schema owned database restore retains private assets and revoked keys
+PASS real Chromium screenshot returns an inline PNG image
+PASS real Chromium export returns an embedded PDF resource
+PASS private image byte and metadata isolation
+PASS alternate loopback backend cannot bypass private image authorization or warm caches
+PASS actual HTTPS held upload denies publication after its parent deletion completes
+PASS actual image materialization binds a draft to its current parent and preserves canonical source
+PASS actual image screenshot and multipage PDF contain private pixels and the real embedded font
+PASS actual MCP dense previews and full downloads retain private current-session authority
+PASS actual normal browser paints private image and font in an opaque editor frame
+PASS actual browser PDF export control downloads selected private pages with embedded fonts
+PASS actual foreign and signed-out human browsers cannot open the private canvas
+PASS an explicitly invited human opens and edits a private canvas in the normal browser
+PASS human membership removal clears the warm editor and denies browser revalidation
+PASS actual private bucket origin rejects unsigned known files
+PASS both bots can work in their own company and foreign humans and frames are denied
+PASS ordinary unmanaged design sync remains available after policy activation
+PASS applied company policy denies sync mint/list and retained keys without frame or edge effects
+PASS managed bot cannot claim a valid ownerless personal canvas; ordinary human can
+PASS managed bot cannot create another workspace or be promoted
+PASS private company canvas cannot enter Community or be deleted through workspace detachment
+PASS bot cannot create a canvas in a foreign workspace
+PASS managed bot cannot create an unrelated personal canvas
+PASS managed canvas owner cannot enable public link access
+PASS foreign company cannot invite the managed bot into its workspace
+PASS managed canvas cannot move into an unrelated personal space
+PASS foreign canvas owner cannot directly invite the managed bot
+PASS competing foreign invitations and personal creates cannot widen the bot audience
+PASS joined bot and human lose live delivery on removal while authorized peer receives each sentinel
+PASS revoked owner loses read/list/frame/duplicate access and workspace creation
+PASS restart preserves binding, revocation, claim denial and retained-key denial
+PASS revoked bot key denies the next MCP request
+PASS known private media and export URLs deny after membership and key revocation
+PASS owner deletion invalidates warm private bytes and the actual open editor
+PASS private acceptance browser cleanup
+PASS live two-company Openbot document workflows and current approvals
+PASS live worker restart reuses known creates and parks a lost receipt
+PASS live document edits persist and bot keys reopen and export
+PASS live ordinary humans reopen their generated private documents
+PASS live human PDF controls export generated private documents
+PASS live generated document IDs and private media deny foreign and signed-out access
+PASS private acceptance browser cleanup
+FAIL live two-company Openbot document workflows and current approvals
+Doop test setup/run failed: Required private acceptance run failed: e2e-bucket

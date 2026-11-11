@@ -1,0 +1,11 @@
+{
+  "status": "PASS",
+  "exit_code": 0,
+  "elapsed_seconds": 35.47,
+  "fixture_image": "sha256:9061f58048a73c632307cb585024f77c05dd07275c61740caa640834544b2c49",
+  "platform": "linux/arm64",
+  "host_clipboard_access": false,
+  "tests_passed": 17,
+  "tests_failed": 0,
+  "tests_skipped": 0
+}

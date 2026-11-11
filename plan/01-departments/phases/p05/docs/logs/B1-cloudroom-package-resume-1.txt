@@ -1,0 +1,28 @@
+
+> bb-plugin-openbot-local@0.2.0 package
+> node scripts/package.mjs
+
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
++ actual - expected
+
++ 'npm@11.17.0'
+- 'npm@11.19.0'
+           ^
+
+    at file:///Users/mac02/.codex/worktrees/2050/openbot/integrations/cloudroom-plugin/scripts/package.mjs:11:8
+    at ModuleJob.run (node:internal/modules/esm/module_job:561:25)
+    at async node:internal/modules/esm/loader:647:26
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5) {
+  generatedMessage: true,
+  code: 'ERR_ASSERTION',
+  actual: 'npm@11.17.0',
+  expected: 'npm@11.19.0',
+  operator: 'strictEqual',
+  diff: 'simple'
+}
+
+Node.js v24.21.0

@@ -1,0 +1,40 @@
+docker.io/library/postgres@sha256:123b17998ccaf47e53b502e8c6a1e79afd8f579c6f3eec83c563da026f957395: Pulling from library/postgres
+85f0bdc54780: Pulling fs layer
+fed66866fab0: Pulling fs layer
+bd55ea5c71cd: Pulling fs layer
+8a9967ff79bf: Pulling fs layer
+b90627b8f429: Pulling fs layer
+8d8e256c4dbb: Pulling fs layer
+4dabfc2d1ead: Pulling fs layer
+284a2c96f7d3: Pulling fs layer
+1636401909fe: Pulling fs layer
+bd5cc639d962: Download complete
+362fea9ff8b4: Download complete
+fed66866fab0: Download complete
+284a2c96f7d3: Download complete
+4dabfc2d1ead: Download complete
+b90627b8f429: Download complete
+4dabfc2d1ead: Pull complete
+b90627b8f429: Pull complete
+8d8e256c4dbb: Download complete
+85f0bdc54780: Download complete
+bd55ea5c71cd: Download complete
+1636401909fe: Download complete
+8d8e256c4dbb: Pull complete
+1636401909fe: Pull complete
+8a9967ff79bf: Download complete
+fed66866fab0: Pull complete
+284a2c96f7d3: Pull complete
+85f0bdc54780: Pull complete
+bd55ea5c71cd: Pull complete
+8a9967ff79bf: Pull complete
+Digest: sha256:123b17998ccaf47e53b502e8c6a1e79afd8f579c6f3eec83c563da026f957395
+Status: Downloaded newer image for postgres@sha256:123b17998ccaf47e53b502e8c6a1e79afd8f579c6f3eec83c563da026f957395
+docker.io/library/postgres:18.6-alpine@sha256:123b17998ccaf47e53b502e8c6a1e79afd8f579c6f3eec83c563da026f957395
+docker.io/dxflrs/garage@sha256:677e5b758e4425a325b811c425c026bf35a4bf42f7ddbaa773de3f4fd779a5a5: Pulling from dxflrs/garage
+feb5db085315: Pulling fs layer
+feb5db085315: Download complete
+feb5db085315: Pull complete
+Digest: sha256:677e5b758e4425a325b811c425c026bf35a4bf42f7ddbaa773de3f4fd779a5a5
+Status: Downloaded newer image for dxflrs/garage@sha256:677e5b758e4425a325b811c425c026bf35a4bf42f7ddbaa773de3f4fd779a5a5
+docker.io/dxflrs/garage:v2.5.0@sha256:677e5b758e4425a325b811c425c026bf35a4bf42f7ddbaa773de3f4fd779a5a5

@@ -1,0 +1,94 @@
+#0 building with "colima-openbot-p05-r3" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile.clipboard-2
+#1 transferring dockerfile: 3.35kB done
+#1 WARN: SecretsUsedInArgOrEnv: Do not use ARG or ENV instructions for sensitive data (ARG "VITE_POSTHOG_KEY") (line 8)
+#1 DONE 0.0s
+
+#2 [internal] load metadata for docker.io/oven/bun:1.3.10@sha256:b86c67b531d87b4db11470d9b2bd0c519b1976eee6fcd71634e73abfa6230d2e
+#2 DONE 0.0s
+
+#3 [internal] load metadata for docker.io/library/node:22-bookworm-slim@sha256:5ec23b7c622b00547753bc6ffd78085dd868a68aeb41c8e0a1418f033e13d96d
+#3 DONE 0.0s
+
+#4 [internal] load .dockerignore
+#4 transferring context: 92B done
+#4 DONE 0.0s
+
+#5 [build 1/6] FROM docker.io/oven/bun:1.3.10@sha256:b86c67b531d87b4db11470d9b2bd0c519b1976eee6fcd71634e73abfa6230d2e
+#5 resolve docker.io/oven/bun:1.3.10@sha256:b86c67b531d87b4db11470d9b2bd0c519b1976eee6fcd71634e73abfa6230d2e done
+#5 DONE 0.0s
+
+#6 [runtime 1/9] FROM docker.io/library/node:22-bookworm-slim@sha256:5ec23b7c622b00547753bc6ffd78085dd868a68aeb41c8e0a1418f033e13d96d
+#6 resolve docker.io/library/node:22-bookworm-slim@sha256:5ec23b7c622b00547753bc6ffd78085dd868a68aeb41c8e0a1418f033e13d96d done
+#6 DONE 0.0s
+
+#7 [internal] load build context
+#7 transferring context: 59.81kB 0.0s done
+#7 DONE 0.0s
+
+#8 [build 3/6] COPY package.json bun.lock ./
+#8 CACHED
+
+#9 [build 5/6] COPY . .
+#9 CACHED
+
+#10 [build 2/6] WORKDIR /app
+#10 CACHED
+
+#11 [build 4/6] RUN bun install --frozen-lockfile --ignore-scripts
+#11 CACHED
+
+#12 [deps 4/4] RUN bun install --frozen-lockfile --production --ignore-scripts
+#12 CACHED
+
+#13 [runtime 5/9] COPY --from=deps /app/node_modules ./node_modules
+#13 CACHED
+
+#14 [runtime 2/9] WORKDIR /app
+#14 CACHED
+
+#15 [runtime 4/9] COPY package.json LICENSE ./
+#15 CACHED
+
+#16 [runtime 8/9] COPY shared ./shared
+#16 CACHED
+
+#17 [runtime 9/9] RUN test "${#DOOP_SOURCE_FINGERPRINT}" -eq 64   && case "$DOOP_SOURCE_FINGERPRINT" in *[!0-9a-f]*) exit 1;; esac
+#17 CACHED
+
+#18 [runtime 7/9] COPY server ./server
+#18 CACHED
+
+#19 [runtime 6/9] COPY --from=build /app/dist ./dist
+#19 CACHED
+
+#20 [runtime 3/9] RUN node -e "const fs=require('node:fs');fs.mkdirSync('/etc/ssl/certs',{recursive:true});fs.writeFileSync('/etc/ssl/certs/ca-certificates.crt',require('node:tls').rootCertificates.join('\n'))"   && rm -f /etc/apt/sources.list.d/debian.sources   && printf '%s\n'     'deb [check-valid-until=no] https://snapshot.debian.org/archive/debian/20261106T000000Z bookworm main'     'deb [check-valid-until=no] https://snapshot.debian.org/archive/debian/20261106T000000Z bookworm-updates main'     'deb [check-valid-until=no] https://snapshot.debian.org/archive/debian-security/20261106T000000Z bookworm-security main'     > /etc/apt/sources.list   && apt-get update   && apt-get install -y --no-install-recommends ca-certificates chromium chromium-sandbox fonts-liberation fonts-noto-color-emoji   && rm -rf /var/lib/apt/lists/*   && mkdir -p /app/data   && chown node:node /app/data
+#20 CACHED
+
+#21 [clipboard-test 1/3] COPY --from=build /usr/local/bin/bun /usr/local/bin/bun
+#21 CACHED
+
+#22 [build 6/6] RUN bun run build
+#22 CACHED
+
+#23 [clipboard-test 2/3] COPY --from=build --chown=node:node /app /app
+#23 DONE 5.0s
+
+#24 [clipboard-test 3/3] WORKDIR /app
+#24 DONE 0.2s
+
+#25 exporting to image
+#25 exporting layers
+#25 exporting layers 14.1s done
+#25 exporting manifest sha256:98a448cc0539a58a672b7b4599465df4f476e8939f8d934b47cad0d8abfa1665 done
+#25 exporting config sha256:12d01174628a7e64fc3a3244567d2296fc356b4b3610ae418f1e481b7b251655 done
+#25 exporting attestation manifest sha256:d5cddbd775c53e8a9a21fe3bb977e23c6d0b9f411bcdbc4ab2e5ae17d83ceb26 done
+#25 exporting manifest list sha256:291abb615d83d5b5de74b0376eb95a847b466fd27169e4685b12c063f7bd903e done
+#25 naming to docker.io/library/openbot-p05-r4-clipboard-2:latest done
+#25 unpacking to docker.io/library/openbot-p05-r4-clipboard-2:latest
+#25 unpacking to docker.io/library/openbot-p05-r4-clipboard-2:latest 4.9s done
+#25 DONE 19.1s
+
+ [33m1 warning found (use docker --debug to expand):
+[0m - SecretsUsedInArgOrEnv: Do not use ARG or ENV instructions for sensitive data (ARG "VITE_POSTHOG_KEY") (line 8)

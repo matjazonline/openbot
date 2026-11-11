@@ -1,0 +1,6 @@
+{
+  "status": "FAIL",
+  "exit_code": 1,
+  "source_image": "/Users/mac02/openbot-p05-r3-wr3kxbjm/doop-image-2/image.json",
+  "helper_sha256": "b5161f08665d8e1ffaa61e0a4d803b9f3ca53dd48c58f313ebdcfc3789e7898b"
+}

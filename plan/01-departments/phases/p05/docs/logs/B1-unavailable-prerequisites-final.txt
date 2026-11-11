@@ -1,0 +1,8 @@
+Command: docker info --format {{.ServerVersion}}
+
+failed to connect to the docker API at unix:///var/run/docker.sock; check if the path is correct and if the daemon is running: dial unix /var/run/docker.sock: connect: no such file or directory
+Exit: 1
+Command: psql postgres://mac02@localhost:5432/openbot_dept_p05_protocol -X -Atqc SELECT name FROM pg_available_extensions WHERE name='vector'
+Exit: 0
+Memory model directory exists: False
+No Docker daemon; pgvector extension and pinned memory model absent. Image, real Doop deployment and live memory-service acceptance NOT EXERCISED.

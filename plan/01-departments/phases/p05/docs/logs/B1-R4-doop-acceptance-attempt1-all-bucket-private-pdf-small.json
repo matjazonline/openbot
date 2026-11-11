@@ -1,0 +1,16 @@
+{
+  "content": [
+    {
+      "type": "resource",
+      "resource": {
+        "uri": "doop://canvas/5oD2dhMm5c/Small%20graphic%20PDF.pdf",
+        "mimeType": "application/pdf",
+        "blob": "JVBERi0xLjcKJYGBgYEKCjUgMCBvYmoKPDwKL0ZpbHRlciAvRmxhdGVEZWNvZGUKL0xlbmd0aCAxMDAKPj4Kc3RyZWFtCnic0zMytgQDBQMg1NVD4hpaKCTnchVygSQMDQwUzE0VilK5wrUU8oCCxnqGRqZgPQgWULWegamhgp6ZiTmQNDIzMlcIclfAECtK59J3N1ZILwYbbWykYGQCMjmNKxAIATMEHO0KZW5kc3RyZWFtCmVuZG9iagoKNyAwIG9iago8PAovRmlsdGVyIC9GbGF0ZURlY29kZQovVHlwZSAvT2JqU3RtCi9OIDUKL0ZpcnN0IDI2Ci9MZW5ndGggMjY3Cj4+CnN0cmVhbQp4nHWQMWvDMBCFd/2KN7bTSYrquCV4sB2HUFJM7Kmlg2qLYEisYiuQ/vtKsUPpEIG44d7dvfcJcEgohQWWMRSkkIggFxFWK0b1z7cBlfpgRkavXTviw3c59vhklNlz7yBYkrA/baadPtoDm4YggvimKAfbnhszYFWsi4JzpTiPiukvecJoZ9tcO4OH/EVyGYnwnkWs4vdHf24w2tn7w9d+Z/u7G2YXjfaeKd2B3uxw0sf//oNtRnsz2vPQ+ACz76YyzmenMi9Atbk40Pbkpelcs7luA5j1xW0qF2yE6c3CY50pJCGkaTud2otfxwN8BRFPOHtnejfi6aqmWn+NoCqQHEwAfVvyC0Kzb9sKZW5kc3RyZWFtCmVuZG9iagoKOCAwIG9iago8PAovU2l6ZSA5Ci9Sb290IDIgMCBSCi9JbmZvIDMgMCBSCi9GaWx0ZXIgL0ZsYXRlRGVjb2RlCi9UeXBlIC9YUmVmCi9MZW5ndGggNDEKL1cgWyAxIDIgMiBdCi9JbmRleCBbIDAgOSBdCj4+CnN0cmVhbQp4nGNgYPj/n4mBnYEBRDCCCCYQwczIIAARY2Fk2MsAlNFjYAAAYCgDNgplbmRzdHJlYW0KZW5kb2JqCgpzdGFydHhyZWYKNTU4CiUlRU9G"
+      }
+    },
+    {
+      "type": "text",
+      "text": "{\"file_name\":\"Small graphic PDF.pdf\",\"bytes\":762,\"pages\":1,\"inline_embedded\":true,\"download_url\":\"https://127.0.0.1:54598/api/canvases/5oD2dhMm5c/export.pdf?frames=l0hsrl_0mA\",\"note\":\"The full PDF is also embedded as application/pdf. The download requires a current normal browser session with access to this canvas; an MCP bearer alone cannot fetch it. The URL renders the selected current stored designs when fetched, not an immutable snapshot. Each page is one frame; text stays selectable.\"}"
+    }
+  ]
+}

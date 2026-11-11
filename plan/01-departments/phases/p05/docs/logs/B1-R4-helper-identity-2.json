@@ -1,0 +1,11 @@
+{
+  "copied_executable": "/Users/mac02/openbot-p05-r3-wr3kxbjm/openbot-doop-libtest-3",
+  "source_executable": "/Users/mac02/.codex/worktrees/2050/openbot/target/debug/deps/open_bots-c4f538027eed5c31",
+  "sha256": "1d94d46c28196318f202a1d0466d3aa917edc82e240068b4afb8ff950d31bda6",
+  "bytes": 361831288,
+  "rust_sources": {
+    "src/adapters/persistence/workflow/doop_document_live_tests.rs": "8ec6e7527834f0cdc7e776454161cf62685160476f740c718c188c340aaccbf2",
+    "src/adapters/persistence/workflow/doop_document_live_driver.rs": "f22fc7841ad63e51760d949c26e1fda6e1e3f0dfb0a46d4ab3435cb180dc5d9c"
+  },
+  "earlier_helpers_preserved": true
+}

@@ -1,0 +1,25 @@
+SQL: SHOW shared_preload_libraries
+
+Exit: 0
+SQL: SHOW compute_query_id
+auto
+Exit: 0
+SQL: SHOW pg_stat_statements.track
+ERROR:  unrecognized configuration parameter "pg_stat_statements.track"
+Exit: 1
+SQL: SHOW pg_stat_statements.track_utility
+ERROR:  unrecognized configuration parameter "pg_stat_statements.track_utility"
+Exit: 1
+SQL: SHOW log_parameter_max_length
+-1
+Exit: 0
+SQL: SHOW log_parameter_max_length_on_error
+0
+Exit: 0
+SQL: SELECT 1 AS ci_pg_stat_statements_probe
+1
+Exit: 0
+SQL: SELECT queryid FROM pg_stat_statements WHERE dbid = (SELECT oid FROM pg_database WHERE datname = current_database()) AND query LIKE '%ci_pg_stat_statements_probe%' LIMIT 1
+ERROR:  pg_stat_statements must be loaded via "shared_preload_libraries"
+Exit: 1
+Read-only prerequisite inspection only. No ALTER SYSTEM, extension installation, restart or shared-server mutation was performed.

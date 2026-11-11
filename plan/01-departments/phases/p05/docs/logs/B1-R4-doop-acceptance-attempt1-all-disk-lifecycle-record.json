@@ -1,0 +1,61 @@
+{
+  "companies": [
+    {
+      "bot_user_id": "Jk066l0sRoVdP4nYk68b0xqkegSdnR7k",
+      "connection_id": "d21b634b-5031-47bd-a870-7e3f87301b26",
+      "credential_rows_after_disconnect": 0,
+      "disabled_without_dispatch": true,
+      "disconnected_without_dispatch": true,
+      "frozen_verification": {
+        "binding_id": "83649dae-af06-413f-aca8-024afc1ae225",
+        "result": {
+          "bot_id": "Jk066l0sRoVdP4nYk68b0xqkegSdnR7k",
+          "canvas_id": "qbbWziHOL_",
+          "verified": true,
+          "workspace_id": "TWsKZKc5-R"
+        },
+        "run_id": "34476403-e9b5-4e8c-b51e-2a22bf6b1f6c",
+        "version_id": "47a0a1d9-ad19-4922-b96e-2b97c941e2a5",
+        "workflow_id": "700b053b-276d-4648-b337-c46b0eaf30f1"
+      },
+      "initial_revision": 4,
+      "openbot_company": "31ad091a-fa25-4303-82fb-53bcb7eb4367",
+      "restored_revision": 6,
+      "retired_key_refused": true,
+      "retired_revision": 5,
+      "workspace_id": "TWsKZKc5-R"
+    },
+    {
+      "bot_user_id": "En3EYtcDT4tygu44UPau8NyZyj67gqcf",
+      "connection_id": "8f1b073f-e0cd-403d-9cea-ed253c6bb648",
+      "credential_rows_after_disconnect": 0,
+      "disabled_without_dispatch": true,
+      "disconnected_without_dispatch": true,
+      "frozen_verification": {
+        "binding_id": "5ea1d3c2-d354-46f6-a64d-63feb5ffb482",
+        "result": {
+          "bot_id": "En3EYtcDT4tygu44UPau8NyZyj67gqcf",
+          "canvas_id": "eTAyTKl5pN",
+          "verified": true,
+          "workspace_id": "s9J5y1TtHV"
+        },
+        "run_id": "377f14a6-0a05-4874-99b5-42fbc533d42b",
+        "version_id": "7bc69c9f-5c92-452b-8f92-e6b25a1fbcbd",
+        "workflow_id": "2c9e3052-63a8-49f2-a172-474b1937066a"
+      },
+      "initial_revision": 4,
+      "openbot_company": "ddb19460-b697-441c-b2fb-ca382abdfeb8",
+      "restored_revision": 6,
+      "retired_key_refused": true,
+      "retired_revision": 5,
+      "workspace_id": "s9J5y1TtHV"
+    }
+  ],
+  "mcp_tool_calls": 12,
+  "remote_documents_deleted": false,
+  "source_identity": {
+    "fingerprint": "351a2180b4ca8cf7489d21cbdc3aa3ce7d275fc5b08ba56eb045592a43e34e1f",
+    "revision": "01584b34f6cadcf21767127280cc6e320a6d748a"
+  },
+  "version": 1
+}

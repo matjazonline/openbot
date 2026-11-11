@@ -1,0 +1,33 @@
+Cargo.toml UNCHANGED cf826cad8fe561377f8b7943283ef303ca14725d cf826cad8fe561377f8b7943283ef303ca14725d
+Cargo.lock UNCHANGED 08e3b754c09a58907171e049119d0febcb0c7608 08e3b754c09a58907171e049119d0febcb0c7608
+.cargo/config.toml UNCHANGED 1da96ac99818d2a1f9c389575b8b77ebebfbb632 1da96ac99818d2a1f9c389575b8b77ebebfbb632
+src/adapters/mcp/tests.rs UNCHANGED f4aba91ab4d8edeb55f80050fccbb43cc2919ce1 f4aba91ab4d8edeb55f80050fccbb43cc2919ce1
+src/adapters/mcp/mod.rs UNCHANGED 85a3edf5fd5c6c32cab59e80fdb71443e47fd104 85a3edf5fd5c6c32cab59e80fdb71443e47fd104
+src/application/services/test_support.rs CHECK REQUIRED f0cc75cefa6693a98ed5679849fe07ce05e2afb8 fef3c4e109300a3105d4f055b6d741ca99295f59
+src/application/services/test_support/scenario.rs UNCHANGED cc23b0401b2867b3b7e86c0a0cec07968d922ff1 cc23b0401b2867b3b7e86c0a0cec07968d922ff1
+src/adapters/http/pages/workflow_authoring/sample.rs UNCHANGED 080df0649a0508a540f01a448a7b659c15b5533d 080df0649a0508a540f01a448a7b659c15b5533d
+MCP rerun reproduced completed 3 of 4 required exchanges in isolation. It does not invoke department code.
+Inline-JavaScript scanner flags unchanged hostile sample-test markup at sample.rs:153.
+These failures are retained separately; neither assertion nor unrelated source was changed.
+
+Shared test_support.rs disposition: only ChannelDirectoryStub::list_departments was added; MCP scenario does not call that stub. Relevant register_origin/scenario code unchanged.
+diff --git a/src/application/services/test_support.rs b/src/application/services/test_support.rs
+index f0cc75ce..fef3c4e1 100644
+--- a/src/application/services/test_support.rs
++++ b/src/application/services/test_support.rs
+@@ -257,6 +257,13 @@ impl ChannelPersistence for ChannelDirectoryStub {
+             .cloned())
+     }
+ 
++    async fn list_departments(
++        &self,
++        _company_id: Uuid,
++    ) -> AppResult<Vec<crate::entities::department::Department>> {
++        Ok(Vec::new())
++    }
++
+     async fn list_by_company_id(&self, _company_id: Uuid) -> AppResult<Vec<Channel>> {
+         if let Some(message) = self.lookup_error.as_ref() {
+             return Err(crate::app_error::AppError::Database(message.clone()));
+
+Stock-stack result: MCP cancellation PASS, scanner FAIL; 4143 passed / 1 failed / 24 ignored; no overflow. MCP failure is intermittent in unchanged source, not a stable always-failing assertion.

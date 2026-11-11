@@ -1,0 +1,5 @@
+Pinned native memory artifact verification:
+PASS all pinned model/runtime artifacts validate
+Cleanup query exit: 0 rows: 
+Cleanup query exit: 0 rows: 
+PASS no memory-service/probe roles or per-test/service databases remain

@@ -1,0 +1,10 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.66s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-c4f538027eed5c31)
+
+running 3 tests
+test adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::live_tests::doop_e2e_live_company_documents ... ignored, explicit disposable private Doop image and owned PostgreSQL; strict private stdin required
+test adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::live_tests::client::doop_e2e_edit_receipt_reads_business_text_with_separate_preview ... ok
+test adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::live_tests::client::doop_e2e_preview_cannot_substitute_a_failed_business_ack - should panic ... ok
+
+test result: ok. 2 passed; 0 failed; 1 ignored; 0 measured; 4165 filtered out; finished in 0.06s
+

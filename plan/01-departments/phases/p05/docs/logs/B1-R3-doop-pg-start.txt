@@ -1,0 +1,46 @@
+Unable to find image 'postgres:18.6-bookworm' locally
+18.6-bookworm: Pulling from library/postgres
+909bc7fed45e: Pulling fs layer
+2d66c782e484: Pulling fs layer
+3e69e7255037: Pulling fs layer
+5a2e8b720053: Pulling fs layer
+f6a01c158bc4: Pulling fs layer
+563f1f0fe004: Pulling fs layer
+90c99da43de0: Pulling fs layer
+38a774254305: Pulling fs layer
+ab955e3db09f: Pulling fs layer
+24e0c6c6f27f: Pulling fs layer
+0b55049841e2: Pulling fs layer
+98d11b77646e: Pulling fs layer
+21fcf9e8a1b5: Pulling fs layer
+21fcf9e8a1b5: Download complete
+909bc7fed45e: Download complete
+ab955e3db09f: Download complete
+3e69e7255037: Download complete
+38a774254305: Download complete
+0b55049841e2: Download complete
+98d11b77646e: Download complete
+563f1f0fe004: Download complete
+f6a01c158bc4: Download complete
+90c99da43de0: Download complete
+f012affad36c: Download complete
+3091ed1f8df0: Download complete
+5a2e8b720053: Download complete
+2d66c782e484: Download complete
+3e69e7255037: Pull complete
+5a2e8b720053: Pull complete
+2d66c782e484: Pull complete
+f6a01c158bc4: Pull complete
+ab955e3db09f: Pull complete
+38a774254305: Pull complete
+563f1f0fe004: Pull complete
+90c99da43de0: Pull complete
+24e0c6c6f27f: Download complete
+0b55049841e2: Pull complete
+98d11b77646e: Pull complete
+24e0c6c6f27f: Pull complete
+21fcf9e8a1b5: Pull complete
+909bc7fed45e: Pull complete
+Digest: sha256:f1ea2a1a4fb7b68d4836be1fdcb8a6466a89b072158bf9d97663600538c294c5
+Status: Downloaded newer image for postgres:18.6-bookworm
+80efb281695d6c0e996338f24c4fe1e15cc6ec1d074ecd30aa5c68bad15e8cbb

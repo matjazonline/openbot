@@ -1,0 +1,9 @@
+{
+  "revision": "01584b34f6cadcf21767127280cc6e320a6d748a",
+  "fingerprint": "351a2180b4ca8cf7489d21cbdc3aa3ce7d275fc5b08ba56eb045592a43e34e1f",
+  "previous_fingerprint": "e0c063c43c5bc70018eb8e09d0add0d32ef35159fff843bc9646da7ebe4c4464",
+  "changed_files": [
+    "tests/fixtures/canvasClipboard.html"
+  ],
+  "production_source_unchanged": true
+}

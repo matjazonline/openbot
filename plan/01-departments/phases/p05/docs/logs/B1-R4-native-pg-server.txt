@@ -1,0 +1,143 @@
+2026-11-11 20:13:29.032 CET [83055] LOG:  starting PostgreSQL 18.6 (Homebrew) on aarch64-apple-darwin24.6.0, compiled by Apple clang version 17.0.0 (clang-1700.6.4.2), 64-bit
+2026-11-11 20:13:29.033 CET [83055] LOG:  listening on IPv4 address "127.0.0.1", port 52648
+2026-11-11 20:13:29.039 CET [83063] LOG:  database system was shut down at 2026-11-11 19:43:06 CET
+2026-11-11 20:13:29.046 CET [83055] LOG:  database system is ready to accept connections
+2026-11-11 20:14:45.502 CET [83292] FATAL:  terminating connection due to administrator command
+2026-11-11 20:14:45.502 CET [83296] FATAL:  terminating connection due to administrator command
+2026-11-11 20:14:45.502 CET [83293] FATAL:  terminating connection due to administrator command
+2026-11-11 20:14:45.502 CET [83294] FATAL:  terminating connection due to administrator command
+2026-11-11 20:14:45.502 CET [83295] FATAL:  terminating connection due to administrator command
+2026-11-11 20:14:45.606 CET [83061] LOG:  checkpoint starting: immediate force wait
+2026-11-11 20:14:45.608 CET [83061] LOG:  checkpoint complete: wrote 3 buffers (0.0%), wrote 4 SLRU buffers; 0 WAL file(s) added, 0 removed, 1 recycled; write=0.001 s, sync=0.001 s, total=0.002 s; sync files=6, longest=0.001 s, average=0.001 s; distance=15680 kB, estimate=15680 kB; lsn=0/15DF32D8, redo lsn=0/15DF3280
+2026-11-11 20:16:02.799 CET [83403] FATAL:  terminating connection due to administrator command
+2026-11-11 20:16:02.799 CET [83417] FATAL:  terminating connection due to administrator command
+2026-11-11 20:16:02.799 CET [83414] FATAL:  terminating connection due to administrator command
+2026-11-11 20:16:02.799 CET [83415] FATAL:  terminating connection due to administrator command
+2026-11-11 20:16:02.799 CET [83416] FATAL:  terminating connection due to administrator command
+2026-11-11 20:16:02.902 CET [83061] LOG:  checkpoint starting: immediate force wait
+2026-11-11 20:16:02.904 CET [83061] LOG:  checkpoint complete: wrote 3 buffers (0.0%), wrote 3 SLRU buffers; 0 WAL file(s) added, 0 removed, 1 recycled; write=0.001 s, sync=0.001 s, total=0.003 s; sync files=6, longest=0.001 s, average=0.001 s; distance=16401 kB, estimate=16401 kB; lsn=0/16DF78D8, redo lsn=0/16DF7880
+2026-11-11 20:17:22.881 CET [83926] FATAL:  terminating connection due to administrator command
+2026-11-11 20:17:22.881 CET [83924] FATAL:  terminating connection due to administrator command
+2026-11-11 20:17:22.881 CET [83927] FATAL:  terminating connection due to administrator command
+2026-11-11 20:17:22.881 CET [83929] FATAL:  terminating connection due to administrator command
+2026-11-11 20:17:22.881 CET [83928] FATAL:  terminating connection due to administrator command
+2026-11-11 20:17:22.984 CET [83061] LOG:  checkpoint starting: immediate force wait
+2026-11-11 20:17:22.986 CET [83061] LOG:  checkpoint complete: wrote 3 buffers (0.0%), wrote 4 SLRU buffers; 0 WAL file(s) added, 0 removed, 1 recycled; write=0.002 s, sync=0.001 s, total=0.003 s; sync files=6, longest=0.001 s, average=0.001 s; distance=15680 kB, estimate=16329 kB; lsn=0/17D479E0, redo lsn=0/17D47988
+2026-11-11 20:18:39.643 CET [84001] FATAL:  terminating connection due to administrator command
+2026-11-11 20:18:39.643 CET [84006] FATAL:  terminating connection due to administrator command
+2026-11-11 20:18:39.643 CET [84003] FATAL:  terminating connection due to administrator command
+2026-11-11 20:18:39.643 CET [84005] FATAL:  terminating connection due to administrator command
+2026-11-11 20:18:39.643 CET [84004] FATAL:  terminating connection due to administrator command
+2026-11-11 20:18:39.746 CET [83061] LOG:  checkpoint starting: immediate force wait
+2026-11-11 20:18:39.748 CET [83061] LOG:  checkpoint complete: wrote 3 buffers (0.0%), wrote 3 SLRU buffers; 0 WAL file(s) added, 0 removed, 1 recycled; write=0.001 s, sync=0.001 s, total=0.002 s; sync files=6, longest=0.001 s, average=0.001 s; distance=16400 kB, estimate=16400 kB; lsn=0/18D4BDD0, redo lsn=0/18D4BD78
+2026-11-11 20:20:15.068 CET [84773] ERROR:  canceling statement due to statement timeout
+2026-11-11 20:20:15.068 CET [84773] CONTEXT:  while locking tuple (1,9) in relation "workflow_runs"
+2026-11-11 20:20:15.068 CET [84773] STATEMENT:  SELECT binding_id, max_context_bytes FROM workflow_runs WHERE company_id=$1 AND id=$2 AND state IN ('queued','running') FOR UPDATE
+2026-11-11 20:20:15.092 CET [84773] WARNING:  there is no transaction in progress
+2026-11-11 20:20:40.477 CET [84773] FATAL:  terminating connection due to administrator command
+2026-11-11 20:20:40.477 CET [84769] FATAL:  terminating connection due to administrator command
+2026-11-11 20:20:40.477 CET [84770] FATAL:  terminating connection due to administrator command
+2026-11-11 20:20:40.477 CET [84771] FATAL:  terminating connection due to administrator command
+2026-11-11 20:20:40.477 CET [85003] FATAL:  terminating connection due to administrator command
+2026-11-11 20:20:40.579 CET [83061] LOG:  checkpoint starting: immediate force wait
+2026-11-11 20:20:40.582 CET [83061] LOG:  checkpoint complete: wrote 7 buffers (0.0%), wrote 3 SLRU buffers; 0 WAL file(s) added, 0 removed, 1 recycled; write=0.002 s, sync=0.001 s, total=0.004 s; sync files=9, longest=0.001 s, average=0.001 s; distance=17641 kB, estimate=17641 kB; lsn=0/19E86278, redo lsn=0/19E86220
+2026-11-11 20:22:02.559 CET [85299] ERROR:  canceling statement due to statement timeout
+2026-11-11 20:22:02.559 CET [85299] CONTEXT:  while locking tuple (1,11) in relation "workflow_runs"
+2026-11-11 20:22:02.559 CET [85299] STATEMENT:  SELECT binding_id, max_context_bytes FROM workflow_runs WHERE company_id=$1 AND id=$2 AND state IN ('queued','running') FOR UPDATE
+2026-11-11 20:22:02.562 CET [85299] WARNING:  there is no transaction in progress
+2026-11-11 20:22:30.719 CET [85299] FATAL:  terminating connection due to administrator command
+2026-11-11 20:22:30.719 CET [85302] FATAL:  terminating connection due to administrator command
+2026-11-11 20:22:30.719 CET [85301] FATAL:  terminating connection due to administrator command
+2026-11-11 20:22:30.719 CET [85303] FATAL:  terminating connection due to administrator command
+2026-11-11 20:22:30.821 CET [83061] LOG:  checkpoint starting: immediate force wait
+2026-11-11 20:22:30.823 CET [83061] LOG:  checkpoint complete: wrote 3 buffers (0.0%), wrote 3 SLRU buffers; 0 WAL file(s) added, 0 removed, 1 recycled; write=0.001 s, sync=0.001 s, total=0.003 s; sync files=6, longest=0.001 s, average=0.001 s; distance=17462 kB, estimate=17623 kB; lsn=0/1AF93A88, redo lsn=0/1AF93A30
+2026-11-11 20:27:30.829 CET [83061] LOG:  checkpoint starting: time
+2026-11-11 20:27:30.932 CET [83061] LOG:  checkpoint complete: wrote 1 buffers (0.0%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=0.102 s, sync=0.001 s, total=0.104 s; sync files=2, longest=0.001 s, average=0.001 s; distance=4 kB, estimate=15861 kB; lsn=0/1AF94C88, redo lsn=0/1AF94C30
+2026-11-11 20:35:46.080 CET [88647] ERROR:  canceling statement due to statement timeout
+2026-11-11 20:35:46.080 CET [88647] CONTEXT:  while locking tuple (0,9) in relation "workflow_runs"
+2026-11-11 20:35:46.080 CET [88647] STATEMENT:  SELECT binding_id, max_context_bytes FROM workflow_runs WHERE company_id=$1 AND id=$2 AND state IN ('queued','running') FOR UPDATE
+2026-11-11 20:35:46.087 CET [88647] WARNING:  there is no transaction in progress
+2026-11-11 20:35:46.668 CET [88649] ERROR:  canceling statement due to statement timeout
+2026-11-11 20:35:46.668 CET [88649] CONTEXT:  while locking tuple (1,9) in relation "workflow_runs"
+2026-11-11 20:35:46.668 CET [88649] STATEMENT:  SELECT binding_id, max_context_bytes FROM workflow_runs WHERE company_id=$1 AND id=$2 AND state IN ('queued','running') FOR UPDATE
+2026-11-11 20:35:46.670 CET [88649] WARNING:  there is no transaction in progress
+2026-11-11 20:36:15.325 CET [88649] LOG:  unexpected EOF on client connection with an open transaction
+2026-11-11 20:36:15.325 CET [88648] LOG:  could not receive data from client: Connection reset by peer
+2026-11-11 20:36:15.325 CET [88647] LOG:  could not receive data from client: Connection reset by peer
+2026-11-11 20:37:30.916 CET [83061] LOG:  checkpoint starting: time
+2026-11-11 20:40:31.173 CET [89659] ERROR:  canceling statement due to statement timeout
+2026-11-11 20:40:31.173 CET [89659] CONTEXT:  while locking tuple (0,9) in relation "workflow_runs"
+2026-11-11 20:40:31.173 CET [89659] STATEMENT:  SELECT binding_id, max_context_bytes FROM workflow_runs WHERE company_id=$1 AND id=$2 AND state IN ('queued','running') FOR UPDATE
+2026-11-11 20:41:03.082 CET [89656] FATAL:  terminating connection due to administrator command
+2026-11-11 20:41:03.082 CET [89679] FATAL:  terminating connection due to administrator command
+2026-11-11 20:41:03.082 CET [89751] FATAL:  terminating connection due to administrator command
+2026-11-11 20:41:03.082 CET [89706] FATAL:  terminating connection due to administrator command
+2026-11-11 20:41:03.082 CET [89837] FATAL:  terminating connection due to administrator command
+2026-11-11 20:41:03.230 CET [83061] LOG:  checkpoint complete: wrote 2579 buffers (15.7%), wrote 4 SLRU buffers; 0 WAL file(s) added, 0 removed, 2 recycled; write=212.285 s, sync=0.027 s, total=212.314 s; sync files=1302, longest=0.001 s, average=0.001 s; distance=17629 kB, estimate=17629 kB; lsn=0/1D208088, redo lsn=0/1C0CC0E8
+2026-11-11 20:41:03.232 CET [83061] LOG:  checkpoint starting: immediate force wait
+2026-11-11 20:41:03.233 CET [83061] LOG:  checkpoint complete: wrote 2 buffers (0.0%), wrote 3 SLRU buffers; 0 WAL file(s) added, 0 removed, 1 recycled; write=0.001 s, sync=0.001 s, total=0.002 s; sync files=5, longest=0.001 s, average=0.001 s; distance=17648 kB, estimate=17648 kB; lsn=0/1D208158, redo lsn=0/1D208100
+2026-11-11 20:43:26.287 CET [90335] FATAL:  terminating connection due to administrator command
+2026-11-11 20:43:26.287 CET [90336] FATAL:  terminating connection due to administrator command
+2026-11-11 20:43:26.287 CET [90337] FATAL:  terminating connection due to administrator command
+2026-11-11 20:43:26.287 CET [90338] FATAL:  terminating connection due to administrator command
+2026-11-11 20:43:26.287 CET [90339] FATAL:  terminating connection due to administrator command
+2026-11-11 20:43:26.390 CET [83061] LOG:  checkpoint starting: immediate force wait
+2026-11-11 20:43:26.392 CET [83061] LOG:  checkpoint complete: wrote 3 buffers (0.0%), wrote 3 SLRU buffers; 0 WAL file(s) added, 0 removed, 1 recycled; write=0.001 s, sync=0.001 s, total=0.003 s; sync files=6, longest=0.001 s, average=0.001 s; distance=15685 kB, estimate=17451 kB; lsn=0/1E159720, redo lsn=0/1E1596C8
+2026-11-11 20:44:43.416 CET [90422] FATAL:  terminating connection due to administrator command
+2026-11-11 20:44:43.416 CET [90425] FATAL:  terminating connection due to administrator command
+2026-11-11 20:44:43.416 CET [90426] FATAL:  terminating connection due to administrator command
+2026-11-11 20:44:43.416 CET [90428] FATAL:  terminating connection due to administrator command
+2026-11-11 20:44:43.416 CET [90427] FATAL:  terminating connection due to administrator command
+2026-11-11 20:44:43.518 CET [83061] LOG:  checkpoint starting: immediate force wait
+2026-11-11 20:44:43.520 CET [83061] LOG:  checkpoint complete: wrote 3 buffers (0.0%), wrote 3 SLRU buffers; 0 WAL file(s) added, 0 removed, 1 recycled; write=0.001 s, sync=0.001 s, total=0.002 s; sync files=6, longest=0.001 s, average=0.001 s; distance=16405 kB, estimate=17347 kB; lsn=0/1F15EB30, redo lsn=0/1F15EAD8
+2026-11-11 20:45:53.950 CET [91061] FATAL:  terminating connection due to administrator command
+2026-11-11 20:45:53.950 CET [91063] FATAL:  terminating connection due to administrator command
+2026-11-11 20:45:53.950 CET [91066] FATAL:  terminating connection due to administrator command
+2026-11-11 20:45:53.950 CET [91064] FATAL:  terminating connection due to administrator command
+2026-11-11 20:45:53.950 CET [91065] FATAL:  terminating connection due to administrator command
+2026-11-11 20:45:54.053 CET [83061] LOG:  checkpoint starting: immediate force wait
+2026-11-11 20:45:54.055 CET [83061] LOG:  checkpoint complete: wrote 3 buffers (0.0%), wrote 3 SLRU buffers; 0 WAL file(s) added, 0 removed, 1 recycled; write=0.001 s, sync=0.001 s, total=0.002 s; sync files=6, longest=0.001 s, average=0.001 s; distance=15683 kB, estimate=17180 kB; lsn=0/200AF888, redo lsn=0/200AF830
+2026-11-11 20:47:10.789 CET [91262] FATAL:  terminating connection due to administrator command
+2026-11-11 20:47:10.789 CET [91273] FATAL:  terminating connection due to administrator command
+2026-11-11 20:47:10.789 CET [91274] FATAL:  terminating connection due to administrator command
+2026-11-11 20:47:10.789 CET [91275] FATAL:  terminating connection due to administrator command
+2026-11-11 20:47:10.789 CET [91276] FATAL:  terminating connection due to administrator command
+2026-11-11 20:47:10.892 CET [83061] LOG:  checkpoint starting: immediate force wait
+2026-11-11 20:47:10.893 CET [83061] LOG:  checkpoint complete: wrote 3 buffers (0.0%), wrote 3 SLRU buffers; 0 WAL file(s) added, 0 removed, 1 recycled; write=0.001 s, sync=0.001 s, total=0.002 s; sync files=6, longest=0.001 s, average=0.001 s; distance=16378 kB, estimate=17100 kB; lsn=0/210AE300, redo lsn=0/210AE2A8
+2026-11-11 20:48:46.445 CET [91997] ERROR:  canceling statement due to statement timeout
+2026-11-11 20:48:46.445 CET [91997] CONTEXT:  while locking tuple (0,9) in relation "workflow_runs"
+2026-11-11 20:48:46.445 CET [91997] STATEMENT:  SELECT binding_id, max_context_bytes FROM workflow_runs WHERE company_id=$1 AND id=$2 AND state IN ('queued','running') FOR UPDATE
+2026-11-11 20:48:46.448 CET [91997] WARNING:  there is no transaction in progress
+2026-11-11 20:48:46.950 CET [92000] ERROR:  canceling statement due to statement timeout
+2026-11-11 20:48:46.950 CET [92000] CONTEXT:  while locking tuple (1,9) in relation "workflow_runs"
+2026-11-11 20:48:46.950 CET [92000] STATEMENT:  SELECT binding_id, max_context_bytes FROM workflow_runs WHERE company_id=$1 AND id=$2 AND state IN ('queued','running') FOR UPDATE
+2026-11-11 20:49:14.990 CET [91999] FATAL:  terminating connection due to administrator command
+2026-11-11 20:49:14.990 CET [92002] FATAL:  terminating connection due to administrator command
+2026-11-11 20:49:14.990 CET [92001] FATAL:  terminating connection due to administrator command
+2026-11-11 20:49:14.990 CET [92262] FATAL:  terminating connection due to administrator command
+2026-11-11 20:49:14.990 CET [92128] FATAL:  terminating connection due to administrator command
+2026-11-11 20:49:15.093 CET [83061] LOG:  checkpoint starting: immediate force wait
+2026-11-11 20:49:15.095 CET [83061] LOG:  checkpoint complete: wrote 3 buffers (0.0%), wrote 4 SLRU buffers; 0 WAL file(s) added, 0 removed, 1 recycled; write=0.001 s, sync=0.001 s, total=0.002 s; sync files=6, longest=0.001 s, average=0.001 s; distance=17644 kB, estimate=17644 kB; lsn=0/221E9608, redo lsn=0/221E95B0
+2026-11-11 20:50:35.714 CET [92613] ERROR:  canceling statement due to statement timeout
+2026-11-11 20:50:35.714 CET [92613] CONTEXT:  while locking tuple (1,6) in relation "workflow_runs"
+2026-11-11 20:50:35.714 CET [92613] STATEMENT:  SELECT binding_id, max_context_bytes FROM workflow_runs WHERE company_id=$1 AND id=$2 AND state IN ('queued','running') FOR UPDATE
+2026-11-11 20:50:36.300 CET [92608] ERROR:  canceling statement due to statement timeout
+2026-11-11 20:50:36.300 CET [92608] CONTEXT:  while locking tuple (1,9) in relation "workflow_runs"
+2026-11-11 20:50:36.300 CET [92608] STATEMENT:  SELECT binding_id, max_context_bytes FROM workflow_runs WHERE company_id=$1 AND id=$2 AND state IN ('queued','running') FOR UPDATE
+2026-11-11 20:50:36.302 CET [92608] WARNING:  there is no transaction in progress
+2026-11-11 20:51:07.265 CET [92610] FATAL:  terminating connection due to administrator command
+2026-11-11 20:51:07.265 CET [92612] FATAL:  terminating connection due to administrator command
+2026-11-11 20:51:07.265 CET [92789] FATAL:  terminating connection due to administrator command
+2026-11-11 20:51:07.265 CET [92608] FATAL:  terminating connection due to administrator command
+2026-11-11 20:51:07.265 CET [92884] FATAL:  terminating connection due to administrator command
+2026-11-11 20:51:07.368 CET [83061] LOG:  checkpoint starting: immediate force wait
+2026-11-11 20:51:07.370 CET [83061] LOG:  checkpoint complete: wrote 3 buffers (0.0%), wrote 3 SLRU buffers; 0 WAL file(s) added, 0 removed, 1 recycled; write=0.001 s, sync=0.001 s, total=0.003 s; sync files=6, longest=0.001 s, average=0.001 s; distance=17640 kB, estimate=17644 kB; lsn=0/23323890, redo lsn=0/23323838
+2026-11-11 20:52:08.673 CET [83061] LOG:  checkpoint starting: immediate force wait
+2026-11-11 20:52:08.673 CET [83061] LOG:  checkpoint complete: wrote 1 buffers (0.0%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=0.001 s, sync=0.001 s, total=0.001 s; sync files=2, longest=0.001 s, average=0.001 s; distance=5 kB, estimate=15880 kB; lsn=0/23324FA8, redo lsn=0/23324F50
+2026-11-11 20:52:08.784 CET [83055] LOG:  received fast shutdown request
+2026-11-11 20:52:08.784 CET [83055] LOG:  aborting any active transactions
+2026-11-11 20:52:08.784 CET [83055] LOG:  background worker "logical replication launcher" (PID 83066) exited with exit code 1
+2026-11-11 20:52:08.784 CET [83061] LOG:  shutting down
+2026-11-11 20:52:08.784 CET [83061] LOG:  checkpoint starting: shutdown immediate
+2026-11-11 20:52:08.785 CET [83061] LOG:  checkpoint complete: wrote 1 buffers (0.0%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=0.001 s, sync=0.001 s, total=0.001 s; sync files=2, longest=0.001 s, average=0.001 s; distance=5 kB, estimate=14292 kB; lsn=0/23326578, redo lsn=0/23326578
+2026-11-11 20:52:08.788 CET [83055] LOG:  database system is shut down

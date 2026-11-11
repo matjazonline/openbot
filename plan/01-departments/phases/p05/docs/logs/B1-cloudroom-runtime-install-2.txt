@@ -1,0 +1,9 @@
+11.19.0
+
+added 4 packages, and audited 5 packages in 6s
+
+1 package is looking for funding
+  run `npm fund` for details
+
+found 0 vulnerabilities
+Pinned-runtime locked production install PASS

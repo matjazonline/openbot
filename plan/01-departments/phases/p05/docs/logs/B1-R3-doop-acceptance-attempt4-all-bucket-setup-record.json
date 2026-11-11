@@ -1,0 +1,66 @@
+{
+  "catalog_discoveries": 6,
+  "disposable": true,
+  "doop_origin": "https://127.0.0.1:51175",
+  "mappings": [
+    {
+      "approved_audience": "entire configured workspace; synthetic data only",
+      "bot_user_id": "DHqqrj4f7zsYvk3rT0ybhmyinN5E5bmD",
+      "connection_id": "99588f7b-37c5-4525-a48a-153a4423ad3e",
+      "connection_slug": "doop",
+      "intended_humans": [
+        {
+          "email": "doop-test-human-a@example.test",
+          "id": "WkweiOa1RMm9CM5HirMeTgvkgkptD0KB"
+        }
+      ],
+      "openbot_company": "d803df62-7882-4407-befc-a12b43684034",
+      "verification": {
+        "binding_id": "affbc863-1736-4dbd-98a6-6c5c035e495d",
+        "result": {
+          "bot_id": "DHqqrj4f7zsYvk3rT0ybhmyinN5E5bmD",
+          "canvas_id": "bljgGt1PXs",
+          "verified": true,
+          "workspace_id": "WBavqbsCJ0"
+        },
+        "run_id": "8c33f12c-d9af-4446-997d-504f3b8d5532",
+        "version_id": "82f9896d-579e-46cc-bfa6-0b0b14fd2deb",
+        "workflow_id": "c3eb63a6-da59-44af-9f58-7c983e092136"
+      },
+      "workspace_id": "WBavqbsCJ0"
+    },
+    {
+      "approved_audience": "entire configured workspace; synthetic data only",
+      "bot_user_id": "nZAr6wcBMCKnVsgalUW4pGtP7yQzRTo3",
+      "connection_id": "27282f12-b1de-47c8-9930-1e55cea7bd1a",
+      "connection_slug": "doop",
+      "intended_humans": [
+        {
+          "email": "doop-test-human-b@example.test",
+          "id": "tmq3EG5ZLV4tnr3mYEQMzvz1kyzlPrWW"
+        }
+      ],
+      "openbot_company": "7f52dcf1-6e07-440c-9c18-299e85884afb",
+      "verification": {
+        "binding_id": "4a85b189-7597-4def-9af5-a8f5067f4840",
+        "result": {
+          "bot_id": "nZAr6wcBMCKnVsgalUW4pGtP7yQzRTo3",
+          "canvas_id": "e1yzaDA1uM",
+          "verified": true,
+          "workspace_id": "wxVSCAmhYK"
+        },
+        "run_id": "29e2adea-6385-40fb-a4f4-9a7bde54dc54",
+        "version_id": "07ef046f-2b0b-40b4-b3e6-44d8b092d24b",
+        "workflow_id": "91c173bc-17db-4ef6-b577-34ac400ecdcf"
+      },
+      "workspace_id": "wxVSCAmhYK"
+    }
+  ],
+  "mcp_tool_calls": 4,
+  "source_identity": {
+    "fingerprint": "e0c063c43c5bc70018eb8e09d0add0d32ef35159fff843bc9646da7ebe4c4464",
+    "revision": "01584b34f6cadcf21767127280cc6e320a6d748a"
+  },
+  "teardown": "owned Openbot database dropped when helper exits; Doop data belongs to the disposable runner",
+  "version": 1
+}

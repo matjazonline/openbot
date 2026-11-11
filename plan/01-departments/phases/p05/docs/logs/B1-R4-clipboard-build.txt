@@ -1,0 +1,123 @@
+#0 building with "colima-openbot-p05-r3" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile.clipboard
+#1 transferring dockerfile: 3.35kB done
+#1 DONE 0.0s
+
+#2 [internal] load metadata for docker.io/oven/bun:1.3.10@sha256:b86c67b531d87b4db11470d9b2bd0c519b1976eee6fcd71634e73abfa6230d2e
+#2 ...
+
+#3 [internal] load metadata for docker.io/library/node:22-bookworm-slim@sha256:5ec23b7c622b00547753bc6ffd78085dd868a68aeb41c8e0a1418f033e13d96d
+#3 DONE 0.8s
+
+#2 [internal] load metadata for docker.io/oven/bun:1.3.10@sha256:b86c67b531d87b4db11470d9b2bd0c519b1976eee6fcd71634e73abfa6230d2e
+#2 DONE 0.8s
+
+#4 [internal] load .dockerignore
+#4 transferring context: 92B done
+#4 DONE 0.0s
+
+#5 [build 1/6] FROM docker.io/oven/bun:1.3.10@sha256:b86c67b531d87b4db11470d9b2bd0c519b1976eee6fcd71634e73abfa6230d2e
+#5 resolve docker.io/oven/bun:1.3.10@sha256:b86c67b531d87b4db11470d9b2bd0c519b1976eee6fcd71634e73abfa6230d2e done
+#5 DONE 0.0s
+
+#6 [runtime 1/9] FROM docker.io/library/node:22-bookworm-slim@sha256:5ec23b7c622b00547753bc6ffd78085dd868a68aeb41c8e0a1418f033e13d96d
+#6 resolve docker.io/library/node:22-bookworm-slim@sha256:5ec23b7c622b00547753bc6ffd78085dd868a68aeb41c8e0a1418f033e13d96d done
+#6 DONE 0.0s
+
+#7 [internal] load build context
+#7 transferring context: 20.57MB 0.2s done
+#7 DONE 0.2s
+
+#8 [build 2/6] WORKDIR /app
+#8 CACHED
+
+#9 [build 3/6] COPY package.json bun.lock ./
+#9 CACHED
+
+#10 [build 4/6] RUN bun install --frozen-lockfile --ignore-scripts
+#10 CACHED
+
+#11 [build 5/6] COPY . .
+#11 DONE 0.1s
+
+#12 [build 6/6] RUN bun run build
+#12 0.116 $ bun run build:claude-extension && vite build
+#12 0.123 $ node scripts/build-claude-extension.mjs
+#12 0.734 Built public/claude-extension/doop.mcpb (89 bundled packages)
+#12 1.053 vite v8.3.4 building client environment for production...
+#12 1.059 transforming...
+#12 1.309 [plugin rolldown:vite-resolve] Module "node:fs" has been externalized for browser compatibility, imported by "/app/node_modules/mupdf/dist/mupdf.js". See https://vite.dev/guide/troubleshooting.html#module-externalized-for-browser-compatibility for more details.
+#12 1.367 [plugin rolldown:vite-resolve] Module "module" has been externalized for browser compatibility, imported by "/app/node_modules/mupdf/dist/mupdf-wasm.js". See https://vite.dev/guide/troubleshooting.html#module-externalized-for-browser-compatibility for more details.
+#12 1.370 ✓ 2619 modules transformed.
+#12 1.475 rendering chunks...
+#12 2.130 computing gzip size...
+#12 2.267 dist/index.html                                       2.35 kB │ gzip:     1.03 kB
+#12 2.267 dist/assets/recorder-C4u_fB9A.js                    126.25 kB
+#12 2.267 dist/assets/mupdf-wasm-Bvf0xebB.wasm             10,409.82 kB │ gzip: 4,778.44 kB
+#12 2.267 dist/assets/index-BNfVF2MT.css                      158.81 kB │ gzip:    27.52 kB
+#12 2.267 dist/assets/__vite-browser-external-CKnVkMRn.js       0.16 kB │ gzip:     0.16 kB │ map:     0.23 kB
+#12 2.267 dist/assets/rolldown-runtime-Dd_uD5pT.js              1.10 kB │ gzip:     0.62 kB
+#12 2.267 dist/assets/preload-helper-BEyK2XXa.js                1.52 kB │ gzip:     0.79 kB
+#12 2.267 dist/assets/mupdf-HnZ1c4_Q.js                        90.80 kB │ gzip:    24.53 kB │ map:   246.51 kB
+#12 2.267 dist/assets/jszip.min-BKkSLVCN.js                    95.98 kB │ gzip:    28.52 kB │ map:   220.66 kB
+#12 2.267 dist/assets/index-DUjKulXq.js                     2,525.17 kB │ gzip:   769.42 kB │ map: 7,916.89 kB
+#12 2.267 
+#12 2.269 [plugin builtin:vite-reporter] 
+#12 2.269 (!) Some chunks are larger than 500 kB after minification. Consider:
+#12 2.269 - Using dynamic import() to code-split the application
+#12 2.269 - Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+#12 2.269 - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+#12 2.275 ✓ built in 1.22s
+#12 DONE 2.3s
+
+#13 [runtime 3/9] RUN node -e "const fs=require('node:fs');fs.mkdirSync('/etc/ssl/certs',{recursive:true});fs.writeFileSync('/etc/ssl/certs/ca-certificates.crt',require('node:tls').rootCertificates.join('\n'))"   && rm -f /etc/apt/sources.list.d/debian.sources   && printf '%s\n'     'deb [check-valid-until=no] https://snapshot.debian.org/archive/debian/20261106T000000Z bookworm main'     'deb [check-valid-until=no] https://snapshot.debian.org/archive/debian/20261106T000000Z bookworm-updates main'     'deb [check-valid-until=no] https://snapshot.debian.org/archive/debian-security/20261106T000000Z bookworm-security main'     > /etc/apt/sources.list   && apt-get update   && apt-get install -y --no-install-recommends ca-certificates chromium chromium-sandbox fonts-liberation fonts-noto-color-emoji   && rm -rf /var/lib/apt/lists/*   && mkdir -p /app/data   && chown node:node /app/data
+#13 CACHED
+
+#14 [runtime 4/9] COPY package.json LICENSE ./
+#14 CACHED
+
+#15 [deps 4/4] RUN bun install --frozen-lockfile --production --ignore-scripts
+#15 CACHED
+
+#16 [runtime 2/9] WORKDIR /app
+#16 CACHED
+
+#17 [runtime 5/9] COPY --from=deps /app/node_modules ./node_modules
+#17 CACHED
+
+#18 [runtime 6/9] COPY --from=build /app/dist ./dist
+#18 DONE 0.0s
+
+#19 [runtime 7/9] COPY server ./server
+#19 DONE 0.0s
+
+#20 [runtime 8/9] COPY shared ./shared
+#20 DONE 0.0s
+
+#21 [runtime 9/9] RUN test "${#DOOP_SOURCE_FINGERPRINT}" -eq 64   && case "$DOOP_SOURCE_FINGERPRINT" in *[!0-9a-f]*) exit 1;; esac
+#21 DONE 0.1s
+
+#22 [clipboard-test 1/3] COPY --from=build /usr/local/bin/bun /usr/local/bin/bun
+#22 DONE 0.1s
+
+#23 [clipboard-test 2/3] COPY --from=build --chown=node:node /app /test
+#23 DONE 3.2s
+
+#24 [clipboard-test 3/3] WORKDIR /test
+#24 DONE 0.2s
+
+#25 exporting to image
+#25 exporting layers
+#25 exporting layers 14.5s done
+#25 exporting manifest sha256:b1409f4bfe6bbe837e212a418855d911f36ccac0e47702cb6d16f660a9542cf4 done
+#25 exporting config sha256:ceb2057717b3373600c6666c02f3df69d4efb852b3058885bbf4a099be4026c5 done
+#25 exporting attestation manifest sha256:7ae0ba9306d8c84ee6a77a6b0c3b8f2d84b252927fbc849bc26746b145cbe59f done
+#25 exporting manifest list sha256:a13a7b86e3e3a96aa8e6e2da5e39adfb46145dca4352985498290a243198bf64 done
+#25 naming to docker.io/library/openbot-p05-r4-clipboard:latest done
+#25 unpacking to docker.io/library/openbot-p05-r4-clipboard:latest
+#25 unpacking to docker.io/library/openbot-p05-r4-clipboard:latest 5.3s done
+#25 DONE 19.8s
+
+ [33m1 warning found (use docker --debug to expand):
+[0m - SecretsUsedInArgOrEnv: Do not use ARG or ENV instructions for sensitive data (ARG "VITE_POSTHOG_KEY") (line 8)

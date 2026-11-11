@@ -1,0 +1,5 @@
+{
+  "command": "scripts/memory-integration.sh",
+  "status": "PASS",
+  "exit_code": 0
+}

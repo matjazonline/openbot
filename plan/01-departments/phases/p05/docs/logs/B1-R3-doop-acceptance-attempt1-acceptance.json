@@ -1,0 +1,7 @@
+{
+  "version": 1,
+  "status": "FAIL",
+  "runs": [],
+  "scope": "actual private image, both storage modes and both required probe families",
+  "current_run": "all-disk"
+}

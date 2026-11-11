@@ -1,0 +1,13 @@
+base:   e7bc780ec7699051b99893d4f497bf2299c77738
+digest: b715976039bbe891c5771d5e7946621afe528baf95b4d57bfd6fd41f59b89e35
+files:
+  integrations/doop/managed.patch
+  integrations/doop/source.json
+  plan/01-departments/05-integration-and-final-verification.md
+  plan/01-departments/phases/p04/docs/logs/01DEP-P04-B1-R1.evidence.json
+  plan/01-departments/phases/p04/docs/logs/01DEP-P04-B2-R1.evidence.json
+  plan/01-departments/phases/p04/docs/logs/B1-R1-css-check.txt
+  plan/01-departments/phases/p04/docs/logs/B2-R1-css-check.txt
+  plan/01-departments/phases/p05/.gitattributes
+  src/adapters/persistence/workflow/doop_document_live_driver.rs
+  src/adapters/persistence/workflow/doop_document_live_tests.rs

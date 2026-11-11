@@ -1,0 +1,21 @@
+vault-rust-1: PASS
+vault-rust-2: PASS
+vault-browser: PASS
+html-rust-1: PASS
+html-browser: PASS
+knowledge-rust-1: PASS
+knowledge-browser: FAIL
+memory-rust-1: PASS
+memory-browser: FAIL
+agent-rust-1: PASS
+agent-browser: PASS
+local-agents-rust-1: PASS
+local-agents-browser: PASS
+agent-picker-rust-1: PASS
+agent-picker-browser: PASS
+session-rust-1: PASS
+session-browser: PASS
+decisions-rust-1: PASS
+decisions-rust-2: PASS
+decisions-browser: PASS
+Summary: 26/28 PASS

@@ -1,0 +1,9 @@
+{
+  "command": [
+    "scripts/test-network-isolation.sh",
+    "scripts/lease-budget.sh",
+    "--offline"
+  ],
+  "status": "PASS",
+  "exit_code": 0
+}

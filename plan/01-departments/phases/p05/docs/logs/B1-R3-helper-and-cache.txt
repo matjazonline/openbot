@@ -1,0 +1,17 @@
+PASS unique helper: doop_live_company_setup
+PASS unique helper: doop_lifecycle_live_company_keys
+PASS unique helper: doop_e2e_live_company_documents
+Helper SHA-256: b5161f08665d8e1ffaa61e0a4d803b9f3ca53dd48c58f313ebdcfc3789e7898b
+/Users/mac02/openbot-p05-r3-wr3kxbjm/openbot-doop-libtest:
+	/usr/lib/liblzma.5.dylib (compatibility version 6.0.0, current version 6.3.0)
+	/usr/lib/libbz2.1.0.dylib (compatibility version 1.0.0, current version 1.0.8)
+	/System/Library/Frameworks/CoreFoundation.framework/Versions/A/CoreFoundation (compatibility version 150.0.0, current version 4201.0.0)
+	/System/Library/Frameworks/SystemConfiguration.framework/Versions/A/SystemConfiguration (compatibility version 1.0.0, current version 1385.60.3)
+	/System/Library/Frameworks/Security.framework/Versions/A/Security (compatibility version 1.0.0, current version 61901.60.40)
+	/usr/lib/libiconv.2.dylib (compatibility version 7.0.0, current version 7.0.0)
+	/usr/lib/libSystem.B.dylib (compatibility version 1.0.0, current version 1356.0.0)
+
+Free bytes before: 8440107008
+Removing idle worktree-owned compiler cache: /Users/mac02/.codex/worktrees/2050/openbot/target/debug/incremental.p05-r3-aac51dea4ba44e56937c70216da5f359
+Free bytes after: 27483619328
+PASS: immutable helper still executes after incremental cache removal

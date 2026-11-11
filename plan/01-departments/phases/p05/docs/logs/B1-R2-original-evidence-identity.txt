@@ -1,0 +1,3 @@
+R1 manifest SHA-256: cd30008186e24aa03b5f004d393b5e173ea56b5a4db006deab31abb14c96f9cb
+All 56 unique R1 referenced files retain their exact pinned SHA-256 values.
+No R1 manifest, evidence bytes, results or artifact identity rewritten.

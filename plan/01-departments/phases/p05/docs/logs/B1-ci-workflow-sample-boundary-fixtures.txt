@@ -1,0 +1,6 @@
+Command: python3 scripts/tests/workflow-sample-boundary.py
+......
+----------------------------------------------------------------------
+Ran 6 tests in 0.051s
+
+OK

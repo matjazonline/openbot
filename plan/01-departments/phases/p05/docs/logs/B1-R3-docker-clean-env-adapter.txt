@@ -1,0 +1,5 @@
+Written file "/Users/mac02/openbot-p05-r3-wr3kxbjm/docker-context.tar"
+colima-openbot-p05-r3
+Successfully imported context "colima-openbot-p05-r3"
+PASS identical owned Docker engine before/after clean-env adapter: 9acd8d05-e39b-48d4-8f43-d1950b2cbb9b
+Global active context: default

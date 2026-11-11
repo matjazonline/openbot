@@ -1,0 +1,123 @@
+diff --git a/migrations/20260817000000_init_schema.sql b/migrations/20260817000000_init_schema.sql
+index f242f76a..8c53307d 100644
+--- a/migrations/20260817000000_init_schema.sql
++++ b/migrations/20260817000000_init_schema.sql
+@@ -5660,7 +5660,7 @@ CREATE TABLE public.workflow_provisioning_commands (
+ -- Name: TABLE workflow_provisioning_commands; Type: COMMENT; Schema: public; Owner: -
+ --
+ 
+-COMMENT ON TABLE public.workflow_provisioning_commands IS 'One assistant-desk command per key (p08 D2.4): the request digest decides replay or conflict, and the stored result is what a replay returns. Keys: a client key for "Create assistant desk"; agent:{agent_id} for the default desk a company agent is created with (01-departments p03), which also records which desk that was; department:{department_id} for a department''s desk, recording the desk and the binding the department owns (result.binding_id), which a lead change re-points, pauses or provisions and then records -- so this row is updated, not only replayed. The tool path needs none; its action receipt is the record.';
++COMMENT ON TABLE public.workflow_provisioning_commands IS 'One assistant-desk command per key (p08 D2.4): the request digest decides replay or conflict, and the stored result is what a replay returns. Keys: a client key for "Create additional desk"; agent:{agent_id} for the default desk a company agent is created with (01-departments p03), which also records which desk that was; department:{department_id} for a department''s desk, recording the desk and the binding the department owns (result.binding_id), which a lead change re-points, pauses or provisions and then records -- so this row is updated, not only replayed. The tool path needs none; its action receipt is the record.';
+ 
+ 
+ --
+diff --git a/plan/01-departments/05-integration-and-final-verification.md b/plan/01-departments/05-integration-and-final-verification.md
+index 2fe78593..c61cdb49 100644
+--- a/plan/01-departments/05-integration-and-final-verification.md
++++ b/plan/01-departments/05-integration-and-final-verification.md
+@@ -45,14 +45,29 @@ remain desks. No old rows or addresses need conversion.
+ 
+ | Evidence | Status |
+ | --- | --- |
+-| 01 focused checks (schema guards, writes, competing writers) | Pending |
+-| 02 focused checks (ownership, members-only, relay, desk wording) | Pending |
+-| 03 focused checks (automatic agent desks, competing creates, department desk, round trip, loop, directory) | Pending |
+-| 04 rendering and route tests, documentation checks | Pending |
+-| Formatting, offline compilation, clippy and reachability | Pending |
+-| Fresh migrations and SQLx metadata | Pending |
+-| Database-backed full suite and network isolation | Pending |
+-| Stack and lease budgets | Pending |
+-| Startup plan paths and graph refresh | Pending |
++| 01 focused checks (schema guards, writes, competing writers) | Accepted in p01; B1-R2 artifact `ccc4ee26…3880` |
++| 02 focused checks (ownership, members-only, relay, desk wording) | Accepted in p02; B1-R2 `cbca0a00…438f`, B2-R1 `6cd8b092…e5bf` |
++| 03 focused checks (automatic agent desks, competing creates, department desk, directory/context) | Accepted in p03; B1-R2 `a75c40e7…5798`, B2-R2 `31d16940…39ea`, B3-R2 `0db98506…dbf1`. Dispatch round-trip/loop checks deferred by user decision C004 r1; they are not implemented or claimed as passing. |
++| 04 rendering and route tests, documentation checks | Accepted in p04; B1-R2 `9cad3b57…3848`, B2-R2 `a97fdbeb…58ba`, B3-R2 `30567a29…c675` |
++| Formatting, offline compilation, clippy and reachability | PASS in p05 resumed gate |
++| Fresh migrations and SQLx metadata | PASS; fresh disposable DB preparation left `.sqlx` unchanged; resumed migrate/prepare check passed |
++| Database-backed full suite and network isolation | Network guard PASS; library 4,142 passed, 2 unrelated failures, 24 ignored. Binary target 5/5 PASS separately. See p05 TASK and retained source-identity evidence. |
++| Stack and lease budgets | Stock run at 2,048 KiB completed: 4,143 passed, 1 unrelated scanner failure, 24 ignored; no overflow. Lease budget PASS at unchanged 50% WORK threshold. |
++| Startup plan paths and graph refresh | PASS: CI integration-docs check and `graft build` |
++| CI-only static/browser protocols and plugin packaging | All 28 checks have successful evidence, retaining initial browser-prerequisite failures. Reproducible plugin package and locked production install PASS with Node 24.21.0/npm 11.19.0. |
++| Query statistics activation and privacy | PASS on a p05-owned PostgreSQL 18.6 cluster after fresh app migrations: required settings, zero parameter-log limits, numeric queryid and normalized query text asserted. Shared server unchanged. |
++| Docker production image, Doop deployment and live memory-service CI jobs | NOT EXERCISED: Docker daemon unavailable; local pgvector and pinned memory model absent. |
+ 
+ Do not declare the implementation complete while a required check is unavailable.
++
++The authoritative execution record is [p05 TASK](phases/p05/docs/TASK.md), with exact prerequisite
++artifact identities in `phases/p05/docs/logs/B1-prerequisite-identities.json`. The p05 integration
++gate remains incomplete. Independent review and next actions are tracked in p05 TASK/REVIEW.
++Required Docker image/Doop and live-memory CI jobs lack local prerequisites; these checks are
++recorded as NOT EXERCISED. The implementation is not declared complete and p05 is not accepted
++or integrated.
++
++Raw `.txt` and `.diff` evidence under p05 `docs/logs/` is archived as binary data by the
++phase-local `.gitattributes`, preserving pinned bytes and line endings. Source, Markdown, Python
++and JSON retain normal whitespace checks. Final staged whitespace and evidence retention are
++checked after staging the complete correction.
+diff --git a/plan/01-departments/phases/p04/docs/logs/01DEP-P04-B1-R1.evidence.json b/plan/01-departments/phases/p04/docs/logs/01DEP-P04-B1-R1.evidence.json
+index 5fe24797..97cdd6eb 100644
+--- a/plan/01-departments/phases/p04/docs/logs/01DEP-P04-B1-R1.evidence.json
++++ b/plan/01-departments/phases/p04/docs/logs/01DEP-P04-B1-R1.evidence.json
+@@ -72,7 +72,7 @@
+       "status": "PASS",
+       "files": [
+         {
+-          "path": "logs/B1-css-check.txt",
++          "path": "logs/B1-R1-css-check.txt",
+           "sha256": "1ee814ce333fe175ee82e3031f6fce1e1804735e25010e858d765789b3e251bf"
+         }
+       ]
+diff --git a/plan/01-departments/phases/p04/docs/logs/01DEP-P04-B2-R1.evidence.json b/plan/01-departments/phases/p04/docs/logs/01DEP-P04-B2-R1.evidence.json
+index 19c5e72c..807611a4 100644
+--- a/plan/01-departments/phases/p04/docs/logs/01DEP-P04-B2-R1.evidence.json
++++ b/plan/01-departments/phases/p04/docs/logs/01DEP-P04-B2-R1.evidence.json
+@@ -67,7 +67,7 @@
+       "status": "PASS",
+       "files": [
+         {
+-          "path": "logs/B2-css-check.txt",
++          "path": "logs/B2-R1-css-check.txt",
+           "sha256": "df7d0266b7cd3837efceab2a9aa9e86028cc68c342ff84310082246f3bbaf3e8"
+         }
+       ]
+diff --git a/plan/01-departments/phases/p04/docs/logs/B1-R1-css-check.txt b/plan/01-departments/phases/p04/docs/logs/B1-R1-css-check.txt
+new file mode 100644
+index 00000000..22b05ae2
+--- /dev/null
++++ b/plan/01-departments/phases/p04/docs/logs/B1-R1-css-check.txt
+@@ -0,0 +1,18 @@
++B1 CSS check (2026-11-10)
++
++Toolchain: /Users/mac02/dev/openbot/node_modules (tailwindcss 4.1.12, @tailwindcss/cli 4.1.12,
++daisyui 5.0.50 — the versions package-lock.json pins). This worktree has no node_modules.
++
++Reproducibility of the committed assets/app.css from its own sources (git archive <rev> src assets,
++node_modules symlinked, `tailwindcss -i assets/app.css.in -o built.css --minify`, cmp):
++  origin/main (6091c3cd)   REPRODUCES
++  merge base (3752ea35)    REPRODUCES
++  p03 head (30654e3c)      DIFFERS   <- drift introduced by p01–p03 classes (full gate was not run, I003)
++  HEAD b1026003            DIFFERS
++
++B1: assets/app.css regenerated from the working tree's src+assets with the same command, then
++rebuilt again from the result and compared: REPRODUCES ("CSS matches sources" after the last test
++edit). New classes present, e.g. sm:grid-cols-7, grid-cols-[auto_1fr],
++grid-cols-[minmax(0,1fr)_minmax(24rem,1.5fr)], divide-base-300, badge-ghost, whitespace-pre-wrap.
++This is the comparison scripts/check-css.sh and scripts/check.sh make.
++CSS matches sources
+diff --git a/plan/01-departments/phases/p04/docs/logs/B2-R1-css-check.txt b/plan/01-departments/phases/p04/docs/logs/B2-R1-css-check.txt
+new file mode 100644
+index 00000000..5956d6a0
+--- /dev/null
++++ b/plan/01-departments/phases/p04/docs/logs/B2-R1-css-check.txt
+@@ -0,0 +1 @@
++B2: CSS rebuilt for new classes; rebuild reproduces
+diff --git a/plan/01-departments/phases/p05/.gitattributes b/plan/01-departments/phases/p05/.gitattributes
+new file mode 100644
+index 00000000..224e8a1b
+--- /dev/null
++++ b/plan/01-departments/phases/p05/.gitattributes
+@@ -0,0 +1,4 @@
++# Preserve immutable machine output exactly, including terminal padding and patch context.
++# Source, Markdown, Python and JSON remain ordinary text with normal whitespace checks.
++docs/logs/*.txt binary
++docs/logs/*.diff binary

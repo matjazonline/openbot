@@ -1,0 +1,24 @@
+[
+  {
+    "name": "knowledge-browser-rerun",
+    "command": [
+      "node",
+      "--test",
+      "scripts/tests/knowledge-browser.mjs"
+    ],
+    "status": "PASS",
+    "exit_code": 0,
+    "log": "B1-ci-knowledge-browser-rerun-1.txt"
+  },
+  {
+    "name": "memory-browser-rerun",
+    "command": [
+      "node",
+      "--test",
+      "scripts/tests/memory-settings-browser.mjs"
+    ],
+    "status": "PASS",
+    "exit_code": 0,
+    "log": "B1-ci-memory-browser-rerun-1.txt"
+  }
+]

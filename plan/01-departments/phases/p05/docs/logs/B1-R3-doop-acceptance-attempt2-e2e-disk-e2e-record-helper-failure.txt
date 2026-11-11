@@ -1,0 +1,30 @@
+
+running 1 test
+DOOP_E2E_STAGE stage=environment_ready elapsed_ms=610
+DOOP_E2E_STAGE stage=company_registered_and_published elapsed_ms=2384
+DOOP_E2E_STAGE stage=company_registered_and_published elapsed_ms=3683
+DOOP_E2E_STAGE stage=documents_admitted elapsed_ms=4946
+DOOP_E2E_CHECKPOINT workers_idle=true
+DOOP_E2E_STAGE stage=model_listeners_started elapsed_ms=15372
+DOOP_E2E_CHECKPOINT workers_idle=true
+DOOP_E2E_STAGE stage=editor_approval_checkpoint elapsed_ms=33813
+test adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::live_tests::doop_e2e_live_company_documents has been running for over 60 seconds
+DOOP_E2E_CHECKPOINT workers_idle=true
+DOOP_E2E_STAGE stage=documents_terminal elapsed_ms=72577
+DOOP_E2E_CHECKPOINT workers_idle=true
+DOOP_E2E_STAGE stage=lost_receipt_parked elapsed_ms=75175
+DOOP_E2E_CHECKPOINT workers_idle=true
+DOOP_E2E_STAGE stage=healthy_progress_after_worker_restart elapsed_ms=75448
+
+thread 'adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::live_tests::doop_e2e_live_company_documents' (47575880) panicked at src/adapters/persistence/workflow/doop_document_live_tests.rs:280:41:
+called `Result::unwrap()` on an `Err` value: "scenario lifetime exceeded"
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::live_tests::doop_e2e_live_company_documents ... FAILED
+
+failures:
+
+failures:
+    adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::live_tests::doop_e2e_live_company_documents
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 4167 filtered out; finished in 75.77s
+

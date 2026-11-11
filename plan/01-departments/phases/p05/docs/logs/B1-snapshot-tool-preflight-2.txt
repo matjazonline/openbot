@@ -1,0 +1,8 @@
+base:   e7bc780ec7699051b99893d4f497bf2299c77738
+digest: e540902387d777e166e3f3e002d7bda81b79a99351994c6371162f14de4d37a4
+files:
+  plan/01-departments/05-integration-and-final-verification.md
+  plan/01-departments/phases/p04/docs/logs/01DEP-P04-B1-R1.evidence.json
+  plan/01-departments/phases/p04/docs/logs/01DEP-P04-B2-R1.evidence.json
+  plan/01-departments/phases/p04/docs/logs/B1-R1-css-check.txt
+  plan/01-departments/phases/p04/docs/logs/B2-R1-css-check.txt

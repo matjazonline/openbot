@@ -1,0 +1,11 @@
+Compared 1159 old and 1159 new files; changes: ['tests/fixtures/canvasClipboard.html']
+Excluded dependency/build/Git directories and generated public/claude-extension/doop.mcpb (ignored by .gitignore:3; package.json:9-10 builds it).
+All clipboard assertion bodies and timeout/skip definitions unchanged.
+Canonical patch SHA matches source.json; current helper and both Rust source hashes match retained identity.
+all-disk: PASS 42; current source/helper/image and cleanup match
+all-bucket: PASS 43; current source/helper/image and cleanup match
+e2e-disk: PASS 9; current source/helper/image and cleanup match
+e2e-bucket: PASS 10; current source/helper/image and cleanup match
+All R1/R2/R3 manifest-pinned evidence bytes remain intact.
+Workflow step types: [('canonical', 'data.url'), ('profile', 'mcp.call'), ('verify_bot', 'data.map'), ('verify_workspace', 'data.map'), ('create', 'mcp.call'), ('created', 'data.map'), ('verify_created_workspace', 'data.map'), ('read_created', 'mcp.call'), ('created_canvas', 'data.map'), ('verify_created_canvas', 'data.map'), ('edit', 'agent.run'), ('verify_editor', 'data.map'), ('read_final', 'mcp.call'), ('final_canvas', 'data.map'), ('verify_final_canvas', 'data.map'), ('result', 'data.map'), ('notify', 'message.send')]
+Editor routes: {'success': 'verify_editor'}

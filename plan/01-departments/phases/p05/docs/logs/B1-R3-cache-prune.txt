@@ -1,0 +1,4 @@
+Removed obsolete flat worktree cache files: 11734
+All current Cargo artifact stems retained: 516
+Free bytes before/after: 19103539200 34144542720
+Immutable helper SHA remains: b5161f08665d8e1ffaa61e0a4d803b9f3ca53dd48c58f313ebdcfc3789e7898b

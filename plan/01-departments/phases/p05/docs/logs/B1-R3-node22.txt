@@ -1,0 +1,1 @@
+{"executable":"/Users/mac02/.npm/_npx/52027bd8fc0022aa/node_modules/node/bin/node","version":"v22.23.4"}

@@ -1,0 +1,48 @@
+Unable to find image 'pgvector/pgvector:0.8.7-pg18-bookworm@sha256:c29f30688a9ad961691bdf0ec1650717cc132a5814619d80f80463d6e4c42e47' locally
+docker.io/pgvector/pgvector@sha256:c29f30688a9ad961691bdf0ec1650717cc132a5814619d80f80463d6e4c42e47: Pulling from pgvector/pgvector
+d984e615192d: Pulling fs layer
+9f78f619a5fd: Pulling fs layer
+7545fb0b63fa: Pulling fs layer
+ccfa6360a7c1: Pulling fs layer
+ba479aea154e: Pulling fs layer
+6f23811428c1: Pulling fs layer
+7c1968cf2205: Pulling fs layer
+3a714400795f: Pulling fs layer
+c3551ece5815: Pulling fs layer
+1d88b1983e0d: Pulling fs layer
+99fedaccd3e0: Pulling fs layer
+303c37b40732: Pulling fs layer
+814149cb3c95: Pulling fs layer
+4b698f6b7eef: Pulling fs layer
+ccfa6360a7c1: Download complete
+7545fb0b63fa: Download complete
+ba479aea154e: Download complete
+6f23811428c1: Download complete
+3a714400795f: Download complete
+c3551ece5815: Download complete
+99fedaccd3e0: Download complete
+7c1968cf2205: Download complete
+814149cb3c95: Download complete
+9f78f619a5fd: Download complete
+1d88b1983e0d: Download complete
+303c37b40732: Download complete
+3a714400795f: Pull complete
+4b698f6b7eef: Download complete
+814149cb3c95: Pull complete
+303c37b40732: Pull complete
+f96ad6e86860: Download complete
+4b698f6b7eef: Pull complete
+c3551ece5815: Pull complete
+99fedaccd3e0: Pull complete
+1d88b1983e0d: Pull complete
+d984e615192d: Download complete
+ccfa6360a7c1: Pull complete
+7545fb0b63fa: Pull complete
+ba479aea154e: Pull complete
+6f23811428c1: Pull complete
+d984e615192d: Pull complete
+7c1968cf2205: Pull complete
+9f78f619a5fd: Pull complete
+Digest: sha256:c29f30688a9ad961691bdf0ec1650717cc132a5814619d80f80463d6e4c42e47
+Status: Downloaded newer image for pgvector/pgvector@sha256:c29f30688a9ad961691bdf0ec1650717cc132a5814619d80f80463d6e4c42e47
+eef1340569419834c59b6b9f08886848d96a1ec339900290bf3aa7f600633672
