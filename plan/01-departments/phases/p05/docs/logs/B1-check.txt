@@ -1,0 +1,124 @@
+
+==> Generated CSS is current
+≈ tailwindcss v4.1.12
+
+(node:11692) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+/*! 🌼 daisyUI 5.0.50 */
+Done in 282ms
+
+==> SSE navigation lifecycle
+✔ library payload carries the agent's own fields and no retired runtime fields (1.346875ms)
+✔ accepted library writes show progress, prevent duplicate submits, and restore on failure (0.842542ms)
+✔ response form supports keyboard navigation and submit and shows request progress without dropping form fields (1734.3635ms)
+✔ ordinary page links release every stream before navigation (2.005125ms)
+✔ HTMX/prevented clicks, modified clicks, downloads and new tabs keep streams (1.914333ms)
+✔ anchors and non-document protocols keep streams (0.877042ms)
+✔ native filter submissions release all streams on every navigation (4.927042ms)
+✔ cancelled, HTMX, dialog and other-window submissions retain streams (1.571416ms)
+ℹ tests 8
+ℹ suites 0
+ℹ pass 8
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1974.323
+
+==> Deployment script tests
+deployment model-stage/non-root/missing-model gate assertions passed
+deploy script tests passed
+credential key rollout script tests passed
+
+==> Formatting
+
+==> Patch whitespace
+
+==> Transport abstraction boundary
+runtime boundary gate regression tests passed
+transport boundary check passed
+
+==> Workflow evidence validator fixtures
+............
+----------------------------------------------------------------------
+Ran 12 tests in 0.806s
+
+OK
+
+==> Retained workflow evidence
+evidence validation failed: evidence hash mismatch: logs/B1-css-check.txt
+/Users/mac02/.codex/worktrees/2050/openbot/plan/.archive/cloudroom-local/phases/p01/docs/logs/CL-P01-B1-R1.evidence.json: retained evidence valid {"FAIL": 0, "NOT EXERCISED": 1, "PASS": 5}
+/Users/mac02/.codex/worktrees/2050/openbot/plan/.archive/cloudroom-local/phases/p01/docs/logs/CL-P01-B1-R3.evidence.json: retained evidence valid {"FAIL": 0, "NOT EXERCISED": 1, "PASS": 5}
+/Users/mac02/.codex/worktrees/2050/openbot/plan/.archive/cloudroom-local/phases/p02/docs/logs/CL-P02-B1-R1.evidence.json: retained evidence valid {"FAIL": 1, "NOT EXERCISED": 1, "PASS": 6}
+/Users/mac02/.codex/worktrees/2050/openbot/plan/.archive/cloudroom-local/phases/p02/docs/logs/CL-P02-B1-R2.evidence.json: retained evidence valid {"FAIL": 3, "NOT EXERCISED": 1, "PASS": 6}
+/Users/mac02/.codex/worktrees/2050/openbot/plan/.archive/cloudroom-local/phases/p03/docs/logs/CL-P03-B1-R1.evidence.json: retained evidence valid {"FAIL": 3, "NOT EXERCISED": 2, "PASS": 5}
+/Users/mac02/.codex/worktrees/2050/openbot/plan/.archive/cloudroom-local/phases/p03/docs/logs/CL-P03-B1-R2.evidence.json: retained evidence valid {"FAIL": 4, "NOT EXERCISED": 2, "PASS": 6}
+/Users/mac02/.codex/worktrees/2050/openbot/plan/.archive/cloudroom-local/phases/p04/docs/logs/CL-P04-B1-R1.evidence.json: retained evidence valid {"FAIL": 3, "NOT EXERCISED": 2, "PASS": 5}
+/Users/mac02/.codex/worktrees/2050/openbot/plan/.archive/cloudroom-local/phases/p04/docs/logs/CL-P04-B1-R2.evidence.json: retained evidence valid {"FAIL": 0, "NOT EXERCISED": 2, "PASS": 5}
+/Users/mac02/.codex/worktrees/2050/openbot/plan/.archive/cloudroom-local/phases/p05/docs/logs/CL-P05-B1-R1.evidence.json: retained evidence valid {"FAIL": 0, "NOT EXERCISED": 0, "PASS": 10}
+/Users/mac02/.codex/worktrees/2050/openbot/plan/.archive/cloudroom-local/phases/p05/docs/logs/CL-P05-B1-R2.evidence.json: retained evidence valid {"FAIL": 2, "NOT EXERCISED": 0, "PASS": 11}
+/Users/mac02/.codex/worktrees/2050/openbot/plan/.archive/cloudroom-local/phases/p06/docs/logs/CL-P06-B1-R1.evidence.json: retained evidence valid {"FAIL": 0, "NOT EXERCISED": 2, "PASS": 11}
+/Users/mac02/.codex/worktrees/2050/openbot/plan/.archive/cloudroom-local/phases/p06/docs/logs/CL-P06-B1-R2.evidence.json: retained evidence valid {"FAIL": 0, "NOT EXERCISED": 2, "PASS": 15}
+/Users/mac02/.codex/worktrees/2050/openbot/plan/.archive/cloudroom-local/phases/p07/docs/logs/CL-P07-B1-R2.final-v2.evidence.json: retained evidence valid {"FAIL": 0, "NOT EXERCISED": 2, "PASS": 65}
+/Users/mac02/.codex/worktrees/2050/openbot/plan/.archive/cloudroom-local/phases/p07/docs/logs/CL-P07-B1-R2.preliminary.evidence.json: retained evidence valid {"FAIL": 0, "NOT EXERCISED": 3, "PASS": 3}
+/Users/mac02/.codex/worktrees/2050/openbot/plan/.archive/cloudroom-local/publication/logs/CL-PUB-R1.final.evidence.json: retained evidence valid {"FAIL": 6, "NOT EXERCISED": 1, "PASS": 55}
+/Users/mac02/.codex/worktrees/2050/openbot/plan/.archive/cloudroom-local/publication/logs/CL-PUB-R1.preliminary.evidence.json: retained evidence valid {"FAIL": 0, "NOT EXERCISED": 1, "PASS": 5}
+/Users/mac02/.codex/worktrees/2050/openbot/plan/.archive/vault-google/integration/publication-06-07/docs/logs/VG-PUB67-B1-R1.evidence.json: retained evidence valid {"FAIL": 0, "NOT EXERCISED": 1, "PASS": 11}
+/Users/mac02/.codex/worktrees/2050/openbot/plan/.archive/vault-google/integration/publication-06-07/docs/logs/VG-PUB67-RELEASE.evidence.json: retained evidence valid {"FAIL": 0, "NOT EXERCISED": 0, "PASS": 1}
+/Users/mac02/.codex/worktrees/2050/openbot/plan/.archived/04-autonomous-agent-history/integration/final/docs/logs/AH-FINAL-B1-R1.evidence.json: retained evidence valid {"FAIL": 0, "NOT EXERCISED": 1, "PASS": 20}
+/Users/mac02/.codex/worktrees/2050/openbot/plan/.archived/04-autonomous-agent-history/integration/publication/docs/logs/AH-PUBLISH-B1-R1.evidence.json: retained evidence valid {"FAIL": 2, "NOT EXERCISED": 1, "PASS": 18}
+/Users/mac02/.codex/worktrees/2050/openbot/plan/.archived/04-autonomous-agent-history/phases/p05/docs/logs/AH-P05-AG1-R1.evidence.json: retained evidence valid {"FAIL": 1, "NOT EXERCISED": 1, "PASS": 0}
+/Users/mac02/.codex/worktrees/2050/openbot/plan/.archived/04-autonomous-agent-history/phases/p05/docs/logs/AH-P05-B1-R1.evidence.json: retained evidence valid {"FAIL": 0, "NOT EXERCISED": 0, "PASS": 17}
+/Users/mac02/.codex/worktrees/2050/openbot/plan/.archived/04-autonomous-agent-history/phases/p06/docs/logs/AH-P06-AG1-R1.evidence.json: retained evidence valid {"FAIL": 0, "NOT EXERCISED": 1, "PASS": 0}
+/Users/mac02/.codex/worktrees/2050/openbot/plan/.archived/04-autonomous-agent-history/phases/p06/docs/logs/AH-P06-AG1-R2.evidence.json: retained evidence valid {"FAIL": 0, "NOT EXERCISED": 1, "PASS": 0}
+/Users/mac02/.codex/worktrees/2050/openbot/plan/.archived/04-autonomous-agent-history/phases/p06/docs/logs/AH-P06-AG1-R3.evidence.json: retained evidence valid {"FAIL": 0, "NOT EXERCISED": 1, "PASS": 0}
+/Users/mac02/.codex/worktrees/2050/openbot/plan/.archived/04-autonomous-agent-history/phases/p06/docs/logs/AH-P06-B1-R1.evidence.json: retained evidence valid {"FAIL": 3, "NOT EXERCISED": 0, "PASS": 17}
+/Users/mac02/.codex/worktrees/2050/openbot/plan/.archived/04-autonomous-agent-history/phases/p06/docs/logs/AH-P06-B1-R2.evidence.json: retained evidence valid {"FAIL": 5, "NOT EXERCISED": 0, "PASS": 17}
+/Users/mac02/.codex/worktrees/2050/openbot/plan/.archived/04-autonomous-agent-history/phases/p07/docs/logs/AH-P07-B1-R1.evidence.json: retained evidence valid {"FAIL": 10, "NOT EXERCISED": 1, "PASS": 24}
+/Users/mac02/.codex/worktrees/2050/openbot/plan/01-departments/phases/p01/docs/logs/01DEP-P01-B1-R1.evidence.json: retained evidence valid {"FAIL": 0, "NOT EXERCISED": 1, "PASS": 6}
+/Users/mac02/.codex/worktrees/2050/openbot/plan/01-departments/phases/p01/docs/logs/01DEP-P01-B1-R2.evidence.json: retained evidence valid {"FAIL": 1, "NOT EXERCISED": 1, "PASS": 4}
+/Users/mac02/.codex/worktrees/2050/openbot/plan/01-departments/phases/p02/docs/logs/01DEP-P02-B1-R1.evidence.json: retained evidence valid {"FAIL": 1, "NOT EXERCISED": 1, "PASS": 5}
+/Users/mac02/.codex/worktrees/2050/openbot/plan/01-departments/phases/p02/docs/logs/01DEP-P02-B1-R2.evidence.json: retained evidence valid {"FAIL": 1, "NOT EXERCISED": 1, "PASS": 3}
+/Users/mac02/.codex/worktrees/2050/openbot/plan/01-departments/phases/p02/docs/logs/01DEP-P02-B2-R1.evidence.json: retained evidence valid {"FAIL": 1, "NOT EXERCISED": 1, "PASS": 6}
+/Users/mac02/.codex/worktrees/2050/openbot/plan/01-departments/phases/p03/docs/logs/01DEP-P03-B1-R1.evidence.json: retained evidence valid {"FAIL": 1, "NOT EXERCISED": 0, "PASS": 3}
+/Users/mac02/.codex/worktrees/2050/openbot/plan/01-departments/phases/p03/docs/logs/01DEP-P03-B1-R2.evidence.json: retained evidence valid {"FAIL": 2, "NOT EXERCISED": 0, "PASS": 3}
+/Users/mac02/.codex/worktrees/2050/openbot/plan/01-departments/phases/p03/docs/logs/01DEP-P03-B2-R1.evidence.json: retained evidence valid {"FAIL": 1, "NOT EXERCISED": 0, "PASS": 3}
+/Users/mac02/.codex/worktrees/2050/openbot/plan/01-departments/phases/p03/docs/logs/01DEP-P03-B2-R2.evidence.json: retained evidence valid {"FAIL": 0, "NOT EXERCISED": 0, "PASS": 3}
+/Users/mac02/.codex/worktrees/2050/openbot/plan/01-departments/phases/p03/docs/logs/01DEP-P03-B3-R1.evidence.json: retained evidence valid {"FAIL": 2, "NOT EXERCISED": 0, "PASS": 3}
+/Users/mac02/.codex/worktrees/2050/openbot/plan/01-departments/phases/p03/docs/logs/01DEP-P03-B3-R2.evidence.json: retained evidence valid {"FAIL": 0, "NOT EXERCISED": 0, "PASS": 2}
+
+==> Fetch locked Rust dependencies
+
+==> Offline compilation
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.23s
+
+==> Clippy
+    Checking open_bots v0.1.0 (/Users/mac02/.codex/worktrees/2050/openbot)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 41.43s
+
+==> Migrations
+
+==> SQLx metadata matches migrated schema
+    Checking open_bots v0.1.0 (/Users/mac02/.codex/worktrees/2050/openbot)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 19.79s
+
+==> Compile tests
+   Compiling open_bots v0.1.0 (/Users/mac02/.codex/worktrees/2050/openbot)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1m 56s
+  Executable unittests src/lib.rs (target/debug/deps/open_bots-c4f538027eed5c31)
+  Executable unittests src/main.rs (target/debug/deps/open_bots-4d11050c2697d5f8)
+  Executable tests/source_modules.rs (target/debug/deps/source_modules-a453341e81152e67)
+
+==> Rust source module reachability
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.66s
+     Running tests/source_modules.rs (target/debug/deps/source_modules-a453341e81152e67)
+
+running 8 tests
+test comments_and_strings_do_not_declare_modules ... ok
+test conditional_inline_paths_keep_the_ordinary_directory_reachable ... ok
+test cfg_attr_paths_and_literal_includes_are_connected ... ok
+test included_files_resolve_nested_modules_and_includes_like_rustc ... ok
+test unresolved_forms_and_recursive_includes_fail_explicitly ... ok
+test removed_module_and_removed_ancestor_leave_detectable_orphans ... ok
+test inline_path_and_conditional_modules_are_connected ... ok
+Terminated: 15

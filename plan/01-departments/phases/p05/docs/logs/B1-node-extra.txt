@@ -1,0 +1,25 @@
+✔ late attribution and reconnect keep both replies, composer and stream owner (2512.943583ms)
+✔ a reconnect backlog keeps an explicit 200-message live window and the composer (2514.242208ms)
+✔ a late body read cannot remove preserved steps after a cancel or navigation (5040.081542ms)
+✔ an actual SSE disconnect reconciles and preserves an unfinished note and disclosure (2345.411417ms)
+✔ a waiting parent refreshes a child badge on the child wakeup without reconnecting (2096.77275ms)
+✔ board: two window reads completing out of order show the later choice (1991.183458ms)
+✔ board: opening a run while a filter read is in flight keeps the chosen filters (2948.519167ms)
+✔ list: a wake-up during a filter read reads the new filter instead of undoing it (2470.685333ms)
+✔ board: a filter change while a wake-up read is in flight wins (2056.346458ms)
+✔ board: a burst of run events reads at most once per two seconds and shows the final state (8574.287167ms)
+✔ board: constant change still reads every two seconds and never starves (12331.589875ms)
+✔ phone: a stream-driven or polled pane reload leaves the reader on the list; opening a run still moves them (2818.944375ms)
+✔ board: reads slower than the interval never overlap and keep landing under constant change (13648.985625ms)
+✔ board: a run change during a filter read is read again after it, on the new leaf (6323.82ms)
+✔ board: two quick filter changes do not leave the coalescer waiting for ever (4291.608208ms)
+✔ sample progress, failed request recovery and late navigation response use the requesting form (3007.722667ms)
+✔ actual sample textarea template preserves leading newlines for every raw JSON field (2120.848292ms)
+ℹ tests 17
+ℹ suites 0
+ℹ pass 17
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 67128.103541

@@ -3,7 +3,7 @@
 - Authority: /Users/mac02/.codex/worktrees/2050/openbot/plan/01-departments/COORDINATION.md
 - Writer: root session 68933786-cbe7-4b6b-9387-b5dcb29689a4, worktree
   /Users/mac02/.codex/worktrees/2050/openbot (branch codex/departments-addressing-plans)
-- Revision: 9
+- Revision: 10
 
 ## Plan-wide instructions
 
@@ -25,7 +25,7 @@
 | p02 | root 68933786 (A), B per TASK | /Users/mac02/.codex/worktrees/2050/openbot | plan/01-departments/phases/p02/docs/{TASK,HANDOFF}.md — accepted in phase (B2 0c5df403, B1 next commit) |
 | p03 | root 68933786 (A), B per TASK | /Users/mac02/.codex/worktrees/2050/openbot | plan/01-departments/phases/p03/docs/{TASK,HANDOFF}.md — accepted in phase (B1 523732b7, B2 01608b1f, B3 30654e3c) |
 | p04 | root 68933786 (A), B per TASK | /Users/mac02/.codex/worktrees/2050/openbot | plan/01-departments/phases/p04/docs/{TASK,HANDOFF}.md — accepted in phase (B1 399efe2c, B2 5c64e7d1, B3 next commit) |
-| p05 | root 68933786 (A), B per TASK | /Users/mac02/.codex/worktrees/2050/openbot | plan/01-departments/phases/p05/docs/{TASK,HANDOFF}.md — next |
+| p05 | root 68933786 (A), B per TASK | /Users/mac02/.codex/worktrees/2050/openbot | plan/01-departments/phases/p05/docs/{TASK,HANDOFF}.md — in progress, paused at a checkpoint (start c42fc15d) |
 
 ## Cross-phase notices
 

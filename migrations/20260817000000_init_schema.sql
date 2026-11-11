@@ -5660,7 +5660,7 @@ CREATE TABLE public.workflow_provisioning_commands (
 -- Name: TABLE workflow_provisioning_commands; Type: COMMENT; Schema: public; Owner: -
 --
 
-COMMENT ON TABLE public.workflow_provisioning_commands IS 'One assistant-desk command per key (p08 D2.4): the request digest decides replay or conflict, and the stored result is what a replay returns. Keys: a client key for "Create assistant desk"; agent:{agent_id} for the default desk a company agent is created with (01-departments p03), which also records which desk that was; department:{department_id} for a department''s desk, recording the desk and the binding the department owns (result.binding_id), which a lead change re-points, pauses or provisions and then records -- so this row is updated, not only replayed. The tool path needs none; its action receipt is the record.';
+COMMENT ON TABLE public.workflow_provisioning_commands IS 'One assistant-desk command per key (p08 D2.4): the request digest decides replay or conflict, and the stored result is what a replay returns. Keys: a client key for "Create additional desk"; agent:{agent_id} for the default desk a company agent is created with (01-departments p03), which also records which desk that was; department:{department_id} for a department''s desk, recording the desk and the binding the department owns (result.binding_id), which a lead change re-points, pauses or provisions and then records -- so this row is updated, not only replayed. The tool path needs none; its action receipt is the record.';
 
 
 --
