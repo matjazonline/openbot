@@ -28,7 +28,8 @@ The package includes `dist/server.js`; the Cloudroom plugin host supplies `BbPlu
 The archive includes a runtime npm shrinkwrap, and its companion integrity file records SHA-256.
 Packaging repeats the build and archive step and rejects differing bytes. Follow
 [OPERATIONS.md](OPERATIONS.md) for the pinned source build, public CLI install/remove,
-single-profile service templates, backup/restore and uncertainty handling.
+single-profile service templates, backup/restore and uncertainty handling. Its one-step
+`node scripts/install-local.mjs` runs that build, packaging and registration for one profile.
 
 In the plugin's Cloudroom settings, set **Openbot HTTPS origin**, **Machine name**, **Selected
 project IDs** (one per line), and the transient secret **Pairing code** generated in Openbot.
