@@ -161,12 +161,13 @@ async fn cloudroom_commands_explicit_uncertainty_reconciles_before_new_effects()
     reconnect_uncertain(Uncertainty::Peer).await;
 }
 
-fn refusals() -> [LocalRefusal; 7] {
+fn refusals() -> [LocalRefusal; 8] {
     [
         LocalRefusal::ProjectUnavailable,
         LocalRefusal::ProviderUnavailable,
         LocalRefusal::ModelUnavailable,
         LocalRefusal::ReasoningUnavailable,
+        LocalRefusal::PermissionsUnavailable,
         LocalRefusal::Capacity,
         LocalRefusal::Expired,
         LocalRefusal::RecoveryRequired,

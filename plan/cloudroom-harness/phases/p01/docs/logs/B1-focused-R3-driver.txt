@@ -1,0 +1,15 @@
+{"starting": "format", "command": ["cargo", "fmt", "--all"]}
+{"name": "format", "command": ["cargo", "fmt", "--all"], "exit": 0, "elapsed_s": 3.24, "log": "B1-focused-R3-format.txt"}
+{"starting": "offline-alltargets", "command": ["cargo", "check", "--locked", "--offline", "--all-targets"]}
+{"name": "offline-alltargets", "command": ["cargo", "check", "--locked", "--offline", "--all-targets"], "exit": 0, "elapsed_s": 23.524, "log": "B1-focused-R3-offline-alltargets.txt"}
+{"starting": "all-skill-callers", "command": ["cargo", "test", "--locked", "--offline", "--lib", "skill"]}
+{"name": "all-skill-callers", "command": ["cargo", "test", "--locked", "--offline", "--lib", "skill"], "exit": 0, "elapsed_s": 105.904, "log": "B1-focused-R3-all-skill-callers.txt"}
+{"starting": "browser-fixtures", "command": ["cargo", "test", "--locked", "--offline", "--lib", "dump_skill_bundle_browser_fixtures", "--", "--ignored"]}
+{"name": "browser-fixtures", "command": ["cargo", "test", "--locked", "--offline", "--lib", "dump_skill_bundle_browser_fixtures", "--", "--ignored"], "exit": 0, "elapsed_s": 0.768, "log": "B1-focused-R3-browser-fixtures.txt"}
+{"starting": "browser", "command": ["node", "--test", "scripts/tests/skill-bundle-browser.mjs"]}
+{"name": "browser", "command": ["node", "--test", "scripts/tests/skill-bundle-browser.mjs"], "exit": 0, "elapsed_s": 1.622, "log": "B1-focused-R3-browser.txt"}
+{"starting": "clippy", "command": ["cargo", "clippy", "--locked", "--offline", "--all-targets", "--", "-D", "warnings"]}
+{"name": "clippy", "command": ["cargo", "clippy", "--locked", "--offline", "--all-targets", "--", "-D", "warnings"], "exit": 0, "elapsed_s": 44.662, "log": "B1-focused-R3-clippy.txt"}
+{"starting": "sqlx-prepare-check", "command": ["cargo", "sqlx", "prepare", "--check", "--", "--all-targets"]}
+{"name": "sqlx-prepare-check", "command": ["cargo", "sqlx", "prepare", "--check", "--", "--all-targets"], "exit": 0, "elapsed_s": 20.687, "log": "B1-focused-R3-sqlx-prepare-check.txt"}
+{"completed": 7, "failures": []}

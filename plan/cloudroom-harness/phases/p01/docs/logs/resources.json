@@ -1,0 +1,16 @@
+{
+  "parent": "/private/tmp/openbot-cloudroom-harness-t1gfnhz1",
+  "worktree": "/private/tmp/openbot-cloudroom-harness-t1gfnhz1/worktree",
+  "records": "/private/tmp/openbot-cloudroom-harness-t1gfnhz1/worktree/plan/cloudroom-harness/phases/p01/docs",
+  "pg_data": "/private/tmp/openbot-cloudroom-harness-t1gfnhz1/postgres/data",
+  "pg_port": 63451,
+  "database": "postgresql://mac02@127.0.0.1:63451/openbot_cloudroom_harness_t1gfnhz1",
+  "target": "/private/tmp/openbot-cloudroom-harness-t1gfnhz1/target",
+  "node": "/private/tmp/openbot-doop-main-k49qm1op/toolchains/node-v24.21.0-darwin-arm64/bin",
+  "cloudroom_source": "/private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom",
+  "playwright": "/private/tmp/openbot-doop-p01-lt29hi9q/playwright",
+  "services_owned": true,
+  "bounds": "PostgreSQL max_connections100, defaults unchanged",
+  "services_running": false,
+  "postgres_stopped_at_user_request": true
+}

@@ -120,7 +120,7 @@ async fn connect(
     upgrade: WebSocketUpgrade,
 ) -> AppResult<Response> {
     let deadline = Instant::now() + Duration::from_secs(HANDSHAKE_SECONDS);
-    if one_header(&headers, "x-openbot-protocol-version")? != "1" {
+    if one_header(&headers, "x-openbot-protocol-version")? != PROTOCOL_VERSION.to_string() {
         return Err(AppError::BadRequest(
             "unsupported local-machine protocol".into(),
         ));

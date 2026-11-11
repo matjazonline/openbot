@@ -122,7 +122,14 @@ impl AgentPreparation for PostgresPersistence {
                     return Ok(AgentPreparationResult::AtCapacity);
                 }
             };
-        let provider = ModelProvider::from(prepared.selection().agent().model.provider.as_str());
+        let provider = ModelProvider::from(
+            prepared
+                .selection()
+                .agent()
+                .hosted_model()?
+                .provider
+                .as_str(),
+        );
         let secret = crate::application::use_cases::company::CompanyPersistence::model_api_key(
             self,
             scope.company.as_uuid(),

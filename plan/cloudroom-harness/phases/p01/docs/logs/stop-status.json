@@ -1,0 +1,27 @@
+{
+  "status": "PAUSED AT USER REQUEST",
+  "weekly_remaining_percent": 3,
+  "weekly_checked_at_utc": "2026-11-10T22:42:15Z",
+  "source_digest": "c7f1caa6465907c7b7f01a19bf9e0571a63704f810a2d18f3eac0a3c8545faea",
+  "optional_model_focused_results": {
+    "agent-domain": {
+      "passed": 17,
+      "failed": 0,
+      "ignored": 0
+    },
+    "publication-db": {
+      "passed": 37,
+      "failed": 0,
+      "ignored": 0
+    },
+    "workflow-publication": {
+      "passed": 35,
+      "failed": 0,
+      "ignored": 0
+    }
+  },
+  "postgres": "owned server stopped; data preserved",
+  "reviewers": "none active after daemon recovery",
+  "full_feature": "incomplete; no B2 source review/acceptance",
+  "recorded_at_utc": "2026-11-10T22:43:39.866367+00:00"
+}

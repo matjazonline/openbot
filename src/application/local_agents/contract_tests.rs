@@ -100,7 +100,7 @@ fn cloudroom_bounds_output_and_catalog_decode_at_their_limits() {
         json!({"model":"provider/model","reasoning_levels":["none"]});
         MAX_MODELS_PER_PROVIDER
     ];
-    let valid = json!({"projects":projects,"providers":[{"provider":"codex","models":models}]});
+    let valid = json!({"projects":projects,"providers":[{"provider":"codex","permission_modes":["full","auto","accept_edits"],"models":models}]});
     assert!(serde_json::from_value::<LocalCatalog>(valid.clone()).is_ok());
     let mut too_many_projects = valid.clone();
     too_many_projects["projects"]
@@ -114,7 +114,8 @@ fn cloudroom_bounds_output_and_catalog_decode_at_their_limits() {
         .unwrap()
         .push(json!({"model":"model_2","reasoning_levels":["none"]}));
     assert!(serde_json::from_value::<LocalCatalog>(too_many_models).is_err());
-    let provider = json!({"provider":"codex","models":[]});
+    let provider =
+        json!({"provider":"codex","permission_modes":["full","auto","accept_edits"],"models":[]});
     assert!(
         serde_json::from_value::<LocalCatalog>(
             json!({"projects":[],"providers":vec![provider.clone(); MAX_PROVIDERS]})
@@ -135,7 +136,7 @@ fn cloudroom_bounds_admission_preserves_control_capacity() {
         "kind":"create", "session_id":uuid::Uuid::new_v4(), "prompt":"hello",
         "selection":{
             "machine_id":uuid::Uuid::new_v4(), "project_id":"project_1", "provider":"codex", "model":"gpt-model",
-            "policy":{"workspace":"project_directory","permissions":"provider_default","reasoning":"none"}
+            "policy":{"workspace":"project_directory","permissions":"full","reasoning":"none"}
         }
     })).unwrap();
     assert!(
@@ -280,7 +281,7 @@ fn open_code_selection() -> ExecutionSelection {
     serde_json::from_value(json!({
         "machine_id":uuid::Uuid::new_v4(), "project_id":"proj_smoke", "provider":"acp-opencode",
         "model":"openai/gpt-6-luna", "policy":{
-            "workspace":"project_directory", "permissions":"provider_default", "reasoning":"low"
+            "workspace":"project_directory", "permissions":"full", "reasoning":"low"
         }
     }))
     .unwrap()
@@ -328,7 +329,7 @@ fn cloudroom_contract_reasoning_is_frozen_into_the_create_digest() {
 fn cloudroom_contract_catalog_refuses_unsupported_model_reasoning() {
     let mut selection = open_code_selection();
     let raw = json!({"projects":["proj_smoke"],"providers":[{
-        "provider":"acp-opencode","models":[{"model":"openai/gpt-6-luna","reasoning_levels":["low","high"]}]
+        "provider":"acp-opencode","permission_modes":["full","auto","accept_edits"],"models":[{"model":"openai/gpt-6-luna","reasoning_levels":["low","high"]}]
     }]});
     let catalog: LocalCatalog = serde_json::from_value(raw.clone()).unwrap();
     assert!(catalog.validate_selection(&selection).is_ok());
@@ -400,4 +401,29 @@ fn cloudroom_contract_aligned_leap_seconds_are_not_representable_operation_deadl
         serde_json::from_value::<LocalAgentOperation>(forged_deadline_record(&operation, leap))
             .is_err()
     );
+}
+
+#[test]
+fn cloudroom_catalog_requires_explicit_supported_permissions() {
+    let mut selection = open_code_selection();
+    let raw = json!({"projects":["proj_smoke"],"providers":[{
+        "provider":"acp-opencode","permission_modes":["auto","accept_edits"],
+        "models":[{"model":"openai/gpt-6-luna","reasoning_levels":["low"]}]
+    }]});
+    let catalog: LocalCatalog = serde_json::from_value(raw.clone()).unwrap();
+    assert!(catalog.validate_selection(&selection).is_err());
+    for mode in [LocalPermissions::Auto, LocalPermissions::AcceptEdits] {
+        selection.policy.permissions = mode;
+        assert!(catalog.validate_selection(&selection).is_ok());
+    }
+    let mut missing = raw.clone();
+    missing["providers"][0]
+        .as_object_mut()
+        .unwrap()
+        .remove("permission_modes");
+    assert!(serde_json::from_value::<LocalCatalog>(missing).is_err());
+    let mut oversized = raw;
+    oversized["providers"][0]["permission_modes"] = json!(["full", "auto", "accept_edits", "full"]);
+    assert!(serde_json::from_value::<LocalCatalog>(oversized).is_err());
+    assert!(serde_json::from_value::<LocalPermissions>(json!("provider_default")).is_err());
 }

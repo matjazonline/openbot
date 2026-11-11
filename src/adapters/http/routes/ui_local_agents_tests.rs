@@ -61,6 +61,14 @@ fn profile_fields(profile: &LocalAgentProfile) -> Vec<(&'static str, String)> {
         ),
         ("model", profile.selection.model.as_str().to_owned()),
         (
+            "permissions",
+            serde_json::to_value(profile.selection.policy.permissions)
+                .unwrap()
+                .as_str()
+                .unwrap()
+                .to_owned(),
+        ),
+        (
             "reasoning",
             serde_json::to_value(profile.selection.policy.reasoning)
                 .unwrap()
@@ -321,4 +329,90 @@ async fn cloudroom_management_ui_foreign_selection_and_form_mutations_cannot_cro
             .unwrap();
         assert_eq!(response.status(), StatusCode::NOT_FOUND, "{path}");
     }
+}
+
+#[tokio::test]
+async fn cloudroom_management_ui_explicit_permissions_default_full_and_roundtrip_lower_modes() {
+    let (f, profile) = profile_fixture().await;
+    let (app, authority) = app(&f);
+    let cookie = cookie(&f, &authority, f.owner).await;
+    let base = format!("/ui/companies/{}/local-agents", f.company);
+    let response = app
+        .clone()
+        .oneshot(request(
+            Method::GET,
+            &format!("{base}?machine={}", profile.selection.machine_id),
+            &cookie,
+            json!({}),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let rendered = html(response).await;
+    assert!(rendered.contains("name=\"permissions\""));
+    assert!(rendered.contains("<option value=\"full\" selected>Full access</option>"));
+    for mode in ["full", "auto", "accept_edits"] {
+        let mut fields = profile_fields(&profile);
+        fields
+            .iter_mut()
+            .find(|(key, _)| *key == "permissions")
+            .unwrap()
+            .1 = mode.into();
+        let response = app
+            .clone()
+            .oneshot(form_request(
+                &format!("{base}/profiles/{}", profile.id),
+                &cookie,
+                &fields,
+            ))
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::SEE_OTHER);
+        let response = app
+            .clone()
+            .oneshot(request(
+                Method::GET,
+                &format!("{base}?profile={}", profile.id),
+                &cookie,
+                json!({}),
+            ))
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        assert!(
+            html(response)
+                .await
+                .contains(&format!("<option value=\"{mode}\" selected>"))
+        );
+    }
+    let mut fields = profile_fields(&profile);
+    fields
+        .iter_mut()
+        .find(|(key, _)| *key == "permissions")
+        .unwrap()
+        .1 = "provider_default".into();
+    let response = app
+        .clone()
+        .oneshot(form_request(
+            &format!("{base}/profiles/{}", profile.id),
+            &cookie,
+            &fields,
+        ))
+        .await
+        .unwrap();
+    assert!(response.status().is_client_error());
+    let response = app
+        .oneshot(request(
+            Method::GET,
+            &format!("{base}?profile={}", profile.id),
+            &cookie,
+            json!({}),
+        ))
+        .await
+        .unwrap();
+    assert!(
+        html(response)
+            .await
+            .contains("<option value=\"accept_edits\" selected>")
+    );
 }

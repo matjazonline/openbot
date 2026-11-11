@@ -1,0 +1,10 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.23s
+     Running unittests src/lib.rs (/private/tmp/openbot-cloudroom-harness-t1gfnhz1/target/debug/deps/open_bots-6467f0b3ff334015)
+
+running 3 tests
+test adapters::persistence::agent_publication::tests::skills::autonomous_agent_skills_shared_edit_does_not_change_frozen_text_or_live_assignment ... ok
+test adapters::persistence::agent_publication::tests::skills::autonomous_agent_skills_missing_requirement_preserves_active_without_adding_grants ... ok
+test adapters::persistence::agent_publication::tests::skills::autonomous_agent_skills_removal_reassignment_and_explicit_revoke_preserve_incarnations ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 4050 filtered out; finished in 0.43s
+

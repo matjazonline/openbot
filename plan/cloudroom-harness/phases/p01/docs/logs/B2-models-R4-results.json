@@ -1,0 +1,59 @@
+[
+  {
+    "check": "format",
+    "command": [
+      "cargo",
+      "fmt",
+      "--all"
+    ],
+    "cwd": "/private/tmp/openbot-cloudroom-harness-t1gfnhz1/worktree",
+    "exit": 0,
+    "elapsed_s": 3.12,
+    "log": "/private/tmp/openbot-cloudroom-harness-t1gfnhz1/worktree/plan/cloudroom-harness/phases/p01/docs/logs/B2-models-R4-format.txt"
+  },
+  {
+    "check": "agent-domain",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "--offline",
+      "--lib",
+      "application::agent::"
+    ],
+    "cwd": "/private/tmp/openbot-cloudroom-harness-t1gfnhz1/worktree",
+    "exit": 0,
+    "elapsed_s": 71.12,
+    "log": "/private/tmp/openbot-cloudroom-harness-t1gfnhz1/worktree/plan/cloudroom-harness/phases/p01/docs/logs/B2-models-R4-agent-domain.txt"
+  },
+  {
+    "check": "publication-db",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "--offline",
+      "--lib",
+      "agent_publication"
+    ],
+    "cwd": "/private/tmp/openbot-cloudroom-harness-t1gfnhz1/worktree",
+    "exit": 0,
+    "elapsed_s": 2.08,
+    "log": "/private/tmp/openbot-cloudroom-harness-t1gfnhz1/worktree/plan/cloudroom-harness/phases/p01/docs/logs/B2-models-R4-publication-db.txt"
+  },
+  {
+    "check": "workflow-publication",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "--offline",
+      "--lib",
+      "application::workflow::publication"
+    ],
+    "cwd": "/private/tmp/openbot-cloudroom-harness-t1gfnhz1/worktree",
+    "exit": 0,
+    "elapsed_s": 0.74,
+    "log": "/private/tmp/openbot-cloudroom-harness-t1gfnhz1/worktree/plan/cloudroom-harness/phases/p01/docs/logs/B2-models-R4-workflow-publication.txt"
+  }
+]

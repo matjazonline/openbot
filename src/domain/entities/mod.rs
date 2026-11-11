@@ -27,6 +27,7 @@ pub mod run_counts;
 pub mod runtime_metrics;
 pub mod schedule;
 pub mod skill;
+pub mod skill_bundle;
 pub mod stuck_work;
 pub mod task;
 pub mod thread;

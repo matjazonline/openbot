@@ -4334,6 +4334,59 @@ CREATE TABLE public.schedule_runs (
 -- Name: skills; Type: TABLE; Schema: public; Owner: -
 --
 
+CREATE FUNCTION public.valid_skill_files(value jsonb) RETURNS boolean
+    LANGUAGE plpgsql IMMUTABLE
+    AS $$
+DECLARE
+    item jsonb;
+    path text;
+    encoded text;
+    content bytea;
+    seen text[] := '{}';
+    previous text;
+    total integer := 0;
+BEGIN
+    IF jsonb_typeof(value) IS DISTINCT FROM 'array' OR jsonb_array_length(value) > 64
+        OR octet_length(value::text) > 1048576 THEN
+        RETURN false;
+    END IF;
+    FOR item IN SELECT jsonb_array_elements(value) LOOP
+        IF jsonb_typeof(item) IS DISTINCT FROM 'object'
+            OR item - 'path' - 'content_base64' - 'executable' <> '{}'::jsonb
+            OR jsonb_typeof(item->'path') IS DISTINCT FROM 'string'
+            OR jsonb_typeof(item->'content_base64') IS DISTINCT FROM 'string'
+            OR jsonb_typeof(item->'executable') IS DISTINCT FROM 'boolean' THEN
+            RETURN false;
+        END IF;
+        path := item->>'path';
+        IF octet_length(path) NOT BETWEEN 1 AND 240 OR path !~ '^[A-Za-z0-9._/ -]+$'
+            OR path ~ '(^/|/$|//|(^|/)[.]{1,2}(/|$)|(^|/) |[. ](/|$))'
+            OR lower(split_part(path, '/', 1) COLLATE "C") = 'skill.md' THEN
+            RETURN false;
+        END IF;
+        path := lower(path COLLATE "C");
+        FOREACH previous IN ARRAY seen LOOP
+            IF previous = path OR strpos(path, previous || '/') = 1 OR strpos(previous, path || '/') = 1 THEN
+                RETURN false;
+            END IF;
+        END LOOP;
+        seen := array_append(seen, path);
+        encoded := item->>'content_base64';
+        IF length(encoded) > 349528 OR encoded !~ '^[A-Za-z0-9+/]*={0,2}$' THEN
+            RETURN false;
+        END IF;
+        content := decode(encoded, 'base64');
+        IF octet_length(content) > 262144 OR replace(encode(content, 'base64'), E'\n', '') <> encoded THEN
+            RETURN false;
+        END IF;
+        total := total + octet_length(content);
+        IF total > 524288 THEN RETURN false; END IF;
+    END LOOP;
+    RETURN true;
+EXCEPTION WHEN OTHERS THEN RETURN false;
+END;
+$$;
+
 CREATE TABLE public.skills (
     id uuid NOT NULL,
     company_id uuid,
@@ -4342,6 +4395,7 @@ CREATE TABLE public.skills (
     description text NOT NULL,
     -- One prompt text; its byte bound is the workflow publication bound on prompt text.
     instructions text NOT NULL,
+    files jsonb DEFAULT '[]'::jsonb NOT NULL CONSTRAINT skills_files_shape CHECK (public.valid_skill_files(files)),
     -- Workflow tools the agent must grant for this skill (06-D5); never a grant itself.
     required_tools text[] DEFAULT '{}'::text[] NOT NULL CONSTRAINT skills_required_tools_shape CHECK (public.valid_workflow_type_names(required_tools)),
     created_by jsonb NOT NULL,

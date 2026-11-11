@@ -4,7 +4,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { Dispatcher } from './dispatcher.js';
 import { ConfigurationRequired, type Paired } from './enrollment.js';
 import { JournalCapacity, RecoveryRequired, type MappingCandidate, type MappingCursor } from './journal.js';
-import { encodeFrames, FrameAssembler, LIMITS, observationSequence, parseServer,
+import { encodeFrames, FrameAssembler, LIMITS, PROTOCOL_VERSION, observationSequence, parseServer,
   type Delivery, type Identity, type Observation } from './protocol.js';
 
 export type ConnectionStatus = 'offline' | 'connecting' | 'recovering' | 'connected' | 'authorization_required';
@@ -75,7 +75,7 @@ export class Connector {
     const journal = this.dispatcher.journal; const binding = paired.binding;
     const endpoint = new URL('/v1/local-machines/connect', binding.origin); endpoint.protocol = 'wss:';
     const socket = new WebSocket(endpoint, { headers: { authorization: `Bearer ${paired.credential}`,
-      'x-openbot-installation-id': binding.installation_id, 'x-openbot-protocol-version': '1' },
+      'x-openbot-installation-id': binding.installation_id, 'x-openbot-protocol-version': String(PROTOCOL_VERSION) },
       followRedirects: false, handshakeTimeout: LIMITS.handshakeMs, maxPayload: LIMITS.frame, perMessageDeflate: false });
     let identity: Identity | undefined; let allowed = false; let active = true;
     let lastReceived = performance.now(); let sent = journal.acknowledged();
@@ -151,7 +151,7 @@ export class Connector {
       const opened = performance.now();
       while (socket.readyState === WebSocket.CONNECTING) await delay(10, undefined, { signal: connected });
       connected.throwIfAborted();
-      await write({ kind: 'hello', hello: { version: 1, installation_id: binding.installation_id,
+      await write({ kind: 'hello', hello: { version: PROTOCOL_VERSION, installation_id: binding.installation_id,
         journal_id: binding.journal_id, journal_sequence: journal.sequence() } });
       while (!identity) {
         if (performance.now() - opened >= LIMITS.handshakeMs) throw new Error('welcome timed out');

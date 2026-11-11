@@ -48,7 +48,7 @@ async fn cloudroom_connection_concurrent_replicas_with_independent_pools_accept_
     let (mut a, mut b) = tokio::join!(open_first, open_second);
     let hello = ClientMessage::Hello {
         hello: JournalHello {
-            version: 1,
+            version: 2,
             installation_id: c.paired.receipt.machine.installation_id,
             journal_id: c.journal,
             journal_sequence: 2,

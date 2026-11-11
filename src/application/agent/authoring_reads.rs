@@ -74,7 +74,7 @@ pub struct AgentActiveState {
     pub id: AgentRevisionId,
     pub draft_revision: AgentDraftRevision,
     pub key: AgentKey,
-    pub model: ModelSettings,
+    pub model: Option<ModelSettings>,
     pub tools: Vec<AgentToolState>,
     pub skills: Vec<AgentActiveSkill>,
 }

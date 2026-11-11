@@ -164,6 +164,7 @@ async fn run_credential_rotation() -> anyhow::Result<()> {
 
 /// Every file carrying the "No backward compatibility" note, logged at startup.
 const NO_BACKWARD_COMPATIBILITY_NOTES: &[&str] = &[
+    "plan/cloudroom-harness/README.md",
     "plan/.archived/workflow-foundation/09-authoring-and-operations-ui.md",
     "plan/.archived/workflow-foundation/README.md",
     "AGENTS.md",

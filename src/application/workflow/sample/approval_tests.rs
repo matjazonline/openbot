@@ -30,11 +30,11 @@ fn protected_request(
         agent_id: reference.agent_id,
         key: reference.key.clone(),
         instructions: "Test a protected canonical binding".into(),
-        model: ModelSettings {
+        model: Some(ModelSettings {
             provider: name("test"),
             model: "sample".into(),
             max_output_tokens: 1000,
-        },
+        }),
         tools: vec![tool],
         skills: vec![],
     }];

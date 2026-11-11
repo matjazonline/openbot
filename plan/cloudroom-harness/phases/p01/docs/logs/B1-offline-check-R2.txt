@@ -1,0 +1,122 @@
+    Checking open_bots v0.1.0 (/private/tmp/openbot-cloudroom-harness-t1gfnhz1/worktree)
+error[E0532]: expected tuple struct or tuple variant, found struct `AuthenticatedUser`
+  --> src/adapters/http/routes/skill_library/bundles.rs:60:5
+   |
+60 |       AuthenticatedUser(user): AuthenticatedUser,
+   |       ^^^^^^^^^^^^^^^^^^^^^^^ help: use struct pattern syntax instead: `AuthenticatedUser { id: user }`
+   |
+  ::: src/adapters/http/auth.rs:23:1
+   |
+23 | / pub struct AuthenticatedUser {
+24 | |     pub id: Uuid,
+25 | | }
+   | |_- `AuthenticatedUser` defined here
+
+error[E0532]: expected tuple struct or tuple variant, found struct `AuthenticatedUser`
+  --> src/adapters/http/routes/skill_library/bundles.rs:83:5
+   |
+83 |       AuthenticatedUser(user): AuthenticatedUser,
+   |       ^^^^^^^^^^^^^^^^^^^^^^^ help: use struct pattern syntax instead: `AuthenticatedUser { id: user }`
+   |
+  ::: src/adapters/http/auth.rs:23:1
+   |
+23 | / pub struct AuthenticatedUser {
+24 | |     pub id: Uuid,
+25 | | }
+   | |_- `AuthenticatedUser` defined here
+
+error[E0532]: expected tuple struct or tuple variant, found struct `AuthenticatedUser`
+   --> src/adapters/http/routes/skill_library/bundles.rs:219:5
+    |
+219 |       AuthenticatedUser(user): AuthenticatedUser,
+    |       ^^^^^^^^^^^^^^^^^^^^^^^ help: use struct pattern syntax instead: `AuthenticatedUser { id: user }`
+    |
+   ::: src/adapters/http/auth.rs:23:1
+    |
+ 23 | / pub struct AuthenticatedUser {
+ 24 | |     pub id: Uuid,
+ 25 | | }
+    | |_- `AuthenticatedUser` defined here
+
+error[E0532]: expected tuple struct or tuple variant, found struct `AuthenticatedUser`
+   --> src/adapters/http/routes/skill_library/bundles.rs:259:5
+    |
+259 |       AuthenticatedUser(user): AuthenticatedUser,
+    |       ^^^^^^^^^^^^^^^^^^^^^^^ help: use struct pattern syntax instead: `AuthenticatedUser { id: user }`
+    |
+   ::: src/adapters/http/auth.rs:23:1
+    |
+ 23 | / pub struct AuthenticatedUser {
+ 24 | |     pub id: Uuid,
+ 25 | | }
+    | |_- `AuthenticatedUser` defined here
+
+error[E0532]: expected tuple struct or tuple variant, found struct `AuthenticatedUser`
+  --> src/adapters/http/routes/skill_library/json.rs:27:5
+   |
+27 |       AuthenticatedUser(user): AuthenticatedUser,
+   |       ^^^^^^^^^^^^^^^^^^^^^^^ help: use struct pattern syntax instead: `AuthenticatedUser { id: user }`
+   |
+  ::: src/adapters/http/auth.rs:23:1
+   |
+23 | / pub struct AuthenticatedUser {
+24 | |     pub id: Uuid,
+25 | | }
+   | |_- `AuthenticatedUser` defined here
+
+error[E0532]: expected tuple struct or tuple variant, found struct `AuthenticatedUser`
+  --> src/adapters/http/routes/skill_library/json.rs:41:5
+   |
+41 |       AuthenticatedUser(user): AuthenticatedUser,
+   |       ^^^^^^^^^^^^^^^^^^^^^^^ help: use struct pattern syntax instead: `AuthenticatedUser { id: user }`
+   |
+  ::: src/adapters/http/auth.rs:23:1
+   |
+23 | / pub struct AuthenticatedUser {
+24 | |     pub id: Uuid,
+25 | | }
+   | |_- `AuthenticatedUser` defined here
+
+error[E0532]: expected tuple struct or tuple variant, found struct `AuthenticatedUser`
+  --> src/adapters/http/routes/skill_library/json.rs:54:5
+   |
+54 |       AuthenticatedUser(user): AuthenticatedUser,
+   |       ^^^^^^^^^^^^^^^^^^^^^^^ help: use struct pattern syntax instead: `AuthenticatedUser { id: user }`
+   |
+  ::: src/adapters/http/auth.rs:23:1
+   |
+23 | / pub struct AuthenticatedUser {
+24 | |     pub id: Uuid,
+25 | | }
+   | |_- `AuthenticatedUser` defined here
+
+error[E0532]: expected tuple struct or tuple variant, found struct `AuthenticatedUser`
+  --> src/adapters/http/routes/skill_library/json.rs:70:5
+   |
+70 |       AuthenticatedUser(user): AuthenticatedUser,
+   |       ^^^^^^^^^^^^^^^^^^^^^^^ help: use struct pattern syntax instead: `AuthenticatedUser { id: user }`
+   |
+  ::: src/adapters/http/auth.rs:23:1
+   |
+23 | / pub struct AuthenticatedUser {
+24 | |     pub id: Uuid,
+25 | | }
+   | |_- `AuthenticatedUser` defined here
+
+error[E0532]: expected tuple struct or tuple variant, found struct `AuthenticatedUser`
+  --> src/adapters/http/routes/skill_library/json.rs:83:5
+   |
+83 |       AuthenticatedUser(user): AuthenticatedUser,
+   |       ^^^^^^^^^^^^^^^^^^^^^^^ help: use struct pattern syntax instead: `AuthenticatedUser { id: user }`
+   |
+  ::: src/adapters/http/auth.rs:23:1
+   |
+23 | / pub struct AuthenticatedUser {
+24 | |     pub id: Uuid,
+25 | | }
+   | |_- `AuthenticatedUser` defined here
+
+For more information about this error, try `rustc --explain E0532`.
+error: could not compile `open_bots` (lib) due to 9 previous errors
+warning: build failed, waiting for other jobs to finish...
+error: could not compile `open_bots` (lib test) due to 9 previous errors

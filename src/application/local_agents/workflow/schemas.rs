@@ -20,7 +20,7 @@ pub fn input_schema() -> Value {
 }
 pub fn frozen_schema() -> Value {
     let policy = object(
-        json!({"workspace":{"const":"project_directory"},"permissions":{"const":"provider_default"},
+        json!({"workspace":{"const":"project_directory"},"permissions":{"enum":["full","auto","accept_edits"]},
         "reasoning":{"enum":["none","low","medium","high","xhigh","max","ultra","ultracode"]}}),
         &["workspace", "permissions", "reasoning"],
     );

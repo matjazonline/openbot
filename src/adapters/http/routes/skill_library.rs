@@ -14,10 +14,10 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::{
-    adapters::http::{app_state::AppState, auth::AuthenticatedUser, pages},
+    adapters::http::{auth::AuthenticatedUser, pages},
     app_error::{AppError, AppResult},
     domain::entities::{
-        skill::{MAX_SKILL_INSTRUCTIONS_BYTES, Skill},
+        skill::{MAX_SKILL_INSTRUCTIONS_BYTES, Skill, SkillSummary},
         user::Caller,
         value_objects::EmailAddress,
     },
@@ -33,11 +33,27 @@ use crate::{
 
 use super::ui::{load_account, workspace_user};
 
+mod archive;
+mod bundles;
+mod json;
+
+#[cfg(test)]
+mod http_tests;
+
 /// Room for the largest valid skill in its widest encoding (JSON's `\uXXXX` spends six bytes on
 /// one), plus the short fields.
 const SKILL_FORM_BODY_LIMIT: usize = 6 * MAX_SKILL_INSTRUCTIONS_BYTES + 64 * 1024;
+// Assets add a separate encoded-body budget. A maximum-valid-payload CI guard must keep 25%
+// headroom here, and the real JSON routes reject limit+1 with 413.
+const SKILL_JSON_BODY_LIMIT: usize = 2 * 1024 * 1024;
 
-pub fn router() -> Router<AppState> {
+pub fn router<S>() -> Router<S>
+where
+    S: Clone + Send + Sync + 'static,
+    Arc<SkillUseCases>: axum::extract::FromRef<S>,
+    Arc<UserUseCases>: axum::extract::FromRef<S>,
+    Arc<AppConfig>: axum::extract::FromRef<S>,
+{
     Router::new()
         .route(
             "/ui/companies/{company_id}/skills",
@@ -58,16 +74,6 @@ pub fn router() -> Router<AppState> {
                 .delete(delete_company_skill),
         )
         .route(
-            "/api/skill-library",
-            get(list_library_json).post(create_library_json),
-        )
-        .route(
-            "/api/skill-library/{skill_id}",
-            get(get_library_json)
-                .put(update_library_json)
-                .delete(delete_library_json),
-        )
-        .route(
             "/ui/skill-library",
             get(library_workspace).post(create_library_skill),
         )
@@ -78,6 +84,8 @@ pub fn router() -> Router<AppState> {
                 .delete(delete_library_skill),
         )
         .layer(DefaultBodyLimit::max(SKILL_FORM_BODY_LIMIT))
+        .merge(json::router().layer(DefaultBodyLimit::max(SKILL_JSON_BODY_LIMIT)))
+        .merge(bundles::router())
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -184,6 +192,7 @@ impl SkillForm {
 
 fn write_from_draft(draft: &pages::SkillDraft) -> SkillWrite {
     SkillWrite {
+        files: None,
         required_tools: None,
         slug: draft.slug.clone(),
         name: draft.name.clone(),
@@ -419,6 +428,7 @@ struct SkillPayload {
     name: String,
     description: String,
     instructions: String,
+    files: Option<Vec<crate::entities::skill_bundle::SkillFile>>,
 }
 
 impl From<SkillPayload> for SkillWrite {
@@ -428,6 +438,7 @@ impl From<SkillPayload> for SkillWrite {
             name: payload.name,
             description: payload.description,
             instructions: payload.instructions,
+            files: payload.files,
             // Required workflow tools are edited in phase 09; keep the stored list.
             required_tools: None,
             created_by: None,
@@ -449,7 +460,7 @@ async fn list_library_json(
 
 #[derive(Serialize)]
 struct SkillPageResponse {
-    items: Vec<Skill>,
+    items: Vec<SkillSummary>,
     next: Option<SkillCursorResponse>,
 }
 #[derive(Serialize)]
@@ -657,8 +668,41 @@ mod tests {
             name: "\u{1}".repeat(120),
             description: "\u{1}".repeat(500),
             instructions: "\u{1}".repeat(MAX_SKILL_INSTRUCTIONS_BYTES),
+            files: None,
         };
         let body = serde_json::to_vec(&payload).unwrap();
         assert!(body.len() <= SKILL_FORM_BODY_LIMIT, "{} bytes", body.len());
+    }
+
+    #[test]
+    fn skill_bundle_json_capacity_retains_twenty_five_percent_headroom() {
+        use crate::entities::skill_bundle::{
+            MAX_SKILL_ASSET_BYTES, MAX_SKILL_FILES, MAX_SKILL_PATH_BYTES, SkillFile,
+        };
+        let files = (0..MAX_SKILL_FILES)
+            .map(|n| {
+                SkillFile::from_bytes(
+                    format!("{n:02}{}", "a".repeat(MAX_SKILL_PATH_BYTES - 2)),
+                    &vec![0xff; MAX_SKILL_ASSET_BYTES / MAX_SKILL_FILES],
+                    true,
+                )
+                .unwrap()
+            })
+            .collect();
+        let payload = SkillPayload {
+            slug: "s".repeat(120),
+            name: "\u{1}".repeat(120),
+            description: "\u{1}".repeat(500),
+            instructions: "\u{1}".repeat(MAX_SKILL_INSTRUCTIONS_BYTES),
+            files: Some(files),
+        };
+        let body = serde_json::to_vec(&payload).unwrap();
+        let mut write: SkillWrite = payload.into();
+        write.normalize().unwrap();
+        assert!(
+            body.len() <= SKILL_JSON_BODY_LIMIT * 3 / 4,
+            "JSON capacity is approaching its bound: {} bytes",
+            body.len()
+        );
     }
 }

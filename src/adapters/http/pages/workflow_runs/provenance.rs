@@ -82,7 +82,12 @@ pub(super) fn agent_revision(agent: &SelectedAgentSummary) -> String {
         <p class="break-all text-xs">Agent {} · revision {} · manifest {}</p>
         <p class="text-xs">tools {}; skills {}</p><ul>{bindings}{assignments}</ul></div>"#,
         escape_html_text(&agent.key),
-        escape_html_text(&agent.model),
+        escape_html_text(
+            agent
+                .model
+                .as_deref()
+                .unwrap_or("Native model selected by local profile")
+        ),
         agent.agent_id.as_uuid(),
         agent.revision_id.as_uuid(),
         agent.manifest.as_uuid(),

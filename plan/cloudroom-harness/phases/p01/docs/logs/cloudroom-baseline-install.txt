@@ -1,0 +1,195 @@
+Scope: all 97 workspace projects
+Lockfile is up to date, resolution step is skipped
+Progress: resolved 1, reused 0, downloaded 0, added 0
+Packages: +1398
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+   ╭──────────────────────────────────────────────────────────────────────╮
+   │                                                                      │
+   │                 Update available! 10.34.9 → 12.18.0.                 │
+   │                 Changelog: https://pnpm.io/v/12.18.0                 │
+   │   To update, run: curl -fsSL https://get.pnpm.io/install.sh | sh -   │
+   │                                                                      │
+   ╰──────────────────────────────────────────────────────────────────────╯
+
+Progress: resolved 1398, reused 0, downloaded 65, added 70
+Progress: resolved 1398, reused 0, downloaded 103, added 112
+Progress: resolved 1398, reused 0, downloaded 142, added 154
+Progress: resolved 1398, reused 0, downloaded 170, added 180
+Progress: resolved 1398, reused 0, downloaded 213, added 224
+ WARN  Tarball download average speed 49 KiB/s (size 84 KiB) is below 50 KiB/s: https://registry.npmjs.org/entities/-/entities-8.0.0.tgz (GET)
+Progress: resolved 1398, reused 0, downloaded 234, added 247
+Progress: resolved 1398, reused 0, downloaded 291, added 303
+Progress: resolved 1398, reused 0, downloaded 343, added 356
+Progress: resolved 1398, reused 0, downloaded 433, added 446
+Progress: resolved 1398, reused 0, downloaded 505, added 518
+Progress: resolved 1398, reused 0, downloaded 613, added 626
+Progress: resolved 1398, reused 0, downloaded 651, added 663
+Progress: resolved 1398, reused 0, downloaded 709, added 720
+Progress: resolved 1398, reused 0, downloaded 792, added 805
+Progress: resolved 1398, reused 0, downloaded 864, added 876
+Progress: resolved 1398, reused 0, downloaded 931, added 944
+Progress: resolved 1398, reused 0, downloaded 974, added 988
+Progress: resolved 1398, reused 0, downloaded 1010, added 1022
+Progress: resolved 1398, reused 0, downloaded 1047, added 1059
+Progress: resolved 1398, reused 0, downloaded 1136, added 1148
+Progress: resolved 1398, reused 0, downloaded 1165, added 1178
+ WARN  Tarball download average speed 32 KiB/s (size 36 KiB) is below 50 KiB/s: https://registry.npmjs.org/json-schema-typed/-/json-schema-typed-8.0.2.tgz (GET)
+Progress: resolved 1398, reused 0, downloaded 1187, added 1201
+Progress: resolved 1398, reused 0, downloaded 1220, added 1234
+Progress: resolved 1398, reused 0, downloaded 1256, added 1270
+Progress: resolved 1398, reused 0, downloaded 1292, added 1306
+Progress: resolved 1398, reused 0, downloaded 1306, added 1319
+Progress: resolved 1398, reused 0, downloaded 1326, added 1341
+Progress: resolved 1398, reused 0, downloaded 1353, added 1368
+Progress: resolved 1398, reused 0, downloaded 1364, added 1379
+Progress: resolved 1398, reused 0, downloaded 1368, added 1382
+Progress: resolved 1398, reused 0, downloaded 1371, added 1386
+Progress: resolved 1398, reused 0, downloaded 1373, added 1388
+Progress: resolved 1398, reused 0, downloaded 1374, added 1388
+Progress: resolved 1398, reused 0, downloaded 1375, added 1389
+Progress: resolved 1398, reused 0, downloaded 1376, added 1391
+Progress: resolved 1398, reused 0, downloaded 1377, added 1391
+Progress: resolved 1398, reused 0, downloaded 1377, added 1392
+Progress: resolved 1398, reused 0, downloaded 1378, added 1392
+Progress: resolved 1398, reused 0, downloaded 1378, added 1393
+Progress: resolved 1398, reused 0, downloaded 1379, added 1394
+Progress: resolved 1398, reused 0, downloaded 1380, added 1394
+Progress: resolved 1398, reused 0, downloaded 1380, added 1395
+Progress: resolved 1398, reused 0, downloaded 1381, added 1396
+Progress: resolved 1398, reused 0, downloaded 1382, added 1396
+Progress: resolved 1398, reused 0, downloaded 1382, added 1397
+Progress: resolved 1398, reused 0, downloaded 1383, added 1397
+Progress: resolved 1398, reused 0, downloaded 1383, added 1398, done
+.../node_modules/msw postinstall$ node -e "import('./config/scripts/postinstall.js').catch(() => void 0)"
+.../sharp@0.34.5/node_modules/sharp install$ node install/check.js || npm run build
+.../esbuild@0.28.1/node_modules/esbuild postinstall$ node install.js
+.../node_modules/workerd postinstall$ node install.js
+.../node_modules/msw postinstall: Done
+.../node_modules/@parcel/watcher install$ node scripts/build-from-source.js
+.../node_modules/node-pty install$ node scripts/prebuild.js || node-gyp rebuild
+.../node_modules/node-pty install: [32m> Checking prebuilds...[0m
+.../node_modules/@parcel/watcher install: Done
+.../node_modules/node-pty install: Done
+.../node_modules/node-pty postinstall$ node scripts/post-install.js
+.../node_modules/msw postinstall$ node -e "import('./config/scripts/postinstall.js').catch(() => void 0)"
+.../node_modules/node-pty postinstall: [32m> Cleaning release folder...[0m
+.../node_modules/node-pty postinstall: [32m> Moving conpty.dll...[0m
+.../node_modules/node-pty postinstall:   SKIPPED (not Windows)
+.../node_modules/node-pty postinstall: Done
+.../node_modules/msw postinstall: Done
+.../esbuild@0.28.1/node_modules/esbuild postinstall: Done
+.../node_modules/better-sqlite3 install$ prebuild-install || node-gyp rebuild --release
+.../node_modules/protobufjs postinstall$ node scripts/postinstall
+.../node_modules/protobufjs postinstall: Done
+.../node_modules/better-sqlite3 install$ node-gyp rebuild
+.../esbuild@0.18.20/node_modules/esbuild postinstall$ node install.js
+.../node_modules/workerd postinstall: Done
+.../node_modules/better-sqlite3 install: (node:30619) [DEP0176] DeprecationWarning: fs.R_OK is deprecated, use fs.constants.R_OK instead
+.../node_modules/better-sqlite3 install: (Use `node --trace-deprecation ...` to show where the warning was created)
+.../esbuild@0.19.12/node_modules/esbuild postinstall$ node install.js
+.../esbuild@0.18.20/node_modules/esbuild postinstall: Done
+.../node_modules/cbor-extract install$ node-gyp-build-optional-packages
+.../node_modules/better-sqlite3 install: Done
+.../sharp@0.34.5/node_modules/sharp install: Done
+.../node_modules/better-sqlite3 install: gyp info it worked if it ends with ok
+.../node_modules/better-sqlite3 install: gyp info using node-gyp@12.4.0
+.../node_modules/better-sqlite3 install: gyp info using node@24.21.0 | darwin | arm64
+.../node_modules/better-sqlite3 install: gyp info find Python using Python version 3.9.6 found at "/Applications/Xcode.app/Contents/Developer/usr/bin/python3"
+.../node_modules/better-sqlite3 install: gyp info spawn /Applications/Xcode.app/Contents/Developer/usr/bin/python3
+.../node_modules/better-sqlite3 install: gyp info spawn args [
+.../node_modules/better-sqlite3 install: gyp info spawn args '/private/tmp/openbot-doop-main-k49qm1op/toolchains/node-v24.21.0-darwin-arm64/lib/node_modules/npm/node_modules/node-gyp/gyp/gyp_main.py',
+.../node_modules/better-sqlite3 install: gyp info spawn args 'binding.gyp',
+.../node_modules/better-sqlite3 install: gyp info spawn args '-f',
+.../node_modules/better-sqlite3 install: gyp info spawn args 'make',
+.../node_modules/better-sqlite3 install: gyp info spawn args '-I',
+.../node_modules/better-sqlite3 install: gyp info spawn args '/private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/node_modules/.pnpm/better-sqlite3@13.0.3/node_modules/better-sqlite3/build/config.gypi',
+.../node_modules/better-sqlite3 install: gyp info spawn args '-I',
+.../node_modules/better-sqlite3 install: gyp info spawn args '/private/tmp/openbot-doop-main-k49qm1op/toolchains/node-v24.21.0-darwin-arm64/lib/node_modules/npm/node_modules/node-gyp/addon.gypi',
+.../node_modules/better-sqlite3 install: gyp info spawn args '-I',
+.../node_modules/better-sqlite3 install: gyp info spawn args '/Users/mac02/Library/Caches/node-gyp/24.21.0/include/node/common.gypi',
+.../node_modules/better-sqlite3 install: gyp info spawn args '-Dlibrary=shared_library',
+.../node_modules/better-sqlite3 install: gyp info spawn args '-Dvisibility=default',
+.../node_modules/better-sqlite3 install: gyp info spawn args '-Dnode_root_dir=/Users/mac02/Library/Caches/node-gyp/24.21.0',
+.../node_modules/better-sqlite3 install: gyp info spawn args '-Dnode_gyp_dir=/private/tmp/openbot-doop-main-k49qm1op/toolchains/node-v24.21.0-darwin-arm64/lib/node_modules/npm/node_modules/node-gyp',
+.../node_modules/better-sqlite3 install: gyp info spawn args '-Dnode_lib_file=/Users/mac02/Library/Caches/node-gyp/24.21.0/<(target_arch)/node.lib',
+.../node_modules/better-sqlite3 install: gyp info spawn args '-Dmodule_root_dir=/private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/node_modules/.pnpm/better-sqlite3@13.0.3/node_modules/better-sqlite3',
+.../node_modules/better-sqlite3 install: gyp info spawn args '-Dnode_engine=v8',
+.../node_modules/better-sqlite3 install: gyp info spawn args '--depth=.',
+.../node_modules/better-sqlite3 install: gyp info spawn args '--no-parallel',
+.../node_modules/better-sqlite3 install: gyp info spawn args '--generator-output',
+.../node_modules/better-sqlite3 install: gyp info spawn args 'build',
+.../node_modules/better-sqlite3 install: gyp info spawn args '-Goutput_dir=.'
+.../node_modules/better-sqlite3 install: gyp info spawn args ]
+.../esbuild@0.19.12/node_modules/esbuild postinstall: Done
+.../node_modules/better-sqlite3 install: gyp info spawn make
+.../node_modules/better-sqlite3 install: gyp info spawn args [ 'BUILDTYPE=Release', '-C', 'build' ]
+.../node_modules/better-sqlite3 install:   TOUCH Release/obj.target/better_sqlite3.stamp
+.../node_modules/better-sqlite3 install:   TOUCH Release/obj.target/test_extension.stamp
+.../node_modules/better-sqlite3 install: gyp info ok 
+.../node_modules/better-sqlite3 install: Done
+.../node_modules/cbor-extract install: Done
+.../node_modules/@google/genai preinstall$ echo 'preinstall: no-op'
+.../node_modules/@google/genai preinstall: preinstall: no-op
+.../node_modules/@google/genai preinstall: Done
+ WARN  Failed to create bin at /private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/desktop/node_modules/.bin/room-cli. ENOENT: no such file or directory, open '/private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/packages/bb-app/dist/room-cli.js'
+ WARN  Failed to create bin at /private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/desktop/node_modules/.bin/bb-app. ENOENT: no such file or directory, open '/private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/packages/bb-app/dist/bb-app.js'
+ WARN  Failed to create bin at /private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/desktop/node_modules/.bin/bb-host-daemon. ENOENT: no such file or directory, open '/private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/packages/bb-app/dist/bb-host-daemon.js'
+ WARN  Failed to create bin at /private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/desktop/node_modules/.bin/bb-server. ENOENT: no such file or directory, open '/private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/packages/bb-app/dist/bb-server.js'
+ WARN  Failed to create bin at /private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/host-daemon/node_modules/.bin/bb-script-request-dev-restart. ENOENT: no such file or directory, open '/private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/packages/scripts/dist/commands/request-dev-restart.js'
+ WARN  Failed to create bin at /private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/host-daemon/node_modules/.bin/bb-script-reset-bb-data. ENOENT: no such file or directory, open '/private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/packages/scripts/dist/commands/reset-bb-data.js'
+ WARN  Failed to create bin at /private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/host-daemon/node_modules/.bin/bb-script-archive-codex-tmp-bb-sessions. ENOENT: no such file or directory, open '/private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/packages/scripts/dist/commands/archive-codex-tmp-bb-sessions.js'
+ WARN  Failed to create bin at /private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/host-daemon/node_modules/.bin/bb-script-run-cli. ENOENT: no such file or directory, open '/private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/packages/scripts/dist/commands/run-cli.js'
+ WARN  Failed to create bin at /private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/host-daemon/node_modules/.bin/bb-script-run-host-daemon. ENOENT: no such file or directory, open '/private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/packages/scripts/dist/commands/run-host-daemon.js'
+ WARN  Failed to create bin at /private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/host-daemon/node_modules/.bin/bb-script-seed-perf-db. ENOENT: no such file or directory, open '/private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/packages/scripts/dist/commands/seed-perf-db.js'
+ WARN  Failed to create bin at /private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/server/node_modules/.bin/bb-script-archive-codex-tmp-bb-sessions. ENOENT: no such file or directory, open '/private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/packages/scripts/dist/commands/archive-codex-tmp-bb-sessions.js'
+ WARN  Failed to create bin at /private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/server/node_modules/.bin/bb-script-request-dev-restart. ENOENT: no such file or directory, open '/private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/packages/scripts/dist/commands/request-dev-restart.js'
+ WARN  Failed to create bin at /private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/server/node_modules/.bin/bb-script-reset-bb-data. ENOENT: no such file or directory, open '/private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/packages/scripts/dist/commands/reset-bb-data.js'
+ WARN  Failed to create bin at /private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/server/node_modules/.bin/bb-script-run-cli. ENOENT: no such file or directory, open '/private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/packages/scripts/dist/commands/run-cli.js'
+ WARN  Failed to create bin at /private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/server/node_modules/.bin/bb-script-run-host-daemon. ENOENT: no such file or directory, open '/private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/packages/scripts/dist/commands/run-host-daemon.js'
+ WARN  Failed to create bin at /private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/server/node_modules/.bin/bb-script-seed-perf-db. ENOENT: no such file or directory, open '/private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/packages/scripts/dist/commands/seed-perf-db.js'
+
+devDependencies:
++ cross-env 10.1.0
++ dotenv-cli 11.0.0
++ esbuild 0.28.1
++ oxfmt 0.64.0
++ oxlint 1.79.0
++ rimraf 6.1.3
++ tsx 4.23.1
++ turbo 2.10.12
++ typescript <- @typescript/typescript6 6.0.2
++ typescript-7 <- typescript 7.0.2
++ vitest 4.1.1
+
+. prepare$ turbo run generate:templates generate:plugin-scaffold generate generate:bb-official-marketplace --filter=@cloudroom/templates --filter=@cloudroom/plugin-build --filter=@cloudroom/server --output-logs=errors-only --summarize=false
+. prepare: Attention:
+. prepare: Turborepo now collects completely anonymous telemetry regarding usage.
+. prepare: This information is used to shape the Turborepo roadmap and prioritize features.
+. prepare: You can learn more, including how to opt-out if you'd not like to participate in this anonymous program, by visiting the following URL:
+. prepare: https://turborepo.dev/docs/telemetry
+. prepare: • turbo 2.10.12
+. prepare:    • Packages in scope: @cloudroom/plugin-build, @cloudroom/server, @cloudroom/templates
+. prepare:    • Running generate:templates, generate:plugin-scaffold, generate, generate:bb-official-marketplace in 3 packages
+. prepare:    • Remote caching disabled
+. prepare:  Tasks:    4 successful, 4 total
+. prepare: Cached:    0 cached, 4 total
+. prepare:   Time:    691ms 
+. prepare: Done
+ WARN  Failed to create bin at /private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/desktop/node_modules/.bin/room-cli. ENOENT: no such file or directory, open '/private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/desktop/node_modules/bb-app/dist/room-cli.js'
+ WARN  Failed to create bin at /private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/desktop/node_modules/.bin/bb-host-daemon. ENOENT: no such file or directory, open '/private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/desktop/node_modules/bb-app/dist/bb-host-daemon.js'
+ WARN  Failed to create bin at /private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/desktop/node_modules/.bin/bb-app. ENOENT: no such file or directory, open '/private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/desktop/node_modules/bb-app/dist/bb-app.js'
+ WARN  Failed to create bin at /private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/desktop/node_modules/.bin/bb-server. ENOENT: no such file or directory, open '/private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/desktop/node_modules/bb-app/dist/bb-server.js'
+ WARN  Failed to create bin at /private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/host-daemon/node_modules/.bin/bb-script-reset-bb-data. ENOENT: no such file or directory, open '/private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/host-daemon/node_modules/@cloudroom/scripts/dist/commands/reset-bb-data.js'
+ WARN  Failed to create bin at /private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/host-daemon/node_modules/.bin/bb-script-request-dev-restart. ENOENT: no such file or directory, open '/private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/host-daemon/node_modules/@cloudroom/scripts/dist/commands/request-dev-restart.js'
+ WARN  Failed to create bin at /private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/host-daemon/node_modules/.bin/bb-script-archive-codex-tmp-bb-sessions. ENOENT: no such file or directory, open '/private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/host-daemon/node_modules/@cloudroom/scripts/dist/commands/archive-codex-tmp-bb-sessions.js'
+ WARN  Failed to create bin at /private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/host-daemon/node_modules/.bin/bb-script-run-cli. ENOENT: no such file or directory, open '/private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/host-daemon/node_modules/@cloudroom/scripts/dist/commands/run-cli.js'
+ WARN  Failed to create bin at /private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/host-daemon/node_modules/.bin/bb-script-run-host-daemon. ENOENT: no such file or directory, open '/private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/host-daemon/node_modules/@cloudroom/scripts/dist/commands/run-host-daemon.js'
+ WARN  Failed to create bin at /private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/host-daemon/node_modules/.bin/bb-script-seed-perf-db. ENOENT: no such file or directory, open '/private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/host-daemon/node_modules/@cloudroom/scripts/dist/commands/seed-perf-db.js'
+ WARN  Failed to create bin at /private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/server/node_modules/.bin/bb-script-request-dev-restart. ENOENT: no such file or directory, open '/private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/server/node_modules/@cloudroom/scripts/dist/commands/request-dev-restart.js'
+ WARN  Failed to create bin at /private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/server/node_modules/.bin/bb-script-archive-codex-tmp-bb-sessions. ENOENT: no such file or directory, open '/private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/server/node_modules/@cloudroom/scripts/dist/commands/archive-codex-tmp-bb-sessions.js'
+ WARN  Failed to create bin at /private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/server/node_modules/.bin/bb-script-reset-bb-data. ENOENT: no such file or directory, open '/private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/server/node_modules/@cloudroom/scripts/dist/commands/reset-bb-data.js'
+ WARN  Failed to create bin at /private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/server/node_modules/.bin/bb-script-run-cli. ENOENT: no such file or directory, open '/private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/server/node_modules/@cloudroom/scripts/dist/commands/run-cli.js'
+ WARN  Failed to create bin at /private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/server/node_modules/.bin/bb-script-seed-perf-db. ENOENT: no such file or directory, open '/private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/server/node_modules/@cloudroom/scripts/dist/commands/seed-perf-db.js'
+ WARN  Failed to create bin at /private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/server/node_modules/.bin/bb-script-run-host-daemon. ENOENT: no such file or directory, open '/private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/server/node_modules/@cloudroom/scripts/dist/commands/run-host-daemon.js'
+Done in 1m 6.6s using pnpm v10.34.9

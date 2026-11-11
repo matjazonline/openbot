@@ -49,6 +49,8 @@ fn assigned(facts: &mut AgentResolutionFacts, name: &str, required: &str) {
     facts.skills.push(ResolvedAgentSkill {
         assignment_id: assignment,
         skill: SkillSnapshot {
+            description: "Skill instructions".into(),
+            files: Vec::new(),
             company_id: facts.draft.company_id,
             skill_id,
             name: TypeName::parse(name).unwrap(),
@@ -62,7 +64,7 @@ fn assigned(facts: &mut AgentResolutionFacts, name: &str, required: &str) {
 fn autonomous_agent_resolution_needs_no_workflow_slot_channel_or_run() {
     let definition = resolve_agent(facts()).unwrap();
     assert_eq!(definition.tools[0].binding.alias.as_str(), "message.reply");
-    assert_eq!(definition.model.model, "fixture-model");
+    assert_eq!(definition.hosted_model().unwrap().model, "fixture-model");
     assert_eq!(definition.instructions, "Answer concisely.");
     assert_eq!(
         ResolvedAgentDefinition::decode(&definition.canonical_content().unwrap())
@@ -122,9 +124,9 @@ fn autonomous_agent_resolution_validates_schema_and_explicit_available_model() {
     let mut schema = facts();
     schema.tools[0].input_schema = json!({"type":"not-a-schema-type"});
     assert!(resolve_agent(schema).is_err());
-    let mut missing = facts();
-    missing.draft.model = None;
-    assert!(resolve_agent(missing).is_err());
+    let mut invalid_model = facts();
+    invalid_model.draft.model.as_mut().unwrap().model.clear();
+    assert!(resolve_agent(invalid_model).is_err());
     let mut unavailable = facts();
     unavailable.model_available = false;
     assert!(resolve_agent(unavailable).is_err());
@@ -179,4 +181,21 @@ fn autonomous_agent_skills_refuse_foreign_tenant_facts_and_missing_requirements(
     assigned(&mut missing, "reply", "message.reply");
     missing.skills.clear();
     assert!(resolve_agent(missing).is_err());
+}
+
+#[test]
+fn autonomous_agent_native_definition_needs_no_hosted_model_connection() {
+    let mut source = facts();
+    source.draft.model = None;
+    source.model_available = false;
+    let definition = resolve_agent(source).unwrap();
+    assert!(definition.model.is_none());
+    assert!(definition.hosted_model().is_err());
+    let restored =
+        ResolvedAgentDefinition::decode(&definition.canonical_content().unwrap()).unwrap();
+    assert!(restored.model.is_none());
+    assert_eq!(
+        restored.content_hash().unwrap(),
+        definition.content_hash().unwrap()
+    );
 }

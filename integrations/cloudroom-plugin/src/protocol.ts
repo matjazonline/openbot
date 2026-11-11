@@ -1,6 +1,8 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { z } from 'zod';
 
+export const PROTOCOL_VERSION = 2;
+
 export const LIMITS = Object.freeze({ prompt: 32 * 1024, output: 256 * 1024, frame: 64 * 1024,
   chunk: 16 * 1024, logical: 2 * 1024 * 1024, assemblyMs: 30_000, outbox: 64 * 1024 * 1024,
   effects: 8, queued: 32, controls: 8, projects: 128, providers: 32, models: 256, page: 100,
@@ -17,8 +19,9 @@ const prompt = text(LIMITS.prompt).refine(value => value.trim().length > 0);
 const digestSchema = z.string().regex(/^[0-9a-f]{64}$/);
 export const reasoning = z.enum(['none', 'low', 'medium', 'high', 'xhigh', 'max', 'ultra', 'ultracode']);
 export const provider = z.enum(['claude-code', 'codex', 'acp-opencode']);
+export const permissions = z.enum(['full', 'auto', 'accept_edits']);
 export const policySchema = z.object({ workspace: z.literal('project_directory'),
-  permissions: z.literal('provider_default'), reasoning }).strict();
+  permissions, reasoning }).strict();
 export const selectionSchema = z.object({ machine_id: uuid, project_id: external, provider,
   model, policy: policySchema }).strict();
 export type Selection = z.infer<typeof selectionSchema>;
@@ -54,11 +57,11 @@ export const identitySchema = z.object({ installation_id: uuid, credential_gener
   connection_generation: positive }).strict();
 export type Identity = z.infer<typeof identitySchema>;
 export const catalogSchema = z.object({ projects: z.array(external).max(LIMITS.projects),
-  providers: z.array(z.object({ provider, models: z.array(z.object({ model,
+  providers: z.array(z.object({ provider, permission_modes: z.array(permissions).max(3), models: z.array(z.object({ model,
     reasoning_levels: z.array(reasoning).max(8) }).strict()).max(LIMITS.models) }).strict()).max(LIMITS.providers) }).strict();
 export type Catalog = z.infer<typeof catalogSchema>;
 export const refusalSchema = z.enum(['project_unavailable', 'provider_unavailable', 'model_unavailable',
-  'reasoning_unavailable', 'capacity', 'expired', 'recovery_required']);
+  'reasoning_unavailable', 'permissions_unavailable', 'capacity', 'expired', 'recovery_required']);
 export type Refusal = z.infer<typeof refusalSchema>;
 export const evidenceSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('receipt') }).strict(),

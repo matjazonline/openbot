@@ -20,7 +20,7 @@ pub fn resolve_agent(facts: AgentResolutionFacts) -> AppResult<ResolvedAgentDefi
         model_available,
     } = facts;
     validate_agent_bindings(&draft.bindings).map_err(crate::app_error::AppError::BadRequest)?;
-    if !model_available
+    if (draft.model.is_some() && !model_available)
         || tools.len() != draft.bindings.len()
         || skills.len() != draft.skills.len()
         || draft.skills.len() > crate::entities::agent::MAX_AGENT_SKILLS
@@ -42,9 +42,7 @@ pub fn resolve_agent(facts: AgentResolutionFacts) -> AppResult<ResolvedAgentDefi
         agent_id: draft.agent_id,
         key: draft.key,
         instructions: draft.instructions,
-        model: draft
-            .model
-            .ok_or_else(|| invalid("Select an explicit agent provider and model"))?,
+        model: draft.model,
         tools,
         skills,
     };

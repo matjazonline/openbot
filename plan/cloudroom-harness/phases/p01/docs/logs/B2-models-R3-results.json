@@ -1,0 +1,29 @@
+[
+  {
+    "check": "format",
+    "command": [
+      "cargo",
+      "fmt",
+      "--all"
+    ],
+    "cwd": "/private/tmp/openbot-cloudroom-harness-t1gfnhz1/worktree",
+    "exit": 0,
+    "elapsed_s": 3.52,
+    "log": "/private/tmp/openbot-cloudroom-harness-t1gfnhz1/worktree/plan/cloudroom-harness/phases/p01/docs/logs/B2-models-R3-format.txt"
+  },
+  {
+    "check": "agent-domain",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "--offline",
+      "--lib",
+      "application::agent::"
+    ],
+    "cwd": "/private/tmp/openbot-cloudroom-harness-t1gfnhz1/worktree",
+    "exit": 101,
+    "elapsed_s": 146.53,
+    "log": "/private/tmp/openbot-cloudroom-harness-t1gfnhz1/worktree/plan/cloudroom-harness/phases/p01/docs/logs/B2-models-R3-agent-domain.txt"
+  }
+]

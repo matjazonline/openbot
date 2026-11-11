@@ -40,7 +40,7 @@ pub struct ResolvedAgentDefinition {
     pub agent_id: AgentId,
     pub key: AgentKey,
     pub instructions: String,
-    pub model: ModelSettings,
+    pub model: Option<ModelSettings>,
     pub tools: Vec<ResolvedAgentTool>,
     pub skills: Vec<ResolvedAgentSkill>,
 }
@@ -67,6 +67,12 @@ pub(super) fn invalid(message: &str) -> AppError {
 }
 
 impl ResolvedAgentDefinition {
+    pub fn hosted_model(&self) -> AppResult<&ModelSettings> {
+        self.model.as_ref().ok_or_else(|| invalid(
+            "Hosted agent execution requires an explicit provider and model; native profiles choose their own model",
+        ))
+    }
+
     pub fn decode(bytes: &[u8]) -> AppResult<Self> {
         if bytes.len() > MAX_AGENT_DEFINITION_BYTES {
             return Err(invalid("Agent definition exceeds 1 MiB"));
@@ -80,9 +86,11 @@ impl ResolvedAgentDefinition {
     pub fn validate(&self) -> AppResult<()> {
         if self.agent_id.as_uuid().is_nil()
             || self.instructions.len() > MAX_AGENT_TEXT_BYTES
-            || self.model.model.is_empty()
-            || self.model.model.len() > 128
-            || !(1..=131_072).contains(&self.model.max_output_tokens)
+            || self.model.as_ref().is_some_and(|model| {
+                model.model.is_empty()
+                    || model.model.len() > 128
+                    || !(1..=131_072).contains(&model.max_output_tokens)
+            })
         {
             return Err(invalid(
                 "Invalid agent identity, instructions or model settings",
@@ -97,6 +105,14 @@ impl ResolvedAgentDefinition {
         }
         for assigned in &self.skills {
             let skill = &assigned.skill;
+            crate::entities::skill_bundle::validate_skill_files(&skill.files)
+                .map_err(AppError::BadRequest)?;
+            crate::entities::skill_bundle::native_skill_markdown(
+                skill.name.as_str(),
+                &skill.description,
+                &skill.instructions,
+            )
+            .map_err(AppError::BadRequest)?;
             if skill.company_id != self.company_id
                 || !skills.insert(skill.skill_id)
                 || !assignments.insert(assigned.assignment_id)

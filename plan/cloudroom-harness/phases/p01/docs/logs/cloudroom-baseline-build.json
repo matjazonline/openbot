@@ -1,0 +1,18 @@
+{
+  "command": [
+    "npx",
+    "--offline",
+    "--yes",
+    "pnpm@10.34.9",
+    "exec",
+    "turbo",
+    "run",
+    "build",
+    "--filter=@cloudroom/server",
+    "--filter=@cloudroom/host-daemon",
+    "--concurrency=2"
+  ],
+  "exit": 0,
+  "elapsed_s": 15.218,
+  "source": "d8b3cc3a16bb4b06fc99d8e543d40f1087d1e815 with two baseline reviewed patches"
+}

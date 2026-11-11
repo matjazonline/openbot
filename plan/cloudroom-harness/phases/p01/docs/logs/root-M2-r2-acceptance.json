@@ -1,0 +1,19 @@
+{
+  "status": "ACCEPTED ARCHITECTURE ONLY",
+  "decision": "CH-P01-M2/r2",
+  "decision_sha256": "08357154aecaa1b044a42688a0f25230eff0e7ca2f9ca56d7bb7989889be9403",
+  "review_note": "CH-P01-AG2-N2",
+  "findings_fixed_in_architecture": [
+    "CH-P01-AG2-F1",
+    "CH-P01-AG2-F2"
+  ],
+  "source_digest": "4cd3cf46d84474c01e74508751adc5dd6918a9c8e75c41cf8f0c1f52a37f3b13",
+  "coordination_revision": 1,
+  "coordination_sha256": "360354ed88bb6b64e0b8f3a74ee7facce51c9a7aef44790fd34904042007448d",
+  "snapshot_exclusions": [
+    "plan/cloudroom-harness/COORDINATION.md",
+    "plan/cloudroom-harness/phases/p01/docs"
+  ],
+  "accepted_at_utc": "2026-11-10T21:57:49.658589+00:00",
+  "limitations": "B2 implementation/verification/review, B3 MCP architecture/implementation and final full gate outstanding"
+}

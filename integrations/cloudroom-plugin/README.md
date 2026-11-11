@@ -1,6 +1,7 @@
 # Openbot local agents plugin
 
 This plugin connects one company-owned Cloudroom installation to Openbot using outbound WSS.
+It requires Openbot logical bridge protocol 2; chunk framing remains version 1.
 Cloudroom owns agent processes, workspaces, permissions, prompt order and history. Provider
 credentials stay with the local CLIs. macOS and headless Linux are supported by the implementation;
 real Linux acceptance has not been exercised.
@@ -46,6 +47,11 @@ identity reset, arbitrary thread import and destructive history cleanup are not 
 If an initial pairing is definitively rejected, its input and rejected candidate are cleared;
 enter a fresh Openbot pairing code and reload the plugin to retry. Incomplete responses keep the
 original candidate and must recover that same claim. Rejection never resets an initialized journal.
+
+Openbot Local Agents profiles select explicit native permissions: **Full access** is the default;
+**Auto** and **Accept edits** remain available when the provider and host advertise them. The plugin
+passes the frozen mode on both spawn and follow-up. A lower host/provider ceiling or a changed
+native permission mode refuses admission instead of silently changing the selected access.
 
 An operation receives a visible `[Openbot operation …]` header. Follow-up prompts use Cloudroom's
 queue. Only the exact originating request and accepted native turn can complete the operation;

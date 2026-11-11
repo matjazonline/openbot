@@ -7,13 +7,48 @@ use uuid::Uuid;
 use crate::{
     adapters::persistence::PostgresPersistence,
     app_error::{AppError, AppResult},
-    entities::{creation::CreationProvenance, skill::Skill, value_objects::SkillSlug},
+    entities::{
+        creation::CreationProvenance,
+        skill::{Skill, SkillSummary},
+        value_objects::SkillSlug,
+    },
     use_cases::skill::{SkillManagementPersistence, SkillPage, SkillPageRequest, SkillWrite},
 };
 
 pub(crate) const SKILL_COLUMNS: &str = "\
     skill.id, skill.company_id, skill.slug::text AS slug, skill.name, skill.description, \
-    skill.instructions, skill.created_by, skill.created_at, skill.updated_at";
+    skill.instructions, skill.created_by, skill.created_at, skill.updated_at, skill.files";
+
+const SKILL_SUMMARY_COLUMNS: &str = "skill.id, skill.company_id, skill.slug::text AS slug, \
+    skill.name, skill.description, skill.updated_at, jsonb_array_length(skill.files) AS file_count";
+
+#[derive(sqlx::FromRow)]
+struct SkillSummaryDb {
+    id: Uuid,
+    company_id: Option<Uuid>,
+    slug: String,
+    name: String,
+    description: String,
+    updated_at: DateTime<Utc>,
+    file_count: i32,
+}
+impl TryFrom<SkillSummaryDb> for SkillSummary {
+    type Error = AppError;
+    fn try_from(row: SkillSummaryDb) -> AppResult<Self> {
+        let invalid = || AppError::Internal(format!("Invalid skill {} summary", row.id));
+        let summary = Self {
+            id: row.id,
+            company_id: row.company_id,
+            slug: SkillSlug::parse(&row.slug).map_err(|_| invalid())?,
+            name: row.name,
+            description: row.description,
+            updated_at: row.updated_at,
+            file_count: usize::try_from(row.file_count).map_err(|_| invalid())?,
+        };
+        summary.validate().map_err(|_| invalid())?;
+        Ok(summary)
+    }
+}
 
 #[derive(Debug, sqlx::FromRow)]
 pub(crate) struct SkillDb {
@@ -23,9 +58,17 @@ pub(crate) struct SkillDb {
     name: String,
     description: String,
     instructions: String,
+    files: serde_json::Value,
     created_by: serde_json::Value,
     created_at: DateTime<Utc>,
     updated_at: DateTime<Utc>,
+}
+
+#[derive(sqlx::FromRow)]
+struct SkillCopyDb {
+    #[sqlx(flatten)]
+    skill: SkillDb,
+    required_tools: Vec<String>,
 }
 
 impl TryFrom<SkillDb> for Skill {
@@ -41,6 +84,8 @@ impl TryFrom<SkillDb> for Skill {
             name: row.name,
             description: row.description,
             instructions: row.instructions,
+            files: serde_json::from_value(row.files)
+                .map_err(|_| AppError::Internal(format!("Invalid skill {id} supporting files")))?,
             created_by: serde_json::from_value(row.created_by).map_err(|error| {
                 AppError::Internal(format!("Invalid skill {id} creation provenance: {error}"))
             })?,
@@ -107,8 +152,8 @@ where
     let created_by = encode_provenance(&validated)?;
     let row = sqlx::query_as::<_, SkillDb>(&format!(
         "INSERT INTO skills AS skill \
-             (id, company_id, slug, name, description, instructions, created_by, required_tools) \
-         VALUES ($1, $2, $3, $4, $5, $6, $7, COALESCE($8, '{{}}'::text[])) \
+             (id, company_id, slug, name, description, instructions, created_by, required_tools, files) \
+         VALUES ($1, $2, $3, $4, $5, $6, $7, COALESCE($8, '{{}}'::text[]), $9) \
          RETURNING {SKILL_COLUMNS}"
     ))
     .bind(Uuid::new_v4())
@@ -124,6 +169,8 @@ where
             .map(|name| name.as_str().to_owned())
             .collect::<Vec<_>>()
     }))
+    .bind(serde_json::to_value(validated.files.as_deref().unwrap_or_default())
+        .map_err(|_| AppError::BadRequest("Invalid skill assets".into()))?)
     .fetch_one(executor)
     .await
     .map_err(write_error)?;
@@ -146,8 +193,10 @@ pub(crate) async fn copy_library_skill_on(
     skill_id: Uuid,
     created_by: &CreationProvenance,
 ) -> AppResult<Skill> {
-    let source = sqlx::query_as::<_, SkillDb>(&format!(
-        "SELECT {SKILL_COLUMNS} FROM skills AS skill \
+    // Capture every copied value in one statement; collision retries must not reread a newer
+    // source's files or tool requirements alongside the original instructions.
+    let captured = sqlx::query_as::<_, SkillCopyDb>(&format!(
+        "SELECT {SKILL_COLUMNS}, skill.required_tools FROM skills AS skill \
          WHERE skill.company_id IS NULL AND skill.id = $1"
     ))
     .bind(skill_id)
@@ -155,16 +204,26 @@ pub(crate) async fn copy_library_skill_on(
     .await
     .map_err(AppError::from)?
     .ok_or_else(|| AppError::NotFound("Library skill not found.".into()))?;
-    let source: Skill = source.try_into()?;
+    let source: Skill = captured.skill.try_into()?;
     let provenance =
         serde_json::to_value(created_by).map_err(|error| AppError::Internal(error.to_string()))?;
 
     for suffix in 1..=100 {
         let candidate = copied_slug(source.slug.as_str(), suffix);
+        let instructions =
+            crate::entities::skill_bundle::rename_skill_markdown(&source.instructions, &candidate)
+                .map_err(AppError::BadRequest)?;
+        if instructions.len() > crate::entities::skill::MAX_SKILL_INSTRUCTIONS_BYTES {
+            return Err(AppError::BadRequest(
+                "The copied skill's renamed SKILL.md exceeds 16 KiB; shorten its source first."
+                    .into(),
+            ));
+        }
         let row = sqlx::query_as::<_, SkillDb>(&format!(
             "INSERT INTO skills AS skill \
-                 (id, company_id, slug, name, description, instructions, created_by, required_tools) \
-             SELECT $1, $2, $3, $4, $5, $6, $7, source.required_tools FROM skills AS source WHERE source.id = $8 \
+                 (id, company_id, slug, name, description, instructions, created_by, required_tools, files) \
+             SELECT $1, $2, $3, $4, $5, $6, $7, $8, $9 \
+             FROM skills AS source WHERE source.id = $10 AND source.company_id IS NULL \
              ON CONFLICT (company_id, slug) DO NOTHING \
              RETURNING {SKILL_COLUMNS}"
         ))
@@ -173,8 +232,10 @@ pub(crate) async fn copy_library_skill_on(
         .bind(candidate)
         .bind(&source.name)
         .bind(&source.description)
-        .bind(&source.instructions)
+        .bind(&instructions)
         .bind(&provenance)
+        .bind(&captured.required_tools)
+        .bind(sqlx::types::Json(&source.files))
         .bind(skill_id)
         .fetch_optional(&mut **transaction)
         .await
@@ -244,8 +305,8 @@ impl SkillManagementPersistence for PostgresPersistence {
     ) -> AppResult<SkillPage> {
         let before_at = page.before.map(|cursor| cursor.updated_at);
         let before_id = page.before.map(|cursor| cursor.id);
-        let rows = sqlx::query_as::<_, SkillDb>(&format!(
-            "SELECT {SKILL_COLUMNS} FROM skills AS skill \
+        let rows = sqlx::query_as::<_, SkillSummaryDb>(&format!(
+            "SELECT {SKILL_SUMMARY_COLUMNS} FROM skills AS skill \
              WHERE skill.company_id = $1 \
                AND ($2::timestamptz IS NULL OR (skill.updated_at, skill.id) < ($2, $3)) \
              ORDER BY skill.updated_at DESC, skill.id DESC LIMIT $4"
@@ -278,8 +339,8 @@ impl SkillManagementPersistence for PostgresPersistence {
     async fn list_library_page(&self, page: SkillPageRequest) -> AppResult<SkillPage> {
         let before_at = page.before.map(|cursor| cursor.updated_at);
         let before_id = page.before.map(|cursor| cursor.id);
-        let rows = sqlx::query_as::<_, SkillDb>(&format!(
-            "SELECT {SKILL_COLUMNS} FROM skills AS skill \
+        let rows = sqlx::query_as::<_, SkillSummaryDb>(&format!(
+            "SELECT {SKILL_SUMMARY_COLUMNS} FROM skills AS skill \
              WHERE skill.company_id IS NULL \
                AND ($1::timestamptz IS NULL OR (skill.updated_at, skill.id) < ($1, $2)) \
              ORDER BY skill.updated_at DESC, skill.id DESC LIMIT $3"
@@ -352,7 +413,7 @@ where
     let row = sqlx::query_as::<_, SkillDb>(&format!(
         "UPDATE skills AS skill SET slug = $1, name = $2, description = $3, \
              instructions = $4, required_tools = COALESCE($7, skill.required_tools), \
-             updated_at = CURRENT_TIMESTAMP \
+             files = COALESCE($8, skill.files), updated_at = CURRENT_TIMESTAMP \
          WHERE skill.id = $5 AND skill.company_id IS NOT DISTINCT FROM $6 \
          RETURNING {SKILL_COLUMNS}"
     ))
@@ -368,6 +429,14 @@ where
             .map(|name| name.as_str().to_owned())
             .collect::<Vec<_>>()
     }))
+    .bind(
+        validated
+            .files
+            .as_ref()
+            .map(serde_json::to_value)
+            .transpose()
+            .map_err(|_| AppError::BadRequest("Invalid skill assets".into()))?,
+    )
     .fetch_optional(executor)
     .await
     .map_err(write_error)?

@@ -1,0 +1,10 @@
+{
+  "status": "PASS",
+  "tests": 90,
+  "command": "npm test",
+  "cwd": "/private/tmp/openbot-cloudroom-harness-t1gfnhz1/worktree/integrations/cloudroom-plugin",
+  "node": "24.21.0",
+  "log": "/private/tmp/openbot-cloudroom-harness-t1gfnhz1/worktree/plan/cloudroom-harness/phases/p01/docs/logs/B2-plugin-baseline.txt",
+  "scope": "Existing unmodified plugin before B2; does not prove proposed native delivery",
+  "source_digest": "4cd3cf46d84474c01e74508751adc5dd6918a9c8e75c41cf8f0c1f52a37f3b13"
+}

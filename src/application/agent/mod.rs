@@ -64,6 +64,8 @@ pub struct SkillSnapshot {
     pub skill_id: uuid::Uuid,
     pub name: TypeName,
     pub instructions: String,
+    pub description: String,
+    pub files: Vec<crate::entities::skill_bundle::SkillFile>,
     pub required_tools: Vec<TypeName>,
 }
 

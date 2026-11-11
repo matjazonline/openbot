@@ -90,6 +90,7 @@ pub enum LocalRefusal {
     ProviderUnavailable,
     ModelUnavailable,
     ReasoningUnavailable,
+    PermissionsUnavailable,
     Capacity,
     Expired,
     RecoveryRequired,

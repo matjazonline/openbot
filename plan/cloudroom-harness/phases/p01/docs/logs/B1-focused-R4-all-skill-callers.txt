@@ -1,0 +1,85 @@
+   Compiling open_bots v0.1.0 (/private/tmp/openbot-cloudroom-harness-t1gfnhz1/worktree)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 3m 31s
+     Running unittests src/lib.rs (/private/tmp/openbot-cloudroom-harness-t1gfnhz1/target/debug/deps/open_bots-6467f0b3ff334015)
+
+running 77 tests
+test adapters::http::pages::company_skills::tests::skill_instructions_with_html_in_their_text_are_escaped ... ok
+test adapters::http::routes::skill_library::archive::tests::skill_archive_caps_footer_counts_before_constructing_the_zip_reader ... ok
+test adapters::http::routes::skill_library::archive::tests::skill_archive_rejects_duplicates_before_the_reader_can_hide_them ... ok
+test adapters::http::routes::skill_library::http_tests::dump_skill_bundle_browser_fixtures ... ignored, explicit browser fixture generator
+test adapters::http::pages::agent_settings::capability_tests::a_library_agent_picker_offers_only_global_skills ... ok
+test adapters::http::routes::skill_library::archive::tests::skill_archive_one_directory_wrapper_is_supported_without_escaping_its_root ... ok
+test adapters::http::routes::skill_library::archive::tests::skill_archive_rejects_unsafe_paths_case_collisions_links_and_bombs ... ok
+test adapters::http::routes::skill_library::archive::tests::skill_archive_round_trip_preserves_source_binary_files_nested_scripts_and_modes ... ok
+test adapters::http::routes::skill_library::archive::tests::skill_archive_maximum_text_only_skill_has_a_byte_exact_native_round_trip ... ok
+test adapters::http::routes::skill_library::tests::the_body_limit_admits_the_largest_valid_skill_as_json ... ok
+test adapters::http::routes::skill_library::archive::tests::skill_archive_large_skill_suffix_assets_round_trip_at_root_and_inside_a_wrapper ... ok
+test adapters::http::routes::skill_library::tests::skill_bundle_json_capacity_retains_twenty_five_percent_headroom ... ok
+test adapters::http::routes::skill_library::archive::tests::skill_archive_maximum_files_and_bytes_are_accepted_then_one_more_is_refused ... ok
+test adapters::persistence::agent_publication::tests::authoring::autonomous_agent_authoring_final_metadata_conflict_rolls_back_skill_and_binding_changes ... ok
+test adapters::http::routes::ui_agents::authoring::publication::tests::autonomous_agent_authoring_malformed_skill_csv_keeps_input_and_does_not_clear_assignments ... ok
+test adapters::http::routes::ui_agents::authoring::publication::tests::autonomous_agent_authoring_missing_skill_tool_fails_shared_preview_without_changing_active ... ok
+test adapters::http::routes::ui_agents::authoring::publication::tests::autonomous_agent_authoring_skill_order_survives_classic_metadata_save_and_stale_rejection ... ok
+test adapters::http::routes::ui_agents::authoring::publication::tests::autonomous_agent_authoring_skill_revocation_form_uses_exact_assignment_and_safe_panel ... ok
+test adapters::persistence::agent_publication::tests::races::autonomous_agent_publication_capture_serializes_before_actual_skill_deletion ... ok
+test adapters::persistence::agent_publication::tests::skills::autonomous_agent_skills_missing_requirement_preserves_active_without_adding_grants ... ok
+test adapters::persistence::skill::tests::a_company_skill_round_trips ... ok
+test adapters::persistence::skill::tests::a_stored_skill_the_domain_refuses_is_a_contextual_conversion_error ... ok
+test adapters::persistence::skill::tests::another_companys_skill_is_not_readable_updatable_or_deletable ... ok
+test adapters::persistence::skill::tests::bundle_tests::skill_bundle_database_constraints_match_the_domain_and_refuse_direct_invalid_writes ... ok
+test adapters::persistence::agent_publication::tests::skills::autonomous_agent_skills_shared_edit_does_not_change_frozen_text_or_live_assignment ... ok
+test adapters::persistence::agent_publication::tests::skills::autonomous_agent_skills_removal_reassignment_and_explicit_revoke_preserve_incarnations ... ok
+test adapters::persistence::skill::tests::copied_slugs_stay_bounded ... ok
+test adapters::persistence::skill::tests::bundle_tests::skill_bundle_library_copy_renames_only_new_identity_and_keeps_assets_independent ... ok
+test adapters::persistence::skill::tests::bundle_tests::skill_bundle_persistence_create_update_preserve_and_scope_round_trip ... ok
+test adapters::persistence::skill::tests::copying_a_library_skill_produces_a_company_owned_row_and_preserves_the_source ... ok
+test adapters::persistence::skill::tests::capability_selection_is_scoped_and_updates_atomically ... ok
+test adapters::persistence::skill::tests::deleting_an_in_use_library_skill_is_refused ... ok
+test adapters::persistence::skill::tests::database_bounds_skill_positions ... ok
+test adapters::persistence::skill::tests::database_scope_trigger_refuses_live_cross_library_skill_links ... ok
+test adapters::persistence::skill::tests::two_competing_library_skill_copies_receive_distinct_slugs ... ok
+test adapters::persistence::skill::tests::picking_a_library_agent_copies_its_skills_with_the_agent_and_channel ... ok
+test adapters::persistence::skill::tests::deleting_either_side_cascades_a_company_agent_skill_selection ... ok
+test adapters::persistence::skill::tests::a_capability_snapshot_never_mixes_an_agent_row_with_a_different_relationship_version ... ok
+test adapters::persistence::agent_publication::tests::races::autonomous_agent_publication_actual_skill_deletion_serializes_before_capture ... ok
+test adapters::http::routes::skill_library::http_tests::skill_bundle_http_maximum_json_uses_the_real_company_and_operator_routes ... ok
+test adapters::http::routes::skill_library::http_tests::bundles::skill_bundle_http_failed_replacement_keeps_original_bytes_and_modes ... ok
+test adapters::http::routes::skill_library::http_tests::skill_bundle_http_json_body_boundary_rejects_before_writing ... ok
+test adapters::http::routes::skill_library::http_tests::bundles::skill_bundle_http_tenant_operator_and_csrf_guards ... ok
+test adapters::http::routes::skill_library::http_tests::bundles::skill_bundle_http_import_download_replace_and_asset_metadata ... ok
+test adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::guide_tests::doop_agent_pinned_guide_skills_preserve_the_full_capture_with_existing_bounds ... ok
+test application::agent::contract_tests::autonomous_agent_contract_skills_require_local_aliases_without_granting_tools ... ok
+test application::agent::resolution_tests::autonomous_agent_skills_preserve_order_and_reject_substituted_assignments ... ok
+test application::agent::resolution_tests::autonomous_agent_skills_refuse_foreign_tenant_facts_and_missing_requirements ... ok
+test application::agent::resolution_tests::autonomous_agent_skills_require_explicit_aliases_without_adding_tools ... ok
+test application::use_cases::skill::tests::a_page_cursor_is_emitted_only_when_the_probe_found_another_row ... ok
+test adapters::http::routes::skill_library::http_tests::bundles::skill_bundle_http_members_cannot_upload_and_admins_keep_read_access ... ok
+test application::use_cases::skill::tests::normalize_trims_metadata_and_preserves_instruction_file_bytes ... ok
+test application::workflow::publication::tests::capabilities_tests::autonomous_agent_definition_skill_requirements_are_agent_local ... ok
+test application::workflow::publication::tests::capabilities_tests::workflow_capabilities_agent_receives_exactly_its_saved_tools_and_skills_in_order ... ok
+test domain::entities::skill::tests::a_blank_description_is_refused ... ok
+test domain::entities::skill::tests::a_skill_with_instructions_is_accepted ... ok
+test domain::entities::skill::tests::blank_instructions_are_refused ... ok
+test domain::entities::skill::tests::instructions_are_bounded_in_bytes_not_characters ... ok
+test domain::entities::skill_bundle::tests::skill_bundle_file_count_byte_budgets_and_collisions_fail_early ... ok
+test domain::entities::skill_bundle::tests::skill_bundle_generated_frontmatter_import_preserves_the_exact_original_body ... ok
+test domain::entities::skill_bundle::tests::skill_bundle_invalid_or_noncanonical_base64_is_refused ... ok
+test domain::entities::skill_bundle::tests::skill_bundle_malformed_or_empty_frontmatter_is_refused ... ok
+test domain::entities::skill_bundle::tests::skill_bundle_markdown_preserves_frontmatter_body_and_copy_identity ... ok
+test domain::entities::skill_bundle::tests::skill_bundle_paths_reject_escape_aliases_and_entrypoint_replacement ... ok
+test domain::entities::skill_bundle::tests::skill_bundle_round_trips_binary_content_and_executable_intent ... ok
+test domain::entities::value_objects::tests::a_skill_slug_that_parses_is_one_the_column_accepts ... ok
+test adapters::persistence::workflow::tests::admission_tests::storage_tests::autonomous_agent_storage_tests::revision_tests::autonomous_agent_storage_skill_incarnations_and_sealed_revision_assignments ... ok
+test adapters::persistence::workflow::tests::admission_tests::storage_tests::autonomous_agent_storage_tests::skill_lifetime_tests::autonomous_agent_storage_skill_authority_reader_serializes_before_source_delete ... ok
+test adapters::persistence::workflow::tests::admission_tests::storage_tests::autonomous_agent_storage_tests::skill_lifetime_tests::autonomous_agent_storage_skill_delete_preserves_history_and_cannot_revive_assignment ... ok
+test adapters::persistence::workflow::tests::admission_tests::storage_tests::autonomous_agent_storage_tests::skill_lifetime_tests::autonomous_agent_storage_skill_delete_serializes_before_authority_reader ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_provisioning::autonomous_agent_provisioning_library_install_failure_rolls_back_portable_skills_and_principal ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::workflow_agent_run_refuses_unlinked_skill_before_provider_entry ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::driver::e2e::autonomous_agent_e2e_approval_reconstruction_after_publication_keeps_saved_call_and_skill ... ok
+test application::use_cases::skill::tests::nonoperators_cannot_read_or_write_the_skill_library_management_surface ... ok
+test adapters::persistence::workflow::tests::mcp_tests::agent_tests::e2e::live::autonomous_agent_e2e_draft_skill_detach_keeps_selection_until_exact_revocation ... ok
+test adapters::persistence::skill::tests::copy_concurrency_tests::skill_bundle_competing_editor_and_both_copy_paths_keep_one_revision_during_slug_retries ... ok
+test adapters::persistence::workflow::tests::mcp_tests::agent_tests::e2e::revisions::autonomous_agent_e2e_mixed_tools_skills_two_workflows_and_queued_revisions ... ok
+
+test result: ok. 76 passed; 0 failed; 1 ignored; 0 measured; 3980 filtered out; finished in 8.94s
+

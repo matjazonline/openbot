@@ -1,0 +1,22 @@
+✖ skill ZIP uploads retain multipart bytes and show progress, success and failure in both themes (420.212833ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 805.216667
+
+✖ failing tests:
+
+test at scripts/tests/skill-bundle-browser.mjs:14:1
+✖ skill ZIP uploads retain multipart bytes and show progress, success and failure in both themes (420.212833ms)
+  locator.click: Error: strict mode violation: locator('form[hx-encoding="multipart/form-data"]').getByRole('button') resolved to 2 elements:
+      1) <input type="file" required="" name="bundle" class="file-input w-full" accept=".zip,application/zip"/> aka getByRole('button', { name: 'ZIP, up to 1 MiB; 64' })
+      2) <button type="submit" class="btn btn-secondary">…</button> aka getByRole('button', { name: 'Replace directory' })
+  
+  Call log:
+  [2m  - waiting for locator('form[hx-encoding="multipart/form-data"]').getByRole('button')[22m
+  
+      at TestContext.<anonymous> (/private/tmp/openbot-cloudroom-harness-t1gfnhz1/worktree/scripts/tests/skill-bundle-browser.mjs:52:22)

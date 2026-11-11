@@ -1,0 +1,34 @@
+{
+  "artifact": "cd38325289a55b05843071e92738e5bf97fb8bfeeb06d5a4e4a7afec1e74ebad",
+  "files": [
+    {
+      "path": "B1-review-archive-probe.rs",
+      "sha256": "5fdb139b6a9d3a070785c7866f282b89b1a32fcd1882bf04552d6bce88c12325"
+    },
+    {
+      "path": "B1-review-archive-probe-build.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "B1-review-archive-probe.txt",
+      "sha256": "440b8487fa488ec45d6568b9de8edf33b3701502dc4f892a64014fbb2f1b8156"
+    },
+    {
+      "path": "B1-review-copy-race.rs",
+      "sha256": "ac4332e4e3701bb8c3da4d7b0159c00bfaf741a70a5823bbed8cd0a15cf886c1"
+    },
+    {
+      "path": "B1-review-copy-race-build.txt",
+      "sha256": "edb44773938d6d94d7b38cf34ad3282d9e166fe37e9acdd9af1b85c33902c7ce"
+    },
+    {
+      "path": "B1-review-copy-race-build-R2.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "B1-review-copy-race.txt",
+      "sha256": "acc05faef13c183426aed912664b274bfc6d73b7f7ed048caefa986140821201"
+    }
+  ],
+  "fixture": "Owned PostgreSQL 18 loopback 63451; UUID-scoped reviewer user/company/library skill, all removed after production race probe; standalone rustc linked existing private target rlibs. Temporary probe binaries removed; sources and outputs retained."
+}

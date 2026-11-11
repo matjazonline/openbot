@@ -1,0 +1,44 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.25s
+     Running unittests src/lib.rs (/private/tmp/openbot-cloudroom-harness-t1gfnhz1/target/debug/deps/open_bots-6467f0b3ff334015)
+
+running 37 tests
+test adapters::persistence::agent_publication::tests::authoring::autonomous_agent_authoring_competing_draft_writers_commit_one_complete_assignment_set ... ok
+test adapters::persistence::agent_publication::tests::authoring::autonomous_agent_authoring_refuses_builder_spoofing_reserved_aliases_and_foreign_scope ... ok
+test adapters::persistence::agent_publication::tests::mcp::autonomous_agent_resolution_malformed_stored_catalog_is_an_error_not_an_empty_capture ... ok
+test adapters::persistence::agent_publication::tests::http::autonomous_agent_resolution_http_alias_captures_exact_connection_and_approval ... ok
+test adapters::persistence::agent_publication::tests::mcp::autonomous_agent_resolution_mcp_reapproval_requires_fresh_concrete_binding ... ok
+test adapters::persistence::agent_publication::tests::http::autonomous_agent_resolution_http_requires_current_secret_and_enabled_connection ... ok
+test adapters::persistence::agent_publication::tests::http::vault_binding_agent_publication_refuses_an_integration_http_source ... ok
+test adapters::persistence::agent_publication::tests::mcp::autonomous_agent_resolution_mcp_retired_operation_and_removed_grant_are_not_discovery ... ok
+test adapters::persistence::agent_publication::tests::authoring::autonomous_agent_authoring_final_metadata_conflict_rolls_back_skill_and_binding_changes ... ok
+test adapters::persistence::agent_publication::tests::mcp::autonomous_agent_resolution_mcp_schema_drift_refuses_without_replacing_active_revision ... ok
+test adapters::persistence::agent_publication::tests::authoring::autonomous_agent_authoring_save_competing_with_publication_never_activates_unsaved_content ... ok
+test adapters::persistence::agent_publication::tests::publication::autonomous_agent_publication_competing_identical_keys_return_one_result ... ok
+test adapters::persistence::agent_publication::tests::mcp::autonomous_agent_resolution_mcp_without_workflow_freezes_remote_name_policy_and_alias ... ok
+test adapters::persistence::agent_publication::tests::authoring_views::autonomous_agent_views_authoring_separates_active_and_draft_and_omits_credentials_and_active_prompt ... ok
+test adapters::persistence::agent_publication::tests::native::autonomous_agent_publication_native_result_cannot_reference_another_agent_or_company ... ok
+test adapters::persistence::agent_publication::tests::native::autonomous_agent_publication_native_request_result_is_immutable_and_company_owned ... ok
+test adapters::persistence::agent_publication::tests::mcp::vault_binding_agent_publication_refuses_an_integration_mcp_source ... ok
+test adapters::persistence::agent_publication::tests::authoring_views::autonomous_agent_views_history_pages_timestamp_ties_without_payloads_or_foreign_rows ... ok
+test adapters::persistence::agent_publication::tests::publication::autonomous_agent_publication_native_only_needs_no_hosted_connection ... ok
+test adapters::persistence::agent_publication::tests::publication::autonomous_agent_publication_competing_publishers_choose_one_without_partial_state ... ok
+test adapters::persistence::agent_publication::tests::publication::autonomous_agent_publication_preview_and_publish_without_a_workflow ... ok
+test adapters::persistence::agent_publication::tests::publication::autonomous_agent_publication_validation_failure_preserves_active_and_history ... ok
+test adapters::persistence::agent_publication::tests::publication::autonomous_agent_publication_replay_returns_original_after_newer_activation ... ok
+test adapters::persistence::agent_publication::tests::publication::autonomous_agent_publication_revoke_deactivate_and_delete_preserve_frozen_result ... ok
+test adapters::persistence::agent_publication::tests::publication::autonomous_agent_publication_requires_current_authority_and_scopes_history ... ok
+test adapters::persistence::agent_publication::tests::publication::autonomous_agent_publication_removal_revokes_identity_and_new_identity_cannot_revive_it ... ok
+test adapters::persistence::agent_publication::tests::skills::autonomous_agent_skills_missing_requirement_preserves_active_without_adding_grants ... ok
+test adapters::persistence::agent_publication::tests::skills::autonomous_agent_skills_shared_edit_does_not_change_frozen_text_or_live_assignment ... ok
+test adapters::persistence::agent_publication::tests::skills::autonomous_agent_skills_removal_reassignment_and_explicit_revoke_preserve_incarnations ... ok
+test adapters::persistence::agent_publication::tests::races::autonomous_agent_publication_capture_serializes_before_actual_skill_deletion ... ok
+test adapters::persistence::agent_publication::tests::mcp::autonomous_agent_publication_capture_locks_mcp_catalog_operation_and_grant ... ok
+test adapters::persistence::agent_publication::tests::races::autonomous_agent_publication_capture_holds_draft_and_shared_text_until_commit ... ok
+test adapters::persistence::agent_publication::tests::mcp::autonomous_agent_publication_catalog_edit_first_cannot_commit_a_mixed_review ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::workflow_agent_publication_refuses_forged_snapshot_and_keeps_frozen_version ... ok
+test adapters::persistence::agent_publication::tests::races::autonomous_agent_publication_actual_skill_deletion_serializes_before_capture ... ok
+test adapters::persistence::agent_publication::tests::races::autonomous_agent_publication_draft_edit_first_refuses_stale_expected_state ... ok
+test adapters::persistence::workflow::tests::message_tests::autonomous_agent_publication_workflow_tests::autonomous_agent_publication_workflow_pin_is_exact_at_publish_and_retained_after_repin ... ok
+
+test result: ok. 37 passed; 0 failed; 0 ignored; 0 measured; 4026 filtered out; finished in 1.73s
+

@@ -75,11 +75,10 @@ impl RevisionRow {
             agent_id: definition.agent_id,
             revision_id: AgentRevisionId::new(self.id),
             key: definition.key.as_str().to_owned(),
-            model: format!(
-                "{} / {}",
-                definition.model.provider.as_str(),
-                definition.model.model
-            ),
+            model: definition
+                .model
+                .as_ref()
+                .map(|model| format!("{} / {}", model.provider.as_str(), model.model)),
             tools: bindings
                 .iter()
                 .map(|tool| tool.alias.as_str().to_owned())

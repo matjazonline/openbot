@@ -207,7 +207,7 @@ impl Setup {
         p.connect_journal(
             fence,
             &JournalHello {
-                version: 1,
+                version: 2,
                 installation_id: fence.machine.installation_id,
                 journal_id: self.journal_id,
                 journal_sequence: sequence as u64,

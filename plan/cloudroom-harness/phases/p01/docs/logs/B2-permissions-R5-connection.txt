@@ -1,0 +1,27 @@
+   Compiling open_bots v0.1.0 (/private/tmp/openbot-cloudroom-harness-t1gfnhz1/worktree)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1m 45s
+     Running unittests src/lib.rs (/private/tmp/openbot-cloudroom-harness-t1gfnhz1/target/debug/deps/open_bots-6467f0b3ff334015)
+
+running 19 tests
+test adapters::http::routes::local_machine_connection::framing::tests::cloudroom_protocol_two_rejects_old_hello_and_retains_chunk_framing_one ... ok
+test adapters::http::routes::local_machine_connection::framing::tests::cloudroom_protocol_refuses_unsafe_javascript_integers_and_nul_output ... ok
+test adapters::http::routes::local_machine_connection::framing::tests::cloudroom_protocol_journal_digest_excludes_current_connection_envelope ... ok
+test adapters::http::routes::local_machine_connection::framing::tests::cloudroom_protocol_rejects_expired_interleaved_corrupt_and_unknown_chunks ... ok
+test adapters::http::routes::local_machine_connection::framing::tests::cloudroom_protocol_chunks_round_trip_exact_logical_limit_and_bound_each_frame ... ok
+test adapters::http::routes::local_machine_connection::tests::cloudroom_connection_revocation_during_bounded_hello_accepts_no_observation ... ok
+test adapters::http::routes::local_machine_connection::tests::failures::resources::cloudroom_connection_concurrent_replicas_with_independent_pools_accept_one_hello ... ok
+test adapters::http::routes::local_machine_connection::tests::cloudroom_connection_two_replicas_supersede_live_socket_and_join_shutdown ... ok
+test adapters::http::routes::local_machine_connection::tests::failures::cloudroom_connection_oversized_binary_and_unknown_frame_close_without_ack ... ok
+test adapters::http::routes::local_machine_connection::tests::failures::resources::cloudroom_connection_global_capacity_bounds_pending_upgrades_and_releases_all ... ok
+test adapters::http::routes::local_machine_connection::tests::cloudroom_connection_lost_ack_reconnect_rewraps_receipt_and_rejects_old_envelope ... ok
+test adapters::http::routes::local_machine_connection::tests::failures::cloudroom_connection_header_authentication_and_version_refuse_before_lease ... ok
+test adapters::http::routes::local_machine_connection::tests::failures::cloudroom_connection_database_outage_is_not_invalid_credentials ... ok
+test adapters::http::routes::local_machine_connection::tests::failures::resources::cloudroom_connection_shutdown_cancels_slow_consumer_and_keeps_possible_delivery_uncertain ... ok
+test adapters::http::routes::local_machine_connection::tests::failures::cloudroom_connection_partial_terminal_output_replays_after_shutdown_without_early_ack ... ok
+test adapters::http::routes::local_machine_connection::tests::submission::cloudroom_submission_actual_websocket_accepts_thread_before_native_turn ... ok
+test adapters::http::routes::local_machine_connection::tests::recovery::cloudroom_connection_uncertain_reconnect_withholds_new_effect_until_reconciled ... ok
+test adapters::http::routes::local_machine_connection::tests::tls::cloudroom_connection_real_wss_validates_certificate_and_commits_result ... ok
+test adapters::http::routes::local_machine_connection::tests::failures::cloudroom_connection_handshake_timeout_and_shutdown_join_pending_hello ... ok
+
+test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 4042 filtered out; finished in 11.95s
+

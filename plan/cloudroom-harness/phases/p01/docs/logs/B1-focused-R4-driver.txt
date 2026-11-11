@@ -1,0 +1,17 @@
+{"starting": "format", "command": ["cargo", "fmt", "--all"]}
+{"name": "format", "command": ["cargo", "fmt", "--all"], "exit": 0, "elapsed_s": 3.123, "log": "B1-focused-R4-format.txt"}
+{"starting": "offline-alltargets", "command": ["cargo", "check", "--locked", "--offline", "--all-targets"]}
+{"name": "offline-alltargets", "command": ["cargo", "check", "--locked", "--offline", "--all-targets"], "exit": 0, "elapsed_s": 98.155, "log": "B1-focused-R4-offline-alltargets.txt"}
+{"starting": "all-skill-callers", "command": ["cargo", "test", "--locked", "--offline", "--lib", "skill"]}
+{"name": "all-skill-callers", "command": ["cargo", "test", "--locked", "--offline", "--lib", "skill"], "exit": 0, "elapsed_s": 223.421, "log": "B1-focused-R4-all-skill-callers.txt"}
+{"starting": "source-modules", "command": ["cargo", "test", "--locked", "--offline", "--test", "source_modules"]}
+{"name": "source-modules", "command": ["cargo", "test", "--locked", "--offline", "--test", "source_modules"], "exit": 0, "elapsed_s": 64.508, "log": "B1-focused-R4-source-modules.txt"}
+{"starting": "browser-fixtures", "command": ["cargo", "test", "--locked", "--offline", "--lib", "dump_skill_bundle_browser_fixtures", "--", "--ignored"]}
+{"name": "browser-fixtures", "command": ["cargo", "test", "--locked", "--offline", "--lib", "dump_skill_bundle_browser_fixtures", "--", "--ignored"], "exit": 0, "elapsed_s": 0.844, "log": "B1-focused-R4-browser-fixtures.txt"}
+{"starting": "browser", "command": ["node", "--test", "scripts/tests/skill-bundle-browser.mjs"]}
+{"name": "browser", "command": ["node", "--test", "scripts/tests/skill-bundle-browser.mjs"], "exit": 0, "elapsed_s": 1.529, "log": "B1-focused-R4-browser.txt"}
+{"starting": "clippy", "command": ["cargo", "clippy", "--locked", "--offline", "--all-targets", "--", "-D", "warnings"]}
+{"name": "clippy", "command": ["cargo", "clippy", "--locked", "--offline", "--all-targets", "--", "-D", "warnings"], "exit": 0, "elapsed_s": 128.098, "log": "B1-focused-R4-clippy.txt"}
+{"starting": "sqlx-prepare", "command": ["cargo", "sqlx", "prepare", "--", "--all-targets"]}
+{"name": "sqlx-prepare", "command": ["cargo", "sqlx", "prepare", "--", "--all-targets"], "exit": 0, "elapsed_s": 21.17, "log": "B1-focused-R4-sqlx-prepare.txt"}
+{"completed": 8, "failures": []}

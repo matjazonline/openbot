@@ -27,7 +27,7 @@ impl Context {
             .unwrap()
             .unwrap();
         let hello = JournalHello {
-            version: 1,
+            version: 2,
             installation_id: fence.machine.installation_id,
             journal_id: journal,
             journal_sequence: 0,
@@ -150,7 +150,7 @@ impl Context {
             .connect_journal(
                 fence,
                 &JournalHello {
-                    version: 1,
+                    version: 2,
                     installation_id: fence.machine.installation_id,
                     journal_id: journal,
                     journal_sequence: sequence,

@@ -130,8 +130,7 @@ async fn autonomous_agent_publication_validation_failure_preserves_active_and_hi
     let f = Fixture::new().await;
     let first = f.p.publish_agent(f.request("valid").await).await.unwrap();
     f.update(AgentWrite {
-        provider: None,
-        model: None,
+        model: Some("not-an-offered-model".into()),
         ..write()
     })
     .await;
@@ -283,5 +282,42 @@ async fn autonomous_agent_publication_requires_current_authority_and_scopes_hist
             revisions: 1,
             requests: 1
         }
+    );
+}
+
+#[tokio::test]
+async fn autonomous_agent_publication_native_only_needs_no_hosted_connection() {
+    let f = Fixture::new().await;
+    f.update(AgentWrite {
+        provider: None,
+        model: None,
+        tool_bindings: Some(vec![]),
+        ..write()
+    })
+    .await;
+    f.p.replace_model_connections_for_user(f.owner, f.scope.company.as_uuid(), vec![])
+        .await
+        .unwrap();
+    let preview = f.p.preview_agent(f.scope).await.unwrap();
+    assert!(preview.definition.model.is_none());
+    let published =
+        f.p.publish_agent(f.request("native-no-hosted-model").await)
+            .await
+            .unwrap();
+    assert!(published.definition.model.is_none());
+    assert_eq!(
+        published.definition.content_hash().unwrap(),
+        published.digest
+    );
+    let active = f.p.active_agent_revision(f.scope).await.unwrap().unwrap();
+    assert_eq!(active.id, published.id);
+    assert!(active.definition.model.is_none());
+    assert!(
+        crate::application::workflow::publication::ResolvedAgent::from_revision(
+            crate::entities::agent_capability::DependencyManifestId::new(Uuid::new_v4()),
+            active,
+        )
+        .is_err(),
+        "hosted execution must refuse a native-only revision"
     );
 }

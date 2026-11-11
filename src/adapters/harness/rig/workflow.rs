@@ -437,11 +437,12 @@ where
             .blocked_workflow_model(claim.fence, self.lease)
             .await?;
         let selection = launch.prepared.selection().agent();
+        let settings = selection.hosted_model()?;
         let model = self
             .providers
             .model(&ResolvedModelRequest {
-                provider: &selection.model.provider.as_str().into(),
-                model: &selection.model.model.as_str().into(),
+                provider: &settings.provider.as_str().into(),
+                model: &settings.model.as_str().into(),
                 secret: &launch.secret,
                 endpoint: endpoint(selection.agent_id.as_uuid()).as_deref(),
             })

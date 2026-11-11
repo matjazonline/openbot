@@ -1,0 +1,83 @@
+[
+  {
+    "name": "format",
+    "command": [
+      "cargo",
+      "fmt",
+      "--all"
+    ],
+    "exit": 0,
+    "elapsed_s": 3.194,
+    "log": "B1-focused-R6-format.txt"
+  },
+  {
+    "name": "offline-alltargets",
+    "command": [
+      "cargo",
+      "check",
+      "--locked",
+      "--offline",
+      "--all-targets"
+    ],
+    "exit": 0,
+    "elapsed_s": 25.616,
+    "log": "B1-focused-R6-offline-alltargets.txt"
+  },
+  {
+    "name": "all-skill-callers",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "--offline",
+      "--lib",
+      "skill"
+    ],
+    "exit": 0,
+    "elapsed_s": 94.226,
+    "log": "B1-focused-R6-all-skill-callers.txt"
+  },
+  {
+    "name": "browser-fixtures",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "--offline",
+      "--lib",
+      "dump_skill_bundle_browser_fixtures",
+      "--",
+      "--ignored"
+    ],
+    "exit": 0,
+    "elapsed_s": 0.72,
+    "log": "B1-focused-R6-browser-fixtures.txt"
+  },
+  {
+    "name": "browser",
+    "command": [
+      "node",
+      "--test",
+      "scripts/tests/skill-bundle-browser.mjs"
+    ],
+    "exit": 0,
+    "elapsed_s": 1.599,
+    "log": "B1-focused-R6-browser.txt"
+  },
+  {
+    "name": "clippy",
+    "command": [
+      "cargo",
+      "clippy",
+      "--locked",
+      "--offline",
+      "--all-targets",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "exit": 0,
+    "elapsed_s": 41.683,
+    "log": "B1-focused-R6-clippy.txt"
+  }
+]

@@ -1,0 +1,12 @@
+   Compiling open_bots v0.1.0 (/private/tmp/openbot-cloudroom-harness-t1gfnhz1/worktree)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1m 33s
+     Running unittests src/lib.rs (/private/tmp/openbot-cloudroom-harness-t1gfnhz1/target/debug/deps/open_bots-6467f0b3ff334015)
+
+running 4 tests
+test adapters::http::routes::local_agents::tests::ui::cloudroom_management_ui_native_forms_parse_save_start_and_render_original_session ... ok
+test adapters::http::routes::local_agents::tests::ui::cloudroom_management_ui_foreign_selection_and_form_mutations_cannot_cross_company ... ok
+test adapters::http::routes::local_agents::tests::ui::cloudroom_management_ui_later_profile_page_and_selection_keep_authorized_start_conversation ... ok
+test adapters::http::routes::local_agents::tests::ui::cloudroom_management_ui_explicit_permissions_default_full_and_roundtrip_lower_modes ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 4056 filtered out; finished in 2.05s
+

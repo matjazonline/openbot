@@ -6,6 +6,29 @@ async fn autonomous_agent_skills_shared_edit_does_not_change_frozen_text_or_live
     let skill = f
         .skill(vec![TypeName::parse("message.reply").unwrap()])
         .await;
+    let original_files = vec![
+        crate::entities::skill_bundle::SkillFile::from_bytes(
+            "scripts/check.py".into(),
+            b"#!/usr/bin/env python3\nprint('original')\n",
+            true,
+        )
+        .unwrap(),
+    ];
+    f.p.update_company(
+        f.scope.company.as_uuid(),
+        skill.id,
+        SkillWrite {
+            slug: skill.slug.as_str().into(),
+            name: skill.name.clone(),
+            description: skill.description.clone(),
+            instructions: skill.instructions.clone(),
+            files: Some(original_files.clone()),
+            required_tools: None,
+            created_by: None,
+        },
+    )
+    .await
+    .unwrap();
     let first =
         f.p.publish_agent(f.request("original").await)
             .await
@@ -14,6 +37,14 @@ async fn autonomous_agent_skills_shared_edit_does_not_change_frozen_text_or_live
         f.scope.company.as_uuid(),
         skill.id,
         SkillWrite {
+            files: Some(vec![
+                crate::entities::skill_bundle::SkillFile::from_bytes(
+                    "scripts/check.py".into(),
+                    b"print('edited')\n",
+                    false,
+                )
+                .unwrap(),
+            ]),
             slug: skill.slug.as_str().into(),
             name: skill.name,
             description: skill.description,
@@ -30,6 +61,7 @@ async fn autonomous_agent_skills_shared_edit_does_not_change_frozen_text_or_live
             .unwrap()
             .unwrap();
     assert_eq!(old.digest, first.digest);
+    assert_eq!(old.definition.skills[0].skill.files, original_files);
     assert_eq!(
         old.definition.skills[0].skill.instructions,
         "Original shared text."
@@ -44,6 +76,8 @@ async fn autonomous_agent_skills_shared_edit_does_not_change_frozen_text_or_live
         first.definition.skills[0].assignment_id
     );
     assert_ne!(second.digest, first.digest);
+    assert_ne!(second.definition.skills[0].skill.files, original_files);
+    assert!(!second.definition.skills[0].skill.files[0].executable);
 }
 
 #[tokio::test]

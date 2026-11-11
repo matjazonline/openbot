@@ -33,6 +33,7 @@ async fn portable_library(p: &PostgresPersistence) -> PortableLibrary {
     let skill = SkillManagementPersistence::create_library(
         p,
         SkillWrite {
+            files: None,
             slug: "portable-support".into(),
             name: "Portable support".into(),
             description: "Requires a company-selected HTTP operation".into(),

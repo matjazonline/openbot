@@ -51,7 +51,7 @@ fn reconciliation_is_offered_as_an_annotation_and_a_step_shows_usage_and_receipt
                 agent_id: crate::entities::agent_capability::AgentId::new(Uuid::new_v4()),
                 revision_id: crate::entities::agent_capability::AgentRevisionId::new(Uuid::new_v4()),
                 key: "assistant".into(),
-                model: "openai / gpt-test".into(),
+                model: Some("openai / gpt-test".into()),
                 tools: vec!["lookup".into()],
                 skills: Vec::new(),
                 bindings: Vec::new(),

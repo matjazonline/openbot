@@ -123,11 +123,11 @@ fn execute(bundle: Arc<PublishedBundle>, mut request: SampleRequest) -> AppResul
                     agent_id: reference.agent_id,
                     key: reference.key.clone(),
                     instructions: "Sample instructions".into(),
-                    model: ModelSettings {
+                    model: Some(ModelSettings {
                         provider: name("test"),
                         model: "sample".into(),
                         max_output_tokens: 1000,
-                    },
+                    }),
                     tools,
                     skills: vec![],
                 });

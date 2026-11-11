@@ -52,6 +52,37 @@ call-origin projections show at most 50 entries per list and explicitly report t
 history shows 20 entries per cursor page. Catalogs show 50 choices per page and retain selected
 identities outside their page.
 
+## Skill directories
+
+Company owners can import a ZIP from **Skills**. Operators have the same controls in the global
+skill library. Include `SKILL.md` at the archive root or inside one enclosing directory, with its
+supporting `scripts/`, reference files and binary assets. Its YAML frontmatter needs a `name`
+matching the skill slug and a nonempty `description`. Preserve executable file modes when
+creating the ZIP; an executable script stays executable on export.
+
+Use **Replace directory** to replace the saved instruction text and all supporting files together.
+An invalid upload leaves the existing skill intact. Ordinary metadata edits preserve supporting
+files. **Download ZIP** exports the saved directory; the file list shows paths, sizes and
+executable flags. Copying a global skill into a company creates independent files. If its slug
+already exists, the copied frontmatter uses the new slug too. Published agent revisions retain
+the original file bytes and executable flags even after the shared skill changes.
+
+Archives accept at most 64 supporting regular files, 256 KiB per file and 512 KiB total decoded
+assets. The ZIP itself may be at most 1 MiB and contain 130 entries, including directories.
+Instruction text is limited to 16 KiB; plain text
+skills receive generated frontmatter on export. Paths must be portable relative ASCII paths,
+at most 240 bytes, without traversal, case collisions or file/directory collisions. Symlinks,
+special files, encrypted archives and ZIP64 are rejected. Empty directories are not stored.
+Importing a script does not execute it on the Openbot server.
+
+Company JSON skill writes under `/api/companies/{company}/skills` and operator writes under
+`/api/skill-library` accept `files` entries shaped like
+`{"path":"scripts/check.sh","content_base64":"ZWNobyBvawo=","executable":true}`.
+`instructions` remains the canonical `SKILL.md` source: do not duplicate it in `files`. Omit
+`files` on update to preserve supporting files, or submit `[]` to clear them. List responses
+return file counts; load an individual skill to read its file content. These asset JSON routes
+allow bodies up to 2 MiB.
+
 ## Company API
 
 Use the existing authenticated company owner/admin session and browser Origin/Referer protection.

@@ -6,6 +6,9 @@
 //! list along out of band, so a rename or a delete shows up immediately.
 
 use super::*;
+use crate::entities::skill::SkillSummary;
+
+#[cfg(test)]
 use crate::entities::skill::Skill;
 
 /// Client-side behaviour this workspace adds on top of [`MAILBOX_SCRIPT`].
@@ -100,7 +103,7 @@ pub struct AgentEditPane<'a> {
 
 #[derive(Debug, Clone, Copy, Default)]
 pub struct AgentCapabilityOptions<'a> {
-    pub skills: &'a [Skill],
+    pub skills: &'a [SkillSummary],
 }
 
 /// Which of the create pane's forms opens.
@@ -693,7 +696,7 @@ fn capability_picker(fields: &AgentFields<'_>) -> String {
     )
 }
 
-fn skill_picker(skills: &[Skill], draft: &AgentDraft<'_>, scope: AgentFormScope) -> String {
+fn skill_picker(skills: &[SkillSummary], draft: &AgentDraft<'_>, scope: AgentFormScope) -> String {
     let skill_ids_text = draft
         .skill_ids_text
         .map(str::to_owned)
@@ -794,7 +797,7 @@ fn company_model_selection(
                 <select id="agent-model-{id_prefix}" name="model" class="select w-full font-mono text-sm">
                     <option value="">Inherit company default</option>{model_options}
                 </select>
-                <div class="label"><span class="text-[11px] opacity-60">Select a model belonging to the provider; invalid pairs are refused on save.</span></div>
+                <div class="label"><span class="text-[11px] opacity-60">Leave both blank for native profiles. Hosted workflows require an explicit provider/model pair; invalid pairs are refused on save.</span></div>
             </label>
         </div>"##
     )
@@ -936,8 +939,9 @@ mod capability_tests {
     use super::*;
     use crate::entities::{creation::CreationProvenance, value_objects::SkillSlug};
 
-    fn skill(company_id: Option<Uuid>, name: &str) -> Skill {
+    fn skill(company_id: Option<Uuid>, name: &str) -> SkillSummary {
         Skill {
+            files: Vec::new(),
             id: Uuid::new_v4(),
             company_id,
             slug: SkillSlug::parse(&name.to_ascii_lowercase()).unwrap(),
@@ -948,6 +952,7 @@ mod capability_tests {
             created_at: Utc::now(),
             updated_at: Utc::now(),
         }
+        .into()
     }
 
     #[test]

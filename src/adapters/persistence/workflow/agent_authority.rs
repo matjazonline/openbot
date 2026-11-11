@@ -59,13 +59,14 @@ pub(super) async fn check_definition_on(
         .fetch_optional(&mut *tx)
         .await?
         .ok_or_else(revoked)?;
+    let model = definition.hosted_model()?;
     let available: bool = sqlx::query_scalar(
         "SELECT CASE WHEN cardinality(models) BETWEEN 1 AND $4 THEN $3=ANY(models) ELSE FALSE END \
          FROM company_model_connections WHERE company_id=$1 AND provider=$2 FOR SHARE",
     )
     .bind(company.as_uuid())
-    .bind(definition.model.provider.as_str())
-    .bind(&definition.model.model)
+    .bind(model.provider.as_str())
+    .bind(&model.model)
     .bind(crate::use_cases::company::MAX_MODELS_PER_CONNECTION as i32)
     .fetch_optional(&mut *tx)
     .await?

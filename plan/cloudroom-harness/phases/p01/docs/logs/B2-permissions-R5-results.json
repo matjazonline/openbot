@@ -1,0 +1,82 @@
+[
+  {
+    "check": "format",
+    "command": [
+      "cargo",
+      "fmt",
+      "--all"
+    ],
+    "cwd": "/private/tmp/openbot-cloudroom-harness-t1gfnhz1/worktree",
+    "exit": 0,
+    "elapsed_s": 3.13,
+    "log": "/private/tmp/openbot-cloudroom-harness-t1gfnhz1/worktree/plan/cloudroom-harness/phases/p01/docs/logs/B2-permissions-R5-format.txt"
+  },
+  {
+    "check": "node-typecheck",
+    "command": [
+      "npm",
+      "run",
+      "typecheck"
+    ],
+    "cwd": "/private/tmp/openbot-cloudroom-harness-t1gfnhz1/worktree/integrations/cloudroom-plugin",
+    "exit": 0,
+    "elapsed_s": 1.31,
+    "log": "/private/tmp/openbot-cloudroom-harness-t1gfnhz1/worktree/plan/cloudroom-harness/phases/p01/docs/logs/B2-permissions-R5-node-typecheck.txt"
+  },
+  {
+    "check": "node-tests",
+    "command": [
+      "npm",
+      "test"
+    ],
+    "cwd": "/private/tmp/openbot-cloudroom-harness-t1gfnhz1/worktree/integrations/cloudroom-plugin",
+    "exit": 0,
+    "elapsed_s": 16.92,
+    "log": "/private/tmp/openbot-cloudroom-harness-t1gfnhz1/worktree/plan/cloudroom-harness/phases/p01/docs/logs/B2-permissions-R5-node-tests.txt"
+  },
+  {
+    "check": "connection",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "--offline",
+      "--lib",
+      "local_machine_connection"
+    ],
+    "cwd": "/private/tmp/openbot-cloudroom-harness-t1gfnhz1/worktree",
+    "exit": 0,
+    "elapsed_s": 120.03,
+    "log": "/private/tmp/openbot-cloudroom-harness-t1gfnhz1/worktree/plan/cloudroom-harness/phases/p01/docs/logs/B2-permissions-R5-connection.txt"
+  },
+  {
+    "check": "persistence",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "--offline",
+      "--lib",
+      "adapters::persistence::local_agents"
+    ],
+    "cwd": "/private/tmp/openbot-cloudroom-harness-t1gfnhz1/worktree",
+    "exit": 0,
+    "elapsed_s": 25.55,
+    "log": "/private/tmp/openbot-cloudroom-harness-t1gfnhz1/worktree/plan/cloudroom-harness/phases/p01/docs/logs/B2-permissions-R5-persistence.txt"
+  },
+  {
+    "check": "workflow",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "--offline",
+      "--lib",
+      "workflow::local_agent_tests"
+    ],
+    "cwd": "/private/tmp/openbot-cloudroom-harness-t1gfnhz1/worktree",
+    "exit": 0,
+    "elapsed_s": 0.32,
+    "log": "/private/tmp/openbot-cloudroom-harness-t1gfnhz1/worktree/plan/cloudroom-harness/phases/p01/docs/logs/B2-permissions-R5-workflow.txt"
+  }
+]

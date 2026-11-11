@@ -227,6 +227,12 @@ jobs:
         run: |
           cargo test --locked --offline --lib dump_cloudroom_management_browser_fixtures -- --ignored
           node --test scripts/tests/local-agents-browser.mjs
+      - name: Skill directory import browser protocol
+        env:
+          SKILL_BUNDLE_BROWSER_FIXTURES: /tmp/skill-bundle-browser
+        run: |
+          cargo test --locked --offline --lib dump_skill_bundle_browser_fixtures -- --ignored
+          node --test scripts/tests/skill-bundle-browser.mjs
       - name: Workflow agent selection browser protocol
         env:
           WORKFLOW_AGENT_BROWSER_FIXTURES: /tmp/workflow-agent-browser

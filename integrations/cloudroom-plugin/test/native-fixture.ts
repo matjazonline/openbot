@@ -12,6 +12,8 @@ export function nativeFixture(journal: Journal, selection: ReturnType<typeof fix
     providerId: selection.provider, status: 'idle', environmentId: 'env_local', originPluginId: 'openbot-test' },
     metadata: {} as Record<string, string>, interactions: [] as unknown[], missing: false,
     providerError: null as null | { code: string }, model: selection.model, platform: process.platform as string,
+    permissionModes: ['full', 'auto', 'accept-edits'], permissionCeiling: 'full', hostPermissionCeiling: 'full',
+    nativePermission: selection.policy.permissions === 'accept_edits' ? 'accept-edits' : selection.policy.permissions,
     hostId: 'host_primary', lostResponse: false, held: false, entered: 0 };
   const mutate = async (kind: string, input: Record<string, unknown>) => {
     state.entered++; calls.push({ kind, input });
@@ -24,16 +26,18 @@ export function nativeFixture(journal: Journal, selection: ReturnType<typeof fix
     if (state.lostResponse) throw new Error('response lost after native acceptance');
   };
   const bb = { pluginId: 'openbot-test', sdk: {
-    system: { config: async () => ({ primaryHostId: state.hostId }) },
+    system: { config: async () => ({ primaryHostId: state.hostId }),
+      executionOptions: async () => ({ permissionCeiling: state.permissionCeiling, modelLoadError: state.providerError,
+        models: [{ model: state.model, supportedReasoningEfforts: [{ reasoningEffort: 'low' }], defaultReasoningEffort: 'low' }] }) },
     hosts: { get: async () => ({ id: state.hostId, status: 'connected', type: 'persistent',
-      platform: state.platform, machineProviderId: null, connectMachineId: null }) },
+      platform: state.platform, maxPermissionMode: state.hostPermissionCeiling, machineProviderId: null, connectMachineId: null }) },
     projects: { get: async () => ({ id: selection.project_id, sources: [{ type: 'local_path', hostId: state.hostId }] }) },
-    providers: { list: async () => [{ id: selection.provider }], models: async () => ({ modelLoadError: state.providerError,
+    providers: { list: async () => [{ id: selection.provider, capabilities: { permissionModes: state.permissionModes } }], models: async () => ({ modelLoadError: state.providerError,
       models: [{ model: state.model, supportedReasoningEfforts: [{ reasoningEffort: 'low' }], defaultReasoningEffort: 'low' }] }) },
     environments: { get: async () => ({ hostId: state.hostId, projectId: selection.project_id }),
       listProviders: async () => [{ id: 'project-checkout', machineProviderId: null, requires: { projectCheckout: true },
         acceptsEmptyInputs: true, machineAvailability: {}, availability: { status: 'available' } }] },
-    threads: { get: async () => { if (state.missing) throw { status: 404 }; return state.thread; },
+    threads: { defaultExecutionOptions: async () => ({ permissionMode: state.nativePermission }), get: async () => { if (state.missing) throw { status: 404 }; return state.thread; },
       list: async () => state.missing ? [] : [state.thread], getPluginMetadata: async () => state.metadata,
       spawn: async (input: Record<string, unknown>) => { await mutate('spawn', input); return state.thread; },
       send: async (input: Record<string, unknown>) => { await mutate('send', input); return { delivery: 'queued', queuedMessage: { id: 'queue_own' } }; },

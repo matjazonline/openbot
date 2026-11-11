@@ -1,0 +1,27 @@
+{
+  "status": "PASS",
+  "exit": 0,
+  "observations": [
+    {
+      "path": "/v1/messages?beta=true",
+      "instruction_tail_received": true,
+      "script_result_received": false,
+      "tools": [
+        "DeferredToolPlaceholder",
+        "Bash"
+      ]
+    },
+    {
+      "path": "/v1/messages?beta=true",
+      "instruction_tail_received": true,
+      "script_result_received": true,
+      "tools": [
+        "DeferredToolPlaceholder",
+        "Bash"
+      ]
+    }
+  ],
+  "asset_sha256": "40aff2e9d2d8922e47afd4648e6967497158785fbd1da870e7110266bf944880",
+  "script_mode": "0o755",
+  "limitations": "Standalone real Claude harness with scripted local API; no Cloudroom staging, Openbot integration or reasoning proved."
+}

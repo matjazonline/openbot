@@ -1,7 +1,7 @@
 use crate::{
     app_error::{AppError, AppResult},
     application::local_agents::{
-        bounds::{MAX_CHUNK_BYTES, MAX_FRAME_BYTES, PROTOCOL_VERSION, REASSEMBLY_SECONDS},
+        bounds::{FRAME_VERSION, MAX_CHUNK_BYTES, MAX_FRAME_BYTES, REASSEMBLY_SECONDS},
         protocol::MAX_LOGICAL_BYTES,
     },
     domain::local_agents::PayloadDigest,
@@ -41,7 +41,7 @@ pub(super) fn encode<T: Serialize>(message: &T) -> AppResult<Vec<String>> {
     let mut frames = Vec::new();
     for (index, data) in bytes.chunks(MAX_CHUNK_BYTES).enumerate() {
         let chunk = Chunk {
-            version: PROTOCOL_VERSION,
+            version: FRAME_VERSION,
             transfer_id,
             index,
             parts: bytes.len().div_ceil(MAX_CHUNK_BYTES),
@@ -95,7 +95,7 @@ impl Assembler {
             return Err(invalid());
         }
         let chunk: Chunk = serde_json::from_str(frame).map_err(|_| invalid())?;
-        if chunk.version != PROTOCOL_VERSION
+        if chunk.version != FRAME_VERSION
             || chunk.transfer_id.is_nil()
             || chunk.total_bytes == 0
             || chunk.total_bytes > self.limit

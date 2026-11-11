@@ -42,11 +42,11 @@ fn definition() -> crate::application::agent::ResolvedAgentDefinition {
         agent_id: agent().agent_id,
         key: agent().key,
         instructions: "Answer using the supplied context".into(),
-        model: ModelSettings {
+        model: Some(ModelSettings {
             provider: name("test"),
             model: "scripted".into(),
             max_output_tokens: 1000,
-        },
+        }),
         tools: vec![],
         skills: vec![],
     }

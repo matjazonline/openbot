@@ -195,7 +195,7 @@ pub struct SelectedAgentSummary {
     pub agent_id: crate::entities::agent_capability::AgentId,
     pub revision_id: crate::entities::agent_capability::AgentRevisionId,
     pub key: String,
-    pub model: String,
+    pub model: Option<String>,
     pub tools: Vec<String>,
     pub skills: Vec<String>,
 }

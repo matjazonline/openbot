@@ -73,6 +73,7 @@ impl Fixture {
                 self.f.owner.id,
                 self.f.company.id,
                 crate::use_cases::skill::SkillWrite {
+                    files: None,
                     slug: name.into(),
                     name: name.into(),
                     description: format!("Use {name}"),

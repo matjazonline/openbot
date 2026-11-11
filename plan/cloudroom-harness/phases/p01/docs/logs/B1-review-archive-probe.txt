@@ -1,0 +1,2 @@
+valid domain file=reference.md, bytes=32768, exported ZIP bytes=333, reimport=Ok(1)
+valid domain file=reference-SKILL.md, bytes=32768, exported ZIP bytes=345, reimport=Err(BadRequest("Skill ZIP entry exceeds its byte limit."))

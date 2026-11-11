@@ -1,0 +1,166 @@
+    Checking open_bots v0.1.0 (/private/tmp/openbot-cloudroom-harness-t1gfnhz1/worktree)
+error[E0609]: no field `provider` on type `std::option::Option<application::agent::ModelSettings>`
+   --> src/adapters/harness/rig/workflow.rs:443:44
+    |
+443 |                 provider: &selection.model.provider.as_str().into(),
+    |                                            ^^^^^^^^ unknown field
+    |
+help: one of the expressions' fields has a field of the same name
+    |
+443 |                 provider: &selection.model.unwrap().provider.as_str().into(),
+    |                                            +++++++++
+
+error[E0609]: no field `model` on type `std::option::Option<application::agent::ModelSettings>`
+   --> src/adapters/harness/rig/workflow.rs:444:41
+    |
+444 |                 model: &selection.model.model.as_str().into(),
+    |                                         ^^^^^ unknown field
+    |
+help: one of the expressions' fields has a field of the same name
+    |
+444 |                 model: &selection.model.unwrap().model.as_str().into(),
+    |                                         +++++++++
+
+error[E0308]: mismatched types
+   --> src/adapters/http/pages/workflow_runs/step.rs:96:46
+    |
+ 96 |                     model = escape_html_text(&call.model),
+    |                             ---------------- ^^^^^^^^^^^ expected `&str`, found `&Option<String>`
+    |                             |
+    |                             arguments to this function are incorrect
+    |
+    = note: expected reference `&str`
+               found reference `&std::option::Option<std::string::String>`
+note: function defined here
+   --> src/adapters/http/pages/layout.rs:669:15
+    |
+669 | pub(crate) fn escape_html_text(value: &str) -> String {
+    |               ^^^^^^^^^^^^^^^^ -----------
+
+error[E0308]: mismatched types
+  --> src/adapters/persistence/workflow/agent_history/storage.rs:23:16
+   |
+23 |         model: selection.agent().model.clone(),
+   |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `ModelSettings`, found `Option<ModelSettings>`
+   |
+   = note: expected struct `application::agent::ModelSettings`
+                found enum `std::option::Option<application::agent::ModelSettings>`
+help: consider using `Option::expect` to unwrap the `std::option::Option<application::agent::ModelSettings>` value, panicking if the value is an `Option::None`
+   |
+23 |         model: selection.agent().model.clone().expect("REASON"),
+   |                                               +++++++++++++++++
+
+error[E0609]: no field `provider` on type `std::option::Option<application::agent::ModelSettings>`
+   --> src/adapters/persistence/workflow/agent_preparation.rs:125:79
+    |
+125 |         let provider = ModelProvider::from(prepared.selection().agent().model.provider.as_str());
+    |                                                                               ^^^^^^^^ unknown field
+    |
+help: one of the expressions' fields has a field of the same name
+    |
+125 |         let provider = ModelProvider::from(prepared.selection().agent().model.unwrap().provider.as_str());
+    |                                                                               +++++++++
+
+error[E0308]: mismatched types
+   --> src/adapters/persistence/workflow/run_views.rs:182:20
+    |
+182 |             model: row.model,
+    |                    ^^^^^^^^^ expected `Option<String>`, found `String`
+    |
+    = note: expected enum `std::option::Option<std::string::String>`
+             found struct `std::string::String`
+help: try wrapping the expression in `Some`
+    |
+182 |             model: Some(row.model),
+    |                    +++++         +
+
+error[E0609]: no field `max_output_tokens` on type `std::option::Option<application::agent::ModelSettings>`
+   --> src/application/workflow/agent.rs:303:57
+    |
+303 |             .min(u64::from(self.selection.agent().model.max_output_tokens));
+    |                                                         ^^^^^^^^^^^^^^^^^ unknown field
+    |
+help: one of the expressions' fields has a field of the same name
+    |
+303 |             .min(u64::from(self.selection.agent().model.unwrap().max_output_tokens));
+    |                                                         +++++++++
+
+error[E0609]: no field `provider` on type `&std::option::Option<application::agent::ModelSettings>`
+   --> src/application/workflow/agent.rs:318:33
+    |
+318 |                 provider: model.provider.as_str().into(),
+    |                                 ^^^^^^^^ unknown field
+
+error[E0609]: no field `model` on type `&std::option::Option<application::agent::ModelSettings>`
+   --> src/application/workflow/agent.rs:319:30
+    |
+319 |                 model: model.model.as_str().into(),
+    |                              ^^^^^ unknown field
+
+Some errors have detailed explanations: E0308, E0609.
+For more information about an error, try `rustc --explain E0308`.
+error: could not compile `open_bots` (lib) due to 9 previous errors
+warning: build failed, waiting for other jobs to finish...
+error[E0308]: mismatched types
+   --> src/adapters/persistence/workflow/autonomous_agent_e2e/support.rs:362:13
+    |
+362 |             format!("{SCRIPTED_PROVIDER} / {SCRIPTED_MODEL}")
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `Option<String>`, found `String`
+    |
+    = note: expected enum `std::option::Option<std::string::String>`
+             found struct `std::string::String`
+help: call `Into::into` on this expression to convert `std::string::String` into `std::option::Option<std::string::String>`
+    |
+362 |             format!("{SCRIPTED_PROVIDER} / {SCRIPTED_MODEL}").into()
+    |                                                              +++++++
+
+error[E0277]: the trait bound `std::option::Option<std::string::String>: std::convert::From<&str>` is not satisfied
+  --> src/adapters/http/routes/workflows/ui/runs/pages_tests.rs:54:44
+   |
+54 |                 model: "openai / gpt-test".into(),
+   |                                            ^^^^ the trait `std::convert::From<&str>` is not implemented for `std::option::Option<std::string::String>`
+   |
+   = help: the following other types implement trait `std::convert::From<T>`:
+             `std::option::Option<&T>` implements `std::convert::From<&std::option::Option<T>>`
+             `std::option::Option<&mut T>` implements `std::convert::From<&mut std::option::Option<T>>`
+             `std::option::Option<&tracing::Id>` implements `std::convert::From<&EnteredSpan>`
+             `std::option::Option<&tracing::Id>` implements `std::convert::From<&tracing::Span>`
+             `std::option::Option<&tracing::Id>` implements `std::convert::From<&tracing_core::span::Current>`
+             `std::option::Option<&tracing::Metadata<'_>>` implements `std::convert::From<&tracing_core::span::Current>`
+             `std::option::Option<Mailbox>` implements `std::convert::From<Mailboxes>`
+             `std::option::Option<T>` implements `std::convert::From<Checked<T>>`
+           and 23 others
+   = note: required for `&str` to implement `Into<std::option::Option<std::string::String>>`
+
+error[E0277]: the trait bound `std::option::Option<std::string::String>: std::convert::From<&str>` is not satisfied
+  --> src/adapters/http/routes/workflows/ui/runs/pages_tests.rs:76:31
+   |
+76 |             model: "gpt-test".into(),
+   |                               ^^^^ the trait `std::convert::From<&str>` is not implemented for `std::option::Option<std::string::String>`
+   |
+   = help: the following other types implement trait `std::convert::From<T>`:
+             `std::option::Option<&T>` implements `std::convert::From<&std::option::Option<T>>`
+             `std::option::Option<&mut T>` implements `std::convert::From<&mut std::option::Option<T>>`
+             `std::option::Option<&tracing::Id>` implements `std::convert::From<&EnteredSpan>`
+             `std::option::Option<&tracing::Id>` implements `std::convert::From<&tracing::Span>`
+             `std::option::Option<&tracing::Id>` implements `std::convert::From<&tracing_core::span::Current>`
+             `std::option::Option<&tracing::Metadata<'_>>` implements `std::convert::From<&tracing_core::span::Current>`
+             `std::option::Option<Mailbox>` implements `std::convert::From<Mailboxes>`
+             `std::option::Option<T>` implements `std::convert::From<Checked<T>>`
+           and 23 others
+   = note: required for `&str` to implement `Into<std::option::Option<std::string::String>>`
+
+error[E0609]: no field `max_output_tokens` on type `std::option::Option<application::agent::ModelSettings>`
+   --> src/application/agent/contract_tests.rs:149:17
+    |
+149 |     value.model.max_output_tokens = 0;
+    |                 ^^^^^^^^^^^^^^^^^ unknown field
+    |
+help: one of the expressions' fields has a field of the same name
+    |
+149 |     value.model.unwrap().max_output_tokens = 0;
+    |                 +++++++++
+
+Some errors have detailed explanations: E0277, E0308, E0609.
+For more information about an error, try `rustc --explain E0277`.
+error: could not compile `open_bots` (lib test) due to 13 previous errors

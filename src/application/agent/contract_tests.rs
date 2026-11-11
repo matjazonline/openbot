@@ -10,11 +10,11 @@ fn definition() -> ResolvedAgentDefinition {
         agent_id: AgentId::new(Uuid::new_v4()),
         key: AgentKey::parse("assistant").unwrap(),
         instructions: "Use the configured capabilities.".into(),
-        model: ModelSettings {
+        model: Some(ModelSettings {
             provider: TypeName::parse("openai").unwrap(),
             model: "scripted-model".into(),
             max_output_tokens: 1000,
-        },
+        }),
         tools: vec![ResolvedAgentTool {
             binding: AgentToolBinding::builtin(AgentBuiltinTool::SearchKnowledge),
             input_schema: json!({"type":"object","additionalProperties":false}),
@@ -120,6 +120,8 @@ fn autonomous_agent_contract_skills_require_local_aliases_without_granting_tools
     value.skills.push(ResolvedAgentSkill {
         assignment_id: AgentSkillAssignmentId::new(Uuid::new_v4()),
         skill: SkillSnapshot {
+            description: "Skill instructions".into(),
+            files: Vec::new(),
             company_id: value.company_id,
             skill_id: Uuid::new_v4(),
             name: TypeName::parse("support").unwrap(),
@@ -144,7 +146,7 @@ fn autonomous_agent_contract_definition_decoding_is_bounded_and_rejects_extra_se
     value.instructions = "x".repeat(MAX_AGENT_TEXT_BYTES + 1);
     assert!(value.canonical_content().is_err());
     value.instructions.clear();
-    value.model.max_output_tokens = 0;
+    value.model.as_mut().unwrap().max_output_tokens = 0;
     assert!(value.validate().is_err());
 }
 

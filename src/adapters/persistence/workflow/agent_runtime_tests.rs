@@ -430,6 +430,7 @@ async fn workflow_agent_capability_writers_preserve_unsupplied_lists() {
         .unwrap();
     assert!(stored(setup.agent).await.is_empty());
     let write = |required: Option<Vec<TypeName>>| SkillWrite {
+        files: None,
         slug: "support".into(),
         name: "Support".into(),
         description: "Support policy".into(),

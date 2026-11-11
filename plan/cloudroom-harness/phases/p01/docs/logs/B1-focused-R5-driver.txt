@@ -1,0 +1,15 @@
+{"starting": "format", "command": ["cargo", "fmt", "--all"]}
+{"name": "format", "command": ["cargo", "fmt", "--all"], "exit": 0, "elapsed_s": 3.329, "log": "B1-focused-R5-format.txt"}
+{"starting": "offline-alltargets", "command": ["cargo", "check", "--locked", "--offline", "--all-targets"]}
+{"name": "offline-alltargets", "command": ["cargo", "check", "--locked", "--offline", "--all-targets"], "exit": 0, "elapsed_s": 25.227, "log": "B1-focused-R5-offline-alltargets.txt"}
+{"starting": "all-skill-callers", "command": ["cargo", "test", "--locked", "--offline", "--lib", "skill"]}
+{"name": "all-skill-callers", "command": ["cargo", "test", "--locked", "--offline", "--lib", "skill"], "exit": 101, "elapsed_s": 119.388, "log": "B1-focused-R5-all-skill-callers.txt"}
+{"starting": "browser-fixtures", "command": ["cargo", "test", "--locked", "--offline", "--lib", "dump_skill_bundle_browser_fixtures", "--", "--ignored"]}
+{"name": "browser-fixtures", "command": ["cargo", "test", "--locked", "--offline", "--lib", "dump_skill_bundle_browser_fixtures", "--", "--ignored"], "exit": 0, "elapsed_s": 0.836, "log": "B1-focused-R5-browser-fixtures.txt"}
+{"starting": "browser", "command": ["node", "--test", "scripts/tests/skill-bundle-browser.mjs"]}
+{"name": "browser", "command": ["node", "--test", "scripts/tests/skill-bundle-browser.mjs"], "exit": 0, "elapsed_s": 1.54, "log": "B1-focused-R5-browser.txt"}
+{"starting": "clippy", "command": ["cargo", "clippy", "--locked", "--offline", "--all-targets", "--", "-D", "warnings"]}
+{"name": "clippy", "command": ["cargo", "clippy", "--locked", "--offline", "--all-targets", "--", "-D", "warnings"], "exit": 0, "elapsed_s": 43.447, "log": "B1-focused-R5-clippy.txt"}
+{"starting": "sqlx-prepare-check", "command": ["cargo", "sqlx", "prepare", "--check", "--", "--all-targets"]}
+{"name": "sqlx-prepare-check", "command": ["cargo", "sqlx", "prepare", "--check", "--", "--all-targets"], "exit": 0, "elapsed_s": 20.902, "log": "B1-focused-R5-sqlx-prepare-check.txt"}
+{"completed": 7, "failures": ["all-skill-callers"]}

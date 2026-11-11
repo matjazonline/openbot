@@ -554,7 +554,7 @@ impl AgentSettingsView<'_> {
             .await
     }
 
-    async fn skills(&self) -> AppResult<Vec<crate::entities::skill::Skill>> {
+    async fn skills(&self) -> AppResult<Vec<crate::entities::skill::SkillSummary>> {
         Ok(self
             .skill_use_cases
             .list_company_page(
@@ -604,7 +604,7 @@ impl AgentSettingsView<'_> {
                     .get_company(self.user_id, self.company.id, *skill_id)
                     .await?
             {
-                skills.push(skill);
+                skills.push(skill.into());
             }
         }
         // Nothing to start from means no Easy tab, so a request that asked for it lands on Simple.
@@ -665,7 +665,7 @@ impl AgentSettingsView<'_> {
         let mut skills = self.skills().await?;
         for selected in &capabilities.skills {
             if !skills.iter().any(|skill| skill.id == selected.id) {
-                skills.push(selected.clone());
+                skills.push(selected.into());
             }
         }
         let stored = pages::AgentDraft {

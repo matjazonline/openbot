@@ -1,0 +1,40 @@
+[
+  {
+    "check": "workflow",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "--offline",
+      "--lib",
+      "workflow::tests::local_agent_tests"
+    ],
+    "cwd": "/private/tmp/openbot-cloudroom-harness-t1gfnhz1/worktree",
+    "exit": 0,
+    "elapsed_s": 44.21,
+    "log": "/private/tmp/openbot-cloudroom-harness-t1gfnhz1/worktree/plan/cloudroom-harness/phases/p01/docs/logs/B2-permissions-R7-workflow.txt"
+  },
+  {
+    "check": "whitespace",
+    "command": [
+      "git",
+      "diff",
+      "--check"
+    ],
+    "cwd": "/private/tmp/openbot-cloudroom-harness-t1gfnhz1/worktree",
+    "exit": 0,
+    "elapsed_s": 0.08,
+    "log": "/private/tmp/openbot-cloudroom-harness-t1gfnhz1/worktree/plan/cloudroom-harness/phases/p01/docs/logs/B2-permissions-R7-whitespace.txt"
+  },
+  {
+    "check": "graft-build",
+    "command": [
+      "graft",
+      "build"
+    ],
+    "cwd": "/private/tmp/openbot-cloudroom-harness-t1gfnhz1/worktree",
+    "exit": 0,
+    "elapsed_s": 3.02,
+    "log": "/private/tmp/openbot-cloudroom-harness-t1gfnhz1/worktree/plan/cloudroom-harness/phases/p01/docs/logs/B2-permissions-R7-graft-build.txt"
+  }
+]

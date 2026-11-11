@@ -3,6 +3,8 @@ use crate::application::agent::{AgentKey, SkillSnapshot};
 
 fn skill(name_: &str, id: u128, required: Vec<TypeName>) -> SkillSnapshot {
     SkillSnapshot {
+        description: "Skill instructions".into(),
+        files: Vec::new(),
         company_id: company(),
         skill_id: Uuid::from_u128(id),
         name: name(name_),

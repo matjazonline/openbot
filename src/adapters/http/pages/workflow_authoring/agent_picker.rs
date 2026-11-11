@@ -152,12 +152,11 @@ fn current_capabilities(view: &WorkflowAgentPicker<'_>) -> String {
         .active
         .as_ref()
         .map(|active| {
-            format!(
-                "{} · {} / {}",
-                active.id.as_uuid(),
-                active.model.provider.as_str(),
-                active.model.model
-            )
+            let model = active.model.as_ref().map_or_else(
+                || "Native model selected by local profile; hosted workflows require an explicit model".to_owned(),
+                |model| format!("{} / {}", model.provider.as_str(), model.model),
+            );
+            format!("{} · {}", active.id.as_uuid(), model)
         })
         .unwrap_or_else(|| {
             "Inactive. Publish this agent before publishing a workflow that uses it.".into()

@@ -1,10 +1,14 @@
 import type { BbPluginApi } from '@get-bb/plugin-sdk';
 import { Journal, RecoveryRequired, type CommandRecord } from './journal.js';
-import { catalogSchema, LIMITS, provider, reasoning, type Catalog, type Evidence, type Selection, type Refusal } from './protocol.js';
+import { catalogSchema, LIMITS, provider, reasoning, permissions, type Catalog, type Evidence, type Selection, type Refusal } from './protocol.js';
 import { applyNativeEvents, type TurnUpdate } from './turns.js';
 
 type SDK = BbPluginApi['sdk'];
-type ModelPage = Awaited<ReturnType<SDK['providers']['models']>>;
+type ModelPage = Awaited<ReturnType<SDK['system']['executionOptions']>>;
+const nativeModes = ['accept-edits', 'auto', 'full'] as const;
+type NativePermission = typeof nativeModes[number];
+const nativePermission = (value: Selection['policy']['permissions']): NativePermission => value === 'accept_edits' ? 'accept-edits' : value;
+type LocalTarget = { hostId: string; permissionModes: Selection['policy']['permissions'][] };
 type ListedThread = Awaited<ReturnType<SDK['threads']['list']>>[number];
 export class PreflightRefusal extends Error {
   readonly reason: Refusal;
@@ -28,13 +32,27 @@ export class CloudroomSdk {
     this.sdk = bb.sdk; this.pluginId = bb.pluginId; this.journal = journal; this.projects = projects;
   }
   async localHost(signal: AbortSignal): Promise<string> {
+    return (await this.localTarget(signal)).hostId;
+  }
+  private async localTarget(signal: AbortSignal): Promise<LocalTarget> {
     const config = await this.sdk.system.config({ signal });
     if (!config.primaryHostId) throw new PreflightRefusal('project_unavailable');
     const host = await this.sdk.hosts.get({ hostId: config.primaryHostId, signal });
     if (host.status !== 'connected' || host.type !== 'persistent' || host.machineProviderId !== null
         || host.connectMachineId !== null || !['darwin', 'linux'].includes(host.platform ?? '')
         || host.platform !== process.platform) throw new PreflightRefusal('project_unavailable');
-    return host.id;
+    if (!nativeModes.includes(host.maxPermissionMode)) {
+      throw new PreflightRefusal('permissions_unavailable');
+    }
+    const ceiling = nativeModes.indexOf(host.maxPermissionMode);
+    return { hostId: host.id, permissionModes: permissions.options.filter(mode => nativeModes.indexOf(nativePermission(mode)) <= ceiling) };
+  }
+  private providerPermissions(installed: Awaited<ReturnType<SDK['providers']['list']>>[number], target: LocalTarget, ceiling: NativePermission) {
+    const modes = installed.capabilities.permissionModes;
+    if (!nativeModes.includes(ceiling) || !Array.isArray(modes) || modes.length > 3 || new Set(modes).size !== modes.length
+        || modes.some(mode => !nativeModes.includes(mode))) throw new PreflightRefusal('permissions_unavailable');
+    return target.permissionModes.filter(mode => modes.includes(nativePermission(mode))
+      && nativeModes.indexOf(nativePermission(mode)) <= nativeModes.indexOf(ceiling));
   }
   private async project(projectId: string, hostId: string, signal: AbortSignal): Promise<void> {
     if (!this.projects().includes(projectId)) throw new PreflightRefusal('project_unavailable');
@@ -44,7 +62,7 @@ export class CloudroomSdk {
     }
   }
   private async models(providerId: Selection['provider'], hostId: string, signal: AbortSignal): Promise<ModelPage> {
-    const page = await this.sdk.providers.models({ providerId, hostId, signal });
+    const page = await this.sdk.system.executionOptions({ providerId, hostId, signal });
     const status = page.modelLoadError?.code === 'auth_required' ? 'auth_required'
       : page.modelLoadError ? 'unavailable' : page.models.length > LIMITS.models ? 'oversized' : 'available';
     this.health.set(providerId, { provider: providerId, status });
@@ -53,7 +71,7 @@ export class CloudroomSdk {
     return page;
   }
   async catalog(signal: AbortSignal): Promise<Catalog> {
-    const hostId = await this.localHost(signal); const projects = [...this.projects()];
+    const target = await this.localTarget(signal); const { hostId } = target; const projects = [...this.projects()];
     if (projects.length > LIMITS.projects) throw new PreflightRefusal('capacity');
     for (const project of projects) await this.project(project, hostId, signal);
     const installed = await this.sdk.providers.list({ hostId, signal });
@@ -66,13 +84,14 @@ export class CloudroomSdk {
         const models = page.models.map(model => ({ model: model.model, reasoning_levels: [...new Set(
           [...model.supportedReasoningEfforts.map(option => option.reasoningEffort), model.defaultReasoningEffort]
             .filter(value => reasoning.safeParse(value).success))] }));
-        providers.push({ provider: id, models });
+        const selected = installed.find(item => item.id === id)!;
+        providers.push({ provider: id, permission_modes: this.providerPermissions(selected, target, page.permissionCeiling), models });
       } catch (error) { if (signal.aborted) throw error; if (!(error instanceof PreflightRefusal)) throw error; }
     }
     return catalogSchema.parse({ projects, providers });
   }
   async prepare(record: CommandRecord, signal: AbortSignal): Promise<Prepared> {
-    const command = record.operation.command; const hostId = await this.localHost(signal);
+    const command = record.operation.command; const target = await this.localTarget(signal); const { hostId } = target;
     let selection: Selection;
     if (command.kind === 'create') {
       if (this.journal.session(command.session_id)) throw new PreflightRefusal('recovery_required');
@@ -94,8 +113,14 @@ export class CloudroomSdk {
       await this.project(selection.project_id, hostId, signal);
       const installed = await this.sdk.providers.list({ hostId, signal });
       if (installed.length > LIMITS.providers) throw new PreflightRefusal('capacity');
-      if (!installed.some(provider => provider.id === selection.provider)) throw new PreflightRefusal('provider_unavailable');
+      const selected = installed.find(provider => provider.id === selection.provider);
+      if (!selected) throw new PreflightRefusal('provider_unavailable');
+      if (command.kind === 'send') {
+        const current = await this.sdk.threads.defaultExecutionOptions({ threadId: command.thread_id, signal });
+        if (!current || current.permissionMode !== nativePermission(selection.policy.permissions)) throw new PreflightRefusal('permissions_unavailable');
+      }
       const page = await this.models(selection.provider, hostId, signal);
+      if (!this.providerPermissions(selected, target, page.permissionCeiling).includes(selection.policy.permissions)) throw new PreflightRefusal('permissions_unavailable');
       const model = page.models.find(model => model.model === selection.model);
       if (!model) throw new PreflightRefusal('model_unavailable');
       if (model.defaultReasoningEffort !== selection.policy.reasoning
@@ -124,7 +149,7 @@ export class CloudroomSdk {
     const command = record.operation.command;
     if (command.kind === 'create') {
       const thread = await this.sdk.threads.spawn({ projectId: prepared.selection.project_id, executionTarget: 'local',
-        providerId: prepared.selection.provider, model: prepared.selection.model, reasoningLevel: prepared.selection.policy.reasoning,
+        providerId: prepared.selection.provider, model: prepared.selection.model, permissionMode: nativePermission(prepared.selection.policy.permissions), reasoningLevel: prepared.selection.policy.reasoning,
         environment: { type: 'provider', environmentProviderId: prepared.environmentProvider,
           machine: { type: 'existing', hostId: prepared.hostId }, inputs: {} },
         title: 'Openbot local session', prompt: record.sdkInput, pluginMetadata: this.metadata(record), signal });
@@ -132,7 +157,7 @@ export class CloudroomSdk {
       this.journal.submission(record, prepared.selection, thread.status === 'pending' ? 'queued' : 'accepted');
     } else if (command.kind === 'send') {
       const result = await this.sdk.threads.send({ threadId: command.thread_id, mode: 'queue-if-active', model: prepared.selection.model,
-        reasoningLevel: prepared.selection.policy.reasoning, input: [{ type: 'text', text: record.sdkInput, mentions: [] }], signal });
+        permissionMode: nativePermission(prepared.selection.policy.permissions), reasoningLevel: prepared.selection.policy.reasoning, input: [{ type: 'text', text: record.sdkInput, mentions: [] }], signal });
       record.threadId = command.thread_id;
       if (result.delivery === 'queued') record.queueId = result.queuedMessage.id;
       this.journal.submission(record, prepared.selection, result.delivery === 'queued' ? 'queued' : 'accepted');

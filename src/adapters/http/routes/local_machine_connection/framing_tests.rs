@@ -128,7 +128,7 @@ fn cloudroom_protocol_refuses_unsafe_javascript_integers_and_nul_output() {
     assert!(ConnectionIdentity::from_fence(fence(MAX_SAFE_INTEGER + 1)).is_err());
     let current = fence(1);
     let hello = JournalHello {
-        version: 1,
+        version: 2,
         installation_id: current.machine.installation_id,
         journal_id: Uuid::new_v4(),
         journal_sequence: MAX_SAFE_INTEGER + 1,
@@ -143,4 +143,23 @@ fn cloudroom_protocol_refuses_unsafe_javascript_integers_and_nul_output() {
     .unwrap();
     extra["company_id"] = json!(Uuid::new_v4());
     assert!(serde_json::from_value::<ClientMessage>(extra).is_err());
+}
+
+#[test]
+fn cloudroom_protocol_two_rejects_old_hello_and_retains_chunk_framing_one() {
+    assert_eq!(
+        crate::application::local_agents::bounds::PROTOCOL_VERSION,
+        2
+    );
+    assert_eq!(crate::application::local_agents::bounds::FRAME_VERSION, 1);
+    let current = fence(1);
+    let mut hello = JournalHello {
+        version: 2,
+        installation_id: current.machine.installation_id,
+        journal_id: Uuid::new_v4(),
+        journal_sequence: 0,
+    };
+    hello.validate(current).unwrap();
+    hello.version = 1;
+    assert!(hello.validate(current).is_err());
 }

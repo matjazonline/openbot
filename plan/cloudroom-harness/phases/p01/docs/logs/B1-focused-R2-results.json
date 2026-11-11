@@ -1,0 +1,167 @@
+[
+  {
+    "name": "format",
+    "command": [
+      "cargo",
+      "fmt",
+      "--all"
+    ],
+    "exit": 0,
+    "elapsed_s": 3.919,
+    "log": "B1-focused-R2-format.txt"
+  },
+  {
+    "name": "offline-alltargets",
+    "command": [
+      "cargo",
+      "check",
+      "--locked",
+      "--offline",
+      "--all-targets"
+    ],
+    "exit": 0,
+    "elapsed_s": 26.548,
+    "log": "B1-focused-R2-offline-alltargets.txt"
+  },
+  {
+    "name": "skill-bundles",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "--offline",
+      "--lib",
+      "skill_bundle"
+    ],
+    "exit": 101,
+    "elapsed_s": 113.39,
+    "log": "B1-focused-R2-skill-bundles.txt"
+  },
+  {
+    "name": "archives",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "--offline",
+      "--lib",
+      "skill_archive"
+    ],
+    "exit": 0,
+    "elapsed_s": 0.842,
+    "log": "B1-focused-R2-archives.txt"
+  },
+  {
+    "name": "skill-persistence",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "--offline",
+      "--lib",
+      "adapters::persistence::skill::tests"
+    ],
+    "exit": 0,
+    "elapsed_s": 0.65,
+    "log": "B1-focused-R2-skill-persistence.txt"
+  },
+  {
+    "name": "frozen-skills",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "--offline",
+      "--lib",
+      "agent_publication::tests::skills"
+    ],
+    "exit": 0,
+    "elapsed_s": 0.764,
+    "log": "B1-focused-R2-frozen-skills.txt"
+  },
+  {
+    "name": "skill-usecases",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "--offline",
+      "--lib",
+      "application::use_cases::skill::tests"
+    ],
+    "exit": 0,
+    "elapsed_s": 1.063,
+    "log": "B1-focused-R2-skill-usecases.txt"
+  },
+  {
+    "name": "source-modules",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "--offline",
+      "--test",
+      "source_modules"
+    ],
+    "exit": 0,
+    "elapsed_s": 51.513,
+    "log": "B1-focused-R2-source-modules.txt"
+  },
+  {
+    "name": "browser-fixtures",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "--offline",
+      "--lib",
+      "dump_skill_bundle_browser_fixtures",
+      "--",
+      "--ignored"
+    ],
+    "exit": 0,
+    "elapsed_s": 0.893,
+    "log": "B1-focused-R2-browser-fixtures.txt"
+  },
+  {
+    "name": "browser",
+    "command": [
+      "node",
+      "--test",
+      "scripts/tests/skill-bundle-browser.mjs"
+    ],
+    "exit": 0,
+    "elapsed_s": 1.693,
+    "log": "B1-focused-R2-browser.txt"
+  },
+  {
+    "name": "clippy",
+    "command": [
+      "cargo",
+      "clippy",
+      "--locked",
+      "--offline",
+      "--all-targets",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "exit": 0,
+    "elapsed_s": 46.21,
+    "log": "B1-focused-R2-clippy.txt"
+  },
+  {
+    "name": "sqlx-prepare-check",
+    "command": [
+      "cargo",
+      "sqlx",
+      "prepare",
+      "--check",
+      "--",
+      "--all-targets"
+    ],
+    "exit": 0,
+    "elapsed_s": 21.389,
+    "log": "B1-focused-R2-sqlx-prepare-check.txt"
+  }
+]

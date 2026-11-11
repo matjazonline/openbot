@@ -1,0 +1,62 @@
+    Checking open_bots v0.1.0 (/private/tmp/openbot-cloudroom-harness-t1gfnhz1/worktree)
+error[E0639]: cannot create non-exhaustive struct using struct expression
+   --> src/domain/entities/skill_bundle.rs:144:18
+    |
+144 |       let budget = serde_saphyr::Budget {
+    |  __________________^
+145 | |         max_events: 1024,
+146 | |         max_nodes: 256,
+147 | |         max_depth: 16,
+...   |
+155 | |         ..Default::default()
+156 | |     };
+    | |_____^
+
+error[E0639]: cannot create non-exhaustive struct using struct expression
+   --> src/domain/entities/skill_bundle.rs:157:19
+    |
+157 |       let options = serde_saphyr::Options {
+    |  ___________________^
+158 | |         budget: Some(budget),
+159 | |         merge_keys: serde_saphyr::options::MergeKeyPolicy::Error,
+160 | |         strict_booleans: true,
+...   |
+163 | |         ..Default::default()
+164 | |     };
+    | |_____^
+
+error[E0034]: multiple applicable items in scope
+   --> src/adapters/persistence/skill_bundle_persistence_tests.rs:79:10
+    |
+ 79 |         .create_library(directory(&format!("research-{}", Uuid::new_v4().simple())))
+    |          ^^^^^^^^^^^^^^ multiple `create_library` found
+    |
+note: candidate #1 is defined in an impl of the trait `application::use_cases::agent::AgentPersistence` for the type `persistence::PostgresPersistence`
+   --> src/adapters/persistence/agent.rs:318:1
+    |
+318 | #[async_trait]
+    | ^^^^^^^^^^^^^^
+note: candidate #2 is defined in an impl of the trait `application::use_cases::skill::SkillManagementPersistence` for the type `persistence::PostgresPersistence`
+   --> src/adapters/persistence/skill.rs:206:1
+    |
+206 | #[async_trait]
+    | ^^^^^^^^^^^^^^
+help: disambiguate the method for candidate #1
+    |
+ 78 -     let source = p
+ 79 -         .create_library(directory(&format!("research-{}", Uuid::new_v4().simple())))
+ 78 +     let source = application::use_cases::agent::AgentPersistence::create_library(&p, directory(&format!("research-{}", Uuid::new_v4().simple())))
+    |
+help: disambiguate the method for candidate #2
+    |
+ 78 -     let source = p
+ 79 -         .create_library(directory(&format!("research-{}", Uuid::new_v4().simple())))
+ 78 +     let source = application::use_cases::skill::SkillManagementPersistence::create_library(&p, directory(&format!("research-{}", Uuid::new_v4().simple())))
+    |
+
+For more information about this error, try `rustc --explain E0639`.
+error: could not compile `open_bots` (lib) due to 2 previous errors
+warning: build failed, waiting for other jobs to finish...
+Some errors have detailed explanations: E0034, E0639.
+For more information about an error, try `rustc --explain E0034`.
+error: could not compile `open_bots` (lib test) due to 3 previous errors

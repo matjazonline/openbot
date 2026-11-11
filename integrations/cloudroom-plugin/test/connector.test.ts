@@ -22,7 +22,7 @@ test('real trusted WSS reconnect rewraps immutable outbox and native tracking co
     try {
       assert.equal(request.headers.authorization, `Bearer ${'a'.repeat(64)}`);
       assert.equal(request.headers['x-openbot-installation-id'], f.binding.installation_id);
-      assert.equal(request.headers['x-openbot-protocol-version'], '1'); assert.equal(request.url, '/v1/local-machines/connect');
+      assert.equal(request.headers['x-openbot-protocol-version'], '2'); assert.equal(request.url, '/v1/local-machines/connect');
     } catch (error) { failures.push(error); }
     const identity: Identity = { installation_id: f.binding.installation_id, credential_generation: 1, connection_generation: ++generation };
     const assembler = new FrameAssembler(); let through = 0;
@@ -31,6 +31,7 @@ test('real trusted WSS reconnect rewraps immutable outbox and native tracking co
         const message = assembler.push(data as Buffer) as Record<string, any> | undefined;
         if (!message) return;
         if (message.kind === 'hello') {
+          assert.equal(message.hello.version, 2);
           assert.equal(message.hello.journal_id, f.binding.journal_id);
           // Replay the last unacknowledged observation after the deliberate cut.
           through = f.journal.acknowledged();

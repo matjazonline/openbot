@@ -331,6 +331,7 @@ struct ProfileForm {
     provider: LocalProvider,
     model: ModelId,
     reasoning: LocalReasoningLevel,
+    permissions: LocalPermissions,
 }
 impl ProfileForm {
     fn profile(self, company: Uuid, id: ProfileId) -> LocalAgentProfile {
@@ -345,7 +346,7 @@ impl ProfileForm {
                 model: self.model,
                 policy: ExecutionPolicy {
                     workspace: LocalWorkspace::ProjectDirectory,
-                    permissions: LocalPermissions::ProviderDefault,
+                    permissions: self.permissions,
                     reasoning: self.reasoning,
                 },
             },

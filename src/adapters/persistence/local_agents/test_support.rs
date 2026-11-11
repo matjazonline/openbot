@@ -124,7 +124,7 @@ impl Fixture {
 
     pub async fn install_catalog(&self, paired: &Paired) -> CapabilitySnapshot {
         let machine = &paired.receipt.machine;
-        let catalog = json!({"projects":["proj_test"],"providers":[{"provider":"codex","models":[{
+        let catalog = json!({"projects":["proj_test"],"providers":[{"provider":"codex","permission_modes":["full","auto","accept_edits"],"models":[{
             "model":"gpt-6-luna","reasoning_levels":["none","low","high"]
         }]}]});
         let mut tx = self.database.pool.begin().await.unwrap();
@@ -162,7 +162,7 @@ impl Fixture {
                 model: ModelId::try_from("gpt-6-luna".to_owned()).unwrap(),
                 policy: ExecutionPolicy {
                     workspace: LocalWorkspace::ProjectDirectory,
-                    permissions: LocalPermissions::ProviderDefault,
+                    permissions: LocalPermissions::Full,
                     reasoning: LocalReasoningLevel::Low,
                 },
             },

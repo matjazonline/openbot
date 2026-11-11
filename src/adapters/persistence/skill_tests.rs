@@ -12,6 +12,12 @@ use crate::{
     },
 };
 
+#[path = "skill_bundle_persistence_tests.rs"]
+mod bundle_tests;
+
+#[path = "skill_bundle_copy_concurrency_tests.rs"]
+mod copy_concurrency_tests;
+
 #[test]
 fn copied_slugs_stay_bounded() {
     let original = "a".repeat(SkillSlug::MAX_CHARS);
@@ -46,6 +52,7 @@ async fn company(persistence: &PostgresPersistence, label: &str) -> Uuid {
 
 fn skill_write(slug: impl Into<String>) -> SkillWrite {
     let mut write = SkillWrite {
+        files: None,
         required_tools: None,
         slug: slug.into(),
         name: "Review invoice".into(),
@@ -362,6 +369,23 @@ async fn deleting_an_in_use_library_skill_is_refused() {
     assert!(error.to_string().contains("still used"), "{error}");
 }
 
+fn bundled_skill_write() -> SkillWrite {
+    let mut bundled = skill_write(format!("agent-skill-{}", Uuid::new_v4().simple()));
+    bundled.instructions = format!(
+        "---\nname: {}\ndescription: A script skill\nallowed-tools: [Read, Bash]\n---\n\nRun scripts/check.py.\n",
+        bundled.slug
+    );
+    bundled.files = Some(vec![
+        crate::entities::skill_bundle::SkillFile::from_bytes(
+            "scripts/check.py".into(),
+            b"#!/usr/bin/env python3\nprint('copied')\n",
+            true,
+        )
+        .unwrap(),
+    ]);
+    bundled
+}
+
 #[tokio::test]
 async fn picking_a_library_agent_copies_its_skills_with_the_agent_and_channel() {
     let Some(pool) = test_pool().await else {
@@ -369,12 +393,14 @@ async fn picking_a_library_agent_copies_its_skills_with_the_agent_and_channel() 
     };
     let persistence = PostgresPersistence::new(pool);
     let company_id = company(&persistence, "agent-copy").await;
-    let source_skill = SkillManagementPersistence::create_library(
-        &persistence,
-        skill_write(format!("agent-skill-{}", Uuid::new_v4().simple())),
-    )
-    .await
-    .unwrap();
+    let bundled = bundled_skill_write();
+    // Force the shared indirect-copy path to choose a new native identity.
+    SkillManagementPersistence::create_company(&persistence, company_id, bundled.clone())
+        .await
+        .unwrap();
+    let source_skill = SkillManagementPersistence::create_library(&persistence, bundled)
+        .await
+        .unwrap();
     let mut source_write = agent_write(format!("source-{}", Uuid::new_v4().simple()));
     source_write.skill_ids = vec![source_skill.id];
     let source_agent = AgentPersistence::create_library(&persistence, source_write)
@@ -411,6 +437,20 @@ async fn picking_a_library_agent_copies_its_skills_with_the_agent_and_channel() 
     assert_eq!(snapshot.skills.len(), 1);
     assert_eq!(snapshot.skills[0].company_id, Some(company_id));
     assert_ne!(snapshot.skills[0].id, source_skill.id);
+    assert_eq!(snapshot.skills[0].files, source_skill.files);
+    assert_eq!(
+        crate::entities::skill_bundle::skill_markdown_metadata(&snapshot.skills[0].instructions)
+            .unwrap()
+            .unwrap()
+            .name,
+        snapshot.skills[0].slug.as_str()
+    );
+    assert!(snapshot.skills[0].slug.as_str().ends_with("-2"));
+    assert!(
+        snapshot.skills[0]
+            .instructions
+            .ends_with("\nRun scripts/check.py.\n")
+    );
     assert!(
         persistence
             .get_library(source_skill.id)

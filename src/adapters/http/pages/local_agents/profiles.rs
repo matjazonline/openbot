@@ -93,8 +93,37 @@ fn editor(view: &Page<'_>) -> String {
         machine = machine.machine.id,
         context = conversation_fields(view)
     );
-    let projects = runtime
-        .projects
+    let controls = runtime_fields(&runtime.projects, provider, model, seeded);
+    let fields = format!(
+        r#"<input type="hidden" name="machine_id" value="{machine}"><input type="hidden" name="provider" value="{provider}"><input type="hidden" name="model" value="{model}"><label class="block">Profile name<input class="input w-full" name="name" maxlength="128" required value="{name}"></label>{controls}<p>Workspace: existing project directory. Full access is the default. Native prompts are answered in Cloudroom.</p>"#,
+        machine = machine.machine.id,
+        provider = attr(&enum_value(&provider.provider)),
+        model = attr(model.model.as_str()),
+        name = attr(view.profile.map_or("", |profile| profile.name.as_str()))
+    );
+    let action = view.profile.map_or_else(
+        || format!("{base}/profiles"),
+        |profile| format!("{base}/profiles/{}", profile.id),
+    );
+    format!(
+        "<article class=\"card card-border p-4 space-y-4\"><h3 class=\"font-semibold\">{title}</h3>{picker}{editor}</article>",
+        title = if view.profile.is_some() {
+            "Edit profile"
+        } else {
+            "New profile"
+        },
+        editor = form(&action, &fields, "Save profile")
+    )
+}
+
+fn runtime_fields(
+    projects: &[crate::domain::local_agents::CloudroomProjectId],
+    provider: &crate::application::local_agents::ProviderCatalog,
+    model: &crate::application::local_agents::ModelCapabilities,
+    seeded: Option<&LocalAgentProfile>,
+) -> String {
+    use crate::domain::local_agents::LocalPermissions;
+    let projects = projects
         .iter()
         .map(|project| {
             option(
@@ -115,24 +144,23 @@ fn editor(view: &Page<'_>) -> String {
             )
         })
         .collect::<String>();
-    let fields = format!(
-        r#"<input type="hidden" name="machine_id" value="{machine}"><input type="hidden" name="provider" value="{provider}"><input type="hidden" name="model" value="{model}"><label class="block">Profile name<input class="input w-full" name="name" maxlength="128" required value="{name}"></label><label class="block">Enabled project<select class="select w-full" name="project" required>{projects}</select></label><label class="block">Reasoning<select class="select w-full" name="reasoning" required>{reasoning}</select></label><p>Workspace: existing project directory. Permissions: provider defaults. Native prompts are answered in Cloudroom.</p>"#,
-        machine = machine.machine.id,
-        provider = attr(&enum_value(&provider.provider)),
-        model = attr(model.model.as_str()),
-        name = attr(view.profile.map_or("", |profile| profile.name.as_str()))
-    );
-    let action = view.profile.map_or_else(
-        || format!("{base}/profiles"),
-        |profile| format!("{base}/profiles/{}", profile.id),
-    );
+    let selected = seeded.map_or(LocalPermissions::Full, |profile| {
+        profile.selection.policy.permissions
+    });
+    let mut permissions = if provider.permission_modes.contains(&selected) {
+        String::new()
+    } else {
+        "<option value=\"\" disabled selected>Selected access unavailable; choose a supported mode</option>".into()
+    };
+    for mode in provider.permission_modes.iter() {
+        let label = match mode {
+            LocalPermissions::Full => "Full access",
+            LocalPermissions::Auto => "Auto",
+            LocalPermissions::AcceptEdits => "Accept edits",
+        };
+        permissions.push_str(&option(&enum_value(mode), label, *mode == selected));
+    }
     format!(
-        "<article class=\"card card-border p-4 space-y-4\"><h3 class=\"font-semibold\">{title}</h3>{picker}{editor}</article>",
-        title = if view.profile.is_some() {
-            "Edit profile"
-        } else {
-            "New profile"
-        },
-        editor = form(&action, &fields, "Save profile")
+        r#"<label class="block">Enabled project<select class="select w-full" name="project" required>{projects}</select></label><label class="block">Reasoning<select class="select w-full" name="reasoning" required>{reasoning}</select></label><label class="block">Permissions<select class="select w-full" name="permissions" required>{permissions}</select></label>"#
     )
 }
