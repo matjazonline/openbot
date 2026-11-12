@@ -1,0 +1,12 @@
+{
+  "source": "/private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/plugins/provider-claude-code/src/bridge/native-tool-origins.ts",
+  "sha256": "201e1bab4deafaa37eddd665913c618d45a4bb2a4a91d466eec6056b84732cee",
+  "case": "Two pending same-text inputs, B prompt acknowledgment first",
+  "accepted": true,
+  "observed": true,
+  "resolved": {
+    "clientRequestId": "creq_A",
+    "callId": "toolu_B"
+  },
+  "required": "Refusal because the digest does not identify exactly one pending owner"
+}

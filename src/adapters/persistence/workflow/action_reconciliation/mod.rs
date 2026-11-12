@@ -177,13 +177,24 @@ async fn head_on(
     tx: &mut Transaction<'_, Postgres>,
     command: &ReconcileActionCommand,
 ) -> AppResult<RunHead> {
-    sqlx::query_as::<_, inspection::HeadRow>(&format!("{} FOR UPDATE OF run", inspection::HEAD))
-        .bind(command.scope.company.as_uuid())
-        .bind(command.scope.run.as_uuid())
-        .fetch_optional(&mut **tx)
-        .await?
-        .ok_or_else(missing)?
-        .restore()
+    let head = sqlx::query_as::<_, inspection::HeadRow>(&format!(
+        "{} FOR UPDATE OF run",
+        inspection::HEAD
+    ))
+    .bind(command.scope.company.as_uuid())
+    .bind(command.scope.run.as_uuid())
+    .fetch_optional(&mut **tx)
+    .await?
+    .ok_or_else(missing)?
+    .restore()?;
+    super::native_mcp::authorize_history_on(
+        tx,
+        command.scope.company,
+        command.actor,
+        command.scope.run,
+    )
+    .await?;
+    Ok(head)
 }
 
 #[derive(sqlx::FromRow)]

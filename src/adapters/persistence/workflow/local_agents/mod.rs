@@ -19,7 +19,7 @@ mod resolution;
 
 pub(super) use continuation::prelock_on as prelock_wait_on;
 pub(super) use continuation::resume_on;
-pub(in crate::adapters::persistence) use delivery::authorize_operation_on;
+pub(in crate::adapters::persistence) use delivery::authorize_operation_with_locks_on;
 
 pub(super) async fn confirm_suspension(
     persistence: &PostgresPersistence,
@@ -148,9 +148,19 @@ pub(in crate::adapters::persistence) async fn authorize_run_on(
     run: Uuid,
     actor: WorkflowActor,
 ) -> AppResult<RunAssociation> {
-    let stored = sqlx::query_as::<_, RunAssociation>(
+    authorize_run_with_locks_on(db, company, run, actor, super::row_locks::RowLocks::Wait).await
+}
+
+pub(in crate::adapters::persistence) async fn authorize_run_with_locks_on(
+    db: &mut PgConnection,
+    company: CompanyId,
+    run: Uuid,
+    actor: WorkflowActor,
+    locks: super::row_locks::RowLocks,
+) -> AppResult<RunAssociation> {
+    let stored = sqlx::query_as::<_, RunAssociation>(&locks.sql(
         "SELECT channel_id,thread_id FROM workflow_runs WHERE company_id=$1 AND id=$2 FOR SHARE",
-    )
+    ))
     .bind(company.as_uuid())
     .bind(run)
     .fetch_optional(&mut *db)
@@ -165,7 +175,7 @@ pub(in crate::adapters::persistence) async fn authorize_run_on(
         },
         _ => return Err(invalid()),
     };
-    association::authorize_association(db, company, actor, association).await?;
+    association::authorize_association_with_locks(db, company, actor, association, locks).await?;
     Ok(stored)
 }
 
@@ -178,56 +188,65 @@ impl action_dispatch::SqlActionAuthority for LocalActionAuthority {
         tx: &mut Transaction<'_, Postgres>,
         authority: &ActionRunAuthority,
     ) -> AppResult<action_dispatch::LockedActionAuthority> {
-        let action = FrozenAction::local_agent(authority.action.request().clone())?;
-        authority::authorize_company(tx, action.scope().company, authority.actor).await?;
-        let args: FrozenLocalRun =
-            serde_json::from_value(action.request().arguments.clone()).map_err(|_| invalid())?;
-        authorize_run_on(
-            tx,
-            action.scope().company,
-            action.scope().run.as_uuid(),
-            authority.actor,
-        )
-        .await?;
-        if let Some(id) = args.session_id {
-            let session = shared::session_on(tx, action.scope().company, id)
-                .await?
-                .ok_or_else(missing)?;
-            preparation::validate_continuation_on(
-                tx,
-                action.scope(),
-                authority.actor,
-                args.profile_id,
-                &session,
-            )
-            .await?;
-        }
-        let locked = shared::lock_profile_on(tx, action.scope().company, args.profile_id).await?;
-        if locked.machine.state != MachineState::Enabled {
-            return Err(conflict());
-        }
-        shared::validate_selection_on(
-            tx,
-            action.scope().company,
-            locked.machine.id,
-            &args.selection,
-        )
-        .await?;
-        Ok(action_dispatch::LockedActionAuthority {
-            resource: crate::application::workflow::binding::ResourceStatus {
-                id: RuntimeResourceId::new(args.profile_id.as_uuid()),
-                company_id: action.scope().company,
-                kind: TypeName::parse(contract::RESOURCE_KIND).map_err(|_| invalid())?,
-                supported_contracts: BTreeSet::from([
-                    TypeName::parse(contract::KIND).map_err(|_| invalid())?
-                ]),
-                authorized: true,
-                readiness: crate::application::workflow::binding::ResourceReadiness::Ready,
-            },
-            policy: CurrentActionPolicy {
-                tool: contract::builtin_snapshot(action.scope().company)?,
-                approval_required: args.approval.is_some(),
-            },
-        })
+        lock_current_with_locks(tx, authority, super::row_locks::RowLocks::Wait).await
     }
+}
+
+async fn lock_current_with_locks(
+    tx: &mut Transaction<'_, Postgres>,
+    authority: &ActionRunAuthority,
+    locks: super::row_locks::RowLocks,
+) -> AppResult<action_dispatch::LockedActionAuthority> {
+    let action = FrozenAction::local_agent(authority.action.request().clone())?;
+    authority::authorize_company_with_locks(tx, action.scope().company, authority.actor, locks)
+        .await?;
+    let args: FrozenLocalRun =
+        serde_json::from_value(action.request().arguments.clone()).map_err(|_| invalid())?;
+    authorize_run_with_locks_on(
+        tx,
+        action.scope().company,
+        action.scope().run.as_uuid(),
+        authority.actor,
+        locks,
+    )
+    .await?;
+    if let Some(id) = args.session_id {
+        let session = shared::session_on(tx, action.scope().company, id)
+            .await?
+            .ok_or_else(missing)?;
+        preparation::validate_continuation_with_locks_on(
+            tx,
+            action.scope(),
+            authority.actor,
+            args.profile_id,
+            &session,
+            locks,
+        )
+        .await?;
+    }
+    shared::validate_frozen_with_locks_on(
+        tx,
+        action.scope().company,
+        authority.actor.user_id(),
+        &args.selection,
+        &args.harness,
+        locks,
+    )
+    .await?;
+    Ok(action_dispatch::LockedActionAuthority {
+        resource: crate::application::workflow::binding::ResourceStatus {
+            id: RuntimeResourceId::new(args.profile_id.as_uuid()),
+            company_id: action.scope().company,
+            kind: TypeName::parse(contract::RESOURCE_KIND).map_err(|_| invalid())?,
+            supported_contracts: BTreeSet::from([
+                TypeName::parse(contract::KIND).map_err(|_| invalid())?
+            ]),
+            authorized: true,
+            readiness: crate::application::workflow::binding::ResourceReadiness::Ready,
+        },
+        policy: CurrentActionPolicy {
+            tool: contract::builtin_snapshot(action.scope().company)?,
+            approval_required: args.approval.is_some(),
+        },
+    })
 }

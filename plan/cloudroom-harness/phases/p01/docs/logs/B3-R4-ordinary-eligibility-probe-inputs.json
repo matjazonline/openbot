@@ -1,0 +1,9 @@
+{
+  "status": "PREPARED NOT EXECUTED",
+  "hypothesis": "Unconditional lease guard SQL function may plan native branch for ordinary/missing runs; measure after baseline full completes. No cause established.",
+  "originalSha256": "dd05d0881621ee13315f32ea13b1bbcd70c39106220bb22021719dfe85559833",
+  "actualMissingSamples": 10,
+  "alternatingClonePairs": 20,
+  "fixture": "temporary ordinary marker row; full native predicate preserved, not a functional credential/tenant proof",
+  "mutation": "pg_temp session only; no public function/source change"
+}

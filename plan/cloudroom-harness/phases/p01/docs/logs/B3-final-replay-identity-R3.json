@@ -1,0 +1,7 @@
+{
+  "status": "PASS",
+  "artifact": "b8e6ad047465101a634878d25bee5a93879dae6765d3de1d6f43bd88f99174d4",
+  "sdk_sha256": "15d79e915398fc0136a82da641c7a825fad41d41ee56c3502867316b2e73ca4c",
+  "sdk_fresh_replay_equal": true,
+  "delta": "R3 test diagnostics only over freshly built R2 production source; actual complete prepare runtime R3 passed"
+}

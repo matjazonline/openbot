@@ -1,0 +1,14 @@
+✔ MCP native preflight refuses an older core before any provider mutation; instructions-only still launch (64.580542ms)
+✔ registered MCP proxy lists and describes the exact frozen contract without creating effect intents (17.980584ms)
+✔ TLS proxy journals before POST, retries a lost response with the same owner, rotates credentials and holds through pending approval (16628.804ms)
+✔ native abort cancels the immutable invocation even when the admission response was lost (33.523334ms)
+✔ unknown outcome survives a physical plugin journal restart; status from B resolves A without another admission (23.554667ms)
+✔ MCP HTTPS transport refuses oversized replies, redirects, invalid metadata and an individual request deadline (75.463875ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 6
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 16938.569417

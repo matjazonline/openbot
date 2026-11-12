@@ -126,6 +126,7 @@ impl Workspace {
             .agents
             .profiles(actor, company, selection.after_profile)
             .await?;
+        let native_agents = self.agents.native_agent_choices(actor, company).await?;
         let access = self.companies.readable_company(actor, company).await?;
         let machines = self
             .machines
@@ -199,6 +200,7 @@ impl Workspace {
             machines: &machines,
             pairings: &pairings,
             profiles: &profiles,
+            native_agents: &native_agents,
             machine: machine.as_ref(),
             runtime: runtime.as_ref(),
             profile: profile.as_ref(),
@@ -332,13 +334,27 @@ struct ProfileForm {
     model: ModelId,
     reasoning: LocalReasoningLevel,
     permissions: LocalPermissions,
+    agent_id: Option<String>,
 }
 impl ProfileForm {
-    fn profile(self, company: Uuid, id: ProfileId) -> LocalAgentProfile {
-        LocalAgentProfile {
+    fn profile(self, company: Uuid, id: ProfileId) -> AppResult<LocalAgentProfile> {
+        let agent_id = self
+            .agent_id
+            .filter(|value| !value.is_empty())
+            .map(|value| {
+                value
+                    .parse::<Uuid>()
+                    .ok()
+                    .filter(|id| !id.is_nil())
+                    .map(crate::entities::agent_capability::AgentId::new)
+                    .ok_or_else(|| AppError::BadRequest("Choose a valid company agent".into()))
+            })
+            .transpose()?;
+        Ok(LocalAgentProfile {
             id,
             company_id: company,
             name: self.name,
+            agent_id,
             selection: ExecutionSelection {
                 machine_id: self.machine_id,
                 project_id: self.project,
@@ -350,7 +366,7 @@ impl ProfileForm {
                     reasoning: self.reasoning,
                 },
             },
-        }
+        })
     }
 }
 async fn create_profile(
@@ -361,7 +377,7 @@ async fn create_profile(
     let id = ProfileId::new(Uuid::new_v4()).map_err(|_| missing())?;
     workspace
         .machines
-        .save_profile(workspace.viewer.user_id, &form.profile(company, id))
+        .save_profile(workspace.viewer.user_id, &form.profile(company, id)?)
         .await?;
     Ok(redirect(company, &format!("profile={id}")))
 }
@@ -377,7 +393,7 @@ async fn update_profile(
         .ok_or_else(missing)?;
     workspace
         .machines
-        .save_profile(workspace.viewer.user_id, &form.profile(company, id))
+        .save_profile(workspace.viewer.user_id, &form.profile(company, id)?)
         .await?;
     Ok(redirect(company, &format!("profile={id}")))
 }

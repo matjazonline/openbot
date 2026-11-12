@@ -1,0 +1,12 @@
+{
+  "changes": [
+    {
+      "path": "integrations/cloudroom-plugin/src/mcp-transport.ts",
+      "old": "325e8a297170634ecfed04605da24773d7d953d2f6041c0531f0ad9c8095abad",
+      "new": "03539a5c16689bbb57d812da1228f69f896513462588b21862a7252aad1d7042"
+    }
+  ],
+  "otherReviewedFilesUnchanged": 189,
+  "sourceWhitespace": "PASS",
+  "packageByteIdentical": "verify integrity JSON against R6"
+}

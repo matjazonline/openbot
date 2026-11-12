@@ -99,6 +99,7 @@ fn request(root: &PublishedBundle, children: &[Arc<PublishedBundle>]) -> SampleR
     SampleRequest { response_contract: None, response_approval_policy: None,
         input:json!({}),params:json!({}),
         agents:vec![ResolvedAgentDefinition { company_id:root.company_id(),agent_id:reference.agent_id,key:reference.key.clone(),instructions:"Bounded sample".into(),
+            native_permissions: Default::default(),
             model:Some(ModelSettings {provider:name("test"),model:"sample".into(),max_output_tokens:1000}),tools,skills:vec![] }],
         scripts:serde_json::from_value(json!([{"workflow_id":root.compiled().graph().definition().workflow_id,"step":"start","responses":[{"output":"done"}]}])).unwrap(),
     }

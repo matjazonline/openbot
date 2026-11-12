@@ -1,0 +1,10 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.36s
+     Running unittests src/lib.rs (/private/tmp/openbot-cloudroom-harness-t1gfnhz1/target/debug/deps/open_bots-6467f0b3ff334015)
+
+running 3 tests
+test application::workflow::native_mcp::tests::native_broker_refuses_postgres_nul_values_and_keys_before_publication ... ok
+test application::workflow::native_mcp::tests::native_broker_compiles_real_mcp_contract_and_binds_original_reviewer ... ok
+test application::workflow::native_mcp::tests::native_broker_refuses_invalid_arguments_and_non_mcp_sources ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 4087 filtered out; finished in 0.30s
+

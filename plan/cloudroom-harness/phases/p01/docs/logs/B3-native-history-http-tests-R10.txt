@@ -1,0 +1,45 @@
+   Compiling open_bots v0.1.0 (/private/tmp/openbot-cloudroom-harness-t1gfnhz1/worktree)
+error[E0603]: trait import `ChannelPersistence` is private
+  --> src/adapters/persistence/local_agents/test_support.rs:5:19
+   |
+ 5 |         channel::{ChannelPersistence, ChannelWrite},
+   |                   ^^^^^^^^^^^^^^^^^^ private trait import
+   |
+note: the trait import `ChannelPersistence` is defined here...
+  --> src/application/use_cases/channel.rs:3:42
+   |
+ 3 | use crate::application::ports::channel::{ChannelPersistence, ChannelUpdate, ChannelWrite};
+   |                                          ^^^^^^^^^^^^^^^^^^
+note: ...and refers to the trait `ChannelPersistence` which is defined here
+  --> src/application/ports/channel.rs:44:1
+   |
+44 | pub trait ChannelPersistence: Send + Sync {
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ you could import this directly
+help: import `ChannelPersistence` directly
+   |
+ 5 |         channel::{application::ports::channel::ChannelPersistence, ChannelWrite},
+   |                   +++++++++++++++++++++++++++++
+
+error[E0603]: struct import `ChannelWrite` is private
+  --> src/adapters/persistence/local_agents/test_support.rs:5:39
+   |
+ 5 |         channel::{ChannelPersistence, ChannelWrite},
+   |                                       ^^^^^^^^^^^^ private struct import
+   |
+note: the struct import `ChannelWrite` is defined here...
+  --> src/application/use_cases/channel.rs:3:77
+   |
+ 3 | use crate::application::ports::channel::{ChannelPersistence, ChannelUpdate, ChannelWrite};
+   |                                                                             ^^^^^^^^^^^^
+note: ...and refers to the struct `ChannelWrite` which is defined here
+  --> src/application/ports/channel.rs:17:1
+   |
+17 | pub struct ChannelWrite {
+   | ^^^^^^^^^^^^^^^^^^^^^^^ you could import this directly
+help: import `ChannelWrite` directly
+   |
+ 5 |         channel::{ChannelPersistence, application::ports::channel::ChannelWrite},
+   |                                       +++++++++++++++++++++++++++++
+
+For more information about this error, try `rustc --explain E0603`.
+error: could not compile `open_bots` (lib test) due to 2 previous errors

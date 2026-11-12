@@ -1,0 +1,20 @@
+{
+  "reason": "Stop known-failing R2 full gate after complete independent R2 review; F5/F6 require correction before final gateR3. Partial failures retained; no completed-full-suite claim.",
+  "processes": [
+    {
+      "pid": 54573,
+      "ppid": 66825,
+      "command": "bash scripts/check.sh"
+    },
+    {
+      "pid": 63276,
+      "ppid": 54573,
+      "command": "/Users/mac02/.rustup/toolchains/1.95.0-aarch64-apple-darwin/bin/cargo test --locked --offline --all-targets"
+    },
+    {
+      "pid": 63281,
+      "ppid": 63276,
+      "command": "/private/tmp/openbot-cloudroom-harness-t1gfnhz1/target/debug/deps/open_bots-6467f0b3ff334015"
+    }
+  ]
+}

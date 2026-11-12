@@ -8,12 +8,18 @@ async fn a_native_urlencoded_submission_builds_the_write() {
         .method("POST")
         .uri("/ui/agents")
         .header("content-type", "application/x-www-form-urlencoded")
-        .body(Body::from("name=NoJs&description=Answers+billing"))
+        .body(Body::from(
+            "name=NoJs&description=Answers+billing&native_permissions=accept_edits",
+        ))
         .unwrap();
     let Form(form) = Form::<AgentForm>::from_request(request, &()).await.unwrap();
     let submitted = SubmittedAgent::new(form);
     let mut write = submitted.agent_write().unwrap();
     write.normalize().unwrap();
+    assert_eq!(
+        write.native_permissions,
+        crate::domain::local_agents::LocalPermissions::AcceptEdits
+    );
     assert_eq!(write.name, "NoJs");
     assert_eq!(write.slug, "nojs");
     assert_eq!(write.description.as_deref(), Some("Answers billing"));

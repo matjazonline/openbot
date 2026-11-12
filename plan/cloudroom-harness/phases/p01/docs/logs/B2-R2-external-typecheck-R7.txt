@@ -1,0 +1,5 @@
+Scope: 2 of 97 workspace projects
+apps/server typecheck$ tsc --noEmit
+apps/server typecheck: Done
+tests/integration typecheck$ tsc --noEmit
+tests/integration typecheck: Done

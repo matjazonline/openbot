@@ -1,0 +1,8 @@
+
+> bb-plugin-openbot-local@0.2.0 typecheck
+> tsc --noEmit
+
+test/mcp-proxy.test.ts(29,18): error TS2571: Object is of type 'unknown'.
+test/mcp-proxy.test.ts(46,20): error TS2571: Object is of type 'unknown'.
+test/mcp-proxy.test.ts(65,18): error TS2571: Object is of type 'unknown'.
+test/mcp-proxy.test.ts(82,18): error TS2571: Object is of type 'unknown'.

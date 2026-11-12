@@ -1,0 +1,135 @@
+{
+  "version": 1,
+  "round": "CH-P01-B3-R3",
+  "artifact": "32445711c489b73d4f95820e1d8e1f732be11c3220f9f47252f22a27f86efe5c",
+  "checks": [
+    {
+      "criteria": [
+        "CH-P01-B3-F5",
+        "M3-AC6"
+      ],
+      "command": "python3 scripts/integration-boundary.py .; python3 scripts/tests/integration-boundary.py",
+      "fixture": "owned PostgreSQL18 port63451/main schema resetR3; pinned Node24.21.0; local scripted endpoints and dummy key only",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B3-R3-integration-boundary.txt",
+          "sha256": "9f55dabd846b9377bfba6441b555d4ae8090f5b38d967ea08d6c338e9346f00a"
+        },
+        {
+          "path": "logs/B3-R3-integration-boundary-fixtures.txt",
+          "sha256": "6a51b2da69a0c20e7776f18b0f3e409d328cc471b6cceffa6cd4dd42c44bd8c8"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "CH-P01-B3-F5",
+        "M3-AC6"
+      ],
+      "command": "cargo sqlx database reset -y (owned main DB with0connections)",
+      "fixture": "owned PostgreSQL18 port63451/main schema resetR3; pinned Node24.21.0; local scripted endpoints and dummy key only",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B3-R3-schema-migrate-R1.txt",
+          "sha256": "d21d172047d9ee99e83f53f0d78b26c70bd5fc9c45b2f48878013494cd86dd75"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "CH-P01-B3-F5",
+        "M3-AC2",
+        "M3-AC3",
+        "M3-AC4",
+        "M3-AC5"
+      ],
+      "command": "scripts/test-network-isolation.sh cargo test --locked --offline --lib native_mcp_ -- --nocapture",
+      "fixture": "owned PostgreSQL18 port63451/main schema resetR3; pinned Node24.21.0; local scripted endpoints and dummy key only",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B3-R3-native-regressions-R1.txt",
+          "sha256": "507b720640073df4803519008151542d460d4a9e4715bd2e7a749648c2e71dc8"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "CH-P01-B3-F6",
+        "M3-AC1",
+        "M3-AC4"
+      ],
+      "command": "scripts/test-network-isolation.sh cargo test --locked --offline --lib agent_publication::tests:: -- --nocapture",
+      "fixture": "owned PostgreSQL18 port63451/main schema resetR3; pinned Node24.21.0; local scripted endpoints and dummy key only",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B3-R3-publication-regressions-R1.txt",
+          "sha256": "3f8fe4a9fdd4d3af663f453bc71be89505df59207b64ba6741255de479ea28a9"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "M3-AC6"
+      ],
+      "command": "node integrations/cloudroom-plugin/scripts/package.mjs <owned artifacts-b3-r6>; npm ci --offline --omit=dev; import packaged dist/server.js",
+      "fixture": "owned PostgreSQL18 port63451/main schema resetR3; pinned Node24.21.0; local scripted endpoints and dummy key only",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B3-R3-package-R6.txt",
+          "sha256": "6177296971f3cd03ff1217e5afebf3f99098cab415cf9da12ad083f043dace20"
+        },
+        {
+          "path": "logs/B3-R3-production-install-R6.txt",
+          "sha256": "7d07e9accd9f93f4e87ebdc1cd24b6a8157f9916aa3408fe2745a908b71e1ec5"
+        },
+        {
+          "path": "logs/B3-R3-production-load-R6.txt",
+          "sha256": "ec266a2bd46db527c3a9e90dc2d5269a2fb10058c43d1d2b52704d458bd2510b"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "M3-AC6"
+      ],
+      "command": "bash scripts/check.sh (R2 partial failed gate deliberately terminated for F5/F6 corrections)",
+      "fixture": "owned PostgreSQL18 port63451/main schema resetR3; pinned Node24.21.0; local scripted endpoints and dummy key only",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B3-final-full-gate-R2.txt",
+          "sha256": "95b15242dbd04e6974e87001f1b4354202868e7ad3e2b25857731ebaea52ccfa"
+        },
+        {
+          "path": "logs/B3-full-gate-R2-interruption.json",
+          "sha256": "7ceab7f8c622489a755fd2d5bcec3e92442ec054a86565dc811b778466c10cbc"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "M3-AC6"
+      ],
+      "command": "bash scripts/check.sh (Node24/explicit Chrome, owned isolated test DB)",
+      "fixture": "owned PostgreSQL18 port63451/main schema resetR3; pinned Node24.21.0; local scripted endpoints and dummy key only",
+      "status": "NOT EXERCISED",
+      "files": [],
+      "reason": "FinalR3 currently running session19781. Final immutable result required before acceptance."
+    },
+    {
+      "criteria": [
+        "M3-AC6"
+      ],
+      "command": "scripts/test-network-isolation.sh bash scripts/lease-budget.sh --offline",
+      "fixture": "owned PostgreSQL18 port63451/main schema resetR3; pinned Node24.21.0; local scripted endpoints and dummy key only",
+      "status": "NOT EXERCISED",
+      "files": [],
+      "reason": "R2 default lease gate passed; rerun after fullgateR3 for extracted module SQL readiness. No concurrent Cargo/sharedPG."
+    }
+  ]
+}

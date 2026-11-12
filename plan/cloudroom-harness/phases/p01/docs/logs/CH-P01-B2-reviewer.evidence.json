@@ -1,0 +1,49 @@
+{
+  "version": 1,
+  "round": "CH-P01-B2-N1",
+  "artifact": "a71abff5242d2b22bb709629bef778c14ee799acbca9c0f417163f42bc7f9793",
+  "checks": [
+    {
+      "criteria": [
+        "B2 independent focused regression"
+      ],
+      "command": "PATH=<pinned Node24> npm test",
+      "fixture": "owned plugin fixtures; 117 passed",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/CH-P01-B2-reviewer-plugin-tests.txt",
+          "sha256": "a925050dfa89a0b3d30685538a87105868baea9dad0bd98ba150352d0305464e"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "B2 independent focused regression"
+      ],
+      "command": "PATH=<pinned Node24> pnpm --filter @cloudroom/server exec vitest run --config vitest.config.ts test/threads/required-agent-configuration.test.ts test/internal/required-skill-trees.test.ts",
+      "fixture": "owned pinned core; 12 passed, 1 explicit native probe skipped",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/CH-P01-B2-reviewer-core-tests.txt",
+          "sha256": "bcb910e0ba6e6e67ee204afba2a8513de3794b9cfd6640308f0362f0af9aa393"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "B2 independent focused regression"
+      ],
+      "command": "cargo test --locked --offline --lib cloudroom_native_ -- --nocapture",
+      "fixture": "owned PostgreSQL 127.0.0.1:63451; 8 passed",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/CH-P01-B2-reviewer-native-db.txt",
+          "sha256": "bcfce4fbd894db5a997f0623b7e1c4b69de3eb706341cc906baa66e8a5e65a0f"
+        }
+      ]
+    }
+  ]
+}

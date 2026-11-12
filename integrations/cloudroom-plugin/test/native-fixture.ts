@@ -14,7 +14,7 @@ export function nativeFixture(journal: Journal, selection: ReturnType<typeof fix
     providerError: null as null | { code: string }, model: selection.model, platform: process.platform as string,
     permissionModes: ['full', 'auto', 'accept-edits'], permissionCeiling: 'full', hostPermissionCeiling: 'full',
     nativePermission: selection.policy.permissions === 'accept_edits' ? 'accept-edits' : selection.policy.permissions,
-    hostId: 'host_primary', lostResponse: false, held: false, entered: 0 };
+    hostId: 'host_primary', requiredConfiguration: undefined as Parameters<BbPluginApi['agents']['configureRequired']>[0] | undefined, dispatchHook: undefined as ((context:any)=>any)|undefined, tools: [] as Parameters<BbPluginApi['agents']['registerTool']>[0][], rechecks: 0, lostResponse: false, held: false, entered: 0 };
   const mutate = async (kind: string, input: Record<string, unknown>) => {
     state.entered++; calls.push({ kind, input });
     if (kind === 'spawn') state.metadata = input.pluginMetadata as Record<string, string>;
@@ -25,7 +25,7 @@ export function nativeFixture(journal: Journal, selection: ReturnType<typeof fix
     });
     if (state.lostResponse) throw new Error('response lost after native acceptance');
   };
-  const bb = { pluginId: 'openbot-test', sdk: {
+  const bb = { pluginId: 'openbot-test', agents: { nativeToolOriginVersion: 1, registerTool: (tool: Parameters<BbPluginApi['agents']['registerTool']>[0]) => {state.tools.push(tool);}, configureRequired: (provider: Parameters<BbPluginApi['agents']['configureRequired']>[0]) => {state.requiredConfiguration=provider;} }, experimental_hooks: { on: (_name: string, handler: (context:any)=>any) => {state.dispatchHook=handler;}, recheck: async () => {state.rechecks++;} }, sdk: {
     system: { config: async () => ({ primaryHostId: state.hostId }),
       executionOptions: async () => ({ permissionCeiling: state.permissionCeiling, modelLoadError: state.providerError,
         models: [{ model: state.model, supportedReasoningEfforts: [{ reasoningEffort: 'low' }], defaultReasoningEffort: 'low' }] }) },
@@ -47,6 +47,6 @@ export function nativeFixture(journal: Journal, selection: ReturnType<typeof fix
         const selected = state.events.filter(event => event.seq > Number(input.afterSeq ?? 0));
         return (input.order === 'desc' ? selected.reverse() : selected).slice(0, Number(input.limit));
       } }, interactions: { list: async () => state.interactions } },
-  } } as unknown as Pick<BbPluginApi, 'sdk' | 'pluginId'>;
+  } } as unknown as Pick<BbPluginApi, 'sdk' | 'pluginId' | 'agents' | 'experimental_hooks'>;
   return { bb, state, calls, sdk: new CloudroomSdk(bb, journal, () => [selection.project_id]) };
 }

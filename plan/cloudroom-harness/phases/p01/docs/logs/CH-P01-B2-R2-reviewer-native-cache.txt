@@ -1,0 +1,21 @@
+✔ native immutable cache preserves namespaced YAML, exact assets, modes and tree hashes, and checks server authority on every hit (72.459125ms)
+✔ native cache bytes refuses without reconstructing a mapped bundle (28.690292ms)
+✔ native cache mode refuses without reconstructing a mapped bundle (26.791208ms)
+✔ native cache symlink refuses without reconstructing a mapped bundle (26.294333ms)
+✔ native cache missing refuses without reconstructing a mapped bundle (28.534083ms)
+✔ native cache capacity refuses before writes and the download/materialization slot is bounded (4.039333ms)
+✔ configured spawn holds before positive mapping, durably binds its receipt, then rechecks and supplies full required configuration (33.483417ms)
+✔ configured lost spawn receipt never recovers authority from editable metadata or repeats a spawn (26.997625ms)
+✔ native cache cancellation joins owned writes without publishing a partial bundle (2.887ms)
+✔ native cache keeps command and session references through acknowledgement and retires only the confirmed unchanged mapping (38.611542ms)
+✔ native cache abort during materialization removes its owned temporary directory before returning (13.406333ms)
+✔ native cache inventory rejects unexpected bytes in another bundle before admitting new materialization (26.811916ms)
+✔ native handoff rejects case-colliding directory components before writes and preserves identical repeated parents (25.715584ms)
+ℹ tests 13
+ℹ suites 0
+ℹ pass 13
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 478.355334

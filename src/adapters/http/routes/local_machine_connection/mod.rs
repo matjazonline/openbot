@@ -1,6 +1,8 @@
 //! Outbound-only peer transport. TaskTracker owns and joins accepted upgrades and the expiry loop.
+mod bundles;
 mod driver;
 mod framing;
+mod mcp;
 
 use crate::{
     app_error::{AppError, AppResult},
@@ -12,7 +14,7 @@ use axum::{
     extract::{FromRef, State, WebSocketUpgrade, ws::WebSocket},
     http::{HeaderMap, StatusCode},
     response::{IntoResponse, Response},
-    routing::get,
+    routing::{get, post},
 };
 use futures::SinkExt;
 use std::sync::{Arc, Mutex};
@@ -31,6 +33,7 @@ pub struct LocalMachineConnections {
     shutdown: CancellationToken,
     tasks: TaskTracker,
     slots: Arc<Semaphore>,
+    bundle_slots: Arc<Semaphore>,
     closing: Mutex<bool>,
     #[cfg(test)]
     command_write_gate: Option<Arc<tests::CommandWriteGate>>,
@@ -43,6 +46,7 @@ impl LocalMachineConnections {
             shutdown: CancellationToken::new(),
             tasks: TaskTracker::new(),
             slots: Arc::new(Semaphore::new(MAX_CONNECTIONS)),
+            bundle_slots: Arc::new(Semaphore::new(8)),
             closing: Mutex::new(false),
             #[cfg(test)]
             command_write_gate: None,
@@ -58,6 +62,21 @@ impl LocalMachineConnections {
                     _=tick.tick()=>{
                         let result=tokio::select! {biased; _=stop.cancelled()=>break, result=store.expire_operations(100)=>result};
                         if result.is_err() {tracing::warn!("local operation expiry check failed");}
+                    }
+                }
+            }
+        });
+        let stop = service.shutdown.clone();
+        let store = service.store.clone();
+        service.tasks.spawn(async move {
+            let mut tick=tokio::time::interval(Duration::from_secs(1));
+            tick.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+            loop {
+                tokio::select! {biased;
+                    _=stop.cancelled()=>break,
+                    _=tick.tick()=>{
+                        let result=tokio::select! {biased; _=stop.cancelled()=>break,result=store.sweep_native_mcp(16)=>result};
+                        if result.is_err() {tracing::warn!("native MCP workflow maintenance failed");}
                     }
                 }
             }
@@ -101,7 +120,16 @@ where
     S: Clone + Send + Sync + 'static,
     Arc<LocalMachineConnections>: FromRef<S>,
 {
-    Router::new().route("/v1/local-machines/connect", get(connect))
+    Router::new()
+        .route("/v1/local-machines/connect", get(connect))
+        .route(
+            "/v1/local-machines/operations/{operation}/bundle",
+            get(bundles::get),
+        )
+        .route(
+            "/v1/local-machines/operations/{operation}/mcp",
+            post(mcp::post),
+        )
 }
 
 fn one_header<'a>(headers: &'a HeaderMap, name: &str) -> AppResult<&'a str> {
@@ -128,13 +156,7 @@ async fn connect(
     let installation =
         InstallationId::try_from(one_header(&headers, "x-openbot-installation-id")?.to_owned())
             .map_err(|_| AppError::InvalidCredentials)?;
-    let authorization = one_header(&headers, "authorization")?;
-    let secret = authorization
-        .strip_prefix("Bearer ")
-        .filter(|v| v.len() == 64)
-        .ok_or(AppError::InvalidCredentials)?;
-    let credential =
-        MachineCredential::try_from(secret.to_owned()).map_err(|_| AppError::InvalidCredentials)?;
+    let credential = bundles::credential(&headers)?;
     let Some((permit, reservation)) = service.reserve() else {
         return Ok((
             StatusCode::SERVICE_UNAVAILABLE,

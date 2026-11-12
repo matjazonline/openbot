@@ -136,6 +136,7 @@ pub fn agents_page(company: &Company, agents: &[Agent]) -> String {
                       hx-params="not avatar_file"
                       data-after-request="reset-and-collapse" data-card="agent-form-card" data-toggle="agent-form-toggle"
                       data-keydown="block-enter">
+                    <input type="hidden" name="native_permissions" value="full">
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                             <label for="agent_name" class="block text-xs font-medium text-base-content/80 mb-1">Agent Name</label>
@@ -268,6 +269,7 @@ pub fn agent_edit_fragment(company: &Company, agent: &Agent) -> String {
         provider: agent.provider.as_deref().unwrap_or(""),
         model: agent.model.as_deref().unwrap_or(""),
         system_prompt: agent.system_prompt.as_deref().unwrap_or(""),
+        native_permissions: agent.native_permissions,
         description: agent.description.as_deref().unwrap_or(""),
         avatar_url: agent
             .avatar_url
@@ -337,6 +339,7 @@ pub fn agent_edit_fragment_draft(
             <form hx-put="/companies/{company_id}/agents/{agent_id}" hx-target="#agent-row-{agent_id}" hx-swap="outerHTML"
                   hx-params="not avatar_file" class="space-y-4">
                 <input type="hidden" name="expected_revision" value="{expected_revision}">
+                <input type="hidden" name="native_permissions" value="{native_permissions}">
                 {preserved}
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
@@ -380,6 +383,7 @@ pub fn agent_edit_fragment_draft(
         "##,
         agent_id = agent_id,
         company_id = company_id,
+        native_permissions = draft.native_permissions.as_str(),
         expected_revision = draft
             .expected_revision
             .unwrap_or(agent.draft_revision)

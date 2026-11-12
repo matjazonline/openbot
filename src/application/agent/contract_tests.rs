@@ -6,6 +6,7 @@ use uuid::Uuid;
 
 fn definition() -> ResolvedAgentDefinition {
     ResolvedAgentDefinition {
+        native_permissions: Default::default(),
         company_id: CompanyId::new(Uuid::new_v4()),
         agent_id: AgentId::new(Uuid::new_v4()),
         key: AgentKey::parse("assistant").unwrap(),

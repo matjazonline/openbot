@@ -1,6 +1,7 @@
 import type { BbPluginApi } from '@get-bb/plugin-sdk';
-import { Journal, RecoveryRequired, type CommandRecord } from './journal.js';
+import { Journal, RecoveryRequired, type CommandRecord, type SessionMapping } from './journal.js';
 import { catalogSchema, LIMITS, provider, reasoning, permissions, type Catalog, type Evidence, type Selection, type Refusal } from './protocol.js';
+import { NativeBundleCache, type BundleReader, type RequiredConfiguration } from './native-bundle.js';
 import { applyNativeEvents, type TurnUpdate } from './turns.js';
 
 type SDK = BbPluginApi['sdk'];
@@ -9,6 +10,7 @@ const nativeModes = ['accept-edits', 'auto', 'full'] as const;
 type NativePermission = typeof nativeModes[number];
 const nativePermission = (value: Selection['policy']['permissions']): NativePermission => value === 'accept_edits' ? 'accept-edits' : value;
 type LocalTarget = { hostId: string; permissionModes: Selection['policy']['permissions'][] };
+type RequiredContext = Parameters<Parameters<BbPluginApi['agents']['configureRequired']>[0]>[0];
 type ListedThread = Awaited<ReturnType<SDK['threads']['list']>>[number];
 export class PreflightRefusal extends Error {
   readonly reason: Refusal;
@@ -27,9 +29,43 @@ function stateUpdate(record: CommandRecord, evidence: Evidence): TurnUpdate {
 export class CloudroomSdk {
   readonly sdk: SDK; readonly pluginId: string; readonly journal: Journal;
   readonly health = new Map<string, ProviderHealth>();
+  private bundleReader: BundleReader | undefined;
+  private readonly nativeCache: NativeBundleCache;
+  private requiredRecheck: (()=>Promise<void>) | undefined;
+  private verifiedToolOrigins = false;
+  nativeConfigurationIssue: 'recovery_required' | undefined;
   private readonly projects: () => readonly string[];
   constructor(bb: Pick<BbPluginApi, 'sdk' | 'pluginId'>, journal: Journal, projects: () => readonly string[]) {
-    this.sdk = bb.sdk; this.pluginId = bb.pluginId; this.journal = journal; this.projects = projects;
+    this.sdk = bb.sdk; this.pluginId = bb.pluginId; this.journal = journal; this.projects = projects; this.nativeCache = new NativeBundleCache(journal);
+  }
+  setBundleReader(reader:BundleReader|undefined):void {this.bundleReader=reader;}
+  async mcpBundle(operation:string,mapping:SessionMapping,signal:AbortSignal) {
+    if(!this.bundleReader || !this.verifiedToolOrigins || mapping.harness.kind!=='agent' || mapping.selection.provider!=='claude-code')throw new RecoveryRequired();
+    return (await this.nativeCache.load(this.bundleReader,operation,mapping.harness,'required_configuration',signal)).bundle;
+  }
+  registerRequiredConfiguration(bb:Pick<BbPluginApi,'agents'|'experimental_hooks'>):void {
+    this.verifiedToolOrigins=bb.agents.nativeToolOriginVersion===1;
+    bb.agents.configureRequired(context=>this.requiredConfiguration(context));
+    bb.experimental_hooks.on('message.dispatch',context=>{
+      if(context.requiredAgentConfigurationOwner!==this.pluginId) return {action:'proceed'};
+      const mapping=this.journal.thread(context.thread.id);
+      if(!mapping) return {action:'wait',reason:'Waiting for the durable Openbot native session receipt'};
+      return mapping.harness.kind==='agent'?{action:'proceed'}:{action:'reject',message:'Openbot native configuration recovery is required'};
+    });
+    this.requiredRecheck=()=>bb.experimental_hooks.recheck('message.dispatch');
+  }
+  private async requiredConfiguration(context:RequiredContext):Promise<RequiredConfiguration> {
+    const mapping=this.journal.thread(context.thread.id);
+    if(!mapping || mapping.harness.kind!=='agent' || !this.bundleReader || mapping.hostId!==context.host.id
+      || mapping.selection.project_id!==context.project.id || mapping.selection.provider!==context.provider.id || mapping.selection.model!==context.provider.model) throw new RecoveryRequired();
+    const loaded=await this.nativeCache.load(this.bundleReader,mapping.operationId,mapping.harness,'required_configuration',context.signal);
+    if(loaded.bundle.tools.length && (!this.verifiedToolOrigins || mapping.selection.provider!=='claude-code')) throw new RecoveryRequired();
+    if(loaded.bundle.permissions!==mapping.selection.policy.permissions) throw new RecoveryRequired();
+    return loaded.configuration;
+  }
+  async cleanupNativeCache(signal:AbortSignal):Promise<void> {
+    try {await this.nativeCache.cleanup(signal);this.nativeConfigurationIssue=undefined;}
+    catch(error){if(signal.aborted)throw error;this.nativeConfigurationIssue='recovery_required';}
   }
   async localHost(signal: AbortSignal): Promise<string> {
     return (await this.localTarget(signal)).hostId;
@@ -137,6 +173,17 @@ export class CloudroomSdk {
       if (!workspace || (available && available.status !== 'available')) throw new PreflightRefusal('project_unavailable');
       environmentProvider = workspace.environmentProviderId ?? workspace.id;
     }
+    if(command.kind==='create' || command.kind==='send') {
+      const harness=command.kind==='create'?command.harness:this.journal.session(command.session_id)!.harness;
+      if(harness.kind==='agent') {
+        if(!this.bundleReader || !this.requiredRecheck) throw new PreflightRefusal('recovery_required');
+        const loaded=await this.nativeCache.load(this.bundleReader,record.operation.id,harness,command.kind==='create'?'admission':'required_configuration',signal);
+        if(loaded.bundle.tools.length && (!this.verifiedToolOrigins || selection.provider!=='claude-code')) throw new PreflightRefusal('provider_unavailable');
+        if(loaded.bundle.permissions!==selection.policy.permissions) throw new PreflightRefusal('permissions_unavailable');
+        if(command.kind==='send') this.journal.referenceOperation(command.session_id,record.operation.id);
+      }
+    }
+    record.hostId = hostId;
     return { selection, hostId, environmentProvider };
   }
   metadata(record: CommandRecord) {
@@ -148,13 +195,14 @@ export class CloudroomSdk {
   async mutate(record: CommandRecord, prepared: Prepared, signal: AbortSignal): Promise<void> {
     const command = record.operation.command;
     if (command.kind === 'create') {
-      const thread = await this.sdk.threads.spawn({ projectId: prepared.selection.project_id, executionTarget: 'local',
+      const thread = await this.sdk.threads.spawn({ ...(command.harness.kind==='agent'?{requiredAgentConfiguration:true}:{}), projectId: prepared.selection.project_id, executionTarget: 'local',
         providerId: prepared.selection.provider, model: prepared.selection.model, permissionMode: nativePermission(prepared.selection.policy.permissions), reasoningLevel: prepared.selection.policy.reasoning,
         environment: { type: 'provider', environmentProviderId: prepared.environmentProvider,
           machine: { type: 'existing', hostId: prepared.hostId }, inputs: {} },
         title: 'Openbot local session', prompt: record.sdkInput, pluginMetadata: this.metadata(record), signal });
       record.threadId = thread.id;
       this.journal.submission(record, prepared.selection, thread.status === 'pending' ? 'queued' : 'accepted');
+      if(command.harness.kind==='agent') await this.requiredRecheck!();
     } else if (command.kind === 'send') {
       const result = await this.sdk.threads.send({ threadId: command.thread_id, mode: 'queue-if-active', model: prepared.selection.model,
         permissionMode: nativePermission(prepared.selection.policy.permissions), reasoningLevel: prepared.selection.policy.reasoning, input: [{ type: 'text', text: record.sdkInput, mentions: [] }], signal });
@@ -180,6 +228,7 @@ export class CloudroomSdk {
   async recoverCreate(record: CommandRecord, signal: AbortSignal): Promise<boolean> {
     const command = record.operation.command;
     if (command.kind !== 'create' || record.threadId) return false;
+    if (command.harness.kind === 'agent') return false;
     const expected = this.metadata(record); const matches: ListedThread[] = [];
     for (let offset = 0; offset < 400; offset += 100) {
       const page = await this.sdk.threads.list({ projectId: command.selection.project_id, originPluginId: this.pluginId,

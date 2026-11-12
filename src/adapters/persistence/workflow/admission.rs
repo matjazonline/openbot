@@ -10,6 +10,17 @@ impl WorkflowAdmission for PostgresPersistence {
     #[tracing::instrument(skip_all, fields(company=%command.company_id().as_uuid(), run=%command.proposed_run_id().as_uuid(), correlation=%command.causality().correlation_id().as_uuid()))]
     async fn admit(&self, command: &PreparedAdmission) -> AppResult<AdmissionResult> {
         agent_history_sessions::check_manual(command)?;
+        let private: bool = sqlx::query_scalar(
+            "SELECT EXISTS(SELECT 1 FROM native_mcp_brokers WHERE company_id=$1 AND version_id=$2)",
+        )
+        .bind(command.company_id().as_uuid())
+        .bind(command.version_id().as_uuid())
+        .fetch_one(&self.pool)
+        .await?;
+        if private {
+            return Err(missing());
+        }
+
         let mut tx = self.pool.begin().await?;
         if command.admission_claim().is_some() {
             sqlx::query("SET LOCAL lock_timeout = '5s'")

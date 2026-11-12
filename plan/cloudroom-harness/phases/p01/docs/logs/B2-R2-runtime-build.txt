@@ -1,0 +1,106 @@
+Scope: all 97 workspace projects
+Lockfile is up to date, resolution step is skipped
+Already up to date
+ WARN  Failed to create bin at /private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/desktop/node_modules/.bin/room-cli. ENOENT: no such file or directory, open '/private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/packages/bb-app/dist/room-cli.js'
+ WARN  Failed to create bin at /private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/desktop/node_modules/.bin/bb-server. ENOENT: no such file or directory, open '/private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/packages/bb-app/dist/bb-server.js'
+ WARN  Failed to create bin at /private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/desktop/node_modules/.bin/bb-host-daemon. ENOENT: no such file or directory, open '/private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/packages/bb-app/dist/bb-host-daemon.js'
+ WARN  Failed to create bin at /private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/host-daemon/node_modules/.bin/bb-script-archive-codex-tmp-bb-sessions. ENOENT: no such file or directory, open '/private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/packages/scripts/dist/commands/archive-codex-tmp-bb-sessions.js'
+ WARN  Failed to create bin at /private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/host-daemon/node_modules/.bin/bb-script-request-dev-restart. ENOENT: no such file or directory, open '/private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/packages/scripts/dist/commands/request-dev-restart.js'
+ WARN  Failed to create bin at /private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/host-daemon/node_modules/.bin/bb-script-reset-bb-data. ENOENT: no such file or directory, open '/private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/packages/scripts/dist/commands/reset-bb-data.js'
+ WARN  Failed to create bin at /private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/host-daemon/node_modules/.bin/bb-script-run-cli. ENOENT: no such file or directory, open '/private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/packages/scripts/dist/commands/run-cli.js'
+ WARN  Failed to create bin at /private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/host-daemon/node_modules/.bin/bb-script-seed-perf-db. ENOENT: no such file or directory, open '/private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/packages/scripts/dist/commands/seed-perf-db.js'
+ WARN  Failed to create bin at /private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/host-daemon/node_modules/.bin/bb-script-run-host-daemon. ENOENT: no such file or directory, open '/private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/packages/scripts/dist/commands/run-host-daemon.js'
+ WARN  Failed to create bin at /private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/desktop/node_modules/.bin/bb-app. ENOENT: no such file or directory, open '/private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/packages/bb-app/dist/bb-app.js'
+ WARN  Failed to create bin at /private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/server/node_modules/.bin/bb-script-archive-codex-tmp-bb-sessions. ENOENT: no such file or directory, open '/private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/packages/scripts/dist/commands/archive-codex-tmp-bb-sessions.js'
+ WARN  Failed to create bin at /private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/server/node_modules/.bin/bb-script-request-dev-restart. ENOENT: no such file or directory, open '/private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/packages/scripts/dist/commands/request-dev-restart.js'
+ WARN  Failed to create bin at /private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/server/node_modules/.bin/bb-script-reset-bb-data. ENOENT: no such file or directory, open '/private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/packages/scripts/dist/commands/reset-bb-data.js'
+ WARN  Failed to create bin at /private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/server/node_modules/.bin/bb-script-run-host-daemon. ENOENT: no such file or directory, open '/private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/packages/scripts/dist/commands/run-host-daemon.js'
+ WARN  Failed to create bin at /private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/server/node_modules/.bin/bb-script-seed-perf-db. ENOENT: no such file or directory, open '/private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/packages/scripts/dist/commands/seed-perf-db.js'
+ WARN  Failed to create bin at /private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/server/node_modules/.bin/bb-script-run-cli. ENOENT: no such file or directory, open '/private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/packages/scripts/dist/commands/run-cli.js'
+
+. prepare$ turbo run generate:templates generate:plugin-scaffold generate generate:bb-official-marketplace --filter=@cloudroom/templates --filter=@cloudroom/plugin-build --filter=@cloudroom/server --output-logs=errors-only --summarize=false
+. prepare: • turbo 2.10.12
+. prepare:    • Packages in scope: @cloudroom/plugin-build, @cloudroom/server, @cloudroom/templates
+. prepare:    • Running generate:templates, generate:plugin-scaffold, generate, generate:bb-official-marketplace in 3 packages
+. prepare:    • Remote caching disabled
+. prepare:  Tasks:    4 successful, 4 total
+. prepare: Cached:    4 cached, 4 total
+. prepare:   Time:    109ms >>> FULL TURBO
+. prepare: Done
+ WARN  Failed to create bin at /private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/desktop/node_modules/.bin/bb-app. ENOENT: no such file or directory, open '/private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/desktop/node_modules/bb-app/dist/bb-app.js'
+ WARN  Failed to create bin at /private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/desktop/node_modules/.bin/room-cli. ENOENT: no such file or directory, open '/private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/desktop/node_modules/bb-app/dist/room-cli.js'
+ WARN  Failed to create bin at /private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/desktop/node_modules/.bin/bb-server. ENOENT: no such file or directory, open '/private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/desktop/node_modules/bb-app/dist/bb-server.js'
+ WARN  Failed to create bin at /private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/desktop/node_modules/.bin/bb-host-daemon. ENOENT: no such file or directory, open '/private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/desktop/node_modules/bb-app/dist/bb-host-daemon.js'
+ WARN  Failed to create bin at /private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/server/node_modules/.bin/bb-script-archive-codex-tmp-bb-sessions. ENOENT: no such file or directory, open '/private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/server/node_modules/@cloudroom/scripts/dist/commands/archive-codex-tmp-bb-sessions.js'
+ WARN  Failed to create bin at /private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/server/node_modules/.bin/bb-script-request-dev-restart. ENOENT: no such file or directory, open '/private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/server/node_modules/@cloudroom/scripts/dist/commands/request-dev-restart.js'
+ WARN  Failed to create bin at /private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/server/node_modules/.bin/bb-script-reset-bb-data. ENOENT: no such file or directory, open '/private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/server/node_modules/@cloudroom/scripts/dist/commands/reset-bb-data.js'
+ WARN  Failed to create bin at /private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/server/node_modules/.bin/bb-script-run-cli. ENOENT: no such file or directory, open '/private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/server/node_modules/@cloudroom/scripts/dist/commands/run-cli.js'
+ WARN  Failed to create bin at /private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/server/node_modules/.bin/bb-script-run-host-daemon. ENOENT: no such file or directory, open '/private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/server/node_modules/@cloudroom/scripts/dist/commands/run-host-daemon.js'
+ WARN  Failed to create bin at /private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/server/node_modules/.bin/bb-script-seed-perf-db. ENOENT: no such file or directory, open '/private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/server/node_modules/@cloudroom/scripts/dist/commands/seed-perf-db.js'
+ WARN  Failed to create bin at /private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/host-daemon/node_modules/.bin/bb-script-request-dev-restart. ENOENT: no such file or directory, open '/private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/host-daemon/node_modules/@cloudroom/scripts/dist/commands/request-dev-restart.js'
+ WARN  Failed to create bin at /private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/host-daemon/node_modules/.bin/bb-script-reset-bb-data. ENOENT: no such file or directory, open '/private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/host-daemon/node_modules/@cloudroom/scripts/dist/commands/reset-bb-data.js'
+ WARN  Failed to create bin at /private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/host-daemon/node_modules/.bin/bb-script-run-cli. ENOENT: no such file or directory, open '/private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/host-daemon/node_modules/@cloudroom/scripts/dist/commands/run-cli.js'
+ WARN  Failed to create bin at /private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/host-daemon/node_modules/.bin/bb-script-run-host-daemon. ENOENT: no such file or directory, open '/private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/host-daemon/node_modules/@cloudroom/scripts/dist/commands/run-host-daemon.js'
+ WARN  Failed to create bin at /private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/host-daemon/node_modules/.bin/bb-script-seed-perf-db. ENOENT: no such file or directory, open '/private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/host-daemon/node_modules/@cloudroom/scripts/dist/commands/seed-perf-db.js'
+ WARN  Failed to create bin at /private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/host-daemon/node_modules/.bin/bb-script-archive-codex-tmp-bb-sessions. ENOENT: no such file or directory, open '/private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/host-daemon/node_modules/@cloudroom/scripts/dist/commands/archive-codex-tmp-bb-sessions.js'
+Done in 5.1s using pnpm v10.34.9
+
+> @get-bb/plugin-sdk@0.6.50 build /private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/packages/plugin-sdk
+> node scripts/build-runtime.mjs
+
+Built 21 @get-bb/plugin-sdk runtime entries.
+
+> @get-bb/plugin-sdk@0.6.50 build:types /private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/packages/plugin-sdk
+> node scripts/build-bundled-dts.mjs
+
+Unchanged bundled-types/bb-plugin-sdk.d.ts
+Unchanged bundled-types/bb-plugin-sdk-provider-bridge.d.ts
+Unchanged bundled-types/bb-plugin-sdk-ai-services.d.ts
+Unchanged bundled-types/bb-plugin-sdk-provider-bridge-testing.d.ts
+Unchanged bundled-types/bb-plugin-sdk-provider-bridge-acp.d.ts
+Unchanged bundled-types/bb-plugin-sdk-environment-provider.d.ts
+Unchanged bundled-types/bb-plugin-sdk-machine-provider.d.ts
+Unchanged bundled-types/bb-plugin-sdk-app.d.ts
+Unchanged bundled-types/bb-plugin-sdk-host.d.ts
+Unchanged bundled-types/bb-plugin-sdk-internal-composer-customization-validation.d.ts
+Unchanged bundled-types/bb-plugin-sdk-internal-composer-handle.d.ts
+Unchanged bundled-types/bb-plugin-sdk-internal-composer-view.d.ts
+Unchanged bundled-types/bb-plugin-sdk-internal-file-navigation-validation.d.ts
+Unchanged bundled-types/bb-plugin-sdk-internal-command-guard.d.ts
+Unchanged bundled-types/bb-plugin-sdk-internal-host-policy.d.ts
+Unchanged bundled-types/bb-plugin-sdk-internal-plugin-app-collector.d.ts
+Unchanged bundled-types/bb-plugin-sdk-testing.d.ts
+Unchanged bundled-types/bb-plugin-sdk-testing-app.d.ts
+Unchanged bundled-types/bb-plugin-sdk-testing-host.d.ts
+
+> @cloudroom/server@0.0.1 build /private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/server
+> node ../../scripts/build-node-entry.mjs src/index.ts dist/index.js --clean-dist --external ./start-server.js --copy-dir ../../packages/db/drizzle dist/drizzle --copy-dir src/assets dist/assets && node --import tsx scripts/copy-builtin-skills.ts && node ../../scripts/build-node-entry.mjs src/start-server.ts dist/start-server.js && node ../../scripts/build-node-entry.mjs ../../packages/plugin-sdk/src/index.ts dist/plugin-sdk-runtime.js
+
+
+> @cloudroom/host-daemon@0.0.1 build /private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/host-daemon
+> node ../../scripts/build-node-entry.mjs src/index.ts dist/index.js --clean-dist --external ./start-host-daemon.js && node ../../scripts/build-node-entry.mjs src/start-host-daemon.ts dist/start-host-daemon.js && node ../../scripts/build-node-entry.mjs src/plugin-host-worker.ts dist/plugin-host-worker.js && node ./scripts/build-bundles.mjs
+
+daemon: 1449616 bytes
+provider bridge worker: 13026 bytes
+plugin host worker: 318200 bytes
+room-cli: 45504 bytes
+parcel watcher child: 2057 bytes
+
+> @cloudroom/cli@0.0.1 build /private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/cli
+> node ../../scripts/build-node-entry.mjs src/index.ts dist/index.js --clean-dist --split
+
+
+> @cloudroom/app@0.0.1 build /private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/app
+> node scripts/generate-pwa-icons.mjs && vite build --logLevel warn && node ../../scripts/precompress-app-dist.mjs dist
+
+
+ WARN  advancedChunks option is deprecated, please use codeSplitting instead.
+
+React Compiler cache: 1203 hits, 0 misses
+[plugin builtin:vite-reporter] 
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+precompressed 446 files (446 br, 446 gzip) in /private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/app/dist
+Prepared pinned Cloudroom runtime. Provider authentication and inference require separate smoke tests.

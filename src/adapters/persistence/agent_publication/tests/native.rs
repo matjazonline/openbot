@@ -62,3 +62,81 @@ async fn autonomous_agent_publication_native_result_cannot_reference_another_age
         }
     );
 }
+
+#[tokio::test]
+async fn autonomous_agent_native_permissions_round_trip_freeze_and_library_copy() {
+    use crate::domain::local_agents::LocalPermissions;
+    use crate::use_cases::agent::LibraryAgentCopyPersistence;
+    let f = Fixture::new().await;
+    let initial = AgentPersistence::get_by_id(&f.p, f.scope.agent.as_uuid())
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(initial.native_permissions, LocalPermissions::Full);
+    let mut frozen = None;
+    for mode in [
+        LocalPermissions::Auto,
+        LocalPermissions::AcceptEdits,
+        LocalPermissions::Full,
+    ] {
+        f.update(AgentWrite {
+            native_permissions: mode,
+            ..write()
+        })
+        .await;
+        let loaded = AgentPersistence::get_by_id(&f.p, f.scope.agent.as_uuid())
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(loaded.native_permissions, mode);
+        let publication =
+            f.p.publish_agent(f.request(mode.as_str()).await)
+                .await
+                .unwrap();
+        assert_eq!(publication.definition.native_permissions, mode);
+        let state = f.p.authoring_state(f.scope).await.unwrap();
+        assert_eq!(state.active.unwrap().native_permissions, mode);
+        if frozen.is_none() {
+            frozen = Some(publication);
+        }
+    }
+    assert_eq!(
+        frozen.unwrap().definition.native_permissions,
+        LocalPermissions::Auto
+    );
+    let library = AgentPersistence::create_library(
+        &f.p,
+        AgentWrite {
+            name: "Native library".into(),
+            slug: format!("native-library-{}", Uuid::new_v4().simple()),
+            native_permissions: LocalPermissions::AcceptEdits,
+            ..Default::default()
+        },
+    )
+    .await
+    .unwrap();
+    let copy =
+        f.p.create_agent_from_library(
+            f.scope.company.as_uuid(),
+            f.scope.actor,
+            library.id,
+            AgentWrite {
+                name: library.name.clone(),
+                slug: library.slug.clone(),
+                native_permissions: library.native_permissions,
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+    assert_eq!(copy.native_permissions, LocalPermissions::AcceptEdits);
+    let error = sqlx::query("UPDATE agents SET native_permissions='provider_default' WHERE id=$1")
+        .bind(copy.id)
+        .execute(f.p.pool())
+        .await
+        .unwrap_err();
+    assert_eq!(
+        error.as_database_error().unwrap().code().as_deref(),
+        Some("23514")
+    );
+}

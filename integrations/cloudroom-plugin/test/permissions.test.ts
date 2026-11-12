@@ -12,9 +12,9 @@ for (const mode of ['full', 'auto', 'accept_edits'] as const) {
     const n = nativeFixture(f.journal, f.selection);
     try {
       const command = kind === 'create'
-        ? { kind, session_id: randomUUID(), selection: f.selection, prompt: 'authorized fixture' }
+        ? { kind, harness: {kind:'unconfigured' as const}, session_id: randomUUID(), selection: f.selection, prompt: 'authorized fixture' }
         : send();
-      if (command.kind === 'send') f.journal.bindSession(command.session_id, command.thread_id, f.selection);
+      if (command.kind === 'send') f.journal.bindSession({sessionId:command.session_id,threadId:command.thread_id,selection:f.selection,harness:{kind:'unconfigured'},operationId:'00000000-0000-4000-8000-000000000001',hostId:null});
       await new Dispatcher(f.journal, n.sdk).process({ operation: operation(command), mode: 'dispatch' }, context);
       assert.equal(n.calls.length, 1);
       assert.equal(n.calls[0]!.input.permissionMode, mode === 'accept_edits' ? 'accept-edits' : mode);
@@ -23,7 +23,7 @@ for (const mode of ['full', 'auto', 'accept_edits'] as const) {
 }
 for (const boundary of ['provider', 'server', 'host', 'manual'] as const) {
   test(`unsupported full access at ${boundary} refuses before native intent`, async () => {
-    const f = fixture(); const command = send(); f.journal.bindSession(command.session_id, command.thread_id, f.selection);
+    const f = fixture(); const command = send(); f.journal.bindSession({sessionId:command.session_id,threadId:command.thread_id,selection:f.selection,harness:{kind:'unconfigured'},operationId:'00000000-0000-4000-8000-000000000001',hostId:null});
     const n = nativeFixture(f.journal, f.selection);
     if (boundary === 'provider') n.state.permissionModes = ['auto', 'accept-edits'];
     if (boundary === 'server') n.state.permissionCeiling = 'auto';

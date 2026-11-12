@@ -1,0 +1,18 @@
+
+> @cloudroom/server@0.0.1 typecheck /private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/server
+> tsc --noEmit
+
+../host-daemon/src/injected-skills.ts(10,33): error TS6059: File '/private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/host-daemon/src/command-discovery.ts' is not under 'rootDir' '/private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/server'. 'rootDir' is expected to contain all source files.
+  File is ECMAScript module because '/private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/host-daemon/package.json' has field "type" with value "module"
+../host-daemon/src/injected-skills.ts(11,35): error TS6059: File '/private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/host-daemon/src/fs-errors.ts' is not under 'rootDir' '/private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/server'. 'rootDir' is expected to contain all source files.
+  File is ECMAScript module because '/private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/host-daemon/package.json' has field "type" with value "module"
+../host-daemon/src/injected-skills.ts(12,33): error TS6059: File '/private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/host-daemon/src/serial-lane.ts' is not under 'rootDir' '/private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/server'. 'rootDir' is expected to contain all source files.
+  File is ECMAScript module because '/private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/host-daemon/package.json' has field "type" with value "module"
+../host-daemon/src/injected-skills.ts(13,37): error TS6059: File '/private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/host-daemon/src/skill-trees.ts' is not under 'rootDir' '/private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/server'. 'rootDir' is expected to contain all source files.
+  File is ECMAScript module because '/private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/host-daemon/package.json' has field "type" with value "module"
+test/internal/required-skill-trees.test.ts(10,95): error TS6059: File '/private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/host-daemon/src/injected-skills.ts' is not under 'rootDir' '/private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/server'. 'rootDir' is expected to contain all source files.
+  File is ECMAScript module because '/private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/host-daemon/package.json' has field "type" with value "module"
+test/internal/required-skill-trees.test.ts(101,106): error TS2353: Object literal may only specify known properties, and 'homeDir' does not exist in type 'StageInjectedSkillSourcesArgs'.
+/private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/server:
+ ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL  @cloudroom/server@0.0.1 typecheck: `tsc --noEmit`
+Exit status 1

@@ -1,0 +1,24 @@
+{
+  "case": "Definitive admission HTTP 400, cancel lookup HTTP 404, source terminal/acked/100 days old",
+  "actions": [
+    "call",
+    "cancel_invocation"
+  ],
+  "result": {
+    "isError": true,
+    "content": [
+      {
+        "type": "text",
+        "text": "Openbot refused this MCP request (400)"
+      }
+    ]
+  },
+  "removed": 0,
+  "intent": {
+    "state": "{\"installation\":\"286bf377-b522-4510-8c1d-bd175c30c5c7\",\"thread\":\"thr_owned\",\"request\":\"creq_A\",\"modelCall\":\"toolu_A\",\"operation\":\"507647ce-2208-4f70-88e3-215e17782af8\",\"session\":\"ae31a1db-0f3d-41e0-a389-6095bf4dccb6\",\"harness\":\"18d4c1bf13bba61445553f0583f47fadd117d3d4551215ab05b739bf54ebd3c0\",\"turn\":\"turn_A\",\"alias\":\"crm\",\"argumentDigest\":\"44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a\",\"deadline\":1794445606703,\"receipt\":null,\"resolved\":false}",
+    "resolved": 0
+  },
+  "commands": {
+    "n": 1
+  }
+}

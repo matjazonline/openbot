@@ -1,0 +1,32 @@
+✔ an explicit A descriptor keeps A ownership after B replaces the mapping pointer and cannot borrow a counter (17.852917ms)
+✔ exact acknowledged identity is required before creating an intent and duplicate request mappings refuse (5.024916ms)
+✔ physical SQLite reopen preserves immutable invocation, receipt and original absolute deadline (5.5465ms)
+✔ record and byte bounds refuse before a second admission while saved identity remains recoverable (32.421792ms)
+✔ unresolved effects pin exact source through collection; resolved collection refuses a later old callback (10.471542ms)
+✔ MCP native preflight refuses an older core before any provider mutation; instructions-only still launch (58.922167ms)
+✔ registered MCP proxy lists and describes the exact frozen contract without creating effect intents (29.332ms)
+✔ TLS proxy journals before POST, retries a lost response with the same owner, rotates credentials and holds through pending approval (16622.904041ms)
+✔ native abort cancels the immutable invocation even when the admission response was lost (26.233541ms)
+✔ MCP HTTPS transport refuses oversized replies, redirects, invalid metadata and an individual request deadline (72.476125ms)
+✔ native immutable cache preserves namespaced YAML, exact assets, modes and tree hashes, and checks server authority on every hit (59.435541ms)
+✔ native cache bytes refuses without reconstructing a mapped bundle (35.754875ms)
+✔ native cache mode refuses without reconstructing a mapped bundle (34.85425ms)
+✔ native cache symlink refuses without reconstructing a mapped bundle (27.099042ms)
+✔ native cache missing refuses without reconstructing a mapped bundle (29.526625ms)
+✔ native cache capacity refuses before writes and the download/materialization slot is bounded (3.528042ms)
+✔ configured spawn holds before positive mapping, durably binds its receipt, then rechecks and supplies full required configuration (31.45475ms)
+✔ configured lost spawn receipt never recovers authority from editable metadata or repeats a spawn (26.63875ms)
+✔ native cache cancellation joins owned writes without publishing a partial bundle (2.59025ms)
+✔ native cache keeps command and session references through acknowledgement and retires only the confirmed unchanged mapping (35.46425ms)
+✔ native cache abort during materialization removes its owned temporary directory before returning (12.191584ms)
+✔ native cache inventory rejects unexpected bytes in another bundle before admitting new materialization (26.642292ms)
+✔ native handoff rejects case-colliding directory components before writes and preserves identical repeated parents (24.225833ms)
+✔ MCP contracts retain exact schema bytes and reject substituted binding/source identities before cache writes (27.647375ms)
+ℹ tests 24
+ℹ suites 0
+ℹ pass 24
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 16900.808333

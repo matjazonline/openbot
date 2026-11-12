@@ -165,6 +165,23 @@ async fn skill_bundle_database_constraints_match_the_domain_and_refuse_direct_in
     let mut collision = valid.clone();
     collision["path"] = json!("SCRIPTS/RUN.py");
     cases.push(json!([valid.clone(), collision]));
+    let mut directory_case = valid.clone();
+    directory_case["path"] = json!("Scripts/another.py");
+    cases.push(json!([valid.clone(), directory_case]));
+    let mut same_parent = valid.clone();
+    same_parent["path"] = json!("scripts/another.py");
+    let repeated = json!([valid.clone(), same_parent]);
+    assert!(
+        validate_skill_files(&serde_json::from_value::<Vec<SkillFile>>(repeated.clone()).unwrap())
+            .is_ok()
+    );
+    assert!(
+        sqlx::query_scalar::<_, bool>("SELECT public.valid_skill_files($1)")
+            .bind(repeated)
+            .fetch_one(&pool)
+            .await
+            .unwrap()
+    );
     let mut parent = valid.clone();
     parent["path"] = json!("scripts");
     cases.push(json!([parent, valid]));

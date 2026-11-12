@@ -1,0 +1,19 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.34s
+     Running unittests src/lib.rs (/private/tmp/openbot-cloudroom-harness-t1gfnhz1/target/debug/deps/open_bots-6467f0b3ff334015)
+
+running 1 test
+native approval source after held wait: {"call_seconds":883.052564,"cancel":false,"live":true,"machine_seconds":39.194677,"machine_state":"enabled","operation_seconds":1776.064528,"outcome":null,"revision_live":true,"state":"waiting","stop":false,"turn":"running","waiting":"decision"}
+
+thread 'adapters::persistence::local_agents::management::tests::native_mcp_tests::native_tests::cloudroom_native_company_mcp_real_cli_plugin_pg_approval_worker_and_gateway' (48597598) panicked at src/adapters/persistence/local_agents/management/native_mcp_native_peer.rs:107:9:
+native fixture failed
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test adapters::persistence::local_agents::management::tests::native_mcp_tests::native_tests::cloudroom_native_company_mcp_real_cli_plugin_pg_approval_worker_and_gateway ... FAILED
+
+failures:
+
+failures:
+    adapters::persistence::local_agents::management::tests::native_mcp_tests::native_tests::cloudroom_native_company_mcp_real_cli_plugin_pg_approval_worker_and_gateway
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 4102 filtered out; finished in 38.68s
+
+error: test failed, to rerun pass `--lib`

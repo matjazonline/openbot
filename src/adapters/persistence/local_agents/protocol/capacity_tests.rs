@@ -88,6 +88,7 @@ async fn cloudroom_commands_capacity_sql_matches_command_kind_and_terminal_evide
     let commands = [
         c.send(),
         LocalCommand::Create {
+            harness: crate::domain::local_agents::NativeHarnessSelection::Unconfigured,
             session_id: c.session.id,
             selection: c.session.profile.selection.clone(),
             prompt: LocalPrompt::try_from("capacity matrix".to_owned()).unwrap(),

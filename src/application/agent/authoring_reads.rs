@@ -75,6 +75,7 @@ pub struct AgentActiveState {
     pub draft_revision: AgentDraftRevision,
     pub key: AgentKey,
     pub model: Option<ModelSettings>,
+    pub native_permissions: crate::domain::local_agents::LocalPermissions,
     pub tools: Vec<AgentToolState>,
     pub skills: Vec<AgentActiveSkill>,
 }

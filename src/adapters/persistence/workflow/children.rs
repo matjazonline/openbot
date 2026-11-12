@@ -353,6 +353,7 @@ async fn insert_child_on(
             rerun_of: None,
             // A simulation's child is a simulation too: it cannot send what its parent may not.
             delivery_policy: DeliveryPolicy::parse(&parent.delivery_policy)?,
+            native_mcp_call: None,
         },
     )
     .await?;

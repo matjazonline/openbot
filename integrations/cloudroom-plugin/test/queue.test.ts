@@ -9,7 +9,7 @@ const context = { signal: new AbortController().signal, canDispatch: () => true 
 
 for (const initial of ['idle', 'human', 'openbot'] as const) {
   test(`native ${initial} admission preserves prompt order, queue identity and separate originating turns`, async () => {
-    const f = fixture(); const command = send(); f.journal.bindSession(command.session_id, command.thread_id, f.selection);
+    const f = fixture(); const command = send(); f.journal.bindSession({sessionId:command.session_id,threadId:command.thread_id,selection:f.selection,harness:{kind:'unconfigured'},operationId:'00000000-0000-4000-8000-000000000001',hostId:null});
     const n = nativeQueueFixture(f); if (initial !== 'idle') n.preexisting(initial);
     const d = new Dispatcher(f.journal, n.sdk); const first = operation({ ...command, prompt: 'first local request' });
     const second = operation({ ...command, prompt: 'second local request' });
@@ -43,7 +43,7 @@ for (const initial of ['idle', 'human', 'openbot'] as const) {
 }
 for (const race of ['idle_to_busy', 'busy_to_idle'] as const) {
   test(`native queue ${race} race is decided at admission without steering or a second SDK call`, async () => {
-    const f = fixture(); const command = send(); f.journal.bindSession(command.session_id, command.thread_id, f.selection);
+    const f = fixture(); const command = send(); f.journal.bindSession({sessionId:command.session_id,threadId:command.thread_id,selection:f.selection,harness:{kind:'unconfigured'},operationId:'00000000-0000-4000-8000-000000000001',hostId:null});
     const n = nativeQueueFixture(f); if (race === 'busy_to_idle') n.preexisting('human');
     n.beforeSend(() => { if (race === 'idle_to_busy') n.preexisting('human'); else n.finish('human completed before send entry'); });
     const d = new Dispatcher(f.journal, n.sdk); const op = operation(command);
@@ -60,7 +60,7 @@ for (const race of ['idle_to_busy', 'busy_to_idle'] as const) {
   });
 }
 test('accepted native queue work survives lost SDK response and replay with one mutation and original order', async () => {
-  const f = fixture(); const command = send(); f.journal.bindSession(command.session_id, command.thread_id, f.selection);
+  const f = fixture(); const command = send(); f.journal.bindSession({sessionId:command.session_id,threadId:command.thread_id,selection:f.selection,harness:{kind:'unconfigured'},operationId:'00000000-0000-4000-8000-000000000001',hostId:null});
   const n = nativeQueueFixture(f); n.preexisting('human'); n.loseNextResponse(); const op = operation(command);
   try {
     const d = new Dispatcher(f.journal, n.sdk); await d.process({ operation: op, mode: 'dispatch' }, context);

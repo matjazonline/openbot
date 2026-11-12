@@ -1,0 +1,192 @@
+{
+  "version": 1,
+  "round": "CH-P01-B3-R4-final",
+  "artifact": "201d4cdf142829b5babd80119f52209a40f56438806045906e88ea393a2cfc6e",
+  "checks": [
+    {
+      "criteria": [
+        "M3-AC6"
+      ],
+      "command": "bash scripts/check.sh (entire final repository gate, including normal and stock2MiB suites)",
+      "fixture": "owned PG18port63451/current R4schema, Node24; isolated network; exact frozen source; see mappingR5 for inherited evidence/stand-in limits",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B3-final-full-gate-R4.txt",
+          "sha256": "93d0e28941d9e783e5fd18fdcb965f5b07eea60dec70c99eb7bdb76753645823"
+        },
+        {
+          "path": "logs/B3-R4-final-verification-summary.json",
+          "sha256": "6f62b87c85e31d8b55b6fb357f32f3f9c77f01852bbccafa1be9856aa1c973a9"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "CH-P01-B3-F7",
+        "M3-AC6"
+      ],
+      "command": "Doop observe and published-editor regression assertions within both actual complete normal and stock2MiB runs of bash scripts/check.sh",
+      "fixture": "owned PG18port63451/current R4schema, Node24; isolated network; exact frozen source; see mappingR5 for inherited evidence/stand-in limits",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B3-final-full-gate-R4.txt",
+          "sha256": "93d0e28941d9e783e5fd18fdcb965f5b07eea60dec70c99eb7bdb76753645823"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "M3-AC6"
+      ],
+      "command": "format/offlinealltargets/Clippy/migrations/SQLx/compile/source reachability/CSS/SSE/deploy gates within final scripts/check.sh",
+      "fixture": "owned PG18port63451/current R4schema, Node24; isolated network; exact frozen source; see mappingR5 for inherited evidence/stand-in limits",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B3-final-full-gate-R4.txt",
+          "sha256": "93d0e28941d9e783e5fd18fdcb965f5b07eea60dec70c99eb7bdb76753645823"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "M3-AC6"
+      ],
+      "command": "scripts/test-network-isolation.sh bash scripts/lease-budget.sh --offline (default filters/50% thresholds unchanged)",
+      "fixture": "owned PG18port63451/current R4schema, Node24; isolated network; exact frozen source; see mappingR5 for inherited evidence/stand-in limits",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B3-R4-lease-budget-R1.txt",
+          "sha256": "ffa8ebcd0f7943ad5c68b0c413f2e986daac6723ead34d37edf67202b56e49d5"
+        },
+        {
+          "path": "logs/B3-R4-lease-budget-record-R1.txt",
+          "sha256": "d5f52cea0508e11da5e6f41ac202352a23c6c2780bd89d120777b52a2359f238"
+        },
+        {
+          "path": "logs/B3-R4-lease-metrics-comparison.json",
+          "sha256": "260d1d0f8958c792f30966edef57200a98720ce08be5c640f8502c1cc2cd2942"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "M3-AC2",
+        "M3-AC3",
+        "M3-AC4",
+        "M3-AC5"
+      ],
+      "command": "cargo test --locked --offline --lib native_mcp_ -- --nocapture",
+      "fixture": "owned PG18port63451/current R4schema, Node24; isolated network; exact frozen source; see mappingR5 for inherited evidence/stand-in limits",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B3-R4-native-regressions-R1.txt",
+          "sha256": "49fe8d3d2a08e9c8c753ee3d210c291cf14cc49bcbdff63f205c36625f716b94"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "M3-AC6",
+        "CH-P01-B3-F7"
+      ],
+      "command": "cargo test --locked --offline --lib doop_agent_ -- --nocapture",
+      "fixture": "owned PG18port63451/current R4schema, Node24; isolated network; exact frozen source; see mappingR5 for inherited evidence/stand-in limits",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B3-R4-doop-agent-regressions-R1.txt",
+          "sha256": "1bc34fc5ca5de07855f9215adadba062bc3122db09de394b2fc749e5454fe10b"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "M3-AC3",
+        "M3-AC4",
+        "M3-AC5"
+      ],
+      "command": "actual pinned CLI/loaded plugin/HTTPS/PG/protected approval/normal worker/gateway65.1s held source proof",
+      "fixture": "owned PG18port63451/current R4schema, Node24; isolated network; exact frozen source; see mappingR5 for inherited evidence/stand-in limits",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B3-R4-native-company-long.txt",
+          "sha256": "4bc730acc49f2504b08b9be674ee555779da4524d21f340ba52a16805d2998ca"
+        },
+        {
+          "path": "logs/B3-R4-native-company-long.native.txt",
+          "sha256": "ac8ad93d4b4b22a71f89c3b3631cc03a92f20df1e05d52d53534e5761724688d"
+        },
+        {
+          "path": "logs/B3-R4-native-company-long.proof.json",
+          "sha256": "a772cba70ba66ff03c70f6c88867b09f91990143cb4bfc147ff4427f5636fd63"
+        },
+        {
+          "path": "logs/B3-R4-native-company-long.sql-liveness.txt",
+          "sha256": "a26d3efaf8b35ba4f0c268479e2a9d6386efbd41e8b3f9ca4fea88bcf0b00f76"
+        },
+        {
+          "path": "logs/B3-R4-native-company-long.audit-summary.json",
+          "sha256": "41ac687158862f054b3461e2de7b5abd3edf29780d2ccd55315c0a70859a5662"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "M3-AC6"
+      ],
+      "command": "unchanged coreR5/runtime/SDK and reproducible production packageR6/install/import evidence (no Node/source changes in R4)",
+      "fixture": "owned PG18port63451/current R4schema, Node24; isolated network; exact frozen source; see mappingR5 for inherited evidence/stand-in limits",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B3-final-replay-identity-R5.json",
+          "sha256": "3254211c1166b383e776822e1c1778e3a87d18ecb996fcd12ce680e9e898a5a4"
+        },
+        {
+          "path": "logs/B3-R3-package-R6.txt",
+          "sha256": "6177296971f3cd03ff1217e5afebf3f99098cab415cf9da12ad083f043dace20"
+        },
+        {
+          "path": "logs/B3-R3-production-install-R6.txt",
+          "sha256": "7d07e9accd9f93f4e87ebdc1cd24b6a8157f9916aa3408fe2745a908b71e1ec5"
+        },
+        {
+          "path": "logs/B3-R3-production-load-R6.txt",
+          "sha256": "ec266a2bd46db527c3a9e90dc2d5269a2fb10058c43d1d2b52704d458bd2510b"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "M3-AC6"
+      ],
+      "command": "baseline reproduction and unchanged-source comparisons establishing separate unrelated CSP/MCP/transport failures",
+      "fixture": "owned PG18port63451/current R4schema, Node24; isolated network; exact frozen source; see mappingR5 for inherited evidence/stand-in limits",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B3-baseline-full-suite.txt",
+          "sha256": "f3cf2d0a5f092a0567adb7c3aeb62625d3ffe34f060e529d8ed8543d6bdc5e02"
+        },
+        {
+          "path": "logs/B3-baseline-full-result.json",
+          "sha256": "750f32fa2faecaa9dfa29ee1b7782e74bfd732ed99d9d987f51ca59d35eb808e"
+        },
+        {
+          "path": "logs/B3-baseline-fixture-identity-R2.json",
+          "sha256": "959f65f2b44979ca577dbea591261f9b11cbd891e0990b97ee0922c41a1d08e0"
+        },
+        {
+          "path": "logs/B3-baseline-transport.json",
+          "sha256": "99e30620618df2563bc3499dbd05bc80a20f61e732c84e662383bfce5f2586da"
+        }
+      ]
+    }
+  ]
+}

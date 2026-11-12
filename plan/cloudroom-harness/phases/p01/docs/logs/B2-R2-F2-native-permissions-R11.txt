@@ -1,0 +1,21 @@
+
+ RUN  v4.1.1 /private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/tests/integration
+
+ ❯ |@cloudroom/required-native-permissions| real/required-native-permissions.test.ts (1 test | 1 failed) 49613ms
+   × managed native spawn and send retain lower permissions, wait on a real approval and continue only after resolution 49612ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@cloudroom/required-native-permissions| real/required-native-permissions.test.ts > managed native spawn and send retain lower permissions, wait on a real approval and continue only after resolution
+AssertionError: actual native permission request must reach the persisted interaction path: expected undefined to be defined
+ ❯ real/required-native-permissions.test.ts:80:100
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed (1)
+   Start at  19:23:36
+   Duration  53.04s (transform 2.39s, setup 0ms, import 3.34s, tests 49.61s, environment 0ms)
+

@@ -17,6 +17,7 @@ pub struct Agent {
     pub provider: Option<String>,
     pub model: Option<String>,
     pub system_prompt: Option<String>,
+    pub native_permissions: crate::domain::local_agents::LocalPermissions,
     /// A short statement of what this agent is for, shown to other agents in the same company by
     /// the agent directory tool. Not part of the prompt.
     pub description: Option<String>,

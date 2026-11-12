@@ -1,0 +1,17 @@
+
+> @cloudroom/server@0.0.1 typecheck /private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/server
+> tsc --noEmit
+
+../host-daemon/src/connect-tunnel/index.ts(1,44): error TS7016: Could not find a declaration file for module 'ws'. '/private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/node_modules/.pnpm/ws@8.21.0/node_modules/ws/wrapper.mjs' implicitly has an 'any' type.
+  If the 'ws' package actually exposes this module, consider sending a pull request to amend 'https://github.com/DefinitelyTyped/DefinitelyTyped/tree/master/types/ws'
+../host-daemon/src/connect-tunnel/index.ts(379,39): error TS7006: Parameter '_request' implicitly has an 'any' type.
+../host-daemon/src/connect-tunnel/index.ts(379,49): error TS7006: Parameter 'response' implicitly has an 'any' type.
+../host-daemon/src/desktop-browser-broker.ts(5,44): error TS7016: Could not find a declaration file for module 'ws'. '/private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/node_modules/.pnpm/ws@8.21.0/node_modules/ws/wrapper.mjs' implicitly has an 'any' type.
+  If the 'ws' package actually exposes this module, consider sending a pull request to amend 'https://github.com/DefinitelyTyped/DefinitelyTyped/tree/master/types/ws'
+../host-daemon/src/desktop-browser-broker.ts(104,59): error TS7006: Parameter 'websocket' implicitly has an 'any' type.
+../host-daemon/src/websocket-constructor.ts(1,44): error TS7016: Could not find a declaration file for module 'ws'. '/private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/node_modules/.pnpm/ws@8.21.0/node_modules/ws/wrapper.mjs' implicitly has an 'any' type.
+  If the 'ws' package actually exposes this module, consider sending a pull request to amend 'https://github.com/DefinitelyTyped/DefinitelyTyped/tree/master/types/ws'
+../../tests/integration/helpers/harness.ts(1,37): error TS2307: Cannot find module '@cloudroom/config' or its corresponding type declarations.
+/private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/server:
+ ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL  @cloudroom/server@0.0.1 typecheck: `tsc --noEmit`
+Exit status 1

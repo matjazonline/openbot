@@ -1,0 +1,80 @@
+{
+  "prior_total": 19460110,
+  "manual_inline": [
+    619,
+    3349,
+    2179,
+    1703,
+    1541,
+    11742,
+    1275,
+    1766
+  ],
+  "retained_calls": [
+    {
+      "file": "B3-R2-F1-failure-inspection-graft.txt",
+      "tokens": 45256
+    },
+    {
+      "file": "B3-R2-F1-engine-test-callers.txt",
+      "tokens": 104793
+    },
+    {
+      "file": "B3-R2-F4-tool-call-timeout-graft.txt",
+      "tokens": 54920
+    },
+    {
+      "file": "B3-R2-F4-server-client-api.txt",
+      "tokens": 4177
+    },
+    {
+      "file": "B3-R2-F4-plugin-tool-callers.txt",
+      "tokens": 980
+    },
+    {
+      "file": "B3-R2-F4-plugin-wrapper-source.txt",
+      "tokens": 36054
+    },
+    {
+      "file": "B3-R2-F4-daemon-timeouts.txt",
+      "tokens": 101030
+    },
+    {
+      "file": "B3-R2-F4-tool-call-endpoint-graft.txt",
+      "tokens": 50532
+    },
+    {
+      "file": "B3-R2-F4-server-client-callers.txt",
+      "tokens": 72557
+    },
+    {
+      "file": "B3-R2-F4-plugin-invoke-source.txt",
+      "tokens": 21822
+    },
+    {
+      "file": "B3-R2-F1-auth-test-callers.txt",
+      "tokens": 14446
+    },
+    {
+      "file": "B3-R2-F3-exhaustive-error-consumers.txt",
+      "tokens": 21945
+    },
+    {
+      "file": "B3-R2-F4-tool-timeout-constants.txt",
+      "tokens": 3448
+    },
+    {
+      "file": "B3-R2-JEV-server-test-callers.txt",
+      "tokens": 24437
+    },
+    {
+      "file": "B3-R2-F4-tool-stream-callers.txt",
+      "tokens": 774
+    },
+    {
+      "file": "B3-R2-JEV-supervise-callers.txt",
+      "tokens": 4684
+    }
+  ],
+  "new_total": 20046139
+}

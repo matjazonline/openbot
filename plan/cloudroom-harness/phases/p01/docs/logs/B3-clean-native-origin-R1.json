@@ -1,0 +1,34 @@
+{
+  "status": "PASS",
+  "rows": [
+    {
+      "phase": 1,
+      "nativeInvocation": {
+        "clientRequestId": "creq_rpz9tyz7cx",
+        "callId": "toolu_origin_1"
+      },
+      "threadId": "thr_uesdmbj2gq",
+      "projectId": "proj_x44fmqv2v9",
+      "frozen": true,
+      "claimedOrigin": {
+        "clientRequestId": "forged_request",
+        "callId": "forged_call"
+      }
+    },
+    {
+      "phase": 2,
+      "nativeInvocation": {
+        "clientRequestId": "creq_hafuaavxve",
+        "callId": "toolu_origin_2"
+      },
+      "threadId": "thr_uesdmbj2gq",
+      "projectId": "proj_x44fmqv2v9",
+      "frozen": true,
+      "claimedOrigin": {
+        "clientRequestId": "forged_request",
+        "callId": "forged_call"
+      }
+    }
+  ],
+  "limitations": "Actual pinned native SDK/provider/daemon/public plugin context; local scripted Messages/dummy key, no model reasoning or paid inference."
+}

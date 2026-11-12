@@ -1,0 +1,21 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.75s
+     Running unittests src/lib.rs (/private/tmp/openbot-cloudroom-harness-t1gfnhz1/target/debug/deps/open_bots-6467f0b3ff334015)
+
+running 14 tests
+test adapters::http::routes::ui_agents::authoring::browser_fixtures::dump_autonomous_agent_authoring_browser_fixtures ... ignored, exports native authoring responses for the browser gate
+test adapters::http::routes::ui_agents::authoring::security_tests::autonomous_agent_authoring_every_publication_write_refuses_cross_origin_cookie_posts ... ok
+test adapters::http::routes::ui_agents::form_tests::a_native_urlencoded_submission_builds_the_write ... ok
+test adapters::http::routes::ui_agents::authoring::security_tests::autonomous_agent_authoring_routes_mount_in_the_authenticated_application_router ... ok
+test adapters::http::routes::ui_agents::authoring::catalog::tests::autonomous_agent_authoring_catalog_builtin_choices_do_not_offer_builder_or_slots ... ok
+test adapters::http::routes::ui_agents::authoring::publication::tests::autonomous_agent_authoring_malformed_skill_csv_keeps_input_and_does_not_clear_assignments ... ok
+test adapters::http::routes::ui_agents::authoring::publication::tests::autonomous_agent_authoring_failed_publication_retains_original_request_and_does_not_save_editor ... ok
+test adapters::http::routes::ui_agents::authoring::publication::tests::autonomous_agent_authoring_preview_publish_replay_and_deactivation_omit_canonical_payloads ... ok
+test adapters::http::routes::ui_agents::authoring::publication::tests::autonomous_agent_authoring_missing_skill_tool_fails_shared_preview_without_changing_active ... ok
+test adapters::http::routes::ui_agents::authoring::publication::tests::autonomous_agent_authoring_form_preserves_stale_input_tools_and_expected_revision ... ok
+test adapters::http::routes::ui_agents::authoring::publication::tests::autonomous_agent_authoring_skill_order_survives_classic_metadata_save_and_stale_rejection ... ok
+test adapters::http::routes::ui_agents::authoring::catalog::tests::autonomous_agent_authoring_catalog_connection_pages_are_scoped_bounded_and_complete ... ok
+test adapters::http::routes::ui_agents::authoring::publication::tests::autonomous_agent_authoring_skill_revocation_form_uses_exact_assignment_and_safe_panel ... ok
+test adapters::http::routes::ui_agents::authoring::publication::tests::autonomous_agent_authoring_exact_binding_revoke_and_foreign_mutation_refusal ... ok
+
+test result: ok. 13 passed; 0 failed; 1 ignored; 0 measured; 4050 filtered out; finished in 0.58s
+

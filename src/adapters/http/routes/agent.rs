@@ -70,6 +70,7 @@ pub struct AgentForm {
     pub provider: Option<String>,
     pub model: Option<String>,
     pub system_prompt: Option<String>,
+    pub native_permissions: crate::domain::local_agents::LocalPermissions,
     /// Short statement of what this agent is for, shown to sibling agents by the directory tool.
     pub description: Option<String>,
     #[serde(default)]
@@ -188,6 +189,7 @@ pub struct AgentJsonPayload {
     pub provider: Option<String>,
     pub model: Option<String>,
     pub system_prompt: Option<String>,
+    pub native_permissions: crate::domain::local_agents::LocalPermissions,
     /// Short statement of what this agent is for, shown to sibling agents by the directory tool.
     pub description: Option<String>,
     #[serde(default)]
@@ -336,6 +338,7 @@ async fn create_agent_handler(
                     provider: form.provider.clone(),
                     model: form.model.clone(),
                     system_prompt: form.system_prompt.clone(),
+                    native_permissions: form.native_permissions,
                     description: form.description.clone(),
                     skill_ids: capabilities.skill_ids,
                     avatar_url,
@@ -545,6 +548,7 @@ async fn create_agent_json(
                 provider: payload.provider.clone(),
                 model: payload.model.clone(),
                 system_prompt: payload.system_prompt.clone(),
+                native_permissions: payload.native_permissions,
                 description: payload.description.clone(),
                 skill_ids: payload.skill_ids.clone().unwrap_or_default(),
                 avatar_url,
@@ -620,6 +624,7 @@ pub(super) async fn update_agent_json(
                     provider: payload.provider.clone(),
                     model: payload.model.clone(),
                     system_prompt: payload.system_prompt.clone(),
+                    native_permissions: payload.native_permissions,
                     description: payload.description.clone(),
                     skill_ids: payload.skill_ids.clone().unwrap_or_default(),
                     avatar_url,
@@ -781,7 +786,9 @@ mod tests {
 
         let request = Request::post("/ui/agents")
             .header("content-type", "application/x-www-form-urlencoded")
-            .body(axum::body::Body::from("name=Support&skill_ids="))
+            .body(axum::body::Body::from(
+                "name=Support&skill_ids=&native_permissions=full",
+            ))
             .unwrap();
         let Form(form) = Form::<AgentForm>::from_request(request, &())
             .await
@@ -799,6 +806,7 @@ mod tests {
             "provider": null,
             "model": null,
             "system_prompt": "Help",
+            "native_permissions": "accept_edits",
             "description": "Answers support mail",
             "avatar_url": null,
             "skill_ids": [skill_id]
@@ -821,6 +829,7 @@ mod tests {
         };
 
         let agent = Agent {
+            native_permissions: Default::default(),
             draft_revision: crate::entities::agent_capability::AgentDraftRevision::new(1).unwrap(),
             id: Uuid::new_v4(),
             company_id: Some(company.id),
@@ -892,14 +901,15 @@ mod harness_payload_tests {
             "response_contract",
             "sub_agent_ids",
         ] {
-            let mut value = serde_json::json!({"name":"test","slug":"test"});
+            let mut value =
+                serde_json::json!({"name":"test","slug":"test","native_permissions":"full"});
             value[retired] = serde_json::json!(null);
             assert!(
                 serde_json::from_value::<AgentJsonPayload>(value).is_err(),
                 "{retired}"
             );
         }
-        assert!(serde_json::from_value::<AgentJsonPayload>(serde_json::json!({"name":"test","slug":"test","mcp_connections":[{"endpoint_url":"https://example.com","token":"secret"}]})).is_err());
+        assert!(serde_json::from_value::<AgentJsonPayload>(serde_json::json!({"name":"test","slug":"test","native_permissions":"full","mcp_connections":[{"endpoint_url":"https://example.com","token":"secret"}]})).is_err());
     }
 }
 

@@ -308,7 +308,7 @@ impl WorkflowReads for PostgresPersistence {
             None => None,
             Some(after) => Some(
                 sqlx::query_as(
-                    "SELECT title, id FROM workflow_definitions WHERE company_id = $1 AND id = $2",
+                    "SELECT title, id FROM workflow_definitions WHERE company_id = $1 AND id = $2 AND NOT EXISTS(SELECT 1 FROM native_mcp_brokers AS broker WHERE broker.company_id=workflow_definitions.company_id AND broker.workflow_id=workflow_definitions.id)",
                 )
                 .bind(company.as_uuid())
                 .bind(after)
@@ -319,7 +319,7 @@ impl WorkflowReads for PostgresPersistence {
         };
         let rows = sqlx::query_as::<_, DefinitionRow>(
             "SELECT id, revision, title, archived, template_origin FROM workflow_definitions \
-             WHERE company_id = $1 AND ($2::text IS NULL OR (title, id) > ($2, $3)) \
+             WHERE company_id = $1 AND NOT EXISTS(SELECT 1 FROM native_mcp_brokers AS broker WHERE broker.company_id=workflow_definitions.company_id AND broker.workflow_id=workflow_definitions.id) AND ($2::text IS NULL OR (title, id) > ($2, $3)) \
              ORDER BY title, id LIMIT $4",
         )
         .bind(company.as_uuid())
@@ -341,7 +341,7 @@ impl WorkflowReads for PostgresPersistence {
     ) -> AppResult<Option<DefinitionDetail>> {
         let row: Option<(Uuid, i64, String, bool, Option<Value>, String, String)> = sqlx::query_as(
             "SELECT id, revision, title, archived, template_origin, description, source \
-                 FROM workflow_definitions WHERE company_id = $1 AND id = $2",
+                 FROM workflow_definitions WHERE company_id = $1 AND id = $2 AND NOT EXISTS(SELECT 1 FROM native_mcp_brokers AS broker WHERE broker.company_id=workflow_definitions.company_id AND broker.workflow_id=workflow_definitions.id)",
         )
         .bind(company.as_uuid())
         .bind(workflow.as_uuid())
@@ -386,7 +386,7 @@ impl WorkflowReads for PostgresPersistence {
     ) -> AppResult<Page<BindingSummary>> {
         let rows = sqlx::query_as::<_, BindingRow>(&format!(
             "SELECT {BINDING_COLUMNS} {BINDING_FROM} WHERE binding.company_id = $1 \
-             AND ($2::uuid IS NULL OR binding.id > $2) ORDER BY binding.id LIMIT $3"
+             AND NOT EXISTS(SELECT 1 FROM native_mcp_brokers AS broker WHERE broker.company_id=binding.company_id AND broker.workflow_binding_id=binding.id) AND ($2::uuid IS NULL OR binding.id > $2) ORDER BY binding.id LIMIT $3"
         ))
         .bind(company.as_uuid())
         .bind(page.after)
@@ -405,7 +405,7 @@ impl WorkflowReads for PostgresPersistence {
         binding: WorkflowBindingId,
     ) -> AppResult<Option<BindingSummary>> {
         sqlx::query_as::<_, BindingRow>(&format!(
-            "SELECT {BINDING_COLUMNS} {BINDING_FROM} WHERE binding.company_id = $1 AND binding.id = $2"
+            "SELECT {BINDING_COLUMNS} {BINDING_FROM} WHERE binding.company_id = $1 AND binding.id = $2 AND NOT EXISTS(SELECT 1 FROM native_mcp_brokers AS broker WHERE broker.company_id=binding.company_id AND broker.workflow_binding_id=binding.id)"
         ))
         .bind(company.as_uuid())
         .bind(binding.as_uuid())

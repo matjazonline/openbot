@@ -19,6 +19,7 @@ impl IntoResponse for AppError {
             AppError::McpAuthentication => "mcp_authentication",
             AppError::ServiceUnavailable(_) => "service_unavailable",
             AppError::BadRequest(_) => "bad_request",
+            AppError::NativeMcpNotAdmitted => "native_mcp_not_admitted",
             AppError::NotFound(_) => "not_found",
             AppError::Forbidden(_) => "forbidden",
             AppError::Conflict(_) => "conflict",
@@ -63,6 +64,11 @@ impl IntoResponse for AppError {
             )
                 .into_response(),
             AppError::BadRequest(message) => (StatusCode::BAD_REQUEST, message).into_response(),
+            AppError::NativeMcpNotAdmitted => (
+                StatusCode::BAD_REQUEST,
+                [("x-openbot-mcp-not-admitted", "invalid_arguments"), ("cache-control", "private, no-store")],
+                "Native MCP arguments failed pre-admission validation",
+            ).into_response(),
             AppError::NotFound(message) => (StatusCode::NOT_FOUND, message).into_response(),
             AppError::Forbidden(message) => (StatusCode::FORBIDDEN, message).into_response(),
             AppError::Conflict(message) | AppError::Superseded(message) => {

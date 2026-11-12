@@ -1,0 +1,1 @@
+integration boundary: production custody, DTO dependencies, nonserializable private results PASS

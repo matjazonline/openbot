@@ -3520,6 +3520,7 @@ CREATE TABLE public.agents (
     provider text,
     model text,
     system_prompt text,
+    native_permissions text NOT NULL DEFAULT 'full' CHECK (native_permissions IN ('full','auto','accept_edits')),
     description text,
     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     avatar_url text,
@@ -4344,6 +4345,10 @@ DECLARE
     content bytea;
     seen text[] := '{}';
     previous text;
+    parts text[];
+    previous_parts text[];
+    previous_folded text;
+    part_index integer;
     total integer := 0;
 BEGIN
     IF jsonb_typeof(value) IS DISTINCT FROM 'array' OR jsonb_array_length(value) > 64
@@ -4364,13 +4369,20 @@ BEGIN
             OR lower(split_part(path, '/', 1) COLLATE "C") = 'skill.md' THEN
             RETURN false;
         END IF;
+        parts := string_to_array(path, '/');
         path := lower(path COLLATE "C");
         FOREACH previous IN ARRAY seen LOOP
-            IF previous = path OR strpos(path, previous || '/') = 1 OR strpos(previous, path || '/') = 1 THEN
+            previous_folded := lower(previous COLLATE "C");
+            IF previous_folded = path OR strpos(path, previous_folded || '/') = 1 OR strpos(previous_folded, path || '/') = 1 THEN
                 RETURN false;
             END IF;
+            previous_parts := string_to_array(previous, '/');
+            FOR part_index IN 1..least(cardinality(parts), cardinality(previous_parts)) LOOP
+                IF lower(parts[part_index] COLLATE "C") <> lower(previous_parts[part_index] COLLATE "C") THEN EXIT; END IF;
+                IF parts[part_index] <> previous_parts[part_index] THEN RETURN false; END IF;
+            END LOOP;
         END LOOP;
-        seen := array_append(seen, path);
+        seen := array_append(seen, item->>'path');
         encoded := item->>'content_base64';
         IF length(encoded) > 349528 OR encoded !~ '^[A-Za-z0-9+/]*={0,2}$' THEN
             RETURN false;
@@ -13790,10 +13802,12 @@ CREATE TABLE public.local_agent_profiles (
     id uuid NOT NULL,
     company_id uuid NOT NULL,
     machine_id uuid NOT NULL,
+    agent_id uuid,
     name text NOT NULL CHECK (octet_length(name) BETWEEN 1 AND 128 AND name = btrim(name)),
     selection jsonb NOT NULL CHECK ((jsonb_typeof(selection) = 'object' AND selection->>'machine_id' = machine_id::text) IS TRUE),
     PRIMARY KEY (company_id,id),
-    FOREIGN KEY (company_id,machine_id) REFERENCES public.local_machines(company_id,id) ON DELETE CASCADE
+    FOREIGN KEY (company_id,machine_id) REFERENCES public.local_machines(company_id,id) ON DELETE CASCADE,
+    FOREIGN KEY (company_id,agent_id) REFERENCES public.agents(company_id,id) DEFERRABLE INITIALLY DEFERRED
 );
 
 CREATE TABLE public.local_agent_sessions (
@@ -13802,6 +13816,9 @@ CREATE TABLE public.local_agent_sessions (
     machine_id uuid NOT NULL,
     installation_id uuid NOT NULL,
     profile_id uuid NOT NULL,
+    agent_id uuid,
+    agent_revision_id uuid,
+    bundle_digest text CHECK (bundle_digest ~ '^[0-9a-f]{64}$'),
     selection jsonb NOT NULL CHECK ((jsonb_typeof(selection) = 'object' AND selection->>'machine_id' = machine_id::text) IS TRUE),
     conversation_id uuid,
     workflow_run_id uuid,
@@ -13813,6 +13830,8 @@ CREATE TABLE public.local_agent_sessions (
     UNIQUE (company_id,machine_id,installation_id,id),
     FOREIGN KEY (company_id,machine_id,installation_id) REFERENCES public.local_machines(company_id,id,installation_id) ON DELETE CASCADE,
     FOREIGN KEY (company_id,profile_id) REFERENCES public.local_agent_profiles(company_id,id),
+    FOREIGN KEY (company_id,agent_id,agent_revision_id) REFERENCES public.agent_revisions(company_id,agent_id,id) DEFERRABLE INITIALLY DEFERRED,
+    CHECK (num_nonnulls(agent_id,agent_revision_id,bundle_digest) IN (0,3)),
     FOREIGN KEY (company_id,conversation_id) REFERENCES public.threads(company_id,id),
     FOREIGN KEY (company_id,workflow_run_id) REFERENCES public.workflow_runs(company_id,id),
     CHECK (num_nonnulls(conversation_id,workflow_run_id) = 1)
@@ -14064,8 +14083,8 @@ CREATE TRIGGER local_operation_inputs_immutable BEFORE UPDATE ON public.local_ag
 
 CREATE FUNCTION public.local_session_inputs_immutable() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
-    IF ROW(NEW.company_id,NEW.machine_id,NEW.installation_id,NEW.profile_id,NEW.selection,NEW.conversation_id,NEW.workflow_run_id)
-        IS DISTINCT FROM ROW(OLD.company_id,OLD.machine_id,OLD.installation_id,OLD.profile_id,OLD.selection,OLD.conversation_id,OLD.workflow_run_id)
+    IF ROW(NEW.company_id,NEW.machine_id,NEW.installation_id,NEW.profile_id,NEW.selection,NEW.conversation_id,NEW.workflow_run_id,NEW.agent_id,NEW.agent_revision_id,NEW.bundle_digest)
+        IS DISTINCT FROM ROW(OLD.company_id,OLD.machine_id,OLD.installation_id,OLD.profile_id,OLD.selection,OLD.conversation_id,OLD.workflow_run_id,OLD.agent_id,OLD.agent_revision_id,OLD.bundle_digest)
         OR (OLD.thread_id IS NOT NULL AND NEW.thread_id IS DISTINCT FROM OLD.thread_id)
     THEN RAISE EXCEPTION 'local session inputs and native identity are immutable' USING ERRCODE='23514'; END IF;
     RETURN NEW;
@@ -15341,6 +15360,29 @@ END $$;
 CREATE TRIGGER integration_grant_guard BEFORE INSERT OR UPDATE ON public.integration_use_grants
     FOR EACH ROW EXECUTE FUNCTION public.guard_integration_grant();
 
+-- Integration-module metadata boundary, shared by PostgresVault publication readiness and
+-- native lease eligibility. Keep private custody joins here; callers receive only a boolean.
+-- This is a nonlocking MVCC observation, never credential resolution or remote-entry authority.
+CREATE FUNCTION public.integration_mcp_reference_ready(
+    tenant uuid, connection uuid, endpoint text, selected_account uuid,
+    selected_authorization bigint, selected_grant uuid, selected_revision bigint
+) RETURNS boolean LANGUAGE sql STABLE AS $$
+    SELECT EXISTS(
+        SELECT 1 FROM public.integration_use_grants AS consent
+        JOIN public.integration_accounts AS account ON account.id=consent.account_id
+            AND account.owner_namespace=consent.owner_namespace AND account.owner_subject=consent.owner_subject
+        JOIN public.integration_owner_states AS owner ON owner.owner_namespace=account.owner_namespace
+            AND owner.owner_subject=account.owner_subject
+        WHERE consent.id=selected_grant AND consent.account_id=selected_account
+            AND consent.owner_namespace='openbot' AND consent.enabled AND NOT owner.retired
+            AND consent.account_authorization=selected_authorization AND consent.revision=selected_revision
+            AND account.authorization_revision=selected_authorization
+            AND account.status='ready' AND account.envelope IS NOT NULL
+            AND consent.host_scope='company/' || tenant::text
+            AND consent.host_binding='mcp/' || tenant::text || '/' || connection::text
+            AND consent.destination=endpoint AND consent.purpose='mcp')
+$$;
+
 ALTER TABLE public.workflow_http_connections
     ADD COLUMN integration_account_id uuid,
     ADD COLUMN integration_grant_id uuid,
@@ -15632,3 +15674,374 @@ CREATE TABLE public.workflow_memory_consumptions (
     FOREIGN KEY (company_id, run_id) REFERENCES public.workflow_runs(company_id, id) ON DELETE CASCADE,
     CHECK (exposed_level <= read_ceiling)
 );
+
+
+-- Native MCP uses real private workflow publications and real worker-owned actions.
+-- No backward compatibility: reset disposable databases for this provenance contract.
+ALTER TABLE public.workflow_runs ADD COLUMN native_mcp_call_id uuid;
+ALTER TABLE public.workflow_runs ADD CONSTRAINT workflow_native_call_identity
+    UNIQUE(company_id,id,native_mcp_call_id);
+
+CREATE TABLE public.native_mcp_brokers (
+    company_id uuid NOT NULL REFERENCES public.companies(id) ON DELETE CASCADE,
+    id uuid NOT NULL,
+    actor_id uuid NOT NULL,
+    agent_revision_id uuid NOT NULL,
+    agent_binding_id uuid NOT NULL,
+    contract jsonb NOT NULL CHECK(jsonb_typeof(contract)='object' AND octet_length(contract::text)<=131072),
+    workflow_id uuid NOT NULL,
+    version_id uuid NOT NULL,
+    workflow_binding_id uuid NOT NULL,
+    created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
+    PRIMARY KEY(company_id,id),
+    UNIQUE(company_id,actor_id,agent_revision_id,agent_binding_id),
+    UNIQUE(company_id,workflow_id),
+    UNIQUE(company_id,version_id),
+    UNIQUE(company_id,workflow_binding_id),
+    FOREIGN KEY(company_id,agent_revision_id,agent_binding_id)
+        REFERENCES public.agent_revision_bindings(company_id,revision_id,binding_id) DEFERRABLE INITIALLY DEFERRED,
+    FOREIGN KEY(company_id,workflow_id) REFERENCES public.workflow_definitions(company_id,id) DEFERRABLE INITIALLY DEFERRED,
+    FOREIGN KEY(company_id,version_id) REFERENCES public.workflow_versions(company_id,id) DEFERRABLE INITIALLY DEFERRED,
+    FOREIGN KEY(company_id,workflow_binding_id) REFERENCES public.workflow_bindings(company_id,id) DEFERRABLE INITIALLY DEFERRED
+);
+
+CREATE TABLE public.native_mcp_calls (
+    company_id uuid NOT NULL REFERENCES public.companies(id) ON DELETE CASCADE,
+    id uuid NOT NULL,
+    broker_id uuid NOT NULL,
+    operation_id uuid NOT NULL,
+    machine_id uuid NOT NULL,
+    installation_id uuid NOT NULL,
+    session_id uuid NOT NULL,
+    source_operation_id uuid,
+    source_session_id uuid,
+    native_thread_id text NOT NULL CHECK(native_thread_id ~ '^[A-Za-z0-9_.:-]{1,128}$'),
+    native_turn_id text NOT NULL CHECK(native_turn_id ~ '^[A-Za-z0-9_.:-]{1,128}$'),
+    client_request_id text NOT NULL CHECK(client_request_id ~ '^[A-Za-z0-9_.:-]{1,128}$'),
+    model_call_id text NOT NULL CHECK(model_call_id ~ '^[A-Za-z0-9_.:-]{1,128}$'),
+    actor_id uuid NOT NULL,
+    harness_digest text NOT NULL CHECK(harness_digest ~ '^[0-9a-f]{64}$'),
+    argument_digest text NOT NULL CHECK(argument_digest ~ '^[0-9a-f]{64}$'),
+    original_run_id uuid NOT NULL,
+    run_id uuid,
+    channel_id uuid,
+    thread_id uuid,
+    input jsonb CHECK(jsonb_typeof(input)='object' AND octet_length(input::text)<=131072),
+    deadline timestamptz NOT NULL,
+    cancel_requested boolean NOT NULL DEFAULT false,
+    maintenance_after timestamptz NOT NULL DEFAULT clock_timestamp(),
+    retired_at timestamptz,
+    retained_content_level public.access_level,
+    terminal_outcome text CHECK(terminal_outcome IN ('succeeded','failed','cancelled')),
+    created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
+    PRIMARY KEY(company_id,id),
+    UNIQUE(company_id,id,original_run_id),
+    UNIQUE(company_id,original_run_id),
+    -- The operation is deliberately absent: a newer turn cannot reuse an old invocation.
+    UNIQUE(company_id,installation_id,native_thread_id,client_request_id,model_call_id),
+    FOREIGN KEY(company_id,broker_id) REFERENCES public.native_mcp_brokers(company_id,id) DEFERRABLE INITIALLY DEFERRED,
+    FOREIGN KEY(company_id,machine_id,installation_id,source_operation_id)
+        REFERENCES public.local_agent_operations(company_id,machine_id,installation_id,id) DEFERRABLE INITIALLY DEFERRED,
+    FOREIGN KEY(company_id,machine_id,installation_id,source_session_id)
+        REFERENCES public.local_agent_sessions(company_id,machine_id,installation_id,id) DEFERRABLE INITIALLY DEFERRED,
+    FOREIGN KEY(company_id,run_id,id) REFERENCES public.workflow_runs(company_id,id,native_mcp_call_id) DEFERRABLE INITIALLY DEFERRED,
+    CHECK(run_id IS NULL OR run_id=original_run_id),
+    CHECK((retired_at IS NULL AND run_id IS NOT NULL AND input IS NOT NULL AND terminal_outcome IS NULL AND retained_content_level IS NULL
+            AND source_operation_id=operation_id AND source_operation_id IS NOT NULL AND source_session_id=session_id AND source_session_id IS NOT NULL)
+        OR (retired_at IS NOT NULL AND run_id IS NULL AND input IS NULL AND terminal_outcome IS NOT NULL AND retained_content_level IS NOT NULL
+            AND source_operation_id IS NULL AND source_session_id IS NULL)),
+    CHECK(deadline>created_at AND deadline<=created_at+interval '15 minutes'),
+    CHECK(thread_id IS NULL OR channel_id IS NOT NULL)
+);
+CREATE INDEX native_mcp_calls_operation ON public.native_mcp_calls(company_id,operation_id);
+CREATE INDEX native_mcp_calls_machine ON public.native_mcp_calls(company_id,machine_id) WHERE retired_at IS NULL;
+CREATE INDEX native_mcp_calls_session ON public.native_mcp_calls(company_id,session_id) WHERE retired_at IS NULL;
+ALTER TABLE public.workflow_runs ADD CONSTRAINT workflow_native_call_provenance
+    FOREIGN KEY(company_id,native_mcp_call_id,id)
+    REFERENCES public.native_mcp_calls(company_id,id,original_run_id) DEFERRABLE INITIALLY DEFERRED;
+
+CREATE FUNCTION public.native_mcp_broker_immutable() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF TG_OP='DELETE' AND NOT EXISTS(SELECT 1 FROM public.companies WHERE id=OLD.company_id) THEN RETURN OLD; END IF;
+    RAISE EXCEPTION 'native MCP broker identity is immutable' USING ERRCODE='23514';
+END $$;
+CREATE TRIGGER native_mcp_broker_immutable BEFORE UPDATE OR DELETE ON public.native_mcp_brokers
+    FOR EACH ROW EXECUTE FUNCTION public.native_mcp_broker_immutable();
+
+-- A receipt or complete authorized historical evidence closes uncertainty; cancellation does not.
+CREATE FUNCTION public.native_mcp_has_unknown(tenant uuid, owner uuid) RETURNS boolean LANGUAGE sql STABLE AS $$
+    SELECT EXISTS(SELECT 1 FROM public.workflow_action_effect_states WHERE company_id=tenant AND run_id=owner
+        AND effect_state IN ('needs_reconciliation','applied_without_result'))
+        OR EXISTS(SELECT 1 FROM public.workflow_action_evidence_conflicts WHERE company_id=tenant AND run_id=owner)
+        OR EXISTS(SELECT 1 FROM public.workflow_action_dispatches AS marker WHERE marker.company_id=tenant AND marker.run_id=owner
+            AND NOT EXISTS(SELECT 1 FROM public.workflow_action_receipts WHERE company_id=tenant AND invocation_id=marker.invocation_id)
+            AND NOT EXISTS(SELECT 1 FROM public.workflow_action_evidence WHERE company_id=tenant AND invocation_id=marker.invocation_id AND disposition='applied')
+            AND NOT EXISTS(SELECT 1 FROM public.workflow_action_evidence AS proof WHERE proof.company_id=tenant
+                AND proof.invocation_id=marker.invocation_id AND proof.disposition='final_not_applied' AND proof.grant_eligible
+                AND NOT EXISTS(SELECT 1 FROM public.workflow_action_remote_entries AS entry WHERE entry.company_id=tenant
+                    AND entry.invocation_id=marker.invocation_id AND NOT EXISTS(SELECT 1 FROM public.workflow_action_evidence_coverage AS coverage
+                        WHERE coverage.company_id=tenant AND coverage.evidence_id=proof.id AND coverage.remote_entry_id=entry.id))))
+$$;
+
+CREATE FUNCTION public.native_mcp_call_immutable() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF TG_OP='DELETE' THEN
+        IF NOT EXISTS(SELECT 1 FROM public.companies WHERE id=OLD.company_id) THEN RETURN OLD; END IF;
+        RAISE EXCEPTION 'native MCP invocation tombstone must remain' USING ERRCODE='23514';
+    END IF;
+    IF (to_jsonb(NEW)-ARRAY['cancel_requested','maintenance_after','run_id','input','retired_at','terminal_outcome','source_operation_id','source_session_id','retained_content_level'])
+        IS DISTINCT FROM (to_jsonb(OLD)-ARRAY['cancel_requested','maintenance_after','run_id','input','retired_at','terminal_outcome','source_operation_id','source_session_id','retained_content_level'])
+        OR (OLD.cancel_requested AND NOT NEW.cancel_requested) THEN
+        RAISE EXCEPTION 'native MCP invocation identity is immutable' USING ERRCODE='23514';
+    END IF;
+    IF ROW(NEW.run_id,NEW.input,NEW.retired_at,NEW.terminal_outcome,NEW.source_operation_id,NEW.source_session_id,NEW.retained_content_level)
+        IS DISTINCT FROM ROW(OLD.run_id,OLD.input,OLD.retired_at,OLD.terminal_outcome,OLD.source_operation_id,OLD.source_session_id,OLD.retained_content_level) THEN
+        IF OLD.retired_at IS NOT NULL OR NEW.retired_at IS NULL OR NEW.run_id IS NOT NULL OR NEW.input IS NOT NULL
+            OR NOT EXISTS(SELECT 1 FROM public.workflow_runs AS run
+                JOIN public.local_agent_operations AS operation ON operation.company_id=OLD.company_id AND operation.id=OLD.operation_id
+                WHERE run.company_id=OLD.company_id AND run.id=OLD.run_id AND run.state=NEW.terminal_outcome
+                  AND run.finished_at<clock_timestamp()-interval '90 days' AND operation.settled_at IS NOT NULL
+                  AND NEW.retained_content_level=run.content_level)
+            OR public.native_mcp_has_unknown(OLD.company_id,OLD.run_id) THEN
+            RAISE EXCEPTION 'native MCP retirement requires resolved old owners' USING ERRCODE='23514';
+        END IF;
+    END IF;
+    RETURN NEW;
+END $$;
+CREATE TRIGGER native_mcp_call_immutable BEFORE UPDATE OR DELETE ON public.native_mcp_calls
+    FOR EACH ROW EXECUTE FUNCTION public.native_mcp_call_immutable();
+
+CREATE FUNCTION public.native_mcp_run_discriminator() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF NEW.native_mcp_call_id IS DISTINCT FROM OLD.native_mcp_call_id THEN
+        RAISE EXCEPTION 'native MCP run provenance is immutable' USING ERRCODE='23514';
+    END IF;
+    RETURN NEW;
+END $$;
+CREATE TRIGGER native_mcp_run_discriminator BEFORE UPDATE ON public.workflow_runs
+    FOR EACH ROW EXECUTE FUNCTION public.native_mcp_run_discriminator();
+
+-- This guard is structural only. Historical reconciliation never depends on live owners.
+CREATE FUNCTION public.native_mcp_witness(tenant uuid, invocation uuid) RETURNS void LANGUAGE plpgsql AS $$
+DECLARE call public.native_mcp_calls; broker public.native_mcp_brokers; actual public.workflow_runs;
+BEGIN
+    SELECT * INTO call FROM public.native_mcp_calls WHERE company_id=tenant AND id=invocation;
+    IF NOT FOUND THEN RETURN; END IF; -- company cascade or an ordinary run
+    SELECT * INTO broker FROM public.native_mcp_brokers WHERE company_id=tenant AND id=call.broker_id;
+    IF broker.id IS NULL OR NOT EXISTS(SELECT 1 FROM public.agent_revisions AS revision,
+        LATERAL jsonb_array_elements(revision.content::jsonb->'tools') AS selected(tool)
+        WHERE revision.company_id=tenant AND revision.id=broker.agent_revision_id
+            AND selected.tool=broker.contract AND selected.tool#>>'{binding,id}'=broker.agent_binding_id::text
+            AND selected.tool#>>'{binding,source,kind}'='mcp') THEN
+        RAISE EXCEPTION 'native MCP broker contract witness missing' USING ERRCODE='23514';
+    END IF;
+    SELECT * INTO actual FROM public.workflow_runs WHERE company_id=tenant AND id=call.original_run_id;
+    IF call.retired_at IS NOT NULL THEN
+        IF actual.id IS NOT NULL THEN RAISE EXCEPTION 'retained native run cannot detach provenance' USING ERRCODE='23514'; END IF;
+        RETURN;
+    END IF;
+    IF actual.id IS NULL OR actual.native_mcp_call_id IS DISTINCT FROM call.id
+        OR actual.version_id<>broker.version_id OR actual.workflow_id<>broker.workflow_id
+        OR actual.binding_id<>broker.workflow_binding_id OR actual.binding_revision<>1
+        OR actual.actor_id<>call.actor_id OR call.actor_id<>broker.actor_id
+        OR actual.input IS DISTINCT FROM call.input OR actual.deadline<>call.deadline
+        OR actual.channel_id IS DISTINCT FROM call.channel_id OR actual.thread_id IS DISTINCT FROM call.thread_id
+        OR actual.parent_run_id IS NOT NULL OR actual.content_exact THEN
+        RAISE EXCEPTION 'native MCP run ownership witness mismatch' USING ERRCODE='23514';
+    END IF;
+    IF NOT EXISTS(SELECT 1 FROM public.local_agent_sessions AS session
+        JOIN public.local_agent_operations AS operation ON operation.company_id=session.company_id AND operation.session_id=session.id
+        WHERE session.company_id=tenant AND session.id=call.session_id AND operation.id=call.operation_id
+            AND session.machine_id=call.machine_id AND session.installation_id=call.installation_id
+            AND session.thread_id=call.native_thread_id AND session.bundle_digest=call.harness_digest
+            AND session.agent_revision_id=broker.agent_revision_id
+            AND (operation.actor_id=call.actor_id OR operation.actor_id IS NULL)
+            AND operation.dispatch->>'kind'='native_identity'
+            AND operation.dispatch->>'thread_id'=call.native_thread_id AND operation.dispatch->>'turn_id'=call.native_turn_id) THEN
+        RAISE EXCEPTION 'native MCP frozen source witness missing' USING ERRCODE='23514';
+    END IF;
+END $$;
+
+CREATE FUNCTION public.native_mcp_call_witness() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    PERFORM public.native_mcp_witness(NEW.company_id,NEW.id);
+    RETURN NULL;
+END $$;
+CREATE CONSTRAINT TRIGGER native_mcp_call_witness AFTER INSERT OR UPDATE ON public.native_mcp_calls
+    DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION public.native_mcp_call_witness();
+CREATE FUNCTION public.native_mcp_run_witness() RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE row public.workflow_runs;
+BEGIN
+    SELECT * INTO row FROM public.workflow_runs WHERE company_id=NEW.company_id AND id=NEW.id;
+    IF NOT FOUND THEN RETURN NULL; END IF;
+    IF EXISTS(SELECT 1 FROM public.native_mcp_brokers WHERE company_id=row.company_id AND version_id=row.version_id)
+        AND row.native_mcp_call_id IS NULL THEN
+        RAISE EXCEPTION 'internal MCP workflow requires native provenance' USING ERRCODE='23514';
+    END IF;
+    IF row.native_mcp_call_id IS NOT NULL THEN PERFORM public.native_mcp_witness(row.company_id,row.native_mcp_call_id); END IF;
+    RETURN NULL;
+END $$;
+CREATE CONSTRAINT TRIGGER native_mcp_run_witness AFTER INSERT OR UPDATE ON public.workflow_runs
+    DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION public.native_mcp_run_witness();
+
+CREATE FUNCTION public.native_mcp_private_definition() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM public.companies WHERE id=OLD.company_id) THEN RETURN OLD; END IF;
+    IF EXISTS(SELECT 1 FROM public.native_mcp_brokers WHERE company_id=OLD.company_id
+        AND ((TG_TABLE_NAME='workflow_definitions' AND workflow_id=OLD.id)
+            OR (TG_TABLE_NAME='workflow_bindings' AND workflow_binding_id=OLD.id))) THEN
+        RAISE EXCEPTION 'native MCP workflow is internally owned' USING ERRCODE='23514';
+    END IF;
+    IF TG_OP='DELETE' THEN RETURN OLD; END IF;
+    RETURN NEW;
+END $$;
+CREATE TRIGGER native_mcp_private_definition BEFORE UPDATE OR DELETE ON public.workflow_definitions
+    FOR EACH ROW EXECUTE FUNCTION public.native_mcp_private_definition();
+CREATE TRIGGER native_mcp_private_binding BEFORE UPDATE OR DELETE ON public.workflow_bindings
+    FOR EACH ROW EXECUTE FUNCTION public.native_mcp_private_definition();
+
+CREATE FUNCTION public.native_mcp_private_version_selection() RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE internal boolean;
+BEGIN
+    IF TG_TABLE_NAME='workflow_versions' THEN
+        SELECT EXISTS(SELECT 1 FROM public.native_mcp_brokers AS broker WHERE broker.company_id=NEW.company_id AND broker.workflow_id=NEW.workflow_id) INTO internal;
+    ELSE
+        SELECT EXISTS(SELECT 1 FROM public.native_mcp_brokers AS broker WHERE broker.company_id=NEW.company_id AND broker.version_id=NEW.version_id) INTO internal;
+    END IF;
+    IF internal THEN
+        RAISE EXCEPTION 'native MCP publications cannot be selected or republished publicly' USING ERRCODE='23514';
+    END IF;
+    RETURN NEW;
+END $$;
+CREATE TRIGGER native_mcp_private_publication BEFORE INSERT ON public.workflow_versions
+    FOR EACH ROW EXECUTE FUNCTION public.native_mcp_private_version_selection();
+CREATE TRIGGER native_mcp_private_configuration BEFORE INSERT ON public.workflow_binding_revisions
+    FOR EACH ROW EXECUTE FUNCTION public.native_mcp_private_version_selection();
+
+
+-- A bounded MVCC eligibility read for leases and maintenance. This never grants an effect:
+-- the real effect boundary additionally restores provenance and locks current authority.
+-- Read-only counterparts of the locked source checks. Each revision carries <=32 tools/16 skills.
+CREATE FUNCTION public.native_mcp_tool_source_live(tenant uuid, tool jsonb) RETURNS boolean LANGUAGE sql STABLE AS $$
+    SELECT CASE tool#>>'{binding,source,kind}'
+    WHEN 'builtin' THEN true
+    WHEN 'workflow' THEN EXISTS(SELECT 1 FROM public.workflow_tool_registrations AS registration
+        WHERE registration.company_id=tenant AND registration.name=tool#>>'{binding,source,registration}'
+            AND registration.workflow_id=(tool#>>'{binding,source,workflow}')::uuid AND registration.revoked_at IS NULL)
+    WHEN 'http' THEN EXISTS(SELECT 1 FROM public.workflow_http_connections AS connection
+        JOIN public.workflow_http_operations AS operation ON operation.company_id=connection.company_id AND operation.connection_id=connection.id
+        WHERE connection.company_id=tenant AND connection.id=(tool#>>'{binding,source,connection}')::uuid
+            AND connection.enabled AND connection.integration_grant_id IS NULL
+            AND (NOT connection.bearer OR EXISTS(SELECT 1 FROM public.workflow_http_credentials WHERE company_id=tenant AND connection_id=connection.id))
+            AND operation.name=tool#>>'{binding,source,operation}' AND operation.revoked_at IS NULL
+            AND operation.snapshot#>'{contract,input_schema}'=tool->'input_schema'
+            AND operation.snapshot#>'{contract,output_schema}'=tool->'output_schema'
+            AND operation.snapshot->'policy'=tool->'policy' AND operation.approval_required=(tool->>'approval_required')::boolean)
+    WHEN 'mcp' THEN EXISTS(SELECT 1 FROM public.company_mcp_connections AS connection
+        JOIN public.workflow_mcp_operations AS operation ON operation.company_id=connection.company_id AND operation.connection_id=connection.id
+        JOIN public.company_mcp_tool_grants AS permission ON permission.company_id=connection.company_id AND permission.connection_id=connection.id
+        WHERE connection.company_id=tenant AND connection.id=(tool#>>'{binding,source,connection}')::uuid
+            AND connection.enabled AND connection.deleted_at IS NULL
+            AND ((connection.auth_type IN ('none','bearer') AND connection.integration_grant_id IS NULL
+                    AND (connection.auth_type='none' OR EXISTS(SELECT 1 FROM public.company_mcp_credentials WHERE company_id=tenant AND connection_id=connection.id)))
+                OR (connection.auth_type='integration' AND public.integration_mcp_reference_ready(
+                    tenant, connection.id, connection.endpoint_url, connection.integration_account_id,
+                    connection.integration_authorization, connection.integration_grant_id,
+                    connection.integration_grant_revision)))
+            AND permission.tool_name=tool#>>'{binding,source,remote_name}' AND permission.revoked_at IS NULL
+            AND operation.name=tool#>>'{binding,source,operation}' AND operation.revoked_at IS NULL
+            AND operation.version=(tool#>>'{binding,source,reviewed_version}')::uuid
+            AND operation.snapshot#>>'{contract,name}'=tool#>>'{binding,source,remote_name}'
+            AND operation.snapshot#>'{contract,input_schema}'=tool->'input_schema'
+            AND operation.snapshot#>'{contract,output_schema}'=tool->'output_schema'
+            AND operation.snapshot->'policy'=tool->'policy' AND operation.approval_required=(tool->>'approval_required')::boolean)
+    ELSE false END
+$$;
+
+CREATE FUNCTION public.native_mcp_revision_live(tenant uuid, selected uuid) RETURNS boolean LANGUAGE sql STABLE AS $$
+    SELECT EXISTS(SELECT 1 FROM public.agent_revisions AS revision
+        JOIN public.agents AS agent ON agent.company_id=revision.company_id AND agent.id=revision.agent_id
+        WHERE revision.company_id=tenant AND revision.id=selected
+            AND NOT EXISTS(SELECT 1 FROM jsonb_array_elements(revision.content::jsonb->'tools') AS frozen(tool)
+                WHERE NOT EXISTS(SELECT 1 FROM public.agent_binding_grants AS permission WHERE permission.company_id=tenant
+                    AND permission.agent_id=revision.agent_id AND permission.binding_id=(frozen.tool#>>'{binding,id}')::uuid AND permission.revoked_at IS NULL)
+                    OR NOT public.native_mcp_tool_source_live(tenant,frozen.tool))
+            AND NOT EXISTS(SELECT 1 FROM jsonb_array_elements(revision.content::jsonb->'skills') AS frozen(skill)
+                WHERE NOT EXISTS(SELECT 1 FROM public.agent_skill_assignments AS assignment
+                    JOIN public.agent_skill_grants AS permission ON permission.company_id=assignment.company_id AND permission.agent_id=assignment.agent_id
+                        AND permission.assignment_id=assignment.id AND permission.skill_id=assignment.skill_id
+                    WHERE assignment.company_id=tenant AND assignment.agent_id=revision.agent_id
+                        AND assignment.id=(frozen.skill->>'assignment_id')::uuid
+                        AND assignment.live_skill_id=(frozen.skill#>>'{skill,skill_id}')::uuid AND permission.revoked_at IS NULL)))
+$$;
+
+CREATE FUNCTION public.native_mcp_parent_agent_live(tenant uuid, selected uuid) RETURNS boolean LANGUAGE sql STABLE AS $$
+    SELECT public.native_mcp_revision_live(tenant,selected) AND EXISTS(SELECT 1 FROM public.agent_revisions AS revision
+        JOIN public.company_model_connections AS connection ON connection.company_id=revision.company_id
+            AND connection.provider=revision.content::jsonb#>>'{model,provider}'
+        WHERE revision.company_id=tenant AND revision.id=selected
+            AND revision.content::jsonb#>>'{model,model}'=ANY(connection.models))
+$$;
+
+-- A committed stop/archive intent revokes earlier native MCP effects immediately;
+-- it is not evidence that the provider has stopped. Later explicit inputs keep their own owner.
+CREATE INDEX native_mcp_stop_intents ON public.local_agent_operations(company_id,session_id,created_at)
+    WHERE command->>'kind' IN ('stop_thread','archive_thread');
+CREATE FUNCTION public.native_mcp_stop_requested(tenant uuid, source_id uuid) RETURNS boolean LANGUAGE sql STABLE AS $$
+    SELECT EXISTS(SELECT 1 FROM public.local_agent_operations AS source
+        JOIN public.local_agent_operations AS stop ON stop.company_id=source.company_id
+            AND stop.session_id=source.session_id AND stop.created_at>=source.created_at
+        WHERE source.company_id=tenant AND source.id=source_id
+            AND stop.command->>'kind' IN ('stop_thread','archive_thread')
+            AND stop.command->>'thread_id'=source.dispatch->>'thread_id')
+$$;
+-- Keep ordinary lease checks independent of the native authority query's planning cost.
+-- Both branches remain nonlocking STABLE reads of the calling statement's snapshot.
+CREATE FUNCTION public.native_mcp_run_live(tenant uuid, owner uuid) RETURNS boolean LANGUAGE plpgsql STABLE AS $$
+DECLARE selected_call uuid; selected_version uuid;
+BEGIN
+    SELECT run.native_mcp_call_id,run.version_id INTO selected_call,selected_version
+    FROM public.workflow_runs AS run WHERE run.company_id=tenant AND run.id=owner;
+    IF NOT FOUND THEN RETURN NULL; END IF;
+    IF selected_call IS NULL THEN
+        -- An unmarked run must still refuse a private broker version.
+        RETURN NOT EXISTS(SELECT 1 FROM public.native_mcp_brokers WHERE company_id=tenant AND version_id=selected_version);
+    END IF;
+    RETURN EXISTS(SELECT 1 FROM public.native_mcp_calls AS call
+        JOIN public.native_mcp_brokers AS broker ON broker.company_id=call.company_id AND broker.id=call.broker_id
+        JOIN public.local_agent_operations AS operation ON operation.company_id=call.company_id AND operation.id=call.operation_id
+        JOIN public.local_agent_sessions AS session ON session.company_id=call.company_id AND session.id=call.session_id
+        JOIN public.local_machines AS machine ON machine.company_id=call.company_id AND machine.id=call.machine_id
+        JOIN public.local_machine_credentials AS credential ON credential.company_id=machine.company_id
+            AND credential.machine_id=machine.id AND credential.generation=machine.credential_generation
+        JOIN public.company_members AS member ON member.company_id=call.company_id AND member.user_id=call.actor_id
+        JOIN public.principals AS principal ON principal.company_id=member.company_id AND principal.user_id=member.user_id
+        JOIN public.users AS account ON account.id=member.user_id
+        WHERE call.company_id=tenant AND call.id=selected_call AND call.run_id=owner AND call.retired_at IS NULL
+            AND NOT call.cancel_requested AND call.deadline>clock_timestamp()
+            AND operation.actor_id=call.actor_id AND operation.outcome IS NULL AND operation.deadline>clock_timestamp()
+            AND NOT public.native_mcp_stop_requested(tenant,operation.id)
+            AND operation.dispatch->>'kind'='native_identity' AND operation.dispatch->>'thread_id'=call.native_thread_id
+            AND operation.dispatch->>'turn_id'=call.native_turn_id
+            AND (operation.observed_turn_state IS NULL OR operation.observed_turn_state IN ('queued','running','waiting_for_input'))
+            AND machine.state='enabled' AND machine.connection_owner IS NOT NULL AND machine.connection_expires_at>clock_timestamp()
+            AND credential.revoked_at IS NULL AND session.agent_revision_id=broker.agent_revision_id
+            AND session.bundle_digest=call.harness_digest AND session.thread_id=call.native_thread_id
+            AND principal.kind='person' AND member.role IN ('owner','admin')
+            AND public.native_mcp_revision_live(tenant,broker.agent_revision_id)
+            AND EXISTS(SELECT 1 FROM public.local_machine_projects WHERE company_id=tenant AND machine_id=call.machine_id
+                AND project_id=session.selection->>'project_id')
+            AND (session.workflow_run_id IS NULL OR EXISTS(SELECT 1 FROM public.workflow_runs AS original
+                WHERE original.company_id=tenant AND original.id=session.workflow_run_id
+                    AND original.state IN ('queued','running','waiting') AND original.deadline>clock_timestamp()))
+            AND (operation.origin='direct' OR EXISTS(SELECT 1 FROM public.workflow_local_agent_calls AS original_call
+                JOIN public.workflow_runs AS original ON original.company_id=original_call.company_id AND original.id=original_call.run_id
+                JOIN public.workflow_waits AS wait ON wait.company_id=original_call.company_id AND wait.id=original_call.wait_id
+                JOIN public.workflow_action_intents AS intent ON intent.company_id=original_call.company_id AND intent.id=original_call.invocation_id
+                WHERE original_call.company_id=tenant AND original_call.operation_id=operation.id
+                    AND original.state='waiting' AND original.waiting_reason='effect' AND original.deadline>clock_timestamp()
+                    AND original_call.ready_at IS NULL AND wait.state='waiting' AND wait.deadline>clock_timestamp()
+                    AND (intent.origin_kind='workflow' OR (intent.origin_kind='agent'
+                        AND public.native_mcp_parent_agent_live(tenant,intent.agent_revision_id)))))
+    );
+END $$;

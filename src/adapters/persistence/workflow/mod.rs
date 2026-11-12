@@ -22,7 +22,7 @@ mod admission_history;
 mod admission_replay;
 mod admission_source;
 mod admission_write;
-mod agent_authority;
+pub(in crate::adapters::persistence) mod agent_authority;
 mod agent_history;
 mod agent_history_sessions;
 pub(crate) mod agent_history_views;
@@ -81,11 +81,13 @@ mod memory_steps;
 pub mod message;
 mod message_intents;
 mod metrics;
+pub(in crate::adapters::persistence) mod native_mcp;
 mod persistence_bound;
 pub mod provisioning;
 mod reads;
 mod reply_waits;
 mod resources;
+pub(in crate::adapters::persistence) mod row_locks;
 mod rows;
 mod run_provenance;
 mod run_views;
@@ -95,6 +97,8 @@ mod schedules;
 pub mod step_builtins;
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+pub(crate) use tests::native_mcp_remote_fixture;
 /// The uncertain HTTP action the reconciliation route tests start from (P08-D3).
 #[cfg(test)]
 pub(crate) use tests::reconciliation_fixture;

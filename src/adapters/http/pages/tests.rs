@@ -1384,6 +1384,7 @@ fn channel_settings_list_targets_the_pane_and_swaps_out_of_band() {
 
 fn settings_agent(company_id: Uuid, name: &str, slug: &str) -> Agent {
     Agent {
+        native_permissions: Default::default(),
         draft_revision: crate::entities::agent_capability::AgentDraftRevision::new(1).unwrap(),
         id: Uuid::new_v4(),
         company_id: Some(company_id),

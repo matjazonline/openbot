@@ -1,5 +1,8 @@
 //! Portable skill assets. No paths are opened and no uploaded code runs here.
-use std::{collections::BTreeSet, fmt};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    fmt,
+};
 
 use base64::{Engine, engine::general_purpose::STANDARD};
 use serde::{Deserialize, Serialize};
@@ -98,8 +101,24 @@ pub fn validate_skill_files(files: &[SkillFile]) -> Result<(), String> {
         return Err("A skill may have at most 64 supporting files.".into());
     }
     let mut paths = BTreeSet::<String>::new();
+    let mut spellings = BTreeMap::<String, String>::new();
     let mut total = 0usize;
     for file in files {
+        let mut prefix = String::new();
+        for component in file.path.as_str().split('/') {
+            if !prefix.is_empty() {
+                prefix.push('/');
+            }
+            prefix.push_str(component);
+            let folded = prefix.to_ascii_lowercase();
+            if spellings
+                .get(&folded)
+                .is_some_and(|spelling| spelling != &prefix)
+            {
+                return Err("Skill path components have conflicting case spellings.".into());
+            }
+            spellings.insert(folded, prefix.clone());
+        }
         let path = file.path.as_str().to_ascii_lowercase();
         if paths.iter().any(|other| {
             other == &path

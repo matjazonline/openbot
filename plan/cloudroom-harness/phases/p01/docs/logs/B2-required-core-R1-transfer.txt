@@ -1,0 +1,61 @@
+
+ RUN  v4.1.1 /private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/server
+
+ ❯ |@cloudroom/server| test/internal/required-skill-trees.test.ts (3 tests | 3 failed) 452ms
+     × authenticates the required route, preserves every byte/mode through production daemon staging and executes an adjacent-file script 379ms
+     × refuses unregistered or changed trees and does not fall back to the ordinary registry 37ms
+     × rejects file count and file-byte limit+1 before reading content 34ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@cloudroom/server| test/internal/required-skill-trees.test.ts > required skill directory transfer > authenticates the required route, preserves every byte/mode through production daemon staging and executes an adjacent-file script
+Error: Invalid required skill root
+ ❯ descriptors src/services/skills/required-skill-trees.ts:17:175
+
+ ❯ readRequiredSkillTree src/services/skills/required-skill-trees.ts:59:19
+ ❯ registerRequiredSkillTree src/services/skills/required-skill-trees.ts:72:16
+ ❯ test/internal/required-skill-trees.test.ts:32:20
+ ❯ withTestHarness test/helpers/test-app.ts:358:12
+ ❯ test/internal/required-skill-trees.test.ts:28:5
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
+
+ FAIL  |@cloudroom/server| test/internal/required-skill-trees.test.ts > required skill directory transfer > refuses unregistered or changed trees and does not fall back to the ordinary registry
+Error: Invalid required skill root
+ ❯ descriptors src/services/skills/required-skill-trees.ts:17:175
+
+ ❯ readRequiredSkillTree src/services/skills/required-skill-trees.ts:59:19
+ ❯ registerRequiredSkillTree src/services/skills/required-skill-trees.ts:72:16
+ ❯ test/internal/required-skill-trees.test.ts:65:7
+ ❯ withTestHarness test/helpers/test-app.ts:358:12
+ ❯ test/internal/required-skill-trees.test.ts:59:5
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯
+
+ FAIL  |@cloudroom/server| test/internal/required-skill-trees.test.ts > required skill directory transfer > rejects file count and file-byte limit+1 before reading content
+AssertionError: expected [Function] to throw error including 'capacity' but got 'Invalid required skill root'
+
+Expected: "capacity"
+Received: "Invalid required skill root"
+
+ ❯ test/internal/required-skill-trees.test.ts:76:68
+     74|       for(let i=0;i<62;i++) { const file=path.join(root,`extra-${i}`);…
+     75|       const read=vi.spyOn(fs,"readSync");
+     76|       try { expect(()=>readRequiredSkillTree(root,"0".repeat(64))).toT…
+       |                                                                    ^
+     77|       for(let i=0;i<62;i++) await fs.promises.unlink(path.join(root,`e…
+     78|       await writeFile(path.join(root,"assets/data.bin"),Buffer.alloc(2…
+ ❯ withTestHarness test/helpers/test-app.ts:358:12
+ ❯ test/internal/required-skill-trees.test.ts:72:5
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  3 failed (3)
+   Start at  15:28:14
+   Duration  4.14s (transform 2.09s, setup 647ms, import 2.95s, tests 452ms, environment 0ms)
+
+undefined
+/private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/server:
+ ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1: vitest run --config vitest.config.ts test/internal/required-skill-trees.test.ts

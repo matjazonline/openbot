@@ -1,0 +1,46 @@
+{
+  "prior_total": 20046139,
+  "retained_calls": [
+    {
+      "file": "B3-R2-JEV-observed-server-callers.txt",
+      "tokens": 5622
+    },
+    {
+      "file": "B3-R2-F4-server-frame-source.txt",
+      "tokens": 6439
+    },
+    {
+      "file": "B3-R2-F4-client-status-source.txt",
+      "tokens": 1197
+    },
+    {
+      "file": "B3-R2-F4-server-process-source.txt",
+      "tokens": 1951
+    },
+    {
+      "file": "B3-R2-F4-connection-task-callers.txt",
+      "tokens": 2349
+    },
+    {
+      "file": "B3-R2-F4-connector-callers.txt",
+      "tokens": 19829
+    },
+    {
+      "file": "B3-R2-F4-proxy-callers.txt",
+      "tokens": 2369
+    },
+    {
+      "file": "B3-R2-doop-full-only-source.txt",
+      "tokens": 3983
+    }
+  ],
+  "manual_inline": [
+    4177,
+    4234,
+    2278,
+    7895,
+    5270,
+    6174
+  ],
+  "new_total": 20119906
+}

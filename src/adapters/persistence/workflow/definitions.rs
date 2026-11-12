@@ -7,7 +7,7 @@ pub(super) async fn read_draft(
 ) -> AppResult<Option<DraftState>> {
     sqlx::query_as::<_, DraftRow>(&format!(
         "SELECT {DRAFT_COLUMNS} FROM workflow_definitions \
-        WHERE company_id = $1 AND id = $2"
+        WHERE company_id = $1 AND id = $2 AND NOT EXISTS(SELECT 1 FROM native_mcp_brokers AS broker WHERE broker.company_id=workflow_definitions.company_id AND broker.workflow_id=workflow_definitions.id)"
     ))
     .bind(company.as_uuid())
     .bind(workflow.as_uuid())
@@ -23,7 +23,7 @@ async fn read_publication(
 ) -> AppResult<Option<PublishedCommand>> {
     sqlx::query_as::<_, VersionRow>(&format!(
         "SELECT {VERSION_COLUMNS} FROM workflow_versions \
-        WHERE company_id = $1 AND command_key = $2"
+        WHERE company_id = $1 AND command_key = $2 AND NOT EXISTS(SELECT 1 FROM native_mcp_brokers AS broker WHERE broker.company_id=workflow_versions.company_id AND broker.version_id=workflow_versions.id)"
     ))
     .bind(company.as_uuid())
     .bind(key.as_str())
@@ -117,7 +117,7 @@ impl WorkflowDefinitions for PostgresPersistence {
             WHERE company_id = $1 AND id = $2 AND EXISTS \
             (SELECT 1 FROM workflow_definitions AS definition \
              WHERE definition.company_id = workflow_versions.company_id \
-               AND definition.id = workflow_versions.workflow_id AND NOT definition.archived)"
+               AND definition.id = workflow_versions.workflow_id AND NOT definition.archived) AND NOT EXISTS(SELECT 1 FROM native_mcp_brokers AS broker WHERE broker.company_id=workflow_versions.company_id AND broker.version_id=workflow_versions.id)"
         );
         sqlx::query_as::<_, VersionRow>(&query)
             .bind(company.as_uuid())
@@ -138,7 +138,10 @@ impl WorkflowDefinitions for PostgresPersistence {
                 let count = sqlx::query(
                     "UPDATE workflow_definitions SET revision = $3, title = $4, \
                     description = $5, source = $6, archived = $7 \
-                    WHERE company_id = $1 AND id = $2 AND revision = $8 AND NOT archived",
+                    WHERE company_id = $1 AND id = $2 AND revision = $8 AND NOT archived \
+                      AND NOT EXISTS(SELECT 1 FROM native_mcp_brokers AS broker \
+                        WHERE broker.company_id=workflow_definitions.company_id \
+                          AND broker.workflow_id=workflow_definitions.id)",
                 )
                 .bind(draft.company().as_uuid())
                 .bind(draft.workflow().as_uuid())

@@ -138,6 +138,7 @@ async fn remove_operations(db: &mut PgConnection, company: Uuid) -> AppResult<u6
         LEFT JOIN workflow_runs AS original ON original.company_id=session.company_id AND original.id=session.workflow_run_id
         WHERE operation.company_id=$1 AND operation.settled_at<clock_timestamp()-interval '90 days'
           AND (session.workflow_run_id IS NULL OR original.state IN ('succeeded','failed','cancelled'))
+          AND NOT EXISTS(SELECT 1 FROM native_mcp_calls AS call WHERE call.company_id=operation.company_id AND call.operation_id=operation.id AND call.retired_at IS NULL)
           AND NOT EXISTS(SELECT 1 FROM workflow_local_agent_calls AS call WHERE call.company_id=operation.company_id AND call.operation_id=operation.id)
           AND NOT EXISTS(SELECT 1 FROM workflow_local_agent_calls AS call JOIN workflow_action_intents AS intent
             ON intent.company_id=call.company_id AND intent.id=call.invocation_id WHERE call.company_id=operation.company_id
@@ -155,6 +156,7 @@ async fn remove_sessions(db: &mut PgConnection, company: Uuid) -> AppResult<u64>
         WHERE session.company_id=$1 AND session.created_at<clock_timestamp()-interval '90 days'
           AND (session.workflow_run_id IS NULL OR (original.state IN ('succeeded','failed','cancelled') AND original.finished_at<clock_timestamp()-interval '90 days'))
           AND NOT EXISTS(SELECT 1 FROM local_agent_operations AS operation WHERE operation.company_id=session.company_id AND operation.session_id=session.id)
+          AND NOT EXISTS(SELECT 1 FROM native_mcp_calls AS call WHERE call.company_id=session.company_id AND call.session_id=session.id AND call.retired_at IS NULL)
           AND NOT EXISTS(SELECT 1 FROM workflow_local_agent_calls AS call JOIN workflow_action_intents AS intent
             ON intent.company_id=call.company_id AND intent.id=call.invocation_id WHERE call.company_id=session.company_id
             AND (call.session_id=session.id OR intent.operation#>>'{arguments,session_id}'=session.id::text))

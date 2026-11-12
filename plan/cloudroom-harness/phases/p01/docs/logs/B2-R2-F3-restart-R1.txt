@@ -1,0 +1,24 @@
+
+ RUN  v4.1.1 /private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/server
+
+ ❯ |@cloudroom/server| test/threads/required-agent-configuration.test.ts (7 tests | 1 failed | 6 skipped) 546ms
+   × retains required ownership and queued work after a real on-disk server restart without its plugin state 544ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@cloudroom/server| test/threads/required-agent-configuration.test.ts > retains required ownership and queued work after a real on-disk server restart without its plugin state
+TypeError: first.pluginService.uninstall is not a function
+ ❯ test/threads/required-agent-configuration.test.ts:146:31
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 6 skipped (7)
+   Start at  18:51:24
+   Duration  4.48s (transform 2.56s, setup 765ms, import 3.07s, tests 546ms, environment 0ms)
+
+undefined
+/private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/server:
+ ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1: vitest run --config vitest.config.ts test/threads/required-agent-configuration.test.ts -t real on-disk server restart

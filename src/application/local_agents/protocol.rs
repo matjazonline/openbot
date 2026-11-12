@@ -255,7 +255,11 @@ impl ConnectionIssue {
 }
 
 #[async_trait]
-pub trait LocalProtocolStore: LocalMachineStore {
+pub trait LocalProtocolStore: LocalMachineStore + super::mcp::NativeMcpBroker {
+    async fn native_bundle(
+        &self,
+        request: &super::harness::NativeBundleRequest,
+    ) -> AppResult<super::harness::NativeBundleResponse>;
     async fn retired_mappings(
         &self,
         fence: ConnectionFence,

@@ -83,9 +83,13 @@ pub(super) async fn start(
         tx.commit().await?;
         return Ok(saved);
     }
-    let locked =
-        shared::lock_profile_on(&mut tx, CompanyId::new(request.company), request.profile_id)
-            .await?;
+    let locked = shared::capture_profile_on(
+        &mut tx,
+        CompanyId::new(request.company),
+        request.actor,
+        request.profile_id,
+    )
+    .await?;
     if locked.machine.state != MachineState::Enabled {
         return Err(AppError::Conflict("Machine is not enabled".into()));
     }
@@ -103,12 +107,14 @@ pub(super) async fn start(
         company_id: request.company,
         installation_id: locked.machine.installation_id,
         selection: locked.profile.selection,
+        harness: locked.harness,
         association,
         thread_id: None,
     };
     let command = LocalCommand::Create {
         session_id: session.id,
         selection: session.selection.clone(),
+        harness: session.harness.clone(),
         prompt: request.prompt.clone(),
     };
     shared::validate_capacity_on(
@@ -164,6 +170,15 @@ pub(super) async fn control(
         verify_actor_on(&mut tx, request.company, request.request_id, request.actor).await?;
         tx.commit().await?;
         return Ok(saved);
+    }
+    if command.is_effect() {
+        super::super::native::selected_on(
+            &mut tx,
+            request.company,
+            request.actor,
+            &session.harness,
+        )
+        .await?;
     }
     let machine = lock_machine(&mut tx, request.company, session.selection.machine_id).await?;
     if machine.installation_id != session.installation_id.as_uuid()

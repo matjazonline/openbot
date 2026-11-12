@@ -1,0 +1,31 @@
+{
+  "phase": "p01",
+  "batch": "B2",
+  "status": "accepted in phase",
+  "artifact": "b6c8d018ef4d17eabb1808b1cf4ee5672e659d89844f6aa6333dfd4dcf0d5aae",
+  "head": "2c477c9dd8cae4d1a7881d377dcea8ce038dae13",
+  "review_base": "abac7038a08a355156b7680a01d2f79f3de756fd",
+  "exclusions": [
+    "plan/cloudroom-harness/COORDINATION.md",
+    "plan/cloudroom-harness/phases/p01/docs"
+  ],
+  "independent_note": "CH-P01-B2-N2",
+  "findings": {
+    "CH-P01-B2-F1": "FIXED",
+    "CH-P01-B2-F2": "FIXED",
+    "CH-P01-B2-F3": "FIXED",
+    "CH-P01-B2-F4": "FIXED"
+  },
+  "coordination_revision": 3,
+  "notices": [],
+  "evidence": {
+    "path": "CH-P01-B2-R2.evidence.json",
+    "sha256": "7deb45f9442022df52d53d78a34bec9a84ac89c3b4670a6658737b272f0678cb"
+  },
+  "limitations": [
+    "Native provider API responses scripted locally; actual CLI/approval/effect exercised",
+    "Browser final submission intercepted; backend save authority separately DB-tested",
+    "B3 MCP and final full verification remain required"
+  ],
+  "integrated": false
+}

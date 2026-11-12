@@ -662,6 +662,7 @@ fn classify_commit_error(error: &AppError) -> (InboundEventErrorClass, bool) {
         | AppError::Execution(_)
         | AppError::McpAuthentication
         | AppError::BadRequest(_)
+        | AppError::NativeMcpNotAdmitted
         | AppError::NotFound(_)
         | AppError::Forbidden(_)
         | AppError::Conflict(_) => (InboundEventErrorClass::Routing, true),

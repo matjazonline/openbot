@@ -133,3 +133,21 @@ fn skill_bundle_malformed_or_empty_frontmatter_is_refused() {
         assert!(skill_markdown_metadata(text).is_err(), "{text:?}");
     }
 }
+
+#[test]
+fn skill_bundle_parent_case_spellings_are_portable_and_identical_parents_repeat() {
+    for paths in [
+        ["Scripts/one.txt", "scripts/two.txt"],
+        ["a/Files/one", "a/files/two"],
+    ] {
+        let files = paths.map(|path| SkillFile::from_bytes(path.into(), b"x", false).unwrap());
+        assert!(validate_skill_files(&files).is_err());
+    }
+    let files = [
+        "scripts/one.txt",
+        "scripts/two.txt",
+        "scripts/deep/three.txt",
+    ]
+    .map(|path| SkillFile::from_bytes(path.into(), b"x", false).unwrap());
+    assert!(validate_skill_files(&files).is_ok());
+}

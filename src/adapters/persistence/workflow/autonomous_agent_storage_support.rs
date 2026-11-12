@@ -38,6 +38,7 @@ pub(super) fn definition(
 ) -> ResolvedAgentDefinition {
     let company = f.binding.target.company;
     ResolvedAgentDefinition {
+        native_permissions: Default::default(),
         company_id: company,
         agent_id: AgentId::new(agent),
         key: AgentKey::parse("assistant").unwrap(),

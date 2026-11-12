@@ -1,0 +1,12 @@
+✔ agent selectors preserve unsaved input, publication retries and navigation after an accepted write (3441.666166ms)
+✔ local profile and session forms escape native output and acknowledge accepted writes (2772.370625ms)
+✔ an Auto agent on an Auto-only provider saves the unchanged unsupported fallback and clearing the agent restores validation (1761.99175ms)
+✔ skill ZIP uploads retain multipart bytes and show progress, success and failure in both themes (3570.972791ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 4710.531333

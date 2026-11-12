@@ -1,0 +1,23 @@
+   Compiling open_bots v0.1.0 (/private/tmp/openbot-cloudroom-harness-t1gfnhz1/worktree)
+warning: function `check_source_on` is never used
+   --> src/adapters/persistence/workflow/agent_authority.rs:174:21
+    |
+174 | pub(super) async fn check_source_on(
+    |                     ^^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `open_bots` (lib test) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2m 49s
+     Running unittests src/lib.rs (/private/tmp/openbot-cloudroom-harness-t1gfnhz1/target/debug/deps/open_bots-6467f0b3ff334015)
+
+running 6 tests
+test adapters::persistence::local_agents::management::tests::native_mcp_tests::native_mcp_competing_invocations_publish_one_real_linked_run_and_job ... ok
+test adapters::persistence::local_agents::management::tests::native_mcp_tests::native_mcp_cancel_by_invocation_invalidates_then_run_first_sweep_closes_work ... ok
+test adapters::persistence::local_agents::management::tests::native_mcp_tests::native_mcp_bad_input_or_unacknowledged_turn_never_publishes_work ... ok
+test adapters::persistence::local_agents::management::tests::native_mcp_tests::live_tests::native_mcp_real_claim_and_preparation_preserve_exact_contract_and_stop_after_grant_revocation ... ok
+test adapters::persistence::local_agents::management::tests::native_mcp_tests::native_mcp_poison_retirement_keeps_a_durable_delay_after_rollback ... ok
+test adapters::persistence::local_agents::management::tests::native_mcp_tests::live_tests::native_mcp_added_grant_and_machine_owner_locks_never_wait_behind_a_competitor ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 4078 filtered out; finished in 3.96s
+

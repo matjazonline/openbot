@@ -15,6 +15,12 @@ use uuid::Uuid;
 pub const SESSION_OPERATION_PAGE: usize = 8;
 
 #[derive(Serialize)]
+pub struct NativeAgentChoice {
+    pub id: crate::entities::agent_capability::AgentId,
+    pub name: String,
+}
+
+#[derive(Serialize)]
 pub struct RecordPage<T> {
     pub entries: Vec<T>,
     pub truncated: bool,
@@ -91,6 +97,11 @@ pub struct ControlSession {
 
 #[async_trait]
 pub trait LocalAgentManagementStore: LocalAgentRead {
+    async fn native_agent_choices(
+        &self,
+        actor: Uuid,
+        company: Uuid,
+    ) -> AppResult<RecordPage<NativeAgentChoice>>;
     async fn list_profiles(
         &self,
         actor: Uuid,
@@ -153,6 +164,14 @@ impl LocalAgentManagement {
     ) -> AppResult<RecordPage<LocalAgentProfile>> {
         managed_company(self.companies.as_ref(), actor, company).await?;
         self.store.list_profiles(actor, company, after).await
+    }
+    pub async fn native_agent_choices(
+        &self,
+        actor: Uuid,
+        company: Uuid,
+    ) -> AppResult<RecordPage<NativeAgentChoice>> {
+        managed_company(self.companies.as_ref(), actor, company).await?;
+        self.store.native_agent_choices(actor, company).await
     }
     pub async fn profile(
         &self,

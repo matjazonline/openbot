@@ -38,6 +38,7 @@ fn agent() -> AgentReference {
 
 fn definition() -> crate::application::agent::ResolvedAgentDefinition {
     crate::application::agent::ResolvedAgentDefinition {
+        native_permissions: Default::default(),
         company_id: company(),
         agent_id: agent().agent_id,
         key: agent().key,

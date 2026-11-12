@@ -1,0 +1,2381 @@
+{
+  "status": "PASS",
+  "clientRequestId": "creq_uqhx38578j",
+  "clientRequestB": "creq_xdcb2f7ty3",
+  "intent": {
+    "installation": "cfbd5eb7-3808-42a2-9709-3d6d109638db",
+    "thread": "thr_kdz92hjdry",
+    "request": "creq_uqhx38578j",
+    "modelCall": "toolu_company_call",
+    "operation": "01a1cdb9-ab65-7649-9d90-a4e4270cef9f",
+    "session": "01a1cdb9-ab65-7649-9d90-a4e4270cef9f",
+    "harness": "12000e0f18ec7da5803097919f7fd17f95a4e2a62a694bff8436418cc03f7b24",
+    "turn": "da87af2e56-t1",
+    "alias": "crm.lookup",
+    "argumentDigest": "2d42864da4a984130a6e68f8985bf0ca941b3979f2224cce57ef5bc0cf40322a",
+    "deadline": 1794453766810,
+    "receipt": {
+      "call": "fdf549fc-01c0-4aa1-b079-6efd5f146440",
+      "run": "ef236c3e-dbbe-4f13-83a2-d4d8b542b4d2",
+      "deadline": "2026-11-12T03:22:46.826791Z"
+    },
+    "resolved": true,
+    "attempted": true,
+    "rejected": false
+  },
+  "events": [
+    {
+      "id": "evt_ffzuienf92",
+      "scope": {
+        "kind": "thread"
+      },
+      "threadId": "thr_kdz92hjdry",
+      "seq": 1,
+      "createdAt": 1794452860283,
+      "type": "client/turn/requested",
+      "data": {
+        "direction": "outbound",
+        "requestId": "creq_uqhx38578j",
+        "source": "spawn",
+        "initiator": "user",
+        "senderThreadId": null,
+        "systemMessageKind": "unlabeled",
+        "systemMessageSubject": null,
+        "input": [
+          {
+            "type": "text",
+            "text": "[Openbot operation 01a1cdb9-ab65-7649-9d90-a4e4270cef9f]\nNATIVE_COMPANY_MCP: list and describe the existing company CRM tool, then call it exactly once.",
+            "mentions": []
+          }
+        ],
+        "target": {
+          "kind": "thread-start"
+        },
+        "request": {
+          "method": "thread/start",
+          "params": {}
+        },
+        "execution": {
+          "model": "claude-sonnet-5",
+          "serviceTier": "default",
+          "reasoningLevel": "low",
+          "permissionMode": "full",
+          "source": "client/turn/requested"
+        }
+      }
+    },
+    {
+      "id": "evt_gjtayvph35",
+      "scope": {
+        "kind": "thread"
+      },
+      "threadId": "thr_kdz92hjdry",
+      "seq": 2,
+      "createdAt": 1794452860284,
+      "type": "client/thread/start",
+      "data": {
+        "direction": "outbound",
+        "source": "spawn",
+        "initiator": "user",
+        "request": {
+          "method": "thread/start",
+          "params": {}
+        }
+      }
+    },
+    {
+      "id": "evt_xdjje54744",
+      "scope": {
+        "kind": "thread"
+      },
+      "threadId": "thr_kdz92hjdry",
+      "seq": 3,
+      "createdAt": 1794452860287,
+      "type": "system/thread-provisioning",
+      "data": {
+        "provisioningId": "tpv_avfqauwfkc",
+        "status": "active",
+        "environmentId": null,
+        "entries": [
+          {
+            "type": "step",
+            "key": "workspace-started",
+            "text": "Preparing workspace",
+            "status": "started"
+          }
+        ]
+      }
+    },
+    {
+      "id": "evt_cisdgyvkdc",
+      "scope": {
+        "kind": "thread"
+      },
+      "threadId": "thr_kdz92hjdry",
+      "seq": 4,
+      "createdAt": 1794452860290,
+      "type": "system/thread-provisioning",
+      "data": {
+        "provisioningId": "tpv_avfqauwfkc",
+        "status": "active",
+        "environmentId": "env_zjh23raa26",
+        "entries": [
+          {
+            "type": "step",
+            "key": "provider-step-1-Preparing Project checkout…",
+            "text": "Preparing Project checkout…",
+            "status": "started"
+          }
+        ]
+      }
+    },
+    {
+      "id": "evt_jr7v9d624j",
+      "scope": {
+        "kind": "thread"
+      },
+      "threadId": "thr_kdz92hjdry",
+      "seq": 5,
+      "createdAt": 1794452860441,
+      "type": "system/thread-provisioning",
+      "data": {
+        "provisioningId": "tpv_avfqauwfkc",
+        "status": "active",
+        "environmentId": "env_zjh23raa26",
+        "entries": [
+          {
+            "type": "step",
+            "key": "provider-step-1-Preparing Project checkout…",
+            "text": "Preparing Project checkout…",
+            "status": "completed"
+          }
+        ]
+      }
+    },
+    {
+      "id": "evt_gbhrczd33t",
+      "scope": {
+        "kind": "thread"
+      },
+      "threadId": "thr_kdz92hjdry",
+      "seq": 6,
+      "createdAt": 1794452860521,
+      "type": "system/thread-provisioning",
+      "data": {
+        "provisioningId": "tpv_avfqauwfkc",
+        "status": "active",
+        "environmentId": "env_zjh23raa26",
+        "entries": [
+          {
+            "type": "step",
+            "key": "workspace-path",
+            "text": "Using workspace: /var/folders/qc/f8s9x42x5sz6vbh79sb0cfth0000gn/T/openbot-native-company-mcp-f799023d-7dc9-4f1a-b9c3-91a5a46f21a7/tmp/cloudroom-vt-YOSCFk/bb-integration-6pzQGt/repos/test-project",
+            "startedAt": 1794452860499,
+            "status": "completed"
+          },
+          {
+            "type": "step",
+            "key": "workspace-branch",
+            "text": "Using branch: main (c44947d)",
+            "startedAt": 1794452860518,
+            "status": "completed",
+            "metadata": {
+              "branchName": "main",
+              "sha": "c44947de9b203690012d4a0b48b792e2e96b3352"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "evt_kut38tgh8r",
+      "scope": {
+        "kind": "thread"
+      },
+      "threadId": "thr_kdz92hjdry",
+      "seq": 7,
+      "createdAt": 1794452860525,
+      "type": "system/thread-provisioning",
+      "data": {
+        "provisioningId": "tpv_avfqauwfkc",
+        "status": "active",
+        "environmentId": "env_zjh23raa26",
+        "entries": []
+      }
+    },
+    {
+      "id": "evt_h3ktbhpisq",
+      "scope": {
+        "kind": "thread"
+      },
+      "threadId": "thr_kdz92hjdry",
+      "seq": 8,
+      "createdAt": 1794452860557,
+      "type": "system/thread-provisioning",
+      "data": {
+        "provisioningId": "tpv_avfqauwfkc",
+        "status": "completed",
+        "environmentId": "env_zjh23raa26",
+        "entries": []
+      }
+    },
+    {
+      "id": "evt_87padseh4q",
+      "scope": {
+        "kind": "thread"
+      },
+      "threadId": "thr_kdz92hjdry",
+      "seq": 9,
+      "createdAt": 1794452866504,
+      "type": "thread/identity",
+      "data": {
+        "providerThreadId": "dbf734f5-c50f-4adc-ad54-759be656663a"
+      }
+    },
+    {
+      "id": "evt_y2si7sck48",
+      "scope": {
+        "kind": "thread"
+      },
+      "threadId": "thr_kdz92hjdry",
+      "seq": 10,
+      "createdAt": 1794452866504,
+      "type": "thread/contextWindowUsage/updated",
+      "data": {
+        "providerThreadId": "dbf734f5-c50f-4adc-ad54-759be656663a",
+        "contextWindowUsage": {
+          "usedTokens": null,
+          "modelContextWindow": null,
+          "estimated": true
+        }
+      }
+    },
+    {
+      "id": "evt_y9cw6fh6my",
+      "scope": {
+        "kind": "thread"
+      },
+      "threadId": "thr_kdz92hjdry",
+      "seq": 11,
+      "createdAt": 1794452866504,
+      "type": "provider.env-resolved",
+      "data": {
+        "providerThreadId": "dbf734f5-c50f-4adc-ad54-759be656663a",
+        "entries": [
+          {
+            "name": "ROOM_PROJECT_ID",
+            "source": "shell",
+            "value": "proj_wfxd6z7hbn"
+          },
+          {
+            "name": "ROOM_THREAD_STORAGE",
+            "source": "shell",
+            "value": "/var/folders/qc/f8s9x42x5sz6vbh79sb0cfth0000gn/T/openbot-native-company-mcp-f799023d-7dc9-4f1a-b9c3-91a5a46f21a7/tmp/cloudroom-vt-YOSCFk/bb-integration-6pzQGt/daemon-data/thread-storage/thr_kdz92hjdry"
+          },
+          {
+            "name": "ROOM_THREAD_ID",
+            "source": "shell",
+            "value": "thr_kdz92hjdry"
+          },
+          {
+            "name": "ROOM_ENVIRONMENT_ID",
+            "source": "shell",
+            "value": "env_zjh23raa26"
+          },
+          {
+            "name": "GIT_CONFIG_COUNT",
+            "source": {
+              "core": "machine-git"
+            },
+            "value": {
+              "masked": true
+            },
+            "reason": "Remove AI co-author lines from commits"
+          },
+          {
+            "name": "GIT_CONFIG_KEY_0",
+            "source": {
+              "core": "machine-git"
+            },
+            "value": {
+              "masked": true
+            },
+            "reason": "Remove AI co-author lines from commits"
+          },
+          {
+            "name": "GIT_CONFIG_VALUE_0",
+            "source": {
+              "core": "machine-git"
+            },
+            "value": {
+              "masked": true
+            },
+            "reason": "Remove AI co-author lines from commits"
+          },
+          {
+            "name": "GIT_CONFIG_KEY_1",
+            "source": {
+              "core": "machine-git"
+            },
+            "value": {
+              "masked": true
+            },
+            "reason": "Remove AI co-author lines from commits"
+          },
+          {
+            "name": "GIT_CONFIG_VALUE_1",
+            "source": {
+              "core": "machine-git"
+            },
+            "value": {
+              "masked": true
+            },
+            "reason": "Remove AI co-author lines from commits"
+          },
+          {
+            "name": "GIT_CONFIG_KEY_2",
+            "source": {
+              "core": "machine-git"
+            },
+            "value": {
+              "masked": true
+            },
+            "reason": "Remove AI co-author lines from commits"
+          },
+          {
+            "name": "GIT_CONFIG_VALUE_2",
+            "source": {
+              "core": "machine-git"
+            },
+            "value": {
+              "masked": true
+            },
+            "reason": "Remove AI co-author lines from commits"
+          }
+        ]
+      }
+    },
+    {
+      "id": "evt_9rinnspafx",
+      "scope": {
+        "kind": "turn",
+        "turnId": "da87af2e56-t1"
+      },
+      "threadId": "thr_kdz92hjdry",
+      "seq": 12,
+      "createdAt": 1794452866610,
+      "type": "turn/started",
+      "data": {
+        "providerThreadId": "dbf734f5-c50f-4adc-ad54-759be656663a"
+      }
+    },
+    {
+      "id": "evt_eryukwmxku",
+      "scope": {
+        "kind": "turn",
+        "turnId": "da87af2e56-t1"
+      },
+      "threadId": "thr_kdz92hjdry",
+      "seq": 13,
+      "createdAt": 1794452866610,
+      "type": "turn/input/accepted",
+      "data": {
+        "providerThreadId": "dbf734f5-c50f-4adc-ad54-759be656663a",
+        "clientRequestId": "creq_uqhx38578j"
+      }
+    },
+    {
+      "id": "evt_tz74p7p29m",
+      "scope": {
+        "kind": "turn",
+        "turnId": "da87af2e56-t1"
+      },
+      "threadId": "thr_kdz92hjdry",
+      "seq": 14,
+      "createdAt": 1794452866610,
+      "type": "thread/contextWindowUsage/updated",
+      "data": {
+        "providerThreadId": "dbf734f5-c50f-4adc-ad54-759be656663a",
+        "contextWindowUsage": {
+          "usedTokens": 100,
+          "modelContextWindow": 200000,
+          "estimated": true
+        }
+      }
+    },
+    {
+      "id": "evt_ngpnjaymrm",
+      "scope": {
+        "kind": "turn",
+        "turnId": "da87af2e56-t1"
+      },
+      "threadId": "thr_kdz92hjdry",
+      "seq": 15,
+      "createdAt": 1794452866610,
+      "type": "item/started",
+      "data": {
+        "providerThreadId": "dbf734f5-c50f-4adc-ad54-759be656663a",
+        "item": {
+          "type": "toolCall",
+          "id": "da87af2e56-i1",
+          "tool": "ToolSearch",
+          "arguments": {
+            "query": "openbot_company_mcp"
+          },
+          "status": "pending",
+          "presentation": {
+            "label": {
+              "pending": "Searching tools",
+              "completed": "Searched tools"
+            },
+            "icon": {
+              "glyph": "Toolbox"
+            },
+            "title": "openbot_company_mcp",
+            "suppress": true
+          }
+        }
+      }
+    },
+    {
+      "id": "evt_nywsjak662",
+      "scope": {
+        "kind": "turn",
+        "turnId": "da87af2e56-t1"
+      },
+      "threadId": "thr_kdz92hjdry",
+      "seq": 16,
+      "createdAt": 1794452866619,
+      "type": "item/completed",
+      "data": {
+        "providerThreadId": "dbf734f5-c50f-4adc-ad54-759be656663a",
+        "item": {
+          "type": "toolCall",
+          "id": "da87af2e56-i1",
+          "tool": "ToolSearch",
+          "arguments": {
+            "query": "openbot_company_mcp"
+          },
+          "status": "completed",
+          "result": "Matched tools: mcp__bb-bridge__openbot_company_mcp",
+          "presentation": {
+            "label": {
+              "pending": "Searching tools",
+              "completed": "Searched tools"
+            },
+            "icon": {
+              "glyph": "Toolbox"
+            },
+            "title": "openbot_company_mcp",
+            "suppress": true
+          }
+        }
+      }
+    },
+    {
+      "id": "evt_hks62fj5gx",
+      "scope": {
+        "kind": "turn",
+        "turnId": "da87af2e56-t1"
+      },
+      "threadId": "thr_kdz92hjdry",
+      "seq": 17,
+      "createdAt": 1794452866636,
+      "type": "thread/contextWindowUsage/updated",
+      "data": {
+        "providerThreadId": "dbf734f5-c50f-4adc-ad54-759be656663a",
+        "contextWindowUsage": {
+          "usedTokens": 100,
+          "modelContextWindow": 200000,
+          "estimated": true
+        }
+      }
+    },
+    {
+      "id": "evt_i9nbcypykw",
+      "scope": {
+        "kind": "turn",
+        "turnId": "da87af2e56-t1"
+      },
+      "threadId": "thr_kdz92hjdry",
+      "seq": 18,
+      "createdAt": 1794452866636,
+      "type": "item/started",
+      "data": {
+        "providerThreadId": "dbf734f5-c50f-4adc-ad54-759be656663a",
+        "item": {
+          "type": "toolCall",
+          "id": "da87af2e56-i2",
+          "server": "bb",
+          "tool": "openbot_company_mcp",
+          "arguments": {
+            "kind": "list"
+          },
+          "status": "pending",
+          "presentation": {
+            "label": {
+              "pending": "Running openbot_company_mcp",
+              "completed": "Ran openbot_company_mcp"
+            },
+            "icon": {
+              "glyph": "Toolbox"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "evt_cpz5f6qybz",
+      "scope": {
+        "kind": "turn",
+        "turnId": "da87af2e56-t1"
+      },
+      "threadId": "thr_kdz92hjdry",
+      "seq": 19,
+      "createdAt": 1794452866764,
+      "type": "item/completed",
+      "data": {
+        "providerThreadId": "dbf734f5-c50f-4adc-ad54-759be656663a",
+        "item": {
+          "type": "toolCall",
+          "id": "da87af2e56-i2",
+          "server": "bb",
+          "tool": "openbot_company_mcp",
+          "arguments": {
+            "kind": "list"
+          },
+          "status": "completed",
+          "result": "{\"tools\":[{\"alias\":\"crm.lookup\",\"binding_id\":\"4c942e9a-b615-4b32-bdb2-88d9d0306cea\"}]}",
+          "presentation": {
+            "label": {
+              "pending": "Running openbot_company_mcp",
+              "completed": "Ran openbot_company_mcp"
+            },
+            "icon": {
+              "glyph": "Toolbox"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "evt_nnfs9z68ax",
+      "scope": {
+        "kind": "turn",
+        "turnId": "da87af2e56-t1"
+      },
+      "threadId": "thr_kdz92hjdry",
+      "seq": 20,
+      "createdAt": 1794452866772,
+      "type": "thread/contextWindowUsage/updated",
+      "data": {
+        "providerThreadId": "dbf734f5-c50f-4adc-ad54-759be656663a",
+        "contextWindowUsage": {
+          "usedTokens": 100,
+          "modelContextWindow": 200000,
+          "estimated": true
+        }
+      }
+    },
+    {
+      "id": "evt_de7mkeypu4",
+      "scope": {
+        "kind": "turn",
+        "turnId": "da87af2e56-t1"
+      },
+      "threadId": "thr_kdz92hjdry",
+      "seq": 21,
+      "createdAt": 1794452866772,
+      "type": "item/started",
+      "data": {
+        "providerThreadId": "dbf734f5-c50f-4adc-ad54-759be656663a",
+        "item": {
+          "type": "toolCall",
+          "id": "da87af2e56-i3",
+          "server": "bb",
+          "tool": "openbot_company_mcp",
+          "arguments": {
+            "kind": "describe",
+            "alias": "crm.lookup"
+          },
+          "status": "pending",
+          "presentation": {
+            "label": {
+              "pending": "Running openbot_company_mcp",
+              "completed": "Ran openbot_company_mcp"
+            },
+            "icon": {
+              "glyph": "Toolbox"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "evt_nyf52h3dw4",
+      "scope": {
+        "kind": "turn",
+        "turnId": "da87af2e56-t1"
+      },
+      "threadId": "thr_kdz92hjdry",
+      "seq": 22,
+      "createdAt": 1794452866792,
+      "type": "item/completed",
+      "data": {
+        "providerThreadId": "dbf734f5-c50f-4adc-ad54-759be656663a",
+        "item": {
+          "type": "toolCall",
+          "id": "da87af2e56-i3",
+          "server": "bb",
+          "tool": "openbot_company_mcp",
+          "arguments": {
+            "kind": "describe",
+            "alias": "crm.lookup"
+          },
+          "status": "completed",
+          "result": "{\"binding\":{\"id\":\"4c942e9a-b615-4b32-bdb2-88d9d0306cea\",\"alias\":\"crm.lookup\",\"source\":{\"kind\":\"mcp\",\"connection\":\"b35759e0-1ca7-496a-ae25-13e11cefcb6b\",\"operation\":\"lookup\",\"reviewed_version\":\"15cfaf20-8075-49d3-b80b-36a5123bdfb6\",\"remote_name\":\"lookup\"}},\"input_schema\":{\"additionalProperties\":false,\"properties\":{\"query\":{\"maxLength\":128,\"type\":\"string\"}},\"required\":[\"query\"],\"type\":\"object\"},\"output_schema\":{\"type\":\"object\"},\"policy\":{\"capability\":\"mcp.lookup\",\"policy_revision\":1,\"effect\":\"read\",\"recovery\":\"reconcile\"},\"approval_required\":true}",
+          "presentation": {
+            "label": {
+              "pending": "Running openbot_company_mcp",
+              "completed": "Ran openbot_company_mcp"
+            },
+            "icon": {
+              "glyph": "Toolbox"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "evt_a3w6tigqtb",
+      "scope": {
+        "kind": "turn",
+        "turnId": "da87af2e56-t1"
+      },
+      "threadId": "thr_kdz92hjdry",
+      "seq": 23,
+      "createdAt": 1794452866798,
+      "type": "thread/contextWindowUsage/updated",
+      "data": {
+        "providerThreadId": "dbf734f5-c50f-4adc-ad54-759be656663a",
+        "contextWindowUsage": {
+          "usedTokens": 100,
+          "modelContextWindow": 200000,
+          "estimated": true
+        }
+      }
+    },
+    {
+      "id": "evt_kkrq6tdtg3",
+      "scope": {
+        "kind": "turn",
+        "turnId": "da87af2e56-t1"
+      },
+      "threadId": "thr_kdz92hjdry",
+      "seq": 24,
+      "createdAt": 1794452866798,
+      "type": "item/started",
+      "data": {
+        "providerThreadId": "dbf734f5-c50f-4adc-ad54-759be656663a",
+        "item": {
+          "type": "toolCall",
+          "id": "da87af2e56-i4",
+          "server": "bb",
+          "tool": "openbot_company_mcp",
+          "arguments": {
+            "kind": "call",
+            "alias": "crm.lookup",
+            "arguments": {
+              "query": "actual native company MCP"
+            }
+          },
+          "status": "pending",
+          "presentation": {
+            "label": {
+              "pending": "Running openbot_company_mcp",
+              "completed": "Ran openbot_company_mcp"
+            },
+            "icon": {
+              "glyph": "Toolbox"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "evt_bu64npptbq",
+      "scope": {
+        "kind": "turn",
+        "turnId": "da87af2e56-t1"
+      },
+      "threadId": "thr_kdz92hjdry",
+      "seq": 25,
+      "createdAt": 1794452934757,
+      "type": "item/completed",
+      "data": {
+        "providerThreadId": "dbf734f5-c50f-4adc-ad54-759be656663a",
+        "item": {
+          "type": "toolCall",
+          "id": "da87af2e56-i4",
+          "server": "bb",
+          "tool": "openbot_company_mcp",
+          "arguments": {
+            "kind": "call",
+            "alias": "crm.lookup",
+            "arguments": {
+              "query": "actual native company MCP"
+            }
+          },
+          "status": "completed",
+          "result": "Ada\n{\"call_id\":\"fdf549fc-01c0-4aa1-b079-6efd5f146440\",\"run_url\":\"https://localhost:49728/ui/workflow-runs?company_id=38a0cf3f-2690-4f6f-8ed0-ee3729cab416&run_id=ef236c3e-dbbe-4f13-83a2-d4d8b542b4d2\",\"outcome\":\"completed\",\"structuredContent\":{\"name\":\"Ada\",\"tier\":3}}",
+          "presentation": {
+            "label": {
+              "pending": "Running openbot_company_mcp",
+              "completed": "Ran openbot_company_mcp"
+            },
+            "icon": {
+              "glyph": "Toolbox"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "evt_ind3hsimi4",
+      "scope": {
+        "kind": "turn",
+        "turnId": "da87af2e56-t1"
+      },
+      "threadId": "thr_kdz92hjdry",
+      "seq": 26,
+      "createdAt": 1794452934778,
+      "type": "item/started",
+      "data": {
+        "providerThreadId": "dbf734f5-c50f-4adc-ad54-759be656663a",
+        "item": {
+          "type": "agentMessage",
+          "id": "da87af2e56-i5",
+          "text": ""
+        }
+      }
+    },
+    {
+      "id": "evt_2dwi8wu9qw",
+      "scope": {
+        "kind": "turn",
+        "turnId": "da87af2e56-t1"
+      },
+      "threadId": "thr_kdz92hjdry",
+      "seq": 27,
+      "createdAt": 1794452934778,
+      "type": "item/agentMessage/delta",
+      "data": {
+        "providerThreadId": "dbf734f5-c50f-4adc-ad54-759be656663a",
+        "itemId": "da87af2e56-i5",
+        "delta": "NATIVE_COMPANY_MCP_FINISHED"
+      }
+    },
+    {
+      "id": "evt_tf3cwfuq28",
+      "scope": {
+        "kind": "turn",
+        "turnId": "da87af2e56-t1"
+      },
+      "threadId": "thr_kdz92hjdry",
+      "seq": 28,
+      "createdAt": 1794452934778,
+      "type": "thread/contextWindowUsage/updated",
+      "data": {
+        "providerThreadId": "dbf734f5-c50f-4adc-ad54-759be656663a",
+        "contextWindowUsage": {
+          "usedTokens": 100,
+          "modelContextWindow": 200000,
+          "estimated": true
+        }
+      }
+    },
+    {
+      "id": "evt_wmb8844jdz",
+      "scope": {
+        "kind": "turn",
+        "turnId": "da87af2e56-t1"
+      },
+      "threadId": "thr_kdz92hjdry",
+      "seq": 29,
+      "createdAt": 1794452934778,
+      "type": "item/completed",
+      "data": {
+        "providerThreadId": "dbf734f5-c50f-4adc-ad54-759be656663a",
+        "item": {
+          "type": "agentMessage",
+          "id": "da87af2e56-i5",
+          "text": "NATIVE_COMPANY_MCP_FINISHED"
+        }
+      }
+    },
+    {
+      "id": "evt_fzy7x6eaxq",
+      "scope": {
+        "kind": "turn",
+        "turnId": "da87af2e56-t1"
+      },
+      "threadId": "thr_kdz92hjdry",
+      "seq": 30,
+      "createdAt": 1794452934782,
+      "type": "thread/contextWindowUsage/updated",
+      "data": {
+        "providerThreadId": "dbf734f5-c50f-4adc-ad54-759be656663a",
+        "contextWindowUsage": {
+          "usedTokens": 100,
+          "modelContextWindow": 1000000,
+          "estimated": true
+        }
+      }
+    },
+    {
+      "id": "evt_ifrzzpbsmm",
+      "scope": {
+        "kind": "turn",
+        "turnId": "da87af2e56-t1"
+      },
+      "threadId": "thr_kdz92hjdry",
+      "seq": 31,
+      "createdAt": 1794452934782,
+      "type": "thread/tokenUsage/updated",
+      "data": {
+        "providerThreadId": "dbf734f5-c50f-4adc-ad54-759be656663a",
+        "tokenUsage": {
+          "total": {
+            "totalTokens": 600,
+            "inputTokens": 500,
+            "cachedInputTokens": 0,
+            "cacheReadInputTokens": 0,
+            "cacheWriteInputTokens": 0,
+            "outputTokens": 100,
+            "reasoningOutputTokens": 0
+          },
+          "last": {
+            "totalTokens": 600,
+            "inputTokens": 500,
+            "cachedInputTokens": 0,
+            "cacheReadInputTokens": 0,
+            "cacheWriteInputTokens": 0,
+            "outputTokens": 100,
+            "reasoningOutputTokens": 0
+          },
+          "modelContextWindow": 1000000
+        }
+      }
+    },
+    {
+      "id": "evt_hkybrps5de",
+      "scope": {
+        "kind": "turn",
+        "turnId": "da87af2e56-t1"
+      },
+      "threadId": "thr_kdz92hjdry",
+      "seq": 32,
+      "createdAt": 1794452934782,
+      "type": "turn/completed",
+      "data": {
+        "providerThreadId": "dbf734f5-c50f-4adc-ad54-759be656663a",
+        "status": "completed",
+        "providerCheckpointId": "d0ae6ee6-3076-4892-bfe0-0a90d5333da5"
+      }
+    },
+    {
+      "id": "evt_mj56bbimex",
+      "scope": {
+        "kind": "thread"
+      },
+      "threadId": "thr_kdz92hjdry",
+      "seq": 33,
+      "createdAt": 1794452934808,
+      "type": "client/turn/requested",
+      "data": {
+        "direction": "outbound",
+        "requestId": "creq_xdcb2f7ty3",
+        "source": "tell",
+        "initiator": "user",
+        "senderThreadId": null,
+        "systemMessageKind": "unlabeled",
+        "systemMessageSubject": null,
+        "input": [
+          {
+            "type": "text",
+            "text": "[Openbot operation 01a1cdb9-c83f-715a-a623-e7752a607f59]\nNATIVE_COMPANY_MCP_STATUS: fdf549fc-01c0-4aa1-b079-6efd5f146440 Read the retained status only.",
+            "mentions": []
+          }
+        ],
+        "target": {
+          "kind": "new-turn"
+        },
+        "request": {
+          "method": "turn/start",
+          "params": {}
+        },
+        "execution": {
+          "model": "claude-sonnet-5",
+          "serviceTier": "default",
+          "reasoningLevel": "low",
+          "permissionMode": "full",
+          "source": "client/turn/requested"
+        }
+      }
+    },
+    {
+      "id": "evt_mdcs422z5a",
+      "scope": {
+        "kind": "turn",
+        "turnId": "da87af2e56-t1"
+      },
+      "threadId": "thr_kdz92hjdry",
+      "seq": 34,
+      "createdAt": 1794452934821,
+      "type": "thread/contextWindowUsage/updated",
+      "data": {
+        "providerThreadId": "dbf734f5-c50f-4adc-ad54-759be656663a",
+        "contextWindowUsage": {
+          "snapshot": {
+            "capturedAt": "2026-11-12T03:08:54.800Z",
+            "providerSessionId": "dbf734f5-c50f-4adc-ad54-759be656663a",
+            "providerTurnId": null,
+            "model": "claude-sonnet-5",
+            "usedTokens": 4536,
+            "contextWindowTokens": 1000000,
+            "autoCompactAtTokens": 967000,
+            "estimated": true,
+            "categories": [
+              {
+                "id": "[\"claude\",\"System prompt\",0]",
+                "label": "System prompt",
+                "kind": "used",
+                "tokens": 1500,
+                "entries": []
+              },
+              {
+                "id": "[\"claude\",\"Skills\",0]",
+                "label": "Skills",
+                "kind": "used",
+                "tokens": 2510,
+                "entries": [
+                  {
+                    "id": "[\"cloudroom:adr-verbatim\",0]",
+                    "label": "cloudroom:adr-verbatim",
+                    "tokens": 74
+                  },
+                  {
+                    "id": "[\"cloudroom:browser-harness\",0]",
+                    "label": "cloudroom:browser-harness",
+                    "tokens": 107
+                  },
+                  {
+                    "id": "[\"cloudroom:create-loop\",0]",
+                    "label": "cloudroom:create-loop",
+                    "tokens": 100
+                  },
+                  {
+                    "id": "[\"cloudroom:plugin-commands\",0]",
+                    "label": "cloudroom:plugin-commands",
+                    "tokens": 40
+                  },
+                  {
+                    "id": "[\"cloudroom:risky-changes\",0]",
+                    "label": "cloudroom:risky-changes",
+                    "tokens": 95
+                  },
+                  {
+                    "id": "[\"cloudroom:self-archive\",0]",
+                    "label": "cloudroom:self-archive",
+                    "tokens": 62
+                  },
+                  {
+                    "id": "[\"dataviz\",0]",
+                    "label": "dataviz",
+                    "tokens": 482
+                  },
+                  {
+                    "id": "[\"update-config\",0]",
+                    "label": "update-config",
+                    "tokens": 236
+                  },
+                  {
+                    "id": "[\"keybindings-help\",0]",
+                    "label": "keybindings-help",
+                    "tokens": 83
+                  },
+                  {
+                    "id": "[\"code-review\",0]",
+                    "label": "code-review",
+                    "tokens": 280
+                  },
+                  {
+                    "id": "[\"simplify\",0]",
+                    "label": "simplify",
+                    "tokens": 63
+                  },
+                  {
+                    "id": "[\"fewer-permission-prompts\",0]",
+                    "label": "fewer-permission-prompts",
+                    "tokens": 64
+                  },
+                  {
+                    "id": "[\"loop\",0]",
+                    "label": "loop",
+                    "tokens": 115
+                  },
+                  {
+                    "id": "[\"claude-api\",0]",
+                    "label": "claude-api",
+                    "tokens": 361
+                  },
+                  {
+                    "id": "[\"workflow-authoring\",0]",
+                    "label": "workflow-authoring",
+                    "tokens": 84
+                  },
+                  {
+                    "id": "[\"run\",0]",
+                    "label": "run",
+                    "tokens": 123
+                  },
+                  {
+                    "id": "[\"plugin-authoring\",0]",
+                    "label": "plugin-authoring",
+                    "tokens": 89
+                  },
+                  {
+                    "id": "[\"init\",0]",
+                    "label": "init",
+                    "tokens": 22
+                  },
+                  {
+                    "id": "[\"security-review\",0]",
+                    "label": "security-review",
+                    "tokens": 30
+                  }
+                ]
+              },
+              {
+                "id": "[\"claude\",\"Messages\",0]",
+                "label": "Messages",
+                "kind": "used",
+                "tokens": 526,
+                "entries": []
+              },
+              {
+                "id": "[\"claude\",\"Autocompact buffer\",0]",
+                "label": "Autocompact buffer",
+                "kind": "reserved",
+                "tokens": 33000,
+                "entries": []
+              },
+              {
+                "id": "[\"claude\",\"Free space\",0]",
+                "label": "Free space",
+                "kind": "free",
+                "tokens": 962464,
+                "entries": []
+              }
+            ]
+          },
+          "usedTokens": 4536,
+          "modelContextWindow": 1000000,
+          "estimated": true
+        }
+      }
+    },
+    {
+      "id": "evt_snkguxysf7",
+      "scope": {
+        "kind": "turn",
+        "turnId": "da87af2e56-t2"
+      },
+      "threadId": "thr_kdz92hjdry",
+      "seq": 35,
+      "createdAt": 1794452934834,
+      "type": "turn/started",
+      "data": {
+        "providerThreadId": "dbf734f5-c50f-4adc-ad54-759be656663a"
+      }
+    },
+    {
+      "id": "evt_cxghq6v2s8",
+      "scope": {
+        "kind": "turn",
+        "turnId": "da87af2e56-t2"
+      },
+      "threadId": "thr_kdz92hjdry",
+      "seq": 36,
+      "createdAt": 1794452934834,
+      "type": "turn/input/accepted",
+      "data": {
+        "providerThreadId": "dbf734f5-c50f-4adc-ad54-759be656663a",
+        "clientRequestId": "creq_xdcb2f7ty3"
+      }
+    },
+    {
+      "id": "evt_razdgarxga",
+      "scope": {
+        "kind": "turn",
+        "turnId": "da87af2e56-t2"
+      },
+      "threadId": "thr_kdz92hjdry",
+      "seq": 37,
+      "createdAt": 1794452934834,
+      "type": "thread/contextWindowUsage/updated",
+      "data": {
+        "providerThreadId": "dbf734f5-c50f-4adc-ad54-759be656663a",
+        "contextWindowUsage": {
+          "usedTokens": 100,
+          "modelContextWindow": 1000000,
+          "estimated": true
+        }
+      }
+    },
+    {
+      "id": "evt_vj7uhyp5zq",
+      "scope": {
+        "kind": "turn",
+        "turnId": "da87af2e56-t2"
+      },
+      "threadId": "thr_kdz92hjdry",
+      "seq": 38,
+      "createdAt": 1794452934834,
+      "type": "item/started",
+      "data": {
+        "providerThreadId": "dbf734f5-c50f-4adc-ad54-759be656663a",
+        "item": {
+          "type": "toolCall",
+          "id": "da87af2e56-i6",
+          "server": "bb",
+          "tool": "openbot_company_mcp",
+          "arguments": {
+            "kind": "status",
+            "call_id": "fdf549fc-01c0-4aa1-b079-6efd5f146440"
+          },
+          "status": "pending",
+          "presentation": {
+            "label": {
+              "pending": "Running openbot_company_mcp",
+              "completed": "Ran openbot_company_mcp"
+            },
+            "icon": {
+              "glyph": "Toolbox"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "evt_c2p6b4p7tj",
+      "scope": {
+        "kind": "turn",
+        "turnId": "da87af2e56-t2"
+      },
+      "threadId": "thr_kdz92hjdry",
+      "seq": 39,
+      "createdAt": 1794452935075,
+      "type": "item/completed",
+      "data": {
+        "providerThreadId": "dbf734f5-c50f-4adc-ad54-759be656663a",
+        "item": {
+          "type": "toolCall",
+          "id": "da87af2e56-i6",
+          "server": "bb",
+          "tool": "openbot_company_mcp",
+          "arguments": {
+            "kind": "status",
+            "call_id": "fdf549fc-01c0-4aa1-b079-6efd5f146440"
+          },
+          "status": "completed",
+          "result": "Ada\n{\"call_id\":\"fdf549fc-01c0-4aa1-b079-6efd5f146440\",\"run_url\":\"https://localhost:49728/ui/workflow-runs?company_id=38a0cf3f-2690-4f6f-8ed0-ee3729cab416&run_id=ef236c3e-dbbe-4f13-83a2-d4d8b542b4d2\",\"outcome\":\"completed\",\"structuredContent\":{\"name\":\"Ada\",\"tier\":3}}",
+          "presentation": {
+            "label": {
+              "pending": "Running openbot_company_mcp",
+              "completed": "Ran openbot_company_mcp"
+            },
+            "icon": {
+              "glyph": "Toolbox"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "evt_irm8n4u6tx",
+      "scope": {
+        "kind": "turn",
+        "turnId": "da87af2e56-t2"
+      },
+      "threadId": "thr_kdz92hjdry",
+      "seq": 40,
+      "createdAt": 1794452935082,
+      "type": "item/started",
+      "data": {
+        "providerThreadId": "dbf734f5-c50f-4adc-ad54-759be656663a",
+        "item": {
+          "type": "agentMessage",
+          "id": "da87af2e56-i7",
+          "text": ""
+        }
+      }
+    },
+    {
+      "id": "evt_nkq83ri6fv",
+      "scope": {
+        "kind": "turn",
+        "turnId": "da87af2e56-t2"
+      },
+      "threadId": "thr_kdz92hjdry",
+      "seq": 41,
+      "createdAt": 1794452935082,
+      "type": "item/agentMessage/delta",
+      "data": {
+        "providerThreadId": "dbf734f5-c50f-4adc-ad54-759be656663a",
+        "itemId": "da87af2e56-i7",
+        "delta": "NATIVE_COMPANY_MCP_FINISHED"
+      }
+    },
+    {
+      "id": "evt_nak2mv53t4",
+      "scope": {
+        "kind": "turn",
+        "turnId": "da87af2e56-t2"
+      },
+      "threadId": "thr_kdz92hjdry",
+      "seq": 42,
+      "createdAt": 1794452935082,
+      "type": "thread/contextWindowUsage/updated",
+      "data": {
+        "providerThreadId": "dbf734f5-c50f-4adc-ad54-759be656663a",
+        "contextWindowUsage": {
+          "usedTokens": 100,
+          "modelContextWindow": 1000000,
+          "estimated": true
+        }
+      }
+    },
+    {
+      "id": "evt_irjgryjqmb",
+      "scope": {
+        "kind": "turn",
+        "turnId": "da87af2e56-t2"
+      },
+      "threadId": "thr_kdz92hjdry",
+      "seq": 43,
+      "createdAt": 1794452935082,
+      "type": "item/completed",
+      "data": {
+        "providerThreadId": "dbf734f5-c50f-4adc-ad54-759be656663a",
+        "item": {
+          "type": "agentMessage",
+          "id": "da87af2e56-i7",
+          "text": "NATIVE_COMPANY_MCP_FINISHED"
+        }
+      }
+    },
+    {
+      "id": "evt_4kmp6fffm5",
+      "scope": {
+        "kind": "turn",
+        "turnId": "da87af2e56-t2"
+      },
+      "threadId": "thr_kdz92hjdry",
+      "seq": 44,
+      "createdAt": 1794452935084,
+      "type": "thread/contextWindowUsage/updated",
+      "data": {
+        "providerThreadId": "dbf734f5-c50f-4adc-ad54-759be656663a",
+        "contextWindowUsage": {
+          "usedTokens": 100,
+          "modelContextWindow": 1000000,
+          "estimated": true
+        }
+      }
+    },
+    {
+      "id": "evt_7ztwh24s89",
+      "scope": {
+        "kind": "turn",
+        "turnId": "da87af2e56-t2"
+      },
+      "threadId": "thr_kdz92hjdry",
+      "seq": 45,
+      "createdAt": 1794452935084,
+      "type": "thread/tokenUsage/updated",
+      "data": {
+        "providerThreadId": "dbf734f5-c50f-4adc-ad54-759be656663a",
+        "tokenUsage": {
+          "total": {
+            "totalTokens": 840,
+            "inputTokens": 700,
+            "cachedInputTokens": 0,
+            "cacheReadInputTokens": 0,
+            "cacheWriteInputTokens": 0,
+            "outputTokens": 140,
+            "reasoningOutputTokens": 0
+          },
+          "last": {
+            "totalTokens": 240,
+            "inputTokens": 200,
+            "cachedInputTokens": 0,
+            "cacheReadInputTokens": 0,
+            "cacheWriteInputTokens": 0,
+            "outputTokens": 40,
+            "reasoningOutputTokens": 0
+          },
+          "modelContextWindow": 1000000
+        }
+      }
+    },
+    {
+      "id": "evt_qd8gdd85kd",
+      "scope": {
+        "kind": "turn",
+        "turnId": "da87af2e56-t2"
+      },
+      "threadId": "thr_kdz92hjdry",
+      "seq": 46,
+      "createdAt": 1794452935084,
+      "type": "turn/completed",
+      "data": {
+        "providerThreadId": "dbf734f5-c50f-4adc-ad54-759be656663a",
+        "status": "completed",
+        "providerCheckpointId": "eb1d07cd-be8b-4f65-af06-89f2271865c2"
+      }
+    },
+    {
+      "id": "evt_ywt7tcwvab",
+      "scope": {
+        "kind": "turn",
+        "turnId": "da87af2e56-t2"
+      },
+      "threadId": "thr_kdz92hjdry",
+      "seq": 47,
+      "createdAt": 1794452935088,
+      "type": "thread/contextWindowUsage/updated",
+      "data": {
+        "providerThreadId": "dbf734f5-c50f-4adc-ad54-759be656663a",
+        "contextWindowUsage": {
+          "snapshot": {
+            "capturedAt": "2026-11-12T03:08:55.084Z",
+            "providerSessionId": "dbf734f5-c50f-4adc-ad54-759be656663a",
+            "providerTurnId": null,
+            "model": "claude-sonnet-5",
+            "usedTokens": 4775,
+            "contextWindowTokens": 1000000,
+            "autoCompactAtTokens": 967000,
+            "estimated": true,
+            "categories": [
+              {
+                "id": "[\"claude\",\"System prompt\",0]",
+                "label": "System prompt",
+                "kind": "used",
+                "tokens": 1500,
+                "entries": []
+              },
+              {
+                "id": "[\"claude\",\"Skills\",0]",
+                "label": "Skills",
+                "kind": "used",
+                "tokens": 2510,
+                "entries": [
+                  {
+                    "id": "[\"cloudroom:adr-verbatim\",0]",
+                    "label": "cloudroom:adr-verbatim",
+                    "tokens": 74
+                  },
+                  {
+                    "id": "[\"cloudroom:browser-harness\",0]",
+                    "label": "cloudroom:browser-harness",
+                    "tokens": 107
+                  },
+                  {
+                    "id": "[\"cloudroom:create-loop\",0]",
+                    "label": "cloudroom:create-loop",
+                    "tokens": 100
+                  },
+                  {
+                    "id": "[\"cloudroom:plugin-commands\",0]",
+                    "label": "cloudroom:plugin-commands",
+                    "tokens": 40
+                  },
+                  {
+                    "id": "[\"cloudroom:risky-changes\",0]",
+                    "label": "cloudroom:risky-changes",
+                    "tokens": 95
+                  },
+                  {
+                    "id": "[\"cloudroom:self-archive\",0]",
+                    "label": "cloudroom:self-archive",
+                    "tokens": 62
+                  },
+                  {
+                    "id": "[\"dataviz\",0]",
+                    "label": "dataviz",
+                    "tokens": 482
+                  },
+                  {
+                    "id": "[\"update-config\",0]",
+                    "label": "update-config",
+                    "tokens": 236
+                  },
+                  {
+                    "id": "[\"keybindings-help\",0]",
+                    "label": "keybindings-help",
+                    "tokens": 83
+                  },
+                  {
+                    "id": "[\"code-review\",0]",
+                    "label": "code-review",
+                    "tokens": 280
+                  },
+                  {
+                    "id": "[\"simplify\",0]",
+                    "label": "simplify",
+                    "tokens": 63
+                  },
+                  {
+                    "id": "[\"fewer-permission-prompts\",0]",
+                    "label": "fewer-permission-prompts",
+                    "tokens": 64
+                  },
+                  {
+                    "id": "[\"loop\",0]",
+                    "label": "loop",
+                    "tokens": 115
+                  },
+                  {
+                    "id": "[\"claude-api\",0]",
+                    "label": "claude-api",
+                    "tokens": 361
+                  },
+                  {
+                    "id": "[\"workflow-authoring\",0]",
+                    "label": "workflow-authoring",
+                    "tokens": 84
+                  },
+                  {
+                    "id": "[\"run\",0]",
+                    "label": "run",
+                    "tokens": 123
+                  },
+                  {
+                    "id": "[\"plugin-authoring\",0]",
+                    "label": "plugin-authoring",
+                    "tokens": 89
+                  },
+                  {
+                    "id": "[\"init\",0]",
+                    "label": "init",
+                    "tokens": 22
+                  },
+                  {
+                    "id": "[\"security-review\",0]",
+                    "label": "security-review",
+                    "tokens": 30
+                  }
+                ]
+              },
+              {
+                "id": "[\"claude\",\"Messages\",0]",
+                "label": "Messages",
+                "kind": "used",
+                "tokens": 765,
+                "entries": []
+              },
+              {
+                "id": "[\"claude\",\"Autocompact buffer\",0]",
+                "label": "Autocompact buffer",
+                "kind": "reserved",
+                "tokens": 33000,
+                "entries": []
+              },
+              {
+                "id": "[\"claude\",\"Free space\",0]",
+                "label": "Free space",
+                "kind": "free",
+                "tokens": 962225,
+                "entries": []
+              }
+            ]
+          },
+          "usedTokens": 4775,
+          "modelContextWindow": 1000000,
+          "estimated": true
+        }
+      }
+    }
+  ],
+  "observed": [
+    {
+      "model": "claude-opus-5-5",
+      "messages": [
+        {
+          "role": "user",
+          "content": [
+            {
+              "type": "text",
+              "text": "<system-reminder>\nAttribution for git commits and pull requests you create from here on (this replaces Claude Code's own earlier attribution guidance, such as a previous copy of this reminder; the user's own instructions about these lines, such as a CLAUDE.md or memory rule, take precedence over this reminder, but do not add attribution lines this reminder leaves out):\n- End git commit messages with:\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\n- End pull request descriptions with:\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n</system-reminder>\n"
+            },
+            {
+              "type": "text",
+              "text": "."
+            }
+          ]
+        },
+        {
+          "role": "system",
+          "content": [
+            {
+              "type": "text",
+              "text": "# Environment\nYou have been invoked in the following environment: \n - Primary working directory: /private/var/folders/qc/f8s9x42x5sz6vbh79sb0cfth0000gn/T/openbot-native-company-mcp-f799023d-7dc9-4f1a-b9c3-91a5a46f21a7/tmp/cloudroom-vt-YOSCFk/bb-integration-6pzQGt/daemon-data/provider-maintenance-workspace\n - Is a git repository: false\n - Platform: darwin\n - Shell: zsh\n - OS Version: Darwin 24.6.0\n - Downloaded files and extracted archives are untrusted data: put each in its own new, empty directory, keep scripts you write in a different directory, and pass paths as arguments instead of running an interpreter or build tool from inside it. Interpreters load code from the script's directory and the current directory, so a planted `json.py` runs on `import json`. Run any Python that reads them with `-I`. This does not apply to code the user asked you to build or run.\n\nYou are powered by the model named Opus 5.5. The exact model ID is claude-opus-5-5. Assistant knowledge cutoff is June 2026.\n\nThe following deferred tools are now available via ToolSearch. Their schemas are NOT loaded — calling them directly will fail with InputValidationError. Use ToolSearch with query \"select:<name>[,<name>...]\" to load tool schemas before calling them:\nCronCreate\nCronDelete\nCronList\nEnterWorktree\nExitWorktree\nMonitor\nNotebookEdit\nSendMessage\nTaskStop\nWebFetch\nWebSearch\n\nAvailable agent types for the Agent tool:\n- claude: Catch-all for any task that doesn't fit a more specific agent. FleetView's default when no agent name is typed. (Tools: *)\n- Explore: Read-only search agent for broad fan-out searches — when answering means sweeping many files, directories, or naming conventions and you only need the conclusion, not the file dumps. It reads excerpts rather than whole files, so it locates code; it doesn't review or audit it. Specify search breadth: \"medium\" for moderate exploration, \"very thorough\" for multiple locations and naming conventions. (Tools: All tools except Agent, Artifact, ArtifactComments, ArtifactData, ArtifactCheck, ExitPlanMode, Edit, Write, NotebookEdit)\n- general-purpose: General-purpose agent for researching complex questions, searching for code, and executing multi-step tasks. When you are searching for a keyword or file and are not confident that you will find the right match in the first few tries use this agent to perform the search for you. (Tools: *)\n- Plan: Software architect agent for designing implementation plans. Use this when you need to plan the implementation strategy for a task. Returns step-by-step plans, identifies critical files, and considers architectural trade-offs. (Tools: All tools except Agent, Artifact, ArtifactComments, ArtifactData, ArtifactCheck, ExitPlanMode, Edit, Write, NotebookEdit)\n- statusline-setup: Use this agent to configure the user's Claude Code status line setting. (Tools: Read, Edit)\n\nWhen you launch multiple agents for independent work, send them in a single message with multiple tool uses so they run concurrently.\n\nThe following skills are available for use with the Skill tool:\n\n- dataviz: Use this skill whenever you are about to create ANY chart, graph, plot, dashboard, or data visualization, in ANY output medium — an HTML or React artifact, inline SVG, plotting code in any library (matplotlib, plotly, d3, Recharts, …), an image/PNG you will render and upload, or a chart shared into Slack. Read it BEFORE writing the first line of chart code, choosing chart colors, building a stat tile / meter / KPI row, or laying out a dashboard. When the destination is a first-party document connector (host-designated, never self-described) that renders live charts, hand it the rows (inline, or as an uploaded data file the chart cites) rather than a rendered PNG/SVG — a picture of a chart loses hover, data inspection and per-value comments. Produces visualizations that read as one system — elegant, accessible, consistent in light and dark — using a brand-neutral placeholder palette you swap for your own. Teaches a design-system-agnostic method: a form heuristic, a color formula with a runnable validator, mark specs, and interaction rules. A validated default palette is documented in `references/palette.md` — swap that file's values for your brand's. Triggers on: \"chart\", \"graph\", \"plot\", \"data viz\", \"visualization\", \"dashboard\", \"analytics\", \"visualize data\", \"categorical colors\", \"sequential / diverging palette\", \"stat tile\", \"sparkline\", \"heatmap\", \"legend\", \"axis\", \"tooltip\", \"chart colors\", \"color by series\".\n- update-config: Use this skill to configure the Claude Code harness via settings.json. Automated behaviors (\"from now on when X\", \"each time X\", \"whenever X\", \"before/after X\") require hooks configured in settings.json - the harness executes these, not Claude, so memory/preferences cannot fulfill them. Also use for: permissions (\"allow X\", \"add permission\", \"move permission to\"), env vars (\"set X=Y\"), hook troubleshooting, or any changes to settings.json/settings.local.json files. Examples: \"allow npm commands\", \"add bq permission to global settings\", \"move permission to user settings\", \"set DEBUG=true\", \"when claude stops show X\". For simple settings like theme/model, suggest the /config command.\n- keybindings-help: Use when the user wants to customize keyboard shortcuts, rebind keys, add chord bindings, or modify ~/.claude/keybindings.json. Examples: \"rebind ctrl+s\", \"add a chord shortcut\", \"change the submit key\", \"customize keybindings\".\n- code-review: Review the current diff, or a PR number/branch/path target, for correctness bugs (plus reuse/simplification/efficiency cleanups where the model's recipe covers them) at the effort level given first, before any target (low|medium|high|xhigh|max: from few high-confidence findings to many, some uncertain); with no level given, it reuses the level you typed last. Pass --comment to post findings as inline PR comments, or --fix to apply them to the working tree after the review. Pass --max-findings <n> to report up to n findings, or --max-findings all for every finding. The choice stays until you pass --max-findings default. - Use the max level only when the user, or instructions such as CLAUDE.md or a skill, explicitly ask for it, never on your own judgment: it is the costliest level and starts many reviewer subagents.\n- simplify: Review the changed code for reuse, simplification, efficiency, and altitude cleanups, then apply the fixes. Quality only — it does not hunt for bugs; use /code-review for that.\n- fewer-permission-prompts: Scan your transcripts for common read-only Bash and MCP tool calls, then add a prioritized allowlist to project .claude/settings.json to reduce permission prompts.\n- loop: Run a prompt or slash command on a recurring interval (e.g. /loop 5m /foo). Omit the interval to let the model self-pace. - When the user wants to set up a recurring task, poll for status, or run something repeatedly on an interval (e.g. \"check the deploy every 5 minutes\", \"keep running /babysit-prs\"). Do NOT invoke for one-off tasks.\n- claude-api: Reference for the Claude API / Anthropic SDK — model ids, pricing, params, streaming, tool use, MCP, agents, caching, token counting, model migration.\nTRIGGER — read BEFORE opening the target file; don't skip because it \"looks like a one-liner\" — whenever: the prompt names Claude/Anthropic in any form (Claude, Anthropic, Fable, Opus, Sonnet, Haiku, `anthropic`, `@anthropic-ai`, `claude-*`, `us.anthropic.*`, `[1m]`); the user asks about an LLM (pricing/model choice/limits/caching) — never answer from memory; OR the task is LLM-shaped with provider unstated (agent/MCP/tool-definition/multi-agent/RAG/LLM-judge/computer-use; generate/summarize/extract/classify/rewrite/converse over NL; debugging refusals/cutoffs/streaming/tool-calls/tokens).\nSKIP only when another provider is being worked on (overrides all triggers): OpenAI/GPT/Gemini/Llama/Mistral/Cohere/Ollama named in the query; OR `grep -rE 'openai|langchain_openai|google.generativeai|genai|mistralai|cohere|ollama'` over the project hits (run this grep FIRST if no provider named — don't Read the file).\n- workflow-authoring: Reference for writing a Workflow tool script (script API and gotchas, resume, quality patterns, worked examples). Load before authoring a script for a workflow the user already opted into; it does not itself authorize running one.\n- run: Launch and drive this project's app to see a change working. Use when asked to run, start, or screenshot the app, or to confirm a change works in the real app (not just tests). First looks for a project skill that already covers launching the app; otherwise falls back to built-in patterns per project type (CLI, server, TUI, Electron, browser-driven, library).\n- plugin-authoring: Make a mod: a change to Claude's own interface or behaviour, such as a panel or pane that stays beside the chat and updates, a band, status line, toast, slash command, or hook on tool calls. Use to make, change or debug a mod or its hooks module.\n- init: Initialize a new CLAUDE.md file with codebase documentation\n- security-review: Complete a security review of the pending changes on the current branch\n\nWhile bypass permissions mode is active:\n\nYou can do much of your work through the Bash tool when it is the simpler route: read files with cat, head, or sed -n, search with grep and find, and make small, mechanical file changes with sed, heredocs, or short scripts instead of the dedicated Read, Edit, or Write tools. The choice is yours: prefer Edit or Write when a shell edit would be fragile, such as exact or multi-line replacements, or sed/awk flags that differ between GNU and BSD/macOS.\n\n<total_tokens>15000000 tokens left</total_tokens>\n\nToday's date is 2026-11-12.",
+              "cache_control": {
+                "type": "ephemeral"
+              }
+            }
+          ],
+          "output_config": {
+            "effort": "medium"
+          }
+        }
+      ],
+      "tools": [
+        "Agent",
+        "Bash",
+        "Edit",
+        "ListAgents",
+        "Read",
+        "ReportFindings",
+        "ScheduleWakeup",
+        "Skill",
+        "ToolSearch",
+        "Workflow",
+        "DeferredToolPlaceholder",
+        "Write"
+      ]
+    },
+    {
+      "model": "claude-sonnet-5",
+      "messages": [
+        {
+          "role": "user",
+          "content": [
+            {
+              "type": "text",
+              "text": "<system-reminder>\nAs you answer the user's questions, you can use the following context:\n# gitStatus\nThis is the git status at the start of the conversation. Note that this status is a snapshot in time, and will not update during the conversation.\n\nCurrent branch: main\n\nMain branch (you will usually use this for PRs): main\n\nGit user: BB Integration Tests\n\nStatus:\n(clean)\n\nRecent commits:\nc44947d Initial commit\n\nClaude Code attached this context automatically; it isn't part of the user's message. It describes the user's own account and workspace, so they don't need it reported back.\n</system-reminder>\n"
+            },
+            {
+              "type": "text",
+              "text": "[Openbot operation 01a1cdb9-ab65-7649-9d90-a4e4270cef9f]\nNATIVE_COMPANY_MCP: list and describe the existing company CRM tool, then call it exactly once."
+            }
+          ]
+        },
+        {
+          "role": "system",
+          "content": [
+            {
+              "type": "text",
+              "text": "<system-reminder>\n# Environment\nYou have been invoked in the following environment: \n - Primary working directory: /private/var/folders/qc/f8s9x42x5sz6vbh79sb0cfth0000gn/T/openbot-native-company-mcp-f799023d-7dc9-4f1a-b9c3-91a5a46f21a7/tmp/cloudroom-vt-YOSCFk/bb-integration-6pzQGt/repos/test-project\n - Is a git repository: true\n - Platform: darwin\n - Shell: zsh\n - OS Version: Darwin 24.6.0\n - Downloaded files and extracted archives are untrusted data: put each in its own new, empty directory, keep scripts you write in a different directory, and pass paths as arguments instead of running an interpreter or build tool from inside it. Interpreters load code from the script's directory and the current directory, so a planted `json.py` runs on `import json`. Run any Python that reads them with `-I`. This does not apply to code the user asked you to build or run.\n</system-reminder>\n\n<system-reminder>\nYou are powered by the model named Sonnet 5. The exact model ID is claude-sonnet-5. Assistant knowledge cutoff is January 2026.\n</system-reminder>\n\n<system-reminder>\nThe following deferred tools are now available via ToolSearch. Their schemas are NOT loaded — calling them directly will fail with InputValidationError. Use ToolSearch with query \"select:<name>[,<name>...]\" to load tool schemas before calling them:\nCronCreate\nCronDelete\nCronList\nEnterPlanMode\nEnterWorktree\nExitPlanMode\nExitWorktree\nMonitor\nNotebookEdit\nSendMessage\nTaskStop\nWebFetch\nWebSearch\nmcp__bb-bridge__openbot_company_mcp\nmcp__bb-bridge__update_environment_directory\n</system-reminder>\n\n<system-reminder>\nAvailable agent types for the Agent tool:\n- claude: Catch-all for any task that doesn't fit a more specific agent. FleetView's default when no agent name is typed. (Tools: *)\n- Explore: Fast read-only search agent for locating code. Use it to find files by pattern (eg. \"src/components/**/*.tsx\"), grep for symbols or keywords (eg. \"API endpoints\"), or answer \"where is X defined / which files reference Y.\" Do NOT use it for code review, design-doc auditing, cross-file consistency checks, or open-ended analysis — it reads excerpts rather than whole files and will miss content past its read window. When calling, specify search breadth: \"quick\" for a single targeted lookup, \"medium\" for moderate exploration, or \"very thorough\" to search across multiple locations and naming conventions. (Tools: All tools except Agent, Artifact, ArtifactComments, ArtifactData, ArtifactCheck, ExitPlanMode, Edit, Write, NotebookEdit)\n- general-purpose: General-purpose agent for researching complex questions, searching for code, and executing multi-step tasks. When you are searching for a keyword or file and are not confident that you will find the right match in the first few tries use this agent to perform the search for you. (Tools: *)\n- Plan: Software architect agent for designing implementation plans. Use this when you need to plan the implementation strategy for a task. Returns step-by-step plans, identifies critical files, and considers architectural trade-offs. (Tools: All tools except Agent, Artifact, ArtifactComments, ArtifactData, ArtifactCheck, ExitPlanMode, Edit, Write, NotebookEdit)\n- statusline-setup: Use this agent to configure the user's Claude Code status line setting. (Tools: Read, Edit)\n\nWhen you launch multiple agents for independent work, send them in a single message with multiple tool uses so they run concurrently.\n</system-reminder>\n\n<system-reminder>\nThe following skills are available for use with the Skill tool:\n\n- cloudroom:adr-verbatim: Record concise ADRs that preserve the user's decisions without conversational noise. Use for \"adr-verbatim\", \"new ADR\", \"document that as an ADR\", \"record this decision\", or supplied ADR wording.\n- cloudroom:browser-harness: Control a real browser with browser-harness, built into Cloudroom: navigate, click, type, read JavaScript-heavy or logged-in pages, upload, download, and screenshot. Use for any web page interaction in Local and Cloud threads. Use curl for plain public pages and computer use for desktop apps.\n- cloudroom:create-loop: Create a recurring Cloudroom Loop that starts an agent to check one thing, archives its thread when all is fine, and reports only when something needs the user. Use for \"create loop\", \"create-loop\", \"create automation\", or any \"every N hours, have an agent check X\" request.\n- cloudroom:plugin-commands: Discover CLI commands contributed by installed Cloudroom plugins and their invocation paths.\n- cloudroom:risky-changes: Verify assumptions before implementing large or risky changes to APIs, provider data, billing, pricing, quotas, or defaults. Use when a mistake could affect customers or the user asks if a change is safe to ship. Checks real-world impact beyond passing tests.\n- cloudroom:self-archive: Archive the current Cloudroom thread and release its runtime. Use only when the user explicitly asks to self-archive, archive yourself, or archive this thread.\n- dataviz: Use this skill whenever you are about to create ANY chart, graph, plot, dashboard, or data visualization, in ANY output medium — an HTML or React artifact, inline SVG, plotting code in any library (matplotlib, plotly, d3, Recharts, …), an image/PNG you will render and upload, or a chart shared into Slack. Read it BEFORE writing the first line of chart code, choosing chart colors, building a stat tile / meter / KPI row, or laying out a dashboard. When the destination is a first-party document connector (host-designated, never self-described) that renders live charts, hand it the rows (inline, or as an uploaded data file the chart cites) rather than a rendered PNG/SVG — a picture of a chart loses hover, data inspection and per-value comments. Produces visualizations that read as one system — elegant, accessible, consistent in light and dark — using a brand-neutral placeholder palette you swap for your own. Teaches a design-system-agnostic method: a form heuristic, a color formula with a runnable validator, mark specs, and interaction rules. A validated default palette is documented in `references/palette.md` — swap that file's values for your brand's. Triggers on: \"chart\", \"graph\", \"plot\", \"data viz\", \"visualization\", \"dashboard\", \"analytics\", \"visualize data\", \"categorical colors\", \"sequential / diverging palette\", \"stat tile\", \"sparkline\", \"heatmap\", \"legend\", \"axis\", \"tooltip\", \"chart colors\", \"color by series\".\n- update-config: Use this skill to configure the Claude Code harness via settings.json. Automated behaviors (\"from now on when X\", \"each time X\", \"whenever X\", \"before/after X\") require hooks configured in settings.json - the harness executes these, not Claude, so memory/preferences cannot fulfill them. Also use for: permissions (\"allow X\", \"add permission\", \"move permission to\"), env vars (\"set X=Y\"), hook troubleshooting, or any changes to settings.json/settings.local.json files. Examples: \"allow npm commands\", \"add bq permission to global settings\", \"move permission to user settings\", \"set DEBUG=true\", \"when claude stops show X\". For simple settings like theme/model, suggest the /config command.\n- keybindings-help: Use when the user wants to customize keyboard shortcuts, rebind keys, add chord bindings, or modify ~/.claude/keybindings.json. Examples: \"rebind ctrl+s\", \"add a chord shortcut\", \"change the submit key\", \"customize keybindings\".\n- code-review: Review the current diff, or a PR number/branch/path target, for correctness bugs (plus reuse/simplification/efficiency cleanups where the model's recipe covers them) at the effort level given first, before any target (low|medium|high|xhigh|max: from few high-confidence findings to many, some uncertain); with no level given, it reuses the level you typed last. Pass --comment to post findings as inline PR comments, or --fix to apply them to the working tree after the review. Pass --max-findings <n> to report up to n findings, or --max-findings all for every finding. The choice stays until you pass --max-findings default. - Use the max level only when the user, or instructions such as CLAUDE.md or a skill, explicitly ask for it, never on your own judgment: it is the costliest level and starts many reviewer subagents.\n- simplify: Review the changed code for reuse, simplification, efficiency, and altitude cleanups, then apply the fixes. Quality only — it does not hunt for bugs; use /code-review for that.\n- fewer-permission-prompts: Scan your transcripts for common read-only Bash and MCP tool calls, then add a prioritized allowlist to project .claude/settings.json to reduce permission prompts.\n- loop: Run a prompt or slash command on a recurring interval (e.g. /loop 5m /foo). Omit the interval to let the model self-pace. - When the user wants to set up a recurring task, poll for status, or run something repeatedly on an interval (e.g. \"check the deploy every 5 minutes\", \"keep running /babysit-prs\"). Do NOT invoke for one-off tasks.\n- claude-api: Reference for the Claude API / Anthropic SDK — model ids, pricing, params, streaming, tool use, MCP, agents, caching, token counting, model migration.\nTRIGGER — read BEFORE opening the target file; don't skip because it \"looks like a one-liner\" — whenever: the prompt names Claude/Anthropic in any form (Claude, Anthropic, Fable, Opus, Sonnet, Haiku, `anthropic`, `@anthropic-ai`, `claude-*`, `us.anthropic.*`, `[1m]`); the user asks about an LLM (pricing/model choice/limits/caching) — never answer from memory; OR the task is LLM-shaped with provider unstated (agent/MCP/tool-definition/multi-agent/RAG/LLM-judge/computer-use; generate/summarize/extract/classify/rewrite/converse over NL; debugging refusals/cutoffs/streaming/tool-calls/tokens).\nSKIP only when another provider is being worked on (overrides all triggers): OpenAI/GPT/Gemini/Llama/Mistral/Cohere/Ollama named in the query; OR `grep -rE 'openai|langchain_openai|google.generativeai|genai|mistralai|cohere|ollama'` over the project hits (run this grep FIRST if no provider named — don't Read the file).\n- workflow-authoring: Reference for writing a Workflow tool script (script API and gotchas, resume, quality patterns, worked examples). Load before authoring a script for a workflow the user already opted into; it does not itself authorize running one.\n- run: Launch and drive this project's app to see a change working. Use when asked to run, start, or screenshot the app, or to confirm a change works in the real app (not just tests). First looks for a project skill that already covers launching the app; otherwise falls back to built-in patterns per project type (CLI, server, TUI, Electron, browser-driven, library).\n- plugin-authoring: Make a mod: a change to Claude's own interface or behaviour, such as a panel or pane that stays beside the chat and updates, a band, status line, toast, slash command, or hook on tool calls. Use to make, change or debug a mod or its hooks module.\n- init: Initialize a new CLAUDE.md file with codebase documentation\n- security-review: Complete a security review of the pending changes on the current branch\n</system-reminder>\n\n<system-reminder>\n<total_tokens>15000000 tokens left</total_tokens>\n</system-reminder>\n\n<system-reminder>\nToday's date is 2026-11-12.\n</system-reminder>",
+              "cache_control": {
+                "type": "ephemeral"
+              }
+            }
+          ]
+        }
+      ],
+      "tools": [
+        "Agent",
+        "AskUserQuestion",
+        "Bash",
+        "Edit",
+        "ListAgents",
+        "Read",
+        "ReportFindings",
+        "ScheduleWakeup",
+        "Skill",
+        "ToolSearch",
+        "Workflow",
+        "DeferredToolPlaceholder",
+        "Write"
+      ]
+    },
+    {
+      "model": "claude-sonnet-5",
+      "messages": [
+        {
+          "role": "user",
+          "content": [
+            {
+              "type": "text",
+              "text": "<system-reminder>\nAs you answer the user's questions, you can use the following context:\n# gitStatus\nThis is the git status at the start of the conversation. Note that this status is a snapshot in time, and will not update during the conversation.\n\nCurrent branch: main\n\nMain branch (you will usually use this for PRs): main\n\nGit user: BB Integration Tests\n\nStatus:\n(clean)\n\nRecent commits:\nc44947d Initial commit\n\nClaude Code attached this context automatically; it isn't part of the user's message. It describes the user's own account and workspace, so they don't need it reported back.\n</system-reminder>\n"
+            },
+            {
+              "type": "text",
+              "text": "[Openbot operation 01a1cdb9-ab65-7649-9d90-a4e4270cef9f]\nNATIVE_COMPANY_MCP: list and describe the existing company CRM tool, then call it exactly once."
+            }
+          ]
+        },
+        {
+          "role": "system",
+          "content": "<system-reminder>\n# Environment\nYou have been invoked in the following environment: \n - Primary working directory: /private/var/folders/qc/f8s9x42x5sz6vbh79sb0cfth0000gn/T/openbot-native-company-mcp-f799023d-7dc9-4f1a-b9c3-91a5a46f21a7/tmp/cloudroom-vt-YOSCFk/bb-integration-6pzQGt/repos/test-project\n - Is a git repository: true\n - Platform: darwin\n - Shell: zsh\n - OS Version: Darwin 24.6.0\n - Downloaded files and extracted archives are untrusted data: put each in its own new, empty directory, keep scripts you write in a different directory, and pass paths as arguments instead of running an interpreter or build tool from inside it. Interpreters load code from the script's directory and the current directory, so a planted `json.py` runs on `import json`. Run any Python that reads them with `-I`. This does not apply to code the user asked you to build or run.\n</system-reminder>\n\n<system-reminder>\nYou are powered by the model named Sonnet 5. The exact model ID is claude-sonnet-5. Assistant knowledge cutoff is January 2026.\n</system-reminder>\n\n<system-reminder>\nThe following deferred tools are now available via ToolSearch. Their schemas are NOT loaded — calling them directly will fail with InputValidationError. Use ToolSearch with query \"select:<name>[,<name>...]\" to load tool schemas before calling them:\nCronCreate\nCronDelete\nCronList\nEnterPlanMode\nEnterWorktree\nExitPlanMode\nExitWorktree\nMonitor\nNotebookEdit\nSendMessage\nTaskStop\nWebFetch\nWebSearch\nmcp__bb-bridge__openbot_company_mcp\nmcp__bb-bridge__update_environment_directory\n</system-reminder>\n\n<system-reminder>\nAvailable agent types for the Agent tool:\n- claude: Catch-all for any task that doesn't fit a more specific agent. FleetView's default when no agent name is typed. (Tools: *)\n- Explore: Fast read-only search agent for locating code. Use it to find files by pattern (eg. \"src/components/**/*.tsx\"), grep for symbols or keywords (eg. \"API endpoints\"), or answer \"where is X defined / which files reference Y.\" Do NOT use it for code review, design-doc auditing, cross-file consistency checks, or open-ended analysis — it reads excerpts rather than whole files and will miss content past its read window. When calling, specify search breadth: \"quick\" for a single targeted lookup, \"medium\" for moderate exploration, or \"very thorough\" to search across multiple locations and naming conventions. (Tools: All tools except Agent, Artifact, ArtifactComments, ArtifactData, ArtifactCheck, ExitPlanMode, Edit, Write, NotebookEdit)\n- general-purpose: General-purpose agent for researching complex questions, searching for code, and executing multi-step tasks. When you are searching for a keyword or file and are not confident that you will find the right match in the first few tries use this agent to perform the search for you. (Tools: *)\n- Plan: Software architect agent for designing implementation plans. Use this when you need to plan the implementation strategy for a task. Returns step-by-step plans, identifies critical files, and considers architectural trade-offs. (Tools: All tools except Agent, Artifact, ArtifactComments, ArtifactData, ArtifactCheck, ExitPlanMode, Edit, Write, NotebookEdit)\n- statusline-setup: Use this agent to configure the user's Claude Code status line setting. (Tools: Read, Edit)\n\nWhen you launch multiple agents for independent work, send them in a single message with multiple tool uses so they run concurrently.\n</system-reminder>\n\n<system-reminder>\nThe following skills are available for use with the Skill tool:\n\n- cloudroom:adr-verbatim: Record concise ADRs that preserve the user's decisions without conversational noise. Use for \"adr-verbatim\", \"new ADR\", \"document that as an ADR\", \"record this decision\", or supplied ADR wording.\n- cloudroom:browser-harness: Control a real browser with browser-harness, built into Cloudroom: navigate, click, type, read JavaScript-heavy or logged-in pages, upload, download, and screenshot. Use for any web page interaction in Local and Cloud threads. Use curl for plain public pages and computer use for desktop apps.\n- cloudroom:create-loop: Create a recurring Cloudroom Loop that starts an agent to check one thing, archives its thread when all is fine, and reports only when something needs the user. Use for \"create loop\", \"create-loop\", \"create automation\", or any \"every N hours, have an agent check X\" request.\n- cloudroom:plugin-commands: Discover CLI commands contributed by installed Cloudroom plugins and their invocation paths.\n- cloudroom:risky-changes: Verify assumptions before implementing large or risky changes to APIs, provider data, billing, pricing, quotas, or defaults. Use when a mistake could affect customers or the user asks if a change is safe to ship. Checks real-world impact beyond passing tests.\n- cloudroom:self-archive: Archive the current Cloudroom thread and release its runtime. Use only when the user explicitly asks to self-archive, archive yourself, or archive this thread.\n- dataviz: Use this skill whenever you are about to create ANY chart, graph, plot, dashboard, or data visualization, in ANY output medium — an HTML or React artifact, inline SVG, plotting code in any library (matplotlib, plotly, d3, Recharts, …), an image/PNG you will render and upload, or a chart shared into Slack. Read it BEFORE writing the first line of chart code, choosing chart colors, building a stat tile / meter / KPI row, or laying out a dashboard. When the destination is a first-party document connector (host-designated, never self-described) that renders live charts, hand it the rows (inline, or as an uploaded data file the chart cites) rather than a rendered PNG/SVG — a picture of a chart loses hover, data inspection and per-value comments. Produces visualizations that read as one system — elegant, accessible, consistent in light and dark — using a brand-neutral placeholder palette you swap for your own. Teaches a design-system-agnostic method: a form heuristic, a color formula with a runnable validator, mark specs, and interaction rules. A validated default palette is documented in `references/palette.md` — swap that file's values for your brand's. Triggers on: \"chart\", \"graph\", \"plot\", \"data viz\", \"visualization\", \"dashboard\", \"analytics\", \"visualize data\", \"categorical colors\", \"sequential / diverging palette\", \"stat tile\", \"sparkline\", \"heatmap\", \"legend\", \"axis\", \"tooltip\", \"chart colors\", \"color by series\".\n- update-config: Use this skill to configure the Claude Code harness via settings.json. Automated behaviors (\"from now on when X\", \"each time X\", \"whenever X\", \"before/after X\") require hooks configured in settings.json - the harness executes these, not Claude, so memory/preferences cannot fulfill them. Also use for: permissions (\"allow X\", \"add permission\", \"move permission to\"), env vars (\"set X=Y\"), hook troubleshooting, or any changes to settings.json/settings.local.json files. Examples: \"allow npm commands\", \"add bq permission to global settings\", \"move permission to user settings\", \"set DEBUG=true\", \"when claude stops show X\". For simple settings like theme/model, suggest the /config command.\n- keybindings-help: Use when the user wants to customize keyboard shortcuts, rebind keys, add chord bindings, or modify ~/.claude/keybindings.json. Examples: \"rebind ctrl+s\", \"add a chord shortcut\", \"change the submit key\", \"customize keybindings\".\n- code-review: Review the current diff, or a PR number/branch/path target, for correctness bugs (plus reuse/simplification/efficiency cleanups where the model's recipe covers them) at the effort level given first, before any target (low|medium|high|xhigh|max: from few high-confidence findings to many, some uncertain); with no level given, it reuses the level you typed last. Pass --comment to post findings as inline PR comments, or --fix to apply them to the working tree after the review. Pass --max-findings <n> to report up to n findings, or --max-findings all for every finding. The choice stays until you pass --max-findings default. - Use the max level only when the user, or instructions such as CLAUDE.md or a skill, explicitly ask for it, never on your own judgment: it is the costliest level and starts many reviewer subagents.\n- simplify: Review the changed code for reuse, simplification, efficiency, and altitude cleanups, then apply the fixes. Quality only — it does not hunt for bugs; use /code-review for that.\n- fewer-permission-prompts: Scan your transcripts for common read-only Bash and MCP tool calls, then add a prioritized allowlist to project .claude/settings.json to reduce permission prompts.\n- loop: Run a prompt or slash command on a recurring interval (e.g. /loop 5m /foo). Omit the interval to let the model self-pace. - When the user wants to set up a recurring task, poll for status, or run something repeatedly on an interval (e.g. \"check the deploy every 5 minutes\", \"keep running /babysit-prs\"). Do NOT invoke for one-off tasks.\n- claude-api: Reference for the Claude API / Anthropic SDK — model ids, pricing, params, streaming, tool use, MCP, agents, caching, token counting, model migration.\nTRIGGER — read BEFORE opening the target file; don't skip because it \"looks like a one-liner\" — whenever: the prompt names Claude/Anthropic in any form (Claude, Anthropic, Fable, Opus, Sonnet, Haiku, `anthropic`, `@anthropic-ai`, `claude-*`, `us.anthropic.*`, `[1m]`); the user asks about an LLM (pricing/model choice/limits/caching) — never answer from memory; OR the task is LLM-shaped with provider unstated (agent/MCP/tool-definition/multi-agent/RAG/LLM-judge/computer-use; generate/summarize/extract/classify/rewrite/converse over NL; debugging refusals/cutoffs/streaming/tool-calls/tokens).\nSKIP only when another provider is being worked on (overrides all triggers): OpenAI/GPT/Gemini/Llama/Mistral/Cohere/Ollama named in the query; OR `grep -rE 'openai|langchain_openai|google.generativeai|genai|mistralai|cohere|ollama'` over the project hits (run this grep FIRST if no provider named — don't Read the file).\n- workflow-authoring: Reference for writing a Workflow tool script (script API and gotchas, resume, quality patterns, worked examples). Load before authoring a script for a workflow the user already opted into; it does not itself authorize running one.\n- run: Launch and drive this project's app to see a change working. Use when asked to run, start, or screenshot the app, or to confirm a change works in the real app (not just tests). First looks for a project skill that already covers launching the app; otherwise falls back to built-in patterns per project type (CLI, server, TUI, Electron, browser-driven, library).\n- plugin-authoring: Make a mod: a change to Claude's own interface or behaviour, such as a panel or pane that stays beside the chat and updates, a band, status line, toast, slash command, or hook on tool calls. Use to make, change or debug a mod or its hooks module.\n- init: Initialize a new CLAUDE.md file with codebase documentation\n- security-review: Complete a security review of the pending changes on the current branch\n</system-reminder>\n\n<system-reminder>\n<total_tokens>15000000 tokens left</total_tokens>\n</system-reminder>\n\n<system-reminder>\nToday's date is 2026-11-12.\n</system-reminder>"
+        },
+        {
+          "role": "assistant",
+          "content": [
+            {
+              "type": "tool_use",
+              "id": "toolu_company_search_12386",
+              "name": "ToolSearch",
+              "input": {
+                "query": "openbot_company_mcp"
+              }
+            }
+          ]
+        },
+        {
+          "role": "user",
+          "content": [
+            {
+              "type": "tool_result",
+              "tool_use_id": "toolu_company_search_12386",
+              "content": [
+                {
+                  "type": "tool_reference",
+                  "tool_name": "mcp__bb-bridge__openbot_company_mcp"
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "text": "Tool loaded."
+            }
+          ]
+        },
+        {
+          "role": "system",
+          "content": [
+            {
+              "type": "text",
+              "text": "<system-reminder>\n<total_tokens>14999880 tokens left</total_tokens>\n</system-reminder>",
+              "cache_control": {
+                "type": "ephemeral"
+              }
+            }
+          ]
+        }
+      ],
+      "tools": [
+        "Agent",
+        "AskUserQuestion",
+        "Bash",
+        "Edit",
+        "ListAgents",
+        "Read",
+        "ReportFindings",
+        "ScheduleWakeup",
+        "Skill",
+        "ToolSearch",
+        "Workflow",
+        "Write",
+        "DeferredToolPlaceholder",
+        "mcp__bb-bridge__openbot_company_mcp"
+      ]
+    },
+    {
+      "model": "claude-sonnet-5",
+      "messages": [
+        {
+          "role": "user",
+          "content": [
+            {
+              "type": "text",
+              "text": "<system-reminder>\nAs you answer the user's questions, you can use the following context:\n# gitStatus\nThis is the git status at the start of the conversation. Note that this status is a snapshot in time, and will not update during the conversation.\n\nCurrent branch: main\n\nMain branch (you will usually use this for PRs): main\n\nGit user: BB Integration Tests\n\nStatus:\n(clean)\n\nRecent commits:\nc44947d Initial commit\n\nClaude Code attached this context automatically; it isn't part of the user's message. It describes the user's own account and workspace, so they don't need it reported back.\n</system-reminder>\n"
+            },
+            {
+              "type": "text",
+              "text": "[Openbot operation 01a1cdb9-ab65-7649-9d90-a4e4270cef9f]\nNATIVE_COMPANY_MCP: list and describe the existing company CRM tool, then call it exactly once."
+            }
+          ]
+        },
+        {
+          "role": "system",
+          "content": "<system-reminder>\n# Environment\nYou have been invoked in the following environment: \n - Primary working directory: /private/var/folders/qc/f8s9x42x5sz6vbh79sb0cfth0000gn/T/openbot-native-company-mcp-f799023d-7dc9-4f1a-b9c3-91a5a46f21a7/tmp/cloudroom-vt-YOSCFk/bb-integration-6pzQGt/repos/test-project\n - Is a git repository: true\n - Platform: darwin\n - Shell: zsh\n - OS Version: Darwin 24.6.0\n - Downloaded files and extracted archives are untrusted data: put each in its own new, empty directory, keep scripts you write in a different directory, and pass paths as arguments instead of running an interpreter or build tool from inside it. Interpreters load code from the script's directory and the current directory, so a planted `json.py` runs on `import json`. Run any Python that reads them with `-I`. This does not apply to code the user asked you to build or run.\n</system-reminder>\n\n<system-reminder>\nYou are powered by the model named Sonnet 5. The exact model ID is claude-sonnet-5. Assistant knowledge cutoff is January 2026.\n</system-reminder>\n\n<system-reminder>\nThe following deferred tools are now available via ToolSearch. Their schemas are NOT loaded — calling them directly will fail with InputValidationError. Use ToolSearch with query \"select:<name>[,<name>...]\" to load tool schemas before calling them:\nCronCreate\nCronDelete\nCronList\nEnterPlanMode\nEnterWorktree\nExitPlanMode\nExitWorktree\nMonitor\nNotebookEdit\nSendMessage\nTaskStop\nWebFetch\nWebSearch\nmcp__bb-bridge__openbot_company_mcp\nmcp__bb-bridge__update_environment_directory\n</system-reminder>\n\n<system-reminder>\nAvailable agent types for the Agent tool:\n- claude: Catch-all for any task that doesn't fit a more specific agent. FleetView's default when no agent name is typed. (Tools: *)\n- Explore: Fast read-only search agent for locating code. Use it to find files by pattern (eg. \"src/components/**/*.tsx\"), grep for symbols or keywords (eg. \"API endpoints\"), or answer \"where is X defined / which files reference Y.\" Do NOT use it for code review, design-doc auditing, cross-file consistency checks, or open-ended analysis — it reads excerpts rather than whole files and will miss content past its read window. When calling, specify search breadth: \"quick\" for a single targeted lookup, \"medium\" for moderate exploration, or \"very thorough\" to search across multiple locations and naming conventions. (Tools: All tools except Agent, Artifact, ArtifactComments, ArtifactData, ArtifactCheck, ExitPlanMode, Edit, Write, NotebookEdit)\n- general-purpose: General-purpose agent for researching complex questions, searching for code, and executing multi-step tasks. When you are searching for a keyword or file and are not confident that you will find the right match in the first few tries use this agent to perform the search for you. (Tools: *)\n- Plan: Software architect agent for designing implementation plans. Use this when you need to plan the implementation strategy for a task. Returns step-by-step plans, identifies critical files, and considers architectural trade-offs. (Tools: All tools except Agent, Artifact, ArtifactComments, ArtifactData, ArtifactCheck, ExitPlanMode, Edit, Write, NotebookEdit)\n- statusline-setup: Use this agent to configure the user's Claude Code status line setting. (Tools: Read, Edit)\n\nWhen you launch multiple agents for independent work, send them in a single message with multiple tool uses so they run concurrently.\n</system-reminder>\n\n<system-reminder>\nThe following skills are available for use with the Skill tool:\n\n- cloudroom:adr-verbatim: Record concise ADRs that preserve the user's decisions without conversational noise. Use for \"adr-verbatim\", \"new ADR\", \"document that as an ADR\", \"record this decision\", or supplied ADR wording.\n- cloudroom:browser-harness: Control a real browser with browser-harness, built into Cloudroom: navigate, click, type, read JavaScript-heavy or logged-in pages, upload, download, and screenshot. Use for any web page interaction in Local and Cloud threads. Use curl for plain public pages and computer use for desktop apps.\n- cloudroom:create-loop: Create a recurring Cloudroom Loop that starts an agent to check one thing, archives its thread when all is fine, and reports only when something needs the user. Use for \"create loop\", \"create-loop\", \"create automation\", or any \"every N hours, have an agent check X\" request.\n- cloudroom:plugin-commands: Discover CLI commands contributed by installed Cloudroom plugins and their invocation paths.\n- cloudroom:risky-changes: Verify assumptions before implementing large or risky changes to APIs, provider data, billing, pricing, quotas, or defaults. Use when a mistake could affect customers or the user asks if a change is safe to ship. Checks real-world impact beyond passing tests.\n- cloudroom:self-archive: Archive the current Cloudroom thread and release its runtime. Use only when the user explicitly asks to self-archive, archive yourself, or archive this thread.\n- dataviz: Use this skill whenever you are about to create ANY chart, graph, plot, dashboard, or data visualization, in ANY output medium — an HTML or React artifact, inline SVG, plotting code in any library (matplotlib, plotly, d3, Recharts, …), an image/PNG you will render and upload, or a chart shared into Slack. Read it BEFORE writing the first line of chart code, choosing chart colors, building a stat tile / meter / KPI row, or laying out a dashboard. When the destination is a first-party document connector (host-designated, never self-described) that renders live charts, hand it the rows (inline, or as an uploaded data file the chart cites) rather than a rendered PNG/SVG — a picture of a chart loses hover, data inspection and per-value comments. Produces visualizations that read as one system — elegant, accessible, consistent in light and dark — using a brand-neutral placeholder palette you swap for your own. Teaches a design-system-agnostic method: a form heuristic, a color formula with a runnable validator, mark specs, and interaction rules. A validated default palette is documented in `references/palette.md` — swap that file's values for your brand's. Triggers on: \"chart\", \"graph\", \"plot\", \"data viz\", \"visualization\", \"dashboard\", \"analytics\", \"visualize data\", \"categorical colors\", \"sequential / diverging palette\", \"stat tile\", \"sparkline\", \"heatmap\", \"legend\", \"axis\", \"tooltip\", \"chart colors\", \"color by series\".\n- update-config: Use this skill to configure the Claude Code harness via settings.json. Automated behaviors (\"from now on when X\", \"each time X\", \"whenever X\", \"before/after X\") require hooks configured in settings.json - the harness executes these, not Claude, so memory/preferences cannot fulfill them. Also use for: permissions (\"allow X\", \"add permission\", \"move permission to\"), env vars (\"set X=Y\"), hook troubleshooting, or any changes to settings.json/settings.local.json files. Examples: \"allow npm commands\", \"add bq permission to global settings\", \"move permission to user settings\", \"set DEBUG=true\", \"when claude stops show X\". For simple settings like theme/model, suggest the /config command.\n- keybindings-help: Use when the user wants to customize keyboard shortcuts, rebind keys, add chord bindings, or modify ~/.claude/keybindings.json. Examples: \"rebind ctrl+s\", \"add a chord shortcut\", \"change the submit key\", \"customize keybindings\".\n- code-review: Review the current diff, or a PR number/branch/path target, for correctness bugs (plus reuse/simplification/efficiency cleanups where the model's recipe covers them) at the effort level given first, before any target (low|medium|high|xhigh|max: from few high-confidence findings to many, some uncertain); with no level given, it reuses the level you typed last. Pass --comment to post findings as inline PR comments, or --fix to apply them to the working tree after the review. Pass --max-findings <n> to report up to n findings, or --max-findings all for every finding. The choice stays until you pass --max-findings default. - Use the max level only when the user, or instructions such as CLAUDE.md or a skill, explicitly ask for it, never on your own judgment: it is the costliest level and starts many reviewer subagents.\n- simplify: Review the changed code for reuse, simplification, efficiency, and altitude cleanups, then apply the fixes. Quality only — it does not hunt for bugs; use /code-review for that.\n- fewer-permission-prompts: Scan your transcripts for common read-only Bash and MCP tool calls, then add a prioritized allowlist to project .claude/settings.json to reduce permission prompts.\n- loop: Run a prompt or slash command on a recurring interval (e.g. /loop 5m /foo). Omit the interval to let the model self-pace. - When the user wants to set up a recurring task, poll for status, or run something repeatedly on an interval (e.g. \"check the deploy every 5 minutes\", \"keep running /babysit-prs\"). Do NOT invoke for one-off tasks.\n- claude-api: Reference for the Claude API / Anthropic SDK — model ids, pricing, params, streaming, tool use, MCP, agents, caching, token counting, model migration.\nTRIGGER — read BEFORE opening the target file; don't skip because it \"looks like a one-liner\" — whenever: the prompt names Claude/Anthropic in any form (Claude, Anthropic, Fable, Opus, Sonnet, Haiku, `anthropic`, `@anthropic-ai`, `claude-*`, `us.anthropic.*`, `[1m]`); the user asks about an LLM (pricing/model choice/limits/caching) — never answer from memory; OR the task is LLM-shaped with provider unstated (agent/MCP/tool-definition/multi-agent/RAG/LLM-judge/computer-use; generate/summarize/extract/classify/rewrite/converse over NL; debugging refusals/cutoffs/streaming/tool-calls/tokens).\nSKIP only when another provider is being worked on (overrides all triggers): OpenAI/GPT/Gemini/Llama/Mistral/Cohere/Ollama named in the query; OR `grep -rE 'openai|langchain_openai|google.generativeai|genai|mistralai|cohere|ollama'` over the project hits (run this grep FIRST if no provider named — don't Read the file).\n- workflow-authoring: Reference for writing a Workflow tool script (script API and gotchas, resume, quality patterns, worked examples). Load before authoring a script for a workflow the user already opted into; it does not itself authorize running one.\n- run: Launch and drive this project's app to see a change working. Use when asked to run, start, or screenshot the app, or to confirm a change works in the real app (not just tests). First looks for a project skill that already covers launching the app; otherwise falls back to built-in patterns per project type (CLI, server, TUI, Electron, browser-driven, library).\n- plugin-authoring: Make a mod: a change to Claude's own interface or behaviour, such as a panel or pane that stays beside the chat and updates, a band, status line, toast, slash command, or hook on tool calls. Use to make, change or debug a mod or its hooks module.\n- init: Initialize a new CLAUDE.md file with codebase documentation\n- security-review: Complete a security review of the pending changes on the current branch\n</system-reminder>\n\n<system-reminder>\n<total_tokens>15000000 tokens left</total_tokens>\n</system-reminder>\n\n<system-reminder>\nToday's date is 2026-11-12.\n</system-reminder>"
+        },
+        {
+          "role": "assistant",
+          "content": [
+            {
+              "type": "tool_use",
+              "id": "toolu_company_search_12386",
+              "name": "ToolSearch",
+              "input": {
+                "query": "openbot_company_mcp"
+              }
+            },
+            {
+              "type": "tool_use",
+              "id": "toolu_company_list",
+              "name": "mcp__bb-bridge__openbot_company_mcp",
+              "input": {
+                "kind": "list"
+              }
+            }
+          ]
+        },
+        {
+          "role": "user",
+          "content": [
+            {
+              "type": "tool_result",
+              "tool_use_id": "toolu_company_search_12386",
+              "content": [
+                {
+                  "type": "tool_reference",
+                  "tool_name": "mcp__bb-bridge__openbot_company_mcp"
+                }
+              ]
+            },
+            {
+              "tool_use_id": "toolu_company_list",
+              "type": "tool_result",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "{\"tools\":[{\"alias\":\"crm.lookup\",\"binding_id\":\"4c942e9a-b615-4b32-bdb2-88d9d0306cea\"}]}"
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "text": "Tool loaded."
+            }
+          ]
+        },
+        {
+          "role": "system",
+          "content": [
+            {
+              "type": "text",
+              "text": "<system-reminder>\n<total_tokens>14999880 tokens left</total_tokens>\n</system-reminder>\n\n<system-reminder>\n<total_tokens>14999880 tokens left</total_tokens>\n</system-reminder>",
+              "cache_control": {
+                "type": "ephemeral"
+              }
+            }
+          ]
+        }
+      ],
+      "tools": [
+        "Agent",
+        "AskUserQuestion",
+        "Bash",
+        "Edit",
+        "ListAgents",
+        "Read",
+        "ReportFindings",
+        "ScheduleWakeup",
+        "Skill",
+        "ToolSearch",
+        "Workflow",
+        "Write",
+        "DeferredToolPlaceholder",
+        "mcp__bb-bridge__openbot_company_mcp"
+      ]
+    },
+    {
+      "model": "claude-sonnet-5",
+      "messages": [
+        {
+          "role": "user",
+          "content": [
+            {
+              "type": "text",
+              "text": "<system-reminder>\nAs you answer the user's questions, you can use the following context:\n# gitStatus\nThis is the git status at the start of the conversation. Note that this status is a snapshot in time, and will not update during the conversation.\n\nCurrent branch: main\n\nMain branch (you will usually use this for PRs): main\n\nGit user: BB Integration Tests\n\nStatus:\n(clean)\n\nRecent commits:\nc44947d Initial commit\n\nClaude Code attached this context automatically; it isn't part of the user's message. It describes the user's own account and workspace, so they don't need it reported back.\n</system-reminder>\n"
+            },
+            {
+              "type": "text",
+              "text": "[Openbot operation 01a1cdb9-ab65-7649-9d90-a4e4270cef9f]\nNATIVE_COMPANY_MCP: list and describe the existing company CRM tool, then call it exactly once."
+            }
+          ]
+        },
+        {
+          "role": "system",
+          "content": "<system-reminder>\n# Environment\nYou have been invoked in the following environment: \n - Primary working directory: /private/var/folders/qc/f8s9x42x5sz6vbh79sb0cfth0000gn/T/openbot-native-company-mcp-f799023d-7dc9-4f1a-b9c3-91a5a46f21a7/tmp/cloudroom-vt-YOSCFk/bb-integration-6pzQGt/repos/test-project\n - Is a git repository: true\n - Platform: darwin\n - Shell: zsh\n - OS Version: Darwin 24.6.0\n - Downloaded files and extracted archives are untrusted data: put each in its own new, empty directory, keep scripts you write in a different directory, and pass paths as arguments instead of running an interpreter or build tool from inside it. Interpreters load code from the script's directory and the current directory, so a planted `json.py` runs on `import json`. Run any Python that reads them with `-I`. This does not apply to code the user asked you to build or run.\n</system-reminder>\n\n<system-reminder>\nYou are powered by the model named Sonnet 5. The exact model ID is claude-sonnet-5. Assistant knowledge cutoff is January 2026.\n</system-reminder>\n\n<system-reminder>\nThe following deferred tools are now available via ToolSearch. Their schemas are NOT loaded — calling them directly will fail with InputValidationError. Use ToolSearch with query \"select:<name>[,<name>...]\" to load tool schemas before calling them:\nCronCreate\nCronDelete\nCronList\nEnterPlanMode\nEnterWorktree\nExitPlanMode\nExitWorktree\nMonitor\nNotebookEdit\nSendMessage\nTaskStop\nWebFetch\nWebSearch\nmcp__bb-bridge__openbot_company_mcp\nmcp__bb-bridge__update_environment_directory\n</system-reminder>\n\n<system-reminder>\nAvailable agent types for the Agent tool:\n- claude: Catch-all for any task that doesn't fit a more specific agent. FleetView's default when no agent name is typed. (Tools: *)\n- Explore: Fast read-only search agent for locating code. Use it to find files by pattern (eg. \"src/components/**/*.tsx\"), grep for symbols or keywords (eg. \"API endpoints\"), or answer \"where is X defined / which files reference Y.\" Do NOT use it for code review, design-doc auditing, cross-file consistency checks, or open-ended analysis — it reads excerpts rather than whole files and will miss content past its read window. When calling, specify search breadth: \"quick\" for a single targeted lookup, \"medium\" for moderate exploration, or \"very thorough\" to search across multiple locations and naming conventions. (Tools: All tools except Agent, Artifact, ArtifactComments, ArtifactData, ArtifactCheck, ExitPlanMode, Edit, Write, NotebookEdit)\n- general-purpose: General-purpose agent for researching complex questions, searching for code, and executing multi-step tasks. When you are searching for a keyword or file and are not confident that you will find the right match in the first few tries use this agent to perform the search for you. (Tools: *)\n- Plan: Software architect agent for designing implementation plans. Use this when you need to plan the implementation strategy for a task. Returns step-by-step plans, identifies critical files, and considers architectural trade-offs. (Tools: All tools except Agent, Artifact, ArtifactComments, ArtifactData, ArtifactCheck, ExitPlanMode, Edit, Write, NotebookEdit)\n- statusline-setup: Use this agent to configure the user's Claude Code status line setting. (Tools: Read, Edit)\n\nWhen you launch multiple agents for independent work, send them in a single message with multiple tool uses so they run concurrently.\n</system-reminder>\n\n<system-reminder>\nThe following skills are available for use with the Skill tool:\n\n- cloudroom:adr-verbatim: Record concise ADRs that preserve the user's decisions without conversational noise. Use for \"adr-verbatim\", \"new ADR\", \"document that as an ADR\", \"record this decision\", or supplied ADR wording.\n- cloudroom:browser-harness: Control a real browser with browser-harness, built into Cloudroom: navigate, click, type, read JavaScript-heavy or logged-in pages, upload, download, and screenshot. Use for any web page interaction in Local and Cloud threads. Use curl for plain public pages and computer use for desktop apps.\n- cloudroom:create-loop: Create a recurring Cloudroom Loop that starts an agent to check one thing, archives its thread when all is fine, and reports only when something needs the user. Use for \"create loop\", \"create-loop\", \"create automation\", or any \"every N hours, have an agent check X\" request.\n- cloudroom:plugin-commands: Discover CLI commands contributed by installed Cloudroom plugins and their invocation paths.\n- cloudroom:risky-changes: Verify assumptions before implementing large or risky changes to APIs, provider data, billing, pricing, quotas, or defaults. Use when a mistake could affect customers or the user asks if a change is safe to ship. Checks real-world impact beyond passing tests.\n- cloudroom:self-archive: Archive the current Cloudroom thread and release its runtime. Use only when the user explicitly asks to self-archive, archive yourself, or archive this thread.\n- dataviz: Use this skill whenever you are about to create ANY chart, graph, plot, dashboard, or data visualization, in ANY output medium — an HTML or React artifact, inline SVG, plotting code in any library (matplotlib, plotly, d3, Recharts, …), an image/PNG you will render and upload, or a chart shared into Slack. Read it BEFORE writing the first line of chart code, choosing chart colors, building a stat tile / meter / KPI row, or laying out a dashboard. When the destination is a first-party document connector (host-designated, never self-described) that renders live charts, hand it the rows (inline, or as an uploaded data file the chart cites) rather than a rendered PNG/SVG — a picture of a chart loses hover, data inspection and per-value comments. Produces visualizations that read as one system — elegant, accessible, consistent in light and dark — using a brand-neutral placeholder palette you swap for your own. Teaches a design-system-agnostic method: a form heuristic, a color formula with a runnable validator, mark specs, and interaction rules. A validated default palette is documented in `references/palette.md` — swap that file's values for your brand's. Triggers on: \"chart\", \"graph\", \"plot\", \"data viz\", \"visualization\", \"dashboard\", \"analytics\", \"visualize data\", \"categorical colors\", \"sequential / diverging palette\", \"stat tile\", \"sparkline\", \"heatmap\", \"legend\", \"axis\", \"tooltip\", \"chart colors\", \"color by series\".\n- update-config: Use this skill to configure the Claude Code harness via settings.json. Automated behaviors (\"from now on when X\", \"each time X\", \"whenever X\", \"before/after X\") require hooks configured in settings.json - the harness executes these, not Claude, so memory/preferences cannot fulfill them. Also use for: permissions (\"allow X\", \"add permission\", \"move permission to\"), env vars (\"set X=Y\"), hook troubleshooting, or any changes to settings.json/settings.local.json files. Examples: \"allow npm commands\", \"add bq permission to global settings\", \"move permission to user settings\", \"set DEBUG=true\", \"when claude stops show X\". For simple settings like theme/model, suggest the /config command.\n- keybindings-help: Use when the user wants to customize keyboard shortcuts, rebind keys, add chord bindings, or modify ~/.claude/keybindings.json. Examples: \"rebind ctrl+s\", \"add a chord shortcut\", \"change the submit key\", \"customize keybindings\".\n- code-review: Review the current diff, or a PR number/branch/path target, for correctness bugs (plus reuse/simplification/efficiency cleanups where the model's recipe covers them) at the effort level given first, before any target (low|medium|high|xhigh|max: from few high-confidence findings to many, some uncertain); with no level given, it reuses the level you typed last. Pass --comment to post findings as inline PR comments, or --fix to apply them to the working tree after the review. Pass --max-findings <n> to report up to n findings, or --max-findings all for every finding. The choice stays until you pass --max-findings default. - Use the max level only when the user, or instructions such as CLAUDE.md or a skill, explicitly ask for it, never on your own judgment: it is the costliest level and starts many reviewer subagents.\n- simplify: Review the changed code for reuse, simplification, efficiency, and altitude cleanups, then apply the fixes. Quality only — it does not hunt for bugs; use /code-review for that.\n- fewer-permission-prompts: Scan your transcripts for common read-only Bash and MCP tool calls, then add a prioritized allowlist to project .claude/settings.json to reduce permission prompts.\n- loop: Run a prompt or slash command on a recurring interval (e.g. /loop 5m /foo). Omit the interval to let the model self-pace. - When the user wants to set up a recurring task, poll for status, or run something repeatedly on an interval (e.g. \"check the deploy every 5 minutes\", \"keep running /babysit-prs\"). Do NOT invoke for one-off tasks.\n- claude-api: Reference for the Claude API / Anthropic SDK — model ids, pricing, params, streaming, tool use, MCP, agents, caching, token counting, model migration.\nTRIGGER — read BEFORE opening the target file; don't skip because it \"looks like a one-liner\" — whenever: the prompt names Claude/Anthropic in any form (Claude, Anthropic, Fable, Opus, Sonnet, Haiku, `anthropic`, `@anthropic-ai`, `claude-*`, `us.anthropic.*`, `[1m]`); the user asks about an LLM (pricing/model choice/limits/caching) — never answer from memory; OR the task is LLM-shaped with provider unstated (agent/MCP/tool-definition/multi-agent/RAG/LLM-judge/computer-use; generate/summarize/extract/classify/rewrite/converse over NL; debugging refusals/cutoffs/streaming/tool-calls/tokens).\nSKIP only when another provider is being worked on (overrides all triggers): OpenAI/GPT/Gemini/Llama/Mistral/Cohere/Ollama named in the query; OR `grep -rE 'openai|langchain_openai|google.generativeai|genai|mistralai|cohere|ollama'` over the project hits (run this grep FIRST if no provider named — don't Read the file).\n- workflow-authoring: Reference for writing a Workflow tool script (script API and gotchas, resume, quality patterns, worked examples). Load before authoring a script for a workflow the user already opted into; it does not itself authorize running one.\n- run: Launch and drive this project's app to see a change working. Use when asked to run, start, or screenshot the app, or to confirm a change works in the real app (not just tests). First looks for a project skill that already covers launching the app; otherwise falls back to built-in patterns per project type (CLI, server, TUI, Electron, browser-driven, library).\n- plugin-authoring: Make a mod: a change to Claude's own interface or behaviour, such as a panel or pane that stays beside the chat and updates, a band, status line, toast, slash command, or hook on tool calls. Use to make, change or debug a mod or its hooks module.\n- init: Initialize a new CLAUDE.md file with codebase documentation\n- security-review: Complete a security review of the pending changes on the current branch\n</system-reminder>\n\n<system-reminder>\n<total_tokens>15000000 tokens left</total_tokens>\n</system-reminder>\n\n<system-reminder>\nToday's date is 2026-11-12.\n</system-reminder>"
+        },
+        {
+          "role": "assistant",
+          "content": [
+            {
+              "type": "tool_use",
+              "id": "toolu_company_search_12386",
+              "name": "ToolSearch",
+              "input": {
+                "query": "openbot_company_mcp"
+              }
+            },
+            {
+              "type": "tool_use",
+              "id": "toolu_company_list",
+              "name": "mcp__bb-bridge__openbot_company_mcp",
+              "input": {
+                "kind": "list"
+              }
+            },
+            {
+              "type": "tool_use",
+              "id": "toolu_company_describe",
+              "name": "mcp__bb-bridge__openbot_company_mcp",
+              "input": {
+                "kind": "describe",
+                "alias": "crm.lookup"
+              }
+            }
+          ]
+        },
+        {
+          "role": "user",
+          "content": [
+            {
+              "type": "tool_result",
+              "tool_use_id": "toolu_company_search_12386",
+              "content": [
+                {
+                  "type": "tool_reference",
+                  "tool_name": "mcp__bb-bridge__openbot_company_mcp"
+                }
+              ]
+            },
+            {
+              "tool_use_id": "toolu_company_list",
+              "type": "tool_result",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "{\"tools\":[{\"alias\":\"crm.lookup\",\"binding_id\":\"4c942e9a-b615-4b32-bdb2-88d9d0306cea\"}]}"
+                }
+              ]
+            },
+            {
+              "tool_use_id": "toolu_company_describe",
+              "type": "tool_result",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "{\"binding\":{\"id\":\"4c942e9a-b615-4b32-bdb2-88d9d0306cea\",\"alias\":\"crm.lookup\",\"source\":{\"kind\":\"mcp\",\"connection\":\"b35759e0-1ca7-496a-ae25-13e11cefcb6b\",\"operation\":\"lookup\",\"reviewed_version\":\"15cfaf20-8075-49d3-b80b-36a5123bdfb6\",\"remote_name\":\"lookup\"}},\"input_schema\":{\"additionalProperties\":false,\"properties\":{\"query\":{\"maxLength\":128,\"type\":\"string\"}},\"required\":[\"query\"],\"type\":\"object\"},\"output_schema\":{\"type\":\"object\"},\"policy\":{\"capability\":\"mcp.lookup\",\"policy_revision\":1,\"effect\":\"read\",\"recovery\":\"reconcile\"},\"approval_required\":true}"
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "text": "Tool loaded."
+            }
+          ]
+        },
+        {
+          "role": "system",
+          "content": [
+            {
+              "type": "text",
+              "text": "<system-reminder>\n<total_tokens>14999880 tokens left</total_tokens>\n</system-reminder>\n\n<system-reminder>\n<total_tokens>14999880 tokens left</total_tokens>\n</system-reminder>\n\n<system-reminder>\n<total_tokens>14999880 tokens left</total_tokens>\n</system-reminder>",
+              "cache_control": {
+                "type": "ephemeral"
+              }
+            }
+          ]
+        }
+      ],
+      "tools": [
+        "Agent",
+        "AskUserQuestion",
+        "Bash",
+        "Edit",
+        "ListAgents",
+        "Read",
+        "ReportFindings",
+        "ScheduleWakeup",
+        "Skill",
+        "ToolSearch",
+        "Workflow",
+        "Write",
+        "DeferredToolPlaceholder",
+        "mcp__bb-bridge__openbot_company_mcp"
+      ]
+    },
+    {
+      "model": "claude-sonnet-5",
+      "messages": [
+        {
+          "role": "user",
+          "content": [
+            {
+              "type": "text",
+              "text": "<system-reminder>\nAs you answer the user's questions, you can use the following context:\n# gitStatus\nThis is the git status at the start of the conversation. Note that this status is a snapshot in time, and will not update during the conversation.\n\nCurrent branch: main\n\nMain branch (you will usually use this for PRs): main\n\nGit user: BB Integration Tests\n\nStatus:\n(clean)\n\nRecent commits:\nc44947d Initial commit\n\nClaude Code attached this context automatically; it isn't part of the user's message. It describes the user's own account and workspace, so they don't need it reported back.\n</system-reminder>\n"
+            },
+            {
+              "type": "text",
+              "text": "[Openbot operation 01a1cdb9-ab65-7649-9d90-a4e4270cef9f]\nNATIVE_COMPANY_MCP: list and describe the existing company CRM tool, then call it exactly once."
+            }
+          ]
+        },
+        {
+          "role": "system",
+          "content": "<system-reminder>\n# Environment\nYou have been invoked in the following environment: \n - Primary working directory: /private/var/folders/qc/f8s9x42x5sz6vbh79sb0cfth0000gn/T/openbot-native-company-mcp-f799023d-7dc9-4f1a-b9c3-91a5a46f21a7/tmp/cloudroom-vt-YOSCFk/bb-integration-6pzQGt/repos/test-project\n - Is a git repository: true\n - Platform: darwin\n - Shell: zsh\n - OS Version: Darwin 24.6.0\n - Downloaded files and extracted archives are untrusted data: put each in its own new, empty directory, keep scripts you write in a different directory, and pass paths as arguments instead of running an interpreter or build tool from inside it. Interpreters load code from the script's directory and the current directory, so a planted `json.py` runs on `import json`. Run any Python that reads them with `-I`. This does not apply to code the user asked you to build or run.\n</system-reminder>\n\n<system-reminder>\nYou are powered by the model named Sonnet 5. The exact model ID is claude-sonnet-5. Assistant knowledge cutoff is January 2026.\n</system-reminder>\n\n<system-reminder>\nThe following deferred tools are now available via ToolSearch. Their schemas are NOT loaded — calling them directly will fail with InputValidationError. Use ToolSearch with query \"select:<name>[,<name>...]\" to load tool schemas before calling them:\nCronCreate\nCronDelete\nCronList\nEnterPlanMode\nEnterWorktree\nExitPlanMode\nExitWorktree\nMonitor\nNotebookEdit\nSendMessage\nTaskStop\nWebFetch\nWebSearch\nmcp__bb-bridge__openbot_company_mcp\nmcp__bb-bridge__update_environment_directory\n</system-reminder>\n\n<system-reminder>\nAvailable agent types for the Agent tool:\n- claude: Catch-all for any task that doesn't fit a more specific agent. FleetView's default when no agent name is typed. (Tools: *)\n- Explore: Fast read-only search agent for locating code. Use it to find files by pattern (eg. \"src/components/**/*.tsx\"), grep for symbols or keywords (eg. \"API endpoints\"), or answer \"where is X defined / which files reference Y.\" Do NOT use it for code review, design-doc auditing, cross-file consistency checks, or open-ended analysis — it reads excerpts rather than whole files and will miss content past its read window. When calling, specify search breadth: \"quick\" for a single targeted lookup, \"medium\" for moderate exploration, or \"very thorough\" to search across multiple locations and naming conventions. (Tools: All tools except Agent, Artifact, ArtifactComments, ArtifactData, ArtifactCheck, ExitPlanMode, Edit, Write, NotebookEdit)\n- general-purpose: General-purpose agent for researching complex questions, searching for code, and executing multi-step tasks. When you are searching for a keyword or file and are not confident that you will find the right match in the first few tries use this agent to perform the search for you. (Tools: *)\n- Plan: Software architect agent for designing implementation plans. Use this when you need to plan the implementation strategy for a task. Returns step-by-step plans, identifies critical files, and considers architectural trade-offs. (Tools: All tools except Agent, Artifact, ArtifactComments, ArtifactData, ArtifactCheck, ExitPlanMode, Edit, Write, NotebookEdit)\n- statusline-setup: Use this agent to configure the user's Claude Code status line setting. (Tools: Read, Edit)\n\nWhen you launch multiple agents for independent work, send them in a single message with multiple tool uses so they run concurrently.\n</system-reminder>\n\n<system-reminder>\nThe following skills are available for use with the Skill tool:\n\n- cloudroom:adr-verbatim: Record concise ADRs that preserve the user's decisions without conversational noise. Use for \"adr-verbatim\", \"new ADR\", \"document that as an ADR\", \"record this decision\", or supplied ADR wording.\n- cloudroom:browser-harness: Control a real browser with browser-harness, built into Cloudroom: navigate, click, type, read JavaScript-heavy or logged-in pages, upload, download, and screenshot. Use for any web page interaction in Local and Cloud threads. Use curl for plain public pages and computer use for desktop apps.\n- cloudroom:create-loop: Create a recurring Cloudroom Loop that starts an agent to check one thing, archives its thread when all is fine, and reports only when something needs the user. Use for \"create loop\", \"create-loop\", \"create automation\", or any \"every N hours, have an agent check X\" request.\n- cloudroom:plugin-commands: Discover CLI commands contributed by installed Cloudroom plugins and their invocation paths.\n- cloudroom:risky-changes: Verify assumptions before implementing large or risky changes to APIs, provider data, billing, pricing, quotas, or defaults. Use when a mistake could affect customers or the user asks if a change is safe to ship. Checks real-world impact beyond passing tests.\n- cloudroom:self-archive: Archive the current Cloudroom thread and release its runtime. Use only when the user explicitly asks to self-archive, archive yourself, or archive this thread.\n- dataviz: Use this skill whenever you are about to create ANY chart, graph, plot, dashboard, or data visualization, in ANY output medium — an HTML or React artifact, inline SVG, plotting code in any library (matplotlib, plotly, d3, Recharts, …), an image/PNG you will render and upload, or a chart shared into Slack. Read it BEFORE writing the first line of chart code, choosing chart colors, building a stat tile / meter / KPI row, or laying out a dashboard. When the destination is a first-party document connector (host-designated, never self-described) that renders live charts, hand it the rows (inline, or as an uploaded data file the chart cites) rather than a rendered PNG/SVG — a picture of a chart loses hover, data inspection and per-value comments. Produces visualizations that read as one system — elegant, accessible, consistent in light and dark — using a brand-neutral placeholder palette you swap for your own. Teaches a design-system-agnostic method: a form heuristic, a color formula with a runnable validator, mark specs, and interaction rules. A validated default palette is documented in `references/palette.md` — swap that file's values for your brand's. Triggers on: \"chart\", \"graph\", \"plot\", \"data viz\", \"visualization\", \"dashboard\", \"analytics\", \"visualize data\", \"categorical colors\", \"sequential / diverging palette\", \"stat tile\", \"sparkline\", \"heatmap\", \"legend\", \"axis\", \"tooltip\", \"chart colors\", \"color by series\".\n- update-config: Use this skill to configure the Claude Code harness via settings.json. Automated behaviors (\"from now on when X\", \"each time X\", \"whenever X\", \"before/after X\") require hooks configured in settings.json - the harness executes these, not Claude, so memory/preferences cannot fulfill them. Also use for: permissions (\"allow X\", \"add permission\", \"move permission to\"), env vars (\"set X=Y\"), hook troubleshooting, or any changes to settings.json/settings.local.json files. Examples: \"allow npm commands\", \"add bq permission to global settings\", \"move permission to user settings\", \"set DEBUG=true\", \"when claude stops show X\". For simple settings like theme/model, suggest the /config command.\n- keybindings-help: Use when the user wants to customize keyboard shortcuts, rebind keys, add chord bindings, or modify ~/.claude/keybindings.json. Examples: \"rebind ctrl+s\", \"add a chord shortcut\", \"change the submit key\", \"customize keybindings\".\n- code-review: Review the current diff, or a PR number/branch/path target, for correctness bugs (plus reuse/simplification/efficiency cleanups where the model's recipe covers them) at the effort level given first, before any target (low|medium|high|xhigh|max: from few high-confidence findings to many, some uncertain); with no level given, it reuses the level you typed last. Pass --comment to post findings as inline PR comments, or --fix to apply them to the working tree after the review. Pass --max-findings <n> to report up to n findings, or --max-findings all for every finding. The choice stays until you pass --max-findings default. - Use the max level only when the user, or instructions such as CLAUDE.md or a skill, explicitly ask for it, never on your own judgment: it is the costliest level and starts many reviewer subagents.\n- simplify: Review the changed code for reuse, simplification, efficiency, and altitude cleanups, then apply the fixes. Quality only — it does not hunt for bugs; use /code-review for that.\n- fewer-permission-prompts: Scan your transcripts for common read-only Bash and MCP tool calls, then add a prioritized allowlist to project .claude/settings.json to reduce permission prompts.\n- loop: Run a prompt or slash command on a recurring interval (e.g. /loop 5m /foo). Omit the interval to let the model self-pace. - When the user wants to set up a recurring task, poll for status, or run something repeatedly on an interval (e.g. \"check the deploy every 5 minutes\", \"keep running /babysit-prs\"). Do NOT invoke for one-off tasks.\n- claude-api: Reference for the Claude API / Anthropic SDK — model ids, pricing, params, streaming, tool use, MCP, agents, caching, token counting, model migration.\nTRIGGER — read BEFORE opening the target file; don't skip because it \"looks like a one-liner\" — whenever: the prompt names Claude/Anthropic in any form (Claude, Anthropic, Fable, Opus, Sonnet, Haiku, `anthropic`, `@anthropic-ai`, `claude-*`, `us.anthropic.*`, `[1m]`); the user asks about an LLM (pricing/model choice/limits/caching) — never answer from memory; OR the task is LLM-shaped with provider unstated (agent/MCP/tool-definition/multi-agent/RAG/LLM-judge/computer-use; generate/summarize/extract/classify/rewrite/converse over NL; debugging refusals/cutoffs/streaming/tool-calls/tokens).\nSKIP only when another provider is being worked on (overrides all triggers): OpenAI/GPT/Gemini/Llama/Mistral/Cohere/Ollama named in the query; OR `grep -rE 'openai|langchain_openai|google.generativeai|genai|mistralai|cohere|ollama'` over the project hits (run this grep FIRST if no provider named — don't Read the file).\n- workflow-authoring: Reference for writing a Workflow tool script (script API and gotchas, resume, quality patterns, worked examples). Load before authoring a script for a workflow the user already opted into; it does not itself authorize running one.\n- run: Launch and drive this project's app to see a change working. Use when asked to run, start, or screenshot the app, or to confirm a change works in the real app (not just tests). First looks for a project skill that already covers launching the app; otherwise falls back to built-in patterns per project type (CLI, server, TUI, Electron, browser-driven, library).\n- plugin-authoring: Make a mod: a change to Claude's own interface or behaviour, such as a panel or pane that stays beside the chat and updates, a band, status line, toast, slash command, or hook on tool calls. Use to make, change or debug a mod or its hooks module.\n- init: Initialize a new CLAUDE.md file with codebase documentation\n- security-review: Complete a security review of the pending changes on the current branch\n</system-reminder>\n\n<system-reminder>\n<total_tokens>15000000 tokens left</total_tokens>\n</system-reminder>\n\n<system-reminder>\nToday's date is 2026-11-12.\n</system-reminder>"
+        },
+        {
+          "role": "assistant",
+          "content": [
+            {
+              "type": "tool_use",
+              "id": "toolu_company_search_12386",
+              "name": "ToolSearch",
+              "input": {
+                "query": "openbot_company_mcp"
+              }
+            },
+            {
+              "type": "tool_use",
+              "id": "toolu_company_list",
+              "name": "mcp__bb-bridge__openbot_company_mcp",
+              "input": {
+                "kind": "list"
+              }
+            },
+            {
+              "type": "tool_use",
+              "id": "toolu_company_describe",
+              "name": "mcp__bb-bridge__openbot_company_mcp",
+              "input": {
+                "kind": "describe",
+                "alias": "crm.lookup"
+              }
+            },
+            {
+              "type": "tool_use",
+              "id": "toolu_company_call",
+              "name": "mcp__bb-bridge__openbot_company_mcp",
+              "input": {
+                "kind": "call",
+                "alias": "crm.lookup",
+                "arguments": {
+                  "query": "actual native company MCP"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "role": "user",
+          "content": [
+            {
+              "type": "tool_result",
+              "tool_use_id": "toolu_company_search_12386",
+              "content": [
+                {
+                  "type": "tool_reference",
+                  "tool_name": "mcp__bb-bridge__openbot_company_mcp"
+                }
+              ]
+            },
+            {
+              "tool_use_id": "toolu_company_list",
+              "type": "tool_result",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "{\"tools\":[{\"alias\":\"crm.lookup\",\"binding_id\":\"4c942e9a-b615-4b32-bdb2-88d9d0306cea\"}]}"
+                }
+              ]
+            },
+            {
+              "tool_use_id": "toolu_company_describe",
+              "type": "tool_result",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "{\"binding\":{\"id\":\"4c942e9a-b615-4b32-bdb2-88d9d0306cea\",\"alias\":\"crm.lookup\",\"source\":{\"kind\":\"mcp\",\"connection\":\"b35759e0-1ca7-496a-ae25-13e11cefcb6b\",\"operation\":\"lookup\",\"reviewed_version\":\"15cfaf20-8075-49d3-b80b-36a5123bdfb6\",\"remote_name\":\"lookup\"}},\"input_schema\":{\"additionalProperties\":false,\"properties\":{\"query\":{\"maxLength\":128,\"type\":\"string\"}},\"required\":[\"query\"],\"type\":\"object\"},\"output_schema\":{\"type\":\"object\"},\"policy\":{\"capability\":\"mcp.lookup\",\"policy_revision\":1,\"effect\":\"read\",\"recovery\":\"reconcile\"},\"approval_required\":true}"
+                }
+              ]
+            },
+            {
+              "tool_use_id": "toolu_company_call",
+              "type": "tool_result",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Ada"
+                },
+                {
+                  "type": "text",
+                  "text": "{\"call_id\":\"fdf549fc-01c0-4aa1-b079-6efd5f146440\",\"run_url\":\"https://localhost:49728/ui/workflow-runs?company_id=38a0cf3f-2690-4f6f-8ed0-ee3729cab416&run_id=ef236c3e-dbbe-4f13-83a2-d4d8b542b4d2\",\"outcome\":\"completed\",\"structuredContent\":{\"name\":\"Ada\",\"tier\":3}}"
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "text": "Tool loaded."
+            }
+          ]
+        },
+        {
+          "role": "system",
+          "content": [
+            {
+              "type": "text",
+              "text": "<system-reminder>\n<total_tokens>14999880 tokens left</total_tokens>\n</system-reminder>\n\n<system-reminder>\n<total_tokens>14999880 tokens left</total_tokens>\n</system-reminder>\n\n<system-reminder>\n<total_tokens>14999880 tokens left</total_tokens>\n</system-reminder>\n\n<system-reminder>\n<total_tokens>14999880 tokens left</total_tokens>\n</system-reminder>",
+              "cache_control": {
+                "type": "ephemeral"
+              }
+            }
+          ]
+        }
+      ],
+      "tools": [
+        "Agent",
+        "AskUserQuestion",
+        "Bash",
+        "Edit",
+        "ListAgents",
+        "Read",
+        "ReportFindings",
+        "ScheduleWakeup",
+        "Skill",
+        "ToolSearch",
+        "Workflow",
+        "Write",
+        "DeferredToolPlaceholder",
+        "mcp__bb-bridge__openbot_company_mcp"
+      ]
+    },
+    {
+      "model": "claude-sonnet-5",
+      "messages": [
+        {
+          "role": "user",
+          "content": [
+            {
+              "type": "text",
+              "text": "<system-reminder>\nAs you answer the user's questions, you can use the following context:\n# gitStatus\nThis is the git status at the start of the conversation. Note that this status is a snapshot in time, and will not update during the conversation.\n\nCurrent branch: main\n\nMain branch (you will usually use this for PRs): main\n\nGit user: BB Integration Tests\n\nStatus:\n(clean)\n\nRecent commits:\nc44947d Initial commit\n\nClaude Code attached this context automatically; it isn't part of the user's message. It describes the user's own account and workspace, so they don't need it reported back.\n</system-reminder>\n"
+            },
+            {
+              "type": "text",
+              "text": "[Openbot operation 01a1cdb9-ab65-7649-9d90-a4e4270cef9f]\nNATIVE_COMPANY_MCP: list and describe the existing company CRM tool, then call it exactly once."
+            }
+          ]
+        },
+        {
+          "role": "system",
+          "content": "<system-reminder>\n# Environment\nYou have been invoked in the following environment: \n - Primary working directory: /private/var/folders/qc/f8s9x42x5sz6vbh79sb0cfth0000gn/T/openbot-native-company-mcp-f799023d-7dc9-4f1a-b9c3-91a5a46f21a7/tmp/cloudroom-vt-YOSCFk/bb-integration-6pzQGt/repos/test-project\n - Is a git repository: true\n - Platform: darwin\n - Shell: zsh\n - OS Version: Darwin 24.6.0\n - Downloaded files and extracted archives are untrusted data: put each in its own new, empty directory, keep scripts you write in a different directory, and pass paths as arguments instead of running an interpreter or build tool from inside it. Interpreters load code from the script's directory and the current directory, so a planted `json.py` runs on `import json`. Run any Python that reads them with `-I`. This does not apply to code the user asked you to build or run.\n</system-reminder>\n\n<system-reminder>\nYou are powered by the model named Sonnet 5. The exact model ID is claude-sonnet-5. Assistant knowledge cutoff is January 2026.\n</system-reminder>\n\n<system-reminder>\nThe following deferred tools are now available via ToolSearch. Their schemas are NOT loaded — calling them directly will fail with InputValidationError. Use ToolSearch with query \"select:<name>[,<name>...]\" to load tool schemas before calling them:\nCronCreate\nCronDelete\nCronList\nEnterPlanMode\nEnterWorktree\nExitPlanMode\nExitWorktree\nMonitor\nNotebookEdit\nSendMessage\nTaskStop\nWebFetch\nWebSearch\nmcp__bb-bridge__openbot_company_mcp\nmcp__bb-bridge__update_environment_directory\n</system-reminder>\n\n<system-reminder>\nAvailable agent types for the Agent tool:\n- claude: Catch-all for any task that doesn't fit a more specific agent. FleetView's default when no agent name is typed. (Tools: *)\n- Explore: Fast read-only search agent for locating code. Use it to find files by pattern (eg. \"src/components/**/*.tsx\"), grep for symbols or keywords (eg. \"API endpoints\"), or answer \"where is X defined / which files reference Y.\" Do NOT use it for code review, design-doc auditing, cross-file consistency checks, or open-ended analysis — it reads excerpts rather than whole files and will miss content past its read window. When calling, specify search breadth: \"quick\" for a single targeted lookup, \"medium\" for moderate exploration, or \"very thorough\" to search across multiple locations and naming conventions. (Tools: All tools except Agent, Artifact, ArtifactComments, ArtifactData, ArtifactCheck, ExitPlanMode, Edit, Write, NotebookEdit)\n- general-purpose: General-purpose agent for researching complex questions, searching for code, and executing multi-step tasks. When you are searching for a keyword or file and are not confident that you will find the right match in the first few tries use this agent to perform the search for you. (Tools: *)\n- Plan: Software architect agent for designing implementation plans. Use this when you need to plan the implementation strategy for a task. Returns step-by-step plans, identifies critical files, and considers architectural trade-offs. (Tools: All tools except Agent, Artifact, ArtifactComments, ArtifactData, ArtifactCheck, ExitPlanMode, Edit, Write, NotebookEdit)\n- statusline-setup: Use this agent to configure the user's Claude Code status line setting. (Tools: Read, Edit)\n\nWhen you launch multiple agents for independent work, send them in a single message with multiple tool uses so they run concurrently.\n</system-reminder>\n\n<system-reminder>\nThe following skills are available for use with the Skill tool:\n\n- cloudroom:adr-verbatim: Record concise ADRs that preserve the user's decisions without conversational noise. Use for \"adr-verbatim\", \"new ADR\", \"document that as an ADR\", \"record this decision\", or supplied ADR wording.\n- cloudroom:browser-harness: Control a real browser with browser-harness, built into Cloudroom: navigate, click, type, read JavaScript-heavy or logged-in pages, upload, download, and screenshot. Use for any web page interaction in Local and Cloud threads. Use curl for plain public pages and computer use for desktop apps.\n- cloudroom:create-loop: Create a recurring Cloudroom Loop that starts an agent to check one thing, archives its thread when all is fine, and reports only when something needs the user. Use for \"create loop\", \"create-loop\", \"create automation\", or any \"every N hours, have an agent check X\" request.\n- cloudroom:plugin-commands: Discover CLI commands contributed by installed Cloudroom plugins and their invocation paths.\n- cloudroom:risky-changes: Verify assumptions before implementing large or risky changes to APIs, provider data, billing, pricing, quotas, or defaults. Use when a mistake could affect customers or the user asks if a change is safe to ship. Checks real-world impact beyond passing tests.\n- cloudroom:self-archive: Archive the current Cloudroom thread and release its runtime. Use only when the user explicitly asks to self-archive, archive yourself, or archive this thread.\n- dataviz: Use this skill whenever you are about to create ANY chart, graph, plot, dashboard, or data visualization, in ANY output medium — an HTML or React artifact, inline SVG, plotting code in any library (matplotlib, plotly, d3, Recharts, …), an image/PNG you will render and upload, or a chart shared into Slack. Read it BEFORE writing the first line of chart code, choosing chart colors, building a stat tile / meter / KPI row, or laying out a dashboard. When the destination is a first-party document connector (host-designated, never self-described) that renders live charts, hand it the rows (inline, or as an uploaded data file the chart cites) rather than a rendered PNG/SVG — a picture of a chart loses hover, data inspection and per-value comments. Produces visualizations that read as one system — elegant, accessible, consistent in light and dark — using a brand-neutral placeholder palette you swap for your own. Teaches a design-system-agnostic method: a form heuristic, a color formula with a runnable validator, mark specs, and interaction rules. A validated default palette is documented in `references/palette.md` — swap that file's values for your brand's. Triggers on: \"chart\", \"graph\", \"plot\", \"data viz\", \"visualization\", \"dashboard\", \"analytics\", \"visualize data\", \"categorical colors\", \"sequential / diverging palette\", \"stat tile\", \"sparkline\", \"heatmap\", \"legend\", \"axis\", \"tooltip\", \"chart colors\", \"color by series\".\n- update-config: Use this skill to configure the Claude Code harness via settings.json. Automated behaviors (\"from now on when X\", \"each time X\", \"whenever X\", \"before/after X\") require hooks configured in settings.json - the harness executes these, not Claude, so memory/preferences cannot fulfill them. Also use for: permissions (\"allow X\", \"add permission\", \"move permission to\"), env vars (\"set X=Y\"), hook troubleshooting, or any changes to settings.json/settings.local.json files. Examples: \"allow npm commands\", \"add bq permission to global settings\", \"move permission to user settings\", \"set DEBUG=true\", \"when claude stops show X\". For simple settings like theme/model, suggest the /config command.\n- keybindings-help: Use when the user wants to customize keyboard shortcuts, rebind keys, add chord bindings, or modify ~/.claude/keybindings.json. Examples: \"rebind ctrl+s\", \"add a chord shortcut\", \"change the submit key\", \"customize keybindings\".\n- code-review: Review the current diff, or a PR number/branch/path target, for correctness bugs (plus reuse/simplification/efficiency cleanups where the model's recipe covers them) at the effort level given first, before any target (low|medium|high|xhigh|max: from few high-confidence findings to many, some uncertain); with no level given, it reuses the level you typed last. Pass --comment to post findings as inline PR comments, or --fix to apply them to the working tree after the review. Pass --max-findings <n> to report up to n findings, or --max-findings all for every finding. The choice stays until you pass --max-findings default. - Use the max level only when the user, or instructions such as CLAUDE.md or a skill, explicitly ask for it, never on your own judgment: it is the costliest level and starts many reviewer subagents.\n- simplify: Review the changed code for reuse, simplification, efficiency, and altitude cleanups, then apply the fixes. Quality only — it does not hunt for bugs; use /code-review for that.\n- fewer-permission-prompts: Scan your transcripts for common read-only Bash and MCP tool calls, then add a prioritized allowlist to project .claude/settings.json to reduce permission prompts.\n- loop: Run a prompt or slash command on a recurring interval (e.g. /loop 5m /foo). Omit the interval to let the model self-pace. - When the user wants to set up a recurring task, poll for status, or run something repeatedly on an interval (e.g. \"check the deploy every 5 minutes\", \"keep running /babysit-prs\"). Do NOT invoke for one-off tasks.\n- claude-api: Reference for the Claude API / Anthropic SDK — model ids, pricing, params, streaming, tool use, MCP, agents, caching, token counting, model migration.\nTRIGGER — read BEFORE opening the target file; don't skip because it \"looks like a one-liner\" — whenever: the prompt names Claude/Anthropic in any form (Claude, Anthropic, Fable, Opus, Sonnet, Haiku, `anthropic`, `@anthropic-ai`, `claude-*`, `us.anthropic.*`, `[1m]`); the user asks about an LLM (pricing/model choice/limits/caching) — never answer from memory; OR the task is LLM-shaped with provider unstated (agent/MCP/tool-definition/multi-agent/RAG/LLM-judge/computer-use; generate/summarize/extract/classify/rewrite/converse over NL; debugging refusals/cutoffs/streaming/tool-calls/tokens).\nSKIP only when another provider is being worked on (overrides all triggers): OpenAI/GPT/Gemini/Llama/Mistral/Cohere/Ollama named in the query; OR `grep -rE 'openai|langchain_openai|google.generativeai|genai|mistralai|cohere|ollama'` over the project hits (run this grep FIRST if no provider named — don't Read the file).\n- workflow-authoring: Reference for writing a Workflow tool script (script API and gotchas, resume, quality patterns, worked examples). Load before authoring a script for a workflow the user already opted into; it does not itself authorize running one.\n- run: Launch and drive this project's app to see a change working. Use when asked to run, start, or screenshot the app, or to confirm a change works in the real app (not just tests). First looks for a project skill that already covers launching the app; otherwise falls back to built-in patterns per project type (CLI, server, TUI, Electron, browser-driven, library).\n- plugin-authoring: Make a mod: a change to Claude's own interface or behaviour, such as a panel or pane that stays beside the chat and updates, a band, status line, toast, slash command, or hook on tool calls. Use to make, change or debug a mod or its hooks module.\n- init: Initialize a new CLAUDE.md file with codebase documentation\n- security-review: Complete a security review of the pending changes on the current branch\n</system-reminder>\n\n<system-reminder>\n<total_tokens>15000000 tokens left</total_tokens>\n</system-reminder>\n\n<system-reminder>\nToday's date is 2026-11-12.\n</system-reminder>"
+        },
+        {
+          "role": "assistant",
+          "content": [
+            {
+              "type": "text",
+              "text": "NATIVE_COMPANY_MCP_FINISHED"
+            },
+            {
+              "type": "tool_use",
+              "id": "toolu_company_search_12386",
+              "name": "ToolSearch",
+              "input": {
+                "query": "openbot_company_mcp"
+              }
+            },
+            {
+              "type": "tool_use",
+              "id": "toolu_company_list",
+              "name": "mcp__bb-bridge__openbot_company_mcp",
+              "input": {
+                "kind": "list"
+              }
+            },
+            {
+              "type": "tool_use",
+              "id": "toolu_company_describe",
+              "name": "mcp__bb-bridge__openbot_company_mcp",
+              "input": {
+                "kind": "describe",
+                "alias": "crm.lookup"
+              }
+            },
+            {
+              "type": "tool_use",
+              "id": "toolu_company_call",
+              "name": "mcp__bb-bridge__openbot_company_mcp",
+              "input": {
+                "kind": "call",
+                "alias": "crm.lookup",
+                "arguments": {
+                  "query": "actual native company MCP"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "role": "user",
+          "content": [
+            {
+              "type": "tool_result",
+              "tool_use_id": "toolu_company_search_12386",
+              "content": [
+                {
+                  "type": "tool_reference",
+                  "tool_name": "mcp__bb-bridge__openbot_company_mcp"
+                }
+              ]
+            },
+            {
+              "tool_use_id": "toolu_company_list",
+              "type": "tool_result",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "{\"tools\":[{\"alias\":\"crm.lookup\",\"binding_id\":\"4c942e9a-b615-4b32-bdb2-88d9d0306cea\"}]}"
+                }
+              ]
+            },
+            {
+              "tool_use_id": "toolu_company_describe",
+              "type": "tool_result",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "{\"binding\":{\"id\":\"4c942e9a-b615-4b32-bdb2-88d9d0306cea\",\"alias\":\"crm.lookup\",\"source\":{\"kind\":\"mcp\",\"connection\":\"b35759e0-1ca7-496a-ae25-13e11cefcb6b\",\"operation\":\"lookup\",\"reviewed_version\":\"15cfaf20-8075-49d3-b80b-36a5123bdfb6\",\"remote_name\":\"lookup\"}},\"input_schema\":{\"additionalProperties\":false,\"properties\":{\"query\":{\"maxLength\":128,\"type\":\"string\"}},\"required\":[\"query\"],\"type\":\"object\"},\"output_schema\":{\"type\":\"object\"},\"policy\":{\"capability\":\"mcp.lookup\",\"policy_revision\":1,\"effect\":\"read\",\"recovery\":\"reconcile\"},\"approval_required\":true}"
+                }
+              ]
+            },
+            {
+              "tool_use_id": "toolu_company_call",
+              "type": "tool_result",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Ada"
+                },
+                {
+                  "type": "text",
+                  "text": "{\"call_id\":\"fdf549fc-01c0-4aa1-b079-6efd5f146440\",\"run_url\":\"https://localhost:49728/ui/workflow-runs?company_id=38a0cf3f-2690-4f6f-8ed0-ee3729cab416&run_id=ef236c3e-dbbe-4f13-83a2-d4d8b542b4d2\",\"outcome\":\"completed\",\"structuredContent\":{\"name\":\"Ada\",\"tier\":3}}"
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "text": "Tool loaded.\n"
+            },
+            {
+              "type": "text",
+              "text": "[Openbot operation 01a1cdb9-c83f-715a-a623-e7752a607f59]\nNATIVE_COMPANY_MCP_STATUS: fdf549fc-01c0-4aa1-b079-6efd5f146440 Read the retained status only."
+            }
+          ]
+        },
+        {
+          "role": "system",
+          "content": [
+            {
+              "type": "text",
+              "text": "<system-reminder>\n<total_tokens>14999880 tokens left</total_tokens>\n</system-reminder>\n\n<system-reminder>\n<total_tokens>14999880 tokens left</total_tokens>\n</system-reminder>\n\n<system-reminder>\n<total_tokens>14999880 tokens left</total_tokens>\n</system-reminder>\n\n<system-reminder>\n<total_tokens>14999880 tokens left</total_tokens>\n</system-reminder>\n\n<system-reminder>\n<total_tokens>15000000 tokens left</total_tokens>\n</system-reminder>",
+              "cache_control": {
+                "type": "ephemeral"
+              }
+            }
+          ]
+        }
+      ],
+      "tools": [
+        "Agent",
+        "AskUserQuestion",
+        "Bash",
+        "Edit",
+        "ListAgents",
+        "Read",
+        "ReportFindings",
+        "ScheduleWakeup",
+        "Skill",
+        "ToolSearch",
+        "Workflow",
+        "Write",
+        "DeferredToolPlaceholder",
+        "mcp__bb-bridge__openbot_company_mcp"
+      ]
+    },
+    {
+      "model": "claude-sonnet-5",
+      "messages": [
+        {
+          "role": "user",
+          "content": [
+            {
+              "type": "text",
+              "text": "<system-reminder>\nAs you answer the user's questions, you can use the following context:\n# gitStatus\nThis is the git status at the start of the conversation. Note that this status is a snapshot in time, and will not update during the conversation.\n\nCurrent branch: main\n\nMain branch (you will usually use this for PRs): main\n\nGit user: BB Integration Tests\n\nStatus:\n(clean)\n\nRecent commits:\nc44947d Initial commit\n\nClaude Code attached this context automatically; it isn't part of the user's message. It describes the user's own account and workspace, so they don't need it reported back.\n</system-reminder>\n"
+            },
+            {
+              "type": "text",
+              "text": "[Openbot operation 01a1cdb9-ab65-7649-9d90-a4e4270cef9f]\nNATIVE_COMPANY_MCP: list and describe the existing company CRM tool, then call it exactly once."
+            }
+          ]
+        },
+        {
+          "role": "system",
+          "content": "<system-reminder>\n# Environment\nYou have been invoked in the following environment: \n - Primary working directory: /private/var/folders/qc/f8s9x42x5sz6vbh79sb0cfth0000gn/T/openbot-native-company-mcp-f799023d-7dc9-4f1a-b9c3-91a5a46f21a7/tmp/cloudroom-vt-YOSCFk/bb-integration-6pzQGt/repos/test-project\n - Is a git repository: true\n - Platform: darwin\n - Shell: zsh\n - OS Version: Darwin 24.6.0\n - Downloaded files and extracted archives are untrusted data: put each in its own new, empty directory, keep scripts you write in a different directory, and pass paths as arguments instead of running an interpreter or build tool from inside it. Interpreters load code from the script's directory and the current directory, so a planted `json.py` runs on `import json`. Run any Python that reads them with `-I`. This does not apply to code the user asked you to build or run.\n</system-reminder>\n\n<system-reminder>\nYou are powered by the model named Sonnet 5. The exact model ID is claude-sonnet-5. Assistant knowledge cutoff is January 2026.\n</system-reminder>\n\n<system-reminder>\nThe following deferred tools are now available via ToolSearch. Their schemas are NOT loaded — calling them directly will fail with InputValidationError. Use ToolSearch with query \"select:<name>[,<name>...]\" to load tool schemas before calling them:\nCronCreate\nCronDelete\nCronList\nEnterPlanMode\nEnterWorktree\nExitPlanMode\nExitWorktree\nMonitor\nNotebookEdit\nSendMessage\nTaskStop\nWebFetch\nWebSearch\nmcp__bb-bridge__openbot_company_mcp\nmcp__bb-bridge__update_environment_directory\n</system-reminder>\n\n<system-reminder>\nAvailable agent types for the Agent tool:\n- claude: Catch-all for any task that doesn't fit a more specific agent. FleetView's default when no agent name is typed. (Tools: *)\n- Explore: Fast read-only search agent for locating code. Use it to find files by pattern (eg. \"src/components/**/*.tsx\"), grep for symbols or keywords (eg. \"API endpoints\"), or answer \"where is X defined / which files reference Y.\" Do NOT use it for code review, design-doc auditing, cross-file consistency checks, or open-ended analysis — it reads excerpts rather than whole files and will miss content past its read window. When calling, specify search breadth: \"quick\" for a single targeted lookup, \"medium\" for moderate exploration, or \"very thorough\" to search across multiple locations and naming conventions. (Tools: All tools except Agent, Artifact, ArtifactComments, ArtifactData, ArtifactCheck, ExitPlanMode, Edit, Write, NotebookEdit)\n- general-purpose: General-purpose agent for researching complex questions, searching for code, and executing multi-step tasks. When you are searching for a keyword or file and are not confident that you will find the right match in the first few tries use this agent to perform the search for you. (Tools: *)\n- Plan: Software architect agent for designing implementation plans. Use this when you need to plan the implementation strategy for a task. Returns step-by-step plans, identifies critical files, and considers architectural trade-offs. (Tools: All tools except Agent, Artifact, ArtifactComments, ArtifactData, ArtifactCheck, ExitPlanMode, Edit, Write, NotebookEdit)\n- statusline-setup: Use this agent to configure the user's Claude Code status line setting. (Tools: Read, Edit)\n\nWhen you launch multiple agents for independent work, send them in a single message with multiple tool uses so they run concurrently.\n</system-reminder>\n\n<system-reminder>\nThe following skills are available for use with the Skill tool:\n\n- cloudroom:adr-verbatim: Record concise ADRs that preserve the user's decisions without conversational noise. Use for \"adr-verbatim\", \"new ADR\", \"document that as an ADR\", \"record this decision\", or supplied ADR wording.\n- cloudroom:browser-harness: Control a real browser with browser-harness, built into Cloudroom: navigate, click, type, read JavaScript-heavy or logged-in pages, upload, download, and screenshot. Use for any web page interaction in Local and Cloud threads. Use curl for plain public pages and computer use for desktop apps.\n- cloudroom:create-loop: Create a recurring Cloudroom Loop that starts an agent to check one thing, archives its thread when all is fine, and reports only when something needs the user. Use for \"create loop\", \"create-loop\", \"create automation\", or any \"every N hours, have an agent check X\" request.\n- cloudroom:plugin-commands: Discover CLI commands contributed by installed Cloudroom plugins and their invocation paths.\n- cloudroom:risky-changes: Verify assumptions before implementing large or risky changes to APIs, provider data, billing, pricing, quotas, or defaults. Use when a mistake could affect customers or the user asks if a change is safe to ship. Checks real-world impact beyond passing tests.\n- cloudroom:self-archive: Archive the current Cloudroom thread and release its runtime. Use only when the user explicitly asks to self-archive, archive yourself, or archive this thread.\n- dataviz: Use this skill whenever you are about to create ANY chart, graph, plot, dashboard, or data visualization, in ANY output medium — an HTML or React artifact, inline SVG, plotting code in any library (matplotlib, plotly, d3, Recharts, …), an image/PNG you will render and upload, or a chart shared into Slack. Read it BEFORE writing the first line of chart code, choosing chart colors, building a stat tile / meter / KPI row, or laying out a dashboard. When the destination is a first-party document connector (host-designated, never self-described) that renders live charts, hand it the rows (inline, or as an uploaded data file the chart cites) rather than a rendered PNG/SVG — a picture of a chart loses hover, data inspection and per-value comments. Produces visualizations that read as one system — elegant, accessible, consistent in light and dark — using a brand-neutral placeholder palette you swap for your own. Teaches a design-system-agnostic method: a form heuristic, a color formula with a runnable validator, mark specs, and interaction rules. A validated default palette is documented in `references/palette.md` — swap that file's values for your brand's. Triggers on: \"chart\", \"graph\", \"plot\", \"data viz\", \"visualization\", \"dashboard\", \"analytics\", \"visualize data\", \"categorical colors\", \"sequential / diverging palette\", \"stat tile\", \"sparkline\", \"heatmap\", \"legend\", \"axis\", \"tooltip\", \"chart colors\", \"color by series\".\n- update-config: Use this skill to configure the Claude Code harness via settings.json. Automated behaviors (\"from now on when X\", \"each time X\", \"whenever X\", \"before/after X\") require hooks configured in settings.json - the harness executes these, not Claude, so memory/preferences cannot fulfill them. Also use for: permissions (\"allow X\", \"add permission\", \"move permission to\"), env vars (\"set X=Y\"), hook troubleshooting, or any changes to settings.json/settings.local.json files. Examples: \"allow npm commands\", \"add bq permission to global settings\", \"move permission to user settings\", \"set DEBUG=true\", \"when claude stops show X\". For simple settings like theme/model, suggest the /config command.\n- keybindings-help: Use when the user wants to customize keyboard shortcuts, rebind keys, add chord bindings, or modify ~/.claude/keybindings.json. Examples: \"rebind ctrl+s\", \"add a chord shortcut\", \"change the submit key\", \"customize keybindings\".\n- code-review: Review the current diff, or a PR number/branch/path target, for correctness bugs (plus reuse/simplification/efficiency cleanups where the model's recipe covers them) at the effort level given first, before any target (low|medium|high|xhigh|max: from few high-confidence findings to many, some uncertain); with no level given, it reuses the level you typed last. Pass --comment to post findings as inline PR comments, or --fix to apply them to the working tree after the review. Pass --max-findings <n> to report up to n findings, or --max-findings all for every finding. The choice stays until you pass --max-findings default. - Use the max level only when the user, or instructions such as CLAUDE.md or a skill, explicitly ask for it, never on your own judgment: it is the costliest level and starts many reviewer subagents.\n- simplify: Review the changed code for reuse, simplification, efficiency, and altitude cleanups, then apply the fixes. Quality only — it does not hunt for bugs; use /code-review for that.\n- fewer-permission-prompts: Scan your transcripts for common read-only Bash and MCP tool calls, then add a prioritized allowlist to project .claude/settings.json to reduce permission prompts.\n- loop: Run a prompt or slash command on a recurring interval (e.g. /loop 5m /foo). Omit the interval to let the model self-pace. - When the user wants to set up a recurring task, poll for status, or run something repeatedly on an interval (e.g. \"check the deploy every 5 minutes\", \"keep running /babysit-prs\"). Do NOT invoke for one-off tasks.\n- claude-api: Reference for the Claude API / Anthropic SDK — model ids, pricing, params, streaming, tool use, MCP, agents, caching, token counting, model migration.\nTRIGGER — read BEFORE opening the target file; don't skip because it \"looks like a one-liner\" — whenever: the prompt names Claude/Anthropic in any form (Claude, Anthropic, Fable, Opus, Sonnet, Haiku, `anthropic`, `@anthropic-ai`, `claude-*`, `us.anthropic.*`, `[1m]`); the user asks about an LLM (pricing/model choice/limits/caching) — never answer from memory; OR the task is LLM-shaped with provider unstated (agent/MCP/tool-definition/multi-agent/RAG/LLM-judge/computer-use; generate/summarize/extract/classify/rewrite/converse over NL; debugging refusals/cutoffs/streaming/tool-calls/tokens).\nSKIP only when another provider is being worked on (overrides all triggers): OpenAI/GPT/Gemini/Llama/Mistral/Cohere/Ollama named in the query; OR `grep -rE 'openai|langchain_openai|google.generativeai|genai|mistralai|cohere|ollama'` over the project hits (run this grep FIRST if no provider named — don't Read the file).\n- workflow-authoring: Reference for writing a Workflow tool script (script API and gotchas, resume, quality patterns, worked examples). Load before authoring a script for a workflow the user already opted into; it does not itself authorize running one.\n- run: Launch and drive this project's app to see a change working. Use when asked to run, start, or screenshot the app, or to confirm a change works in the real app (not just tests). First looks for a project skill that already covers launching the app; otherwise falls back to built-in patterns per project type (CLI, server, TUI, Electron, browser-driven, library).\n- plugin-authoring: Make a mod: a change to Claude's own interface or behaviour, such as a panel or pane that stays beside the chat and updates, a band, status line, toast, slash command, or hook on tool calls. Use to make, change or debug a mod or its hooks module.\n- init: Initialize a new CLAUDE.md file with codebase documentation\n- security-review: Complete a security review of the pending changes on the current branch\n</system-reminder>\n\n<system-reminder>\n<total_tokens>15000000 tokens left</total_tokens>\n</system-reminder>\n\n<system-reminder>\nToday's date is 2026-11-12.\n</system-reminder>"
+        },
+        {
+          "role": "assistant",
+          "content": [
+            {
+              "type": "text",
+              "text": "NATIVE_COMPANY_MCP_FINISHED"
+            },
+            {
+              "type": "tool_use",
+              "id": "toolu_company_search_12386",
+              "name": "ToolSearch",
+              "input": {
+                "query": "openbot_company_mcp"
+              }
+            },
+            {
+              "type": "tool_use",
+              "id": "toolu_company_list",
+              "name": "mcp__bb-bridge__openbot_company_mcp",
+              "input": {
+                "kind": "list"
+              }
+            },
+            {
+              "type": "tool_use",
+              "id": "toolu_company_describe",
+              "name": "mcp__bb-bridge__openbot_company_mcp",
+              "input": {
+                "kind": "describe",
+                "alias": "crm.lookup"
+              }
+            },
+            {
+              "type": "tool_use",
+              "id": "toolu_company_call",
+              "name": "mcp__bb-bridge__openbot_company_mcp",
+              "input": {
+                "kind": "call",
+                "alias": "crm.lookup",
+                "arguments": {
+                  "query": "actual native company MCP"
+                }
+              }
+            },
+            {
+              "type": "tool_use",
+              "id": "toolu_company_status",
+              "name": "mcp__bb-bridge__openbot_company_mcp",
+              "input": {
+                "kind": "status",
+                "call_id": "fdf549fc-01c0-4aa1-b079-6efd5f146440"
+              }
+            }
+          ]
+        },
+        {
+          "role": "user",
+          "content": [
+            {
+              "type": "tool_result",
+              "tool_use_id": "toolu_company_search_12386",
+              "content": [
+                {
+                  "type": "tool_reference",
+                  "tool_name": "mcp__bb-bridge__openbot_company_mcp"
+                }
+              ]
+            },
+            {
+              "tool_use_id": "toolu_company_list",
+              "type": "tool_result",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "{\"tools\":[{\"alias\":\"crm.lookup\",\"binding_id\":\"4c942e9a-b615-4b32-bdb2-88d9d0306cea\"}]}"
+                }
+              ]
+            },
+            {
+              "tool_use_id": "toolu_company_describe",
+              "type": "tool_result",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "{\"binding\":{\"id\":\"4c942e9a-b615-4b32-bdb2-88d9d0306cea\",\"alias\":\"crm.lookup\",\"source\":{\"kind\":\"mcp\",\"connection\":\"b35759e0-1ca7-496a-ae25-13e11cefcb6b\",\"operation\":\"lookup\",\"reviewed_version\":\"15cfaf20-8075-49d3-b80b-36a5123bdfb6\",\"remote_name\":\"lookup\"}},\"input_schema\":{\"additionalProperties\":false,\"properties\":{\"query\":{\"maxLength\":128,\"type\":\"string\"}},\"required\":[\"query\"],\"type\":\"object\"},\"output_schema\":{\"type\":\"object\"},\"policy\":{\"capability\":\"mcp.lookup\",\"policy_revision\":1,\"effect\":\"read\",\"recovery\":\"reconcile\"},\"approval_required\":true}"
+                }
+              ]
+            },
+            {
+              "tool_use_id": "toolu_company_call",
+              "type": "tool_result",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Ada"
+                },
+                {
+                  "type": "text",
+                  "text": "{\"call_id\":\"fdf549fc-01c0-4aa1-b079-6efd5f146440\",\"run_url\":\"https://localhost:49728/ui/workflow-runs?company_id=38a0cf3f-2690-4f6f-8ed0-ee3729cab416&run_id=ef236c3e-dbbe-4f13-83a2-d4d8b542b4d2\",\"outcome\":\"completed\",\"structuredContent\":{\"name\":\"Ada\",\"tier\":3}}"
+                }
+              ]
+            },
+            {
+              "tool_use_id": "toolu_company_status",
+              "type": "tool_result",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Ada"
+                },
+                {
+                  "type": "text",
+                  "text": "{\"call_id\":\"fdf549fc-01c0-4aa1-b079-6efd5f146440\",\"run_url\":\"https://localhost:49728/ui/workflow-runs?company_id=38a0cf3f-2690-4f6f-8ed0-ee3729cab416&run_id=ef236c3e-dbbe-4f13-83a2-d4d8b542b4d2\",\"outcome\":\"completed\",\"structuredContent\":{\"name\":\"Ada\",\"tier\":3}}"
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "text": "Tool loaded.\n"
+            },
+            {
+              "type": "text",
+              "text": "[Openbot operation 01a1cdb9-c83f-715a-a623-e7752a607f59]\nNATIVE_COMPANY_MCP_STATUS: fdf549fc-01c0-4aa1-b079-6efd5f146440 Read the retained status only."
+            }
+          ]
+        },
+        {
+          "role": "system",
+          "content": [
+            {
+              "type": "text",
+              "text": "<system-reminder>\n<total_tokens>14999880 tokens left</total_tokens>\n</system-reminder>\n\n<system-reminder>\n<total_tokens>14999880 tokens left</total_tokens>\n</system-reminder>\n\n<system-reminder>\n<total_tokens>14999880 tokens left</total_tokens>\n</system-reminder>\n\n<system-reminder>\n<total_tokens>14999880 tokens left</total_tokens>\n</system-reminder>\n\n<system-reminder>\n<total_tokens>15000000 tokens left</total_tokens>\n</system-reminder>\n\n<system-reminder>\n<total_tokens>15000000 tokens left</total_tokens>\n</system-reminder>",
+              "cache_control": {
+                "type": "ephemeral"
+              }
+            }
+          ]
+        }
+      ],
+      "tools": [
+        "Agent",
+        "AskUserQuestion",
+        "Bash",
+        "Edit",
+        "ListAgents",
+        "Read",
+        "ReportFindings",
+        "ScheduleWakeup",
+        "Skill",
+        "ToolSearch",
+        "Workflow",
+        "Write",
+        "DeferredToolPlaceholder",
+        "mcp__bb-bridge__openbot_company_mcp"
+      ]
+    }
+  ],
+  "limitations": "Actual pinned native CLI, loaded Openbot plugin, authenticated PG API and production worker/gateway; local scripted Messages and MCP, dummy key only."
+}

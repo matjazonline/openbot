@@ -1,0 +1,19 @@
+{
+  "case": "Authenticated explicit first non-admission proof; terminal/acked/100 days old",
+  "actions": [
+    "call"
+  ],
+  "result": {
+    "isError": true,
+    "content": [
+      {
+        "type": "text",
+        "text": "Openbot refused this MCP request (400)"
+      }
+    ]
+  },
+  "removed": 1,
+  "commands": {
+    "n": 0
+  }
+}

@@ -1,0 +1,16 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+
+running 1 test
+
+thread 'adapters::persistence::workflow::tests::jev_runtime_tests::recovery::jev_runtime_lost_lease_cancels_actual_http_and_prevents_settlement' (48856028) panicked at src/adapters/persistence/workflow/jev_runtime_recovery_tests.rs:33:5:
+assertion failed: matches!(result, SupervisedResult::Stopped(StopReason::LeaseLost))
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test adapters::persistence::workflow::tests::jev_runtime_tests::recovery::jev_runtime_lost_lease_cancels_actual_http_and_prevents_settlement ... FAILED
+
+failures:
+
+failures:
+    adapters::persistence::workflow::tests::jev_runtime_tests::recovery::jev_runtime_lost_lease_cancels_actual_http_and_prevents_settlement
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 4103 filtered out; finished in 1.44s
+

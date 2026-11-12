@@ -1,0 +1,9 @@
+
+ RUN  v4.1.1 /private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/server
+
+
+ Test Files  2 passed (2)
+      Tests  13 passed (13)
+   Start at  18:21:09
+   Duration  11.56s (transform 4.88s, setup 1.98s, import 5.50s, tests 8.47s, environment 0ms)
+

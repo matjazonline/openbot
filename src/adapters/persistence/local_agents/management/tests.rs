@@ -391,6 +391,10 @@ async fn dump_cloudroom_management_browser_fixtures() {
         Some(LocalOutput::try_from("Result <img src=x onerror=alert(1)>".to_owned()).unwrap());
     session.recent.entries[0].observed_turn_state = Some(TurnState::WaitingForInput);
     let view = local_agents::Page {
+        native_agents: &RecordPage {
+            entries: vec![],
+            truncated: false,
+        },
         company: &company,
         machines: std::slice::from_ref(&machine.machine),
         pairings: &[],
@@ -411,6 +415,7 @@ async fn dump_cloudroom_management_browser_fixtures() {
     std::fs::write(root.join("theme-init.js"), pages::theme_init_javascript()).unwrap();
     std::fs::write(root.join("metadata.json"),json!({"company":s.f.company,"machine":profile.selection.machine_id,"profile":profile.id,"session":id,"conversation":s.conversation}).to_string()).unwrap();
     write_profile_navigation(&s, &root, &view).await;
+    write_agent_permissions_fixture(&s, &root, &view).await;
 }
 
 async fn write_profile_navigation(
@@ -450,6 +455,78 @@ async fn write_profile_navigation(
         json!({"company":s.f.company,"channel":view.conversation.unwrap().channel_id,
         "conversation":view.conversation.unwrap().id,"cursor":cursor,"profile":chosen.id,"name":chosen.name})
         .to_string(),
+    )
+    .unwrap();
+}
+
+#[path = "native_mcp_tests.rs"]
+mod native_mcp_tests;
+#[path = "native_tests.rs"]
+mod native_tests;
+
+async fn write_agent_permissions_fixture(
+    s: &Setup,
+    root: &std::path::Path,
+    view: &crate::adapters::http::pages::local_agents::Page<'_>,
+) {
+    use crate::adapters::http::pages::local_agents;
+    use crate::application::agent::{
+        AgentPublicationKey, AgentPublicationScope, AgentPublications, PublishAgent,
+    };
+    use crate::entities::agent_capability::AgentId;
+    use crate::use_cases::agent::{AgentPersistence, AgentWrite};
+    let p = s.f.persistence.as_ref();
+    let agent = AgentPersistence::create(
+        p,
+        s.f.company,
+        AgentWrite {
+            name: "Auto native agent".into(),
+            slug: "auto-native-agent".into(),
+            native_permissions: LocalPermissions::Auto,
+            ..Default::default()
+        },
+    )
+    .await
+    .unwrap();
+    p.publish_agent(PublishAgent {
+        scope: AgentPublicationScope {
+            company: CompanyId::new(s.f.company),
+            actor: WorkflowActor::authenticated(s.f.owner).unwrap(),
+            agent: AgentId::new(agent.id),
+        },
+        expected_draft_revision: agent.draft_revision,
+        expected_active_revision: None,
+        key: AgentPublicationKey::parse("browser-auto-agent").unwrap(),
+    })
+    .await
+    .unwrap();
+    sqlx::query("UPDATE local_machine_capabilities SET catalog=jsonb_set(catalog,'{providers,0,permission_modes}','[\"auto\"]') WHERE company_id=$1")
+        .bind(s.f.company).execute(&s.f.database.pool).await.unwrap();
+    let machine =
+        s.f.cases
+            .details(s.f.owner, s.f.company, s.profile.selection.machine_id)
+            .await
+            .unwrap();
+    let choices = RecordPage {
+        entries: vec![NativeAgentChoice {
+            id: AgentId::new(agent.id),
+            name: agent.name,
+        }],
+        truncated: false,
+    };
+    let native_view = local_agents::Page {
+        machine: Some(&machine),
+        native_agents: &choices,
+        ..*view
+    };
+    std::fs::write(
+        root.join("profiles-agent-permissions.html"),
+        local_agents::page(&native_view),
+    )
+    .unwrap();
+    std::fs::write(
+        root.join("profile-agent-permissions.json"),
+        json!({"agent":agent.id,"fallback":"full"}).to_string(),
     )
     .unwrap();
 }

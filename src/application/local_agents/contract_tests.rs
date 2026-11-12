@@ -134,6 +134,7 @@ fn cloudroom_bounds_output_and_catalog_decode_at_their_limits() {
 fn cloudroom_bounds_admission_preserves_control_capacity() {
     let create: LocalCommand = serde_json::from_value(json!({
         "kind":"create", "session_id":uuid::Uuid::new_v4(), "prompt":"hello",
+        "harness":{"kind":"unconfigured"},
         "selection":{
             "machine_id":uuid::Uuid::new_v4(), "project_id":"project_1", "provider":"codex", "model":"gpt-model",
             "policy":{"workspace":"project_directory","permissions":"full","reasoning":"none"}
@@ -292,6 +293,7 @@ fn cloudroom_contract_reasoning_is_frozen_into_the_create_digest() {
     let selection = open_code_selection();
     assert_eq!(selection.policy.reasoning, LocalReasoningLevel::Low);
     let command = LocalCommand::Create {
+        harness: crate::domain::local_agents::NativeHarnessSelection::Unconfigured,
         session_id: SessionId::new(uuid::Uuid::new_v4()).unwrap(),
         selection,
         prompt: LocalPrompt::try_from("smoke".to_owned()).unwrap(),

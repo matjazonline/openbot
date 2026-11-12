@@ -1,0 +1,32 @@
+
+ RUN  v4.1.1 /private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/packages/agent-runtime
+
+ ❯ |@cloudroom/agent-runtime| src/runtime.skill-roots-capability.test.ts (4 tests | 1 failed) 719ms
+     × sends skills/configure before thread/start to a bridge that declares it 68ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@cloudroom/agent-runtime| src/runtime.skill-roots-capability.test.ts > skills/configure handshake capability > sends skills/configure before thread/start to a bridge that declares it
+ProviderProcessExitedError: Provider "fake" exited unexpectedly (code 1)
+stderr: plugin "provider-scripted-echo" failed to load its provider bridge: Cannot find module '/private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/packages/agent-runtime/dist/test-bridges/scripted-echo-provider.mjs' imported from /private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/packages/provider-bridge-protocol/src/bridge-worker-entry.ts
+ ❯ RuntimeProviderProcessManager.handleProviderProcessExit src/runtime-provider-process.ts:612:9
+    610|     for (const [, pending] of args.providerProcess.pending) {
+    611|       pending.reject(
+    612|         new ProviderProcessExitedError({
+       |         ^
+    613|           providerId: args.providerId,
+    614|           status: { code: args.code, signal: args.signal },
+ ❯ handleExit src/runtime-provider-process.ts:478:14
+ ❯ ChildProcess.<anonymous> src/runtime-provider-process.ts:503:7
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 3 passed (4)
+   Start at  18:13:40
+   Duration  1.21s (transform 272ms, setup 0ms, import 410ms, tests 719ms, environment 0ms)
+
+undefined
+/private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/packages/agent-runtime:
+ ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1: vitest run --config vitest.config.ts src/runtime.skill-roots-capability.test.ts src/integration.skill-roots.test.ts

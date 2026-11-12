@@ -1,0 +1,95 @@
+{
+  "version": 1,
+  "round": "CH-P01-B3-R5-whitespace",
+  "artifact": "b2fc6f2c11e57a2e88e09d5978903b91e1977ef3219c65fe6376bf5428f856ac",
+  "checks": [
+    {
+      "criteria": [
+        "delivery-identity"
+      ],
+      "command": "compare all reviewed file hashes; one final LF removed; source whitespace check",
+      "fixture": "one EOF LF removal only; all189other reviewed files unchanged; package server.js and all package members except sourcemap byte-identical",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B3-final-source-whitespace-delta.json",
+          "sha256": "fab855289e52758efdd994f7b0748f7eeadda5eb8108417e69a6534de1521111"
+        },
+        {
+          "path": "logs/B3-final-source-whitespace-coverage.json",
+          "sha256": "a31d38c024a94e9ed3de39dff34bd0c08d3502f4cadc8e2b19095e8f78120a9f"
+        },
+        {
+          "path": "logs/B3-final-source-whitespace-pass.txt",
+          "sha256": "3ebf2e7e494e24a8142eb48faf8f16c9151e59c16111ed94bae8c2f4a2b2c8e0"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "M3-AC6"
+      ],
+      "command": "repeat package build twice; compare all tar members to tested R6 package; offline production install/import",
+      "fixture": "one EOF LF removal only; all189other reviewed files unchanged; package server.js and all package members except sourcemap byte-identical",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B3-final-whitespace-package.txt",
+          "sha256": "a64102eb01f0ecb4a4324b63e8ab8ae2a941547f97f20c876c1682bdb617315a"
+        },
+        {
+          "path": "logs/B3-final-whitespace-package-delta.json",
+          "sha256": "e53364ac4147f614879031aff7c6f7d896682e845a0162d554d033065e05dfe8"
+        },
+        {
+          "path": "logs/B3-final-whitespace-production-install.txt",
+          "sha256": "7d07e9accd9f93f4e87ebdc1cd24b6a8157f9916aa3408fe2745a908b71e1ec5"
+        },
+        {
+          "path": "logs/B3-final-whitespace-production-load.txt",
+          "sha256": "ec266a2bd46db527c3a9e90dc2d5269a2fb10058c43d1d2b52704d458bd2510b"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "M3-AC2",
+        "M3-AC3",
+        "M3-AC4",
+        "M3-AC5",
+        "CH-P01-B3-F7"
+      ],
+      "command": "inherit unchanged executable/Rust behavior tests from accepted N4; no token/code change in transport source",
+      "fixture": "one EOF LF removal only; all189other reviewed files unchanged; package server.js and all package members except sourcemap byte-identical",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/CH-P01-B3-R4-final.evidence.json",
+          "sha256": "9ca9e65be7e4d65fb72de4edbac0323ad2a88ad83b1daae3ff4cc434b7f5339c"
+        },
+        {
+          "path": "logs/B3-R4-final-verification-summary.json",
+          "sha256": "6f62b87c85e31d8b55b6fb357f32f3f9c77f01852bbccafa1be9856aa1c973a9"
+        },
+        {
+          "path": "logs/B3-final-whitespace-package-delta.json",
+          "sha256": "e53364ac4147f614879031aff7c6f7d896682e845a0162d554d033065e05dfe8"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "M3-AC6"
+      ],
+      "command": "retained actual full command result from N4 (confirmed unrelated baseline failures remain)",
+      "fixture": "one EOF LF removal only; all189other reviewed files unchanged; package server.js and all package members except sourcemap byte-identical",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B3-final-full-gate-R4.txt",
+          "sha256": "93d0e28941d9e783e5fd18fdcb965f5b07eea60dec70c99eb7bdb76753645823"
+        }
+      ]
+    }
+  ]
+}

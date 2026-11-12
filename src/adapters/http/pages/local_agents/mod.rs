@@ -15,6 +15,7 @@ pub struct Page<'a> {
     pub machines: &'a [LocalMachine],
     pub pairings: &'a [PairingAttempt],
     pub profiles: &'a RecordPage<LocalAgentProfile>,
+    pub native_agents: &'a RecordPage<NativeAgentChoice>,
     pub machine: Option<&'a MachineDetails>,
     pub runtime: Option<&'a MachineRuntime>,
     pub profile: Option<&'a LocalAgentProfile>,
@@ -89,3 +90,19 @@ fn option(value: &str, label: &str, selected: bool) -> String {
         text(label)
     )
 }
+
+pub(crate) const PROFILE_PERMISSIONS_SCRIPT: &str = r#"
+document.addEventListener('input', function (event) {
+    var agent = event.target.closest('[data-local-agent-selector]');
+    if (!agent) return;
+    var form = agent.closest('form');
+    var permissions = form.querySelector('[data-local-agent-permissions]');
+    var fallback = form.querySelector('[data-local-agent-fallback]');
+    if (!permissions || !fallback) return;
+    if (!permissions.disabled && permissions.value) fallback.value = permissions.value;
+    var usesAgent = agent.value.trim().length > 0;
+    permissions.disabled = usesAgent;
+    permissions.required = !usesAgent;
+    fallback.disabled = !usesAgent;
+});
+"#;

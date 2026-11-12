@@ -1,0 +1,24 @@
+{
+  "baseline": "abac7038a08a355156b7680a01d2f79f3de756fd",
+  "identity": {
+    "scripts/transport-boundary-check.sh": true,
+    "src/adapters/persistence/workflow/channel_reply_continuation_views_support.rs": true
+  },
+  "runs": [
+    {
+      "round": 1,
+      "exit": 1,
+      "log": "B3-baseline-transport-R1.txt"
+    },
+    {
+      "round": 2,
+      "exit": 1,
+      "log": "B3-baseline-transport-R2.txt"
+    },
+    {
+      "round": 3,
+      "exit": 1,
+      "log": "B3-baseline-transport-R3.txt"
+    }
+  ]
+}

@@ -6269,6 +6269,13 @@ declare const hostDaemonCommandRegistry: {
             treeHash: z$1.ZodString;
         }, z$1.core.$strict>, z$1.ZodObject<{
             description: z$1.ZodString;
+            entryPath: z$1.ZodLiteral<"SKILL.md">;
+            kind: z$1.ZodLiteral<"required-tree">;
+            name: z$1.ZodString;
+            sourceType: z$1.ZodLiteral<"managed">;
+            treeHash: z$1.ZodString;
+        }, z$1.core.$strict>, z$1.ZodObject<{
+            description: z$1.ZodString;
             kind: z$1.ZodLiteral<"workspace-path">;
             name: z$1.ZodString;
             skillFilePath: z$1.ZodString;
@@ -6430,6 +6437,13 @@ declare const hostDaemonCommandRegistry: {
                 "data-dir": "data-dir";
                 builtin: "builtin";
             }>;
+            treeHash: z$1.ZodString;
+        }, z$1.core.$strict>, z$1.ZodObject<{
+            description: z$1.ZodString;
+            entryPath: z$1.ZodLiteral<"SKILL.md">;
+            kind: z$1.ZodLiteral<"required-tree">;
+            name: z$1.ZodString;
+            sourceType: z$1.ZodLiteral<"managed">;
             treeHash: z$1.ZodString;
         }, z$1.core.$strict>, z$1.ZodObject<{
             description: z$1.ZodString;
@@ -6984,6 +6998,13 @@ declare const hostDaemonCommandRegistry: {
                 treeHash: z$1.ZodString;
             }, z$1.core.$strict>, z$1.ZodObject<{
                 description: z$1.ZodString;
+                entryPath: z$1.ZodLiteral<"SKILL.md">;
+                kind: z$1.ZodLiteral<"required-tree">;
+                name: z$1.ZodString;
+                sourceType: z$1.ZodLiteral<"managed">;
+                treeHash: z$1.ZodString;
+            }, z$1.core.$strict>, z$1.ZodObject<{
+                description: z$1.ZodString;
                 kind: z$1.ZodLiteral<"workspace-path">;
                 name: z$1.ZodString;
                 skillFilePath: z$1.ZodString;
@@ -7254,6 +7275,13 @@ declare const hostDaemonCommandRegistry: {
                 treeHash: z$1.ZodString;
             }, z$1.core.$strict>, z$1.ZodObject<{
                 description: z$1.ZodString;
+                entryPath: z$1.ZodLiteral<"SKILL.md">;
+                kind: z$1.ZodLiteral<"required-tree">;
+                name: z$1.ZodString;
+                sourceType: z$1.ZodLiteral<"managed">;
+                treeHash: z$1.ZodString;
+            }, z$1.core.$strict>, z$1.ZodObject<{
+                description: z$1.ZodString;
                 kind: z$1.ZodLiteral<"workspace-path">;
                 name: z$1.ZodString;
                 skillFilePath: z$1.ZodString;
@@ -7438,6 +7466,13 @@ declare const hostDaemonCommandRegistry: {
                     "data-dir": "data-dir";
                     builtin: "builtin";
                 }>;
+                treeHash: z$1.ZodString;
+            }, z$1.core.$strict>, z$1.ZodObject<{
+                description: z$1.ZodString;
+                entryPath: z$1.ZodLiteral<"SKILL.md">;
+                kind: z$1.ZodLiteral<"required-tree">;
+                name: z$1.ZodString;
+                sourceType: z$1.ZodLiteral<"managed">;
                 treeHash: z$1.ZodString;
             }, z$1.core.$strict>, z$1.ZodObject<{
                 description: z$1.ZodString;
@@ -12259,6 +12294,7 @@ declare const createThreadRequestSchema: z$1.ZodObject<{
         xhigh: "xhigh";
     }>>;
     requestId: z$1.ZodOptional<z$1.ZodString>;
+    requiredAgentConfiguration: z$1.ZodOptional<z$1.ZodBoolean>;
     sectionId: z$1.ZodOptional<z$1.ZodNullable<z$1.ZodString>>;
     sendAt: z$1.ZodOptional<z$1.ZodNumber>;
     serviceTier: z$1.ZodOptional<z$1.ZodEnum<{
@@ -22313,6 +22349,8 @@ type PluginDispatchAttemptKind = "join-turn" | "start-turn";
  * on every drain, on restart, and on retry.
  */
 interface MessageDispatchHookContext {
+    /** Immutable server-owned marker, independent of editable thread metadata. */
+    requiredAgentConfigurationOwner: string | null;
     /**
      * The target thread. Never null: thread creation is unhooked — it is a cheap
      * row — so by the time the first message is decided about, the thread exists
@@ -22705,6 +22743,13 @@ type PluginAgentToolResult = string | {
 };
 /** Per-call context handed to a native tool's execute (design §4.4). */
 interface PluginAgentToolContext {
+    /** Exact originating provider input/model call, when explicitly established by the provider.
+     * Absent for ordinary/inferred invocations; never derived from model arguments or current turn.
+     */
+    readonly nativeInvocation?: Readonly<{
+        clientRequestId: string;
+        callId: string;
+    }>;
     threadId: string;
     projectId: string;
     /**
@@ -22854,6 +22899,16 @@ interface PluginAgentToolSelection {
     parameters: Record<string, unknown>;
 }
 /** Per-resolution selection returned by {@link PluginAgents.configure}. */
+interface RequiredAgentConfiguration {
+    instructions: string;
+    skillDirectories: Array<{
+        rootPath: string;
+        expectedTreeHash: string;
+    }>;
+}
+type RequiredAgentConfigurationContext = Omit<PluginAgentConfigurationContext, "pluginMetadata"> & {
+    readonly signal: AbortSignal;
+};
 interface PluginAgentConfiguration {
     /** Tool names registered by this plugin, or {@link PluginAgentToolSelection}
      * entries to also override a tool's advertised parameter schema for this
@@ -23229,6 +23284,10 @@ interface PluginProviderDeclaration {
     deriveProviderOptions?: (context: PluginProviderOptionsContext) => Readonly<Record<string, JsonValue>>;
 }
 interface PluginAgents {
+    /** This core preserves verified Claude prompt/tool origins in nativeInvocation. */
+    readonly nativeToolOriginVersion: 1;
+    /** Required owner callback; failures stop provider launch, including restart and queued sends. */
+    configureRequired(provider: (context: RequiredAgentConfigurationContext) => RequiredAgentConfiguration | Promise<RequiredAgentConfiguration>): void;
     /**
      * Select this plugin's statically registered tools and manifest skills for
      * each thread/session resolution, with optional dynamic instructions. The
@@ -23972,4 +24031,4 @@ declare const experimental_THREAD_ACTION_GROUPS: {
 };
 
 export { PLUGIN_CLI_OUTPUT_MAX_BYTES, PluginCliError, cliCommand, defineCli, defineRpcContract, experimental_THREAD_ACTION_GROUPS, experimental_defineHostEntry };
-export type { BbContext, BbNavigate, BbPluginApi, BranchPickerProps, BranchesState, CheckoutState, CodeOverflowMode, ComposerAttachment, ComposerCustomization, ComposerDraft, ComposerDraftReplacement, ComposerDraftSnapshot, ComposerInsertOptions, ComposerInsertPart, ComposerMention, ComposerPlusMenuItem, ComposerRichTextSpec, ComposerSelection, ComposerSendMenuItem, ComposerSubmitOptions, DiffProps, DiffViewMode, ExperimentalAppIcons, ExperimentalAppOverlayProps, ExperimentalAppOverlayRegistration, ExperimentalAppPanel, ExperimentalAppPanelSurface, ExperimentalClipboardContent, ExperimentalCodeFenceRendererProps, ExperimentalCodeFenceRendererRegistration, ExperimentalCodeFenceStatus, ExperimentalComposerCommandRegistration, ExperimentalComposerPopupRegistration, ExperimentalDesktopBrowserAcquireInput, ExperimentalDesktopBrowserCreateInput, ExperimentalDesktopBrowserLease, ExperimentalDesktopBrowserScope, ExperimentalDesktopBrowsersArea, ExperimentalDiffFileContent, ExperimentalDiffFullFileContents, ExperimentalFileLinkProps, ExperimentalFileLocation, ExperimentalFileOpenOptions, ExperimentalFixedTabTargetContract, ExperimentalFixedTabTargetState, ExperimentalHostCallOptions, ExperimentalHostClient, ExperimentalHostEntry, ExperimentalHostPaths, ExperimentalHostRpcContext, ExperimentalHostRpcHandlers, ExperimentalHostSignalContract, ExperimentalHostSignalEvent, ExperimentalHostSignals, ExperimentalHostWatchChange, ExperimentalHostWatchChangeType, ExperimentalHostWatchEvent, ExperimentalHostWatchListener, ExperimentalHostWatchOptions, ExperimentalHostWatchSubscription, ExperimentalHostWorkerLease, ExperimentalIconProps, ExperimentalIconRegistration, ExperimentalLiveFileTarget, ExperimentalOpenFixedTabOptions, ExperimentalPermissionModePickerProps, ExperimentalPluginBrowserPage, ExperimentalPluginBrowserPageEvaluateOptions, ExperimentalPluginBrowserPageWorld, ExperimentalPluginBrowserToolbarActionProps, ExperimentalPluginBrowserToolbarActionRegistration, ExperimentalPluginFixedTabReference, ExperimentalPluginMentionImage, ExperimentalPluginProviderEnvContext, ExperimentalPluginProviderEnvEntry, ExperimentalPluginProviderEnvHealth, ExperimentalPluginProviderEnvHealthContext, ExperimentalPluginRpcCaller, ExperimentalPluginRpcHandlerContext, ExperimentalPluginRpcHandlersWithContext, ExperimentalPluginWebSocket, ExperimentalPluginWebSocketContext, ExperimentalPluginWebSocketHandler, ExperimentalPluginWebSocketHandlers, ExperimentalProviderIconProps, ExperimentalProviderModelPickerProps, ExperimentalProviderModelPickerRouting, ExperimentalProviderModelPickerValue, ExperimentalQuestionFormHost, ExperimentalQuestionShortcut, ExperimentalSaveFileOutcome, ExperimentalSaveFileRequest, ExperimentalSidebarFooter, ExperimentalSidebarFooterActionContext, ExperimentalSidebarFooterActionRegistration, ExperimentalSidebarFooterDisclosureController, ExperimentalSidebarFooterDisclosureProps, ExperimentalSidebarFooterDisclosureRegistration, ExperimentalSidebarFooterItemBase, ExperimentalSidebarFooterItemRegistration, ExperimentalSidebarNavigationAction, ExperimentalSidebarNavigationActivationOptions, ExperimentalSidebarNavigationIcon, ExperimentalSidebarNavigationItem, ExperimentalSidebarNavigationProps, ExperimentalSidebarNavigationRegistration, ExperimentalSidebarNavigationShortcut, ExperimentalVoiceInputTextareaProps, JsonValue, MachineBootstrapApi, MachineBootstrapRequest, MachineExecutor, MachineExecutorRequest, MarkdownProps, MessageDispatchHookContext, MessageDispatchHookDecision, NewThreadComposerProps, NewThreadRequest, PluginAgentConfiguration, PluginAgentConfigurationContext, PluginAgentToolContentPart, PluginAgentToolContext, PluginAgentToolLabels, PluginAgentToolPresentation, PluginAgentToolRegistrationBase, PluginAgentToolResult, PluginAgentToolSelection, PluginAgents, PluginAiCompleteOptions, PluginAiServiceDeclaration, PluginAiServiceKind, PluginAiServiceStatus, PluginAiServices, PluginAiTranscribeOptions, PluginAppBuilder, PluginAppCommands, PluginAppComposer, PluginAppContentScripts, PluginAppDefinition, PluginAppSetup, PluginAppSlots, PluginBackground, PluginBbSdk, PluginBoundThreadAction, PluginBoundThreadsArea, PluginBrowserBbSdk, PluginClaudeSetupTokenRun, PluginCli, PluginCliBooleanOption, PluginCliCommand, PluginCliCommandInfo, PluginCliConstraint, PluginCliContext, PluginCliDurationOption, PluginCliDurationUnit, PluginCliEnumOption, PluginCliErrorCode, PluginCliExecutionResult, PluginCliIntegerOption, PluginCliOption, PluginCliOptionValues, PluginCliOutputLimitError, PluginCliPositional, PluginCliPositionalValues, PluginCliRegistration, PluginCliResult, PluginCliRunInput, PluginCliSpec, PluginCliStringOption, PluginCodeThemeData, PluginCodeThemeState, PluginCodeThemeTokenRule, PluginCommandContext, PluginCommandPaletteActionContext, PluginCommandPaletteActionRegistration, PluginCommandRegistration, PluginCommandShortcut, PluginComposerApi, PluginComposerMention, PluginComposerScope, PluginComposerTextEffect, PluginComposerThreadRowStatus, PluginContentScriptContext, PluginContentScriptDisposer, PluginContentScriptRegistration, PluginDiffRendererProps, PluginDiffRendererRegistration, PluginDispatchAttemptKind, PluginDispatchEnvironmentIntent, PluginDispatchExecution, PluginDispatchExecutionSources, PluginDispatchInput, PluginEnvironmentProvider, PluginEnvironmentProviderDeclaration, PluginEnvironmentProviderInputsChange, PluginEnvironmentProviderInputsProps, PluginEnvironmentProviderInputsRegistration, PluginEnvironmentProviderRequirements, PluginEnvironmentProvidersState, PluginEnvironmentValidateDecision, PluginEnvironments, PluginEvents, PluginFileOpenerProps, PluginFileOpenerRegistration, PluginFileOpenerSource, PluginFixedTabDeclaration, PluginFixedTabRegistration, PluginHomepageSectionProps, PluginHomepageSectionRegistration, PluginHookHandler, PluginHookName, PluginHookSignatures, PluginHooks, PluginHosts, PluginHttp, PluginHttpAuthMode, PluginHttpHandler, PluginInteractionCancelReason, PluginInteractionDescription, PluginInteractionRequest, PluginInteractionResult, PluginKvStorage, PluginLogger, PluginMachineProviderDeclaration, PluginMachineProviderInputsChange, PluginMachineProviderInputsProps, PluginMachineProviderInputsRegistration, PluginMachineValidateDecision, PluginMachines, PluginMentionItem, PluginMentionProviderRegistration, PluginMentionSearchContext, PluginMentionTrigger, PluginMessageActionContext, PluginMessageActionRegistration, PluginMessageDirectiveMessage, PluginMessageDirectiveOpenWorkspaceFile, PluginMessageDirectiveProps, PluginMessageDirectiveRegistration, PluginNavPanelProps, PluginNavPanelRegistration, PluginNewThreadPanelActionContext, PluginNewThreadPanelActionRegistration, PluginNewThreadPanelProps, PluginPanelActionOpenOptions, PluginPendingInteractionProps, PluginPendingInteractionRegistration, PluginPendingInteractionView, PluginProviderCapabilities, PluginProviderCompletedTurnDisplay, PluginProviderComposerAction, PluginProviderDeclaration, PluginProviderExtensionKindDeclaration, PluginProviderFallbackModel, PluginProviderIconRegistration, PluginProviderMaintenance, PluginProviderModelCatalogScope, PluginProviderNativeRootEntry, PluginProviderNativeRoots, PluginProviderOptionDescriptor, PluginProviderOptionsContext, PluginProviderPermissionMode, PluginProviderReasoningLevel, PluginProviderStrings, PluginProviders, PluginProvidersState, PluginRealtime, PluginRealtimeConnectionState, PluginRowLabels, PluginRowPresentation, PluginRpc, PluginRpcCallArgs, PluginRpcClient, PluginRpcContract, PluginRpcError, PluginRpcErrorCode, PluginRpcHandlers, PluginRpcIssuePathSegment, PluginRpcMethodContract, PluginRpcResult, PluginRpcValidationIssue, PluginSdkApp, PluginServerAccess, PluginServerApi, PluginSettingDescriptor, PluginSettingDescriptors, PluginSettingValue, PluginSettings, PluginSettingsHandle, PluginSettingsSectionProps, PluginSettingsSectionRegistration, PluginSettingsState, PluginSettingsValues, PluginSharedPortTunnelIdentity, PluginSidebarFooterActionContext, PluginSidebarFooterActionProps, PluginSidebarFooterActionRegistration, PluginSidebarProject, PluginSidebarPullRequest, PluginSidebarSection, PluginSidebarSplitLayout, PluginSidebarSplitPane, PluginSidebarThread, PluginSidebarThreadActivity, PluginSidebarThreadDraftState, PluginSidebarThreadIndicator, PluginSidebarThreadPullRequestState, PluginSidebarThreadRowStatus, PluginSidebarThreadShortcut, PluginSidebarThreadSplit, PluginSidebarThreadsState, PluginSourceCodeRendererProps, PluginSourceCodeRendererRegistration, PluginStatusApi, PluginStorage, PluginTargetedPanelActionOpenOptions, PluginTelemetry, PluginTelemetryValue, PluginThreadAction, PluginThreadActionChoice, PluginThreadActionChoices, PluginThreadActionDataInput, PluginThreadActionEntry, PluginThreadActionItemInput, PluginThreadActionRegistration, PluginThreadActionRegistrationInfo, PluginThreadActionRunInput, PluginThreadActionTarget, PluginThreadActionsContextMenuProps, PluginThreadActionsInlineItem, PluginThreadActionsMenuProps, PluginThreadActionsOptions, PluginThreadActionsTriggerProps, PluginThreadEventHandler, PluginThreadEventName, PluginThreadEventPayloads, PluginThreadHeaderActionProps, PluginThreadHeaderActionRegistration, PluginThreadListProps, PluginThreadListRegistration, PluginThreadPanelActionContext, PluginThreadPanelActionRegistration, PluginThreadPanelProps, PluginThreadStatusGlyphProps, PluginThreadTitleProps, PluginTimelineRendererProps, PluginTimelineRendererRegistration, PluginTimelineRendererRow, PluginTimelineRowPresentation, PluginTimelineRowStatus, PluginTurnFailedEvent, PluginUi, ReadonlyJsonValue, ServerAccessGrant, ServerAccessProviderDeclaration, SourceCodeLineRange, SourceCodeProps, StandardSchemaV1, StandardSchemaV1InferInput, StandardSchemaV1InferOutput, StandardSchemaV1Issue, StandardSchemaV1Result, ThreadChatMessageAction, ThreadChatMessageReference, ThreadChatProps, UrlLinkProps, UseBranchesArgs, UseCheckoutStateArgs };
+export type { BbContext, BbNavigate, BbPluginApi, BranchPickerProps, BranchesState, CheckoutState, CodeOverflowMode, ComposerAttachment, ComposerCustomization, ComposerDraft, ComposerDraftReplacement, ComposerDraftSnapshot, ComposerInsertOptions, ComposerInsertPart, ComposerMention, ComposerPlusMenuItem, ComposerRichTextSpec, ComposerSelection, ComposerSendMenuItem, ComposerSubmitOptions, DiffProps, DiffViewMode, ExperimentalAppIcons, ExperimentalAppOverlayProps, ExperimentalAppOverlayRegistration, ExperimentalAppPanel, ExperimentalAppPanelSurface, ExperimentalClipboardContent, ExperimentalCodeFenceRendererProps, ExperimentalCodeFenceRendererRegistration, ExperimentalCodeFenceStatus, ExperimentalComposerCommandRegistration, ExperimentalComposerPopupRegistration, ExperimentalDesktopBrowserAcquireInput, ExperimentalDesktopBrowserCreateInput, ExperimentalDesktopBrowserLease, ExperimentalDesktopBrowserScope, ExperimentalDesktopBrowsersArea, ExperimentalDiffFileContent, ExperimentalDiffFullFileContents, ExperimentalFileLinkProps, ExperimentalFileLocation, ExperimentalFileOpenOptions, ExperimentalFixedTabTargetContract, ExperimentalFixedTabTargetState, ExperimentalHostCallOptions, ExperimentalHostClient, ExperimentalHostEntry, ExperimentalHostPaths, ExperimentalHostRpcContext, ExperimentalHostRpcHandlers, ExperimentalHostSignalContract, ExperimentalHostSignalEvent, ExperimentalHostSignals, ExperimentalHostWatchChange, ExperimentalHostWatchChangeType, ExperimentalHostWatchEvent, ExperimentalHostWatchListener, ExperimentalHostWatchOptions, ExperimentalHostWatchSubscription, ExperimentalHostWorkerLease, ExperimentalIconProps, ExperimentalIconRegistration, ExperimentalLiveFileTarget, ExperimentalOpenFixedTabOptions, ExperimentalPermissionModePickerProps, ExperimentalPluginBrowserPage, ExperimentalPluginBrowserPageEvaluateOptions, ExperimentalPluginBrowserPageWorld, ExperimentalPluginBrowserToolbarActionProps, ExperimentalPluginBrowserToolbarActionRegistration, ExperimentalPluginFixedTabReference, ExperimentalPluginMentionImage, ExperimentalPluginProviderEnvContext, ExperimentalPluginProviderEnvEntry, ExperimentalPluginProviderEnvHealth, ExperimentalPluginProviderEnvHealthContext, ExperimentalPluginRpcCaller, ExperimentalPluginRpcHandlerContext, ExperimentalPluginRpcHandlersWithContext, ExperimentalPluginWebSocket, ExperimentalPluginWebSocketContext, ExperimentalPluginWebSocketHandler, ExperimentalPluginWebSocketHandlers, ExperimentalProviderIconProps, ExperimentalProviderModelPickerProps, ExperimentalProviderModelPickerRouting, ExperimentalProviderModelPickerValue, ExperimentalQuestionFormHost, ExperimentalQuestionShortcut, ExperimentalSaveFileOutcome, ExperimentalSaveFileRequest, ExperimentalSidebarFooter, ExperimentalSidebarFooterActionContext, ExperimentalSidebarFooterActionRegistration, ExperimentalSidebarFooterDisclosureController, ExperimentalSidebarFooterDisclosureProps, ExperimentalSidebarFooterDisclosureRegistration, ExperimentalSidebarFooterItemBase, ExperimentalSidebarFooterItemRegistration, ExperimentalSidebarNavigationAction, ExperimentalSidebarNavigationActivationOptions, ExperimentalSidebarNavigationIcon, ExperimentalSidebarNavigationItem, ExperimentalSidebarNavigationProps, ExperimentalSidebarNavigationRegistration, ExperimentalSidebarNavigationShortcut, ExperimentalVoiceInputTextareaProps, JsonValue, MachineBootstrapApi, MachineBootstrapRequest, MachineExecutor, MachineExecutorRequest, MarkdownProps, MessageDispatchHookContext, MessageDispatchHookDecision, NewThreadComposerProps, NewThreadRequest, PluginAgentConfiguration, PluginAgentConfigurationContext, PluginAgentToolContentPart, PluginAgentToolContext, PluginAgentToolLabels, PluginAgentToolPresentation, PluginAgentToolRegistrationBase, PluginAgentToolResult, PluginAgentToolSelection, PluginAgents, PluginAiCompleteOptions, PluginAiServiceDeclaration, PluginAiServiceKind, PluginAiServiceStatus, PluginAiServices, PluginAiTranscribeOptions, PluginAppBuilder, PluginAppCommands, PluginAppComposer, PluginAppContentScripts, PluginAppDefinition, PluginAppSetup, PluginAppSlots, PluginBackground, PluginBbSdk, PluginBoundThreadAction, PluginBoundThreadsArea, PluginBrowserBbSdk, PluginClaudeSetupTokenRun, PluginCli, PluginCliBooleanOption, PluginCliCommand, PluginCliCommandInfo, PluginCliConstraint, PluginCliContext, PluginCliDurationOption, PluginCliDurationUnit, PluginCliEnumOption, PluginCliErrorCode, PluginCliExecutionResult, PluginCliIntegerOption, PluginCliOption, PluginCliOptionValues, PluginCliOutputLimitError, PluginCliPositional, PluginCliPositionalValues, PluginCliRegistration, PluginCliResult, PluginCliRunInput, PluginCliSpec, PluginCliStringOption, PluginCodeThemeData, PluginCodeThemeState, PluginCodeThemeTokenRule, PluginCommandContext, PluginCommandPaletteActionContext, PluginCommandPaletteActionRegistration, PluginCommandRegistration, PluginCommandShortcut, PluginComposerApi, PluginComposerMention, PluginComposerScope, PluginComposerTextEffect, PluginComposerThreadRowStatus, PluginContentScriptContext, PluginContentScriptDisposer, PluginContentScriptRegistration, PluginDiffRendererProps, PluginDiffRendererRegistration, PluginDispatchAttemptKind, PluginDispatchEnvironmentIntent, PluginDispatchExecution, PluginDispatchExecutionSources, PluginDispatchInput, PluginEnvironmentProvider, PluginEnvironmentProviderDeclaration, PluginEnvironmentProviderInputsChange, PluginEnvironmentProviderInputsProps, PluginEnvironmentProviderInputsRegistration, PluginEnvironmentProviderRequirements, PluginEnvironmentProvidersState, PluginEnvironmentValidateDecision, PluginEnvironments, PluginEvents, PluginFileOpenerProps, PluginFileOpenerRegistration, PluginFileOpenerSource, PluginFixedTabDeclaration, PluginFixedTabRegistration, PluginHomepageSectionProps, PluginHomepageSectionRegistration, PluginHookHandler, PluginHookName, PluginHookSignatures, PluginHooks, PluginHosts, PluginHttp, PluginHttpAuthMode, PluginHttpHandler, PluginInteractionCancelReason, PluginInteractionDescription, PluginInteractionRequest, PluginInteractionResult, PluginKvStorage, PluginLogger, PluginMachineProviderDeclaration, PluginMachineProviderInputsChange, PluginMachineProviderInputsProps, PluginMachineProviderInputsRegistration, PluginMachineValidateDecision, PluginMachines, PluginMentionItem, PluginMentionProviderRegistration, PluginMentionSearchContext, PluginMentionTrigger, PluginMessageActionContext, PluginMessageActionRegistration, PluginMessageDirectiveMessage, PluginMessageDirectiveOpenWorkspaceFile, PluginMessageDirectiveProps, PluginMessageDirectiveRegistration, PluginNavPanelProps, PluginNavPanelRegistration, PluginNewThreadPanelActionContext, PluginNewThreadPanelActionRegistration, PluginNewThreadPanelProps, PluginPanelActionOpenOptions, PluginPendingInteractionProps, PluginPendingInteractionRegistration, PluginPendingInteractionView, PluginProviderCapabilities, PluginProviderCompletedTurnDisplay, PluginProviderComposerAction, PluginProviderDeclaration, PluginProviderExtensionKindDeclaration, PluginProviderFallbackModel, PluginProviderIconRegistration, PluginProviderMaintenance, PluginProviderModelCatalogScope, PluginProviderNativeRootEntry, PluginProviderNativeRoots, PluginProviderOptionDescriptor, PluginProviderOptionsContext, PluginProviderPermissionMode, PluginProviderReasoningLevel, PluginProviderStrings, PluginProviders, PluginProvidersState, PluginRealtime, PluginRealtimeConnectionState, PluginRowLabels, PluginRowPresentation, PluginRpc, PluginRpcCallArgs, PluginRpcClient, PluginRpcContract, PluginRpcError, PluginRpcErrorCode, PluginRpcHandlers, PluginRpcIssuePathSegment, PluginRpcMethodContract, PluginRpcResult, PluginRpcValidationIssue, PluginSdkApp, PluginServerAccess, PluginServerApi, PluginSettingDescriptor, PluginSettingDescriptors, PluginSettingValue, PluginSettings, PluginSettingsHandle, PluginSettingsSectionProps, PluginSettingsSectionRegistration, PluginSettingsState, PluginSettingsValues, PluginSharedPortTunnelIdentity, PluginSidebarFooterActionContext, PluginSidebarFooterActionProps, PluginSidebarFooterActionRegistration, PluginSidebarProject, PluginSidebarPullRequest, PluginSidebarSection, PluginSidebarSplitLayout, PluginSidebarSplitPane, PluginSidebarThread, PluginSidebarThreadActivity, PluginSidebarThreadDraftState, PluginSidebarThreadIndicator, PluginSidebarThreadPullRequestState, PluginSidebarThreadRowStatus, PluginSidebarThreadShortcut, PluginSidebarThreadSplit, PluginSidebarThreadsState, PluginSourceCodeRendererProps, PluginSourceCodeRendererRegistration, PluginStatusApi, PluginStorage, PluginTargetedPanelActionOpenOptions, PluginTelemetry, PluginTelemetryValue, PluginThreadAction, PluginThreadActionChoice, PluginThreadActionChoices, PluginThreadActionDataInput, PluginThreadActionEntry, PluginThreadActionItemInput, PluginThreadActionRegistration, PluginThreadActionRegistrationInfo, PluginThreadActionRunInput, PluginThreadActionTarget, PluginThreadActionsContextMenuProps, PluginThreadActionsInlineItem, PluginThreadActionsMenuProps, PluginThreadActionsOptions, PluginThreadActionsTriggerProps, PluginThreadEventHandler, PluginThreadEventName, PluginThreadEventPayloads, PluginThreadHeaderActionProps, PluginThreadHeaderActionRegistration, PluginThreadListProps, PluginThreadListRegistration, PluginThreadPanelActionContext, PluginThreadPanelActionRegistration, PluginThreadPanelProps, PluginThreadStatusGlyphProps, PluginThreadTitleProps, PluginTimelineRendererProps, PluginTimelineRendererRegistration, PluginTimelineRendererRow, PluginTimelineRowPresentation, PluginTimelineRowStatus, PluginTurnFailedEvent, PluginUi, ReadonlyJsonValue, RequiredAgentConfiguration, RequiredAgentConfigurationContext, ServerAccessGrant, ServerAccessProviderDeclaration, SourceCodeLineRange, SourceCodeProps, StandardSchemaV1, StandardSchemaV1InferInput, StandardSchemaV1InferOutput, StandardSchemaV1Issue, StandardSchemaV1Result, ThreadChatMessageAction, ThreadChatMessageReference, ThreadChatProps, UrlLinkProps, UseBranchesArgs, UseCheckoutStateArgs };

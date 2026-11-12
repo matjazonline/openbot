@@ -1,4 +1,5 @@
 use super::*;
+use crate::application::ports::channel::{ChannelPersistence, ChannelWrite};
 use crate::{
     adapters::persistence::test_support::{OwnDatabase, own_database},
     use_cases::{
@@ -152,6 +153,7 @@ impl Fixture {
 
     pub fn profile(&self, machine: MachineId) -> LocalAgentProfile {
         LocalAgentProfile {
+            agent_id: None,
             id: ProfileId::new(Uuid::new_v4()).unwrap(),
             company_id: self.company,
             name: "test profile".into(),
@@ -170,11 +172,24 @@ impl Fixture {
     }
 
     pub async fn conversation(&self, company: Uuid) -> Uuid {
-        let channel = Uuid::new_v4();
+        let channel = ChannelPersistence::create(
+            self.persistence.as_ref(),
+            company,
+            ChannelWrite {
+                name: "local fixture".into(),
+                slug: format!("local-{}", Uuid::new_v4().simple()),
+                enabled: true,
+                add_3rd_party: true,
+                created_by: Some(crate::entities::creation::CreationProvenance::user(
+                    self.owner,
+                )),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap()
+        .id;
         let thread = Uuid::new_v4();
-        sqlx::query("INSERT INTO channels (id,company_id,name,created_by) VALUES ($1,$2,'local fixture',$3)")
-            .bind(channel).bind(company).bind(json!({"actor_type":"user","actor_id":self.owner,"actor_name":"test owner"}))
-            .execute(&self.database.pool).await.unwrap();
         sqlx::query("INSERT INTO threads (id,company_id,channel_id,subject) VALUES ($1,$2,$3,'local fixture')")
             .bind(thread).bind(company).bind(channel).execute(&self.database.pool).await.unwrap();
         thread
@@ -218,3 +233,81 @@ pub(crate) async fn prepare_session(f: &Fixture, paired: &Paired) -> SessionSetu
         selection,
     }
 }
+
+pub(crate) async fn native_mcp_binding(
+    p: &PostgresPersistence,
+    tenant: Uuid,
+    actor: Uuid,
+    endpoint: &str,
+) -> crate::entities::agent_capability::AgentToolBinding {
+    use crate::application::agent::{ActionEffect, ActionRecovery, ApprovedActionPolicy};
+    use crate::application::workflow::{mcp::*, publication::ToolSnapshot, registry::ToolContract};
+    use crate::domain::workflow::TypeName;
+    use crate::entities::{agent_capability::*, mcp::*};
+    use crate::use_cases::mcp::*;
+    let company = CompanyId::new(tenant);
+    let schema = json!({"type":"object","required":["query"],"additionalProperties":false,"properties":{"query":{"type":"string","maxLength":128}}});
+    let connection = p
+        .create_mcp_connection(
+            tenant,
+            McpConnectionWrite {
+                slug: "native-crm".into(),
+                endpoint: endpoint.to_owned().try_into().unwrap(),
+                enabled: true,
+                auth: McpAuth::None,
+                discovered_tools: vec![McpDiscoveredTool {
+                    name: "lookup".to_owned().try_into().unwrap(),
+                    description: "Lookup".into(),
+                    input_schema: schema.clone(),
+                    output_schema: Some(json!({"type":"object"})),
+                }],
+                tool_grants: vec!["lookup".to_owned().try_into().unwrap()],
+            },
+        )
+        .await
+        .unwrap();
+    let reviewed = p
+        .register_mcp_operation(
+            company,
+            WorkflowActor::authenticated(actor).unwrap(),
+            McpOperationWrite {
+                connection: connection.id,
+                catalog_revision: connection.revision,
+                expected_version: None,
+                operation: McpOperation {
+                    tool: ToolSnapshot {
+                        company_id: company,
+                        workflow: None,
+                        contract: ToolContract {
+                            name: TypeName::parse("lookup").unwrap(),
+                            connection: None,
+                            input_schema: schema,
+                            output_schema: json!({"type":"object"}),
+                        },
+                        policy: ApprovedActionPolicy {
+                            capability: TypeName::parse("mcp.lookup").unwrap(),
+                            policy_revision: 1,
+                            effect: ActionEffect::Read,
+                            recovery: ActionRecovery::Reconcile,
+                        },
+                    },
+                    approval_required: true,
+                },
+            },
+        )
+        .await
+        .unwrap();
+    AgentToolBinding {
+        id: AgentBindingId::new(Uuid::new_v4()),
+        alias: AgentToolAlias::parse("crm.lookup").unwrap(),
+        source: AgentBindingSource::Mcp {
+            connection: connection.id,
+            operation: TypeName::parse("lookup").unwrap(),
+            reviewed_version: reviewed,
+            remote_name: "lookup".to_owned().try_into().unwrap(),
+        },
+    }
+}
+
+#[path = "native_mcp_workflow_test_support.rs"]
+pub(crate) mod mcp_workflow;

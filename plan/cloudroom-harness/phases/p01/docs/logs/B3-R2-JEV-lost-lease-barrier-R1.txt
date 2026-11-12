@@ -1,0 +1,9 @@
+   Compiling open_bots v0.1.0 (/private/tmp/openbot-cloudroom-harness-t1gfnhz1/worktree)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1m 47s
+     Running unittests src/lib.rs (/private/tmp/openbot-cloudroom-harness-t1gfnhz1/target/debug/deps/open_bots-6467f0b3ff334015)
+
+running 1 test
+test adapters::persistence::workflow::tests::jev_runtime_tests::recovery::jev_runtime_lost_lease_cancels_actual_http_and_prevents_settlement ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 4103 filtered out; finished in 3.29s
+

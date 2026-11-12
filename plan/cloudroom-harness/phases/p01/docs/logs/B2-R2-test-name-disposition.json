@@ -1,0 +1,13 @@
+{
+  "before_count": 12,
+  "after_count": 14,
+  "removed": [
+    "required native agent configuration > uses the actual loaded required provider without truncation, and refuses disable, callback failure and missing owner on restart"
+  ],
+  "added": [
+    "hands off distinct leaves with identically spelled parent directories through the native transfer",
+    "required native agent configuration > uses the actual loaded required provider without truncation, and refuses disable, callback failure and stopped owner in the same server",
+    "retains required ownership and queued work after a real on-disk server restart without its plugin state"
+  ],
+  "disposition": "One misleading same-server stop title renamed to accurately say stopped owner in the same server; body and all assertions retained. Added actual on-disk restart and repeated-parent native transfer cases. Existing opt-in native staged test remains unchanged and explicitly ran in combined R2. New isolated lower-permission probe explicitly ran in R13."
+}

@@ -1,0 +1,24 @@
+
+ RUN  v4.1.1 /private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/plugins/provider-claude-code
+
+{"jsonrpc":"2.0","id":2,"result":{"ok":true}}
+{"jsonrpc":"2.0","id":2,"result":{"ok":true}}
+{"jsonrpc":"2.0","id":2,"result":{"ok":true}}
+claude-code bridge: Invalid params for turn/start: params.clientRequestId: Invalid string: must match pattern /^creq_[23456789abcdefghijkmnpqrstuvwxyz]{10}$/u
+claude-code bridge: Unknown method: turn/teleport
+claude-code bridge: Invalid params for thread/resume: params.providerThreadId: Invalid input: expected string, received null
+{"jsonrpc":"2.0","id":2,"result":{"ok":true}}
+{"jsonrpc":"2.0","id":2,"result":{"ok":true}}
+{"jsonrpc":"2.0","id":2,"result":{"ok":true}}
+{"jsonrpc":"2.0","id":2,"result":{"ok":true}}
+{"jsonrpc":"2.0","id":2,"result":{"ok":true}}
+{"jsonrpc":"2.0","id":2,"result":{"ok":true}}
+{"jsonrpc":"2.0","id":2,"result":{"ok":true}}
+{"jsonrpc":"2.0","id":2,"result":{"ok":true}}
+{"jsonrpc":"2.0","id":2,"result":{"ok":true}}
+
+ Test Files  2 passed (2)
+      Tests  86 passed (86)
+   Start at  02:41:08
+   Duration  1.23s (transform 890ms, setup 0ms, import 1.39s, tests 413ms, environment 0ms)
+

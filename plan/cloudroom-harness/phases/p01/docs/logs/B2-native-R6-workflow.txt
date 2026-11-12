@@ -1,0 +1,35 @@
+   Compiling open_bots v0.1.0 (/private/tmp/openbot-cloudroom-harness-t1gfnhz1/worktree)
+error[E0432]: unresolved import `crate::application::agent::AgentPublicationStore`
+   --> src/adapters/persistence/workflow/local_agent_continuation_tests.rs:355:53
+    |
+355 |         AgentPublicationKey, AgentPublicationScope, AgentPublicationStore, PublishAgent,
+    |                                                     ^^^^^^^^^^^^^^^^^^^^^ no `AgentPublicationStore` in `application::agent`
+    |
+help: a similar name exists in the module
+    |
+355 -         AgentPublicationKey, AgentPublicationScope, AgentPublicationStore, PublishAgent,
+355 +         AgentPublicationKey, AgentPublicationScope, AgentPublicationScope, PublishAgent,
+    |
+
+error[E0599]: no method named `publish_agent` found for reference `&persistence::PostgresPersistence` in the current scope
+   --> src/adapters/persistence/workflow/local_agent_continuation_tests.rs:374:10
+    |
+373 |       let revision = p
+    |  ____________________-
+374 | |         .publish_agent(PublishAgent {
+    | |_________-^^^^^^^^^^^^^
+    |
+    = help: items from traits can only be used if the trait is in scope
+help: trait `AgentPublications` which provides `publish_agent` is implemented but not in scope; perhaps you want to import it
+    |
+  1 + use crate::application::agent::publication::AgentPublications;
+    |
+help: there is a method `publish` with a similar name
+    |
+374 -         .publish_agent(PublishAgent {
+374 +         .publish(PublishAgent {
+    |
+
+Some errors have detailed explanations: E0432, E0599.
+For more information about an error, try `rustc --explain E0432`.
+error: could not compile `open_bots` (lib test) due to 2 previous errors

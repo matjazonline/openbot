@@ -15,7 +15,8 @@ mod storage;
 #[path = "capture_tests.rs"]
 mod tests;
 pub(super) use storage::{
-    attach_child_on, execution_selection_on, persist_on, selected_on, workflow_bundle_on,
+    attach_child_on, execution_selection_on, execution_selection_with_locks_on, persist_on,
+    selected_on, workflow_bundle_on,
 };
 
 struct Closure {

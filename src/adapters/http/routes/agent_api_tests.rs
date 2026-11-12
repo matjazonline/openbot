@@ -63,7 +63,8 @@ impl Fixture {
             company,
         })
     }
-    async fn create(&self, body: Value) -> Value {
+    async fn create(&self, mut body: Value) -> Value {
+        body["native_permissions"] = json!("full");
         response_json(
             create_agent_json(
                 State(self.agents.clone()),
@@ -77,8 +78,7 @@ impl Fixture {
         .await
     }
     async fn update(&self, id: Uuid, patch: Value) -> AppResult<Value> {
-        let mut body =
-            json!({"name":"Structured", "slug":"structured", "description":"Updated description"});
+        let mut body = json!({"name":"Structured", "slug":"structured", "description":"Updated description", "native_permissions":"full"});
         body.as_object_mut()
             .unwrap()
             .extend(patch.as_object().unwrap().clone());

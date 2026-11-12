@@ -29,6 +29,8 @@ mod resolution;
 mod continuation;
 #[path = "local_agent_correction_tests.rs"]
 mod corrections;
+#[path = "local_agent_mcp_tests.rs"]
+mod native_mcp;
 
 struct Setup {
     fixture: Fixture,

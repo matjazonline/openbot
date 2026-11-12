@@ -1,0 +1,103 @@
+{
+  "base": "abac7038a08a355156b7680a01d2f79f3de756fd",
+  "sourceClean": true,
+  "pluginTests": "90 PASS",
+  "fixtures": [
+    {
+      "path": "integrations/cloudroom-plugin/dist/server.js",
+      "sha256": "c67b46a2606d156cf743dcc56c5cb9efc243c039c5d0560b94b726d94d5352ad"
+    },
+    {
+      "path": "integrations/cloudroom-plugin/dist/server.js.map",
+      "sha256": "109d7b02cc16d9a76644d4c284ce2d09c9a5cc134d54cade69b0202d2d0d21f3"
+    },
+    {
+      "path": "integrations/cloudroom-plugin/build-tests/connector.test.js",
+      "sha256": "4fb93c06b54c01167cbbdeecc2ecef3c7f7e1d2f8940f2fc7e896018d0dd75cf"
+    },
+    {
+      "path": "integrations/cloudroom-plugin/build-tests/connector.test.js.map",
+      "sha256": "c2062aa3b1afee03d78b9eecf642e06fed5b3f32b8cef4f061f0e5fd2ff1e3dd"
+    },
+    {
+      "path": "integrations/cloudroom-plugin/build-tests/core.test.js",
+      "sha256": "597069f26d67cc60ecb86b0e82015970df732e53325ba5feedf588833546faa1"
+    },
+    {
+      "path": "integrations/cloudroom-plugin/build-tests/core.test.js.map",
+      "sha256": "6bfc0c7cc3ac5e0e3bd678065c0303f8ddd17d2ddd039cb9855e7e6a53763d7e"
+    },
+    {
+      "path": "integrations/cloudroom-plugin/build-tests/e2e-peer.js",
+      "sha256": "4ef2663ff1887a6bfd935f06c5d34c1f60b1a27f0bb84de4c95f1691c2b21fc1"
+    },
+    {
+      "path": "integrations/cloudroom-plugin/build-tests/e2e-peer.js.map",
+      "sha256": "75faed2b770b5e0ce206e902161ebf9b71ce0d7a4da85b30aa6cf866ffac0a2f"
+    },
+    {
+      "path": "integrations/cloudroom-plugin/build-tests/enrollment.test.js",
+      "sha256": "b6ae7c13681d8bfefa155cbbb64290d931acd98fdc3381299e3c63a3f3ccc8c9"
+    },
+    {
+      "path": "integrations/cloudroom-plugin/build-tests/enrollment.test.js.map",
+      "sha256": "11d513af2e32401c0151e2f09ea9be300acbf2bf6762c9dce0226e42269f18d4"
+    },
+    {
+      "path": "integrations/cloudroom-plugin/build-tests/lock.test.js",
+      "sha256": "5f562cd375140f02abc620e3d246ab1486187c9c9fb1ac8a94b556473a5a7ebf"
+    },
+    {
+      "path": "integrations/cloudroom-plugin/build-tests/lock.test.js.map",
+      "sha256": "821b4da77cfda53c5cb7cde9c947135e416f47aafbcc7bc7423f55fc27d94945"
+    },
+    {
+      "path": "integrations/cloudroom-plugin/build-tests/native-peer.js",
+      "sha256": "3c6105f6ac0dd18a328b3b29891e54a17451314cd5a111f3a9221b9f65635c01"
+    },
+    {
+      "path": "integrations/cloudroom-plugin/build-tests/native-peer.js.map",
+      "sha256": "f3de62dbcfa3f1a9d7fcb8b33445c8e42d4ebf157909c90f8e51d422ef5ed4ca"
+    },
+    {
+      "path": "integrations/cloudroom-plugin/build-tests/queue.test.js",
+      "sha256": "47959ece06dcb1422f4e11793a2eed410c5e2332cf91b74f5398f9a7da5eb830"
+    },
+    {
+      "path": "integrations/cloudroom-plugin/build-tests/queue.test.js.map",
+      "sha256": "84acca296a4849b9062840f68590f250f420974c4ccd162066d3de2b84938198"
+    },
+    {
+      "path": "integrations/cloudroom-plugin/build-tests/retention-peer.js",
+      "sha256": "4e343481304e4c5ed21946866bb765c0b29cf235de9c4e72f8c87060a253af5b"
+    },
+    {
+      "path": "integrations/cloudroom-plugin/build-tests/retention-peer.js.map",
+      "sha256": "14017234102d97909f01ee9121c85cace380c5099db915bfe83cda1c54db5a53"
+    },
+    {
+      "path": "integrations/cloudroom-plugin/build-tests/retention.test.js",
+      "sha256": "f09344f37fe5ee1b356aabea69013f983a4fc94007fd5eb23632a6e178bc1f62"
+    },
+    {
+      "path": "integrations/cloudroom-plugin/build-tests/retention.test.js.map",
+      "sha256": "b22f740ffaeb6221833a53460a74cbd45bb8d014231d01f922149925ee7be8f9"
+    },
+    {
+      "path": "integrations/cloudroom-plugin/build-tests/sdk.test.js",
+      "sha256": "d52c7af32a4e6bf158f2758f8d3908887de0b2601230fb25b022f608a4bbe85a"
+    },
+    {
+      "path": "integrations/cloudroom-plugin/build-tests/sdk.test.js.map",
+      "sha256": "1ac674172f7b73da902dfbc855fdba5af64da5f733180ec41cde3ea3cac5cf95"
+    },
+    {
+      "path": "integrations/cloudroom-plugin/build-tests/startup.test.js",
+      "sha256": "d197f6f5ddeaa714a34af3a9389244b06942fff12e99dde2c0fa3837ab721e76"
+    },
+    {
+      "path": "integrations/cloudroom-plugin/build-tests/startup.test.js.map",
+      "sha256": "f01e9eea44cf0351ad40519cb4fa3170e6a09f588842ba0f69b8cffe570c235d"
+    }
+  ]
+}

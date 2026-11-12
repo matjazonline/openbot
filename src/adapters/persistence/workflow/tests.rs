@@ -26,6 +26,9 @@ pub(crate) use http_tests::reconciliation_fixture;
 mod local_agent_tests;
 #[path = "mcp_tests.rs"]
 mod mcp_tests;
+pub(crate) mod native_mcp_remote_fixture {
+    pub(crate) use super::mcp_tests::support::{Call, McpServer, guarded_client, mcp_server};
+}
 #[path = "message_tests.rs"]
 mod message_tests;
 #[path = "run_schema_tests.rs"]

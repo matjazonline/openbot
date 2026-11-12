@@ -261,6 +261,12 @@ impl LocalMachineStore for PostgresPersistence {
         let mut tx = begin(&self.pool).await?;
         authorize(&mut tx, profile.company_id, actor).await?;
         let selection = &profile.selection;
+        let mut effective = selection.clone();
+        if let Some(agent) = profile.agent_id {
+            let revision =
+                super::native::active_on(&mut tx, profile.company_id, actor, agent).await?;
+            effective.policy.permissions = revision.definition.native_permissions;
+        }
         let machine = lock_machine(&mut tx, profile.company_id, selection.machine_id).await?;
         if machine.state != "enabled" {
             return Err(AppError::Conflict("machine is not enabled".into()));
@@ -272,11 +278,11 @@ impl LocalMachineStore for PostgresPersistence {
         }
         current_catalog(&mut tx, profile.company_id, selection.machine_id)
             .await?
-            .validate_selection(selection)
+            .validate_selection(&effective)
             .map_err(|error| AppError::BadRequest(error.into()))?;
-        sqlx::query("INSERT INTO local_agent_profiles (company_id,id,machine_id,name,selection) VALUES ($1,$2,$3,$4,$5) \
-            ON CONFLICT (company_id,id) DO UPDATE SET machine_id=EXCLUDED.machine_id,name=EXCLUDED.name,selection=EXCLUDED.selection")
-            .bind(profile.company_id).bind(profile.id.as_uuid()).bind(selection.machine_id.as_uuid()).bind(&profile.name).bind(encode(selection)?).execute(&mut *tx).await?;
+        sqlx::query("INSERT INTO local_agent_profiles (company_id,id,machine_id,name,selection,agent_id) VALUES ($1,$2,$3,$4,$5,$6) \
+            ON CONFLICT (company_id,id) DO UPDATE SET machine_id=EXCLUDED.machine_id,name=EXCLUDED.name,selection=EXCLUDED.selection,agent_id=EXCLUDED.agent_id")
+            .bind(profile.company_id).bind(profile.id.as_uuid()).bind(selection.machine_id.as_uuid()).bind(&profile.name).bind(encode(selection)?).bind(profile.agent_id.map(|id| id.as_uuid())).execute(&mut *tx).await?;
         tx.commit().await?;
         Ok(())
     }

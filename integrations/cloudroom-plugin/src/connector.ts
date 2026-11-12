@@ -1,3 +1,5 @@
+import { fetchNativeBundle } from './bundle-transport.js';
+import type { NativeMcpConnection } from './mcp-transport.js';
 import WebSocket from 'ws';
 import { randomUUID } from 'node:crypto';
 import { setTimeout as delay } from 'node:timers/promises';
@@ -17,6 +19,9 @@ export class Connector {
   readonly dispatcher: Dispatcher;
   status: ConnectionStatus = 'offline';
   private readonly queue = new Map<string, Work>();
+  private nativeMcp:NativeMcpConnection|undefined;
+  get nativeMcpConnection():NativeMcpConnection|undefined {return this.status==='connected' && !this.nativeMcp?.signal.aborted?this.nativeMcp:undefined;}
+  get latestNativeMcpConnection():NativeMcpConnection|undefined {return this.nativeMcp;}
   constructor(dispatcher: Dispatcher) { this.dispatcher = dispatcher; }
 
   async run(paired: Paired, signal: AbortSignal): Promise<void> {
@@ -110,7 +115,10 @@ export class Connector {
               || message.welcome.identity.credential_generation !== binding.credential_generation) throw new RecoveryRequired();
           if (message.welcome.recovery_required) { journal.requireRecovery(); throw new RecoveryRequired(); }
           journal.acknowledge(message.welcome.acknowledged_sequence);
-          identity = message.welcome.identity; sent = journal.acknowledged(); this.status = 'recovering';
+          identity = message.welcome.identity;
+          this.nativeMcp={paired,identity,signal:connected};
+          this.dispatcher.sdk.setBundleReader((operation,requestSignal)=>fetchNativeBundle(paired,identity!,operation,AbortSignal.any([requestSignal,connected])));
+          sent = journal.acknowledged(); this.status = 'recovering';
         } else {
           if (!identity || JSON.stringify(message.identity) !== JSON.stringify(identity)) throw new Error('stale connection identity');
           if (message.kind === 'acknowledged') journal.acknowledge(message.through);
@@ -171,7 +179,7 @@ export class Connector {
           await write({ kind: 'observation', identity, observation }); sent = observationSequence(observation);
         }
         for (const observation of cached.splice(0)) await write({ kind: 'observation', identity, observation });
-        if (now >= compaction) { journal.compactAcknowledged(); compaction = now + 60_000; }
+        if (now >= compaction) { journal.compactAcknowledged(); await this.dispatcher.sdk.cleanupNativeCache(connected); compaction = now + 60_000; }
         if (allowed && now >= retention && !retirement) {
           let candidates = journal.mappingCandidates(this.mappingCursor);
           if (!candidates.length && this.mappingCursor) candidates = journal.mappingCandidates();
@@ -194,6 +202,7 @@ export class Connector {
       }
     } catch (error) { throw failure ?? error; }
     finally {
+      this.dispatcher.sdk.setBundleReader(undefined);
       active = false; allowed = false; stop.abort(); signal.removeEventListener('abort', abort);
       socket.terminate();
     }

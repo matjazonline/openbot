@@ -42,6 +42,7 @@ pub(super) async fn retire_on(
     if !eligible {
         return Ok(None);
     }
+    super::native_mcp::retire_on(db, company, root_id).await?;
     let calls = archive_usage(db, company, root_id).await?;
     let removed = sqlx::query("WITH retained AS MATERIALIZED (
         SELECT company_id,run_id FROM workflow_run_budgets WHERE company_id=$1 AND root_run_id=$2)

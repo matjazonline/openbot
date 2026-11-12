@@ -26,6 +26,7 @@ fn protected_request(
         output,
     }];
     request.agents = vec![ResolvedAgentDefinition {
+        native_permissions: Default::default(),
         company_id: bundle.company_id(),
         agent_id: reference.agent_id,
         key: reference.key.clone(),

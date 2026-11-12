@@ -31,7 +31,7 @@ pub(super) fn listed_tools() -> Value {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(in crate::adapters::persistence::workflow) enum Call {
+pub(crate) enum Call {
     Json,
     Sse,
     ToolError,
@@ -64,8 +64,8 @@ pub(super) struct ServerState {
     pub(super) arrived: Notify,
     pub(super) release: Notify,
 }
-pub(in crate::adapters::persistence::workflow) struct McpServer {
-    pub(in crate::adapters::persistence::workflow) url: String,
+pub(crate) struct McpServer {
+    pub(crate) url: String,
     pub(super) state: Arc<ServerState>,
     task: tokio::task::JoinHandle<()>,
 }
@@ -78,28 +78,31 @@ impl McpServer {
     pub(super) fn log(&self) -> Vec<String> {
         self.state.log.lock().unwrap().clone()
     }
-    pub(super) fn count(&self, entry: &str) -> usize {
+    pub(crate) fn count(&self, entry: &str) -> usize {
         self.log().iter().filter(|line| *line == entry).count()
     }
-    pub(in crate::adapters::persistence::workflow) fn calls(&self) -> usize {
+    pub(crate) fn calls(&self) -> usize {
         self.count("POST tools/call")
     }
-    pub(super) fn arguments(&self) -> Vec<Value> {
+    pub(crate) fn arguments(&self) -> Vec<Value> {
         self.state.arguments.lock().unwrap().clone()
     }
     pub(super) fn call_names(&self) -> Vec<String> {
         self.state.names.lock().unwrap().clone()
     }
-    pub(super) fn auth(&self) -> Vec<String> {
+    pub(crate) fn auth(&self) -> Vec<String> {
         self.state.auth.lock().unwrap().clone()
     }
     pub(super) fn set_call(&self, call: Call) {
         *self.state.call.lock().unwrap() = call;
     }
-    pub(super) fn set_tools(&self, tools: Value) {
+    pub(crate) fn release_call(&self) {
+        self.state.release.notify_one();
+    }
+    pub(crate) fn set_tools(&self, tools: Value) {
         *self.state.tools.lock().unwrap() = tools;
     }
-    pub(in crate::adapters::persistence::workflow) fn set_result(&self, result: Value) {
+    pub(crate) fn set_result(&self, result: Value) {
         *self.state.result.lock().unwrap() = Some(result);
     }
     pub(super) fn set_tool_result(&self, tool: McpToolName, result: Value) {
@@ -145,7 +148,7 @@ impl McpServer {
     }
 }
 
-pub(in crate::adapters::persistence::workflow) async fn mcp_server(call: Call) -> McpServer {
+pub(crate) async fn mcp_server(call: Call) -> McpServer {
     let state = Arc::new(ServerState {
         base: Mutex::new(String::new()),
         log: Mutex::default(),
@@ -395,7 +398,7 @@ pub(super) async fn connection_on(
         .find(|connection| connection.id == id)
         .expect("the connection is live")
 }
-pub(in crate::adapters::persistence::workflow) fn guarded_client(url: &str) -> Arc<HttpMcpClient> {
+pub(crate) fn guarded_client(url: &str) -> Arc<HttpMcpClient> {
     Arc::new(HttpMcpClient::new(
         EndpointPolicy::new([url.to_owned()]).unwrap(),
     ))

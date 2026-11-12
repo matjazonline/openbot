@@ -1,0 +1,202 @@
+Result  (cost=0.00..0.26 rows=1 width=1) (actual rows=1.00 loops=1)
+  Buffers: shared hit=2697 read=179 dirtied=2
+Planning:
+  Buffers: shared hit=12
+Planning Time: 0.213 ms
+Execution Time: 44.851 ms
+Result  (cost=0.00..0.26 rows=1 width=1) (actual rows=1.00 loops=1)
+  Buffers: shared hit=120
+Planning Time: 0.170 ms
+Execution Time: 25.317 ms
+Result  (cost=0.00..0.26 rows=1 width=1) (actual rows=1.00 loops=1)
+  Buffers: shared hit=120
+Planning Time: 0.167 ms
+Execution Time: 24.272 ms
+Result  (cost=0.00..0.26 rows=1 width=1) (actual rows=1.00 loops=1)
+  Buffers: shared hit=120
+Planning Time: 0.163 ms
+Execution Time: 24.738 ms
+Result  (cost=0.00..0.26 rows=1 width=1) (actual rows=1.00 loops=1)
+  Buffers: shared hit=120
+Planning Time: 0.176 ms
+Execution Time: 24.551 ms
+Result  (cost=0.00..0.26 rows=1 width=1) (actual rows=1.00 loops=1)
+  Buffers: shared hit=120
+Planning Time: 0.160 ms
+Execution Time: 24.186 ms
+Result  (cost=0.00..0.26 rows=1 width=1) (actual rows=1.00 loops=1)
+  Buffers: shared hit=2
+Planning Time: 0.002 ms
+Execution Time: 0.045 ms
+Result  (cost=0.00..0.26 rows=1 width=1) (actual rows=1.00 loops=1)
+  Buffers: shared hit=2
+Planning Time: 0.002 ms
+Execution Time: 0.039 ms
+Result  (cost=0.00..0.26 rows=1 width=1) (actual rows=1.00 loops=1)
+  Buffers: shared hit=2
+Planning Time: 0.001 ms
+Execution Time: 0.036 ms
+Result  (cost=0.00..0.26 rows=1 width=1) (actual rows=1.00 loops=1)
+  Buffers: shared hit=2
+Planning Time: 0.001 ms
+Execution Time: 0.036 ms
+Result  (cost=0.00..0.26 rows=1 width=1) (actual rows=1.00 loops=1)
+  Buffers: shared hit=110, local hit=3
+Planning Time: 0.157 ms
+Execution Time: 24.872 ms
+Result  (cost=0.00..0.26 rows=1 width=1) (actual rows=1.00 loops=1)
+  Buffers: shared hit=7, local hit=2
+Planning Time: 0.007 ms
+Execution Time: 0.130 ms
+Result  (cost=0.00..0.26 rows=1 width=1) (actual rows=1.00 loops=1)
+  Buffers: shared hit=100, local hit=2
+Planning Time: 0.165 ms
+Execution Time: 24.939 ms
+Result  (cost=0.00..0.26 rows=1 width=1) (actual rows=1.00 loops=1)
+  Buffers: shared hit=7, local hit=2
+Planning Time: 0.007 ms
+Execution Time: 0.052 ms
+Result  (cost=0.00..0.26 rows=1 width=1) (actual rows=1.00 loops=1)
+  Buffers: shared hit=100, local hit=2
+Planning Time: 0.154 ms
+Execution Time: 23.340 ms
+Result  (cost=0.00..0.26 rows=1 width=1) (actual rows=1.00 loops=1)
+  Buffers: shared hit=7, local hit=2
+Planning Time: 0.005 ms
+Execution Time: 0.052 ms
+Result  (cost=0.00..0.26 rows=1 width=1) (actual rows=1.00 loops=1)
+  Buffers: shared hit=100, local hit=2
+Planning Time: 0.156 ms
+Execution Time: 23.412 ms
+Result  (cost=0.00..0.26 rows=1 width=1) (actual rows=1.00 loops=1)
+  Buffers: shared hit=7, local hit=2
+Planning Time: 0.005 ms
+Execution Time: 0.037 ms
+Result  (cost=0.00..0.26 rows=1 width=1) (actual rows=1.00 loops=1)
+  Buffers: shared hit=100, local hit=2
+Planning Time: 0.144 ms
+Execution Time: 23.381 ms
+Result  (cost=0.00..0.26 rows=1 width=1) (actual rows=1.00 loops=1)
+  Buffers: shared hit=7, local hit=2
+Planning Time: 0.005 ms
+Execution Time: 0.041 ms
+Result  (cost=0.00..0.26 rows=1 width=1) (actual rows=1.00 loops=1)
+  Buffers: shared hit=100, local hit=2
+Planning Time: 0.147 ms
+Execution Time: 23.115 ms
+Result  (cost=0.00..0.26 rows=1 width=1) (actual rows=1.00 loops=1)
+  Buffers: shared hit=7, local hit=2
+Planning Time: 0.005 ms
+Execution Time: 0.037 ms
+Result  (cost=0.00..0.26 rows=1 width=1) (actual rows=1.00 loops=1)
+  Buffers: shared hit=2, local hit=2
+Planning Time: 0.001 ms
+Execution Time: 0.045 ms
+Result  (cost=0.00..0.26 rows=1 width=1) (actual rows=1.00 loops=1)
+  Buffers: shared hit=2, local hit=2
+Planning Time: 0.001 ms
+Execution Time: 0.009 ms
+Result  (cost=0.00..0.26 rows=1 width=1) (actual rows=1.00 loops=1)
+  Buffers: shared hit=2, local hit=2
+Planning Time: 0.001 ms
+Execution Time: 0.040 ms
+Result  (cost=0.00..0.26 rows=1 width=1) (actual rows=1.00 loops=1)
+  Buffers: shared hit=2, local hit=2
+Planning Time: 0.001 ms
+Execution Time: 0.007 ms
+Result  (cost=0.00..0.26 rows=1 width=1) (actual rows=1.00 loops=1)
+  Buffers: shared hit=2, local hit=2
+Planning Time: 0.001 ms
+Execution Time: 0.040 ms
+Result  (cost=0.00..0.26 rows=1 width=1) (actual rows=1.00 loops=1)
+  Buffers: shared hit=2, local hit=2
+Planning Time: 0.001 ms
+Execution Time: 0.007 ms
+Result  (cost=0.00..0.26 rows=1 width=1) (actual rows=1.00 loops=1)
+  Buffers: shared hit=2, local hit=2
+Planning Time: 0.001 ms
+Execution Time: 0.034 ms
+Result  (cost=0.00..0.26 rows=1 width=1) (actual rows=1.00 loops=1)
+  Buffers: shared hit=2, local hit=2
+Planning Time: 0.001 ms
+Execution Time: 0.007 ms
+Result  (cost=0.00..0.26 rows=1 width=1) (actual rows=1.00 loops=1)
+  Buffers: shared hit=2, local hit=2
+Planning Time: 0.001 ms
+Execution Time: 0.034 ms
+Result  (cost=0.00..0.26 rows=1 width=1) (actual rows=1.00 loops=1)
+  Buffers: shared hit=2, local hit=2
+Planning Time: 0.001 ms
+Execution Time: 0.007 ms
+Result  (cost=0.00..0.26 rows=1 width=1) (actual rows=1.00 loops=1)
+  Buffers: shared hit=2, local hit=2
+Planning Time: 0.001 ms
+Execution Time: 0.033 ms
+Result  (cost=0.00..0.26 rows=1 width=1) (actual rows=1.00 loops=1)
+  Buffers: shared hit=2, local hit=2
+Planning Time: 0.001 ms
+Execution Time: 0.007 ms
+Result  (cost=0.00..0.26 rows=1 width=1) (actual rows=1.00 loops=1)
+  Buffers: shared hit=2, local hit=2
+Planning Time: 0.001 ms
+Execution Time: 0.033 ms
+Result  (cost=0.00..0.26 rows=1 width=1) (actual rows=1.00 loops=1)
+  Buffers: shared hit=2, local hit=2
+Planning Time: 0.001 ms
+Execution Time: 0.006 ms
+Result  (cost=0.00..0.26 rows=1 width=1) (actual rows=1.00 loops=1)
+  Buffers: shared hit=2, local hit=2
+Planning Time: 0.001 ms
+Execution Time: 0.034 ms
+Result  (cost=0.00..0.26 rows=1 width=1) (actual rows=1.00 loops=1)
+  Buffers: shared hit=2, local hit=2
+Planning Time: 0.001 ms
+Execution Time: 0.006 ms
+Result  (cost=0.00..0.26 rows=1 width=1) (actual rows=1.00 loops=1)
+  Buffers: shared hit=2, local hit=2
+Planning Time: 0.001 ms
+Execution Time: 0.034 ms
+Result  (cost=0.00..0.26 rows=1 width=1) (actual rows=1.00 loops=1)
+  Buffers: shared hit=2, local hit=2
+Planning Time: 0.001 ms
+Execution Time: 0.008 ms
+Result  (cost=0.00..0.26 rows=1 width=1) (actual rows=1.00 loops=1)
+  Buffers: shared hit=2, local hit=2
+Planning Time: 0.001 ms
+Execution Time: 0.033 ms
+Result  (cost=0.00..0.26 rows=1 width=1) (actual rows=1.00 loops=1)
+  Buffers: shared hit=2, local hit=2
+Planning Time: 0.001 ms
+Execution Time: 0.006 ms
+Result  (cost=0.00..0.26 rows=1 width=1) (actual rows=1.00 loops=1)
+  Buffers: shared hit=2, local hit=2
+Planning Time: 0.001 ms
+Execution Time: 0.033 ms
+Result  (cost=0.00..0.26 rows=1 width=1) (actual rows=1.00 loops=1)
+  Buffers: shared hit=2, local hit=2
+Planning Time: 0.001 ms
+Execution Time: 0.006 ms
+Result  (cost=0.00..0.26 rows=1 width=1) (actual rows=1.00 loops=1)
+  Buffers: shared hit=2, local hit=2
+Planning Time: 0.001 ms
+Execution Time: 0.033 ms
+Result  (cost=0.00..0.26 rows=1 width=1) (actual rows=1.00 loops=1)
+  Buffers: shared hit=2, local hit=2
+Planning Time: 0.001 ms
+Execution Time: 0.006 ms
+Result  (cost=0.00..0.26 rows=1 width=1) (actual rows=1.00 loops=1)
+  Buffers: shared hit=2, local hit=2
+Planning Time: 0.001 ms
+Execution Time: 0.033 ms
+Result  (cost=0.00..0.26 rows=1 width=1) (actual rows=1.00 loops=1)
+  Buffers: shared hit=2, local hit=2
+Planning Time: 0.001 ms
+Execution Time: 0.008 ms
+Result  (cost=0.00..0.26 rows=1 width=1) (actual rows=1.00 loops=1)
+  Buffers: shared hit=2, local hit=2
+Planning Time: 0.001 ms
+Execution Time: 0.039 ms
+Result  (cost=0.00..0.26 rows=1 width=1) (actual rows=1.00 loops=1)
+  Buffers: shared hit=2, local hit=2
+Planning Time: 0.001 ms
+Execution Time: 0.008 ms

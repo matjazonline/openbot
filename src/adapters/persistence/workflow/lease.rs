@@ -341,6 +341,14 @@ pub(super) async fn live_window(
     fence: WorkflowFence,
     started: Instant,
 ) -> AppResult<Option<LeaseWindow>> {
+    if !sqlx::query_scalar::<_, bool>("SELECT COALESCE(public.native_mcp_run_live($1,$2),false)")
+        .bind(fence.scope.company.as_uuid())
+        .bind(fence.scope.run.as_uuid())
+        .fetch_one(&mut *db)
+        .await?
+    {
+        return Ok(None);
+    }
     let row = sqlx::query_as::<_, Remaining>("SELECT extract(epoch FROM (job.lock_expires_at-clock_timestamp()))::float8 AS lease_seconds, extract(epoch FROM (run.deadline-clock_timestamp()))::float8 AS run_seconds FROM background_tasks AS job JOIN workflow_executions AS execution ON execution.company_id=job.company_id AND execution.id=job.workflow_execution_id JOIN workflow_runs AS run ON run.company_id=execution.company_id AND run.id=execution.run_id JOIN task_attempts AS attempt ON attempt.task_id=job.id AND attempt.attempt_number=$7 AND attempt.execution_generation=$6 AND attempt.worker_id=$5 AND attempt.status='processing' WHERE job.company_id=$1 AND run.id=$2 AND execution.id=$3 AND job.id=$4  AND job.status='processing' AND job.worker_id=$5 AND job.execution_generation=$6 AND job.attempt_ordinal=$7 AND job.lock_expires_at > clock_timestamp() AND execution.completed_at IS NULL AND run.state IN ('queued','running') AND run.deadline > clock_timestamp()")
         .bind(fence.scope.company.as_uuid()).bind(fence.scope.run.as_uuid()).bind(fence.scope.execution.as_uuid()).bind(fence.scope.job.0).bind(fence.worker.0).bind(fence.generation.0).bind(fence.attempt.0).fetch_optional(db).await?;
     Ok(row

@@ -181,6 +181,7 @@ async fn cloudroom_commands_create_binds_once_and_logical_replay_survives_native
             .unwrap();
     assert_eq!(stored.thread_id.unwrap().as_str(), "thr_created");
     let mapped = c.admission(LocalCommand::Create {
+        harness: crate::domain::local_agents::NativeHarnessSelection::Unconfigured,
         session_id: c.session.id,
         selection: c.session.profile.selection.clone(),
         prompt: LocalPrompt::try_from("must not replace mapping".to_owned()).unwrap(),

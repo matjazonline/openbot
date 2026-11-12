@@ -1,0 +1,7 @@
+
+> bb-plugin-openbot-local@0.2.0 typecheck
+> tsc --noEmit
+
+test/mcp-journal.test.ts(72,69): error TS2345: Argument of type '{ records: number; bytes: number; }' is not assignable to parameter of type 'Readonly<{ records: 4096; bytes: number; }>'.
+  Types of property 'records' are incompatible.
+    Type 'number' is not assignable to type '4096'.

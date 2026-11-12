@@ -1,0 +1,26 @@
+{
+  "prior_total": 20412606,
+  "retained_calls": [
+    {
+      "file": "B3-R4-run-live-callers-graft.txt",
+      "tokens": 23534
+    },
+    {
+      "file": "B3-R4-live-window-callers.txt",
+      "tokens": 84950
+    },
+    {
+      "file": "B3-R4-claim-on-callers.txt",
+      "tokens": 7946
+    },
+    {
+      "file": "B3-R4-plan-cache-mode-graft.txt",
+      "tokens": 4592
+    },
+    {
+      "file": "B3-R4-native-env-graft.txt",
+      "tokens": 1741
+    }
+  ],
+  "new_total": 20535369
+}

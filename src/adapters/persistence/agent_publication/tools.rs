@@ -1,8 +1,9 @@
+use super::super::workflow::row_locks::RowLocks;
 use super::*;
 use crate::application::workflow::{
     http::HttpOperation, mcp::McpOperation, publication::ToolSnapshot,
 };
-use crate::entities::mcp::McpAuth;
+use crate::entities::mcp::{CompanyMcpConnection, McpAuth};
 use std::collections::BTreeMap;
 
 #[derive(PartialEq, Eq, PartialOrd, Ord)]
@@ -64,6 +65,7 @@ pub(super) async fn resolve_tools(
     tx: &mut PgConnection,
     company: CompanyId,
     bindings: &[AgentToolBinding],
+    native_only: bool,
 ) -> AppResult<Vec<ResolvedAgentTool>> {
     validate_agent_bindings(bindings).map_err(AppError::BadRequest)?;
     memory_publication_on(tx, company, bindings.iter().map(|binding| &binding.source)).await?;
@@ -96,7 +98,7 @@ pub(super) async fn resolve_tools(
                     approval_required: false,
                 }
             }
-            source => direct_registration_on(tx, company, source).await?,
+            source => direct_registration_on(tx, company, source, native_only).await?,
         };
         resolved.insert(
             binding.id,
@@ -127,11 +129,34 @@ async fn memory_publication_on<'a>(
     Ok(())
 }
 
-/// The same current owner validation for publication and live use of direct agent tools.
+/// Publication preserves hosted dispatch restrictions; native-only agents use the broker.
 pub(in crate::adapters::persistence) async fn direct_registration_on(
     db: &mut PgConnection,
     company: CompanyId,
     source: &AgentBindingSource,
+    native_only: bool,
+) -> AppResult<RegisteredTool> {
+    if !native_only && let AgentBindingSource::Mcp { connection, .. } = source {
+        let current = super::super::mcp::publication_connection_with_locks_on(
+            db,
+            company.as_uuid(),
+            *connection,
+            RowLocks::Wait,
+        )
+        .await?
+        .ok_or_else(unavailable)?;
+        if matches!(current.auth, McpAuth::Integration(_)) {
+            return Err(unavailable());
+        }
+    }
+    direct_registration_with_locks_on(db, company, source, RowLocks::Wait).await
+}
+
+pub(in crate::adapters::persistence) async fn direct_registration_with_locks_on(
+    db: &mut PgConnection,
+    company: CompanyId,
+    source: &AgentBindingSource,
+    locks: RowLocks,
 ) -> AppResult<RegisteredTool> {
     match source {
         AgentBindingSource::Builtin { tool } => Ok(RegisteredTool {
@@ -141,7 +166,7 @@ pub(in crate::adapters::persistence) async fn direct_registration_on(
         AgentBindingSource::Http {
             connection,
             operation,
-        } => http_tool(db, company, *connection, operation).await,
+        } => http_tool(db, company, *connection, operation, locks).await,
         AgentBindingSource::Mcp {
             connection,
             operation,
@@ -155,6 +180,7 @@ pub(in crate::adapters::persistence) async fn direct_registration_on(
                 operation,
                 *reviewed_version,
                 remote_name.as_str(),
+                locks,
             )
             .await
         }
@@ -220,6 +246,7 @@ async fn credential_ready(
     company: CompanyId,
     connection: Uuid,
     owner: CredentialOwner,
+    locks: RowLocks,
 ) -> AppResult<()> {
     let query = match owner {
         CredentialOwner::Http => {
@@ -229,7 +256,7 @@ async fn credential_ready(
             "SELECT connection_id FROM company_mcp_credentials WHERE company_id=$1 AND connection_id=$2 FOR SHARE"
         }
     };
-    sqlx::query_scalar::<_, Uuid>(query)
+    sqlx::query_scalar::<_, Uuid>(&locks.sql(query))
         .bind(company.as_uuid())
         .bind(connection)
         .fetch_optional(db)
@@ -243,10 +270,14 @@ async fn http_tool(
     company: CompanyId,
     connection: Uuid,
     operation: &TypeName,
+    locks: RowLocks,
 ) -> AppResult<RegisteredTool> {
-    let current = super::super::workflow::http::connection_on(tx, company, connection)
-        .await?
-        .ok_or_else(|| AppError::BadRequest("Selected HTTP connection is unavailable".into()))?;
+    let current =
+        super::super::workflow::http::connection_with_locks_on(tx, company, connection, locks)
+            .await?
+            .ok_or_else(|| {
+                AppError::BadRequest("Selected HTTP connection is unavailable".into())
+            })?;
     if !current.enabled {
         return Err(AppError::BadRequest(
             "Selected HTTP connection is unavailable".into(),
@@ -259,12 +290,12 @@ async fn http_tool(
         return Err(unavailable());
     }
     if current.uses_owned_bearer() {
-        credential_ready(tx, company, connection, CredentialOwner::Http).await?;
+        credential_ready(tx, company, connection, CredentialOwner::Http, locks).await?;
     }
-    let (snapshot, approval_required): (serde_json::Value, bool) = sqlx::query_as(
+    let (snapshot, approval_required): (serde_json::Value, bool) = sqlx::query_as(&locks.sql(
         "SELECT snapshot,approval_required FROM workflow_http_operations \
          WHERE company_id=$1 AND connection_id=$2 AND name=$3 AND revoked_at IS NULL FOR SHARE",
-    )
+    ))
     .bind(company.as_uuid())
     .bind(connection)
     .bind(operation.as_str())
@@ -292,6 +323,35 @@ struct ReviewedMcpOperation {
     version: Uuid,
 }
 
+async fn mcp_credential_ready(
+    tx: &mut PgConnection,
+    company: CompanyId,
+    current: &CompanyMcpConnection,
+    locks: RowLocks,
+) -> AppResult<()> {
+    if let McpAuth::Integration(reference) = &current.auth {
+        // Use the existing consent-bound MCP credential path. This metadata read
+        // takes no integration-owner locks; dispatch rechecks the frozen grant
+        // and obtains the actual credential through the integration gateway.
+        super::super::workflow::integration_authority::mcp_snapshot(tx, current).await?;
+        let ready = super::super::integrations::PostgresVault::mcp_reference_ready_on(
+            tx,
+            company.as_uuid(),
+            current.id,
+            current.endpoint.as_str(),
+            reference,
+        )
+        .await?;
+        if !ready {
+            return Err(unavailable());
+        }
+    }
+    if current.auth == McpAuth::Bearer {
+        credential_ready(tx, company, current.id, CredentialOwner::Mcp, locks).await?;
+    }
+    Ok(())
+}
+
 async fn mcp_tool(
     tx: &mut PgConnection,
     company: CompanyId,
@@ -299,25 +359,26 @@ async fn mcp_tool(
     operation: &TypeName,
     reviewed_version: Uuid,
     remote_name: &str,
+    locks: RowLocks,
 ) -> AppResult<RegisteredTool> {
-    let current = super::super::mcp::publication_connection_on(tx, company.as_uuid(), connection)
-        .await?
-        .ok_or_else(|| AppError::BadRequest("Selected MCP connection is unavailable".into()))?;
+    let current = super::super::mcp::publication_connection_with_locks_on(
+        tx,
+        company.as_uuid(),
+        connection,
+        locks,
+    )
+    .await?
+    .ok_or_else(|| AppError::BadRequest("Selected MCP connection is unavailable".into()))?;
     if !current.enabled {
         return Err(AppError::BadRequest(
             "Selected MCP connection is unavailable".into(),
         ));
     }
-    if matches!(current.auth, McpAuth::Integration(_)) {
-        return Err(unavailable());
-    }
-    if current.auth == McpAuth::Bearer {
-        credential_ready(tx, company, connection, CredentialOwner::Mcp).await?;
-    }
-    sqlx::query_scalar::<_, String>(
+    mcp_credential_ready(tx, company, &current, locks).await?;
+    sqlx::query_scalar::<_, String>(&locks.sql(
         "SELECT tool_name FROM company_mcp_tool_grants WHERE company_id=$1 AND connection_id=$2 \
          AND tool_name=$3 AND revoked_at IS NULL FOR SHARE",
-    )
+    ))
     .bind(company.as_uuid())
     .bind(connection)
     .bind(remote_name)
@@ -327,8 +388,8 @@ async fn mcp_tool(
         AppError::BadRequest("Selected MCP tool permission is revoked or missing".into())
     })?;
     let reviewed: ReviewedMcpOperation = sqlx::query_as(
-        "SELECT snapshot,approval_required,version FROM workflow_mcp_operations WHERE company_id=$1 \
-         AND connection_id=$2 AND name=$3 AND revoked_at IS NULL FOR SHARE"
+        &locks.sql("SELECT snapshot,approval_required,version FROM workflow_mcp_operations WHERE company_id=$1 \
+         AND connection_id=$2 AND name=$3 AND revoked_at IS NULL FOR SHARE")
     ).bind(company.as_uuid()).bind(connection).bind(operation.as_str())
         .fetch_optional(&mut *tx).await?.ok_or_else(|| AppError::BadRequest("Selected MCP operation is unavailable or revoked".into()))?;
     if reviewed.version != reviewed_version {

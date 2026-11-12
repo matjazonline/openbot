@@ -1,0 +1,13 @@
+Scope: 6 of 97 workspace projects
+packages/provider-bridge-acp typecheck$ tsc --noEmit
+packages/provider-bridge-acp typecheck: Done
+packages/plugin-sdk typecheck$ tsc --noEmit
+packages/plugin-sdk typecheck: Done
+packages/agent-runtime typecheck$ tsc --noEmit
+plugins/provider-claude-code typecheck$ tsc --noEmit
+plugins/provider-claude-code typecheck: Done
+packages/agent-runtime typecheck: Done
+apps/server typecheck$ tsc --noEmit
+apps/host-daemon typecheck$ tsc --noEmit
+apps/host-daemon typecheck: Done
+apps/server typecheck: Done

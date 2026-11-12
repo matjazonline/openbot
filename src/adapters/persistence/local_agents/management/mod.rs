@@ -81,6 +81,27 @@ async fn operation_on(
 
 #[async_trait]
 impl LocalAgentManagementStore for PostgresPersistence {
+    async fn native_agent_choices(
+        &self,
+        actor: Uuid,
+        company: Uuid,
+    ) -> AppResult<RecordPage<NativeAgentChoice>> {
+        let mut tx = begin(&self.pool).await?;
+        authorize(&mut tx, company, actor).await?;
+        let rows: Vec<(Uuid, String)> = sqlx::query_as("SELECT agent.id,agent.name FROM agents AS agent JOIN agent_active_revisions AS active ON active.company_id=agent.company_id AND active.agent_id=agent.id WHERE agent.company_id=$1 ORDER BY agent.id LIMIT $2")
+            .bind(company).bind((MAX_PAGE_RECORDS+1) as i64).fetch_all(&mut *tx).await?;
+        let mut entries: Vec<_> = rows
+            .into_iter()
+            .map(|(id, name)| NativeAgentChoice {
+                id: crate::entities::agent_capability::AgentId::new(id),
+                name,
+            })
+            .collect();
+        let truncated = entries.len() > MAX_PAGE_RECORDS;
+        entries.truncate(MAX_PAGE_RECORDS);
+        tx.commit().await?;
+        Ok(RecordPage { entries, truncated })
+    }
     async fn read_operation(
         &self,
         actor: Uuid,
@@ -122,7 +143,7 @@ impl LocalAgentManagementStore for PostgresPersistence {
     ) -> AppResult<RecordPage<LocalAgentProfile>> {
         let mut tx = begin(&self.pool).await?;
         authorize(&mut tx, company, actor).await?;
-        let values: Vec<Value> = sqlx::query_scalar("SELECT jsonb_build_object('id',id,'company_id',company_id,'name',name,'selection',selection) FROM local_agent_profiles WHERE company_id=$1 AND ($2::uuid IS NULL OR id>$2) ORDER BY id LIMIT $3")
+        let values: Vec<Value> = sqlx::query_scalar("SELECT jsonb_build_object('id',id,'company_id',company_id,'name',name,'selection',selection,'agent_id',agent_id) FROM local_agent_profiles WHERE company_id=$1 AND ($2::uuid IS NULL OR id>$2) ORDER BY id LIMIT $3")
             .bind(company).bind(after.map(ProfileId::as_uuid)).bind((MAX_PAGE_RECORDS+1) as i64).fetch_all(&mut *tx).await?;
         let mut entries = values
             .into_iter()

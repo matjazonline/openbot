@@ -35,6 +35,7 @@ struct MockAgentPersistence {
 impl AgentPersistence for MockAgentPersistence {
     async fn create(&self, company_id: Uuid, write: AgentWrite) -> AppResult<Agent> {
         let agent = Agent {
+            native_permissions: write.native_permissions,
             draft_revision: crate::entities::agent_capability::AgentDraftRevision::new(1).unwrap(),
             id: Uuid::new_v4(),
             company_id: Some(company_id),
@@ -111,6 +112,7 @@ impl AgentPersistence for MockAgentPersistence {
         agent.provider = write.provider;
         agent.model = write.model;
         agent.system_prompt = write.system_prompt;
+        agent.native_permissions = write.native_permissions;
         agent.description = write.description;
         agent.avatar_url = write.avatar_url;
         Ok(agent.clone())
@@ -627,6 +629,7 @@ async fn a_library_pick_is_copied_into_the_company_with_a_model_it_can_run() {
 
     // A library definition is one with no company of its own.
     let definition = |name: &str, slug: &str, provider: &str, model: &str| Agent {
+        native_permissions: Default::default(),
         draft_revision: crate::entities::agent_capability::AgentDraftRevision::new(1).unwrap(),
         id: Uuid::new_v4(),
         company_id: None,

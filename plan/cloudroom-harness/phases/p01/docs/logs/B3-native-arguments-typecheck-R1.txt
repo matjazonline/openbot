@@ -1,0 +1,6 @@
+
+> bb-plugin-openbot-local@0.2.0 typecheck
+> tsc --noEmit
+
+src/mcp-arguments.ts(11,67): error TS2550: Property 'isWellFormed' does not exist on type 'string'. Do you need to change your target library? Try changing the 'lib' compiler option to 'es2024' or later.
+src/mcp-arguments.ts(20,37): error TS2550: Property 'isWellFormed' does not exist on type 'string'. Do you need to change your target library? Try changing the 'lib' compiler option to 'es2024' or later.

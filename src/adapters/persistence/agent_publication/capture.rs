@@ -6,6 +6,7 @@ struct DraftRow {
     draft_revision: i64,
     slug: String,
     system_prompt: Option<String>,
+    native_permissions: String,
     provider: Option<String>,
     model: Option<String>,
 }
@@ -45,7 +46,7 @@ pub(super) async fn capture_on(
     scope: AgentPublicationScope,
 ) -> AppResult<(AgentDraftRevision, ResolvedAgentDefinition)> {
     let row: DraftRow = sqlx::query_as(
-        "SELECT draft_revision,slug::text AS slug,system_prompt,provider,model \
+        "SELECT draft_revision,slug::text AS slug,system_prompt,provider,model,native_permissions \
          FROM agents WHERE company_id=$1 AND id=$2",
     )
     .bind(scope.company.as_uuid())
@@ -72,7 +73,7 @@ pub(super) async fn capture_on(
         scope.agent.as_uuid(),
     )
     .await?;
-    let tools = super::tools::resolve_tools(tx, scope.company, &bindings).await?;
+    let tools = super::tools::resolve_tools(tx, scope.company, &bindings, model.is_none()).await?;
     let skills = capture_skills(tx, scope).await?;
     let draft = AgentDraft {
         company_id: scope.company,
@@ -80,6 +81,10 @@ pub(super) async fn capture_on(
         revision,
         key: AgentKey::parse(row.slug).ok_or_else(invalid)?,
         instructions: row.system_prompt.unwrap_or_default(),
+        native_permissions: crate::domain::local_agents::LocalPermissions::parse(
+            &row.native_permissions,
+        )
+        .map_err(AppError::Internal)?,
         model,
         bindings,
         skills: skills

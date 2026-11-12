@@ -1,0 +1,9 @@
+{
+  "src/adapters/http/pages/workflow_authoring/sample.rs": {
+    "same_entire_file": true,
+    "hostile_literal_in_baseline": true
+  },
+  "src/adapters/http/pages/tests.rs": {
+    "same_guard_function": true
+  }
+}

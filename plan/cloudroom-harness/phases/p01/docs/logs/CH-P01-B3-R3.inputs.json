@@ -1,0 +1,18 @@
+{
+  "phase": "p01",
+  "stage": "complete F5/F6 correction recheck and final combined acceptance",
+  "phase_start": "abac7038a08a355156b7680a01d2f79f3de756fd",
+  "review_base": "abac7038a08a355156b7680a01d2f79f3de756fd",
+  "head": "2c477c9dd8cae4d1a7881d377dcea8ce038dae13",
+  "artifact": "32445711c489b73d4f95820e1d8e1f732be11c3220f9f47252f22a27f86efe5c",
+  "prior_artifact": "ef03b7ee614b9e72f0aa3b287a9c086527950b5e5851bb43831bf090bd17d00a",
+  "exclusions": [
+    "plan/cloudroom-harness/COORDINATION.md",
+    "plan/cloudroom-harness/phases/p01/docs"
+  ],
+  "coordination_revision": 3,
+  "coordination_sha256": "41b64d5e053759107a73e880143623b11b6c05fdffe715ccdf12e5a7e7adb408",
+  "mapping": "B3-verification-mapping-R4.md",
+  "evidence": "CH-P01-B3-R3.evidence.json",
+  "full_gate_status": "RUNNING, lease recheck pending; root acceptance pending"
+}

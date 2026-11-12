@@ -1,22 +1,22 @@
 use super::*;
-use crate::adapters::persistence::workflow::action_dispatch::SqlActionAuthority;
 
 /// A parked call authorizes only its saved operation. This check precedes machine and
 /// operation locks; reconciliation after any attempted delivery retains protocol semantics.
-pub(in crate::adapters::persistence) async fn authorize_operation_on(
+pub(in crate::adapters::persistence) async fn authorize_operation_with_locks_on(
     tx: &mut Transaction<'_, Postgres>,
     company: CompanyId,
     operation: OperationId,
     actor: WorkflowActor,
+    locks: super::super::row_locks::RowLocks,
 ) -> AppResult<()> {
     let (scope, subject) = parked_subject_on(tx, company, operation)
         .await?
         .ok_or_else(missing)?;
-    let current = action_authority::prelock_on(tx, scope).await?;
+    let current = action_authority::prelock_accounts_with_locks_on(tx, scope, None, locks).await?;
     if current != Some(actor) {
         return Err(missing());
     }
-    current_authority_on(tx, scope, &subject, current).await?;
+    current_authority_with_locks_on(tx, scope, &subject, current, locks).await?;
     // This last proof also checks cancellation/deadline after lock waits.
     if parked_subject_on(tx, company, operation).await?.is_none() {
         return Err(conflict());
@@ -30,16 +30,34 @@ pub(super) async fn current_authority_on(
     subject: &ApprovalSubject,
     actor: Option<WorkflowActor>,
 ) -> AppResult<()> {
-    let authority = action_authority::load_on(
+    current_authority_with_locks_on(
+        tx,
+        scope,
+        subject,
+        actor,
+        super::super::row_locks::RowLocks::Wait,
+    )
+    .await
+}
+
+async fn current_authority_with_locks_on(
+    tx: &mut Transaction<'_, Postgres>,
+    scope: ActionScope,
+    subject: &ApprovalSubject,
+    actor: Option<WorkflowActor>,
+    locks: super::super::row_locks::RowLocks,
+) -> AppResult<()> {
+    let authority = action_authority::load_with_locks_on(
         tx,
         scope,
         subject,
         actor,
         action_authority::RunPhase::LocalAgentWait,
+        locks,
     )
     .await?;
     validate_run_authority(scope, subject, &authority)?;
-    let current = LocalActionAuthority.lock_current(tx, &authority).await?;
+    let current = lock_current_with_locks(tx, &authority, locks).await?;
     validate_resource(authority.action.request(), &current.resource)?;
     let policy = validate_current_authority(authority.action.request(), &current.policy)?;
     let activation = activation_on(tx, scope).await?;

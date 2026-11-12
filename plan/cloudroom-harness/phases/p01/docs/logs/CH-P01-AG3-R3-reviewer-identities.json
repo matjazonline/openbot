@@ -1,0 +1,8 @@
+{
+  "decision_sha256": "9241772862bb0b762f56e3b84ef9488a250460ee0e6d69c20758146e9bf420b6",
+  "external_revision": "d8b3cc3a16bb4b06fc99d8e543d40f1087d1e815",
+  "targets_verified": 45,
+  "sdk_version": "0.3.245",
+  "coordination_sha256": "41b64d5e053759107a73e880143623b11b6c05fdffe715ccdf12e5a7e7adb408",
+  "status": "MATCH"
+}

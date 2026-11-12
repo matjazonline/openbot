@@ -1,0 +1,149 @@
+
+> bb-plugin-openbot-local@0.2.0 test
+> node scripts/build.mjs && node scripts/build.mjs --test && node test/run.mjs
+
+built 1 plugin entry
+built 14 test entries
+✔ bundle transport uses trusted TLS and live identity with exact maximum streaming bytes (296.359166ms)
+✔ bundle transport refuses redirects, revoked authority, corrupt digests and oversized declared bodies (31.164ms)
+✔ bundle body cancellation closes the active request and joins promptly (32.566083ms)
+✔ real trusted WSS reconnect rewraps immutable outbox and native tracking continues offline without duplicate SDK calls (1082.476458ms)
+✔ authorization rejection stops reconnect attempts and never enters the SDK (7.301417ms)
+✔ shutdown during a stalled TLS handshake joins network and dispatcher within the host drain (14.741542ms)
+✔ real WSS rejects stale_identity before journal receipt or SDK entry (25.937ms)
+✔ real WSS rejects changed_digest before journal receipt or SDK entry (27.5945ms)
+✔ real WSS rejects binary before journal receipt or SDK entry (27.642583ms)
+✔ real WSS rejects unknown_field before journal receipt or SDK entry (27.441667ms)
+✔ public plugin service reload joins SDK work before storage closes and settings changes stop admission (312.634667ms)
+✔ configuration refuses non-origin URL http:// (0.576291ms)
+✔ configuration refuses non-origin URL https:// (0.065875ms)
+✔ configuration refuses non-origin URL https://path (0.053166ms)
+✔ configuration refuses non-origin URL https:// (0.051583ms)
+✔ configuration refuses non-origin URL https:// (0.055875ms)
+✔ configuration canonicalizes HTTPS and refuses arbitrary project paths/duplicates/bounds (0.724833ms)
+✔ user UTF8 prompt bound remains32KiB with fixed native operation header (31.771333ms)
+✔ actual peer command decoder canonicalizes field order and rejects hash/date/field changes (3.970209ms)
+✔ chunk transport roundtrips the exact2MiB limit and rejects overflow before send (20.024708ms)
+✔ chunks reject interleaving, invalid UTF8/base64, unsafe integers and time expiry (2.902709ms)
+✔ real SQLite survives receipt/intent reopen and replay keeps immutable payloads (35.198209ms)
+✔ competing stale intent claimants have exactly one durable SDK entry marker (10.42125ms)
+✔ missing command under reconcile enters durable recovery without a fresh SDK claim (6.58275ms)
+✔ acknowledgment cannot forget an unknown future or restore an already-pruned cursor (7.427583ms)
+✔ preflight refusal is durable but cannot follow the SDK intent cut (5.158666ms)
+✔ fixed4096 history bound fails controlled admission and never allocates a dangling sequence (2133.083333ms)
+✔ real process interruption at enrollment before-pending recovers the same durable claim (152.229583ms)
+✔ real process interruption at enrollment pending recovers the same durable claim (225.434583ms)
+✔ real process interruption at enrollment server-commit recovers the same durable claim (125.286375ms)
+✔ real process interruption at enrollment receipt recovers the same durable claim (192.738125ms)
+✔ real process interruption at enrollment journal recovers the same durable claim (99.690208ms)
+✔ real process interruption at enrollment paired recovers the same durable claim (87.993208ms)
+✔ real process interruption at enrollment cleaned recovers the same durable claim (88.755375ms)
+✔ changed origin never receives a saved pending credential or pairing claim (2.778792ms)
+✔ complete initial pairing 400 clears rejected input and explicit replacement starts a fresh attempt (5.116583ms)
+✔ complete initial pairing 401 clears rejected input and explicit replacement starts a fresh attempt (4.362542ms)
+✔ complete initial pairing 403 clears rejected input and explicit replacement starts a fresh attempt (4.794583ms)
+✔ complete initial pairing 404 clears rejected input and explicit replacement starts a fresh attempt (4.280291ms)
+✔ transport retains original pending secrets and ignores replacement input until outcome is resolved (3.751208ms)
+✔ incomplete_rejection retains original pending secrets and ignores replacement input until outcome is resolved (3.672583ms)
+✔ actual process interruption during definitive rejection cleaned cannot enroll stale input as a new identity (79.392541ms)
+✔ actual process interruption during definitive rejection rejected cannot enroll stale input as a new identity (78.155625ms)
+✔ a complete rejection cannot clear a Pending record or secret input once its journal is initialized (3.403458ms)
+✔ real competing connector processes exclude each other and OS releases graceful and killed owners (524.846084ms)
+✔ native immutable cache preserves namespaced YAML, exact assets, modes and tree hashes, and checks server authority on every hit (198.890459ms)
+✔ native cache bytes refuses without reconstructing a mapped bundle (224.481541ms)
+✔ native cache mode refuses without reconstructing a mapped bundle (48.423542ms)
+✔ native cache symlink refuses without reconstructing a mapped bundle (45.407666ms)
+✔ native cache missing refuses without reconstructing a mapped bundle (48.394625ms)
+✔ native cache capacity refuses before writes and the download/materialization slot is bounded (6.191208ms)
+✔ configured spawn holds before positive mapping, durably binds its receipt, then rechecks and supplies full required configuration (63.522041ms)
+✔ configured lost spawn receipt never recovers authority from editable metadata or repeats a spawn (35.781583ms)
+✔ native cache cancellation joins owned writes without publishing a partial bundle (2.516083ms)
+✖ native cache keeps command and session references through acknowledgement and retires only the confirmed unchanged mapping (38.33325ms)
+✔ native cache abort during materialization removes its owned temporary directory before returning (17.833292ms)
+✔ create sends explicit full native permissions (88.078084ms)
+✔ send sends explicit full native permissions (7.049583ms)
+✔ create sends explicit auto native permissions (8.607709ms)
+✔ send sends explicit auto native permissions (16.20025ms)
+✔ create sends explicit accept_edits native permissions (8.517125ms)
+✔ send sends explicit accept_edits native permissions (7.944958ms)
+✔ unsupported full access at provider refuses before native intent (10.183667ms)
+✔ unsupported full access at server refuses before native intent (4.682709ms)
+✔ unsupported full access at host refuses before native intent (3.7295ms)
+✔ unsupported full access at manual refuses before native intent (3.240833ms)
+✔ catalog advertises only permission modes allowed by provider and both ceilings (3.294125ms)
+✔ permission policy has no implicit default or legacy permission decoder (0.129541ms)
+✔ native idle admission preserves prompt order, queue identity and separate originating turns (80.188875ms)
+✔ native human admission preserves prompt order, queue identity and separate originating turns (17.288125ms)
+✔ native openbot admission preserves prompt order, queue identity and separate originating turns (16.993416ms)
+✔ native queue idle_to_busy race is decided at admission without steering or a second SDK call (18.577375ms)
+✔ native queue busy_to_idle race is decided at admission without steering or a second SDK call (33.106833ms)
+✔ accepted native queue work survives lost SDK response and replay with one mutation and original order (15.648084ms)
+✔ bounded mapping traversal passes a retained oldest page and wraps after reclaiming full history (560.798459ms)
+✔ real WSS mapping traversal preserves the oldest page across timeout/reconnect and visits later mappings (4096) (6097.678166ms)
+✔ real WSS mapping traversal preserves the oldest page across timeout/reconnect and visits later mappings (205) (8871.771417ms)
+✔ same-point journal restore retains mapping while SQL-only history rollback cannot reconstruct it at an equal cursor (12.4385ms)
+✔ terminal receipts remain for90days after ACK and old compacted effects cannot enter the SDK again (5.707625ms)
+✔ uncertainty and pending local references survive compaction and only unchanged confirmed mappings retire (6.253167ms)
+✔ 64MiB outbox pressure coalesces progress and preserves its reserved unacknowledged terminal summary (57.363333ms)
+✔ real WSS retirement requires current nonce and unchanged binding after server confirmation (79.122833ms)
+✔ real WSS mapping retirement rejects a stale connection before deleting local ownership (64.641625ms)
+✔ full mapping history pauses new creates while existing native work completes and ACKs drain (654.229875ms)
+✔ lost read-only deliveries reconcile without poisoning native admission (63.805583ms)
+✔ native startup error before turn acceptance stays uncertain across restart without resubmission (22.764084ms)
+✔ create freezes explicit local checkout/provider/model and duplicate concurrent delivery submits once (12.678ms)
+✔ lost send response reopens intent and recovers exact turn without sending again (10.262167ms)
+✔ spawn gap recovers positive plugin metadata, while absent threads never recreate (10.136125ms)
+✔ human turn, idle thread and unrelated permission prompts cannot complete or take ownership (10.520875ms)
+✔ persistent missing native thread coalesces evidence and retains effect capacity (19.510875ms)
+✔ resolved matching permission updates running without item event across journal reopen (7.90875ms)
+✔ preflight model refusal is durable before any SDK mutation (5.148958ms)
+✔ preflight provider refusal is durable before any SDK mutation (7.140375ms)
+✔ preflight project refusal is durable before any SDK mutation (7.258667ms)
+✔ preflight expired refusal is durable before any SDK mutation (124.055333ms)
+✔ preflight gate refusal is durable before any SDK mutation (14.353167ms)
+✔ preflight foreign refusal is durable before any SDK mutation (11.325083ms)
+✔ unknown work consumes eight effect slots but explicit mapped-thread stop retains headroom (29.362708ms)
+✔ service abort cancels actual SDK wait and retains ambiguous intent without broad stop (7.619042ms)
+✔ matching terminal output stays within UTF8 bound and unknown usage remains null (15.905583ms)
+✔ ambiguous duplicate matching requests cannot attribute a human or second turn (3.153959ms)
+✔ compacted sparse native replay survives restart and uses completed snapshots (4.949166ms)
+✔ sparse native replay never invents missing request correlation (3.338792ms)
+✔ sparse native replay never invents missing acceptance correlation (3.204292ms)
+✔ prunable partial or started text cannot become final output without a completed snapshot (4.059667ms)
+✔ startup paired selectedProjects change prevents connector and native admission (39.993125ms)
+✔ startup paired openbotOrigin change prevents connector and native admission (5.069333ms)
+✔ startup paired enrollment change prevents connector and native admission (14.362ms)
+✔ startup enrolling selectedProjects change prevents connector and native admission (16.56025ms)
+✔ startup enrolling openbotOrigin change prevents connector and native admission (6.098666ms)
+✔ startup enrolling enrollment change prevents connector and native admission (5.625875ms)
+✔ legitimate internal Pending to Paired secret writes do not cancel connector startup (15.364041ms)
+✔ profile ownership excludes competing processes and refuses unsafe directory/symlink (188.193833ms)
+✔ supervisor observes failure, stops siblings and joins real children (35.7395ms)
+✔ shutdown escalates a child which ignores TERM and joins it within the fixed drain (5030.850292ms)
+ℹ tests 116
+ℹ suites 0
+ℹ pass 115
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 16584.749542
+
+✖ failing tests:
+
+test at build-tests/native-bundle.test.js:1792:1
+✖ native cache keeps command and session references through acknowledgement and retires only the confirmed unchanged mapping (38.33325ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  0 !== 1
+  
+      at TestContext.<anonymous> (file:///private/tmp/openbot-cloudroom-harness-t1gfnhz1/worktree/integrations/cloudroom-plugin/build-tests/native-bundle.test.js:1819:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 0,
+    expected: 1,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

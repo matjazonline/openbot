@@ -1,0 +1,41 @@
+{
+  "baseline": "abac7038a08a355156b7680a01d2f79f3de756fd",
+  "files": [
+    {
+      "path": "src/adapters/persistence/workflow/doop_document_agent_tests.rs",
+      "currentSha256": "8a95f9c27a326c18b62569e947f89caa3fbdd41816a8a3e56fb6096ae5ed7a90",
+      "baselineSha256": "8a95f9c27a326c18b62569e947f89caa3fbdd41816a8a3e56fb6096ae5ed7a90",
+      "identical": true
+    },
+    {
+      "path": "src/adapters/persistence/workflow/doop_document_tests.rs",
+      "currentSha256": "20a05b5be36bb0e3a1bc92af3b54e12f03dd584c92f937072f32006dcb197902",
+      "baselineSha256": "257673d4374b8ae3acd8e05216ea25081b642c1693e17c48fb55798354dcf6cd",
+      "identical": false
+    },
+    {
+      "path": "src/application/services/test_support/scenario.rs",
+      "currentSha256": "13aff67fd6bf1014472f3152902899af989fcb4953fcfecc903befa915fe41b1",
+      "baselineSha256": "13aff67fd6bf1014472f3152902899af989fcb4953fcfecc903befa915fe41b1",
+      "identical": true
+    },
+    {
+      "path": "Cargo.lock",
+      "currentSha256": "9e8b32712929b0909224f64ad0fa2ab76302d4656655727741ff558b12986bea",
+      "baselineSha256": "787dc111f178529201e0864ae427c70cd7ef50714e3966b37f4c27ccbc95e311",
+      "identical": false
+    },
+    {
+      "path": "package-lock.json",
+      "currentSha256": "88199d85baa119326fc3abb2a06af84098c095d6ac0c47ac15ebd824e9c370b1",
+      "baselineSha256": "88199d85baa119326fc3abb2a06af84098c095d6ac0c47ac15ebd824e9c370b1",
+      "identical": true
+    },
+    {
+      "path": "scripts/test-network-isolation.sh",
+      "currentSha256": "3116ff0ec965a91fa05eb9084b7486accddb0f056f89570b810b40b373aaf055",
+      "baselineSha256": "3116ff0ec965a91fa05eb9084b7486accddb0f056f89570b810b40b373aaf055",
+      "identical": true
+    }
+  ]
+}

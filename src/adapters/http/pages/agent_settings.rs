@@ -74,6 +74,7 @@ pub struct AgentDraft<'a> {
     pub slug: &'a str,
     /// The written system prompt in Advanced mode; the instructions to expand in Simple mode.
     pub system_prompt: &'a str,
+    pub native_permissions: crate::domain::local_agents::LocalPermissions,
     /// One line on what this agent is for, shown to sibling agents by the directory tool.
     pub description: &'a str,
     pub provider: &'a str,
@@ -448,6 +449,7 @@ pub fn agent_create_pane(pane: &AgentCreatePane<'_>) -> String {
                     method="post" action="/ui/agents?company_id={company_id}" hx-post="/ui/agents?company_id={company_id}" hx-target="#agent-pane" hx-swap="outerHTML"
                     hx-params="not avatar_file" hx-disabled-elt="find button[type='submit']">
                     <input type="hidden" name="form_mode" value="simple">
+                    <input type="hidden" name="native_permissions" value="full">
                     <label class="form-control w-full">
                         <div class="label"><span class="text-xs opacity-70">Agent Name</span></div>
                         <input type="text" name="name" required value="{name}" placeholder="Support Triage"
@@ -652,6 +654,7 @@ fn agent_fields(fields: &AgentFields<'_>) -> String {
                         <div class="collapse-content space-y-4">
                             {capabilities}
                             {model_connection_fields}
+                            {native_permissions_field}
                             <label class="form-control w-full">
                                 <div class="label">
                                     <span class="text-xs opacity-70">Description</span>
@@ -667,6 +670,7 @@ fn agent_fields(fields: &AgentFields<'_>) -> String {
         sparkle = icon(Icon::Sparkle, BUTTON_ICON),
         generator = prompt_generator(fields.scope, fields.agent_id, &id_prefix),
         capabilities = capability_picker(fields),
+        native_permissions_field = native_permissions_field(draft.native_permissions),
         prompt_textarea =
             agent_prompt_textarea(&id_prefix, draft.system_prompt, FragmentSwap::Inline),
         name = escape_html_text(draft.name),
@@ -674,6 +678,27 @@ fn agent_fields(fields: &AgentFields<'_>) -> String {
         description_help = description_help,
         description = escape_html_text(draft.description),
         avatar_field = agent_avatar_field(&id_prefix, draft),
+    )
+}
+
+fn native_permissions_field(selected: crate::domain::local_agents::LocalPermissions) -> String {
+    use crate::domain::local_agents::LocalPermissions;
+    let options: String = [
+        (LocalPermissions::Full, "Full access"),
+        (LocalPermissions::Auto, "Automatic approval"),
+        (LocalPermissions::AcceptEdits, "Approve edits"),
+    ]
+    .into_iter()
+    .map(|(mode, label)| {
+        format!(
+            r#"<option value="{}"{}>{label}</option>"#,
+            mode.as_str(),
+            if mode == selected { " selected" } else { "" }
+        )
+    })
+    .collect();
+    format!(
+        r#"<label class="form-control w-full"><div class="label"><span class="text-xs opacity-70">Native permissions</span></div><select name="native_permissions" class="select w-full">{options}</select><div class="label"><span class="text-xs opacity-60">Used by Local Agents profiles that select this agent.</span></div></label>"#
     )
 }
 
@@ -790,12 +815,12 @@ fn company_model_selection(
         r##"<div class="grid grid-cols-1 gap-4 md:grid-cols-2">
             <label class="form-control w-full"><div class="label"><span class="text-xs opacity-70">Provider</span></div>
                 <select id="agent-provider-{id_prefix}" name="provider" class="select w-full font-mono text-sm">
-                    <option value="">Inherit company default</option>{provider_options}
+                    <option value="">No hosted model</option>{provider_options}
                 </select>
             </label>
             <label class="form-control w-full"><div class="label"><span class="text-xs opacity-70">Model</span></div>
                 <select id="agent-model-{id_prefix}" name="model" class="select w-full font-mono text-sm">
-                    <option value="">Inherit company default</option>{model_options}
+                    <option value="">No hosted model</option>{model_options}
                 </select>
                 <div class="label"><span class="text-[11px] opacity-60">Leave both blank for native profiles. Hosted workflows require an explicit provider/model pair; invalid pairs are refused on save.</span></div>
             </label>
@@ -916,6 +941,7 @@ fn stored_draft(agent: &Agent) -> AgentDraft<'_> {
         name: &agent.name,
         slug: &agent.slug,
         system_prompt: agent.system_prompt.as_deref().unwrap_or(""),
+        native_permissions: agent.native_permissions,
         description: agent.description.as_deref().unwrap_or(""),
         provider: agent.provider.as_deref().unwrap_or(""),
         model: agent.model.as_deref().unwrap_or(""),

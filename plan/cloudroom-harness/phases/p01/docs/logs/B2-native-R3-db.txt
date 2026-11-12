@@ -1,0 +1,38 @@
+   Compiling open_bots v0.1.0 (/private/tmp/openbot-cloudroom-harness-t1gfnhz1/worktree)
+warning: field `scope` is never read
+  --> src/adapters/persistence/local_agents/management/native_tests.rs:12:5
+   |
+10 | struct NativeSetup {
+   |        ----------- field in this struct
+11 |     s: Setup,
+12 |     scope: AgentPublicationScope,
+   |     ^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `open_bots` (lib test) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1m 22s
+     Running unittests src/lib.rs (/private/tmp/openbot-cloudroom-harness-t1gfnhz1/target/debug/deps/open_bots-6467f0b3ff334015)
+
+running 3 tests
+test adapters::persistence::local_agents::management::tests::native_tests::cloudroom_native_competing_starts_capture_one_revision_and_replay_before_profile_change ... ok
+test adapters::persistence::local_agents::management::tests::native_tests::cloudroom_native_bundle_http_authorizes_cached_reads_and_preserves_connection_identity ... FAILED
+test adapters::persistence::local_agents::management::tests::native_tests::cloudroom_native_profile_uses_published_permissions_and_database_rejects_foreign_agent ... ok
+
+failures:
+
+---- adapters::persistence::local_agents::management::tests::native_tests::cloudroom_native_bundle_http_authorizes_cached_reads_and_preserves_connection_identity stdout ----
+
+thread 'adapters::persistence::local_agents::management::tests::native_tests::cloudroom_native_bundle_http_authorizes_cached_reads_and_preserves_connection_identity' (47133321) panicked at src/adapters/persistence/local_agents/management/native_tests.rs:249:5:
+assertion `left == right` failed
+  left: [35, 33, 47, 98, 105, 110, 47, 115, 104, 10, 99, 97, 116, 32, 100, 97, 116, 97, 46, 98, 105, 110, 10]
+ right: [0, 255, 3]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    adapters::persistence::local_agents::management::tests::native_tests::cloudroom_native_bundle_http_authorizes_cached_reads_and_preserves_connection_identity
+
+test result: FAILED. 2 passed; 1 failed; 0 ignored; 0 measured; 4065 filtered out; finished in 2.19s
+
+error: test failed, to rerun pass `--lib`

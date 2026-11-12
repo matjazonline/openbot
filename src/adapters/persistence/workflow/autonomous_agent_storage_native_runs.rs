@@ -108,6 +108,7 @@ async fn insert(f: &AdmissionFixture, owner: NativeRun<'_>) -> ActivationRequest
             parent: owner.parent,
             rerun_of: None,
             delivery_policy: crate::application::workflow::DeliveryPolicy::Deliver,
+            native_mcp_call: None,
         },
     )
     .await

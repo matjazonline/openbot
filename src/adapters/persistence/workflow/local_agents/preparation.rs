@@ -24,24 +24,7 @@ pub(super) async fn prepare_on(
     }
     let inputs: LocalRunInputs = serde_json::from_value(inputs).map_err(|_| contract::invalid())?;
     authorize_run_on(tx, scope.company, scope.run.as_uuid(), facts.actor).await?;
-    // Resolve the original association before taking any machine lock.
-    if let Some(id) = inputs.session_id {
-        let session = shared::session_on(tx, scope.company, id)
-            .await?
-            .ok_or_else(missing)?;
-        validate_continuation_on(tx, scope, facts.actor, inputs.profile_id, &session).await?;
-    }
-    let locked = shared::lock_profile_on(tx, scope.company, inputs.profile_id).await?;
-    if locked.machine.state != MachineState::Enabled {
-        return Err(conflict());
-    }
-    shared::validate_selection_on(
-        tx,
-        scope.company,
-        locked.machine.id,
-        &locked.profile.selection,
-    )
-    .await?;
+    let captured = selection_on(tx, scope, facts.actor, &inputs).await?;
     let deadline: DateTime<Utc> = sqlx::query_scalar(
         "SELECT LEAST(deadline,clock_timestamp()+interval '30 minutes') FROM workflow_runs WHERE company_id=$1 AND id=$2",
     ).bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).fetch_one(&mut **tx).await?;
@@ -50,7 +33,8 @@ pub(super) async fn prepare_on(
         prompt: inputs.prompt,
         session_id: inputs.session_id,
         approval: inputs.approval,
-        selection: locked.profile.selection,
+        selection: captured.selection,
+        harness: captured.harness,
         deadline,
     };
     let tool = facts
@@ -89,6 +73,25 @@ pub(super) async fn validate_continuation_on(
     profile: ProfileId,
     session: &LocalAgentSession,
 ) -> AppResult<()> {
+    validate_continuation_with_locks_on(
+        db,
+        scope,
+        actor,
+        profile,
+        session,
+        super::super::row_locks::RowLocks::Wait,
+    )
+    .await
+}
+
+pub(super) async fn validate_continuation_with_locks_on(
+    db: &mut PgConnection,
+    scope: ActionScope,
+    actor: WorkflowActor,
+    profile: ProfileId,
+    session: &LocalAgentSession,
+    locks: super::super::row_locks::RowLocks,
+) -> AppResult<()> {
     if session.company_id != scope.company.as_uuid()
         || session.profile_id != profile
         || session.thread_id.is_none()
@@ -98,10 +101,58 @@ pub(super) async fn validate_continuation_on(
     let SessionAssociation::Workflow { run_id: original } = session.association else {
         return Err(missing());
     };
-    let current = authorize_run_on(db, scope.company, scope.run.as_uuid(), actor).await?;
-    let original = authorize_run_on(db, scope.company, original, actor).await?;
+    let current =
+        authorize_run_with_locks_on(db, scope.company, scope.run.as_uuid(), actor, locks).await?;
+    let original = authorize_run_with_locks_on(db, scope.company, original, actor, locks).await?;
     if current != original {
         return Err(missing());
     }
     Ok(())
+}
+
+struct CapturedSelection {
+    selection: ExecutionSelection,
+    harness: NativeHarnessSelection,
+}
+
+async fn selection_on(
+    tx: &mut Transaction<'_, Postgres>,
+    scope: ActionScope,
+    actor: WorkflowActor,
+    inputs: &LocalRunInputs,
+) -> AppResult<CapturedSelection> {
+    if let Some(id) = inputs.session_id {
+        let session = shared::session_on(tx, scope.company, id)
+            .await?
+            .ok_or_else(missing)?;
+        validate_continuation_on(tx, scope, actor, inputs.profile_id, &session).await?;
+        shared::validate_frozen_on(
+            tx,
+            scope.company,
+            actor.user_id(),
+            &session.selection,
+            &session.harness,
+        )
+        .await?;
+        return Ok(CapturedSelection {
+            selection: session.selection,
+            harness: session.harness,
+        });
+    }
+    let captured =
+        shared::capture_profile_on(tx, scope.company, actor.user_id(), inputs.profile_id).await?;
+    if captured.machine.state != MachineState::Enabled {
+        return Err(conflict());
+    }
+    shared::validate_selection_on(
+        tx,
+        scope.company,
+        captured.machine.id,
+        &captured.profile.selection,
+    )
+    .await?;
+    Ok(CapturedSelection {
+        selection: captured.profile.selection,
+        harness: captured.harness,
+    })
 }

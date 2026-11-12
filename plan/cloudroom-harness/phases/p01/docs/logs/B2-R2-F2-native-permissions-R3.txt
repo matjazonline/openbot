@@ -1,0 +1,26 @@
+
+ RUN  v4.1.1 /private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/server
+
+ ❯ |@cloudroom/server:isolated| test/threads/required-native-permissions.test.ts (0 test)
+
+⎯⎯⎯⎯⎯⎯ Failed Suites 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@cloudroom/server:isolated| test/threads/required-native-permissions.test.ts [ test/threads/required-native-permissions.test.ts ]
+Error: "." is not exported under the conditions ["source", "node", "development", "import"] from package /private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/tests/integration/node_modules/@cloudroom/config (see exports field in /private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/tests/integration/node_modules/@cloudroom/config/package.json)
+  Plugin: builtin:vite-resolve
+ ❯ EnvironmentPluginContainer.resolveId ../../node_modules/.pnpm/vite@8.0.12_@types+node@24.12.4_esbuild@0.28.1_jiti@2.7.0_terser@5.50.0_tsx@4.23.1_yaml@2.9.0/node_modules/vite/dist/node/chunks/node.js:30109:19
+ ❯ TransformPluginContext.resolve ../../node_modules/.pnpm/vite@8.0.12_@types+node@24.12.4_esbuild@0.28.1_jiti@2.7.0_terser@5.50.0_tsx@4.23.1_yaml@2.9.0/node_modules/vite/dist/node/chunks/node.js:30338:13
+ ❯ normalizeUrl ../../node_modules/.pnpm/vite@8.0.12_@types+node@24.12.4_esbuild@0.28.1_jiti@2.7.0_terser@5.50.0_tsx@4.23.1_yaml@2.9.0/node_modules/vite/dist/node/chunks/node.js:27654:22
+ ❯ ../../node_modules/.pnpm/vite@8.0.12_@types+node@24.12.4_esbuild@0.28.1_jiti@2.7.0_terser@5.50.0_tsx@4.23.1_yaml@2.9.0/node_modules/vite/dist/node/chunks/node.js:27725:30
+ ❯ TransformPluginContext.transform ../../node_modules/.pnpm/vite@8.0.12_@types+node@24.12.4_esbuild@0.28.1_jiti@2.7.0_terser@5.50.0_tsx@4.23.1_yaml@2.9.0/node_modules/vite/dist/node/chunks/node.js:27693:4
+ ❯ EnvironmentPluginContainer.transform ../../node_modules/.pnpm/vite@8.0.12_@types+node@24.12.4_esbuild@0.28.1_jiti@2.7.0_terser@5.50.0_tsx@4.23.1_yaml@2.9.0/node_modules/vite/dist/node/chunks/node.js:30193:14
+ ❯ loadAndTransform ../../node_modules/.pnpm/vite@8.0.12_@types+node@24.12.4_esbuild@0.28.1_jiti@2.7.0_terser@5.50.0_tsx@4.23.1_yaml@2.9.0/node_modules/vite/dist/node/chunks/node.js:24511:26
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  no tests
+   Start at  19:04:29
+   Duration  952ms (transform 504ms, setup 823ms, import 0ms, tests 0ms, environment 0ms)
+

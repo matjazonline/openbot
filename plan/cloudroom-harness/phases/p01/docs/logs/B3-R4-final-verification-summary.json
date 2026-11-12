@@ -1,0 +1,32 @@
+{
+  "artifact": "201d4cdf142829b5babd80119f52209a40f56438806045906e88ea393a2cfc6e",
+  "normal": {
+    "passed": 4077,
+    "failed": 2,
+    "ignored": 26,
+    "seconds": 1296.93
+  },
+  "stock": {
+    "passed": 4077,
+    "failed": 2,
+    "ignored": 26,
+    "seconds": 1264.2,
+    "stackKiB": 2048,
+    "overflow": false
+  },
+  "doopRegressionCases": [
+    "doop_agent_observe_policy_keeps_error_observation_available_to_the_model",
+    "doop_agent_published_editor_approvals_and_worker_restart_reuse_one_canvas"
+  ],
+  "doopBothModes": "PASS",
+  "lease": "PASS unchanged50%threshold/defaultfilters",
+  "confirmedUnrelatedFailures": [
+    "CSP inline JavaScript hostile-fixture scanner",
+    "MCP dropped-call cancellation fixture",
+    "transport Message-ID fixture guard"
+  ],
+  "limitations": [
+    "local scripted native provider/MCP, no paid reasoning/real provider ledger",
+    "macOS/installed Chrome; Linux/private live Doop/Docker jobs not claimed"
+  ]
+}

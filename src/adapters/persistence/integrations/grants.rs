@@ -125,6 +125,28 @@ pub(super) async fn pending(
     Ok(())
 }
 impl PostgresVault {
+    /// Nonlocking metadata only. The same module-owned SQL projection serves native eligibility;
+    /// neither consumer obtains a credential or permission to enter a remote effect here.
+    pub(crate) async fn mcp_reference_ready_on(
+        db: &mut PgConnection,
+        company: uuid::Uuid,
+        connection: uuid::Uuid,
+        endpoint: &str,
+        reference: &IntegrationReference,
+    ) -> IntegrationResult<bool> {
+        sqlx::query_scalar("SELECT public.integration_mcp_reference_ready($1,$2,$3,$4,$5,$6,$7)")
+            .bind(company)
+            .bind(connection)
+            .bind(endpoint)
+            .bind(reference.account.as_uuid())
+            .bind(reference.authorization.get())
+            .bind(reference.grant.as_uuid())
+            .bind(reference.grant_revision.get())
+            .fetch_one(db)
+            .await
+            .map_err(storage_error)
+    }
+
     pub(crate) async fn grant_metadata_on(
         db: &mut PgConnection,
         id: UseGrantId,

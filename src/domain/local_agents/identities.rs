@@ -42,7 +42,8 @@ uuid_identity!(
     ProfileId,
     SessionId,
     OperationId,
-    PairingId
+    PairingId,
+    NativeMcpCallId
 );
 
 macro_rules! external_identity {
@@ -73,7 +74,13 @@ macro_rules! external_identity {
     )+};
 }
 
-external_identity!(CloudroomProjectId, CloudroomThreadId, CloudroomTurnId);
+external_identity!(
+    CloudroomProjectId,
+    CloudroomThreadId,
+    CloudroomTurnId,
+    CloudroomClientRequestId,
+    CloudroomModelCallId
+);
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(try_from = "String", into = "String")]

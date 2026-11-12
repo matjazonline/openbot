@@ -28,6 +28,7 @@ pub(super) async fn create(
             parent: None,
             rerun_of: command.rerun_of(),
             delivery_policy: command.delivery_policy(),
+            native_mcp_call: None,
         },
     )
     .await?;
@@ -98,6 +99,7 @@ pub(super) struct RunRow<'a> {
     pub rerun_of: Option<RunId>,
     /// Admission's choice for a root; a runtime child inherits its parent's (p08 D1.7).
     pub delivery_policy: DeliveryPolicy,
+    pub native_mcp_call: Option<crate::domain::local_agents::NativeMcpCallId>,
 }
 
 /// The deferred root-budget FK permits inserting the budget before its run; the run's
@@ -141,9 +143,9 @@ pub(super) async fn insert_run(db: &mut PgConnection, row: &RunRow<'_>) -> AppRe
         "INSERT INTO workflow_runs (company_id, id, binding_id, binding_revision, workflow_id, version_id, \
          channel_id, thread_id, actor_id, trigger_id, correlation_id, bundle_digest, input, params, resources, \
          max_steps, max_context_bytes, deadline, parent_run_id, parent_execution_id, rerun_of_run_id, \
-         delivery_policy, knowledge_ceiling, content_level, content_exact) \
+         delivery_policy, knowledge_ceiling, content_level, content_exact, native_mcp_call_id) \
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17, \
-         COALESCE($18, CURRENT_TIMESTAMP + make_interval(secs => $19)), $20, $21, $22, $23, $24::smallint, $25::smallint, $26)",
+         COALESCE($18, CURRENT_TIMESTAMP + make_interval(secs => $19)), $20, $21, $22, $23, $24::smallint, $25::smallint, $26, $27)",
     ).bind(row.company.as_uuid()).bind(row.run.as_uuid())
         .bind(row.binding.id().as_uuid()).bind(revision(row.binding.revision().get())?)
         .bind(definition.workflow_id.as_uuid()).bind(definition.version_id.as_uuid()).bind(channel).bind(thread)
@@ -158,7 +160,7 @@ pub(super) async fn insert_run(db: &mut PgConnection, row: &RunRow<'_>) -> AppRe
         .bind(row.parent.map(|parent| parent.execution.as_uuid()))
         .bind(row.rerun_of.map(|original| original.as_uuid()))
         .bind(row.delivery_policy.as_str()).bind(row.knowledge.ceiling().as_i16()).bind(row.knowledge.content().as_i16())
-        .bind(row.content_exact).execute(db).await?;
+        .bind(row.content_exact).bind(row.native_mcp_call.map(crate::domain::local_agents::NativeMcpCallId::as_uuid)).execute(db).await?;
     Ok(())
 }
 

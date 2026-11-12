@@ -16,6 +16,7 @@ async fn cloudroom_protocol_rust_node_command_hash_preserves_exact_deadline_and_
     let prompt = LocalPrompt::try_from("exact é😀\n\t\r\"\\\u{1}".to_owned()).unwrap();
     let commands = [
         LocalCommand::Create {
+            harness: crate::domain::local_agents::NativeHarnessSelection::Unconfigured,
             session_id,
             selection,
             prompt: prompt.clone(),

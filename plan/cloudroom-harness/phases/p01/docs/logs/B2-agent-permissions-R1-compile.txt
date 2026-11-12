@@ -1,0 +1,81 @@
+    Checking open_bots v0.1.0 (/private/tmp/openbot-cloudroom-harness-t1gfnhz1/worktree)
+error[E0063]: missing field `native_permissions` in initializer of `domain::entities::agent::Agent`
+    --> src/adapters/http/pages/tests.rs:1386:5
+     |
+1386 |     Agent {
+     |     ^^^^^ missing `native_permissions`
+
+error[E0063]: missing field `native_permissions` in initializer of `domain::entities::agent::Agent`
+   --> src/adapters/http/routes/agent.rs:828:21
+    |
+828 |         let agent = Agent {
+    |                     ^^^^^ missing `native_permissions`
+
+error[E0063]: missing field `native_permissions` in initializer of `domain::entities::agent::Agent`
+   --> src/adapters/http/routes/onboarding.rs:404:9
+    |
+404 |         Agent {
+    |         ^^^^^ missing `native_permissions`
+
+error[E0063]: missing field `native_permissions` in initializer of `persistence::agent::AgentDb`
+   --> src/adapters/persistence/agent.rs:586:18
+    |
+586 |         let db = AgentDb {
+    |                  ^^^^^^^ missing `native_permissions`
+
+error[E0063]: missing field `native_permissions` in initializer of `application::agent::definition::ResolvedAgentDefinition`
+  --> src/adapters/persistence/workflow/autonomous_agent_storage_support.rs:40:5
+   |
+40 |     ResolvedAgentDefinition {
+   |     ^^^^^^^^^^^^^^^^^^^^^^^ missing `native_permissions`
+
+error[E0063]: missing field `native_permissions` in initializer of `application::agent::definition::ResolvedAgentDefinition`
+   --> src/adapters/persistence/workflow/sample_capture_bounds_tests.rs:101:21
+    |
+101 | ...   agents:vec![ResolvedAgentDefinition { company_id:root.company_id(),agent_id:reference.agent_id,key:reference.key.clone(),inst...
+    |                   ^^^^^^^^^^^^^^^^^^^^^^^ missing `native_permissions`
+
+error[E0063]: missing field `native_permissions` in initializer of `application::agent::definition::ResolvedAgentDefinition`
+ --> src/application/agent/contract_tests.rs:8:5
+  |
+8 |     ResolvedAgentDefinition {
+  |     ^^^^^^^^^^^^^^^^^^^^^^^ missing `native_permissions`
+
+error[E0063]: missing field `native_permissions` in initializer of `application::agent::definition::AgentDraft`
+  --> src/application/agent/resolution_tests.rs:16:16
+   |
+16 |         draft: AgentDraft {
+   |                ^^^^^^^^^^ missing `native_permissions`
+
+error[E0063]: missing field `native_permissions` in initializer of `domain::entities::agent::Agent`
+  --> src/application/use_cases/agent_tests.rs:37:21
+   |
+37 |         let agent = Agent {
+   |                     ^^^^^ missing `native_permissions`
+
+error[E0063]: missing field `native_permissions` in initializer of `domain::entities::agent::Agent`
+   --> src/application/use_cases/agent_tests.rs:629:76
+    |
+629 |     let definition = |name: &str, slug: &str, provider: &str, model: &str| Agent {
+    |                                                                            ^^^^^ missing `native_permissions`
+
+error[E0063]: missing field `native_permissions` in initializer of `application::agent::definition::ResolvedAgentDefinition`
+  --> src/application/workflow/publication/tests.rs:40:5
+   |
+40 |     crate::application::agent::ResolvedAgentDefinition {
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ missing `native_permissions`
+
+error[E0063]: missing field `native_permissions` in initializer of `application::agent::definition::ResolvedAgentDefinition`
+  --> src/application/workflow/sample/approval_tests.rs:28:27
+   |
+28 |     request.agents = vec![ResolvedAgentDefinition {
+   |                           ^^^^^^^^^^^^^^^^^^^^^^^ missing `native_permissions`
+
+error[E0063]: missing field `native_permissions` in initializer of `application::agent::definition::ResolvedAgentDefinition`
+   --> src/application/workflow/sample/tests.rs:121:37
+    |
+121 |                 request.agents.push(ResolvedAgentDefinition {
+    |                                     ^^^^^^^^^^^^^^^^^^^^^^^ missing `native_permissions`
+
+For more information about this error, try `rustc --explain E0063`.
+error: could not compile `open_bots` (lib test) due to 13 previous errors

@@ -1,0 +1,9 @@
+{
+  "artifact": "b6c8d018ef4d17eabb1808b1cf4ee5672e659d89844f6aa6333dfd4dcf0d5aae",
+  "coordination_revision": 3,
+  "coordination_sha256": "41b64d5e053759107a73e880143623b11b6c05fdffe715ccdf12e5a7e7adb408",
+  "external_revision": "d8b3cc3a16bb4b06fc99d8e543d40f1087d1e815",
+  "external_targets": 45,
+  "prepared_runtime_digest": "79f11bfffe259d9bc31aa210656951832f94df38a1177529faefa586bb3f899d",
+  "all_match": true
+}

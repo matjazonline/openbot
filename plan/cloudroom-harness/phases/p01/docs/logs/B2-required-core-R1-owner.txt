@@ -1,0 +1,33 @@
+
+ RUN  v4.1.1 /private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/server
+
+ ❯ |@cloudroom/server| test/threads/required-agent-configuration.test.ts (2 tests | 1 failed) 463ms
+     × persists an immutable owner in the create transaction, keeps lineage independent, and rolls back a refused owner insertion 322ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@cloudroom/server| test/threads/required-agent-configuration.test.ts > required native agent configuration > persists an immutable owner in the create transaction, keeps lineage independent, and rolls back a refused owner insertion
+AssertionError: expected null to be undefined
+
+- Expected:
+undefined
+
++ Received:
+null
+
+ ❯ test/threads/required-agent-configuration.test.ts:33:69
+
+ ❯ withTestHarness test/helpers/test-app.ts:358:18
+ ❯ test/threads/required-agent-configuration.test.ts:20:5
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 1 passed (2)
+   Start at  15:30:41
+   Duration  3.61s (transform 2.12s, setup 648ms, import 2.41s, tests 463ms, environment 0ms)
+
+undefined
+/private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/server:
+ ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1: vitest run --config vitest.config.ts test/threads/required-agent-configuration.test.ts

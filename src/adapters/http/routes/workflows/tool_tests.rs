@@ -118,7 +118,7 @@ async fn autonomous_agent_authoring_competing_json_draft_writes_apply_once() {
         async move {
             crate::adapters::http::routes::agent::update_agent_json(State(agents), State(skills), by(user), Path((company, agent.id)), body(json!({
                 "expected_revision":agent.draft_revision,
-                "agent":{"name":"Raced","slug":"raced"},
+                "agent":{"name":"Raced","slug":"raced","native_permissions":"full"},
                 "tool_assignments":[{"binding":null,"alias":if tool == "message_reply" {"message.reply"} else {"message.send"},"choice":{"kind":"builtin","tool":tool}}]
             }))).await.map(IntoResponse::into_response).unwrap_or_else(IntoResponse::into_response).status()
         }

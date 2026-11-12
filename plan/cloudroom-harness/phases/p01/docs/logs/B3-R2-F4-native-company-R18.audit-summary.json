@@ -1,0 +1,33 @@
+{
+  "samples": 330,
+  "minMachineSeconds": 37.308986,
+  "cancellationRequested": false,
+  "states": [
+    "queued",
+    "running",
+    "succeeded",
+    "waiting"
+  ],
+  "liveStates": [
+    [
+      "queued",
+      "True"
+    ],
+    [
+      "running",
+      "True"
+    ],
+    [
+      "succeeded",
+      "False"
+    ],
+    [
+      "succeeded",
+      "True"
+    ],
+    [
+      "waiting",
+      "True"
+    ]
+  ]
+}

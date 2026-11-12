@@ -1,0 +1,201 @@
+{
+  "version": 1,
+  "round": "CH-P01-B3-R4",
+  "artifact": "201d4cdf142829b5babd80119f52209a40f56438806045906e88ea393a2cfc6e",
+  "checks": [
+    {
+      "criteria": [
+        "CH-P01-B3-F7",
+        "M3-AC6"
+      ],
+      "command": "prepared baseline-rooted network guard cargo test --locked --offline --lib (original abac source)",
+      "fixture": "owned PG18 port63451/fresh current schema; pinned Node24; baseline separately built/owned; local endpoints and dummy keys only",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B3-baseline-full-suite.txt",
+          "sha256": "f3cf2d0a5f092a0567adb7c3aeb62625d3ffe34f060e529d8ed8543d6bdc5e02"
+        },
+        {
+          "path": "logs/B3-baseline-full-result.json",
+          "sha256": "750f32fa2faecaa9dfa29ee1b7782e74bfd732ed99d9d987f51ca59d35eb808e"
+        },
+        {
+          "path": "logs/B3-baseline-fixture-identity-R2.json",
+          "sha256": "959f65f2b44979ca577dbea591261f9b11cbd891e0990b97ee0922c41a1d08e0"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "CH-P01-B3-F7"
+      ],
+      "command": "original pinned plugin npm ci --offline; baseline-rooted guard npm --prefix baseline-plugin test",
+      "fixture": "owned PG18 port63451/fresh current schema; pinned Node24; baseline separately built/owned; local endpoints and dummy keys only",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B3-baseline-plugin-install-R2.txt",
+          "sha256": "0e0af73157939742bc785e76cedbdde830f7003016b90c2ceb7d9034fe44ff5f"
+        },
+        {
+          "path": "logs/B3-baseline-plugin-tests-R2.txt",
+          "sha256": "8aaaf4cbfe24353f145e9695306dae627f33b348fb218008521a7fcd9b1beee7"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "CH-P01-B3-F7",
+        "M3-AC6"
+      ],
+      "command": "bash scripts/check.sh (completed prior R3 before performance correction; original failures retained)",
+      "fixture": "owned PG18 port63451/fresh current schema; pinned Node24; baseline separately built/owned; local endpoints and dummy keys only",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B3-final-full-gate-R3.txt",
+          "sha256": "b7e4a51396434f869329aca0bb9309fbf4d96a54f5887ac3ca3db88a8de98c1f"
+        },
+        {
+          "path": "logs/B3-R3-doop-normal-failures.txt",
+          "sha256": "f35439576b41ad4de5ca49a0c2fd8ed06fcc04f3b2ed54259d7d7f106853e053"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "CH-P01-B3-F7"
+      ],
+      "command": "psql -X -qAt -v ON_ERROR_STOP=1 -f ordinary-eligibility-planning-probe.sql (temporary same-session old/new branch planning comparison)",
+      "fixture": "owned PG18 port63451/fresh current schema; pinned Node24; baseline separately built/owned; local endpoints and dummy keys only",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B3-R4-ordinary-eligibility-planning-probe.sql",
+          "sha256": "37cc41e2ff237d6df80f63232a9f587c0b42975bb7517a3d3921c44213d5ad35"
+        },
+        {
+          "path": "logs/B3-R4-ordinary-eligibility-planning-probe-R1.txt",
+          "sha256": "72382bf84fc9456516e38ca27033c7c2a2ad7789fe05087b51ab8bcc6b300852"
+        },
+        {
+          "path": "logs/B3-R4-ordinary-eligibility-planning-probe-R1.json",
+          "sha256": "3242a936d9fff72add066542954523bc634061b9ffe0eb9ee6229a818cede404"
+        },
+        {
+          "path": "logs/B3-R4-ordinary-eligibility-planning-probe-R2.txt",
+          "sha256": "fa1ef478b73898d404f5f86ca925bd19b03945ede2ab8236cc110731ec0fdee5"
+        },
+        {
+          "path": "logs/B3-R4-ordinary-eligibility-planning-probe-R2.json",
+          "sha256": "c29d8a3cb41e60fa9d12041c1d6b445f0b142fdeae3002da1d845a0b74b9ed79"
+        },
+        {
+          "path": "logs/B3-R4-native-run-live-parity.json",
+          "sha256": "d37247efc5c6d13d74a91f00198fca45363c25c11795d550db368afc893ed44e"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "M3-AC6"
+      ],
+      "command": "cargo sqlx database reset -y (owned main0connections)",
+      "fixture": "owned PG18 port63451/fresh current schema; pinned Node24; baseline separately built/owned; local endpoints and dummy keys only",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B3-R4-schema-migrate-R1.txt",
+          "sha256": "bdcaf56f3b40c5b485e1a404ccfde827e9cf67a31bf2a1ac1e007dc252c17eac"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "M3-AC2",
+        "M3-AC3",
+        "M3-AC4",
+        "M3-AC5",
+        "CH-P01-B3-F7"
+      ],
+      "command": "scripts/test-network-isolation.sh cargo test --locked --offline --lib native_mcp_ -- --nocapture",
+      "fixture": "owned PG18 port63451/fresh current schema; pinned Node24; baseline separately built/owned; local endpoints and dummy keys only",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B3-R4-native-regressions-R1.txt",
+          "sha256": "49fe8d3d2a08e9c8c753ee3d210c291cf14cc49bcbdff63f205c36625f716b94"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "M3-AC6",
+        "CH-P01-B3-F7"
+      ],
+      "command": "scripts/test-network-isolation.sh cargo test --locked --offline --lib doop_agent_ -- --nocapture",
+      "fixture": "owned PG18 port63451/fresh current schema; pinned Node24; baseline separately built/owned; local endpoints and dummy keys only",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B3-R4-doop-agent-regressions-R1.txt",
+          "sha256": "1bc34fc5ca5de07855f9215adadba062bc3122db09de394b2fc749e5454fe10b"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "M3-AC3",
+        "M3-AC4",
+        "M3-AC5"
+      ],
+      "command": "actual native CLI/plugin/HTTPS/PG/approval/normal worker/gateway test with65.1s held approval; explicit opt-in",
+      "fixture": "owned PG18 port63451/fresh current schema; pinned Node24; baseline separately built/owned; local endpoints and dummy keys only",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B3-R4-native-company-long.txt",
+          "sha256": "4bc730acc49f2504b08b9be674ee555779da4524d21f340ba52a16805d2998ca"
+        },
+        {
+          "path": "logs/B3-R4-native-company-long.native.txt",
+          "sha256": "ac8ad93d4b4b22a71f89c3b3631cc03a92f20df1e05d52d53534e5761724688d"
+        },
+        {
+          "path": "logs/B3-R4-native-company-long.proof.json",
+          "sha256": "a772cba70ba66ff03c70f6c88867b09f91990143cb4bfc147ff4427f5636fd63"
+        },
+        {
+          "path": "logs/B3-R4-native-company-long.sql-liveness.txt",
+          "sha256": "a26d3efaf8b35ba4f0c268479e2a9d6386efbd41e8b3f9ca4fea88bcf0b00f76"
+        },
+        {
+          "path": "logs/B3-R4-native-company-long.audit-summary.json",
+          "sha256": "41ac687158862f054b3461e2de7b5abd3edf29780d2ccd55315c0a70859a5662"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "M3-AC6"
+      ],
+      "command": "scripts/test-network-isolation.sh bash scripts/lease-budget.sh --offline (unchanged default filters/50% thresholds)",
+      "fixture": "owned PG18 port63451/fresh current schema; pinned Node24; baseline separately built/owned; local endpoints and dummy keys only",
+      "status": "NOT EXERCISED",
+      "files": [],
+      "reason": "Currently running exec42302. Final immutable result required; no running-log hash."
+    },
+    {
+      "criteria": [
+        "M3-AC6",
+        "CH-P01-B3-F7"
+      ],
+      "command": "bash scripts/check.sh (final corrected R4 full normal+stock verification)",
+      "fixture": "owned PG18 port63451/fresh current schema; pinned Node24; baseline separately built/owned; local endpoints and dummy keys only",
+      "status": "NOT EXERCISED",
+      "files": [],
+      "reason": "Starts after lease gate; full Doop regression correction still unverified. Same-artifact immutable final manifest required."
+    }
+  ]
+}

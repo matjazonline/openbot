@@ -1,0 +1,15 @@
+
+⎯⎯⎯⎯⎯⎯⎯ Startup Error ⎯⎯⎯⎯⎯⎯⎯⎯
+Error: No projects matched the filter "server".
+    at Vitest._setServer (file:///private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/node_modules/.pnpm/vitest@4.1.1_@opentelemetry+api@1.9.1_@types+node@24.12.4_jsdom@29.0.1_@noble+hashes@2._3cd22145e3e574fd0bf64e251da0c354/node_modules/vitest/dist/chunks/cli-api.BUXBO6jS.js:13141:22)
+    at BasicMinimalPluginContext.handler (file:///private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/node_modules/.pnpm/vitest@4.1.1_@opentelemetry+api@1.9.1_@types+node@24.12.4_jsdom@29.0.1_@noble+hashes@2._3cd22145e3e574fd0bf64e251da0c354/node_modules/vitest/dist/chunks/cli-api.BUXBO6jS.js:14125:5)
+    at _createServer (file:///private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/node_modules/.pnpm/vite@8.0.12_@types+node@24.12.4_esbuild@0.28.1_jiti@2.7.0_terser@5.50.0_tsx@4.23.1_yaml@2.9.0/node_modules/vite/dist/node/chunks/node.js:26271:84)
+    at createViteServer (file:///private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/node_modules/.pnpm/vitest@4.1.1_@opentelemetry+api@1.9.1_@types+node@24.12.4_jsdom@29.0.1_@noble+hashes@2._3cd22145e3e574fd0bf64e251da0c354/node_modules/vitest/dist/chunks/cli-api.BUXBO6jS.js:8819:17)
+    at createVitest (file:///private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/node_modules/.pnpm/vitest@4.1.1_@opentelemetry+api@1.9.1_@types+node@24.12.4_jsdom@29.0.1_@noble+hashes@2._3cd22145e3e574fd0bf64e251da0c354/node_modules/vitest/dist/chunks/cli-api.BUXBO6jS.js:14159:18)
+    at prepareVitest (file:///private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/node_modules/.pnpm/vitest@4.1.1_@opentelemetry+api@1.9.1_@types+node@24.12.4_jsdom@29.0.1_@noble+hashes@2._3cd22145e3e574fd0bf64e251da0c354/node_modules/vitest/dist/chunks/cli-api.BUXBO6jS.js:14526:14)
+    at startVitest (file:///private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/node_modules/.pnpm/vitest@4.1.1_@opentelemetry+api@1.9.1_@types+node@24.12.4_jsdom@29.0.1_@noble+hashes@2._3cd22145e3e574fd0bf64e251da0c354/node_modules/vitest/dist/chunks/cli-api.BUXBO6jS.js:14469:14)
+    at start (file:///private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/node_modules/.pnpm/vitest@4.1.1_@opentelemetry+api@1.9.1_@types+node@24.12.4_jsdom@29.0.1_@noble+hashes@2._3cd22145e3e574fd0bf64e251da0c354/node_modules/vitest/dist/chunks/cac.CHfKU_gf.js:2326:15)
+    at CAC.run (file:///private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/node_modules/.pnpm/vitest@4.1.1_@opentelemetry+api@1.9.1_@types+node@24.12.4_jsdom@29.0.1_@noble+hashes@2._3cd22145e3e574fd0bf64e251da0c354/node_modules/vitest/dist/chunks/cac.CHfKU_gf.js:2304:2)
+
+
+

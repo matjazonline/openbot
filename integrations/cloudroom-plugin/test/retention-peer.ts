@@ -19,7 +19,7 @@ const db = new Database(join(cfg.directory, 'peer.db')); db.pragma('journal_mode
 for (const statement of JOURNAL_SCHEMA) db.exec(statement);
 const journal = new Journal(db); journal.initialize(cfg.paired.binding);
 db.prepare('UPDATE journal_meta SET allocated=?,acknowledged=? WHERE id=1').run(cfg.sequence, cfg.sequence);
-journal.bindSession(cfg.session, cfg.thread, cfg.selection);
+journal.bindSession({sessionId:cfg.session,threadId:cfg.thread,selection:cfg.selection,harness:{kind:'unconfigured'},operationId:'00000000-0000-4000-8000-000000000001',hostId:null});
 db.prepare('UPDATE sessions SET last_used_at=?').run(Date.now() - 100 * 86_400_000);
 const n = nativeFixture(journal, cfg.selection); n.state.thread.id = cfg.thread;
 const emit = (value: unknown) => process.stdout.write(`${JSON.stringify(value)}\n`);

@@ -1,4 +1,4 @@
-import { Journal, type CommandRecord } from './journal.js';
+import { Journal, JournalCapacity, RecoveryRequired, type CommandRecord } from './journal.js';
 import { CloudroomSdk, PreflightRefusal, sdkSignal } from './sdk.js';
 import { isEffect, LIMITS, observationSequence, type Delivery, type Observation, type Refusal } from './protocol.js';
 export type DispatchContext = { signal: AbortSignal; canDispatch: () => boolean };
@@ -62,7 +62,7 @@ export class Dispatcher {
       const current = this.journal.get(record.operation.id)!;
       if (current.stage !== 'terminal') {
         if (current.sdkCalls === 0 && current.stage === 'received') {
-          this.refuse(current, error instanceof PreflightRefusal ? error.reason : 'provider_unavailable');
+          this.refuse(current, error instanceof PreflightRefusal ? error.reason : error instanceof JournalCapacity ? 'capacity' : error instanceof RecoveryRequired ? 'recovery_required' : 'provider_unavailable');
         } else this.uncertain(current);
       }
     }

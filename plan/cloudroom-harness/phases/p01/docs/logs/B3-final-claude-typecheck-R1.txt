@@ -1,0 +1,4 @@
+
+> bb-plugin-provider-claude-code@0.1.0 typecheck /private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom-replay-b3-r2/gui/plugins/provider-claude-code
+> tsc --noEmit
+

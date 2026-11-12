@@ -1,0 +1,10 @@
+{
+  "status": "accepted in p01",
+  "artifact": "b2fc6f2c11e57a2e88e09d5978903b91e1977ef3219c65fe6376bf5428f856ac",
+  "parentFunctionalAcceptance": "201d4cdf142829b5babd80119f52209a40f56438806045906e88ea393a2cfc6e",
+  "reviewNote": "CH-P01-B3-N5",
+  "scope": "one EOF LF only, source map content only; N4 functional acceptance and baseline dispositions inherited",
+  "coordinationRevision": 3,
+  "packageSha256": "e06c8b073850ba74d216225018cda5f30dbc560173cc846f7930bda455f9ddcb",
+  "accepted_at_utc": "2026-11-12T06:49:08.068546+00:00"
+}

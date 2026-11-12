@@ -1,0 +1,9 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.19s
+     Running unittests src/lib.rs (/private/tmp/openbot-cloudroom-harness-t1gfnhz1/target/debug/deps/open_bots-6467f0b3ff334015)
+
+running 1 test
+C fixture database=open_bots_own_f9abc7382bc94693a4446af9dfd9db03 first=WorkflowFence { scope: ActivationRequest { company: CompanyId(14ee8210-0394-4af6-bc46-355354e0e05d), run: RunId(99a8bd0d-af22-4136-8e23-e8403f2c1c4a), execution: ExecutionId(d5799a1a-7eaf-4c94-ba0a-5a39bd21646c), job: WorkflowJobId(4ea9885c-ad48-4647-9f87-6e3f784ad39b) }, worker: WorkflowWorkerId(4b593803-768f-4aa0-a844-506e82f4d5dc), generation: WorkflowGeneration(61994420-0924-46a4-a473-62f21ef04b2f), attempt: WorkflowAttempt(1) } second=WorkflowFence { scope: ActivationRequest { company: CompanyId(14ee8210-0394-4af6-bc46-355354e0e05d), run: RunId(99a8bd0d-af22-4136-8e23-e8403f2c1c4a), execution: ExecutionId(d93d9a82-43b2-4d29-936a-df42257d215b), job: WorkflowJobId(a7e295ab-2df9-4cb2-befa-b9ddcac33bb4) }, worker: WorkflowWorkerId(90c062a2-d75a-46d2-9ec6-cd77bcd629d8), generation: WorkflowGeneration(8e0409ae-38ab-403c-8f48-f6364cb7bd75), attempt: WorkflowAttempt(1) }
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::eligibility_tests::claim_sql_tests::candidate_tests::workflow_action_reconciliation_claim_sql_multiple_applicable_candidates ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 4103 filtered out; finished in 2.86s
+

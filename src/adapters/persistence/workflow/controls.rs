@@ -222,7 +222,11 @@ pub(super) async fn cancel_children_on(
     Ok(())
 }
 
-async fn cancel_run_on(db: &mut PgConnection, company: CompanyId, run: RunId) -> AppResult<()> {
+pub(super) async fn cancel_run_on(
+    db: &mut PgConnection,
+    company: CompanyId,
+    run: RunId,
+) -> AppResult<()> {
     sqlx::query("SELECT id FROM workflow_executions WHERE company_id=$1 AND run_id=$2 ORDER BY id FOR UPDATE")
         .bind(company.as_uuid()).bind(run.as_uuid()).execute(&mut *db).await?;
     sqlx::query("SELECT job.id FROM background_tasks AS job JOIN workflow_executions AS execution ON execution.company_id=job.company_id AND execution.id=job.workflow_execution_id WHERE execution.company_id=$1 AND execution.run_id=$2  ORDER BY job.id FOR UPDATE OF job")

@@ -1,0 +1,8 @@
+
+> bb-plugin-openbot-local@0.2.0 typecheck
+> tsc --noEmit
+
+test/native-bundle.test.ts(81,119): error TS2345: Argument of type 'Pick<BbPluginApi, "pluginId" | "sdk">' is not assignable to parameter of type 'Pick<BbPluginApi, "agents" | "experimental_hooks">'.
+  Type 'Pick<BbPluginApi, "pluginId" | "sdk">' is missing the following properties from type 'Pick<BbPluginApi, "agents" | "experimental_hooks">': agents, experimental_hooks
+test/native-bundle.test.ts(102,119): error TS2345: Argument of type 'Pick<BbPluginApi, "pluginId" | "sdk">' is not assignable to parameter of type 'Pick<BbPluginApi, "agents" | "experimental_hooks">'.
+  Type 'Pick<BbPluginApi, "pluginId" | "sdk">' is missing the following properties from type 'Pick<BbPluginApi, "agents" | "experimental_hooks">': agents, experimental_hooks

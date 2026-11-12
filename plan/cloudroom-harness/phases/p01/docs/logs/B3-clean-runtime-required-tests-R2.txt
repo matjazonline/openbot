@@ -1,0 +1,11 @@
+
+[1m[46m RUN [49m[22m [36mv4.1.1 [39m[90m/private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom-replay-b3/gui/packages/agent-runtime[39m
+
+ [32m✓[39m [30m[45m @cloudroom/agent-runtime [49m[39m src/runtime.skill-roots-capability.test.ts [2m([22m[2m4 tests[22m[2m)[22m[33m 700[2mms[22m[39m
+     [33m[2m✓[22m[39m starts a thread on a bridge that does not declare skills.configure, without sending the request [33m 374[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m4 passed[39m[22m[90m (4)[39m
+[2m   Start at [22m 00:57:12
+[2m   Duration [22m 1.32s[2m (transform 349ms, setup 0ms, import 519ms, tests 700ms, environment 0ms)[22m
+

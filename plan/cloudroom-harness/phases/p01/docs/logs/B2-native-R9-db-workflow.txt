@@ -1,0 +1,28 @@
+   Compiling open_bots v0.1.0 (/private/tmp/openbot-cloudroom-harness-t1gfnhz1/worktree)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1m 11s
+     Running unittests src/lib.rs (/private/tmp/openbot-cloudroom-harness-t1gfnhz1/target/debug/deps/open_bots-6467f0b3ff334015)
+
+running 8 tests
+test adapters::persistence::local_agents::management::tests::native_tests::cloudroom_native_profile_uses_published_permissions_and_database_rejects_foreign_agent ... ok
+test adapters::persistence::local_agents::management::tests::native_tests::cloudroom_native_bundle_http_authorizes_cached_reads_and_preserves_connection_identity ... ok
+
+thread 'adapters::persistence::local_agents::management::tests::native_tests::cloudroom_native_capture_foreign_keys_preserve_history_and_allow_company_cascade' (47401284) panicked at src/adapters/persistence/local_agents/management/native_tests.rs:389:5:
+assertion `left == right` failed
+  left: Some("23514")
+ right: Some("23503")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test adapters::persistence::local_agents::management::tests::native_tests::cloudroom_native_capture_foreign_keys_preserve_history_and_allow_company_cascade ... FAILED
+test adapters::persistence::local_agents::management::tests::native_tests::cloudroom_native_competing_publication_and_admission_capture_a_coherent_revision ... ok
+test adapters::persistence::workflow::tests::local_agent_tests::continuation::cloudroom_native_workflow_continuation_keeps_original_agent_before_its_new_approval ... ok
+test adapters::persistence::local_agents::management::tests::native_tests::cloudroom_native_bundle_refuses_a_valid_foreign_machine_and_revoked_original_actor ... ok
+test adapters::persistence::workflow::tests::local_agent_tests::continuation::cloudroom_native_workflow_freezes_agent_before_approval_and_ignores_later_profile_choice ... ok
+test adapters::persistence::local_agents::management::tests::native_tests::cloudroom_native_competing_starts_capture_one_revision_and_replay_before_profile_change ... ok
+
+failures:
+
+failures:
+    adapters::persistence::local_agents::management::tests::native_tests::cloudroom_native_capture_foreign_keys_preserve_history_and_allow_company_cascade
+
+test result: FAILED. 7 passed; 1 failed; 0 ignored; 0 measured; 4065 filtered out; finished in 3.98s
+
+error: test failed, to rerun pass `--lib`

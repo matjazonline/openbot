@@ -1,0 +1,17 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+
+running 1 test
+
+thread 'adapters::http::pages::tests::rendered_markup_carries_no_inline_javascript' (48836536) panicked at src/adapters/http/pages/tests.rs:4664:5:
+inline JavaScript is blocked by the page CSP and will never run:
+/private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom-gate-baseline/src/adapters/http/pages/workflow_authoring/sample.rs:153: inline <script> block
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test adapters::http::pages::tests::rendered_markup_carries_no_inline_javascript ... FAILED
+
+failures:
+
+failures:
+    adapters::http::pages::tests::rendered_markup_carries_no_inline_javascript
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 4029 filtered out; finished in 0.12s
+

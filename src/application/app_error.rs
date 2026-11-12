@@ -44,6 +44,11 @@ pub enum AppError {
     #[error("Bad request: {0}")]
     BadRequest(String),
 
+    /// Only emitted after authenticated native invocation recovery found no call
+    /// and compilation refused before any admission write or commit.
+    #[error("Native MCP arguments failed pre-admission validation")]
+    NativeMcpNotAdmitted,
+
     #[error("Not found: {0}")]
     NotFound(String),
 

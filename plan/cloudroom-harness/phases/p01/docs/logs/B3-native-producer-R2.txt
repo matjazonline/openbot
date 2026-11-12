@@ -1,0 +1,26 @@
+
+ RUN  v4.1.1 /private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/tests/integration
+
+ ❯ |@cloudroom/required-native-permissions| real/required-native-origins.test.ts (1 test | 1 failed) 11004ms
+   × delivers explicit originating input and stable model tool id through the actual native SDK bridge daemon and public plugin context 11003ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@cloudroom/required-native-permissions| real/required-native-origins.test.ts > delivers explicit originating input and stable model tool id through the actual native SDK bridge daemon and public plugin context
+Error: ENOENT: no such file or directory, open '/private/tmp/openbot-cloudroom-harness-t1gfnhz1/native-permission-runner/tmp/cloudroom-vt-UrkYmD/openbot-native-origin-O6dcj2/proofs.jsonl'
+ ❯ real/required-native-origins.test.ts:91:21
+     89|       const events = await getThreadEvents(harness.api, thread.id);
+     90|       if(process.env.OPENBOT_NATIVE_ORIGIN_OUTPUT)await writeFile(proc…
+     91|       const rows = (await readFile(proofs, "utf8")).trim().split("\n")…
+       |                     ^
+     92|       expect(rows).toHaveLength(2);
+     93|       for (const phase of [1, 2]) {
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed (1)
+   Start at  20:43:51
+   Duration  14.18s (transform 2.18s, setup 0ms, import 3.09s, tests 11.00s, environment 0ms)
+

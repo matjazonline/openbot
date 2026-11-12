@@ -25,8 +25,13 @@ export const policySchema = z.object({ workspace: z.literal('project_directory')
 export const selectionSchema = z.object({ machine_id: uuid, project_id: external, provider,
   model, policy: policySchema }).strict();
 export type Selection = z.infer<typeof selectionSchema>;
+export const harnessSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('unconfigured') }).strict(),
+  z.object({ kind: z.literal('agent'), agent_id: uuid, revision_id: uuid, digest: digestSchema }).strict(),
+]);
+export type Harness = z.infer<typeof harnessSchema>;
 export const commandSchema = z.discriminatedUnion('kind', [
-  z.object({ kind: z.literal('create'), session_id: uuid, selection: selectionSchema, prompt }).strict(),
+  z.object({ kind: z.literal('create'), session_id: uuid, selection: selectionSchema, harness: harnessSchema, prompt }).strict(),
   z.object({ kind: z.literal('send'), session_id: uuid, thread_id: external, prompt }).strict(),
   z.object({ kind: z.literal('inspect'), session_id: uuid, thread_id: external }).strict(),
   z.object({ kind: z.literal('stop_thread'), session_id: uuid, thread_id: external }).strict(),

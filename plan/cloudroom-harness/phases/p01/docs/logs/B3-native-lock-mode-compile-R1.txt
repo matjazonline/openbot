@@ -1,0 +1,22 @@
+    Checking open_bots v0.1.0 (/private/tmp/openbot-cloudroom-harness-t1gfnhz1/worktree)
+warning: function `check_source_on` is never used
+   --> src/adapters/persistence/workflow/agent_authority.rs:174:21
+    |
+174 | pub(super) async fn check_source_on(
+    |                     ^^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: variant `NoWait` is never constructed
+ --> src/adapters/persistence/workflow/row_locks.rs:5:5
+  |
+3 | pub(in crate::adapters::persistence) enum RowLocks {
+  |                                           -------- variant in this enum
+4 |     Wait,
+5 |     NoWait,
+  |     ^^^^^^
+  |
+  = note: `RowLocks` has a derived impl for the trait `Clone`, but this is intentionally ignored during dead code analysis
+
+warning: `open_bots` (lib) generated 2 warnings
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 36.90s

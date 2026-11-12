@@ -349,3 +349,162 @@ async fn cloudroom_workflow_call_origin_foreign_key_refuses_direct_link_even_wit
     );
     tx.rollback().await.unwrap();
 }
+
+async fn select_native_agent(s: &mut Setup) -> crate::entities::agent_capability::AgentRevisionId {
+    use crate::application::agent::{
+        AgentPublicationKey, AgentPublicationScope, AgentPublications, PublishAgent,
+    };
+    use crate::entities::agent_capability::AgentId;
+    use crate::use_cases::agent::{AgentPersistence, AgentWrite};
+    let p = &s.fixture.persistence;
+    let agent = AgentPersistence::create(
+        p,
+        s.scope.company.as_uuid(),
+        AgentWrite {
+            name: "Native workflow".into(),
+            slug: "native-workflow".into(),
+            system_prompt: Some("Frozen native workflow instructions".into()),
+            native_permissions: LocalPermissions::Auto,
+            ..Default::default()
+        },
+    )
+    .await
+    .unwrap();
+    let revision = p
+        .publish_agent(PublishAgent {
+            scope: AgentPublicationScope {
+                company: s.scope.company,
+                actor: s.fixture.target.actor,
+                agent: AgentId::new(agent.id),
+            },
+            expected_draft_revision: agent.draft_revision,
+            expected_active_revision: None,
+            key: AgentPublicationKey::parse("workflow-native-initial").unwrap(),
+        })
+        .await
+        .unwrap();
+    s.profile.agent_id = Some(AgentId::new(agent.id));
+    p.save_profile(s.fixture.target.actor.user_id(), &s.profile)
+        .await
+        .unwrap();
+    revision.id
+}
+
+fn native_approval(actor: Uuid) -> Value {
+    json!({"literal":{"reviewers":[{"kind":"user","id":actor}],"deadline":(chrono::Utc::now()+chrono::Duration::minutes(20)).to_rfc3339()}})
+}
+
+async fn frozen_native(s: &Setup, scope: ActivationRequest) -> Value {
+    sqlx::query_scalar(
+        "SELECT operation->'arguments'->'harness' FROM workflow_action_intents WHERE run_id=$1",
+    )
+    .bind(scope.run.as_uuid())
+    .fetch_one(s.fixture.persistence.pool())
+    .await
+    .unwrap()
+}
+
+async fn approve_native(s: &Setup, scope: ActivationRequest) -> ClaimedWorkflow {
+    let p = &s.fixture.persistence;
+    p.submit_decision(
+        super::super::approval_test_support::command(p, scope, s.fixture.target.actor, "approve")
+            .await,
+    )
+    .await
+    .unwrap();
+    p.claim_io(scope, WorkflowWorkerId(Uuid::new_v4()), lease())
+        .await
+        .unwrap()
+        .unwrap()
+}
+
+#[tokio::test]
+async fn cloudroom_native_workflow_freezes_agent_before_approval_and_ignores_later_profile_choice()
+{
+    let mut s = Setup::with_inputs(|inputs, actor| {
+        inputs["approval"] = native_approval(actor);
+    })
+    .await;
+    let revision = select_native_agent(&mut s).await;
+    let claim = s.claim().await;
+    assert!(matches!(
+        invoke(&s, &claim).await.unwrap(),
+        LocalRunProgress::Suspended(_)
+    ));
+    let captured = frozen_native(&s, s.scope).await;
+    assert_eq!(captured["revision_id"], json!(revision));
+    let count: i64 = sqlx::query_scalar("SELECT count(*) FROM local_agent_operations")
+        .fetch_one(s.fixture.persistence.pool())
+        .await
+        .unwrap();
+    assert_eq!(count, 0, "approval must precede native effects");
+    let mut changed = s.profile.clone();
+    changed.agent_id = None;
+    s.fixture
+        .persistence
+        .save_profile(s.fixture.target.actor.user_id(), &changed)
+        .await
+        .unwrap();
+    let approved = approve_native(&s, s.scope).await;
+    assert!(matches!(
+        invoke(&s, &approved).await.unwrap(),
+        LocalRunProgress::Suspended(_)
+    ));
+    let session:Value=sqlx::query_scalar("SELECT jsonb_build_object('revision_id',agent_revision_id,'permissions',selection->'policy'->'permissions') FROM local_agent_sessions")
+        .fetch_one(s.fixture.persistence.pool()).await.unwrap();
+    assert_eq!(
+        session,
+        json!({"revision_id":revision,"permissions":"auto"})
+    );
+    assert_eq!(frozen_native(&s, s.scope).await, captured);
+}
+
+#[tokio::test]
+async fn cloudroom_native_workflow_continuation_keeps_original_agent_before_its_new_approval() {
+    let mut s = Setup::new().await;
+    let revision = select_native_agent(&mut s).await;
+    let session = original(&s).await;
+    let mut changed = s.profile.clone();
+    changed.agent_id = None;
+    s.fixture
+        .persistence
+        .save_profile(s.fixture.target.actor.user_id(), &changed)
+        .await
+        .unwrap();
+    let mut with = inputs(s.profile.id, session);
+    with["approval"] = native_approval(s.fixture.target.actor.user_id());
+    let scope = s
+        .activate(s.fixture.target.actor, with, RelatedAssociation::Company)
+        .await;
+    let claim = s
+        .fixture
+        .persistence
+        .claim_io(scope, WorkflowWorkerId(Uuid::new_v4()), lease())
+        .await
+        .unwrap()
+        .unwrap();
+    assert!(matches!(
+        invoke(&s, &claim).await.unwrap(),
+        LocalRunProgress::Suspended(_)
+    ));
+    let captured = frozen_native(&s, scope).await;
+    assert_eq!(captured["revision_id"], json!(revision));
+    let next = approve_native(&s, scope).await;
+    assert!(matches!(
+        invoke(&s, &next).await.unwrap(),
+        LocalRunProgress::Suspended(_)
+    ));
+    let count: i64 = sqlx::query_scalar("SELECT count(*) FROM local_agent_sessions")
+        .fetch_one(s.fixture.persistence.pool())
+        .await
+        .unwrap();
+    assert_eq!(count, 1);
+    assert_eq!(frozen_native(&s, scope).await, captured);
+    let send: Value = sqlx::query_scalar(
+        "SELECT command FROM local_agent_operations WHERE command->>'kind'='send'",
+    )
+    .fetch_one(s.fixture.persistence.pool())
+    .await
+    .unwrap();
+    assert_eq!(send["session_id"], json!(session));
+}

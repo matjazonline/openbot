@@ -39,6 +39,7 @@ pub struct AgentWrite {
     pub provider: Option<String>,
     pub model: Option<String>,
     pub system_prompt: Option<String>,
+    pub native_permissions: crate::domain::local_agents::LocalPermissions,
     /// Short statement of what the agent is for, read by the agent directory tool.
     pub description: Option<String>,
     /// Ordered concrete capability bindings. `None` preserves the draft's bindings on update.
@@ -200,6 +201,7 @@ pub(super) fn library_agent_write(definition: &Agent) -> AgentWrite {
         provider: definition.provider.clone(),
         model: definition.model.clone(),
         system_prompt: definition.system_prompt.clone(),
+        native_permissions: definition.native_permissions,
         description: definition.description.clone(),
         skill_ids: Vec::new(),
         avatar_url: definition.avatar_url.clone(),

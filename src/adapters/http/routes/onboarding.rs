@@ -402,6 +402,7 @@ mod tests {
 
     fn library_agent(name: &str, slug: &str) -> Agent {
         Agent {
+            native_permissions: Default::default(),
             draft_revision: crate::entities::agent_capability::AgentDraftRevision::new(1).unwrap(),
             id: Uuid::new_v4(),
             company_id: None,

@@ -1,0 +1,660 @@
+{
+  "status": "PASS",
+  "cloudroom_revision": "d8b3cc3a16bb4b06fc99d8e543d40f1087d1e815",
+  "targets": 45,
+  "sourcePatches": [
+    {
+      "path": "patches/local-onboarding.patch",
+      "sha256": "c201acedcbe1003a3867507e7fb4138c4171d7f5fa0c2971c4e182800cd58ca4",
+      "targets": [
+        {
+          "sourcePath": "gui/apps/app/src/components/Onboarding.tsx",
+          "beforeSha256": "26edcb0d980159dbf88fd28979d7d87dcd1935c8e429546e90228dbe5c22e489",
+          "afterSha256": "d2aebaadf687bc3863f645acd2dff5add1fb943219afe0dec4f5a9ac2836496d"
+        }
+      ]
+    },
+    {
+      "path": "patches/sdk-mutation-abort.patch",
+      "sha256": "1a8782db46c9450974cadede95d32c76ad1d3ffa6eb9bb53db97315df6228451",
+      "targets": [
+        {
+          "sourcePath": "gui/packages/sdk/src/areas/threads.ts",
+          "beforeSha256": "2fcd66e9c89af1bf288ac20d08d7c55bc67104b61e982d009cc517710df70413",
+          "afterSha256": "87c13f25884f240e7b94267d497d82fd1a8cc50398783e63185064aa846d8fe3"
+        }
+      ]
+    },
+    {
+      "path": "patches/required-native-configuration.patch",
+      "sha256": "d2fe86bc822babf8f136ea88ed756fed94dbc56869ccec720653b12458687865",
+      "targets": [
+        {
+          "sourcePath": "gui/apps/host-daemon/src/app.ts",
+          "beforeSha256": "63b539249be2294d48366d261cec6bf5c82b6b5742877771621c3d252aed10aa",
+          "afterSha256": "fdf3d123dd4361fe1eeaf4ae74fd9e8471b3c79378271a34cb785221a21ffc87"
+        },
+        {
+          "sourcePath": "gui/apps/host-daemon/src/injected-skills.ts",
+          "beforeSha256": "3bdbf39d51b48e0f442bb7d1f9cb8ffa6557d640d55ac88ccadceac8d5e72076",
+          "afterSha256": "31a17e0918b009701befa2804296b9ada3a1ae27c3409dfbb852079524632d14"
+        },
+        {
+          "sourcePath": "gui/apps/host-daemon/src/server-client.ts",
+          "beforeSha256": "928638f30b88eb526f01376fb9e5c10828cc2a90a9091946e7936b6b8919269a",
+          "afterSha256": "1e7485cea1f853f4e790d7d11a1b4a87ba2926329d685c7100b7c34b46b3104f"
+        },
+        {
+          "sourcePath": "gui/apps/host-daemon/src/skill-trees.ts",
+          "beforeSha256": "d43e576d39a1f7ea10a6496fa6a8d43ecd31aa38c3264d1f0aef809d28cfcb16",
+          "afterSha256": "96adeab626bf4eb3fc5df7c51dc0ee5bfce74c23e9c349d242025f685dfa3521"
+        },
+        {
+          "sourcePath": "gui/apps/server/src/internal/skills.ts",
+          "beforeSha256": "5f8202e7427af4dec359406797ecd9ce995111e142282a43ce87d0de486e6a27",
+          "afterSha256": "44f6a5e16aae6b5a2eaa04cff64da4c4ea4f19f42d66cd81e3216ee777b946c6"
+        },
+        {
+          "sourcePath": "gui/apps/server/src/services/plugins/plugin-agent-contributions.ts",
+          "beforeSha256": "a63e921501aaa8d598cf838fe4a6a2b514fde3f5fbf0e8adf3fa3a5fb8305bd3",
+          "afterSha256": "15d252502f5de14d3621ecc90f0d2b4c2c18adc1dce7c09312cba7f41afb1e3c"
+        },
+        {
+          "sourcePath": "gui/apps/server/src/services/plugins/plugin-api.ts",
+          "beforeSha256": "19047e6b57515350c7168c1d7f4f973e571e88fa6b0a603ca36796fe957d87fb",
+          "afterSha256": "4362fac2ffcf8af1b9143a4ee31f95bfd139dfe5b547d53e53d6351ce38d6192"
+        },
+        {
+          "sourcePath": "gui/apps/server/src/services/plugins/plugin-runtime.ts",
+          "beforeSha256": "82a6d0aa557205c21784a132e24f78c67637ecae51a7f9ef1bc223f5ffee0e54",
+          "afterSha256": "32016990afc8528e4d4e03f488c475dc0f0da77668cefeab79d3b0a78d9e3c14"
+        },
+        {
+          "sourcePath": "gui/apps/server/src/services/plugins/plugin-service.ts",
+          "beforeSha256": "a4acc02b3fc9a4bf516edb323c768c5b9bffe761a07f63dad9de03a7af3c52e8",
+          "afterSha256": "64d903d3e088f29feba2007a34b0539a4a4cd30513779f15791b95a5050c5e1d"
+        },
+        {
+          "sourcePath": "gui/apps/server/src/services/plugins/required-agent-configuration.ts",
+          "beforeSha256": null,
+          "afterSha256": "5198701b3f6e67922e26924972b7c1d1a7f1a9aa346552d8190ea753906c044b"
+        },
+        {
+          "sourcePath": "gui/apps/server/src/services/skills/injected-skills.ts",
+          "beforeSha256": "6fae31d6792248e2815ff04a1b0dcad2e59cfa04e7c3d4bac9a1460ea3710bc9",
+          "afterSha256": "d751c9e1ed1123bbe580f714728a784d85377ff481bfa0bd7c19b92c705e4e55"
+        },
+        {
+          "sourcePath": "gui/apps/server/src/services/skills/required-skill-trees.ts",
+          "beforeSha256": null,
+          "afterSha256": "256b0ccabb39967b538fdc1b63dc3a0415f5ddac2295fe4eac7d791fb7210df2"
+        },
+        {
+          "sourcePath": "gui/apps/server/src/services/threads/dispatch-hooks.ts",
+          "beforeSha256": "0a58f5ac584cd2a431ff70bb2bfdda00f5d5f55333873acd4544ad64feb35093",
+          "afterSha256": "6727b0d0fbf9f0559e379ef923495d8c0aa49fb939cf83a1c30e03958954fd57"
+        },
+        {
+          "sourcePath": "gui/apps/server/src/services/threads/thread-create-helpers.ts",
+          "beforeSha256": "f06e68829246c0807260566e1a6e106c181b745bd507d32f1bde58521660d19f",
+          "afterSha256": "4f75f1ab53d4b53e0265b1483b844741ba1a0d626fb54bafe8e979db00e9a5b2"
+        },
+        {
+          "sourcePath": "gui/apps/server/src/services/threads/thread-create-request.ts",
+          "beforeSha256": "69c543bd9523938badca240477bf356cd655a0a04a3dd9813babcfd96394857b",
+          "afterSha256": "e3402b588ac747e03d9c0cbe2646ae48e516e75b44924f1ee81240f97132ebf0"
+        },
+        {
+          "sourcePath": "gui/apps/server/src/services/threads/thread-create.ts",
+          "beforeSha256": "3b70dd43bd7df639a4bb7737ee340d0f89fe6c822cfd61a6d50cf085cea353fc",
+          "afterSha256": "418487a1d9b09359866fbb24cec07f94250a8238637f4cdb5e606e9afe84446f"
+        },
+        {
+          "sourcePath": "gui/apps/server/src/services/threads/thread-runtime-config.ts",
+          "beforeSha256": "0bf1d2ec1bcece37cd8062a3a09b52ab2cf740c5511d6701595ca0e274b5635e",
+          "afterSha256": "2243d4121725b5cda3b942ad9bb19da5dd6db16bedf98ca1ce8e30255b22ba60"
+        },
+        {
+          "sourcePath": "gui/apps/server/test/helpers/test-app.ts",
+          "beforeSha256": "0451f7cf1009e4d0b468b4e9c50d7f696b3746d53fd68bcc1dd310cd92851b75",
+          "afterSha256": "cde5111b1795d9c574ad7ae392c74df7f918ce625903a4ccb90165000b07ceb5"
+        },
+        {
+          "sourcePath": "gui/apps/server/test/internal/required-skill-trees.test.ts",
+          "beforeSha256": null,
+          "afterSha256": "8d60ceb5c8d1457507cc030b8843ded323233b519ebc0c07889aad563c25dbc1"
+        },
+        {
+          "sourcePath": "gui/apps/server/test/threads/required-agent-configuration.test.ts",
+          "beforeSha256": null,
+          "afterSha256": "102be5048e424a81c4a047637156e4b538388f5e8ffe6f110da01594376771c9"
+        },
+        {
+          "sourcePath": "gui/apps/server/tsconfig.json",
+          "beforeSha256": "1241c38b603bb429174f97ef14714bce2bdcd4145e099598e08fedd1b17569bc",
+          "afterSha256": "dd2ba75566457083322fad113a297c758844ae4f588c3f6d0a4247cc8b806175"
+        },
+        {
+          "sourcePath": "gui/packages/agent-runtime/src/runtime-provider-process.ts",
+          "beforeSha256": "8cdafb2479307f0934500d4a0bd7cb1b95e7699c9e4a59e1b2a6abcf1a209dae",
+          "afterSha256": "cd251a400d0037f7a89cd8c680803e97403d30a89d754519cefa2121d96ad718"
+        },
+        {
+          "sourcePath": "gui/packages/agent-runtime/src/runtime.skill-roots-capability.test.ts",
+          "beforeSha256": "aedcd9d19bd25dd2070ae7c1b6ac3bb40712975f9ea6816f2e31dcf77f60f609",
+          "afterSha256": "e734b44272d8a06e1f43d3d0677031f5ad664ffe9f3ce60685d117c477382548"
+        },
+        {
+          "sourcePath": "gui/packages/db/drizzle/0135_required_agent_configurations.sql",
+          "beforeSha256": null,
+          "afterSha256": "7529575ca3fc70d07d22853929af189d307aec77dfa024d5d94003ab14115fe8"
+        },
+        {
+          "sourcePath": "gui/packages/db/drizzle/meta/_journal.json",
+          "beforeSha256": "e0e14eec9a14987338280678a57e394405171a3e1e2772688c98294b80c66a1d",
+          "afterSha256": "f42031727134c861c098925c25181aee72da43f58ef0b350290e6b446c403ca5"
+        },
+        {
+          "sourcePath": "gui/packages/db/src/data/index.ts",
+          "beforeSha256": "14b01433ba3810e411299fffb832bb88c7021f98797041ab5e10e9e30159bc3c",
+          "afterSha256": "26d9a233c3a80d854b3c481f222ecfb5cdac96f3b3a99729c6ab9e152599660f"
+        },
+        {
+          "sourcePath": "gui/packages/db/src/data/threads.ts",
+          "beforeSha256": "a5116557582fa7be3b691c171afde53f78310b27f295e9b8a357a4b14068c1df",
+          "afterSha256": "f874affdeea7ecc470f8e9bab728c07668db7ece2f8657157373d806321d71da"
+        },
+        {
+          "sourcePath": "gui/packages/db/src/schema.ts",
+          "beforeSha256": "0ee111a0795b6a1158c52fb7d32753da5110375864cf9cc86bb9ebd9760c296f",
+          "afterSha256": "25d355488bc0913da207615ccf4ebdcfa25a66d4f8f6c3fd61cb52b0705c7dcd"
+        },
+        {
+          "sourcePath": "gui/packages/host-daemon-contract/src/commands.ts",
+          "beforeSha256": "d2bbe6c7fccd926a19404727c123a738e6ef3f9d9e2fba863f89a04fbabde709",
+          "afterSha256": "422d7c7017c2d51992931c2c2f776cd0b38a8c4883f2be67e6767267790d3e88"
+        },
+        {
+          "sourcePath": "gui/packages/host-daemon-contract/src/session.ts",
+          "beforeSha256": "93f1bc4a12fcc54774fd560095e02c5bcb44d9cca6dcb01db7a2dc8f1299ef19",
+          "afterSha256": "636e4f6af26ced2740ad5e123e547cd30f51287af51c79196fd89df2c1e56230"
+        },
+        {
+          "sourcePath": "gui/packages/plugin-sdk/src/backend-contract.ts",
+          "beforeSha256": "55c598c5615815a1047b84c0f82cf07fd21938a4f0039b9c10c5d83f6b03cede",
+          "afterSha256": "3b7f0c5b83f8efbd96626ccc4b752052ce8f8764353f7e99dc5473139b6e5e4c"
+        },
+        {
+          "sourcePath": "gui/packages/plugin-sdk/src/testing/fake-plugin-host.ts",
+          "beforeSha256": "bb845abd96cff7f74c06eefab363a6bc6406ccb7c12b0b1f714ff822c156cd03",
+          "afterSha256": "fa2c2c45025db4ceaa342e1334a151530973c34baedeb5d7f440bcb3e70ec500"
+        },
+        {
+          "sourcePath": "gui/packages/plugin-sdk/src/testing/fixtures.ts",
+          "beforeSha256": "a2660ea8cf24a65d839f9e2a7d163eca8a29442c048b7a331e8a5af88adda12f",
+          "afterSha256": "4e154352bdba281b967c11db90837dfbc0f95fa066a3dc2e660f55422b130cbd"
+        },
+        {
+          "sourcePath": "gui/packages/provider-bridge-acp/src/bridge/bridge.ts",
+          "beforeSha256": "511f757760255f21ba23fa76d2876b6292592f22d916609763b1011fef492f8e",
+          "afterSha256": "400992b5cf3968250e7cce6047679ff16e74646393fdd27df4f3a6991ae72f0f"
+        },
+        {
+          "sourcePath": "gui/packages/provider-bridge-acp/src/session-params.test.ts",
+          "beforeSha256": "ee171a631b79ace71e6de99f1a40195ab309fbebfd3c0ba7c13e376719971a1f",
+          "afterSha256": "bfbf2dc0a492c501fb9534fd721ced610115aa251aa3283f1f904ac461635afc"
+        },
+        {
+          "sourcePath": "gui/packages/provider-bridge-acp/src/session-params.ts",
+          "beforeSha256": "474a47b98de63946a6c2cfd457e54f875c7a6ef4334c83e2be4ccb521bd03be2",
+          "afterSha256": "8a2eeba85ba8275f06f31f475d4a7429bdf026fcaa239139bc26a2728b65cd73"
+        },
+        {
+          "sourcePath": "gui/packages/provider-bridge-protocol/src/requests.ts",
+          "beforeSha256": "a155be23e22c4f53895e1fb30599a5369c1ea01e3d561f41fd3f55cc0a2d634f",
+          "afterSha256": "ebc3918367dfa20c5067cb12682cbd051677378ddd62280c1912b449d2e304b8"
+        },
+        {
+          "sourcePath": "gui/packages/server-contract/src/api/threads.ts",
+          "beforeSha256": "2337a3effa4f5275bb8331eab0ae6ce8a2a42ead6f69ab70116d764f04dbcd45",
+          "afterSha256": "8d378541d11b3fb2f279aa7f2315ca18f89a985bce815976a42ab48cf9bd0297"
+        },
+        {
+          "sourcePath": "gui/plugins/provider-claude-code/src/bridge/__tests__/bridge.test.ts",
+          "beforeSha256": "058700e4e4e2687ae10b885a68c295cc9b0b4d891ea5f5143677672b19ab45b2",
+          "afterSha256": "5b4dc24f502f1b66b892fbc329780fb874bbe877bccc575cf25786372c3aacb9"
+        },
+        {
+          "sourcePath": "gui/plugins/provider-claude-code/src/bridge/bridge.ts",
+          "beforeSha256": "2477af8a32686191dab5974927715a0ef6ab9a857605479f126e2efeedb4b42d",
+          "afterSha256": "654147971bbdced609f828b0e1599f47f12713d52fed7f241bb21f3cfe07bece"
+        },
+        {
+          "sourcePath": "gui/tests/integration/helpers/harness.ts",
+          "beforeSha256": "dec7e67d220fd180c4949511e5684e9fbdcf299448b6f1c9a4e20705dcd6265f",
+          "afterSha256": "a184b223aff8366cd31169dd22ef60b32df8aea30d806a9f19ad9c226292b3c1"
+        },
+        {
+          "sourcePath": "gui/tests/integration/real/required-native-permissions.test.ts",
+          "beforeSha256": null,
+          "afterSha256": "506b3f52ec61240491eea9449fda05752a75877e0358380e1443c5e95e50835d"
+        },
+        {
+          "sourcePath": "gui/tests/integration/vitest.required-native.config.ts",
+          "beforeSha256": null,
+          "afterSha256": "f585a714ebea45a46ddb9954168592aed0ee7a818e215b31010171b36eee9136"
+        }
+      ]
+    }
+  ],
+  "runtime": {
+    "version": 1,
+    "node": "v24.21.0",
+    "packageManager": "pnpm@10.34.9",
+    "revision": "d8b3cc3a16bb4b06fc99d8e543d40f1087d1e815",
+    "patches": [
+      {
+        "sha256": "c201acedcbe1003a3867507e7fb4138c4171d7f5fa0c2971c4e182800cd58ca4",
+        "targets": [
+          {
+            "sourcePath": "gui/apps/app/src/components/Onboarding.tsx",
+            "sourceSha256": "d2aebaadf687bc3863f645acd2dff5add1fb943219afe0dec4f5a9ac2836496d"
+          }
+        ]
+      },
+      {
+        "sha256": "1a8782db46c9450974cadede95d32c76ad1d3ffa6eb9bb53db97315df6228451",
+        "targets": [
+          {
+            "sourcePath": "gui/packages/sdk/src/areas/threads.ts",
+            "sourceSha256": "87c13f25884f240e7b94267d497d82fd1a8cc50398783e63185064aa846d8fe3"
+          }
+        ]
+      },
+      {
+        "sha256": "d2fe86bc822babf8f136ea88ed756fed94dbc56869ccec720653b12458687865",
+        "targets": [
+          {
+            "sourcePath": "gui/apps/host-daemon/src/app.ts",
+            "sourceSha256": "fdf3d123dd4361fe1eeaf4ae74fd9e8471b3c79378271a34cb785221a21ffc87"
+          },
+          {
+            "sourcePath": "gui/apps/host-daemon/src/injected-skills.ts",
+            "sourceSha256": "31a17e0918b009701befa2804296b9ada3a1ae27c3409dfbb852079524632d14"
+          },
+          {
+            "sourcePath": "gui/apps/host-daemon/src/server-client.ts",
+            "sourceSha256": "1e7485cea1f853f4e790d7d11a1b4a87ba2926329d685c7100b7c34b46b3104f"
+          },
+          {
+            "sourcePath": "gui/apps/host-daemon/src/skill-trees.ts",
+            "sourceSha256": "96adeab626bf4eb3fc5df7c51dc0ee5bfce74c23e9c349d242025f685dfa3521"
+          },
+          {
+            "sourcePath": "gui/apps/server/src/internal/skills.ts",
+            "sourceSha256": "44f6a5e16aae6b5a2eaa04cff64da4c4ea4f19f42d66cd81e3216ee777b946c6"
+          },
+          {
+            "sourcePath": "gui/apps/server/src/services/plugins/plugin-agent-contributions.ts",
+            "sourceSha256": "15d252502f5de14d3621ecc90f0d2b4c2c18adc1dce7c09312cba7f41afb1e3c"
+          },
+          {
+            "sourcePath": "gui/apps/server/src/services/plugins/plugin-api.ts",
+            "sourceSha256": "4362fac2ffcf8af1b9143a4ee31f95bfd139dfe5b547d53e53d6351ce38d6192"
+          },
+          {
+            "sourcePath": "gui/apps/server/src/services/plugins/plugin-runtime.ts",
+            "sourceSha256": "32016990afc8528e4d4e03f488c475dc0f0da77668cefeab79d3b0a78d9e3c14"
+          },
+          {
+            "sourcePath": "gui/apps/server/src/services/plugins/plugin-service.ts",
+            "sourceSha256": "64d903d3e088f29feba2007a34b0539a4a4cd30513779f15791b95a5050c5e1d"
+          },
+          {
+            "sourcePath": "gui/apps/server/src/services/plugins/required-agent-configuration.ts",
+            "sourceSha256": "5198701b3f6e67922e26924972b7c1d1a7f1a9aa346552d8190ea753906c044b"
+          },
+          {
+            "sourcePath": "gui/apps/server/src/services/skills/injected-skills.ts",
+            "sourceSha256": "d751c9e1ed1123bbe580f714728a784d85377ff481bfa0bd7c19b92c705e4e55"
+          },
+          {
+            "sourcePath": "gui/apps/server/src/services/skills/required-skill-trees.ts",
+            "sourceSha256": "256b0ccabb39967b538fdc1b63dc3a0415f5ddac2295fe4eac7d791fb7210df2"
+          },
+          {
+            "sourcePath": "gui/apps/server/src/services/threads/dispatch-hooks.ts",
+            "sourceSha256": "6727b0d0fbf9f0559e379ef923495d8c0aa49fb939cf83a1c30e03958954fd57"
+          },
+          {
+            "sourcePath": "gui/apps/server/src/services/threads/thread-create-helpers.ts",
+            "sourceSha256": "4f75f1ab53d4b53e0265b1483b844741ba1a0d626fb54bafe8e979db00e9a5b2"
+          },
+          {
+            "sourcePath": "gui/apps/server/src/services/threads/thread-create-request.ts",
+            "sourceSha256": "e3402b588ac747e03d9c0cbe2646ae48e516e75b44924f1ee81240f97132ebf0"
+          },
+          {
+            "sourcePath": "gui/apps/server/src/services/threads/thread-create.ts",
+            "sourceSha256": "418487a1d9b09359866fbb24cec07f94250a8238637f4cdb5e606e9afe84446f"
+          },
+          {
+            "sourcePath": "gui/apps/server/src/services/threads/thread-runtime-config.ts",
+            "sourceSha256": "2243d4121725b5cda3b942ad9bb19da5dd6db16bedf98ca1ce8e30255b22ba60"
+          },
+          {
+            "sourcePath": "gui/apps/server/test/helpers/test-app.ts",
+            "sourceSha256": "cde5111b1795d9c574ad7ae392c74df7f918ce625903a4ccb90165000b07ceb5"
+          },
+          {
+            "sourcePath": "gui/apps/server/test/internal/required-skill-trees.test.ts",
+            "sourceSha256": "8d60ceb5c8d1457507cc030b8843ded323233b519ebc0c07889aad563c25dbc1"
+          },
+          {
+            "sourcePath": "gui/apps/server/test/threads/required-agent-configuration.test.ts",
+            "sourceSha256": "102be5048e424a81c4a047637156e4b538388f5e8ffe6f110da01594376771c9"
+          },
+          {
+            "sourcePath": "gui/apps/server/tsconfig.json",
+            "sourceSha256": "dd2ba75566457083322fad113a297c758844ae4f588c3f6d0a4247cc8b806175"
+          },
+          {
+            "sourcePath": "gui/packages/agent-runtime/src/runtime-provider-process.ts",
+            "sourceSha256": "cd251a400d0037f7a89cd8c680803e97403d30a89d754519cefa2121d96ad718"
+          },
+          {
+            "sourcePath": "gui/packages/agent-runtime/src/runtime.skill-roots-capability.test.ts",
+            "sourceSha256": "e734b44272d8a06e1f43d3d0677031f5ad664ffe9f3ce60685d117c477382548"
+          },
+          {
+            "sourcePath": "gui/packages/db/drizzle/0135_required_agent_configurations.sql",
+            "sourceSha256": "7529575ca3fc70d07d22853929af189d307aec77dfa024d5d94003ab14115fe8"
+          },
+          {
+            "sourcePath": "gui/packages/db/drizzle/meta/_journal.json",
+            "sourceSha256": "f42031727134c861c098925c25181aee72da43f58ef0b350290e6b446c403ca5"
+          },
+          {
+            "sourcePath": "gui/packages/db/src/data/index.ts",
+            "sourceSha256": "26d9a233c3a80d854b3c481f222ecfb5cdac96f3b3a99729c6ab9e152599660f"
+          },
+          {
+            "sourcePath": "gui/packages/db/src/data/threads.ts",
+            "sourceSha256": "f874affdeea7ecc470f8e9bab728c07668db7ece2f8657157373d806321d71da"
+          },
+          {
+            "sourcePath": "gui/packages/db/src/schema.ts",
+            "sourceSha256": "25d355488bc0913da207615ccf4ebdcfa25a66d4f8f6c3fd61cb52b0705c7dcd"
+          },
+          {
+            "sourcePath": "gui/packages/host-daemon-contract/src/commands.ts",
+            "sourceSha256": "422d7c7017c2d51992931c2c2f776cd0b38a8c4883f2be67e6767267790d3e88"
+          },
+          {
+            "sourcePath": "gui/packages/host-daemon-contract/src/session.ts",
+            "sourceSha256": "636e4f6af26ced2740ad5e123e547cd30f51287af51c79196fd89df2c1e56230"
+          },
+          {
+            "sourcePath": "gui/packages/plugin-sdk/src/backend-contract.ts",
+            "sourceSha256": "3b7f0c5b83f8efbd96626ccc4b752052ce8f8764353f7e99dc5473139b6e5e4c"
+          },
+          {
+            "sourcePath": "gui/packages/plugin-sdk/src/testing/fake-plugin-host.ts",
+            "sourceSha256": "fa2c2c45025db4ceaa342e1334a151530973c34baedeb5d7f440bcb3e70ec500"
+          },
+          {
+            "sourcePath": "gui/packages/plugin-sdk/src/testing/fixtures.ts",
+            "sourceSha256": "4e154352bdba281b967c11db90837dfbc0f95fa066a3dc2e660f55422b130cbd"
+          },
+          {
+            "sourcePath": "gui/packages/provider-bridge-acp/src/bridge/bridge.ts",
+            "sourceSha256": "400992b5cf3968250e7cce6047679ff16e74646393fdd27df4f3a6991ae72f0f"
+          },
+          {
+            "sourcePath": "gui/packages/provider-bridge-acp/src/session-params.test.ts",
+            "sourceSha256": "bfbf2dc0a492c501fb9534fd721ced610115aa251aa3283f1f904ac461635afc"
+          },
+          {
+            "sourcePath": "gui/packages/provider-bridge-acp/src/session-params.ts",
+            "sourceSha256": "8a2eeba85ba8275f06f31f475d4a7429bdf026fcaa239139bc26a2728b65cd73"
+          },
+          {
+            "sourcePath": "gui/packages/provider-bridge-protocol/src/requests.ts",
+            "sourceSha256": "ebc3918367dfa20c5067cb12682cbd051677378ddd62280c1912b449d2e304b8"
+          },
+          {
+            "sourcePath": "gui/packages/server-contract/src/api/threads.ts",
+            "sourceSha256": "8d378541d11b3fb2f279aa7f2315ca18f89a985bce815976a42ab48cf9bd0297"
+          },
+          {
+            "sourcePath": "gui/plugins/provider-claude-code/src/bridge/__tests__/bridge.test.ts",
+            "sourceSha256": "5b4dc24f502f1b66b892fbc329780fb874bbe877bccc575cf25786372c3aacb9"
+          },
+          {
+            "sourcePath": "gui/plugins/provider-claude-code/src/bridge/bridge.ts",
+            "sourceSha256": "654147971bbdced609f828b0e1599f47f12713d52fed7f241bb21f3cfe07bece"
+          },
+          {
+            "sourcePath": "gui/tests/integration/helpers/harness.ts",
+            "sourceSha256": "a184b223aff8366cd31169dd22ef60b32df8aea30d806a9f19ad9c226292b3c1"
+          },
+          {
+            "sourcePath": "gui/tests/integration/real/required-native-permissions.test.ts",
+            "sourceSha256": "506b3f52ec61240491eea9449fda05752a75877e0358380e1443c5e95e50835d"
+          },
+          {
+            "sourcePath": "gui/tests/integration/vitest.required-native.config.ts",
+            "sourceSha256": "f585a714ebea45a46ddb9954168592aed0ee7a818e215b31010171b36eee9136"
+          }
+        ]
+      }
+    ],
+    "artifactDigest": "79f11bfffe259d9bc31aa210656951832f94df38a1177529faefa586bb3f899d"
+  },
+  "sdk": {
+    "revision": "d8b3cc3a16bb4b06fc99d8e543d40f1087d1e815",
+    "patches": [
+      {
+        "sha256": "c201acedcbe1003a3867507e7fb4138c4171d7f5fa0c2971c4e182800cd58ca4",
+        "targets": [
+          {
+            "sourcePath": "gui/apps/app/src/components/Onboarding.tsx",
+            "sourceSha256": "d2aebaadf687bc3863f645acd2dff5add1fb943219afe0dec4f5a9ac2836496d"
+          }
+        ]
+      },
+      {
+        "sha256": "1a8782db46c9450974cadede95d32c76ad1d3ffa6eb9bb53db97315df6228451",
+        "targets": [
+          {
+            "sourcePath": "gui/packages/sdk/src/areas/threads.ts",
+            "sourceSha256": "87c13f25884f240e7b94267d497d82fd1a8cc50398783e63185064aa846d8fe3"
+          }
+        ]
+      },
+      {
+        "sha256": "d2fe86bc822babf8f136ea88ed756fed94dbc56869ccec720653b12458687865",
+        "targets": [
+          {
+            "sourcePath": "gui/apps/host-daemon/src/app.ts",
+            "sourceSha256": "fdf3d123dd4361fe1eeaf4ae74fd9e8471b3c79378271a34cb785221a21ffc87"
+          },
+          {
+            "sourcePath": "gui/apps/host-daemon/src/injected-skills.ts",
+            "sourceSha256": "31a17e0918b009701befa2804296b9ada3a1ae27c3409dfbb852079524632d14"
+          },
+          {
+            "sourcePath": "gui/apps/host-daemon/src/server-client.ts",
+            "sourceSha256": "1e7485cea1f853f4e790d7d11a1b4a87ba2926329d685c7100b7c34b46b3104f"
+          },
+          {
+            "sourcePath": "gui/apps/host-daemon/src/skill-trees.ts",
+            "sourceSha256": "96adeab626bf4eb3fc5df7c51dc0ee5bfce74c23e9c349d242025f685dfa3521"
+          },
+          {
+            "sourcePath": "gui/apps/server/src/internal/skills.ts",
+            "sourceSha256": "44f6a5e16aae6b5a2eaa04cff64da4c4ea4f19f42d66cd81e3216ee777b946c6"
+          },
+          {
+            "sourcePath": "gui/apps/server/src/services/plugins/plugin-agent-contributions.ts",
+            "sourceSha256": "15d252502f5de14d3621ecc90f0d2b4c2c18adc1dce7c09312cba7f41afb1e3c"
+          },
+          {
+            "sourcePath": "gui/apps/server/src/services/plugins/plugin-api.ts",
+            "sourceSha256": "4362fac2ffcf8af1b9143a4ee31f95bfd139dfe5b547d53e53d6351ce38d6192"
+          },
+          {
+            "sourcePath": "gui/apps/server/src/services/plugins/plugin-runtime.ts",
+            "sourceSha256": "32016990afc8528e4d4e03f488c475dc0f0da77668cefeab79d3b0a78d9e3c14"
+          },
+          {
+            "sourcePath": "gui/apps/server/src/services/plugins/plugin-service.ts",
+            "sourceSha256": "64d903d3e088f29feba2007a34b0539a4a4cd30513779f15791b95a5050c5e1d"
+          },
+          {
+            "sourcePath": "gui/apps/server/src/services/plugins/required-agent-configuration.ts",
+            "sourceSha256": "5198701b3f6e67922e26924972b7c1d1a7f1a9aa346552d8190ea753906c044b"
+          },
+          {
+            "sourcePath": "gui/apps/server/src/services/skills/injected-skills.ts",
+            "sourceSha256": "d751c9e1ed1123bbe580f714728a784d85377ff481bfa0bd7c19b92c705e4e55"
+          },
+          {
+            "sourcePath": "gui/apps/server/src/services/skills/required-skill-trees.ts",
+            "sourceSha256": "256b0ccabb39967b538fdc1b63dc3a0415f5ddac2295fe4eac7d791fb7210df2"
+          },
+          {
+            "sourcePath": "gui/apps/server/src/services/threads/dispatch-hooks.ts",
+            "sourceSha256": "6727b0d0fbf9f0559e379ef923495d8c0aa49fb939cf83a1c30e03958954fd57"
+          },
+          {
+            "sourcePath": "gui/apps/server/src/services/threads/thread-create-helpers.ts",
+            "sourceSha256": "4f75f1ab53d4b53e0265b1483b844741ba1a0d626fb54bafe8e979db00e9a5b2"
+          },
+          {
+            "sourcePath": "gui/apps/server/src/services/threads/thread-create-request.ts",
+            "sourceSha256": "e3402b588ac747e03d9c0cbe2646ae48e516e75b44924f1ee81240f97132ebf0"
+          },
+          {
+            "sourcePath": "gui/apps/server/src/services/threads/thread-create.ts",
+            "sourceSha256": "418487a1d9b09359866fbb24cec07f94250a8238637f4cdb5e606e9afe84446f"
+          },
+          {
+            "sourcePath": "gui/apps/server/src/services/threads/thread-runtime-config.ts",
+            "sourceSha256": "2243d4121725b5cda3b942ad9bb19da5dd6db16bedf98ca1ce8e30255b22ba60"
+          },
+          {
+            "sourcePath": "gui/apps/server/test/helpers/test-app.ts",
+            "sourceSha256": "cde5111b1795d9c574ad7ae392c74df7f918ce625903a4ccb90165000b07ceb5"
+          },
+          {
+            "sourcePath": "gui/apps/server/test/internal/required-skill-trees.test.ts",
+            "sourceSha256": "8d60ceb5c8d1457507cc030b8843ded323233b519ebc0c07889aad563c25dbc1"
+          },
+          {
+            "sourcePath": "gui/apps/server/test/threads/required-agent-configuration.test.ts",
+            "sourceSha256": "102be5048e424a81c4a047637156e4b538388f5e8ffe6f110da01594376771c9"
+          },
+          {
+            "sourcePath": "gui/apps/server/tsconfig.json",
+            "sourceSha256": "dd2ba75566457083322fad113a297c758844ae4f588c3f6d0a4247cc8b806175"
+          },
+          {
+            "sourcePath": "gui/packages/agent-runtime/src/runtime-provider-process.ts",
+            "sourceSha256": "cd251a400d0037f7a89cd8c680803e97403d30a89d754519cefa2121d96ad718"
+          },
+          {
+            "sourcePath": "gui/packages/agent-runtime/src/runtime.skill-roots-capability.test.ts",
+            "sourceSha256": "e734b44272d8a06e1f43d3d0677031f5ad664ffe9f3ce60685d117c477382548"
+          },
+          {
+            "sourcePath": "gui/packages/db/drizzle/0135_required_agent_configurations.sql",
+            "sourceSha256": "7529575ca3fc70d07d22853929af189d307aec77dfa024d5d94003ab14115fe8"
+          },
+          {
+            "sourcePath": "gui/packages/db/drizzle/meta/_journal.json",
+            "sourceSha256": "f42031727134c861c098925c25181aee72da43f58ef0b350290e6b446c403ca5"
+          },
+          {
+            "sourcePath": "gui/packages/db/src/data/index.ts",
+            "sourceSha256": "26d9a233c3a80d854b3c481f222ecfb5cdac96f3b3a99729c6ab9e152599660f"
+          },
+          {
+            "sourcePath": "gui/packages/db/src/data/threads.ts",
+            "sourceSha256": "f874affdeea7ecc470f8e9bab728c07668db7ece2f8657157373d806321d71da"
+          },
+          {
+            "sourcePath": "gui/packages/db/src/schema.ts",
+            "sourceSha256": "25d355488bc0913da207615ccf4ebdcfa25a66d4f8f6c3fd61cb52b0705c7dcd"
+          },
+          {
+            "sourcePath": "gui/packages/host-daemon-contract/src/commands.ts",
+            "sourceSha256": "422d7c7017c2d51992931c2c2f776cd0b38a8c4883f2be67e6767267790d3e88"
+          },
+          {
+            "sourcePath": "gui/packages/host-daemon-contract/src/session.ts",
+            "sourceSha256": "636e4f6af26ced2740ad5e123e547cd30f51287af51c79196fd89df2c1e56230"
+          },
+          {
+            "sourcePath": "gui/packages/plugin-sdk/src/backend-contract.ts",
+            "sourceSha256": "3b7f0c5b83f8efbd96626ccc4b752052ce8f8764353f7e99dc5473139b6e5e4c"
+          },
+          {
+            "sourcePath": "gui/packages/plugin-sdk/src/testing/fake-plugin-host.ts",
+            "sourceSha256": "fa2c2c45025db4ceaa342e1334a151530973c34baedeb5d7f440bcb3e70ec500"
+          },
+          {
+            "sourcePath": "gui/packages/plugin-sdk/src/testing/fixtures.ts",
+            "sourceSha256": "4e154352bdba281b967c11db90837dfbc0f95fa066a3dc2e660f55422b130cbd"
+          },
+          {
+            "sourcePath": "gui/packages/provider-bridge-acp/src/bridge/bridge.ts",
+            "sourceSha256": "400992b5cf3968250e7cce6047679ff16e74646393fdd27df4f3a6991ae72f0f"
+          },
+          {
+            "sourcePath": "gui/packages/provider-bridge-acp/src/session-params.test.ts",
+            "sourceSha256": "bfbf2dc0a492c501fb9534fd721ced610115aa251aa3283f1f904ac461635afc"
+          },
+          {
+            "sourcePath": "gui/packages/provider-bridge-acp/src/session-params.ts",
+            "sourceSha256": "8a2eeba85ba8275f06f31f475d4a7429bdf026fcaa239139bc26a2728b65cd73"
+          },
+          {
+            "sourcePath": "gui/packages/provider-bridge-protocol/src/requests.ts",
+            "sourceSha256": "ebc3918367dfa20c5067cb12682cbd051677378ddd62280c1912b449d2e304b8"
+          },
+          {
+            "sourcePath": "gui/packages/server-contract/src/api/threads.ts",
+            "sourceSha256": "8d378541d11b3fb2f279aa7f2315ca18f89a985bce815976a42ab48cf9bd0297"
+          },
+          {
+            "sourcePath": "gui/plugins/provider-claude-code/src/bridge/__tests__/bridge.test.ts",
+            "sourceSha256": "5b4dc24f502f1b66b892fbc329780fb874bbe877bccc575cf25786372c3aacb9"
+          },
+          {
+            "sourcePath": "gui/plugins/provider-claude-code/src/bridge/bridge.ts",
+            "sourceSha256": "654147971bbdced609f828b0e1599f47f12713d52fed7f241bb21f3cfe07bece"
+          },
+          {
+            "sourcePath": "gui/tests/integration/helpers/harness.ts",
+            "sourceSha256": "a184b223aff8366cd31169dd22ef60b32df8aea30d806a9f19ad9c226292b3c1"
+          },
+          {
+            "sourcePath": "gui/tests/integration/real/required-native-permissions.test.ts",
+            "sourceSha256": "506b3f52ec61240491eea9449fda05752a75877e0358380e1443c5e95e50835d"
+          },
+          {
+            "sourcePath": "gui/tests/integration/vitest.required-native.config.ts",
+            "sourceSha256": "f585a714ebea45a46ddb9954168592aed0ee7a818e215b31010171b36eee9136"
+          }
+        ]
+      }
+    ],
+    "artifactDigest": "79f11bfffe259d9bc31aa210656951832f94df38a1177529faefa586bb3f899d",
+    "sdk": "0.6.50",
+    "declarationSha256": "26bb18254236801dc99c526d1f685f075b809f057f94c3cf0c402ed8d5057faa",
+    "source": "gui/packages/plugin-sdk/bundled-types/bb-plugin-sdk.d.ts"
+  },
+  "nativePermissionEvidence": "B2-R2-F2-native-permissions-R13.json",
+  "browser": "explicit installed Google Chrome, Playwright1.55.1; pinned Chromium1193 unavailable"
+}

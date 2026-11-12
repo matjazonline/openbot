@@ -1,0 +1,9 @@
+
+ RUN  v4.1.1 /private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/packages/agent-runtime
+
+
+ Test Files  1 passed (1)
+      Tests  4 passed (4)
+   Start at  18:14:59
+   Duration  1.47s (transform 447ms, setup 0ms, import 608ms, tests 766ms, environment 0ms)
+

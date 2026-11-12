@@ -1,7 +1,7 @@
 # Company local Cloudroom installation
 
 The supported runtime is Cloudroom revision `d8b3cc3a16bb4b06fc99d8e543d40f1087d1e815`
-plus both patches in `compatibility/manifest.json`, public SDK 0.6.50, Node 24.21.0,
+plus all patches in `compatibility/manifest.json`, public SDK 0.6.50, Node 24.21.0,
 pnpm 10.34.9 and npm 11.19.0. This is a source build, not the upstream
 `npx bb-app@latest` release. It uses Cloudroom's native local providers. The separate
 Rust Core/VPS launcher and hosted sandboxes are outside this integration.
@@ -24,7 +24,7 @@ npm run package -- /absolute/artifacts
 ```
 
 `prepare-runtime` verifies the source/patch identity, checks pnpm's exact version,
-uses the upstream frozen lockfile, and builds the SDK/declarations, CLI and local UI.
+uses the upstream frozen lockfile, and builds the SDK/declarations, server, host daemon, CLI and local UI.
 Its `.openbot-runtime.json` stamp identifies the prepared source and runtime. It does
 not attest provider login or native task success. Startup verifies that stamp and source
 identity and performs no dependency download, remote script execution or auto update.
@@ -157,7 +157,9 @@ uncertainty with local inspection and allow acknowledged old records to retire.
 
 Stop services before taking a coordinated snapshot of Openbot SQL, the entire private
 Cloudroom profile (including plugin SQLite/WAL, secret settings and host identity)
-and provider-managed session state. Treat all of it as sensitive. Never start two
+and provider-managed session state. Include the plugin's adjacent `openbot-native-bundles`
+cache in that same snapshot. Configured mappings with missing or changed cache contents require
+recovery; copying thread metadata cannot restore capability ownership. Treat all of it as sensitive. Never start two
 clones with one installation identity. A coordinated same-point restore may retain
 known mappings. A SQL-only rollback requires revoking affected installations and a
 new installation/re-pair; an unchanged observation cursor does **not** prove that

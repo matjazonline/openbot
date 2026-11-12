@@ -152,6 +152,7 @@ async fn active(
         draft_revision: revision.draft_revision,
         key: revision.definition.key,
         model: revision.definition.model,
+        native_permissions: revision.definition.native_permissions,
         tools,
         skills,
     })

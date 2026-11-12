@@ -1,0 +1,12 @@
+   Compiling open_bots v0.1.0 (/private/tmp/openbot-cloudroom-harness-t1gfnhz1/worktree)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1m 12s
+     Running unittests src/lib.rs (/private/tmp/openbot-cloudroom-harness-t1gfnhz1/target/debug/deps/open_bots-6467f0b3ff334015)
+
+running 4 tests
+test adapters::http::routes::skill_library::http_tests::dump_skill_bundle_browser_fixtures ... ok
+test adapters::http::routes::ui_agents::authoring::browser_fixtures::dump_autonomous_agent_authoring_browser_fixtures ... ok
+test adapters::persistence::local_agents::management::tests::native_mcp_tests::private_tests::native_mcp_company_cascade_removes_real_broker_call_and_run_with_deferred_provenance ... ok
+test adapters::persistence::local_agents::management::tests::dump_cloudroom_management_browser_fixtures ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 4099 filtered out; finished in 1.33s
+

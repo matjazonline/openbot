@@ -1,0 +1,8 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.21s
+     Running unittests src/lib.rs (/private/tmp/openbot-cloudroom-harness-t1gfnhz1/target/debug/deps/open_bots-6467f0b3ff334015)
+
+running 1 test
+test adapters::response_schema::tests::documented_rig_configuration_and_response_contracts_pass_application_parsers ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 4103 filtered out; finished in 0.05s
+

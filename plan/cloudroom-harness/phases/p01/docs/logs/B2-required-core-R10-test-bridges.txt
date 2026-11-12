@@ -1,0 +1,4 @@
+
+> @cloudroom/agent-runtime@0.0.1 generate:test-bridges /private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/packages/agent-runtime
+> node ./scripts/build-test-bridges.mjs
+

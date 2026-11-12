@@ -43,6 +43,7 @@ pub mod memory_tools;
 pub mod message;
 pub mod message_admission;
 pub mod metrics;
+pub mod native_mcp;
 mod ports;
 pub mod provisioning;
 pub mod publication;

@@ -7,9 +7,9 @@ credentials stay with the local CLIs. macOS and headless Linux are supported by 
 real Linux acceptance has not been exercised.
 
 Use Node 24.21.0 and npm 11.19.0. The supported Cloudroom artifact is the fixed revision and
-**both** patches in [compatibility/manifest.json](compatibility/manifest.json), not an npm
+all patches in [compatibility/manifest.json](compatibility/manifest.json), not an npm
 release. The public SDK 0.6.50 declarations in `types/` come from that exact artifact, with their
-license and hash manifest. A stock build without the SDK cancellation patch is unsupported.
+license and hash manifest. A stock build without SDK cancellation and required agent configuration is unsupported.
 
 From this directory:
 
@@ -48,10 +48,42 @@ If an initial pairing is definitively rejected, its input and rejected candidate
 enter a fresh Openbot pairing code and reload the plugin to retry. Incomplete responses keep the
 original candidate and must recover that same claim. Rejection never resets an initialized journal.
 
-Openbot Local Agents profiles select explicit native permissions: **Full access** is the default;
+Choose a published company agent in the Openbot Local Agents profile to apply its full
+instructions, skill directories and native permission mode. Native-only agents can leave their
+hosted model unset; the profile chooses the local model. Publication freezes the instructions,
+files and permissions used by new work. An existing session keeps its admitted revision when
+the profile or publication changes. Source or grant revocation still blocks new configuration.
+Published company MCP tools are available through the native `openbot_company_mcp` tool on the
+pinned Claude Code provider. It lists and describes frozen aliases and schemas, then calls the
+existing company connection through a real Openbot workflow. Openbot keeps connection credentials,
+current grants and required human approval. Other configured tool kinds and MCP agents on other
+providers are refused before native startup; instructions, skills and permission modes remain
+available on supported providers.
+
+Integration-owned MCP credentials require a native-only published agent with its hosted model
+unset. Configure the local model in the profile.
+
+Company MCP authority is available to the root Claude turn after Openbot acknowledges its
+invocation. Native subagents do not receive that authority.
+
+An MCP call waits for its actual approval and result, for at most the originating operation's
+remaining deadline or 15 minutes. Stopping the native operation prevents later dispatch. A lost
+response reuses the same durable invocation; an uncertain remote effect requires reconciliation
+and cannot start another effect in that native session. Later turns can read an existing call's
+status with current authority. Full filesystem access does not bypass company MCP approval.
+
+Agent permissions and unconfigured profiles default to **Full access**;
 **Auto** and **Accept edits** remain available when the provider and host advertise them. The plugin
 passes the frozen mode on both spawn and follow-up. A lower host/provider ceiling or a changed
 native permission mode refuses admission instead of silently changing the selected access.
+
+Configured threads require a positive SDK spawn receipt saved in the plugin journal before
+provider startup. A lost receipt remains uncertain and cannot be recovered from thread metadata.
+The pinned core retains the required plugin owner independently of editable metadata: disabling
+or removing that plugin prevents future launch/resume. Instructions are complete, and skill
+scripts/assets retain their paths and executable modes. The private immutable cache beside the
+journal is bounded to 64 MiB and 128 bundles; full capacity refuses admission. Cache hits check
+current server authority and local integrity. Missing or changed files require recovery.
 
 An operation receives a visible `[Openbot operation …]` header. Follow-up prompts use Cloudroom's
 queue. Only the exact originating request and accepted native turn can complete the operation;

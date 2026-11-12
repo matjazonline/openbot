@@ -1,0 +1,28 @@
+   Compiling open_bots v0.1.0 (/private/tmp/openbot-cloudroom-harness-t1gfnhz1/worktree)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 31.99s
+     Running unittests src/lib.rs (/private/tmp/openbot-cloudroom-harness-t1gfnhz1/target/debug/deps/open_bots-6467f0b3ff334015)
+
+running 20 tests
+test adapters::http::routes::skill_library::http_tests::dump_skill_bundle_browser_fixtures ... ignored, explicit browser fixture generator
+test domain::entities::skill_bundle::tests::skill_bundle_file_count_byte_budgets_and_collisions_fail_early ... ok
+test domain::entities::skill_bundle::tests::skill_bundle_generated_frontmatter_import_preserves_the_exact_original_body ... ok
+test domain::entities::skill_bundle::tests::skill_bundle_invalid_or_noncanonical_base64_is_refused ... ok
+test domain::entities::skill_bundle::tests::skill_bundle_malformed_or_empty_frontmatter_is_refused ... ok
+test domain::entities::skill_bundle::tests::skill_bundle_markdown_preserves_frontmatter_body_and_copy_identity ... ok
+test domain::entities::skill_bundle::tests::skill_bundle_parent_case_spellings_are_portable_and_identical_parents_repeat ... ok
+test domain::entities::skill_bundle::tests::skill_bundle_paths_reject_escape_aliases_and_entrypoint_replacement ... ok
+test domain::entities::skill_bundle::tests::skill_bundle_round_trips_binary_content_and_executable_intent ... ok
+test adapters::http::routes::skill_library::tests::skill_bundle_json_capacity_retains_twenty_five_percent_headroom ... ok
+test adapters::persistence::skill::tests::bundle_tests::skill_bundle_library_copy_renames_only_new_identity_and_keeps_assets_independent ... ok
+test adapters::persistence::skill::tests::bundle_tests::skill_bundle_persistence_create_update_preserve_and_scope_round_trip ... ok
+test adapters::persistence::skill::tests::bundle_tests::skill_bundle_database_constraints_match_the_domain_and_refuse_direct_invalid_writes ... ok
+test adapters::http::routes::skill_library::http_tests::skill_bundle_http_json_body_boundary_rejects_before_writing ... ok
+test adapters::http::routes::skill_library::http_tests::bundles::skill_bundle_http_members_cannot_upload_and_admins_keep_read_access ... ok
+test adapters::http::routes::skill_library::http_tests::bundles::skill_bundle_http_import_download_replace_and_asset_metadata ... ok
+test adapters::http::routes::skill_library::http_tests::skill_bundle_http_maximum_json_uses_the_real_company_and_operator_routes ... ok
+test adapters::http::routes::skill_library::http_tests::bundles::skill_bundle_http_failed_replacement_keeps_original_bytes_and_modes ... ok
+test adapters::http::routes::skill_library::http_tests::bundles::skill_bundle_http_tenant_operator_and_csrf_guards ... ok
+test adapters::persistence::skill::tests::copy_concurrency_tests::skill_bundle_competing_editor_and_both_copy_paths_keep_one_revision_during_slug_retries ... ok
+
+test result: ok. 19 passed; 0 failed; 1 ignored; 0 measured; 4054 filtered out; finished in 5.03s
+

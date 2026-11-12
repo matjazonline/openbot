@@ -1,0 +1,39 @@
+   Compiling open_bots v0.1.0 (/private/tmp/openbot-cloudroom-harness-t1gfnhz1/worktree)
+error[E0364]: `authorize_history_on` is private, and cannot be re-exported
+  --> src/adapters/persistence/workflow/native_mcp/mod.rs:18:16
+   |
+18 | pub(super) use reads::authorize_history_on;
+   |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+note: consider marking `authorize_history_on` as `pub` in the imported module
+  --> src/adapters/persistence/workflow/native_mcp/mod.rs:18:16
+   |
+18 | pub(super) use reads::authorize_history_on;
+   |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error[E0603]: function import `authorize_history_on` is private
+   --> src/adapters/persistence/workflow/action_reconciliation/mod.rs:190:24
+    |
+190 |     super::native_mcp::authorize_history_on(
+    |                        ^^^^^^^^^^^^^^^^^^^^ private function import
+    |
+note: the function import `authorize_history_on` is defined here...
+   --> src/adapters/persistence/workflow/native_mcp/mod.rs:18:16
+    |
+ 18 | pub(super) use reads::authorize_history_on;
+    |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+note: ...and refers to the function `authorize_history_on` which is defined here
+   --> src/adapters/persistence/workflow/native_mcp/reads.rs:49:1
+    |
+ 49 | / pub(super) async fn authorize_history_on(
+ 50 | |     db: &mut PgConnection,
+ 51 | |     company: CompanyId,
+ 52 | |     actor: WorkflowActor,
+...   |
+ 66 | |     Ok(())
+ 67 | | }
+    | |_^
+
+Some errors have detailed explanations: E0364, E0603.
+For more information about an error, try `rustc --explain E0364`.
+error: could not compile `open_bots` (lib test) due to 2 previous errors

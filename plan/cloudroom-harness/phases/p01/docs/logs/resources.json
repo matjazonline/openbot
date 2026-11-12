@@ -11,6 +11,15 @@
   "playwright": "/private/tmp/openbot-doop-p01-lt29hi9q/playwright",
   "services_owned": true,
   "bounds": "PostgreSQL max_connections100, defaults unchanged",
-  "services_running": false,
-  "postgres_stopped_at_user_request": true
+  "services_running": true,
+  "postgres_stopped_at_user_request": false,
+  "additional_owned_databases": [
+    "openbot_cloudroom_harness_t1gfnhz1_b3_schema"
+  ],
+  "database_reset_reason": "B3 stop-intent eligibility helper/index; zero main connections; actual fresh sqlx database reset + migrate PASS B3-schema-migrate-R3",
+  "b3_clean_replay": "/private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom-replay-b3",
+  "b3_native_regression_runner": "/private/tmp/openbot-cloudroom-harness-t1gfnhz1/b3-native-regression-runner",
+  "b3_package_install": "/private/tmp/openbot-cloudroom-harness-t1gfnhz1/b3-package-install",
+  "b3_package_artifacts": "/private/tmp/openbot-cloudroom-harness-t1gfnhz1/artifacts-b3",
+  "b3_final_replay": "/private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom-replay-b3-r2"
 }

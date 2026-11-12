@@ -1,0 +1,22 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 8.13s
+     Running unittests src/lib.rs (/private/tmp/openbot-cloudroom-harness-t1gfnhz1/target/debug/deps/open_bots-6467f0b3ff334015)
+
+running 1 test
+test adapters::persistence::local_agents::management::tests::native_mcp_tests::native_tests::cloudroom_native_company_mcp_real_cli_plugin_pg_approval_worker_and_gateway has been running for over 60 seconds
+native approval source after held wait: {"actor_live":true,"call_seconds":832.858059,"call_thread":"thr_6pwpvcs5s2","call_turn":"da6bbd2e49-t1","cancel":false,"credential_live":true,"dispatch_thread":"thr_6pwpvcs5s2","dispatch_turn":"da6bbd2e49-t1","live":false,"machine_owner":false,"machine_seconds":null,"machine_state":"enabled","operation_seconds":1725.328018,"outcome":"succeeded","revision_live":true,"session_live":true,"state":"cancelled","stop":false,"turn":"completed","waiting":null}
+
+thread 'adapters::persistence::local_agents::management::tests::native_mcp_tests::native_tests::cloudroom_native_company_mcp_real_cli_plugin_pg_approval_worker_and_gateway' (48888288) panicked at src/adapters/persistence/local_agents/native_mcp_workflow_test_support.rs:104:9:
+assertion `left == right` failed: native source must stay eligible through held approval: {"actor_live":true,"call_seconds":832.858059,"call_thread":"thr_6pwpvcs5s2","call_turn":"da6bbd2e49-t1","cancel":false,"credential_live":true,"dispatch_thread":"thr_6pwpvcs5s2","dispatch_turn":"da6bbd2e49-t1","live":false,"machine_owner":false,"machine_seconds":null,"machine_state":"enabled","operation_seconds":1725.328018,"outcome":"succeeded","revision_live":true,"session_live":true,"state":"cancelled","stop":false,"turn":"completed","waiting":null}
+  left: Bool(false)
+ right: true
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test adapters::persistence::local_agents::management::tests::native_mcp_tests::native_tests::cloudroom_native_company_mcp_real_cli_plugin_pg_approval_worker_and_gateway ... FAILED
+
+failures:
+
+failures:
+    adapters::persistence::local_agents::management::tests::native_mcp_tests::native_tests::cloudroom_native_company_mcp_real_cli_plugin_pg_approval_worker_and_gateway
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 4103 filtered out; finished in 88.62s
+
+error: test failed, to rerun pass `--lib`

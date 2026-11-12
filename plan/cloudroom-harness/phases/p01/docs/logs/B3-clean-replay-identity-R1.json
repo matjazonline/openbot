@@ -1,0 +1,6 @@
+{
+  "status": "PASS",
+  "sdk_fresh_replay_equal": true,
+  "sdk_sha256": "15d79e915398fc0136a82da641c7a825fad41d41ee56c3502867316b2e73ca4c",
+  "runtime_artifact_digest": "157144229a1352e3659a16eed865dc34793a3d09113d57d351814ca9f691fd20"
+}

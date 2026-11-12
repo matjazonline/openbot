@@ -1,0 +1,32 @@
+
+[1m[46m RUN [49m[22m [36mv4.1.1 [39m[90m/private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom-replay-b3/gui/packages/agent-runtime[39m
+
+ [31m❯[39m [30m[45m @cloudroom/agent-runtime [49m[39m src/runtime.skill-roots-capability.test.ts [2m([22m[2m4 tests[22m[2m | [22m[31m1 failed[39m[2m)[22m[33m 700[2mms[22m[39m
+     [33m[2m✓[22m[39m starts a thread on a bridge that does not declare skills.configure, without sending the request [33m 430[2mms[22m[39m
+[31m     [31m×[31m sends skills/configure before thread/start to a bridge that declares it[39m[32m 70[2mms[22m[39m
+     [32m✓[39m refuses required skill directories before thread startup when a bridge lacks the capability[32m 199[2mms[22m[39m
+     [32m✓[39m rejects a relative skill root path[32m 0[2mms[22m[39m
+
+[31m⎯⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Tests 1 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[41m[1m FAIL [22m[49m [30m[45m @cloudroom/agent-runtime [49m[39m src/runtime.skill-roots-capability.test.ts[2m > [22mskills/configure handshake capability[2m > [22msends skills/configure before thread/start to a bridge that declares it
+[31m[1mProviderProcessExitedError[22m: Provider "fake" exited unexpectedly (code 1)
+stderr: plugin "provider-scripted-echo" failed to load its provider bridge: Cannot find module '/private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom-replay-b3/gui/packages/agent-runtime/dist/test-bridges/scripted-echo-provider.mjs' imported from /private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom-replay-b3/gui/packages/provider-bridge-protocol/src/bridge-worker-entry.ts[39m
+[36m [2m❯[22m RuntimeProviderProcessManager.handleProviderProcessExit src/runtime-provider-process.ts:[2m612:9[22m[39m
+    [90m610|[39m     [35mfor[39m ([35mconst[39m [[33m,[39m pending] [35mof[39m args[33m.[39mproviderProcess[33m.[39mpending) {
+    [90m611|[39m       pending[33m.[39m[34mreject[39m(
+    [90m612|[39m         [35mnew[39m [33mProviderProcessExitedError[39m({
+    [90m   |[39m         [31m^[39m
+    [90m613|[39m           providerId[33m:[39m args[33m.[39mproviderId[33m,[39m
+    [90m614|[39m           status[33m:[39m { code[33m:[39m args[33m.[39mcode[33m,[39m signal[33m:[39m args[33m.[39msignal }[33m,[39m
+[90m [2m❯[22m handleExit src/runtime-provider-process.ts:[2m478:14[22m[39m
+[90m [2m❯[22m ChildProcess.<anonymous> src/runtime-provider-process.ts:[2m503:7[22m[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯[22m[39m
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m1 failed[39m[22m[2m | [22m[1m[32m3 passed[39m[22m[90m (4)[39m
+[2m   Start at [22m 00:51:57
+[2m   Duration [22m 1.57s[2m (transform 572ms, setup 0ms, import 771ms, tests 700ms, environment 0ms)[22m
+

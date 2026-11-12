@@ -1,0 +1,293 @@
+
+[1m[46m RUN [49m[22m [36mv4.1.1 [39m[90m/private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom-replay-b3/gui/plugins/provider-claude-code[39m
+
+ [32m✓[39m [30m[42m bb-plugin-provider-claude-code [49m[39m src/bridge/__tests__/native-tool-origins.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 54[2mms[22m[39m
+{"jsonrpc":"2.0","id":2,"result":{"ok":true}}
+{"jsonrpc":"2.0","id":2,"result":{"ok":true}}
+claude-code bridge: Invalid params for turn/start: params.clientRequestId: Invalid string: must match pattern /^creq_[23456789abcdefghijkmnpqrstuvwxyz]{10}$/u
+claude-code bridge: Unknown method: turn/teleport
+claude-code bridge: Invalid params for thread/resume: params.providerThreadId: Invalid input: expected string, received null
+ [31m❯[39m [30m[45m bb-plugin-provider-claude-code:isolated [49m[39m src/bridge/__tests__/bridge.test.ts [2m([22m[2m78 tests[22m[2m | [22m[31m4 failed[39m[2m)[22m[33m 15355[2mms[22m[39m
+     [32m✓[39m publishes a context snapshot after a turn and invalidates it at compaction[32m 117[2mms[22m[39m
+     [32m✓[39m forks a Claude session through the requested provider checkpoint[32m 6[2mms[22m[39m
+     [32m✓[39m keeps manager sessions on a plain string system prompt[32m 0[2mms[22m[39m
+     [32m✓[39m decomposes ultracode into xhigh effort plus the ultracode settings flag[32m 0[2mms[22m[39m
+     [32m✓[39m enables workflows without the ultracode flag at lower efforts[32m 0[2mms[22m[39m
+     [32m✓[39m passes the memory setting when workflows are not enabled[32m 0[2mms[22m[39m
+     [32m✓[39m disables Claude auto-memory reads and writes[32m 0[2mms[22m[39m
+     [32m✓[39m passes --chrome only when Claude in Chrome is enabled[32m 0[2mms[22m[39m
+     [32m✓[39m leaves standard sessions on the default Claude tool preset[32m 0[2mms[22m[39m
+     [32m✓[39m passes Claude local plugins through to the session[32m 0[2mms[22m[39m
+     [32m✓[39m passes the resolved Claude permission mode through to the session[32m 0[2mms[22m[39m
+     [32m✓[39m uses a Claude executable discovered from PATH for SDK sessions[32m 1[2mms[22m[39m
+     [32m✓[39m falls back to well-known install locations when PATH discovery fails[32m 1[2mms[22m[39m
+     [32m✓[39m lets an explicit Claude executable override PATH discovery[32m 0[2mms[22m[39m
+     [32m✓[39m trims explicit Claude executable overrides before forwarding[32m 0[2mms[22m[39m
+     [32m✓[39m rejects explicit Claude executable overrides that are not executable[32m 1[2mms[22m[39m
+     [32m✓[39m configures acceptEdits and auto sessions with the same Claude sandbox[32m 0[2mms[22m[39m
+     [32m✓[39m keeps plan sessions on native gating without the workspace sandbox[32m 0[2mms[22m[39m
+     [32m✓[39m configures auto sessions with additional writable roots[32m 0[2mms[22m[39m
+       [32m✓[39m 'auto workspace sandbox denies out-of-…'[32m 4[2mms[22m[39m
+       [32m✓[39m 'escalation deny blocks unsandboxed Ba…'[32m 3[2mms[22m[39m
+       [32m✓[39m 'full bypass allows Bash input unchang…'[32m 3[2mms[22m[39m
+     [32m✓[39m forwards unresolved high-risk auto-mode asks to bb[32m 4[2mms[22m[39m
+     [32m✓[39m forwards a sandbox network ask with a grantable network permission[32m 5[2mms[22m[39m
+     [32m✓[39m tells the host when Claude cancels a forwarded permission request[32m 4[2mms[22m[39m
+     [32m✓[39m forwards AskUserQuestion through canUseTool and returns the answer payload[32m 5[2mms[22m[39m
+     [32m✓[39m forwards ExitPlanMode for user approval in 'plan mode'[32m 5[2mms[22m[39m
+     [32m✓[39m forwards ExitPlanMode for user approval in 'bypassPermissions'[32m 7[2mms[22m[39m
+     [32m✓[39m returns to the user's permission preset once a plan is approved[32m 8[2mms[22m[39m
+     [32m✓[39m switches a live session into Plan mode when a later turn carries /plan[32m 7[2mms[22m[39m
+[31m     [31m×[31m enters Plan mode from a /plan steer and only re-requests it after the plan is approved[39m[33m 5006[2mms[22m[39m
+     [32m✓[39m fails a /plan turn instead of running it in the old mode when the SDK refuses the switch[32m 4[2mms[22m[39m
+     [32m✓[39m denies ExitPlanMode without prompting when the plan is missing[32m 3[2mms[22m[39m
+     [32m✓[39m dispatches an inbound request whose id collides with a pending bb request[32m 7[2mms[22m[39m
+     [32m✓[39m answers a schema-invalid request with an error instead of dropping it[32m 1[2mms[22m[39m
+     [32m✓[39m denies invalid AskUserQuestion input before forwarding to bb[32m 3[2mms[22m[39m
+     [32m✓[39m denies AskUserQuestion when bb returns an interactive request error[32m 5[2mms[22m[39m
+     [32m✓[39m denies AskUserQuestion when bb returns an invalid response payload[32m 5[2mms[22m[39m
+     [32m✓[39m denies AskUserQuestion when bb returns a mismatched response kind[32m 4[2mms[22m[39m
+     [32m✓[39m returns the bridge-owned Claude model list from the SDK probe[32m 2[2mms[22m[39m
+     [32m✓[39m propagates Claude model discovery failures and closes the probe[32m 1[2mms[22m[39m
+     [32m✓[39m exposes the host HOME and CLAUDE settings cascade to the Claude SDK on thread/start[32m 3[2mms[22m[39m
+     [32m✓[39m includes captured Claude stderr when the SDK stream fails[32m 3[2mms[22m[39m
+     [32m✓[39m passes thread/start max reasoningLevel through to Claude SDK effort and thinking display[32m 3[2mms[22m[39m
+     [32m✓[39m passes thread/start additional workspace-write roots to Claude SDK options[32m 3[2mms[22m[39m
+     [32m✓[39m passes thread/resume additional workspace-write roots to Claude SDK options[32m 4[2mms[22m[39m
+     [32m✓[39m returns an existing live same-provider thread/resume session[32m 5[2mms[22m[39m
+     [32m✓[39m rebuilds for enforcement changes but applies model changes live[32m 8[2mms[22m[39m
+     [32m✓[39m keeps a live Claude session across an escalation-only resume change[32m 4[2mms[22m[39m
+     [32m✓[39m restarts the Claude process before the next turn when the Chrome setting changes[32m 6[2mms[22m[39m
+[31m     [31m×[31m applies turn model, reasoning, memory, workflow, and subagent settings live[39m[33m 5002[2mms[22m[39m
+[31m     [31m×[31m keeps background subagents on their parent tool escalation when canUseTool omits agent metadata[39m[33m 5002[2mms[22m[39m
+     [32m✓[39m replaces a live thread/resume session when the provider thread differs[32m 4[2mms[22m[39m
+     [32m✓[39m refuses a thread/resume with no provider thread id[32m 0[2mms[22m[39m
+     [32m✓[39m replaces a stream-ended same-provider thread/resume session[32m 5[2mms[22m[39m
+     [32m✓[39m waits for a closing same-provider thread/resume session before replacing it[32m 7[2mms[22m[39m
+     [32m✓[39m resumes a Claude session when follow-up arrives after an SDK stream error[32m 6[2mms[22m[39m
+     [32m✓[39m resumes the same Claude session on the next turn after a failed stop[32m 6[2mms[22m[39m
+     [32m✓[39m restarts a Claude session before the next turn after an authentication failure[32m 6[2mms[22m[39m
+     [32m✓[39m does not resume an ended Claude session for invalid follow-up input[32m 3[2mms[22m[39m
+     [32m✓[39m forwards stale Claude resume errors without starting a fresh session[32m 4[2mms[22m[39m
+     [32m✓[39m holds thread stop open until the Claude SDK stream closes[32m 3[2mms[22m[39m
+     [32m✓[39m waits for an in-flight close before replacing the same thread[32m 7[2mms[22m[39m
+     [32m✓[39m delays 'turn start' responses until the SDK prompt consumes the input[32m 3[2mms[22m[39m
+     [32m✓[39m delays 'turn steer' responses until the SDK prompt consumes the input[32m 3[2mms[22m[39m
+     [32m✓[39m keeps the prior escalation when a rejected 'turn start' cannot push input[32m 3[2mms[22m[39m
+     [32m✓[39m keeps the prior escalation when a rejected 'turn steer' cannot push input[32m 4[2mms[22m[39m
+       [32m✓[39m forwards a text-only prompt unchanged[32m 2[2mms[22m[39m
+       [32m✓[39m joins multiple text fragments with newlines[32m 2[2mms[22m[39m
+       [32m✓[39m emits a path-bearing marker for a localImage attachment[32m 1[2mms[22m[39m
+       [32m✓[39m emits a name+mime+size marker for a localFile with full metadata[32m 2[2mms[22m[39m
+       [32m✓[39m omits missing fields from the localFile marker[32m 2[2mms[22m[39m
+       [32m✓[39m emits a URL marker for a remote image attachment[32m 2[2mms[22m[39m
+       [32m✓[39m accepts an attachment-only turn (no text fragments)[32m 2[2mms[22m[39m
+[31m     [31m×[31m refuses a missing required injected root without starting a native session[39m[32m 1[2mms[22m[39m
+     [32m✓[39m assembles a local plugin per generic skill root and loads them on canonical sessions[32m 5[2mms[22m[39m
+     [32m✓[39m rebuilds with the same provider session when the turn environment changes[32m 4[2mms[22m[39m
+     [32m✓[39m uses Fable's Claude Code capacity through a custom API endpoint[32m 2[2mms[22m[39m
+
+[31m⎯⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Tests 4 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[41m[1m FAIL [22m[49m [30m[45m bb-plugin-provider-claude-code:isolated [49m[39m src/bridge/__tests__/bridge.test.ts[2m > [22mbridge[2m > [22menters Plan mode from a /plan steer and only re-requests it after the plan is approved
+[31m[1mError[22m: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".[39m
+[36m [2m❯[22m src/bridge/__tests__/bridge.test.ts:[2m1958:3[22m[39m
+    [90m1956|[39m   });
+    [90m1957|[39m
+    [90m1958|[39m   it("enters Plan mode from a /plan steer and only re-requests it afte…
+    [90m   |[39m   [31m^[39m
+    [90m1959|[39m     const bridge = createBridgeJsonRpcTestHarness(handleLine);
+    [90m1960|[39m     const queries: ControlledClaudeQuery[] = [];
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/4]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m [30m[45m bb-plugin-provider-claude-code:isolated [49m[39m src/bridge/__tests__/bridge.test.ts[2m > [22mbridge[2m > [22mapplies turn model, reasoning, memory, workflow, and subagent settings live
+[31m[1mError[22m: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".[39m
+[36m [2m❯[22m src/bridge/__tests__/bridge.test.ts:[2m3097:3[22m[39m
+    [90m3095|[39m   });
+    [90m3096|[39m
+    [90m3097|[39m   it("applies turn model, reasoning, memory, workflow, and subagent se…
+    [90m   |[39m   [31m^[39m
+    [90m3098|[39m     const bridge = createBridgeJsonRpcTestHarness(handleLine);
+    [90m3099|[39m     const queries: ControlledClaudeQuery[] = [];
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/4]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m [30m[45m bb-plugin-provider-claude-code:isolated [49m[39m src/bridge/__tests__/bridge.test.ts[2m > [22mbridge[2m > [22mkeeps background subagents on their parent tool escalation when canUseTool omits agent metadata
+[31m[1mError[22m: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".[39m
+[36m [2m❯[22m src/bridge/__tests__/bridge.test.ts:[2m3297:3[22m[39m
+    [90m3295|[39m   });
+    [90m3296|[39m
+    [90m3297|[39m   it("keeps background subagents on their parent tool escalation when …
+    [90m   |[39m   [31m^[39m
+    [90m3298|[39m     const bridge = createBridgeJsonRpcTestHarness(handleLine);
+    [90m3299|[39m     const queries: ControlledClaudeQuery[] = [];
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/4]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m [30m[45m bb-plugin-provider-claude-code:isolated [49m[39m src/bridge/__tests__/bridge.test.ts[2m > [22mcanonical skills/configure[2m > [22mrefuses a missing required injected root without starting a native session
+[31m[1mAssertionError[22m: expected "vi.fn()" to not be called at all, but actually been called 1 times[90m
+
+Received:
+
+[1m  1st vi.fn() call:
+
+[22m    Array [
+      Object {
+        "options": Object {
+          "abortController": AbortController {},
+          "canUseTool": [Function anonymous],
+          "cwd": "/tmp/worktree",
+          "env": Object {
+            "BASE_URL": "/",
+            "CLAUDE_CODE_ENTRYPOINT": "cli",
+            "DEV": "1",
+            "FORCE_TTY": "",
+            "HOME": "/private/tmp/openbot-cloudroom-harness-t1gfnhz1/b3-native-regression-runner/home",
+            "MODE": "test",
+            "NODE_ENV": "test",
+            "PATH": "/private/tmp/openbot-doop-main-k49qm1op/toolchains/node-v24.21.0-darwin-arm64/bin:/usr/bin:/bin",
+            "PROD": "",
+            "SSR": "1",
+            "TEST": "true",
+            "TMPDIR": "/private/tmp/openbot-cloudroom-harness-t1gfnhz1/b3-native-regression-runner/tmp/cloudroom-vt-QISQnY",
+            "VITEST": "true",
+            "VITEST_MODE": "RUN",
+            "VITEST_POOL_ID": "1",
+            "VITEST_WORKER_ID": "0",
+            "__CF_USER_TEXT_ENCODING": "0x1F5:0x0:0x0",
+          },
+          "hooks": Object {
+            "PermissionDenied": Array [
+              Object {
+                "hooks": Array [
+                  [Function clearToolUse],
+                ],
+              },
+            ],
+            "PermissionRequest": Array [
+              Object {
+                "hooks": Array [
+                  [Function trackPermissionRequest],
+                ],
+              },
+            ],
+            "PostToolUse": Array [
+              Object {
+                "hooks": Array [
+                  [Function clearToolUse],
+                ],
+              },
+            ],
+            "PostToolUseFailure": Array [
+              Object {
+                "hooks": Array [
+                  [Function clearToolUse],
+                ],
+              },
+            ],
+            "PreToolUse": Array [
+              Object {
+                "hooks": Array [
+                  [Function anonymous],
+                ],
+                "matcher": "Bash",
+              },
+              Object {
+                "hooks": Array [
+                  [Function trackPreToolUse],
+                ],
+              },
+              Object {
+                "hooks": Array [
+                  [Function tool],
+                ],
+              },
+            ],
+            "SubagentStart": Array [
+              Object {
+                "hooks": Array [
+                  [Function trackSubagentStart],
+                ],
+              },
+            ],
+            "SubagentStop": Array [
+              Object {
+                "hooks": Array [
+                  [Function clearSubagent],
+                ],
+              },
+            ],
+            "UserPromptSubmit": Array [
+              Object {
+                "hooks": Array [
+                  [Function submitted],
+                ],
+              },
+            ],
+          },
+          "includePartialMessages": true,
+          "onElicitation": [Function anonymous],
+          "pathToClaudeCodeExecutable": "/opt/homebrew/bin/claude",
+          "permissionMode": "acceptEdits",
+          "persistSession": true,
+          "sandbox": Object {
+            "allowUnsandboxedCommands": true,
+            "autoAllowBashIfSandboxed": true,
+            "enabled": true,
+            "failIfUnavailable": false,
+            "network": Object {
+              "allowLocalBinding": true,
+            },
+          },
+          "sessionId": "a3ccfda9-08d0-4aa1-acdb-c157566101fc",
+          "settingSources": Array [
+            "user",
+            "project",
+            "local",
+          ],
+          "settings": Object {
+            "attribution": Object {
+              "commit": "",
+              "pr": "",
+            },
+            "autoMemoryEnabled": true,
+            "disableClaudeAiConnectors": true,
+            "enableWorkflows": false,
+            "ultracode": false,
+          },
+          "stderr": [Function onStderr],
+          "systemPrompt": Object {
+            "append": "test",
+            "preset": "claude_code",
+            "type": "preset",
+          },
+        },
+        "prompt": Object {
+          Symbol(Symbol.asyncIterator): [Function [Symbol.asyncIterator]],
+        },
+      },
+    ]
+[31m[90m
+
+Number of calls: [1m1[22m
+[31m[39m
+[36m [2m❯[22m src/bridge/__tests__/bridge.test.ts:[2m4571:27[22m[39m
+    [90m4569|[39m     const response=await bridge.waitForResponse(901);
+    [90m4570|[39m     expect(response).toMatchObject({error:{message:expect.stringContai…
+    [90m4571|[39m     expect(queryMock).not.toHaveBeenCalled();
+    [90m   |[39m                           [31m^[39m
+    [90m4572|[39m   });
+    [90m4573|[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/4]⎯[22m[39m
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[2m | [22m[1m[32m1 passed[39m[22m[90m (2)[39m
+[2m      Tests [22m [1m[31m4 failed[39m[22m[2m | [22m[1m[32m79 passed[39m[22m[90m (83)[39m
+[2m   Start at [22m 00:51:57
+[2m   Duration [22m 16.67s[2m (transform 1.46s, setup 0ms, import 2.04s, tests 15.41s, environment 0ms)[22m
+

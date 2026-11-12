@@ -71,6 +71,7 @@ impl McpActionPreparation for PostgresPersistence {
             .as_str()
             .ok_or_else(crate::application::workflow::mcp::invalid)?;
         let mut result = request(scope, &facts, &slot, tool, field("arguments")?.clone())?;
+        super::native_mcp::live_on(&mut tx, &result).await?;
         let connection = connection_on(&mut tx, scope.company, mcp_target(&result.target)?)
             .await?
             .ok_or_else(missing)?;

@@ -48,7 +48,7 @@ pub(super) async fn read_binding_at(
          FROM workflow_bindings AS binding JOIN workflow_binding_revisions AS configuration \
            ON configuration.company_id = binding.company_id AND configuration.binding_id = binding.id \
            AND configuration.revision = COALESCE($3,binding.configuration_revision) \
-         WHERE binding.company_id = $1 AND binding.id = $2",
+         WHERE binding.company_id = $1 AND binding.id = $2 AND NOT EXISTS(SELECT 1 FROM native_mcp_brokers AS broker WHERE broker.company_id=binding.company_id AND broker.workflow_binding_id=binding.id)",
     ).bind(company.as_uuid()).bind(id.as_uuid())
         .bind(selected.map(|value| revision(value.get())).transpose()?)
         .fetch_optional(&mut *db).await?;

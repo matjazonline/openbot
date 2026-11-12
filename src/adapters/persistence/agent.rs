@@ -20,7 +20,7 @@ use crate::{
 
 pub(crate) const AGENT_COLUMNS: &str = "\
     agent.id, agent.company_id, agent.name, agent.slug::text AS slug, agent.provider, agent.model, \
-    agent.system_prompt, agent.description, agent.avatar_url, agent.created_by, agent.created_at, agent.draft_revision";
+    agent.system_prompt, agent.description, agent.avatar_url, agent.created_by, agent.created_at, agent.draft_revision, agent.native_permissions";
 
 #[derive(sqlx::FromRow, Debug, Serialize)]
 pub struct AgentDb {
@@ -31,6 +31,7 @@ pub struct AgentDb {
     pub provider: Option<String>,
     pub model: Option<String>,
     pub system_prompt: Option<String>,
+    pub native_permissions: String,
     pub description: Option<String>,
     pub avatar_url: Option<String>,
     pub created_by: serde_json::Value,
@@ -62,6 +63,12 @@ impl TryFrom<AgentDb> for Agent {
             provider: db.provider,
             model: db.model,
             system_prompt: db.system_prompt,
+            native_permissions: crate::domain::local_agents::LocalPermissions::parse(
+                &db.native_permissions,
+            )
+            .map_err(|error| {
+                AppError::Internal(format!("Invalid agents.native_permissions: {error}"))
+            })?,
             description: db.description,
             avatar_url: db.avatar_url.map(AvatarUrl::from),
             created_by: serde_json::from_value(db.created_by).map_err(|err| {
@@ -99,8 +106,8 @@ pub(crate) async fn insert_agent_on(
     sqlx::query(
         r#"INSERT INTO agents
            (id, company_id, name, slug, provider, model, system_prompt, description,
-            avatar_url, created_by)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)"#,
+            avatar_url, created_by, native_permissions)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)"#,
     )
     .bind(id)
     .bind(company_id)
@@ -112,6 +119,7 @@ pub(crate) async fn insert_agent_on(
     .bind(&write.description)
     .bind(write.avatar_url.as_ref().map(AvatarUrl::as_str))
     .bind(created_by)
+    .bind(write.native_permissions.as_str())
     .execute(&mut **transaction)
     .await
     .map_err(|error| {
@@ -284,7 +292,8 @@ pub(in crate::adapters::persistence) async fn update_agent_on(
     sqlx::query_as::<_, AgentDb>(&format!(
         r#"UPDATE agents AS agent
            SET name = $1, slug = $2, provider = $3, model = $4, system_prompt = $5,
-               description = $6, avatar_url = $7, draft_revision = draft_revision + 1
+               description = $6, avatar_url = $7, draft_revision = draft_revision + 1,
+               native_permissions = $10
            WHERE id = $8 AND company_id IS NOT DISTINCT FROM $9
            RETURNING {AGENT_COLUMNS}"#
     ))
@@ -297,6 +306,7 @@ pub(in crate::adapters::persistence) async fn update_agent_on(
     .bind(write.avatar_url.as_ref().map(AvatarUrl::as_str))
     .bind(id)
     .bind(company_id)
+    .bind(write.native_permissions.as_str())
     .fetch_optional(&mut **tx)
     .await
     .map_err(slug_conflict)?
@@ -578,6 +588,7 @@ mod tests {
     #[test]
     fn malformed_provenance_is_a_conversion_error_not_a_panic() {
         let db = AgentDb {
+            native_permissions: "full".into(),
             draft_revision: 1,
             id: Uuid::new_v4(),
             company_id: None,

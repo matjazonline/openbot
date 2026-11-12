@@ -1,0 +1,78 @@
+{
+  "artifact": "6818b04bee06fd0b6ad6d6ed365ebd40cf7c5978033ded4b2325041c5ee11cba",
+  "coordination_revision": 3,
+  "coordination_sha256": "41b64d5e053759107a73e880143623b11b6c05fdffe715ccdf12e5a7e7adb408",
+  "external_targets": [
+    {
+      "root": "/private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom",
+      "count": 58,
+      "mismatches": []
+    },
+    {
+      "root": "/private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom-replay-b3-r2",
+      "count": 58,
+      "mismatches": []
+    },
+    {
+      "root": "/private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom-replay-b3-r4-verify",
+      "count": 58,
+      "mismatches": []
+    }
+  ],
+  "probes": [
+    {
+      "path": "logs/CH-P01-B3-R1-reviewer-origin-probe.cjs",
+      "sha256": "7e7865f27ee660ba7e9aa3bf7da14826d6851ed091a9530a6eb3c250574f23b3"
+    },
+    {
+      "path": "logs/CH-P01-B3-R1-reviewer-origin-probe.txt",
+      "sha256": "53d6d0e47b9b2169a4096a82c63d3febaf56de0d4df35156ee64842d6e1fe5aa"
+    },
+    {
+      "path": "logs/CH-P01-B3-R1-reviewer-refusal-probe.cjs",
+      "sha256": "a5f491384520a1334287affc8ecc845857925df70c29a26c47d0e27395f3f79c"
+    },
+    {
+      "path": "logs/CH-P01-B3-R1-reviewer-refusal-probe.ts",
+      "sha256": "c3393db6f4702d84578c971dfc3e31fe6a44048743b57a93fbba65fc94f0a0c3"
+    },
+    {
+      "path": "logs/CH-P01-B3-R1-reviewer-refusal-probe.txt",
+      "sha256": "6ac108e3c6e63a380349fccb94eb06685ae9bde8f526bd70db72be48ed6967c5"
+    }
+  ],
+  "native_failures": [
+    {
+      "round": 13,
+      "message": "AssertionError: expected true not to be true // Object.is equality",
+      "last_results": [
+        {
+          "type": "tool_result",
+          "content": "{\"call_id\":\"7577db87-87d6-4e29-b323-a2521804227f\",\"run_url\":\"https://localhost:59555/ui/workflow-runs?company_id=12907f13-a280-4d08-b13d-d9429820d72d&run_id=78fd56c4-5e0d-45a7-80ad-f05ae0d67ff6\",\"outcome\":\"cancelled\"}",
+          "is_error": true,
+          "tool_use_id": "toolu_company_call"
+        },
+        {
+          "type": "tool_result",
+          "content": "{\"call_id\":\"7577db87-87d6-4e29-b323-a2521804227f\",\"run_url\":\"https://localhost:59555/ui/workflow-runs?company_id=12907f13-a280-4d08-b13d-d9429820d72d&run_id=78fd56c4-5e0d-45a7-80ad-f05ae0d67ff6\",\"outcome\":\"cancelled\"}",
+          "is_error": true,
+          "tool_use_id": "toolu_company_status"
+        }
+      ],
+      "cause": "unclassified; no causal evidence supplied by root"
+    },
+    {
+      "round": 14,
+      "message": "Error: Owned native fixture was cancelled",
+      "last_results": [
+        {
+          "type": "tool_result",
+          "content": "{\"call_id\":\"0584fafe-e09f-4b77-8564-7f7a4a24029c\",\"run_url\":\"https://localhost:60043/ui/workflow-runs?company_id=dc352726-181a-4dc7-b3b1-d4f82795aa78&run_id=770861f8-a104-4794-b5ea-1feb671cd9b4\",\"outcome\":\"cancelled\"}",
+          "is_error": true,
+          "tool_use_id": "toolu_company_call"
+        }
+      ],
+      "cause": "unclassified; no causal evidence supplied by root"
+    }
+  ]
+}

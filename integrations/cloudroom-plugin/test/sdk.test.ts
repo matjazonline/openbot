@@ -10,7 +10,7 @@ import { event, nativeFixture } from './native-fixture.js';
 const context = { signal: new AbortController().signal, canDispatch: () => true };
 test('lost read-only deliveries reconcile without poisoning native admission', async () => {
   const f = fixture(); const command = send();
-  f.journal.bindSession(command.session_id, command.thread_id, f.selection);
+  f.journal.bindSession({sessionId:command.session_id,threadId:command.thread_id,selection:f.selection,harness:{kind:'unconfigured'},operationId:'00000000-0000-4000-8000-000000000001',hostId:null});
   const n = nativeFixture(f.journal, f.selection); const d = new Dispatcher(f.journal, n.sdk);
   try {
     for (const op of [operation(), operation({ kind: 'inspect', session_id: command.session_id, thread_id: command.thread_id })]) {
@@ -36,7 +36,7 @@ function completed(input: string, source: 'spawn' | 'tell' = 'tell') {
 
 test('native startup error before turn acceptance stays uncertain across restart without resubmission', async () => {
   const f = fixture(); const n = nativeFixture(f.journal, f.selection);
-  const op = operation({ kind: 'create', session_id: randomUUID(), selection: f.selection, prompt: 'authorized work' });
+  const op = operation({ kind: 'create', harness: {kind:'unconfigured'}, session_id: randomUUID(), selection: f.selection, prompt: 'authorized work' });
   const d = new Dispatcher(f.journal, n.sdk);
   try {
     await d.process({ operation: op, mode: 'dispatch' }, context);
@@ -66,7 +66,7 @@ test('native startup error before turn acceptance stays uncertain across restart
 test('create freezes explicit local checkout/provider/model and duplicate concurrent delivery submits once', async () => {
   const f = fixture(); const n = nativeFixture(f.journal, f.selection); const d = new Dispatcher(f.journal, n.sdk);
   try {
-    const op = operation({ kind: 'create', session_id: randomUUID(), selection: f.selection, prompt: 'authorized work' });
+    const op = operation({ kind: 'create', harness: {kind:'unconfigured'}, session_id: randomUUID(), selection: f.selection, prompt: 'authorized work' });
     await Promise.all([d.process({ operation: op, mode: 'dispatch' }, context), d.process({ operation: op, mode: 'dispatch' }, context)]);
     assert.equal(n.calls.length, 1); assert.equal(n.calls[0]!.kind, 'spawn');
     const args = n.calls[0]!.input;
@@ -80,7 +80,7 @@ test('create freezes explicit local checkout/provider/model and duplicate concur
   } finally { f.close(); }
 });
 test('lost send response reopens intent and recovers exact turn without sending again', async () => {
-  const f = fixture(); const command = send(); f.journal.bindSession(command.session_id, command.thread_id, f.selection);
+  const f = fixture(); const command = send(); f.journal.bindSession({sessionId:command.session_id,threadId:command.thread_id,selection:f.selection,harness:{kind:'unconfigured'},operationId:'00000000-0000-4000-8000-000000000001',hostId:null});
   const n = nativeFixture(f.journal, f.selection); const op = operation(command); n.state.lostResponse = true;
   try {
     await new Dispatcher(f.journal, n.sdk).process({ operation: op, mode: 'dispatch' }, context);
@@ -98,7 +98,7 @@ test('lost send response reopens intent and recovers exact turn without sending 
 });
 test('spawn gap recovers positive plugin metadata, while absent threads never recreate', async () => {
   const f = fixture(); const n = nativeFixture(f.journal, f.selection); n.state.lostResponse = true;
-  const op = operation({ kind: 'create', session_id: randomUUID(), selection: f.selection, prompt: 'recover only' });
+  const op = operation({ kind: 'create', harness: {kind:'unconfigured'}, session_id: randomUUID(), selection: f.selection, prompt: 'recover only' });
   const d = new Dispatcher(f.journal, n.sdk);
   try {
     await d.process({ operation: op, mode: 'dispatch' }, context); assert.equal(f.journal.get(op.id)!.threadId, null);
@@ -109,7 +109,7 @@ test('spawn gap recovers positive plugin metadata, while absent threads never re
   } finally { f.close(); }
 });
 test('human turn, idle thread and unrelated permission prompts cannot complete or take ownership', async () => {
-  const f = fixture(); const command = send(); f.journal.bindSession(command.session_id, command.thread_id, f.selection);
+  const f = fixture(); const command = send(); f.journal.bindSession({sessionId:command.session_id,threadId:command.thread_id,selection:f.selection,harness:{kind:'unconfigured'},operationId:'00000000-0000-4000-8000-000000000001',hostId:null});
   const n = nativeFixture(f.journal, f.selection); const d = new Dispatcher(f.journal, n.sdk); const op = operation(command);
   try {
     await d.process({ operation: op, mode: 'dispatch' }, context);
@@ -129,7 +129,7 @@ test('human turn, idle thread and unrelated permission prompts cannot complete o
   } finally { f.close(); }
 });
 test('persistent missing native thread coalesces evidence and retains effect capacity', async () => {
-  const f = fixture(); const command = send(); f.journal.bindSession(command.session_id, command.thread_id, f.selection);
+  const f = fixture(); const command = send(); f.journal.bindSession({sessionId:command.session_id,threadId:command.thread_id,selection:f.selection,harness:{kind:'unconfigured'},operationId:'00000000-0000-4000-8000-000000000001',hostId:null});
   const n = nativeFixture(f.journal, f.selection); const d = new Dispatcher(f.journal, n.sdk); const op = operation(command);
   try {
     await d.process({ operation: op, mode: 'dispatch' }, context); n.state.missing = true;
@@ -140,7 +140,7 @@ test('persistent missing native thread coalesces evidence and retains effect cap
   } finally { f.close(); }
 });
 test('resolved matching permission updates running without item event across journal reopen', async () => {
-  const f = fixture(); const command = send(); f.journal.bindSession(command.session_id, command.thread_id, f.selection);
+  const f = fixture(); const command = send(); f.journal.bindSession({sessionId:command.session_id,threadId:command.thread_id,selection:f.selection,harness:{kind:'unconfigured'},operationId:'00000000-0000-4000-8000-000000000001',hostId:null});
   const n = nativeFixture(f.journal, f.selection); const d = new Dispatcher(f.journal, n.sdk); const op = operation(command);
   try {
     await d.process({ operation: op, mode: 'dispatch' }, context);
@@ -170,7 +170,7 @@ for (const cause of ['model', 'provider', 'project', 'expired', 'gate', 'foreign
     if (cause === 'model') n.state.model = 'another-model';
     if (cause === 'provider') n.state.providerError = { code: 'auth_required' };
     if (cause === 'project') n.state.platform = 'win32';
-    const op = operation({ kind: 'create', session_id: randomUUID(), selection: selected, prompt: 'refuse safely' });
+    const op = operation({ kind: 'create', harness: {kind:'unconfigured'}, session_id: randomUUID(), selection: selected, prompt: 'refuse safely' });
     if (cause === 'expired') { op.deadline = '2020-01-01T00:00:00Z'; const { commandDigest } = await import('../src/protocol.js'); op.payload_digest = commandDigest(op.command, op.deadline); }
     try {
       await new Dispatcher(f.journal, n.sdk).process({ operation: op, mode: 'dispatch' }, { ...context, canDispatch: () => cause !== 'gate' });
@@ -183,7 +183,7 @@ for (const cause of ['model', 'provider', 'project', 'expired', 'gate', 'foreign
 }
 test('unknown work consumes eight effect slots but explicit mapped-thread stop retains headroom', async () => {
   const f = fixture(); const n = nativeFixture(f.journal, f.selection); const d = new Dispatcher(f.journal, n.sdk);
-  const command = send(); f.journal.bindSession(command.session_id, command.thread_id, f.selection);
+  const command = send(); f.journal.bindSession({sessionId:command.session_id,threadId:command.thread_id,selection:f.selection,harness:{kind:'unconfigured'},operationId:'00000000-0000-4000-8000-000000000001',hostId:null});
   try {
     for (let i = 0; i < LIMITS.effects; i++) await d.process({ operation: operation(command), mode: 'dispatch' }, context);
     const ninth = operation(command); await d.process({ operation: ninth, mode: 'dispatch' }, context);
@@ -195,7 +195,7 @@ test('unknown work consumes eight effect slots but explicit mapped-thread stop r
   } finally { f.close(); }
 });
 test('service abort cancels actual SDK wait and retains ambiguous intent without broad stop', async () => {
-  const f = fixture(); const command = send(); f.journal.bindSession(command.session_id, command.thread_id, f.selection);
+  const f = fixture(); const command = send(); f.journal.bindSession({sessionId:command.session_id,threadId:command.thread_id,selection:f.selection,harness:{kind:'unconfigured'},operationId:'00000000-0000-4000-8000-000000000001',hostId:null});
   const n = nativeFixture(f.journal, f.selection); n.state.held = true; const stop = new AbortController(); const op = operation(command);
   try {
     const pending = new Dispatcher(f.journal, n.sdk).process({ operation: op, mode: 'dispatch' }, { ...context, signal: stop.signal });

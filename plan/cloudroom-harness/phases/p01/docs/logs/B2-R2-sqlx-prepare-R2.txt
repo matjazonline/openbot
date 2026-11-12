@@ -1,0 +1,4 @@
+    Blocking waiting for file lock on build directory
+    Checking open_bots v0.1.0 (/private/tmp/openbot-cloudroom-harness-t1gfnhz1/worktree)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1m 08s
+query data written to .sqlx in the current directory; please check this into version control

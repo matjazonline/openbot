@@ -48,6 +48,7 @@ pub enum LocalCommand {
     Create {
         session_id: SessionId,
         selection: ExecutionSelection,
+        harness: super::NativeHarnessSelection,
         prompt: LocalPrompt,
     },
     Send {

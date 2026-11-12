@@ -42,6 +42,7 @@ pub fn resolve_agent(facts: AgentResolutionFacts) -> AppResult<ResolvedAgentDefi
         agent_id: draft.agent_id,
         key: draft.key,
         instructions: draft.instructions,
+        native_permissions: draft.native_permissions,
         model: draft.model,
         tools,
         skills,

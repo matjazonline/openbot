@@ -51,10 +51,30 @@ pub enum LocalWorkspace {
     ProjectDirectory,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum LocalPermissions {
+    #[default]
     Full,
     Auto,
     AcceptEdits,
+}
+
+impl LocalPermissions {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Full => "full",
+            Self::Auto => "auto",
+            Self::AcceptEdits => "accept_edits",
+        }
+    }
+
+    pub fn parse(value: &str) -> Result<Self, String> {
+        match value {
+            "full" => Ok(Self::Full),
+            "auto" => Ok(Self::Auto),
+            "accept_edits" => Ok(Self::AcceptEdits),
+            _ => Err("Invalid native permissions".into()),
+        }
+    }
 }

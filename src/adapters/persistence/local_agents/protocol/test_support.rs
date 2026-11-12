@@ -96,6 +96,7 @@ impl Context {
     }
     pub fn create(&self, session_id: SessionId) -> LocalCommand {
         LocalCommand::Create {
+            harness: crate::domain::local_agents::NativeHarnessSelection::Unconfigured,
             session_id,
             selection: self.session.profile.selection.clone(),
             prompt: LocalPrompt::try_from("new native thread".to_owned()).unwrap(),

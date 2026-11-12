@@ -15,13 +15,25 @@ pub(super) async fn authority_on(
     actor: WorkflowActor,
     bundle: &PublishedBundle,
 ) -> AppResult<ActionOriginAuthority> {
+    authority_with_locks_on(db, request, actor, bundle, super::row_locks::RowLocks::Wait).await
+}
+
+pub(super) async fn authority_with_locks_on(
+    db: &mut PgConnection,
+    request: &ActionRequest,
+    actor: WorkflowActor,
+    bundle: &PublishedBundle,
+    locks: super::row_locks::RowLocks,
+) -> AppResult<ActionOriginAuthority> {
+    super::native_mcp::structural_on(db, request, actor, bundle).await?;
     match request.context.origin {
         ToolCallOrigin::Workflow => {
             require_workflow_origin(db, request.scope, bundle).await?;
             Ok(ActionOriginAuthority::Workflow)
         }
         ToolCallOrigin::Agent(origin) => {
-            let selection = selected_on(db, request.scope, actor, bundle, origin).await?;
+            let selection =
+                selected_with_locks_on(db, request.scope, actor, bundle, origin, locks).await?;
             validate_agent_action(request, &selection)?;
             Ok(ActionOriginAuthority::Agent(Box::new(selection)))
         }
@@ -67,7 +79,27 @@ async fn selected_on(
     bundle: &PublishedBundle,
     origin: AgentToolOrigin,
 ) -> AppResult<ResolvedAgent> {
-    let selection = agent_manifest::execution_selection_on(db, scope, actor, bundle).await?;
+    selected_with_locks_on(
+        db,
+        scope,
+        actor,
+        bundle,
+        origin,
+        super::row_locks::RowLocks::Wait,
+    )
+    .await
+}
+
+async fn selected_with_locks_on(
+    db: &mut PgConnection,
+    scope: ActionScope,
+    actor: WorkflowActor,
+    bundle: &PublishedBundle,
+    origin: AgentToolOrigin,
+    locks: super::row_locks::RowLocks,
+) -> AppResult<ResolvedAgent> {
+    let selection =
+        agent_manifest::execution_selection_with_locks_on(db, scope, actor, bundle, locks).await?;
     if selection.mode() != AgentUseMode::Tools || selection.agent().agent_id != origin.agent {
         return Err(missing());
     }

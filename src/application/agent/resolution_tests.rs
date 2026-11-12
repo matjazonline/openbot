@@ -14,6 +14,7 @@ fn facts() -> AgentResolutionFacts {
     .unwrap();
     AgentResolutionFacts {
         draft: AgentDraft {
+            native_permissions: Default::default(),
             company_id: company,
             agent_id: AgentId::new(Uuid::new_v4()),
             revision: AgentDraftRevision::new(1).unwrap(),

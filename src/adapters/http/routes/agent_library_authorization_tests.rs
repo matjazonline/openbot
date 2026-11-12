@@ -6,8 +6,7 @@ async fn nonoperators_get_not_found_before_library_form_or_avatar_validation() {
     let Some(f) = Fixture::new().await else {
         return;
     };
-    let payload =
-        || serde_json::json!({"name":"Draft", "slug":"draft", "avatar_url":"javascript:alert(1)"});
+    let payload = || serde_json::json!({"name":"Draft", "slug":"draft", "native_permissions":"full", "avatar_url":"javascript:alert(1)"});
     let caller = || Caller::user(f.owner.id);
     let skills = Arc::new(SkillUseCases::new(
         f.persistence.clone(),

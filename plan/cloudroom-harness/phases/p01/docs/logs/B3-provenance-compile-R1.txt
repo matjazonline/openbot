@@ -1,0 +1,39 @@
+    Checking open_bots v0.1.0 (/private/tmp/openbot-cloudroom-harness-t1gfnhz1/worktree)
+error[E0364]: `restore_on` is private, and cannot be re-exported
+  --> src/adapters/persistence/workflow/native_mcp/mod.rs:14:16
+   |
+14 | pub(super) use provenance::restore_on as structural_on;
+   |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+note: consider marking `restore_on` as `pub` in the imported module
+  --> src/adapters/persistence/workflow/native_mcp/mod.rs:14:16
+   |
+14 | pub(super) use provenance::restore_on as structural_on;
+   |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error[E0603]: function import `structural_on` is private
+  --> src/adapters/persistence/workflow/agent_origin.rs:18:24
+   |
+18 |     super::native_mcp::structural_on(db, request, actor, bundle).await?;
+   |                        ^^^^^^^^^^^^^ private function import
+   |
+note: the function import `structural_on` is defined here...
+  --> src/adapters/persistence/workflow/native_mcp/mod.rs:14:16
+   |
+14 | pub(super) use provenance::restore_on as structural_on;
+   |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+note: ...and refers to the function `restore_on` which is defined here
+  --> src/adapters/persistence/workflow/native_mcp/provenance.rs:22:1
+   |
+22 | / pub(super) async fn restore_on(
+23 | |     db: &mut PgConnection,
+24 | |     request: &ActionRequest,
+25 | |     actor: WorkflowActor,
+...  |
+55 | |     Ok(true)
+56 | | }
+   | |_^
+
+Some errors have detailed explanations: E0364, E0603.
+For more information about an error, try `rustc --explain E0364`.
+error: could not compile `open_bots` (lib) due to 2 previous errors

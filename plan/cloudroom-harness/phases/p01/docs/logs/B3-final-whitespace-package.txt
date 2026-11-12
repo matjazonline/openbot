@@ -1,0 +1,3 @@
+built 1 plugin entry
+built 1 plugin entry
+{"filename":"bb-plugin-openbot-local-0.2.0.tgz","sha256":"e06c8b073850ba74d216225018cda5f30dbc560173cc846f7930bda455f9ddcb"}

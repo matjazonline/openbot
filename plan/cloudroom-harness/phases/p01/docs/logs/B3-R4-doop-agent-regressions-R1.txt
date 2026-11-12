@@ -1,0 +1,36 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.25s
+     Running unittests src/lib.rs (/private/tmp/openbot-cloudroom-harness-t1gfnhz1/target/debug/deps/open_bots-6467f0b3ff334015)
+
+running 19 tests
+test adapters::harness::rig::workflow::guard_tests::doop_agent_strict_mcp_error_maps_to_a_terminal_failure ... ok
+test adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::guide_tests::doop_agent_pinned_guide_skills_preserve_the_full_capture_with_existing_bounds ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::native::doop_agent_current_preparation_reaches_ready_before_model_io ... ok
+test adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::guide_tests::doop_agent_actual_guide_text_bound_preserves_unknown_without_reissue ... ok
+test application::workflow::agent::mcp_policy::tests::doop_agent_mcp_policy_parsing_is_typed_and_serialization_is_required ... ok
+test application::workflow::agent::mcp_policy::tests::doop_agent_strict_mcp_policy_does_not_classify_business_fields_or_text ... ok
+test application::workflow::publication::tests::agent_tests::doop_agent_mcp_error_policy_is_frozen_in_preparation_and_checkpoint_identity ... ok
+test application::workflow::registry::tests::doop_agent_mcp_error_policy_requires_an_explicit_literal_enum ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::native::doop_agent_database_first_freeze_binds_current_version_and_trusted_mcp_policy ... ok
+Doop step edit failed: agent.mcp_tool_failed
+test adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::policy_tests::doop_agent_saved_mcp_error_refuses_restart_and_saved_final_without_provider_or_write ... ok
+Doop step edit failed: agent.rejected
+test adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::failure_tests::doop_agent_revoked_write_after_approval_never_enters_remote_frame_creation ... ok
+Doop step edit failed: agent.mcp_tool_failed
+test adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::agent_tests::doop_agent_conflict_cannot_be_hidden_by_claimed_success ... ok
+test adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::agent_tests::doop_agent_observed_human_conflict_retains_business_reason_without_an_edit ... ok
+Doop step edit failed: agent.unresolved
+Doop step edit failed: agent.unresolved
+Doop step edit failed: agent.unresolved
+test adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::failure_tests::doop_agent_incomplete_provider_stream_cannot_complete_or_duplicate_canvas ... ok
+Doop step edit failed: agent.mcp_tool_failed
+test adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::agent_tests::doop_agent_human_edit_conflict_stops_without_blind_retry_or_false_completion ... ok
+test adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::agent_tests::doop_agent_observe_policy_keeps_error_observation_available_to_the_model ... ok
+test adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::agent_tests::doop_agent_published_editor_approvals_and_worker_restart_reuse_one_canvas ... ok
+Doop step edit failed: agent.mcp_tool_failed
+test adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::agent_tests::doop_agent_imported_instructions_cannot_grant_canvas_creation_or_publication ... ok
+test adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::agent_tests::doop_agent_wrong_identity_or_claimed_success_with_empty_canvas_cannot_complete has been running for over 60 seconds
+test adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::agent_tests::doop_agent_wrong_identity_or_claimed_success_with_empty_canvas_cannot_complete ... ok
+
+test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 4086 filtered out; finished in 64.91s
+

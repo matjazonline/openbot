@@ -1,0 +1,21 @@
+   Compiling open_bots v0.1.0 (/private/tmp/openbot-cloudroom-harness-t1gfnhz1/worktree)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2m 41s
+     Running unittests src/lib.rs (/private/tmp/openbot-cloudroom-harness-t1gfnhz1/target/debug/deps/open_bots-6467f0b3ff334015)
+
+running 3 tests
+test application::local_agents::harness::tests::native_bundle_mcp_contract_preserves_large_schema_numbers_and_refuses_other_tools ... ok
+
+thread 'application::local_agents::harness::tests::native_bundle_maximum_mcp_contract_projection_retains_twenty_five_percent_headroom' (47841969) panicked at src/application/local_agents/harness.rs:263:17:
+attempt to subtract with overflow
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test application::local_agents::harness::tests::native_bundle_maximum_mcp_contract_projection_retains_twenty_five_percent_headroom ... FAILED
+test application::local_agents::harness::tests::native_bundle_maximum_projection_retains_twenty_five_percent_headroom ... ok
+
+failures:
+
+failures:
+    application::local_agents::harness::tests::native_bundle_maximum_mcp_contract_projection_retains_twenty_five_percent_headroom
+
+test result: FAILED. 2 passed; 1 failed; 0 ignored; 0 measured; 4073 filtered out; finished in 0.87s
+
+error: test failed, to rerun pass `--lib`

@@ -1,0 +1,4 @@
+
+> @cloudroom/server@0.0.1 typecheck /private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/server
+> tsc --noEmit
+

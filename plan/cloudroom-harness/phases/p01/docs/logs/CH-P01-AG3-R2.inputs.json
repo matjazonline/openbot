@@ -1,0 +1,21 @@
+{
+  "phase": "p01",
+  "stage": "architecture correction recheck",
+  "decision": "CH-P01-M3/r2",
+  "decision_path": "plan/cloudroom-harness/phases/p01/docs/logs/CH-P01-M3-r2.md",
+  "decision_sha256": "20894944a7e30ed3ea3230b6b166c04acb45c9943a2f8cbd350b0e4893da5047",
+  "findings": [
+    "CH-P01-AG3-F1",
+    "CH-P01-AG3-F2",
+    "CH-P01-AG3-F3"
+  ],
+  "source_artifact": "b6c8d018ef4d17eabb1808b1cf4ee5672e659d89844f6aa6333dfd4dcf0d5aae",
+  "head": "2c477c9dd8cae4d1a7881d377dcea8ce038dae13",
+  "review_base": "abac7038a08a355156b7680a01d2f79f3de756fd",
+  "exclusions": [
+    "plan/cloudroom-harness/COORDINATION.md",
+    "plan/cloudroom-harness/phases/p01/docs"
+  ],
+  "coordination_revision": 3,
+  "notices": []
+}

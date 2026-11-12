@@ -13,7 +13,7 @@ import { waitFor, server, write } from './connection-support.js';
 
 test('real trusted WSS reconnect rewraps immutable outbox and native tracking continues offline without duplicate SDK calls', async () => {
   const s = await server(); const f = fixture({ initialized: false }); f.binding.origin = s.origin; f.journal.initialize(f.binding);
-  const command = send(); f.journal.bindSession(command.session_id, command.thread_id, f.selection);
+  const command = send(); f.journal.bindSession({sessionId:command.session_id,threadId:command.thread_id,selection:f.selection,harness:{kind:'unconfigured'},operationId:'00000000-0000-4000-8000-000000000001',hostId:null});
   const n = nativeFixture(f.journal, f.selection); const connector = new Connector(new Dispatcher(f.journal, n.sdk));
   const stop = new AbortController(); const op = operation(command);
   let generation = 0; let delivered = false; let cut = false; let terminal = false;
@@ -118,7 +118,7 @@ for (const invalid of ['stale_identity', 'changed_digest', 'binary', 'unknown_fi
 }
 test('public plugin service reload joins SDK work before storage closes and settings changes stop admission', async () => {
   const s = await server(); const f = fixture({ initialized: false }); f.binding.origin = s.origin; f.journal.initialize(f.binding);
-  const command = send(); f.journal.bindSession(command.session_id, command.thread_id, f.selection);
+  const command = send(); f.journal.bindSession({sessionId:command.session_id,threadId:command.thread_id,selection:f.selection,harness:{kind:'unconfigured'},operationId:'00000000-0000-4000-8000-000000000001',hostId:null});
   const n = nativeFixture(f.journal, f.selection); n.state.held = true; const op = operation(command);
   let changed: (next: any, prev: any) => void = () => {};
   let start!: (signal: AbortSignal) => Promise<void>; let runCli!: (argv: string[], context: {}) => Promise<any>;

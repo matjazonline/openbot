@@ -1,0 +1,18 @@
+
+> bb-plugin-openbot-local@0.2.0 test:guards
+> node --test compatibility/check-source.test.mjs
+
+✔ bundled public SDK declarations match the pinned source and all approved patches (6.121083ms)
+✔ multiple source patches validate all inputs before mutation and accept partial preparation (677.10825ms)
+✔ source verification rejects changed tracked GUI source before any build, from any cwd (197.334125ms)
+✔ prepared source accepts only the exact approved patch and rejects tampering (777.392334ms)
+✔ cohesive source patch adds absent inputs and refuses partial or unsafe preparation (811.754792ms)
+✔ pinned compatibility extension retains 75 percent source capacity headroom (0.371ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 6
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2524.296959
